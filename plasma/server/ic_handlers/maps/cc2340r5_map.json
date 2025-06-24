@@ -1,0 +1,16 @@
+[
+  {
+    "offset": 0,
+    "target_addr": "0x00000000",
+    "length": 1024,
+    "priority": 1,
+    "handler": "default"
+  },
+  {
+    "offset": 1024,
+    "target_addr": "0x00001000",
+    "length": 1024,
+    "priority": 2,
+    "handler": "bootloader"
+  }
+]
