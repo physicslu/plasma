@@ -1,0 +1,11 @@
+README.md
+setup.py
+client/__init__.py
+client/multi_target_cli.py
+client/plasma_cli.py
+plasma_cli.egg-info/PKG-INFO
+plasma_cli.egg-info/SOURCES.txt
+plasma_cli.egg-info/dependency_links.txt
+plasma_cli.egg-info/entry_points.txt
+plasma_cli.egg-info/requires.txt
+plasma_cli.egg-info/top_level.txt

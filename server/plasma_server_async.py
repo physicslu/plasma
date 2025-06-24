@@ -1,27 +1,29 @@
-# 目前仍以 TCP 為主，不抽換 interface。未來如使用 USB 接收端點則在此擴充。
-
 import asyncio
+import argparse
 
 async def handle_client(reader, writer):
     addr = writer.get_extra_info('peername')
     print(f"Connected with {addr}")
-
+    total_received = 0
     while True:
         data = await reader.read(4096)
         if not data:
             break
-        print(f"Received {len(data)} bytes.")
-        # 模擬燒錄處理
-        await asyncio.sleep(0.1)
-
+        total_received += len(data)
+        print(f"Received {len(data)} bytes. Total: {total_received}")
     writer.close()
     await writer.wait_closed()
 
 async def main():
-    server = await asyncio.start_server(handle_client, '0.0.0.0', 9000)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port', type=int, default=9000, help='TCP port to listen on')
+    args = parser.parse_args()
+
+    server = await asyncio.start_server(handle_client, '0.0.0.0', args.port)
+    print(f"Server running on port {args.port}...")
     async with server:
-        print("Server running on port 9000...")
         await server.serve_forever()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())
+

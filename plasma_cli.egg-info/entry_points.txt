@@ -1,0 +1,3 @@
+[console_scripts]
+plasma-cli = client.multi_target_cli:entrypoint
+
