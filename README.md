@@ -1,4 +1,4 @@
-# Plasma v2.1
+# Plasma v2.3
 
 Plasma 是一個多通道模擬燒錄平台，支援抽換式通訊介面（TCP/USB），可模擬多通道 IC 燒錄流程，並依照 map.json 執行分段燒錄與自定義處理。
 
