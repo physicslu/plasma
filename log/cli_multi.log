@@ -91,3 +91,35 @@
 [2025-06-24 16:23:59] Sent to 127.0.0.1:9001 CH1 → 4194304 bytes
 [2025-06-24 16:23:59] Sent to 127.0.0.1:9001 CH2 → 4194304 bytes
 [2025-06-24 16:23:59] Sent to 127.0.0.1:9001 CH3 → 4194304 bytes
+[2025-06-27 12:21:58] Error with 127.0.0.1:9000 CH0: [Errno 111] Connect call failed ('127.0.0.1', 9000)
+[2025-06-27 12:21:58] Error with 127.0.0.1:9000 CH1: [Errno 111] Connect call failed ('127.0.0.1', 9000)
+[2025-06-27 12:21:58] Error with 127.0.0.1:9000 CH2: [Errno 111] Connect call failed ('127.0.0.1', 9000)
+[2025-06-27 12:21:58] Error with 127.0.0.1:9000 CH3: [Errno 111] Connect call failed ('127.0.0.1', 9000)
+[2025-06-27 12:21:58] Error with 127.0.0.1:9001 CH0: [Errno 111] Connect call failed ('127.0.0.1', 9001)
+[2025-06-27 12:21:58] Error with 127.0.0.1:9001 CH1: [Errno 111] Connect call failed ('127.0.0.1', 9001)
+[2025-06-27 12:21:58] Error with 127.0.0.1:9001 CH2: [Errno 111] Connect call failed ('127.0.0.1', 9001)
+[2025-06-27 12:21:58] Error with 127.0.0.1:9001 CH3: [Errno 111] Connect call failed ('127.0.0.1', 9001)
+[2025-06-27 12:23:30] Error with 127.0.0.1:9000 CH0: [Errno 111] Connect call failed ('127.0.0.1', 9000)
+[2025-06-27 12:23:30] Error with 127.0.0.1:9000 CH1: [Errno 111] Connect call failed ('127.0.0.1', 9000)
+[2025-06-27 12:23:30] Error with 127.0.0.1:9000 CH2: [Errno 111] Connect call failed ('127.0.0.1', 9000)
+[2025-06-27 12:23:30] Error with 127.0.0.1:9000 CH3: [Errno 111] Connect call failed ('127.0.0.1', 9000)
+[2025-06-27 12:23:30] Error with 127.0.0.1:9001 CH0: [Errno 111] Connect call failed ('127.0.0.1', 9001)
+[2025-06-27 12:23:30] Error with 127.0.0.1:9001 CH1: [Errno 111] Connect call failed ('127.0.0.1', 9001)
+[2025-06-27 12:23:30] Error with 127.0.0.1:9001 CH2: [Errno 111] Connect call failed ('127.0.0.1', 9001)
+[2025-06-27 12:23:30] Error with 127.0.0.1:9001 CH3: [Errno 111] Connect call failed ('127.0.0.1', 9001)
+[2025-06-27 12:34:01] Error with 127.0.0.1:9000 CH2: Connection lost
+[2025-06-27 12:34:01] Error with 127.0.0.1:9001 CH3: Connection lost
+[2025-06-27 12:34:01] Error with 127.0.0.1:9000 CH0: Connection lost
+[2025-06-27 12:34:01] Error with 127.0.0.1:9000 CH1: Connection lost
+[2025-06-27 12:34:01] Error with 127.0.0.1:9001 CH2: Connection lost
+[2025-06-27 12:34:01] Error with 127.0.0.1:9000 CH3: Connection lost
+[2025-06-27 12:34:01] Error with 127.0.0.1:9001 CH0: Connection lost
+[2025-06-27 12:34:01] Error with 127.0.0.1:9001 CH1: Connection lost
+[2025-06-27 12:34:16] Error with 127.0.0.1:9000 CH1: Connection lost
+[2025-06-27 12:34:16] Error with 127.0.0.1:9000 CH0: Connection lost
+[2025-06-27 12:34:16] Error with 127.0.0.1:9001 CH0: Connection lost
+[2025-06-27 12:34:16] Error with 127.0.0.1:9001 CH2: Connection lost
+[2025-06-27 12:34:16] Error with 127.0.0.1:9001 CH3: Connection lost
+[2025-06-27 12:34:16] Error with 127.0.0.1:9000 CH2: Connection lost
+[2025-06-27 12:34:16] Error with 127.0.0.1:9000 CH3: Connection lost
+[2025-06-27 12:34:16] Error with 127.0.0.1:9001 CH1: Connection lost
