@@ -1,5 +1,0 @@
-2025-06-23 14:46:44 [INFO] CLI started - IC=cc2340r5, file=fw.bin, map=cc2340r5_map.json
-2025-06-23 14:46:44 [INFO] Connecting to programmer at 192.168.1.42, channel=3
-2025-06-23 14:46:44 [INFO] Programming started on CH3
-2025-06-23 14:46:44 [INFO] Programming completed on CH3
-2025-06-23 14:46:44 [INFO] Result: SUCCESS
