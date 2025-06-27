@@ -1,0 +1,15 @@
+[
+  {
+    "offset": 0,
+    "size": 1024,
+    "target": "0x00000000",
+    "handler": "default"
+  },
+  {
+    "offset": 1024,
+    "size": 1024,
+    "target": "0x00001000",
+    "handler": "bootloader"
+  }
+]
+
