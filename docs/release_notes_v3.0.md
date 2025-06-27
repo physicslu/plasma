@@ -18,25 +18,18 @@
 
 ## 🚀 對應檔案結構調整
 
-plasma/
-├── server/
-│   ├── plasma_server_async.py
-│   ├── session_manager.py
-│   ├── handlers/
-│   │   ├── section_handlers.py
-│   │   ├── ic_cc2340r5_handler.py
-│   │   └── maps/cc2340r5_map.json
-│   └── utils/map_parser.py
-├── client/
-│   └── plasma_cli.py
-├── interfaces/
-│   ├── base_interface.py
-│   └── tcp_interface.py
-├── testfile/firmware.bin
-├── run_test.sh
-├── .gitignore
-├── README.md
-└── docs/release_notes_v3.0.md
+```
+server/
+ ├── handlers/
+ │   ├── ic_cc2340r5_handler.py
+ │   ├── maps/
+ │   │   └── cc2340r5_map.json
+ │   └── section_handlers.py
+ ├── utils/
+ │   └── map_parser.py
+ ├── plasma_server_async.py
+ └── session_manager.py
+```
 
 ---
 
@@ -50,22 +43,4 @@ python3 client/plasma_cli.py \
   --map server/handlers/maps/cc2340r5_map.json \
   --file testfile/firmware.bin \
   --debug
-
----
-
-### 📘 `docs/expansion_roadmap.md`（尾端追加）
-
-```markdown
-...
-
----
-
-## ✅ v3.0 已完成項目（2025-06-27）
-
-- 支援區段 handler map 與分派邏輯
-- CLI 傳輸格式使用 MAPSIZE/BINLEN 明確定義
-- 整合 preprocess_file() 支援
-- plasma_server_async.py 改為統一 server/ 路徑
-- IC handler 結構統一化，可快速新增與測試
-
-
+```
