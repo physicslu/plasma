@@ -1,16 +1,21 @@
+
+---
+
+### 📘 `docs/ic_map_template.json`
+
+```json
 [
   {
     "offset": 0,
-    "target_addr": "0x00000000",
-    "length": 1024,
-    "priority": 1,
+    "size": 1024,
+    "target": "0x00000000",
     "handler": "default"
   },
   {
     "offset": 1024,
-    "target_addr": "0x00001000",
-    "length": 1024,
-    "priority": 2,
+    "size": 1024,
+    "target": "0x00001000",
     "handler": "bootloader"
   }
 ]
+
