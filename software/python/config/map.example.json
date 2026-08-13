@@ -1,0 +1,14 @@
+{
+  "sections": [
+    {
+      "name": "section0",
+      "address": 0,
+      "length": 256
+    },
+    {
+      "name": "section1",
+      "address": 256,
+      "length": 256
+    }
+  ]
+}

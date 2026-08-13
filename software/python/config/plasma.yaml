@@ -1,0 +1,53 @@
+server:
+  host: 127.0.0.1
+  port: 9900
+  max_supported_channels: 8
+  max_concurrent_jobs: 2
+  max_queue_depth_per_channel: 16
+  output_root: output
+  log_root: logs
+  max_metadata_bytes: 65536
+  max_map_bytes: 1048576
+  max_binary_bytes: 67108864
+
+channels:
+  - id: 0
+    enabled: true
+    interface: mock
+    target: STM32F103C8T6
+    operation_timeout_s: 30.0
+    max_retries: 1
+    retry_backoff_s: 0.05
+    mock:
+      flash_size: 262144
+      default_delay_s: 0.8
+      progress_steps: 30
+      delays:
+        erase: 1.5
+        program: 3.0
+        verify: 1.5
+        read: 0.8
+
+  - id: 1
+    enabled: true
+    interface: mock
+    target: STM32F103C8T6
+    operation_timeout_s: 30.0
+    max_retries: 1
+    retry_backoff_s: 0.05
+    mock:
+      flash_size: 262144
+      default_delay_s: 0.8
+      progress_steps: 30
+      delays:
+        erase: 1.5
+        program: 3.0
+        verify: 1.5
+        read: 0.8
+
+  - {id: 2, enabled: false, interface: mock}
+  - {id: 3, enabled: false, interface: mock}
+  - {id: 4, enabled: false, interface: mock}
+  - {id: 5, enabled: false, interface: mock}
+  - {id: 6, enabled: false, interface: mock}
+  - {id: 7, enabled: false, interface: mock}
