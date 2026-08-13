@@ -35,6 +35,7 @@ test("renders the Plasma programmer console", async () => {
   assert.match(html, />CH<!-- -->7</);
   assert.match(html, />深色</);
   assert.match(html, />淺色</);
+  assert.match(html, /class="active"[^>]*aria-pressed="true"[^>]*>淺色</);
   assert.match(html, />PYTHON MOCK API</);
   assert.match(html, /aria-label="Python API URL"/);
   assert.match(html, />PYTHON GATEWAY</);

@@ -76,7 +76,7 @@ export default function Home() {
   const [firmware, setFirmware] = useState<File | null>(null);
   const [logs, setLogs] = useState<string[]>(["[SYSTEM] Plasma Web Console ready"]);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
   const [apiDraft, setApiDraft] = useState(DEFAULT_API_BASE);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
