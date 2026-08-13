@@ -21,7 +21,8 @@ def _run(coro: Any) -> Any:
 
 class PlasmaWebHandler(BaseHTTPRequestHandler):
     client_factory: Callable[[], PlasmaClient] = PlasmaClient
-    max_body_bytes = 18 * 1024 * 1024
+    max_body_bytes = 24 * 1024 * 1024
+    allowed_origins = frozenset({"*"})
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -32,8 +33,20 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        self._cors_headers()
         self.end_headers()
         self.wfile.write(data)
+
+    def _cors_headers(self) -> None:
+        origin = self.headers.get("Origin")
+        if "*" in self.allowed_origins:
+            self.send_header("Access-Control-Allow-Origin", "*")
+        elif origin in self.allowed_origins:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "600")
 
     def _body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
@@ -49,6 +62,12 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.BAD_GATEWAY, {"ok": False, "error": {"error_code": exc.code.value, "message": exc.message}})
         else:
             self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"message": str(exc)}})
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Content-Length", "0")
+        self._cors_headers()
+        self.end_headers()
 
     def do_GET(self) -> None:
         try:
@@ -92,8 +111,15 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             self._error(exc)
 
 
-def serve(host: str, port: int, plasma_host: str, plasma_port: int) -> None:
+def serve(
+    host: str,
+    port: int,
+    plasma_host: str,
+    plasma_port: int,
+    cors_origins: tuple[str, ...] = ("*",),
+) -> None:
     PlasmaWebHandler.client_factory = staticmethod(lambda: PlasmaClient(plasma_host, plasma_port))
+    PlasmaWebHandler.allowed_origins = frozenset(cors_origins)
     server = ThreadingHTTPServer((host, port), PlasmaWebHandler)
     print(f"Plasma Web API listening on http://{host}:{port}")
     try:
@@ -110,8 +136,20 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--plasma-host", default="127.0.0.1")
     parser.add_argument("--plasma-port", type=int, default=9900)
+    parser.add_argument(
+        "--cors-origin",
+        action="append",
+        dest="cors_origins",
+        help="Allowed Web origin; repeat for multiple origins (prototype default: *)",
+    )
     args = parser.parse_args()
-    serve(args.host, args.port, args.plasma_host, args.plasma_port)
+    serve(
+        args.host,
+        args.port,
+        args.plasma_host,
+        args.plasma_port,
+        tuple(args.cors_origins or ["*"]),
+    )
 
 
 if __name__ == "__main__":

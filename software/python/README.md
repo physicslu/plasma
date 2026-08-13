@@ -60,12 +60,16 @@ plasma-multichannel-v0.3.1/
 
 ```bash
 plasma-server --config config/plasma.yaml
-plasma-web --host 0.0.0.0 --port 8080 --plasma-host 127.0.0.1 --plasma-port 9900
+plasma-web --host 0.0.0.0 --port 8080 \
+  --plasma-host 127.0.0.1 --plasma-port 9900 \
+  --cors-origin http://127.0.0.1:5173
 ```
 
 Gateway 提供 `GET /api/status`、`POST /api/jobs` 與
 `POST /api/jobs/{job_id}/cancel`。`program`／`verify` 的 Firmware 由 Web UI
 轉成 Base64 JSON 傳入；Job 仍由 Plasma Server 持有，關閉瀏覽器不等於取消工作。
+`--cors-origin` 可重複指定允許的 Web origin；Prototype 預設為 `*`，跨電腦測試時
+建議改成實際的 Web URL。CORS 不等於認證，Gateway 不可直接暴露到 Internet。
 
 ```bash
 cd plasma-multichannel-v0.3.1

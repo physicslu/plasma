@@ -12,3 +12,5 @@ Plasma 是以 PYNQ-Z2（Z2）為開發平台的多通道 IC 燒錄系統。Proto
 
 PL 的使用方式請參考 [`pl/README.md`](pl/README.md)。
 Software 的版本、限制與測試方式請參考 [`software/README.md`](software/README.md)。
+跨電腦的 GitHub、VS Code、Command Line 與 Vivado 工作流程請參考
+[`docs/development/multi-machine-development-guide.md`](docs/development/multi-machine-development-guide.md)。

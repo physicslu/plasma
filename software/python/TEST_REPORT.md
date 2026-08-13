@@ -7,17 +7,18 @@
 | 執行日期 | 2026-08-13 |
 | Python | 3.12.13 |
 | 測試框架 | Python `unittest` |
-| 測試數 | 66 |
-| 通過 | 66 |
+| 測試數 | 69 |
+| 通過 | 69 |
 | 失敗 | 0 |
 | 錯誤 | 0 |
 | 跳過 | 0 |
-| 最終執行時間 | 3.618 秒 |
-| Web Gateway REST API | 4/4 通過 |
+| 最終執行時間 | 6.910 秒 |
+| Web Gateway REST API | 5/5 通過 |
+| Web → Gateway → TCP Server → Mock E2E | 2/2 通過 |
 | CLI 進度端對端 | 通過 |
 | CLI `Ctrl+C` 取消端對端 | 通過 |
 | Editable install／console entry | 通過 |
-| Python trace（production source，加權約） | 81% |
+| Python trace（v0.3.1 上次量測） | 約 81%；本次未重跑 |
 
 執行指令：
 
@@ -28,14 +29,17 @@ python3 -m unittest discover -s tests -v
 結果：
 
 ```text
-Ran 66 tests in 3.618s
+Ran 69 tests in 6.910s
 
 OK
 ```
 
 ## 已驗證
 
-- Web status 查詢、Firmware program submission、verify 缺少檔案拒絕及遠端 cancel。
+- Web status 查詢、Firmware program submission、verify 缺少檔案拒絕、遠端 cancel
+  與 CORS preflight。
+- 真實 HTTP Gateway → Plasma v3.1 TCP Server → `MockInterface` 的 program
+  `erase → program → verify`、進度、成功結果與安全取消。
 
 - v3.1 frame encode/decode、fragmented read、半包與 checksum。
 - `firmware_size`／BINLEN 一致性、SHA-256 格式與內容驗證。
@@ -81,7 +85,9 @@ OK
 
 另在臨時 venv 執行 editable install，確認 `plasma`、`plasma-server` console entry point 與 package lazy import 均可用。
 
-Python 內建 trace 的 production source 加權覆蓋率約 81%；排除尚未實機驗證的 OpenOCD scaffold 約 83%。這是 line trace 近似值，不宣稱為 branch coverage。新增 CLI 訊號及 console error 路徑後，總行數增加，因此不能直接拿 v0.1.0 的百分比比較品質。
+上次 v0.3.1 的 Python 內建 trace production source 加權覆蓋率約 81%；本次 Web
+Mock 整合未重跑 coverage，因此不宣稱新百分比。該數值是 line trace 近似值，並非
+branch coverage。
 
 ## 未驗證
 

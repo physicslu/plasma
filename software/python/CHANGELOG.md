@@ -1,5 +1,15 @@
 # Plasma 版本紀錄
 
+## 未發佈 — 2026-08-13
+
+### Web Mock 整合
+
+- Web Console 改為呼叫 Python REST Gateway，不再以瀏覽器 timer 模擬工作進度。
+- Gateway 加入 CORS preflight 與可設定的 allowed origin。
+- Gateway JSON body 上限調整為 24 MiB，可容納 16 MiB firmware 的 Base64 payload。
+- 新增 Gateway → Plasma v3.1 TCP Server → `MockInterface` program/cancel 端對端測試。
+- Python 自動測試由 66 項增加至 69 項。
+
 ## v0.3.1 — 2026-08-13
 
 ### 改善
