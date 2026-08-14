@@ -101,7 +101,7 @@ plasmactl deploy
 - 只允許 fast-forward，不自動 merge 或 rebase。
 - Python 或 Node 相依設定改變時才重新同步相依套件。
 - 測試失敗時不重新啟動現有服務。
-- restart 後檢查 TCP 9900、Gateway API 與 Vite HTTP。
+- restart 後等待並檢查 TCP 9900、Gateway API 與 Vite HTTP；服務啟動較慢時會自動重試。
 
 ## 5. 從外面透過 Tailscale SSH 部署
 

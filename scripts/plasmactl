@@ -281,15 +281,23 @@ wait_for_port() {
   die "$label 未在期限內監聽 $host:$port"
 }
 
+wait_for_http() {
+  local url="$1" label="$2" attempt
+  for attempt in {1..30}; do
+    if curl --fail --silent --max-time 2 "$url" >/dev/null 2>&1; then
+      say "$label 正常"
+      return 0
+    fi
+    sleep 0.5
+  done
+  die "$label 未在期限內通過健康檢查：$url"
+}
+
 health_check() {
   require_command curl
   wait_for_port 127.0.0.1 9900 "Plasma Server"
-  curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$gateway_port/api/status" >/dev/null || \
-    die "Python Gateway health check 失敗"
-  say "Python Gateway API 正常"
-  curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$vite_port/" >/dev/null || \
-    die "Vite Web Console health check 失敗"
-  say "Vite Web Console 正常"
+  wait_for_http "http://127.0.0.1:$gateway_port/api/status" "Python Gateway API"
+  wait_for_http "http://127.0.0.1:$vite_port/" "Vite Web Console"
 }
 
 start_services() {
