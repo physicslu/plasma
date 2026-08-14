@@ -49,7 +49,14 @@ export default defineConfig(async () => {
       allowedHosts: [
         "terminal.local",
         "swpc.tail820e64.ts.net",
+        "plasma.open4th.com",
       ],
+      proxy: {
+        "/api": {
+          target: "http://127.0.0.1:18080",
+          changeOrigin: true,
+        },
+      },
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),

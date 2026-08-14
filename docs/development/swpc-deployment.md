@@ -125,7 +125,14 @@ ssh gordon@swpc '~/.local/bin/plasmactl status'
 ssh -t gordon@swpc '~/.local/bin/plasmactl logs'
 ```
 
-完成後即可從外部瀏覽器開啟 SWPC 的 Tailscale HTTPS 網址測試。
+公開 Web Console 網址：
+
+```text
+https://plasma.open4th.com
+```
+
+Tailscale 網址 `https://swpc.tail820e64.ts.net` 保留作為內部維護入口；
+Gateway 的內部維護網址為 `https://swpc.tail820e64.ts.net:8443`。
 
 ## 6. 設定檔
 
@@ -149,11 +156,30 @@ PLASMA_VITE_HOST=127.0.0.1
 PLASMA_VITE_PORT=5173
 ```
 
-若 Tailscale Serve 已把 Gateway 映射到 HTTPS path，可加入：
+公開部署使用下列 API Base：
 
 ```bash
-PLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net/api
+PLASMA_PUBLIC_API_URL=https://plasma.open4th.com
 ```
+
+API Base 後面不能加入 `/api`；Web Console 會自行在 Base URL 後附加 API
+路徑。
+
+Cloudflare Tunnel 只需將整個 hostname 代理到 Vite：
+
+```text
+plasma.open4th.com → http://127.0.0.1:5173
+```
+
+Vite 會保留原始路徑，將 `/api/*` 代理到：
+
+```text
+http://127.0.0.1:18080
+```
+
+建議使用 Cloudflare Access 保護整個 `plasma.open4th.com` hostname。
+
+既有 Tailscale 網址仍保留作為內部維護入口，不受公開 Cloudflare 路由影響。
 
 修改設定檔後，重新產生 unit 並啟動：
 
