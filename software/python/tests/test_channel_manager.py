@@ -158,6 +158,11 @@ class ChannelManagerTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.state, JobState.TIMEOUT)
         self.assertEqual(result.error.error_code, ErrorCode.OPERATION_TIMEOUT.value)
+        jsonl_path = next((self.root / "logs").glob(f"*/CH0/{result.job_id}.jsonl"))
+        events = [json.loads(line) for line in jsonl_path.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(events[-1]["event"], "job_timeout")
+        self.assertEqual(events[-1]["level"], "ERROR")
+        self.assertEqual(events[-1]["state"], JobState.TIMEOUT.value)
 
     async def test_running_job_can_be_cancelled(self) -> None:
         manager = await self.create_manager(
@@ -175,6 +180,11 @@ class ChannelManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response["accepted"])
         self.assertEqual(result.state, JobState.CANCELLED)
         self.assertEqual(result.error.error_code, ErrorCode.OPERATION_CANCELLED.value)
+        jsonl_path = next((self.root / "logs").glob(f"*/CH0/{result.job_id}.jsonl"))
+        events = [json.loads(line) for line in jsonl_path.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(events[-1]["event"], "job_cancelled")
+        self.assertEqual(events[-1]["level"], "WARNING")
+        self.assertEqual(events[-1]["state"], JobState.CANCELLED.value)
 
     async def test_job_waiting_for_global_slot_can_be_cancelled_immediately(self) -> None:
         manager = await self.create_manager(

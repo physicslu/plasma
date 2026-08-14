@@ -17,6 +17,21 @@ from plasma_handlers.base import BaseHandler
 from .job_manager import JobRuntime
 
 
+def _terminal_log_event(state: JobState) -> tuple[str, str]:
+    """Return the structured log event and level for a terminal job state."""
+    events = {
+        JobState.SUCCESS: ("job_completed", "INFO"),
+        JobState.CANCELLED: ("job_cancelled", "WARNING"),
+        JobState.TIMEOUT: ("job_timeout", "ERROR"),
+        JobState.ABORTED: ("job_aborted", "ERROR"),
+        JobState.FAILED: ("job_failed", "ERROR"),
+    }
+    try:
+        return events[state]
+    except KeyError as exc:
+        raise ValueError(f"job state is not terminal: {state.value}") from exc
+
+
 class ChannelWorker:
     def __init__(
         self,
@@ -426,9 +441,10 @@ class ChannelWorker:
             runtime.updated_at = iso_now()
             self.output.write_state(request.job_id, self._state_payload(runtime, result.error))
             self.output.write_result(result)
+            event, level = _terminal_log_event(result.state)
             logger.event(
-                "job_completed" if result.success else "job_failed",
-                level="INFO" if result.success else "ERROR",
+                event,
+                level=level,
                 state=result.state.value,
                 elapsed_ms=result.elapsed_ms,
                 attempts=result.attempts,
