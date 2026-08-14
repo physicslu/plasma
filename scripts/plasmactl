@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+default_repo="$(cd "$(dirname "$script_path")/.." && pwd)"
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+config_file="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
+
+if [[ -f "$config_file" ]]; then
+  # shellcheck source=/dev/null
+  source "$config_file"
+fi
+
+repo="${PLASMA_REPO:-$default_repo}"
+branch="${PLASMA_BRANCH:-main}"
+python_dir="$repo/software/python"
+web_dir="$repo/software/web"
+python_bin="${PLASMA_PYTHON:-$python_dir/.venv/bin/python}"
+npm_bin="${PLASMA_NPM:-$(command -v npm 2>/dev/null || true)}"
+gateway_host="${PLASMA_GATEWAY_HOST:-0.0.0.0}"
+gateway_port="${PLASMA_GATEWAY_PORT:-18080}"
+cors_origin="${PLASMA_CORS_ORIGIN:-*}"
+vite_host="${PLASMA_VITE_HOST:-127.0.0.1}"
+vite_port="${PLASMA_VITE_PORT:-5173}"
+public_api_url="${PLASMA_PUBLIC_API_URL:-}"
+unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+bin_dir="${PLASMACTL_BIN_DIR:-$HOME/.local/bin}"
+services=(plasma-server.service plasma-web.service plasma-vite.service)
+
+say() {
+  printf '[plasmactl] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "找不到必要指令：$1"
+}
+
+require_repo() {
+  [[ -d "$repo/.git" ]] || die "PLASMA_REPO 不是 Git repository：$repo"
+  [[ -d "$python_dir" && -d "$web_dir" ]] || die "Plasma 專案目錄不完整：$repo"
+}
+
+require_runtime() {
+  [[ -x "$python_bin" ]] || die "找不到 Python venv：$python_bin；請先執行 ./scripts/plasmactl install"
+  [[ -n "$npm_bin" && -x "$npm_bin" ]] || die "找不到 npm；請先安裝 Node.js 22 與 npm"
+}
+
+require_clean_tree() {
+  local changes
+  changes="$(git -C "$repo" status --porcelain --untracked-files=normal)"
+  [[ -z "$changes" ]] || {
+    printf '%s\n' "$changes" >&2
+    die "工作目錄有尚未提交的修改，取消更新以免覆蓋 SWPC 上的工作"
+  }
+}
+
+require_user_units() {
+  local service
+  for service in "${services[@]}"; do
+    [[ -f "$unit_dir/$service" ]] || die "尚未安裝 $service；請先執行 ./scripts/plasmactl install"
+  done
+}
+
+write_config() {
+  mkdir -p "$(dirname "$config_file")"
+  if [[ ! -f "$config_file" ]]; then
+    cat >"$config_file" <<EOF
+# SWPC Plasma deployment settings
+PLASMA_REPO=$repo
+PLASMA_BRANCH=$branch
+PLASMA_GATEWAY_HOST=$gateway_host
+PLASMA_GATEWAY_PORT=$gateway_port
+PLASMA_CORS_ORIGIN=$cors_origin
+PLASMA_VITE_HOST=$vite_host
+PLASMA_VITE_PORT=$vite_port
+# Optional: URL shown as the Web Console's default Python API.
+# PLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net/api
+EOF
+    say "建立設定檔：$config_file"
+  else
+    say "保留既有設定檔：$config_file"
+  fi
+}
+
+validate_unit_values() {
+  local value
+  for value in "$repo" "$python_bin" "$npm_bin" "$gateway_host" "$gateway_port" \
+    "$cors_origin" "$vite_host" "$vite_port" "$public_api_url"; do
+    [[ "$value" != *$'\n'* ]] || die "systemd 設定值不可包含換行"
+  done
+  [[ "$repo" != *' '* && "$python_bin" != *' '* && "$npm_bin" != *' '* ]] || \
+    die "目前安裝腳本不支援含空白的 repository、Python 或 npm 路徑"
+}
+
+write_units() {
+  local node_path public_api_environment
+  node_path="$(dirname "$npm_bin"):/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  public_api_environment=""
+  if [[ -n "$public_api_url" ]]; then
+    public_api_environment="Environment=NEXT_PUBLIC_PLASMA_API_URL=$public_api_url"
+  fi
+
+  mkdir -p "$unit_dir"
+  cat >"$unit_dir/plasma-server.service" <<EOF
+[Unit]
+Description=Plasma multi-channel programming server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=$python_dir
+Environment=PYTHONUNBUFFERED=1
+ExecStart=$python_bin -m plasma_server.server --config config/plasma.yaml
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+EOF
+
+  cat >"$unit_dir/plasma-web.service" <<EOF
+[Unit]
+Description=Plasma Python Web Gateway
+After=network-online.target plasma-server.service
+Wants=network-online.target plasma-server.service
+
+[Service]
+Type=simple
+WorkingDirectory=$python_dir
+Environment=PYTHONUNBUFFERED=1
+ExecStart=$python_bin -m plasma_web.gateway --host $gateway_host --port $gateway_port --plasma-host 127.0.0.1 --plasma-port 9900 --cors-origin $cors_origin
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+EOF
+
+  cat >"$unit_dir/plasma-vite.service" <<EOF
+[Unit]
+Description=Plasma Vite Web Console
+After=network-online.target plasma-web.service
+Wants=network-online.target plasma-web.service
+
+[Service]
+Type=simple
+WorkingDirectory=$web_dir
+Environment=PATH=$node_path
+$public_api_environment
+ExecStart=$npm_bin run dev -- --host $vite_host --port $vite_port
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+EOF
+}
+
+install_dependencies() {
+  require_command python3
+  if [[ ! -x "$python_bin" ]]; then
+    say "建立 Python virtual environment"
+    python3 -m venv "$python_dir/.venv"
+  fi
+  say "同步 Python 開發相依套件"
+  "$python_bin" -m pip install -e "$python_dir[dev]"
+
+  [[ -n "$npm_bin" && -x "$npm_bin" ]] || die "找不到 npm；請先安裝 Node.js 22 與 npm"
+  say "同步 Web 相依套件"
+  (cd "$web_dir" && "$npm_bin" ci)
+}
+
+install_services() {
+  local login_user
+  require_repo
+  require_command systemctl
+  install_dependencies
+  validate_unit_values
+  write_config
+  write_units
+  mkdir -p "$bin_dir"
+  ln -sfn "$script_path" "$bin_dir/plasmactl"
+  systemctl --user daemon-reload
+  systemctl --user enable "${services[@]}"
+  login_user="${USER:-$(id -un)}"
+  say "已安裝 user systemd units，但尚未啟動，避免與目前手動程序爭用 Port"
+  say "管理指令：$bin_dir/plasmactl"
+  say "先執行 plasmactl ports，確認舊程序後，再執行 plasmactl start"
+  say "若要開機後不登入也自動啟動，另執行：sudo loginctl enable-linger $login_user"
+}
+
+sync_changed_dependencies() {
+  local before="$1" after="$2" changed
+  [[ "$before" != "$after" ]] || return 0
+  changed="$(git -C "$repo" diff --name-only "$before" "$after")"
+  if grep -Eq '^software/python/(pyproject.toml|.*requirements.*)$' <<<"$changed"; then
+    say "Python 相依設定有更新，重新安裝"
+    "$python_bin" -m pip install -e "$python_dir[dev]"
+  fi
+  if grep -Eq '^software/web/(package.json|package-lock.json)$' <<<"$changed"; then
+    say "Web 相依設定有更新，執行 npm ci"
+    (cd "$web_dir" && "$npm_bin" ci)
+  fi
+}
+
+update_code() {
+  local before local_ahead remote_ahead after
+  require_repo
+  require_runtime
+  require_clean_tree
+  [[ "$(git -C "$repo" branch --show-current)" == "$branch" ]] || die "目前分支不是 $branch"
+
+  before="$(git -C "$repo" rev-parse HEAD)"
+  say "從 origin/$branch 取得最新程式"
+  git -C "$repo" fetch --prune origin "$branch"
+  read -r local_ahead remote_ahead < <(
+    git -C "$repo" rev-list --left-right --count "HEAD...origin/$branch"
+  )
+  [[ "$local_ahead" == "0" ]] || die "SWPC 有 $local_ahead 個尚未推送的本機 commit，拒絕自動部署"
+  git -C "$repo" merge --ff-only "origin/$branch"
+  after="$(git -C "$repo" rev-parse HEAD)"
+  sync_changed_dependencies "$before" "$after"
+  say "目前版本：$(git -C "$repo" log -1 --oneline)"
+}
+
+run_tests() {
+  require_repo
+  require_runtime
+  say "執行 Python 測試"
+  (cd "$python_dir" && "$python_bin" -m pytest -q) || return 1
+  say "執行 Web lint、test 與 artifact validation"
+  (cd "$web_dir" && "$npm_bin" run lint) || return 1
+  (cd "$web_dir" && "$npm_bin" test) || return 1
+  (cd "$web_dir" && "$npm_bin" run validate:artifact) || return 1
+  say "所有測試通過"
+}
+
+wait_for_port() {
+  local host="$1" port="$2" label="$3" attempt
+  for attempt in {1..30}; do
+    if (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null; then
+      exec 3>&-
+      exec 3<&-
+      say "$label 已監聽 $host:$port"
+      return 0
+    fi
+    sleep 0.5
+  done
+  die "$label 未在期限內監聽 $host:$port"
+}
+
+health_check() {
+  require_command curl
+  wait_for_port 127.0.0.1 9900 "Plasma Server"
+  curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$gateway_port/api/status" >/dev/null || \
+    die "Python Gateway health check 失敗"
+  say "Python Gateway API 正常"
+  curl --fail --silent --show-error --max-time 5 "http://127.0.0.1:$vite_port/" >/dev/null || \
+    die "Vite Web Console health check 失敗"
+  say "Vite Web Console 正常"
+}
+
+start_services() {
+  require_user_units
+  systemctl --user start "${services[@]}"
+  health_check
+}
+
+restart_services() {
+  require_user_units
+  say "重新啟動 Plasma 服務"
+  systemctl --user restart "${services[@]}"
+  health_check
+}
+
+stop_services() {
+  require_user_units
+  systemctl --user stop plasma-vite.service plasma-web.service plasma-server.service
+  say "Plasma 服務已停止"
+}
+
+show_ports() {
+  printf '\nListening ports (9900 / %s / %s):\n' "$gateway_port" "$vite_port"
+  ss -lntp 2>/dev/null | awk -v gateway=":$gateway_port" -v vite=":$vite_port" \
+    '$4 ~ /:9900$/ || index($4, gateway) || index($4, vite)'
+}
+
+show_status() {
+  require_repo
+  printf 'Version:  %s\n' "$(git -C "$repo" log -1 --oneline)"
+  printf 'Branch:   %s\n' "$(git -C "$repo" branch --show-current)"
+  printf 'Worktree: %s\n' "$(if [[ -z "$(git -C "$repo" status --porcelain)" ]]; then echo clean; else echo modified; fi)"
+  printf '\n%-24s %s\n' SERVICE STATE
+  local service state load_state
+  for service in "${services[@]}"; do
+    load_state="$(systemctl --user show "$service" --property=LoadState --value 2>/dev/null || true)"
+    state="$(systemctl --user show "$service" --property=ActiveState --value 2>/dev/null || true)"
+    if [[ "$load_state" == "not-found" || -z "$load_state" ]]; then
+      state="not-installed"
+    elif [[ "$state" =~ ^(active|inactive|failed|activating|deactivating|reloading)$ ]]; then
+      :
+    else
+      state="systemd-unavailable"
+    fi
+    printf '%-24s %s\n' "$service" "$state"
+  done
+  show_ports
+}
+
+show_logs() {
+  local target="${1:-all}" units=()
+  case "$target" in
+    all) units=(-u plasma-server.service -u plasma-web.service -u plasma-vite.service) ;;
+    server) units=(-u plasma-server.service) ;;
+    web|gateway) units=(-u plasma-web.service) ;;
+    vite|console) units=(-u plasma-vite.service) ;;
+    *) die "logs 只接受 all、server、web/gateway 或 vite/console" ;;
+  esac
+  journalctl --user "${units[@]}" -n 100 -f
+}
+
+deploy() {
+  update_code
+  if ! run_tests; then
+    die "測試失敗；程式已更新，但既有服務未重新啟動"
+  fi
+  restart_services
+  say "部署完成：$(git -C "$repo" log -1 --oneline)"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: plasmactl COMMAND
+
+Commands:
+  install              安裝相依套件與 user systemd units（不立即啟動）
+  update               從 GitHub main 做 fast-forward 更新
+  test                 執行完整 Python 與 Web 測試
+  restart              重新啟動服務並執行 health check
+  deploy               update → test → restart（建議日常使用）
+  update-and-restart   deploy 的別名
+  start | stop         啟動或停止全部 Plasma 服務
+  status               顯示 Git、systemd 與 Port 狀態
+  ports                顯示 9900、18080、5173 的監聽程序
+  logs [TARGET]        即時顯示 Log；TARGET: all/server/web/vite
+  help                 顯示本說明
+EOF
+}
+
+command="${1:-help}"
+shift || true
+case "$command" in
+  install) install_services ;;
+  update) update_code ;;
+  test) run_tests ;;
+  restart) restart_services ;;
+  deploy|update-and-restart) deploy ;;
+  start) start_services ;;
+  stop) stop_services ;;
+  status) show_status ;;
+  ports) show_ports ;;
+  logs) show_logs "${1:-all}" ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; die "未知指令：$command" ;;
+esac
