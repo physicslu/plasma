@@ -17,6 +17,13 @@ python_dir="$repo/software/python"
 web_dir="$repo/software/web"
 python_bin="${PLASMA_PYTHON:-$python_dir/.venv/bin/python}"
 npm_bin="${PLASMA_NPM:-$(command -v npm 2>/dev/null || true)}"
+uv_bin="${PLASMA_UV:-$(command -v uv 2>/dev/null || true)}"
+if [[ -z "$uv_bin" && -x "$HOME/.local/bin/uv" ]]; then
+  uv_bin="$HOME/.local/bin/uv"
+fi
+if [[ -n "$npm_bin" ]]; then
+  export PATH="$(dirname "$npm_bin"):$PATH"
+fi
 gateway_host="${PLASMA_GATEWAY_HOST:-0.0.0.0}"
 gateway_port="${PLASMA_GATEWAY_PORT:-18080}"
 cors_origin="${PLASMA_CORS_ORIGIN:-*}"
@@ -73,6 +80,8 @@ write_config() {
 # SWPC Plasma deployment settings
 PLASMA_REPO=$repo
 PLASMA_BRANCH=$branch
+PLASMA_NPM=$npm_bin
+PLASMA_UV=$uv_bin
 PLASMA_GATEWAY_HOST=$gateway_host
 PLASMA_GATEWAY_PORT=$gateway_port
 PLASMA_CORS_ORIGIN=$cors_origin
@@ -175,11 +184,22 @@ install_dependencies() {
     python3 -m venv "$python_dir/.venv"
   fi
   say "同步 Python 開發相依套件"
-  "$python_bin" -m pip install -e "$python_dir[dev]"
+  install_python_dependencies
 
   [[ -n "$npm_bin" && -x "$npm_bin" ]] || die "找不到 npm；請先安裝 Node.js 22 與 npm"
   say "同步 Web 相依套件"
   (cd "$web_dir" && "$npm_bin" ci)
+}
+
+install_python_dependencies() {
+  if "$python_bin" -m pip --version >/dev/null 2>&1; then
+    "$python_bin" -m pip install -e "$python_dir[dev]"
+  elif [[ -n "$uv_bin" && -x "$uv_bin" ]]; then
+    say "Python venv 沒有 pip，改用 uv：$uv_bin"
+    "$uv_bin" pip install --python "$python_bin" -e "$python_dir[dev]"
+  else
+    die "Python venv 沒有 pip，且找不到 uv；請確認 $HOME/.local/bin/uv"
+  fi
 }
 
 install_services() {
@@ -207,7 +227,7 @@ sync_changed_dependencies() {
   changed="$(git -C "$repo" diff --name-only "$before" "$after")"
   if grep -Eq '^software/python/(pyproject.toml|.*requirements.*)$' <<<"$changed"; then
     say "Python 相依設定有更新，重新安裝"
-    "$python_bin" -m pip install -e "$python_dir[dev]"
+    install_python_dependencies
   fi
   if grep -Eq '^software/web/(package.json|package-lock.json)$' <<<"$changed"; then
     say "Web 相依設定有更新，執行 npm ci"

@@ -44,7 +44,7 @@ chmod +x scripts/plasmactl
 安裝程序會：
 
 1. 建立或使用 `software/python/.venv`。
-2. 安裝 Python 開發相依套件。
+2. 安裝 Python 開發相依套件；venv 沒有 pip 時自動改用 `uv pip`。
 3. 執行 `npm ci`。
 4. 建立三個 user systemd services。
 5. 在 `~/.local/bin/plasmactl` 建立連結。
@@ -105,22 +105,24 @@ plasmactl deploy
 
 ## 5. 從外面透過 Tailscale SSH 部署
 
+Mac 已在 `~/.ssh/config` 設定 `swpc` alias，因此 SSH 連線使用 `gordon@swpc`。
+
 完整更新、測試與重啟：
 
 ```bash
-ssh gordon@swpc.tail820e64.ts.net '~/.local/bin/plasmactl deploy'
+ssh gordon@swpc '~/.local/bin/plasmactl deploy'
 ```
 
 只查看狀態：
 
 ```bash
-ssh gordon@swpc.tail820e64.ts.net '~/.local/bin/plasmactl status'
+ssh gordon@swpc '~/.local/bin/plasmactl status'
 ```
 
 查看即時 Log（`-t` 會配置互動終端）：
 
 ```bash
-ssh -t gordon@swpc.tail820e64.ts.net '~/.local/bin/plasmactl logs'
+ssh -t gordon@swpc '~/.local/bin/plasmactl logs'
 ```
 
 完成後即可從外部瀏覽器開啟 SWPC 的 Tailscale HTTPS 網址測試。
@@ -138,6 +140,8 @@ ssh -t gordon@swpc.tail820e64.ts.net '~/.local/bin/plasmactl logs'
 ```bash
 PLASMA_REPO=/storage/projects/plasma
 PLASMA_BRANCH=main
+PLASMA_NPM=/home/gordon/.nvm/versions/node/v22.23.2/bin/npm
+PLASMA_UV=/home/gordon/.local/bin/uv
 PLASMA_GATEWAY_HOST=0.0.0.0
 PLASMA_GATEWAY_PORT=18080
 PLASMA_CORS_ORIGIN='*'
