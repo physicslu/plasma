@@ -110,19 +110,72 @@ Mac 已在 `~/.ssh/config` 設定 `swpc` alias，因此 SSH 連線使用 `gordon
 完整更新、測試與重啟：
 
 ```bash
-ssh gordon@swpc '~/.local/bin/plasmactl deploy'
+ssh gordon@swpc 'plasmactl deploy'
 ```
 
 只查看狀態：
 
 ```bash
-ssh gordon@swpc '~/.local/bin/plasmactl status'
+ssh gordon@swpc 'plasmactl status'
+```
+
+只從 GitHub `main` fast-forward 更新程式碼，不執行測試或 restart：
+
+```bash
+ssh gordon@swpc 'plasmactl update'
 ```
 
 查看即時 Log（`-t` 會配置互動終端）：
 
 ```bash
-ssh -t gordon@swpc '~/.local/bin/plasmactl logs'
+ssh -t gordon@swpc 'plasmactl logs'
+```
+
+### 5.1 Non-interactive SSH 的 PATH
+
+`ssh gordon@swpc 'command'` 使用 non-interactive shell。Ubuntu 的 `~/.bashrc`
+通常會在偵測到 non-interactive shell 後提早 `return`，因此如果
+`~/.local/bin` 的 PATH 設定寫在該 `return` 之後，SSH 遠端命令可能會出現：
+
+```text
+plasmactl: command not found
+```
+
+即使 `~/.local/bin/plasmactl` symlink 本身已存在。
+
+SWPC 目前已調整 `~/.bashrc`：在 non-interactive shell 的 early return **之前**，
+以有條件的方式將 `$HOME/.local/bin` 加入 `PATH`，避免重複加入。修改 shell
+設定前應先備份原始檔案。
+
+等效設定可採用：
+
+```bash
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+```
+
+這段必須位於 `.bashrc` 的 non-interactive early return 之前。
+
+修改後，從 Mac 驗證：
+
+```bash
+ssh gordon@swpc 'command -v plasmactl && plasmactl status'
+```
+
+預期 `command -v` 回傳：
+
+```text
+/home/gordon/.local/bin/plasmactl
+```
+
+並且 `plasmactl status` 能正常顯示 Plasma Git、systemd services 與 Port 狀態。
+
+若 PATH 尚未修正，可暫時使用完整路徑：
+
+```bash
+ssh gordon@swpc '~/.local/bin/plasmactl status'
 ```
 
 公開 Web Console 網址：
