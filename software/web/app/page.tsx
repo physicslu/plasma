@@ -8,6 +8,7 @@ import {
   getChannels,
   getJob,
   normalizeApiBase,
+  readDownloadUrl,
   startJob,
 } from "./plasma-api";
 import type { JobSnapshot, Operation } from "./plasma-api";
@@ -18,6 +19,7 @@ type Stage =
   | "erase"
   | "program"
   | "verify"
+  | "read"
   | "success"
   | "cancelled"
   | "failed"
@@ -34,6 +36,7 @@ type Channel = {
   target?: string;
   interface?: string;
   error?: string;
+  outputFile?: string;
 };
 type Theme = "dark" | "light";
 type ConnectionState = "connecting" | "online" | "offline";
@@ -52,6 +55,7 @@ const stageLabels: Record<Stage, string> = {
   erase: "擦除",
   program: "燒錄",
   verify: "驗證",
+  read: "讀取",
   success: "完成",
   cancelled: "已取消",
   failed: "失敗",
@@ -61,8 +65,8 @@ const stageLabels: Record<Stage, string> = {
 
 function uiStage(job: JobSnapshot): Stage {
   if (job.state === "running") {
-    if (job.stage === "erase" || job.stage === "program" || job.stage === "verify") {
-      return job.stage;
+    if (job.stage === "erase" || job.stage === "program" || job.stage === "verify" || job.stage?.startsWith("read_")) {
+      return job.stage.startsWith("read_") ? "read" : job.stage;
     }
     return "queued";
   }
@@ -74,6 +78,8 @@ export default function Home() {
   const [channels, setChannels] = useState(initialChannels);
   const [selected, setSelected] = useState(0);
   const [firmware, setFirmware] = useState<File | null>(null);
+  const [readOffset, setReadOffset] = useState("0");
+  const [readLength, setReadLength] = useState("256");
   const [logs, setLogs] = useState<string[]>(["[SYSTEM] Plasma Web Console ready"]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
@@ -85,7 +91,7 @@ export default function Home() {
   const transitionKeys = useRef<Record<string, string>>({});
   const connectionRef = useRef<ConnectionState>("connecting");
   const active = channels[selected];
-  const isRunning = ["queued", "erase", "program", "verify"].includes(active.stage);
+  const isRunning = ["queued", "erase", "program", "verify", "read"].includes(active.stage);
   const enabledCount = channels.filter(channel => channel.enabled).length;
 
   const appendLog = useCallback((message: string) => {
@@ -97,6 +103,7 @@ export default function Home() {
     trackedJobs.current[job.channel_id] = job.job_id;
     const stage = uiStage(job);
     const error = job.result?.error?.message;
+    const outputFile = job.result?.output_files?.[0]?.split(/[\\/]/).pop();
     setChannels(items => items.map(channel => channel.id === job.channel_id ? {
       ...channel,
       stage,
@@ -104,6 +111,7 @@ export default function Home() {
       stageProgress: Number(job.stage_progress_percent ?? 0),
       jobId: job.job_id,
       error,
+      outputFile,
     } : channel));
 
     const transitionKey = `${job.state}:${job.stage ?? "-"}`;
@@ -207,7 +215,7 @@ export default function Home() {
   async function run(requestedOperation: Operation | "sequence") {
     const operation: Operation = requestedOperation === "sequence" ? "program" : requestedOperation;
     if (!active.enabled || connection !== "online" || isRunning) return;
-    if (operation !== "erase" && !firmware) return;
+    if (operation !== "erase" && operation !== "read" && !firmware) return;
     if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
       appendLog(`[CH${selected}] Firmware 超過 16 MiB 限制`);
       return;
@@ -218,7 +226,9 @@ export default function Home() {
       const job = await startJob(apiBase, {
         channelId: selected,
         operation,
-        firmware: operation === "erase" ? null : firmware,
+        firmware: operation === "erase" || operation === "read" ? null : firmware,
+        offset: operation === "read" ? Number(readOffset) : undefined,
+        length: operation === "read" ? Number(readLength) : undefined,
       });
       trackedJobs.current[selected] = job.job_id;
       setChannels(items => items.map(channel => channel.id === selected ? {
@@ -229,6 +239,7 @@ export default function Home() {
         jobId: job.job_id,
         file: firmware?.name,
         error: undefined,
+        outputFile: undefined,
       } : channel));
       appendLog(`[CH${selected}] ${job.job_id} accepted by Python · ${operation.toUpperCase()}`);
     } catch (error) {
@@ -292,16 +303,22 @@ export default function Home() {
             {!active.enabled && <div className="warning">CH{selected} 尚未在 Python Prototype 設定中啟用</div>}
             {connection !== "online" && <div className="warning">請先確認 Python Server 與 Gateway 已啟動，再連線 API</div>}
             {active.error && <div className="warning">{active.error}</div>}
+            <div className="readRange">
+              <label>READ logical offset<input aria-label="READ logical flash offset" type="number" min="0" step="1" value={readOffset} onChange={event => setReadOffset(event.target.value)}/></label>
+              <label>READ byte length<input aria-label="READ byte length" type="number" min="1" step="1" value={readLength} onChange={event => setReadLength(event.target.value)}/></label>
+              <small>Phase 1 預設讀取 256 bytes；目標 Flash 容量尚未由 Channel API 提供。</small>
+            </div>
             <div className="actions">
               <button onClick={() => void run("erase")} disabled={controlDisabled}><span>01</span>擦除<small>ERASE</small></button>
               <button onClick={() => void run("program")} disabled={controlDisabled || !firmware}><span>02</span>燒錄<small>PROGRAM</small></button>
               <button onClick={() => void run("verify")} disabled={controlDisabled || !firmware}><span>03</span>驗證<small>VERIFY</small></button>
+              <button onClick={() => void run("read")} disabled={controlDisabled || !Number.isInteger(Number(readOffset)) || Number(readOffset) < 0 || !Number.isInteger(Number(readLength)) || Number(readLength) <= 0}><span>04</span>讀取<small>READ</small></button>
               <button className="sequence" onClick={() => void run("sequence")} disabled={controlDisabled || !firmware}>執行完整流程 <b>→</b></button>
             </div>
           </div>
 
           <div className="progressCard">
-            <div className="progressHead"><div><span className="ring">{Math.round(active.progress)}</span><div><b>{stageLabels[active.stage]}</b><small>{active.jobId ?? "尚未建立 Job"}</small></div></div><button className="cancel" onClick={() => void cancel()} disabled={!isRunning}>■　取消工作</button></div>
+            <div className="progressHead"><div><span className="ring">{Math.round(active.progress)}</span><div><b>{stageLabels[active.stage]}</b><small>{active.jobId ?? "尚未建立 Job"}</small></div></div><div className="jobActions">{active.stage === "success" && active.jobId && active.outputFile && <a className="download" href={readDownloadUrl(apiBase, active.jobId, active.outputFile)}>Download BIN</a>}<button className="cancel" onClick={() => void cancel()} disabled={!isRunning}>■　取消工作</button></div></div>
             <div className="track"><i style={{ width: `${active.progress}%` }}/></div>
             <div className="metrics"><span>整體進度 <b>{active.progress.toFixed(1)}%</b></span><span>階段進度 <b>{active.stageProgress.toFixed(1)}%</b></span><span>Firmware <b>{active.file ?? "—"}</b></span></div>
           </div>

@@ -145,7 +145,7 @@ Wants=network-online.target plasma-server.service
 Type=simple
 WorkingDirectory=$python_dir
 Environment=PYTHONUNBUFFERED=1
-ExecStart=$python_bin -m plasma_web.gateway --host $gateway_host --port $gateway_port --plasma-host 127.0.0.1 --plasma-port 9900 --cors-origin $cors_origin
+ExecStart=$python_bin -m plasma_web.gateway --host $gateway_host --port $gateway_port --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $python_dir/output --cors-origin $cors_origin
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

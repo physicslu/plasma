@@ -7,7 +7,7 @@ export type JobState =
   | "timeout"
   | "aborted";
 
-export type Operation = "erase" | "program" | "verify";
+export type Operation = "erase" | "program" | "verify" | "read";
 
 export type ChannelSnapshot = {
   channel_id: number;
@@ -33,6 +33,7 @@ export type JobSnapshot = {
   bytes_total: number | null;
   result?: {
     state: JobState;
+    output_files?: string[];
     error?: { message?: string } | null;
   };
 };
@@ -126,6 +127,8 @@ export async function startJob(
     channelId: number;
     operation: Operation;
     firmware?: File | null;
+    offset?: number;
+    length?: number;
   },
 ): Promise<JobSnapshot> {
   const firmwareBase64 = options.firmware
@@ -141,6 +144,10 @@ export async function startJob(
         operation: options.operation,
         firmware_name: options.firmware?.name,
         firmware_base64: firmwareBase64,
+        ...(options.operation === "read" ? {
+          offset: options.offset ?? 0,
+          length: options.length ?? 256,
+        } : {}),
         timeout_s: 30,
       }),
     },
@@ -157,6 +164,10 @@ export async function cancelJob(
     `/api/jobs/${encodeURIComponent(jobId)}/cancel`,
     { method: "POST", body: "{}" },
   );
+}
+
+export function readDownloadUrl(apiBase: string, jobId: string, filename: string): string {
+  return `${apiBase}/api/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(filename)}`;
 }
 
 async function fileToBase64(file: File): Promise<string> {
