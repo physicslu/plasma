@@ -191,29 +191,142 @@ Do not stop Apache, Nextcloud, Docker services, networking, Tailscale, SSH, or u
 
 Do not expose internal service ports directly to the public Internet as a shortcut for fixing connectivity.
 
-## 9. Git and publication rules
+## 9. Git workflow and publication policy
 
-Before edits:
+The Git workflow exists to keep `main` reviewable and deployable and to prevent an agent from mixing unrelated user work into a change.
+
+### 9.1 Inspect before changing anything
+
+Before code-changing work, inspect the repository first:
 
 ```bash
+cd /storage/projects/plasma
 git status -sb
+git branch --show-current
+git log -1 --oneline
+git fetch origin main
 ```
 
-After edits:
+After fetching, determine whether the local branch is ahead of or behind `origin/main` before proceeding.
+Fetching is safe because it updates remote-tracking refs without modifying the working tree.
+
+If local `main` is clean and only behind `origin/main`, synchronize it using fast-forward only:
+
+```bash
+git pull --ff-only origin main
+```
+
+Do not silently merge or rebase divergent history.
+If the worktree already contains modifications, do not pull, merge, rebase, reset, stash, or discard them until their ownership and purpose are understood.
+
+### 9.2 Use feature branches for code changes
+
+New features, bug fixes, refactors, protocol changes, API changes, and hardware-interface changes must not normally be developed directly on `main`.
+After synchronizing a clean `main`, create a dedicated branch before editing code.
+AI-created development branches should normally use:
+
+```text
+agent/<short-feature-name>
+```
+
+Example:
+
+```bash
+git switch -c agent/read-ic-v1
+```
+
+If requested feature work has already been started as uncommitted changes on `main`, do not discard or recreate the work.
+Create a feature branch from the current state while preserving the existing working-tree changes:
+
+```bash
+git switch -c agent/<short-feature-name>
+```
+
+Then verify that all intended modifications are still present with `git status -sb` and `git diff --stat`.
+
+Small documentation-only or explicitly requested repository-maintenance changes may be applied directly to `main` when the user intentionally requests that workflow, but code-changing feature development should use a feature branch.
+
+### 9.3 Validate and review before commit
+
+During development, run focused checks as needed.
+Before declaring the implementation ready for review, run the full validation required by the affected scope and then inspect the diff:
 
 ```bash
 git diff --check
+git diff --stat
 git diff
 ```
 
-Rules:
+For cross-stack Plasma changes, normally run:
 
-- Keep changes narrowly scoped to the requested task.
-- Do not discard or reset user work.
-- Do not use destructive Git operations (`reset --hard`, forced checkout, forced push) unless explicitly requested and justified.
-- Do not commit, push, merge, rebase, tag, or open a PR unless the user explicitly asks for that publication action.
-- Never commit credentials, SSH private keys, tokens, `.env` secrets, or generated credentials.
-- Prefer fast-forward deployment behavior on SWPC; do not silently merge deployment divergence.
+```bash
+plasmactl test
+```
+
+Do not equate passing tests with architectural correctness. The diff must still be reviewed for scope, interface changes, security impact, generated files, and unintended edits.
+
+### 9.4 Do not commit before review approval
+
+Unless the user explicitly requested commit as part of the task, stop after implementation, validation, and diff review.
+Do not automatically commit merely because tests pass.
+
+When commit approval is given:
+
+1. Stage only files that belong to the requested change.
+2. Prefer explicit file paths instead of `git add -A` when unrelated modifications may exist.
+3. Inspect exactly what will be committed:
+
+```bash
+git diff --cached --check
+git diff --cached
+```
+
+4. Create a focused commit with a concise message describing the complete change.
+
+Never stage or commit unrelated user work.
+
+### 9.5 Publication requires explicit approval
+
+Do not commit, push, merge, rebase, tag, force-update a branch, or open a PR unless the user explicitly authorizes the corresponding publication action.
+
+The normal feature publication flow is:
+
+```text
+synchronize main
+    -> create feature branch
+    -> implement
+    -> focused tests
+    -> full validation
+    -> diff review
+    -> user approval
+    -> stage intended files
+    -> review staged diff
+    -> commit
+    -> push feature branch
+    -> pull request
+    -> review
+    -> merge to main
+    -> deploy main
+```
+
+Never use destructive Git operations such as `git reset --hard`, forced checkout, or forced push unless explicitly requested, justified, and the consequences are understood.
+Never commit credentials, SSH private keys, tokens, `.env` secrets, or generated credentials.
+
+### 9.6 `main` and deployment rules
+
+Treat `main` as the integration/deployment branch, not as an agent scratch branch.
+SWPC deployment behavior must remain fast-forward based; do not silently resolve divergence with an automatic merge or rebase.
+
+`plasmactl update` and `plasmactl deploy` are intended to operate on the configured deployment branch (`main` by default).
+Do not deploy an unreviewed feature branch as though it were the production/demo `main` branch.
+
+After a feature is reviewed and merged to GitHub `main`, the normal SWPC deployment sequence is:
+
+```bash
+plasmactl deploy
+```
+
+which performs the repository's update, full validation, service restart, and health checks according to `scripts/plasmactl`.
 
 ## 10. Validation policy
 
