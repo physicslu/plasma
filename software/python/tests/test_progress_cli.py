@@ -5,11 +5,11 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from plasma_client.cli import ProgressRenderer, _run_work
 from plasma_client.client import PlasmaClient
 from plasma_core.enums import JobState, Operation
-from plasma_core.errors import PlasmaError
 from plasma_core.models import JobRequest
 from plasma_interfaces.mock import MockInterface
 from plasma_server.channel_manager import ChannelManager
@@ -105,40 +105,58 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("█", rendered)
 
     async def test_cancelling_cli_wait_cancels_server_operation(self) -> None:
-        client, server = await self.start_server(
-            {"erase": 0.05, "program": 0.8, "verify": 0.05}
-        )
+        client, server = await self.start_server({"erase": 0.05, "verify": 0.05})
         stream = io.StringIO()
+        program_entered = asyncio.Event()
+        keep_programming = asyncio.Event()
+        cli_observed_program = asyncio.Event()
+
+        class SynchronizedRenderer(ProgressRenderer):
+            def update(self, job: dict[str, object]) -> None:
+                super().update(job)
+                if job.get("stage") == "program":
+                    cli_observed_program.set()
+
+        async def gated_program(
+            interface: MockInterface,
+            firmware: bytes,
+            address: int = 0,
+            progress=None,
+        ) -> None:
+            interface._validate_range(address, len(firmware))
+            interface.calls["program"] += 1
+            if progress:
+                await progress(1, len(firmware))
+            program_entered.set()
+            await keep_programming.wait()
+
         request = JobRequest(
             channel_id=0,
             operation=Operation.PROGRAM,
             firmware=b"cancel-me" * 32,
             job_id="cli-cancel",
-            timeout_s=2.0,
+            timeout_s=10.0,
         )
-        task = asyncio.create_task(
-            _run_work(
-                client,
-                request,
-                poll_interval_s=0.01,
-                renderer=ProgressRenderer(stream=stream, width=12),
+        with mock.patch.object(MockInterface, "program", gated_program):
+            task = asyncio.create_task(
+                _run_work(
+                    client,
+                    request,
+                    poll_interval_s=0.01,
+                    renderer=SynchronizedRenderer(stream=stream, width=12),
+                )
             )
-        )
+            await asyncio.wait_for(program_entered.wait(), timeout=5.0)
+            await asyncio.wait_for(cli_observed_program.wait(), timeout=5.0)
+            runtime = server.manager.registry.get(request.job_id)
+            self.assertEqual(runtime.stage, "program")
+            self.assertGreater(runtime.stage_progress_percent, 0)
 
-        for _ in range(200):
-            try:
-                snapshot = server.manager.registry.get(request.job_id).snapshot()
-            except PlasmaError:
-                await asyncio.sleep(0.005)
-                continue
-            if snapshot["stage"] == "program" and snapshot["stage_progress_percent"] > 0:
-                break
-            await asyncio.sleep(0.005)
-        else:
-            self.fail("program stage was not reached")
+            task.cancel()
+            await asyncio.wait_for(runtime.cancel_event.wait(), timeout=5.0)
+            self.assertIn("Cancellation requested", stream.getvalue())
+            result = await asyncio.wait_for(task, timeout=5.0)
 
-        task.cancel()
-        result = await task
         snapshot = server.manager.registry.get(request.job_id).snapshot()
         interface = server.manager.interfaces[0]
         self.assertIsInstance(interface, MockInterface)
@@ -147,7 +165,6 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(snapshot["cancel_requested"])
         self.assertEqual(snapshot["stage_state"], "cancelled")
         self.assertGreaterEqual(interface.shutdown_count, 1)
-        self.assertIn("Cancellation requested", stream.getvalue())
 
         follow_up = await client.erase(0, timeout_s=1.0)
         self.assertEqual(follow_up["result"]["state"], "success")
