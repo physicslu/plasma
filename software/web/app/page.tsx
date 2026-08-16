@@ -31,6 +31,7 @@ type Channel = {
   stage: Stage;
   progress: number;
   stageProgress: number;
+  operation?: Operation;
   jobId?: string;
   file?: string;
   target?: string;
@@ -42,6 +43,8 @@ type Theme = "dark" | "light";
 type ConnectionState = "connecting" | "online" | "offline";
 
 const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
+const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
+const failedStages: Stage[] = ["cancelled", "failed", "timeout", "aborted"];
 const initialChannels: Channel[] = Array.from({ length: 8 }, (_, id) => ({
   id,
   enabled: id < 2,
@@ -52,16 +55,32 @@ const initialChannels: Channel[] = Array.from({ length: 8 }, (_, id) => ({
 const stageLabels: Record<Stage, string> = {
   idle: "待命",
   queued: "排隊中",
-  erase: "擦除",
-  program: "燒錄",
-  verify: "驗證",
-  read: "讀取",
-  success: "完成",
+  erase: "擦除中",
+  program: "燒錄中",
+  verify: "驗證中",
+  read: "讀取中",
+  success: "成功",
   cancelled: "已取消",
   failed: "失敗",
   timeout: "逾時",
   aborted: "已中止",
 };
+const operationLabels: Record<Operation, string> = {
+  erase: "擦除",
+  program: "燒錄",
+  verify: "驗證",
+  read: "讀取",
+};
+const operationSymbols: Record<Operation, string> = {
+  erase: "擦",
+  program: "燒",
+  verify: "驗",
+  read: "讀",
+};
+
+function isRunning(channel: Channel): boolean {
+  return runningStages.includes(channel.stage);
+}
 
 function uiStage(job: JobSnapshot): Stage {
   if (job.state === "running") {
@@ -76,23 +95,39 @@ function uiStage(job: JobSnapshot): Stage {
 
 export default function Home() {
   const [channels, setChannels] = useState(initialChannels);
-  const [selected, setSelected] = useState(0);
+  const [visibleChannelIds, setVisibleChannelIds] = useState<number[]>([0, 1]);
   const [firmware, setFirmware] = useState<File | null>(null);
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
   const [logs, setLogs] = useState<string[]>(["[SYSTEM] Plasma Web Console ready"]);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsChannelId, setDetailsChannelId] = useState<number | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
   const [apiDraft, setApiDraft] = useState(DEFAULT_API_BASE);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
-  const [submittingChannel, setSubmittingChannel] = useState<number | null>(null);
+  const [submittingChannelIds, setSubmittingChannelIds] = useState<number[]>([]);
   const trackedJobs = useRef<Record<number, string>>({});
   const transitionKeys = useRef<Record<string, string>>({});
   const connectionRef = useRef<ConnectionState>("connecting");
-  const active = channels[selected];
-  const isRunning = ["queued", "erase", "program", "verify", "read"].includes(active.stage);
+
+  const visibleChannels = channels.filter(channel => visibleChannelIds.includes(channel.id));
   const enabledCount = channels.filter(channel => channel.enabled).length;
+  const detailsChannel = detailsChannelId === null
+    ? undefined
+    : channels.find(channel => channel.id === detailsChannelId);
+  const readRangeValid = Number.isInteger(Number(readOffset))
+    && Number(readOffset) >= 0
+    && Number.isInteger(Number(readLength))
+    && Number(readLength) > 0;
+
+  const statusCounts = useMemo(() => visibleChannels.reduce((counts, channel) => {
+    if (!channel.enabled) counts.disabled += 1;
+    else if (submittingChannelIds.includes(channel.id) || isRunning(channel)) counts.busy += 1;
+    else if (channel.stage === "success") counts.success += 1;
+    else if (failedStages.includes(channel.stage)) counts.failed += 1;
+    else counts.idle += 1;
+    return counts;
+  }, { idle: 0, busy: 0, success: 0, failed: 0, disabled: 0 }), [submittingChannelIds, visibleChannels]);
 
   const appendLog = useCallback((message: string) => {
     const time = new Date().toLocaleTimeString("zh-TW", { hour12: false });
@@ -107,6 +142,7 @@ export default function Home() {
     setChannels(items => items.map(channel => channel.id === job.channel_id ? {
       ...channel,
       stage,
+      operation: job.operation,
       progress: Number(job.progress_percent ?? 0),
       stageProgress: Number(job.stage_progress_percent ?? 0),
       jobId: job.job_id,
@@ -212,58 +248,95 @@ export default function Home() {
     }
   }
 
-  async function run(requestedOperation: Operation | "sequence") {
-    const operation: Operation = requestedOperation === "sequence" ? "program" : requestedOperation;
-    if (!active.enabled || connection !== "online" || isRunning) return;
-    if (operation !== "erase" && operation !== "read" && !firmware) return;
+  function toggleChannel(channelId: number) {
+    const channel = channels[channelId];
+    if (isRunning(channel) || submittingChannelIds.includes(channelId)) return;
+    setVisibleChannelIds(current => {
+      if (!current.includes(channelId)) return [...current, channelId].sort((left, right) => left - right);
+      if (current.length === 1) {
+        appendLog("[UI] 主畫面至少必須保留一個通道");
+        return current;
+      }
+      return current.filter(id => id !== channelId);
+    });
+  }
+
+  function operationDisabled(channel: Channel, operation: Operation): boolean {
+    if (connection !== "online" || !channel.enabled || isRunning(channel)) return true;
+    if (submittingChannelIds.includes(channel.id)) return true;
+    if ((operation === "program" || operation === "verify") && !firmware) return true;
+    if ((operation === "program" || operation === "verify") && firmware.size > MAX_FIRMWARE_BYTES) return true;
+    if (operation === "read" && !readRangeValid) return true;
+    return false;
+  }
+
+  function batchDisabled(operation: Operation): boolean {
+    return visibleChannels.some(channel => operationDisabled(channel, operation));
+  }
+
+  async function runChannel(channelId: number, operation: Operation) {
+    const channel = channels[channelId];
+    if (operationDisabled(channel, operation)) return;
     if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
-      appendLog(`[CH${selected}] Firmware 超過 16 MiB 限制`);
+      appendLog(`[CH${channelId}] Firmware 超過 16 MiB 限制`);
       return;
     }
 
-    setSubmittingChannel(selected);
+    setSubmittingChannelIds(current => current.includes(channelId) ? current : [...current, channelId]);
     try {
       const job = await startJob(apiBase, {
-        channelId: selected,
+        channelId,
         operation,
         firmware: operation === "erase" || operation === "read" ? null : firmware,
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
       });
-      trackedJobs.current[selected] = job.job_id;
-      setChannels(items => items.map(channel => channel.id === selected ? {
-        ...channel,
+      trackedJobs.current[channelId] = job.job_id;
+      setChannels(items => items.map(item => item.id === channelId ? {
+        ...item,
         stage: "queued",
+        operation,
         progress: 0,
         stageProgress: 0,
         jobId: job.job_id,
         file: firmware?.name,
         error: undefined,
         outputFile: undefined,
-      } : channel));
-      appendLog(`[CH${selected}] ${job.job_id} accepted by Python · ${operation.toUpperCase()}`);
+      } : item));
+      appendLog(`[CH${channelId}] ${job.job_id} accepted by Python · ${operation.toUpperCase()}`);
     } catch (error) {
-      appendLog(`[CH${selected}] Submit failed · ${error instanceof Error ? error.message : "unknown error"}`);
+      appendLog(`[CH${channelId}] Submit failed · ${error instanceof Error ? error.message : "unknown error"}`);
+      setChannels(items => items.map(item => item.id === channelId ? {
+        ...item,
+        stage: "failed",
+        operation,
+        error: error instanceof Error ? error.message : "unknown error",
+      } : item));
     } finally {
-      setSubmittingChannel(null);
+      setSubmittingChannelIds(current => current.filter(id => id !== channelId));
     }
   }
 
-  async function cancel() {
-    if (!active.jobId || !isRunning) return;
+  async function runBatch(operation: Operation) {
+    if (batchDisabled(operation)) return;
+    appendLog(`[BATCH] ${operation.toUpperCase()} · ${visibleChannelIds.map(id => `CH${id}`).join(", ")}`);
+    await Promise.all(visibleChannelIds.map(channelId => runChannel(channelId, operation)));
+  }
+
+  async function cancel(channelId: number) {
+    const channel = channels[channelId];
+    if (!channel.jobId || !isRunning(channel)) return;
     try {
-      await cancelJob(apiBase, active.jobId);
-      appendLog(`[CH${selected}] Cancel requested · waiting for Python safe shutdown`);
+      await cancelJob(apiBase, channel.jobId);
+      appendLog(`[CH${channelId}] Cancel requested · waiting for Python safe shutdown`);
     } catch (error) {
-      appendLog(`[CH${selected}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`);
+      appendLog(`[CH${channelId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`);
     }
   }
 
-  const statusText = useMemo(() => {
-    if (submittingChannel === selected) return "SUBMITTING";
-    return active.stage === "idle" ? "READY" : active.stage.toUpperCase();
-  }, [active.stage, selected, submittingChannel]);
-  const controlDisabled = connection !== "online" || !active.enabled || isRunning || submittingChannel !== null;
+  const batchTargetText = visibleChannelIds.length === 8
+    ? "CH0～CH7"
+    : visibleChannelIds.map(id => `CH${id}`).join("、");
 
   return (
     <main>
@@ -280,59 +353,88 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="workspace">
-        <aside>
-          <p className="eyebrow">CHANNEL MATRIX</p>
-          <div className="channelGrid">
-            {channels.map(channel => <button key={channel.id} onClick={() => setSelected(channel.id)} className={`channel ${selected === channel.id ? "selected" : ""} ${!channel.enabled ? "disabled" : ""}`}>
-              <span>CH{channel.id}</span><i className={channel.stage}/><small>{channel.enabled ? stageLabels[channel.stage] : "DISABLED"}</small>
-            </button>)}
-          </div>
-          <div className={`health ${connection}`}><span>PYTHON GATEWAY</span><b>{connection === "online" ? "Online" : connection === "connecting" ? "Connecting" : "Offline"}</b><div><i/><i/><i/><i/></div><small>{enabledCount}/8 channels enabled · REST polling 500 ms</small></div>
-        </aside>
+      <section className="console overviewConsole">
+        <div className="pageHeading">
+          <div><p className="eyebrow">CHANNEL MATRIX</p><h1>多通道工作總覽</h1></div>
+          <div className={`gatewayHealth ${connection}`}><span className="pulse"/><div><small>PYTHON GATEWAY</small><b>{connection === "online" ? "Online" : connection === "connecting" ? "Connecting" : "Offline"}</b></div><em>{enabledCount}/8 Enabled</em></div>
+        </div>
 
-        <section className="console">
-          <div className="heading"><div><p className="eyebrow">ACTIVE WORKSPACE</p><h1>Channel {selected}</h1></div><div className="headingActions"><button onClick={() => setDetailsOpen(true)}>詳細資料 ↗</button><span className={`state ${active.stage}`}>{statusText}</span></div></div>
-
-          <div className="controlCard">
-            <div className="fileDrop">
-              <div className="chipIcon">⌁</div>
-              <div><b>{firmware?.name ?? "選擇 Firmware BIN 檔案"}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB · BIN` : "支援 .bin · Max 16 MiB"}</small></div>
-              <label>瀏覽檔案<input aria-label="選擇 Firmware 檔案" type="file" accept=".bin,application/octet-stream" onChange={event => setFirmware(event.target.files?.[0] ?? null)}/></label>
-            </div>
-            {!active.enabled && <div className="warning">CH{selected} 尚未在 Python Prototype 設定中啟用</div>}
-            {connection !== "online" && <div className="warning">請先確認 Python Server 與 Gateway 已啟動，再連線 API</div>}
-            {active.error && <div className="warning">{active.error}</div>}
-            <div className="readRange">
-              <label>READ logical offset<input aria-label="READ logical flash offset" type="number" min="0" step="1" value={readOffset} onChange={event => setReadOffset(event.target.value)}/></label>
-              <label>READ byte length<input aria-label="READ byte length" type="number" min="1" step="1" value={readLength} onChange={event => setReadLength(event.target.value)}/></label>
-              <small>Phase 1 預設讀取 256 bytes；目標 Flash 容量尚未由 Channel API 提供。</small>
-            </div>
-            <div className="actions">
-              <button onClick={() => void run("erase")} disabled={controlDisabled}><span>01</span>擦除<small>ERASE</small></button>
-              <button onClick={() => void run("program")} disabled={controlDisabled || !firmware}><span>02</span>燒錄<small>PROGRAM</small></button>
-              <button onClick={() => void run("verify")} disabled={controlDisabled || !firmware}><span>03</span>驗證<small>VERIFY</small></button>
-              <button onClick={() => void run("read")} disabled={controlDisabled || !Number.isInteger(Number(readOffset)) || Number(readOffset) < 0 || !Number.isInteger(Number(readLength)) || Number(readLength) <= 0}><span>04</span>讀取<small>READ</small></button>
-              <button className="sequence" onClick={() => void run("sequence")} disabled={controlDisabled || !firmware}>執行完整流程 <b>→</b></button>
-            </div>
-          </div>
-
-          <div className="progressCard">
-            <div className="progressHead"><div><span className="ring">{Math.round(active.progress)}</span><div><b>{stageLabels[active.stage]}</b><small>{active.jobId ?? "尚未建立 Job"}</small></div></div><div className="jobActions">{active.stage === "success" && active.jobId && active.outputFile && <a className="download" href={readDownloadUrl(apiBase, active.jobId, active.outputFile)}>Download BIN</a>}<button className="cancel" onClick={() => void cancel()} disabled={!isRunning}>■　取消工作</button></div></div>
-            <div className="track"><i style={{ width: `${active.progress}%` }}/></div>
-            <div className="metrics"><span>整體進度 <b>{active.progress.toFixed(1)}%</b></span><span>階段進度 <b>{active.stageProgress.toFixed(1)}%</b></span><span>Firmware <b>{active.file ?? "—"}</b></span></div>
-          </div>
-
-          <div className="logCard">
-            <div className="logHead"><div><span/>LIVE JOB LOG</div><button onClick={() => setLogs([])}>清除</button></div>
-            <pre>{logs.length ? logs.join("\n") : "Log cleared."}</pre>
+        <section className="selectorPanel" aria-labelledby="channel-selector-title">
+          <div className="sectionHeading"><div><p className="eyebrow">DISPLAY CHANNELS</p><h2 id="channel-selector-title">顯示與批次操作通道</h2></div><b>{visibleChannelIds.length} / 8</b></div>
+          <div className="channelChecks">
+            {channels.map(channel => {
+              const locked = isRunning(channel) || submittingChannelIds.includes(channel.id);
+              return <label key={channel.id} className={`${visibleChannelIds.includes(channel.id) ? "checked" : ""} ${!channel.enabled ? "disabled" : ""}`}>
+                <input type="checkbox" aria-label={`顯示 CH${channel.id}`} checked={visibleChannelIds.includes(channel.id)} disabled={locked} onChange={() => toggleChannel(channel.id)}/>
+                <span>CH{channel.id}</span><small>{channel.enabled ? stageLabels[channel.stage] : "停用"}</small>
+              </label>;
+            })}
           </div>
         </section>
-      </div>
-      {detailsOpen && <div className="modalBackdrop" onClick={() => setDetailsOpen(false)}><section className="details" onClick={event => event.stopPropagation()}>
-        <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Channel {selected} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsOpen(false)}>×</button></div>
-        <dl><div><dt>Python API</dt><dd>{apiBase}</dd></div><div><dt>Job ID</dt><dd>{active.jobId ?? "—"}</dd></div><div><dt>Operation state</dt><dd>{active.stage.toUpperCase()}</dd></div><div><dt>Firmware</dt><dd>{active.file ?? "—"}</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{active.target ?? "STM32F103C8T6"} ({active.interface ?? "Mock"})</dd></div></dl>
-        <p>目前狀態由 Python Job Manager 與 MockInterface 回傳，不再由瀏覽器計時器產生。OpenOCD 與 FPGA 實機仍待後續驗證。</p>
+
+        <section className="operationConfig" aria-label="工作參數">
+          <div className="compactFile">
+            <div><b>{firmware?.name ?? "選擇 Firmware BIN 檔案"}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB · BIN` : "Program / Verify 共用 · Max 16 MiB"}</small></div>
+            <label>瀏覽檔案<input aria-label="選擇 Firmware 檔案" type="file" accept=".bin,application/octet-stream" onChange={event => setFirmware(event.target.files?.[0] ?? null)}/></label>
+          </div>
+          <div className="compactRead">
+            <label>READ Offset<input aria-label="READ logical flash offset" type="number" min="0" step="1" value={readOffset} onChange={event => setReadOffset(event.target.value)}/></label>
+            <label>READ Length<input aria-label="READ byte length" type="number" min="1" step="1" value={readLength} onChange={event => setReadLength(event.target.value)}/></label>
+          </div>
+        </section>
+
+        <section className="batchPanel" aria-labelledby="batch-title">
+          <div className="batchInfo">
+            <div><p className="eyebrow">BATCH CONTROL</p><h2 id="batch-title">批次控制</h2><small>目標：{batchTargetText}</small></div>
+            <div className="statusSummary" aria-label="選取通道狀態摘要">
+              <span>待命 <b>{statusCounts.idle}</b></span><span className="busy">工作中 <b>{statusCounts.busy}</b></span><span className="success">成功 <b>{statusCounts.success}</b></span><span className="failed">失敗 <b>{statusCounts.failed}</b></span><span>停用 <b>{statusCounts.disabled}</b></span>
+            </div>
+          </div>
+          <div className="batchActions">
+            {(Object.keys(operationLabels) as Operation[]).map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} onClick={() => void runBatch(operation)} disabled={batchDisabled(operation)}><span>{operationSymbols[operation]}</span>{operationLabels[operation]}</button>)}
+          </div>
+          {visibleChannels.some(channel => !channel.enabled) && <div className="warning">選取項目包含未啟用通道；取消勾選後才能執行批次工作。</div>}
+          {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">Firmware 超過 16 MiB 限制。</div>}
+        </section>
+
+        <section className="overviewCard" aria-labelledby="overview-title">
+          <div className="overviewHead"><div><p className="eyebrow">LIVE CHANNEL STATUS</p><h2 id="overview-title">通道執行狀態</h2></div><small>REST polling 500 ms</small></div>
+          <div className="channelTableWrap">
+            <table className="channelTable">
+              <thead><tr><th>通道</th><th>目標／介面</th><th>目前工作</th><th>狀態</th><th>進度</th><th>獨立操作</th></tr></thead>
+              <tbody>
+                {visibleChannels.map(channel => {
+                  const submitting = submittingChannelIds.includes(channel.id);
+                  const rowState = submitting ? "submitting" : channel.stage;
+                  const status = !channel.enabled ? "停用" : submitting ? "提交中" : stageLabels[channel.stage];
+                  return <tr key={channel.id}>
+                    <td><button className="channelDetails" onClick={() => setDetailsChannelId(channel.id)}><b>CH{channel.id}</b><small>詳細資料 ↗</small></button></td>
+                    <td><b>{channel.target ?? "STM32F103C8T6"}</b><small>{channel.interface ?? "Mock / SWD"}</small></td>
+                    <td>{channel.operation ? operationLabels[channel.operation] : "—"}{channel.error && <small className="errorText">{channel.error}</small>}</td>
+                    <td><span className={`state ${rowState}`}>{status}</span></td>
+                    <td><div className="tableProgress"><div className="track"><i style={{ width: `${channel.progress}%` }}/></div><b>{Math.round(channel.progress)}%</b></div></td>
+                    <td><div className="rowActions">
+                      {(Object.keys(operationLabels) as Operation[]).map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`CH${channel.id} ${operationLabels[operation]}`} title={operationLabels[operation]} onClick={() => void runChannel(channel.id, operation)} disabled={operationDisabled(channel, operation)}>{operationSymbols[operation]}</button>)}
+                      <button className="stop" aria-label={`取消 CH${channel.id} 工作`} title="取消工作" onClick={() => void cancel(channel.id)} disabled={!isRunning(channel)}>■</button>
+                      {channel.stage === "success" && channel.jobId && channel.outputFile && <a className="rowDownload" aria-label={`下載 CH${channel.id} 讀取檔案`} title="下載 BIN" href={readDownloadUrl(apiBase, channel.jobId, channel.outputFile)}>↓</a>}
+                    </div></td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="logCard">
+          <div className="logHead"><div><span/>LIVE JOB LOG</div><button onClick={() => setLogs([])}>清除</button></div>
+          <pre>{logs.length ? logs.join("\n") : "Log cleared."}</pre>
+        </section>
+      </section>
+
+      {detailsChannel && <div className="modalBackdrop" onClick={() => setDetailsChannelId(null)}><section className="details" onClick={event => event.stopPropagation()}>
+        <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Channel {detailsChannel.id} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsChannelId(null)}>×</button></div>
+        <dl><div><dt>Python API</dt><dd>{apiBase}</dd></div><div><dt>Job ID</dt><dd>{detailsChannel.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsChannel.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>State</dt><dd>{detailsChannel.stage.toUpperCase()}</dd></div><div><dt>Firmware</dt><dd>{detailsChannel.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsChannel.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsChannel.target ?? "STM32F103C8T6"} ({detailsChannel.interface ?? "Mock"})</dd></div></dl>
+        <p>狀態由 Python Job Manager 與目前的通道介面回傳。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
       </section></div>}
     </main>
   );
