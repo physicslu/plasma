@@ -25,7 +25,7 @@ Plasma 是一個多通道 IC 燒錄器的純 Python 控制層 Prototype。本版
 - `job_state.json`、`result.json` 與 read-back binary。
 - 原子寫檔，避免未完成檔案直接成為正式輸出。
 - Server 啟動時將先前未完成的工作標記為 `ABORTED`。
-- Python 內建 `unittest` 測試，不強制依賴 pytest。
+- `pytest` 是統一測試執行器；既有 `unittest.TestCase` 測試由 pytest 相容收集。
 - 瀏覽器 REST Gateway：狀態查詢、Firmware 上傳、擦除、燒錄、驗證與取消。
 - `job_id`、協定保留欄位、數值型別與 read-back 檔名的防禦性驗證。
 - 等待全域執行名額的 Job 可立即取消；Server 關閉時取消執行中與排隊中工作。
@@ -76,18 +76,15 @@ cd plasma-multichannel-v0.3.1
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e .
-```
-
-只有設定檔解析需要 `PyYAML`。開發者若要使用 pytest 與 coverage：
-
-```bash
 python -m pip install -e '.[dev]'
 ```
 
+正式 runtime 只有設定檔解析需要 `PyYAML`；開發與測試環境使用 `dev` extra，
+提供 pytest 與 coverage。
+
 ## 快速測試
 
-不需安裝 pytest：
+統一測試入口：
 
 ```bash
 ./scripts/run_tests.sh
@@ -96,10 +93,10 @@ python -m pip install -e '.[dev]'
 或直接執行：
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m pytest -q
 ```
 
-不安裝第三方 coverage 套件也可產生 Python 內建 trace 摘要：
+Coverage 使用同一個 pytest runner；舊檔名保留供既有流程相容：
 
 ```bash
 ./scripts/run_trace_coverage.sh

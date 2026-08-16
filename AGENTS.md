@@ -25,6 +25,14 @@ scripts/            SWPC deployment and service-control scripts
 docs/               Architecture, development, deployment, hardware, and test documentation
 ```
 
+Execution-zone ownership:
+
+```text
+Codex Cloud   Software engineering, isolated tests, branch/PR delivery
+SWPC          Integration, Vivado build, deployment, shared-service validation
+Z2            Target runtime, FPGA/PS integration, electrical/hardware validation
+```
+
 ## 2. Source-of-truth priority
 
 Do not assume chat history or older documentation is current.
@@ -40,9 +48,35 @@ When sources disagree, use this priority order:
 If an inconsistency is found, report it explicitly and avoid silently choosing the older behavior.
 Update the relevant documentation when behavior is intentionally changed.
 
-## 3. Development host: SWPC
+## 3. Execution zones
 
-SWPC is the primary Plasma development, integration-test, build, and demo server.
+### 3.1 Codex Cloud: software engineering agent
+
+Codex Cloud is the default isolated software-engineering environment. It may edit source,
+run tests that do not need site-specific services or hardware, and deliver changes on an
+`agent/*` branch through a pull request.
+
+Use these repository entry points in Codex Cloud:
+
+```bash
+bash scripts/codex-cloud-setup.sh
+bash scripts/codex-cloud-test.sh
+```
+
+The configured maintenance command is:
+
+```bash
+bash scripts/codex-cloud-maintenance.sh
+```
+
+Codex Cloud does not prove SWPC deployment, Vivado implementation, Z2 runtime behavior,
+FPGA I/O behavior, or real IC programming. Do not add SWPC SSH keys, Z2 credentials,
+GitHub tokens, board certificates, or deployment secrets to the Cloud environment merely
+to collapse these validation boundaries.
+
+### 3.2 Integration and deployment host: SWPC
+
+SWPC is the Plasma integration-test, Vivado build, deployment, and demo server.
 
 ```text
 SSH:        gordon@swpc
@@ -64,6 +98,12 @@ git fetch origin main
 
 Never overwrite unrelated user changes.
 If the worktree contains unrelated modifications, keep them untouched and limit edits to the requested scope.
+
+### 3.3 Target runtime and hardware validation: Z2
+
+Z2 owns embedded runtime, PS/PL integration, FPGA loading, target-interface behavior,
+and hardware validation. A passing Cloud or SWPC Mock test must never be reported as a
+passing Z2 or real-target test.
 
 ## 4. Current software architecture
 
@@ -117,6 +157,8 @@ cd /storage/projects/plasma/software/python
 ```
 
 Do not replace pytest with unittest based on stale documentation or CI configuration.
+`pytest` is the repository-wide test runner. Existing `unittest.TestCase` classes may
+remain while pytest collects them; do not reintroduce a separate unittest command path.
 If a Python dependency changes, update `pyproject.toml` and verify the SWPC install/deploy path still works.
 
 ## 6. Web environment
@@ -168,7 +210,8 @@ plasmactl logs
 plasmactl deploy
 ```
 
-`plasmactl test` is the preferred full SWPC validation because it runs the repository's Python and Web checks together.
+`plasmactl test` is the preferred full SWPC validation because it runs the repository's
+Python and PL source-layout pytest collection plus the Web checks together.
 
 The normal deployment flow is:
 
@@ -571,11 +614,10 @@ Before standardizing a Z2 Python environment, verify compatibility with the PYNQ
 
 Agents should be aware of these items and must not silently propagate them:
 
-1. `software/python/pyproject.toml` and `scripts/plasmactl` use pytest, while the current GitHub Python workflow still runs `unittest discover`; CI should eventually be aligned with the repository-defined test entry point.
-2. SWPC development currently uses Python 3.11 while the GitHub Python workflow uses Python 3.12; this is valid under the declared `>=3.11` requirement but differences must be considered when diagnosing CI-only failures.
-3. The SWPC operational Gateway port is 18080, while the Python gateway module has a code-level default of 8080.
-4. Older architecture discussion may describe FastAPI/WebSocket, but the current checked-in Gateway uses Python standard-library HTTP and REST polling.
-5. Older descriptions may call the Web stack simply React/TypeScript/Vite; current `package.json` also includes Next.js/Vinext. Always inspect the current package metadata before making stack assumptions.
+1. SWPC development currently uses Python 3.11 while the GitHub Python workflow uses Python 3.12; this is valid under the declared `>=3.11` requirement but differences must be considered when diagnosing CI-only failures.
+2. The SWPC operational Gateway port is 18080, while the Python gateway module has a code-level default of 8080.
+3. Older architecture discussion may describe FastAPI/WebSocket, but the current checked-in Gateway uses Python standard-library HTTP and REST polling.
+4. Older descriptions may call the Web stack simply React/TypeScript/Vite; current `package.json` also includes Next.js/Vinext. Always inspect the current package metadata before making stack assumptions.
 
 When working near one of these areas, either resolve the inconsistency as part of the task or call it out clearly in the final report.
 

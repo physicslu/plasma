@@ -1,37 +1,35 @@
-# Plasma v0.3.1 純軟體與 Web Gateway 測試報告
+# Plasma v0.3.1 pytest 與 Web Gateway 測試報告
 
 ## 執行摘要
 
 | 項目 | 結果 |
 |---|---|
-| 執行日期 | 2026-08-13 |
+| 執行日期 | 2026-08-16 |
 | Python | 3.12.13 |
-| 測試框架 | Python `unittest` |
-| 測試數 | 69 |
-| 通過 | 69 |
+| 測試執行器 | `pytest 9.1.1`；相容收集既有 `unittest.TestCase` |
+| 測試數 | 75，另有 8 個 subtests |
+| 通過 | 75；8 個 subtests 通過 |
 | 失敗 | 0 |
 | 錯誤 | 0 |
 | 跳過 | 0 |
-| 最終執行時間 | 6.910 秒 |
+| 最終執行時間 | 6.37 秒 |
 | Web Gateway REST API | 5/5 通過 |
 | Web → Gateway → TCP Server → Mock E2E | 2/2 通過 |
 | CLI 進度端對端 | 通過 |
 | CLI `Ctrl+C` 取消端對端 | 通過 |
 | Editable install／console entry | 通過 |
-| Python trace（v0.3.1 上次量測） | 約 81%；本次未重跑 |
+| pytest-cov line coverage | 83%（1795 statements，302 missing） |
 
 執行指令：
 
 ```bash
-python3 -m unittest discover -s tests -v
+./scripts/run_tests.sh
 ```
 
 結果：
 
 ```text
-Ran 69 tests in 6.910s
-
-OK
+75 passed, 8 subtests passed in 6.37s
 ```
 
 ## 已驗證
@@ -85,9 +83,9 @@ OK
 
 另在臨時 venv 執行 editable install，確認 `plasma`、`plasma-server` console entry point 與 package lazy import 均可用。
 
-上次 v0.3.1 的 Python 內建 trace production source 加權覆蓋率約 81%；本次 Web
-Mock 整合未重跑 coverage，因此不宣稱新百分比。該數值是 line trace 近似值，並非
-branch coverage。
+本次使用 `run_trace_coverage.sh` 相容入口重新執行 pytest-cov，production modules
+line coverage 為 83%（1795 statements，302 missing）。這是 line coverage，並非
+branch coverage；不可與先前 Python trace 的近似百分比直接比較。
 
 ## 未驗證
 

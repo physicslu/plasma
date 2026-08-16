@@ -14,7 +14,7 @@ GitHub main → SWPC fast-forward 更新 → 完整測試 → 重新啟動 → h
 |---|---|
 | `plasmactl status` | 顯示 Git 版本、工作目錄、systemd 與 Port 狀態 |
 | `plasmactl update` | 從 GitHub `main` 做 fast-forward 更新 |
-| `plasmactl test` | 執行完整 Python 與 Web 測試 |
+| `plasmactl test` | 執行完整 Python、PL source-layout 與 Web 測試 |
 | `plasmactl restart` | 重新啟動三個服務並執行 health check |
 | `plasmactl deploy` | 依序執行 update、test、restart |
 | `plasmactl logs` | 同時查看三個服務的即時 Log |
