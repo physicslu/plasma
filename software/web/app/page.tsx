@@ -11,7 +11,7 @@ import {
   readDownloadUrl,
   startJob,
 } from "./plasma-api";
-import type { JobSnapshot, Operation } from "./plasma-api";
+import type { JobSnapshot, JobState, Operation } from "./plasma-api";
 
 type Stage =
   | "idle"
@@ -43,8 +43,11 @@ type Theme = "dark" | "light";
 type ConnectionState = "connecting" | "online" | "offline";
 
 const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
+const BATCH_JOB_POLL_INTERVAL_MS = 500;
+const BATCH_JOB_POLL_ATTEMPTS = 120;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
 const failedStages: Stage[] = ["cancelled", "failed", "timeout", "aborted"];
+const terminalJobStates = new Set<JobState>(["success", "failed", "cancelled", "timeout", "aborted"]);
 const initialChannels: Channel[] = Array.from({ length: 8 }, (_, id) => ({
   id,
   enabled: id < 2,
@@ -108,6 +111,7 @@ export default function Home() {
   const [apiDraft, setApiDraft] = useState(DEFAULT_API_BASE);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [submittingChannelIds, setSubmittingChannelIds] = useState<number[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
   const trackedJobs = useRef<Record<number, string>>({});
   const transitionKeys = useRef<Record<string, string>>({});
   const connectionRef = useRef<ConnectionState>("connecting");
@@ -253,7 +257,7 @@ export default function Home() {
 
   function toggleChannel(channelId: number) {
     const channel = channels[channelId];
-    if (isRunning(channel) || submittingChannelIds.includes(channelId)) return;
+    if (batchRunning || isRunning(channel) || submittingChannelIds.includes(channelId)) return;
     setVisibleChannelIds(current => {
       if (!current.includes(channelId)) return [...current, channelId].sort((left, right) => left - right);
       if (current.length === 1) {
@@ -265,7 +269,7 @@ export default function Home() {
   }
 
   function operationDisabled(channel: Channel, operation: Operation): boolean {
-    if (connection !== "online" || !channel.enabled || isRunning(channel)) return true;
+    if (batchRunning || connection !== "online" || !channel.enabled || isRunning(channel)) return true;
     if (submittingChannelIds.includes(channel.id)) return true;
     if ((operation === "program" || operation === "verify") && !firmware) return true;
     if ((operation === "program" || operation === "verify") && firmware.size > MAX_FIRMWARE_BYTES) return true;
@@ -278,6 +282,7 @@ export default function Home() {
   }
 
   function toggleBatchOperation(operation: Operation) {
+    if (batchRunning) return;
     setSelectedBatchOperations(current => {
       if (!current.includes(operation)) {
         return operationOrder.filter(item => current.includes(item) || item === operation);
@@ -290,7 +295,7 @@ export default function Home() {
     });
   }
 
-  async function runChannel(channelId: number, operation: Operation) {
+  async function runChannel(channelId: number, operation: Operation): Promise<JobSnapshot | undefined> {
     const channel = channels[channelId];
     if (operationDisabled(channel, operation)) return;
     if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
@@ -320,6 +325,7 @@ export default function Home() {
         outputFile: undefined,
       } : item));
       appendLog(`[CH${channelId}] ${job.job_id} accepted by Python · ${operation.toUpperCase()}`);
+      return job;
     } catch (error) {
       appendLog(`[CH${channelId}] Submit failed · ${error instanceof Error ? error.message : "unknown error"}`);
       setChannels(items => items.map(item => item.id === channelId ? {
@@ -333,11 +339,48 @@ export default function Home() {
     }
   }
 
+  async function waitForTerminalJob(job: JobSnapshot): Promise<JobSnapshot> {
+    for (let attempt = 0; attempt < BATCH_JOB_POLL_ATTEMPTS; attempt += 1) {
+      const current = await getJob(apiBase, job.job_id);
+      applyJob(current);
+      if (terminalJobStates.has(current.state)) return current;
+      await new Promise(resolve => window.setTimeout(resolve, BATCH_JOB_POLL_INTERVAL_MS));
+    }
+    throw new Error(`${job.job_id} 等待完成逾時`);
+  }
+
   async function runBatch(operations: Operation[]) {
-    if (operations.length === 0 || operations.some(batchDisabled)) return;
-    appendLog(`[BATCH] QUEUE ${operations.map(operation => operation.toUpperCase()).join(" → ")} · ${visibleChannelIds.map(id => `CH${id}`).join(", ")}`);
-    for (const operation of operations) {
-      await Promise.all(visibleChannelIds.map(channelId => runChannel(channelId, operation)));
+    if (batchRunning || operations.length === 0 || operations.some(batchDisabled)) return;
+    const batchOperations = [...operations];
+    const batchChannelIds = [...visibleChannelIds];
+    setBatchRunning(true);
+    appendLog(`[BATCH] START ${batchOperations.map(operation => operation.toUpperCase()).join(" → ")} · ${batchChannelIds.map(id => `CH${id}`).join(", ")}`);
+    try {
+      const outcomes = await Promise.all(batchChannelIds.map(async channelId => {
+        for (const operation of batchOperations) {
+          appendLog(`[CH${channelId}] Batch ${operation.toUpperCase()}`);
+          const job = await runChannel(channelId, operation);
+          if (!job) return { channelId, succeeded: false };
+          try {
+            const finalJob = await waitForTerminalJob(job);
+            if (finalJob.state !== "success") {
+              appendLog(`[CH${channelId}] Batch stopped · ${finalJob.state.toUpperCase()}`);
+              return { channelId, succeeded: false };
+            }
+          } catch (error) {
+            appendLog(`[CH${channelId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`);
+            return { channelId, succeeded: false };
+          }
+        }
+        appendLog(`[CH${channelId}] Batch complete`);
+        return { channelId, succeeded: true };
+      }));
+      const successfulChannelIds = outcomes.filter(outcome => outcome.succeeded).map(outcome => outcome.channelId);
+      const stoppedChannelIds = outcomes.filter(outcome => !outcome.succeeded).map(outcome => outcome.channelId);
+      appendLog(`[BATCH] COMPLETE · success: ${successfulChannelIds.length ? successfulChannelIds.map(id => `CH${id}`).join(", ") : "none"}` +
+        (stoppedChannelIds.length ? ` · stopped: ${stoppedChannelIds.map(id => `CH${id}`).join(", ")}` : ""));
+    } finally {
+      setBatchRunning(false);
     }
   }
 
@@ -381,7 +424,7 @@ export default function Home() {
           <div className="sectionHeading"><div><p className="eyebrow">DISPLAY CHANNELS</p><h2 id="channel-selector-title">顯示與批次操作通道</h2></div><b>{visibleChannelIds.length} / 8</b></div>
           <div className="channelChecks">
             {channels.map(channel => {
-              const locked = isRunning(channel) || submittingChannelIds.includes(channel.id);
+              const locked = batchRunning || isRunning(channel) || submittingChannelIds.includes(channel.id);
               return <label key={channel.id} className={`${visibleChannelIds.includes(channel.id) ? "checked" : ""} ${!channel.enabled ? "disabled" : ""}`}>
                 <input type="checkbox" aria-label={`顯示 CH${channel.id}`} checked={visibleChannelIds.includes(channel.id)} disabled={locked} onChange={() => toggleChannel(channel.id)}/>
                 <span>CH{channel.id}</span><small>{channel.enabled ? stageLabels[channel.stage] : "停用"}</small>
@@ -393,11 +436,11 @@ export default function Home() {
         <section className="operationConfig" aria-label="工作參數">
           <div className="compactFile">
             <div><b>{firmware?.name ?? "選擇 Firmware BIN 檔案"}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB · BIN` : "Program / Verify 共用 · Max 16 MiB"}</small></div>
-            <label>瀏覽檔案<input aria-label="選擇 Firmware 檔案" type="file" accept=".bin,application/octet-stream" onChange={event => setFirmware(event.target.files?.[0] ?? null)}/></label>
+            <label>瀏覽檔案<input aria-label="選擇 Firmware 檔案" type="file" accept=".bin,application/octet-stream" disabled={batchRunning} onChange={event => setFirmware(event.target.files?.[0] ?? null)}/></label>
           </div>
           <div className="compactRead">
-            <label>READ Offset<input aria-label="READ logical flash offset" type="number" min="0" step="1" value={readOffset} onChange={event => setReadOffset(event.target.value)}/></label>
-            <label>READ Length<input aria-label="READ byte length" type="number" min="1" step="1" value={readLength} onChange={event => setReadLength(event.target.value)}/></label>
+            <label>READ Offset<input aria-label="READ logical flash offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)}/></label>
+            <label>READ Length<input aria-label="READ byte length" type="number" min="1" step="1" value={readLength} disabled={batchRunning} onChange={event => setReadLength(event.target.value)}/></label>
           </div>
         </section>
 
@@ -410,9 +453,9 @@ export default function Home() {
           </div>
           <div className="batchActions">
             <div className="batchOperationChoices" role="group" aria-label="選取批次操作">
-              {operationOrder.map(operation => <button key={operation} type="button" className={selectedBatchOperations.includes(operation) ? "selected" : ""} aria-pressed={selectedBatchOperations.includes(operation)} onClick={() => toggleBatchOperation(operation)}><span>{operationSymbols[operation]}</span>{operationLabels[operation]}</button>)}
+              {operationOrder.map(operation => <button key={operation} type="button" className={selectedBatchOperations.includes(operation) ? "selected" : ""} aria-pressed={selectedBatchOperations.includes(operation)} onClick={() => toggleBatchOperation(operation)} disabled={batchRunning}><span>{operationSymbols[operation]}</span>{operationLabels[operation]}</button>)}
             </div>
-            <button type="button" className="executeBatch" aria-label={`批次執行：${selectedBatchOperations.map(operation => operationLabels[operation]).join("、")}`} onClick={() => void runBatch(selectedBatchOperations)} disabled={selectedBatchOperations.some(batchDisabled)}><span>▶</span>批次執行（{selectedBatchOperations.length}）</button>
+            <button type="button" className="executeBatch" aria-label={`批次執行：${selectedBatchOperations.map(operation => operationLabels[operation]).join("、")}`} onClick={() => void runBatch(selectedBatchOperations)} disabled={batchRunning || selectedBatchOperations.some(batchDisabled)}><span>▶</span>{batchRunning ? "批次執行中" : `批次執行（${selectedBatchOperations.length}）`}</button>
           </div>
           {visibleChannels.some(channel => !channel.enabled) && <div className="warning">選取項目包含未啟用通道；取消勾選後才能執行批次工作。</div>}
           {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">Firmware 超過 16 MiB 限制。</div>}

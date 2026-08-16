@@ -23,7 +23,13 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
   assert.match(page, /visibleChannelIds/);
-  assert.match(page, /Promise\.all\(visibleChannelIds\.map/);
+  assert.match(page, /waitForTerminalJob/);
+  assert.match(page, /terminalJobStates\.has\(current\.state\)/);
+  assert.match(page, /const batchChannelIds = \[\.\.\.visibleChannelIds\]/);
+  assert.match(page, /Promise\.all\(batchChannelIds\.map/);
+  assert.match(page, /for \(const operation of batchOperations\)/);
+  assert.match(page, /Batch stopped/);
+  assert.match(page, /Batch complete/);
   assert.match(page, /runChannel\(channel\.id, operation\)/);
   assert.match(page, /主畫面至少必須保留一個通道/);
   assert.match(page, /disabled=\{locked\}/);
@@ -35,7 +41,6 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /停用 <b>\{disabledCount\}/);
   assert.match(page, /selectedBatchOperations/);
   assert.match(page, /批次操作至少必須選擇一項/);
-  assert.match(page, /for \(const operation of operations\)/);
   assert.match(page, /runBatch\(selectedBatchOperations\)/);
   assert.match(page, /批次執行/);
 });
