@@ -12,7 +12,7 @@
 | 失敗 | 0 |
 | 錯誤 | 0 |
 | 跳過 | 0 |
-| 最終執行時間 | 6.37 秒 |
+| 最終執行時間 | 4.41 秒 |
 | Web Gateway REST API | 5/5 通過 |
 | Web → Gateway → TCP Server → Mock E2E | 2/2 通過 |
 | CLI 進度端對端 | 通過 |
@@ -29,15 +29,15 @@
 結果：
 
 ```text
-75 passed, 8 subtests passed in 6.37s
+75 passed, 8 subtests passed in 4.41s
 ```
 
 ## 已驗證
 
 - Web status 查詢、Firmware program submission、verify 缺少檔案拒絕、遠端 cancel
   與 CORS preflight。
-- 真實 HTTP Gateway → Plasma v3.1 TCP Server → `MockInterface` 的 program
-  `erase → program → verify`、進度、成功結果與安全取消。
+- 真實 HTTP Gateway → Plasma v3.1 TCP Server → `MockInterface` 的獨立 program
+  寫入、進度、成功結果與安全取消。
 
 - v3.1 frame encode/decode、fragmented read、半包與 checksum。
 - `firmware_size`／BINLEN 一致性、SHA-256 格式與內容驗證。
@@ -49,9 +49,9 @@
 - `max_concurrent_jobs=2` 時最大 active 數不超過 2。
 - 單通道失敗隔離、recoverable retry、timeout、cancel。
 - 非阻塞工作提交與 `job_id` 立即回覆。
-- `erase`、`program`、`verify` 三階段進度及整體進度單調增加。
+- `erase`、`program`、`verify` 各自作為獨立 Job；program 不會隱含 erase 或 verify。
 - `program`／`verify` 的 `bytes_done`、`bytes_total`。
-- CLI 動態進度條包含 `ERASE`、`PROGRAM`、`VERIFY` 與 100%。
+- CLI program 動態進度條只包含 `PROGRAM` 與 100%。
 - CLI process 收到真正 `SIGINT` 後發出遠端 cancel，結果為 `cancelled`。
 - retry backoff 期間取消會立即終止，不會誤啟動下一次 attempt。
 - 等待全域 concurrency slot 時可立即取消，不必等其他通道完成。

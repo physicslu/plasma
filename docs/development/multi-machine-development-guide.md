@@ -405,17 +405,18 @@ npm ci
 npm run dev
 ```
 
-Web 預設連 `http://127.0.0.1:8080`。Python 在另一台電腦時，可在 Web 上方的
+Web 預設 API Base 為 `https://plasma.open4th.com`（不可加 `/api`）。Python
+在另一台電腦時，可在 Web 上方的
 **Python API URL** 輸入：
 
 ```text
-http://PYTHON電腦IP:8080
+http://PYTHON電腦IP:18080
 ```
 
 也可在啟動前指定預設值：
 
 ```bash
-NEXT_PUBLIC_PLASMA_API_URL=http://PYTHON電腦IP:8080 npm run dev
+NEXT_PUBLIC_PLASMA_API_URL=http://PYTHON電腦IP:18080 npm run dev
 ```
 
 提交前：

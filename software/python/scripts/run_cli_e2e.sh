@@ -59,9 +59,9 @@ assert len(status["channels"]) == 8
 assert program["result"]["state"] == "success"
 assert read["result"]["state"] == "success"
 assert len(read["result"]["output_files"]) == 2
-assert "ERASE" in progress
 assert "PROGRAM" in progress
-assert "VERIFY" in progress
+assert "ERASE" not in progress
+assert "VERIFY" not in progress
 assert "100.0%" in progress
 print("CLI E2E: status/progress/program/read passed")
 PY

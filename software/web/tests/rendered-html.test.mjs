@@ -43,6 +43,8 @@ test("renders the Plasma programmer console", async () => {
   assert.match(html, /aria-label="顯示 CH0"/);
   assert.match(html, /aria-label="顯示 CH7"/);
   assert.match(html, />BATCH CONTROL</);
+  assert.match(html, /aria-label="選取批次操作"/);
+  assert.match(html, /aria-label="批次執行：燒錄"/);
   assert.match(html, />LIVE CHANNEL STATUS</);
   assert.match(html, />獨立操作</);
   assert.match(html, /aria-label="CH0 擦除"/);

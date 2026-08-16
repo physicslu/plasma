@@ -45,8 +45,8 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         self.servers.append(server)
         return PlasmaClient(*server.address, response_timeout_s=2.0), server
 
-    async def test_detached_program_reports_all_stages_and_monotonic_progress(self) -> None:
-        client, _server = await self.start_server(
+    async def test_detached_program_reports_program_only_and_monotonic_progress(self) -> None:
+        client, server = await self.start_server(
             {"erase": 0.12, "program": 0.18, "verify": 0.12}
         )
         request = JobRequest(
@@ -72,13 +72,18 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         observed_stages = {str(item["stage"]) for item in updates if item.get("stage")}
         percentages = [float(item["progress_percent"]) for item in updates]
         self.assertEqual(result["result"]["state"], "success")
-        self.assertEqual(observed_stages, {"erase", "program", "verify"})
+        self.assertEqual(observed_stages, {"program"})
         self.assertTrue(any(0.0 < value < 100.0 for value in percentages))
         self.assertEqual(percentages, sorted(percentages))
         self.assertEqual(percentages[-1], 100.0)
         self.assertTrue(any(item.get("bytes_total") == 64 for item in updates))
+        interface = server.manager.interfaces[0]
+        self.assertIsInstance(interface, MockInterface)
+        self.assertEqual(interface.calls["erase"], 0)
+        self.assertEqual(interface.calls["program"], 1)
+        self.assertEqual(interface.calls["verify"], 0)
 
-    async def test_cli_progress_renderer_shows_erase_program_verify(self) -> None:
+    async def test_cli_progress_renderer_shows_program_only(self) -> None:
         client, _server = await self.start_server(
             {"erase": 0.09, "program": 0.12, "verify": 0.09}
         )
@@ -98,9 +103,9 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         )
         rendered = stream.getvalue()
         self.assertEqual(result["result"]["state"], "success")
-        self.assertIn("ERASE", rendered)
         self.assertIn("PROGRAM", rendered)
-        self.assertIn("VERIFY", rendered)
+        self.assertNotIn("ERASE", rendered)
+        self.assertNotIn("VERIFY", rendered)
         self.assertIn("100.0%", rendered)
         self.assertIn("█", rendered)
 

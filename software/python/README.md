@@ -11,12 +11,12 @@ Plasma 是一個多通道 IC 燒錄器的純 Python 控制層 Prototype。本版
 - 每通道獨立 queue、worker、state、interface instance 與 log。
 - 全域 `max_concurrent_jobs` 限制，避免硬體資源過載。
 - 操作：`erase`、`program`、`verify`、`read`、`status`、`cancel`。
-- `program` 工作流程：`erase → program → verify`。
+- `program` 只負責寫入 Firmware；完整流程由 Client／Web UI 依序送出 `erase → program → verify`。
 - v3.1 framed protocol：明確 metadata、map、binary 長度。
 - Binary SHA-256 驗證、封包大小上限與不完整資料偵測。
 - 統一錯誤碼、recoverable 分類及原始例外保留。
 - 每個 Job 的 timeout、retry、backoff 與 cancel。
-- `erase → program → verify` 可設定模擬時間並持續回報階段及整體進度。
+- `erase`、`program`、`verify` 可獨立設定模擬時間並持續回報進度。
 - CLI 單行動態進度條，包含階段百分比與 program／verify 位元組數。
 - CLI 執行期間按 `Ctrl+C` 會向 Server 送出取消要求並等待安全收尾。
 - 也可從另一個終端以 `plasma cancel --job ...` 取消工作。
@@ -127,7 +127,7 @@ python3 -m plasma_server.server --config config/plasma.yaml
 plasma --host 127.0.0.1 --port 9900 status
 ```
 
-燒錄 CH0：
+只寫入 Firmware 至 CH0（不自動擦除或驗證）：
 
 ```bash
 plasma --host 127.0.0.1 --port 9900 program \
@@ -142,10 +142,8 @@ plasma --host 127.0.0.1 --port 9900 program \
 
 ```text
 Job job-... queued. Press Ctrl+C to cancel.
-CH0 ERASE     [██████──────────────────────]  21.1%  stage 63.3%
-CH0 PROGRAM   [████████████████────────────]  58.9%  stage 76.7%  50,266/65,536 B
-CH0 VERIFY    [██████████████████████████──]  94.4%  stage 83.3%  54,613/65,536 B
-CH0 VERIFY    [████████████████████████████] 100.0%  stage 100.0% 65,536/65,536 B
+CH0 PROGRAM   [████████████████────────────]  58.9%  stage 58.9%  38,600/65,536 B
+CH0 PROGRAM   [████████████████████████████] 100.0%  stage 100.0% 65,536/65,536 B
 ```
 
 若不需要進度條：

@@ -43,7 +43,7 @@ type ApiErrorPayload = {
 };
 
 export const DEFAULT_API_BASE =
-  process.env.NEXT_PUBLIC_PLASMA_API_URL ?? "http://127.0.0.1:8080";
+  process.env.NEXT_PUBLIC_PLASMA_API_URL ?? "https://plasma.open4th.com";
 
 export class PlasmaApiError extends Error {
   constructor(

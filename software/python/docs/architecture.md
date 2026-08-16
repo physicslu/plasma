@@ -24,7 +24,7 @@ flowchart TD
 | `plasma_client` | 建立 request、TCP 傳輸、CLI | 通道排程與硬體操作 |
 | `plasma_core` | models、errors、config、protocol、log/output | target-specific 指令 |
 | `plasma_server` | 連線、Job registry、queue、worker、cancel | MCU 燒錄細節 |
-| `plasma_handlers` | IC 操作流程，例如 erase→program→verify | TCP、檔案路徑、AXI 位址 |
+| `plasma_handlers` | IC 的獨立 erase、program、verify、read 操作 | TCP、檔案路徑、AXI 位址 |
 | `plasma_interfaces` | 實際硬體或 Mock 操作 | Job 排程與跨通道策略 |
 
 ## Job 生命週期
@@ -56,7 +56,7 @@ sequenceDiagram
     participant Worker
     CLI->>Server: submit(wait=false)
     Server-->>CLI: accepted + job_id
-    Worker->>Worker: erase / program / verify
+    Worker->>Worker: selected operation
     CLI->>Server: status(job_id)
     Server-->>CLI: stage + progress
     CLI->>Server: cancel(job_id)

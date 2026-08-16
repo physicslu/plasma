@@ -84,8 +84,9 @@ def main() -> int:
             result = json.loads(stdout)
             assert result["result"]["state"] == "cancelled", result
             assert "Cancellation requested" in stderr, stderr
-            assert "ERASE" in stderr, stderr
             assert "PROGRAM" in stderr, stderr
+            assert "ERASE" not in stderr, stderr
+            assert "VERIFY" not in stderr, stderr
 
             follow_up = run_cli(
                 "erase",

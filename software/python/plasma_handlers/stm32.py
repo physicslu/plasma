@@ -79,30 +79,15 @@ class STM32F103Handler(BaseHandler):
             if not request.firmware:
                 raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "program requires non-empty firmware")
             await self._stage(
-                "erase",
-                stage_callback,
-                lambda progress: self.interface.erase(progress),
-                stage_index=0,
-                stage_count=3,
-            )
-            await self._stage(
                 "program",
                 stage_callback,
                 lambda progress: self.interface.program(request.firmware, 0, progress),
-                stage_index=1,
-                stage_count=3,
-                byte_progress=True,
-            )
-            await self._stage(
-                "verify",
-                stage_callback,
-                lambda progress: self.interface.verify(request.firmware, 0, progress),
-                stage_index=2,
-                stage_count=3,
+                stage_index=0,
+                stage_count=1,
                 byte_progress=True,
             )
             return ExecutionOutput(
-                details={"stages": ["erase", "program", "verify"], "bytes_programmed": len(request.firmware)}
+                details={"stages": ["program"], "bytes_programmed": len(request.firmware)}
             )
 
         if operation is Operation.VERIFY:
