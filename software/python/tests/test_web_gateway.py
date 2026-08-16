@@ -3,9 +3,11 @@ from __future__ import annotations
 import base64
 import json
 import threading
+import tempfile
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
 from plasma_web.gateway import PlasmaWebHandler
 
@@ -22,7 +24,13 @@ class FakeClient:
 class WebGatewayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.output_root = Path(cls.temporary.name)
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.addClassCleanup(setattr, PlasmaWebHandler, "output_root", PlasmaWebHandler.output_root)
+        cls.addClassCleanup(setattr, PlasmaWebHandler, "client_factory", PlasmaWebHandler.client_factory)
         PlasmaWebHandler.client_factory = staticmethod(FakeClient)
+        PlasmaWebHandler.output_root = cls.output_root
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -42,7 +50,7 @@ class WebGatewayTests(unittest.TestCase):
         response_headers = dict(response.getheaders())
         response_body = response.read()
         conn.close()
-        payload = json.loads(response_body) if response_body else None
+        payload = json.loads(response_body) if response_body and response_headers.get("Content-Type", "").startswith("application/json") else (response_body or None)
         return response.status, payload, response_headers
 
     def test_status(self):
@@ -57,6 +65,55 @@ class WebGatewayTests(unittest.TestCase):
 
     def test_verify_requires_firmware(self):
         status, payload, _ = self.request("POST", "/api/jobs", {"channel_id": 0, "operation": "verify"})
+        self.assertEqual(status, 400); self.assertFalse(payload["ok"])
+
+    def test_read_without_firmware_uses_logical_range(self):
+        status, _, _ = self.request("POST", "/api/jobs", {"channel_id": 0, "operation": "read", "offset": 12, "length": 4})
+        self.assertEqual(status, 202)
+        self.assertEqual(FakeClient.last_request.firmware, b"")
+        self.assertEqual(FakeClient.last_request.map_data["sections"], [{"name": "flash", "address": 12, "length": 4}])
+
+    def test_read_rejects_invalid_range(self):
+        status, payload, _ = self.request("POST", "/api/jobs", {"channel_id": 0, "operation": "read", "offset": -1, "length": 4})
+        self.assertEqual(status, 400); self.assertFalse(payload["ok"])
+
+    def test_read_rejects_non_integer_and_non_positive_ranges(self):
+        invalid_ranges = [
+            {"offset": True, "length": 4},
+            {"offset": 1.5, "length": 4},
+            {"offset": "1", "length": 4},
+            {"offset": 0, "length": False},
+            {"offset": 0, "length": 1.5},
+            {"offset": 0, "length": "4"},
+            {"offset": 0, "length": 0},
+            {"offset": 0, "length": -1},
+        ]
+        for values in invalid_ranges:
+            with self.subTest(**values):
+                status, payload, _ = self.request(
+                    "POST", "/api/jobs", {"channel_id": 0, "operation": "read", **values}
+                )
+                self.assertEqual(status, 400)
+                self.assertFalse(payload["ok"])
+
+    def test_download_is_job_scoped_and_binary(self):
+        job_dir = self.output_root / "web-job-1"
+        job_dir.mkdir()
+        output = job_dir / "read_CH0_flash.bin"
+        output.write_bytes(b"\x01\x02\xff")
+        (job_dir / "result.json").write_text(json.dumps({"output_files": [str(output)]}))
+        status, payload, headers = self.request("GET", "/api/jobs/web-job-1/files/read_CH0_flash.bin")
+        self.assertEqual(status, 200); self.assertEqual(payload, b"\x01\x02\xff")
+        self.assertEqual(headers["Content-Type"], "application/octet-stream")
+        self.assertIn("read_CH0_flash.bin", headers["Content-Disposition"])
+
+        other = self.output_root / "other-job"
+        other.mkdir(); secret = other / "secret.bin"; secret.write_bytes(b"secret")
+        status, payload, _ = self.request("GET", "/api/jobs/web-job-1/files/secret.bin")
+        self.assertEqual(status, 400); self.assertFalse(payload["ok"])
+
+    def test_download_rejects_path_traversal(self):
+        status, payload, _ = self.request("GET", "/api/jobs/web-job-1/files/%2e%2e%2fresult.json")
         self.assertEqual(status, 400); self.assertFalse(payload["ok"])
 
     def test_cancel(self):

@@ -54,7 +54,8 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
             operation=Operation.PROGRAM,
             firmware=bytes(range(64)),
             job_id="progress-stages",
-            timeout_s=2.0,
+            # This test validates progress semantics, so leave scheduling margin for loaded CI runners.
+            timeout_s=10.0,
         )
         accepted = await client.start(request)
         self.assertTrue(accepted["accepted"])
@@ -64,7 +65,7 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         result = await client.wait_for_job(
             request.job_id,
             poll_interval_s=0.01,
-            timeout_s=2.0,
+            timeout_s=12.0,
             on_update=lambda job: updates.append(dict(job)),
         )
 

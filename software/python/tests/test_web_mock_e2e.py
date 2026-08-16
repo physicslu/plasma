@@ -46,10 +46,15 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
 
         self.original_factory = PlasmaWebHandler.client_factory
         self.original_origins = PlasmaWebHandler.allowed_origins
+        self.original_output_root = PlasmaWebHandler.output_root
+        self.addCleanup(setattr, PlasmaWebHandler, "output_root", self.original_output_root)
+        self.addCleanup(setattr, PlasmaWebHandler, "allowed_origins", self.original_origins)
+        self.addCleanup(setattr, PlasmaWebHandler, "client_factory", self.original_factory)
         PlasmaWebHandler.client_factory = staticmethod(
             lambda: PlasmaClient(*self.plasma.address, response_timeout_s=3.0)
         )
         PlasmaWebHandler.allowed_origins = frozenset({"http://localhost:4173"})
+        PlasmaWebHandler.output_root = config.server.output_root
         self.gateway = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
         self.gateway_thread = threading.Thread(
             target=self.gateway.serve_forever,
@@ -61,8 +66,6 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         self.gateway.shutdown()
         self.gateway.server_close()
         self.gateway_thread.join()
-        PlasmaWebHandler.client_factory = self.original_factory
-        PlasmaWebHandler.allowed_origins = self.original_origins
         await self.plasma.close()
         self.temporary.cleanup()
 
@@ -71,7 +74,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         method: str,
         path: str,
         body: dict[str, Any] | None = None,
-    ) -> tuple[int, dict[str, Any], dict[str, str]]:
+    ) -> tuple[int, Any, dict[str, str]]:
         connection = HTTPConnection("127.0.0.1", self.gateway.server_port, timeout=3)
         raw = json.dumps(body).encode() if body is not None else None
         headers = {"Origin": "http://localhost:4173"}
@@ -80,7 +83,8 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         connection.request(method, path, raw, headers)
         response = connection.getresponse()
         response_headers = dict(response.getheaders())
-        payload = json.loads(response.read())
+        response_body = response.read()
+        payload = json.loads(response_body) if response_headers.get("Content-Type", "").startswith("application/json") else response_body
         status = response.status
         connection.close()
         return status, payload, response_headers
@@ -90,7 +94,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         method: str,
         path: str,
         body: dict[str, Any] | None = None,
-    ) -> tuple[int, dict[str, Any], dict[str, str]]:
+    ) -> tuple[int, Any, dict[str, str]]:
         return await asyncio.to_thread(self._request_sync, method, path, body)
 
     async def wait_for_terminal(
@@ -169,6 +173,34 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         final, _ = await self.wait_for_terminal(job_id)
         self.assertEqual(final["state"], "cancelled")
         self.assertTrue(final["cancel_requested"])
+
+    async def test_program_then_read_and_download_exact_mock_bytes(self) -> None:
+        firmware = bytes(range(64))
+        status, accepted, _ = await self.request("POST", "/api/jobs", {
+            "channel_id": 1, "operation": "program", "firmware_name": "known.bin",
+            "firmware_base64": base64.b64encode(firmware).decode(),
+        })
+        self.assertEqual(status, 202)
+        programmed, _ = await self.wait_for_terminal(accepted["job"]["job_id"])
+        self.assertEqual(programmed["state"], "success")
+
+        status, accepted, _ = await self.request("POST", "/api/jobs", {
+            "channel_id": 1, "operation": "read", "offset": 7, "length": 29,
+        })
+        self.assertEqual(status, 202)
+        read_job, updates = await self.wait_for_terminal(accepted["job"]["job_id"])
+        self.assertEqual(read_job["state"], "success")
+        self.assertTrue(any(item["stage"] == "read_flash" for item in updates))
+        output_file = Path(read_job["result"]["output_files"][0])
+        self.assertTrue(output_file.is_file())
+        self.assertEqual(output_file.read_bytes(), firmware[7:36])
+
+        status, downloaded, headers = await self.request(
+            "GET", f"/api/jobs/{read_job['job_id']}/files/{output_file.name}"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "application/octet-stream")
+        self.assertEqual(downloaded, firmware[7:36])
 
 
 if __name__ == "__main__":
