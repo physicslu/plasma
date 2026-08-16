@@ -96,7 +96,7 @@ Server 同時檢查：
 | `cancel_requested` | Server 是否已收到取消要求 |
 | `updated_at` | 最後狀態更新時間 |
 
-`program` 的三個階段目前各占整體進度三分之一。這是 Mock 工作流程權重；真實硬體版應根據 erase block、傳輸 byte count 與 verify 回報重新定義。
+每個操作是獨立 Job。`program` 只寫入 Firmware，不會自動執行 `erase` 或 `verify`；需要完整燒錄流程時，Client 必須依序送出 `erase → program → verify`。每個 Job 的 `progress_percent` 分別由該操作的實際進度計算。
 
 Request-level error：
 

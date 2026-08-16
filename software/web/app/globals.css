@@ -114,12 +114,14 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .statusSummary .success { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
 .statusSummary .failed { border-color: color-mix(in srgb, var(--red) 45%, var(--line)); }
 .batchActions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.batchOperationChoices { display: flex; gap: 7px; flex-wrap: wrap; }
 .batchActions button { border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel); color: var(--text); padding: 8px 11px; font-size: 11px; cursor: pointer; }
 .batchActions button span { color: var(--cyan); font: 10px var(--font-mono); margin-right: 6px; }
-.batchActions button.primary { border-color: var(--cyan); background: var(--cyan); color: #fff; }
-.batchActions button.primary span { color: #fff; }
+.batchOperationChoices button.selected { border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, var(--panel)); color: var(--cyan); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cyan) 28%, transparent); }
+.batchActions button.executeBatch { border-color: var(--cyan); background: var(--cyan); color: #fff; font-weight: 700; }
+.batchActions button.executeBatch span { color: #fff; }
 .batchActions button:hover:not(:disabled) { border-color: var(--cyan); background: var(--hover); }
-.batchActions button.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--cyan) 86%, #000); color: #fff; }
+.batchActions button.executeBatch:hover:not(:disabled) { background: color-mix(in srgb, var(--cyan) 86%, #000); color: #fff; }
 .batchActions button:disabled, .rowActions button:disabled { opacity: .3; cursor: not-allowed; }
 .warning { grid-column: 1 / -1; padding: 8px 10px; background: color-mix(in srgb, var(--amber) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--amber) 65%, var(--line)); color: var(--amber); border-radius: 5px; font-size: 11px; }
 

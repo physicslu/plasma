@@ -36,11 +36,12 @@ npm run install:ci
 npm run dev
 ```
 
-The default Python API URL is `http://127.0.0.1:8080`. Enter another URL in the
-top bar when Python runs on a different computer, or set it at build time:
+The default Python API Base is `https://plasma.open4th.com` (without `/api`).
+Enter another Base URL in the top bar when Python runs on a different computer,
+or set it at build time:
 
 ```bash
-NEXT_PUBLIC_PLASMA_API_URL=http://192.168.1.50:8080 npm run dev
+NEXT_PUBLIC_PLASMA_API_URL=http://192.168.1.50:18080 npm run dev
 ```
 
 For a shared LAN, bind the Gateway to `0.0.0.0` and restrict CORS to the Web

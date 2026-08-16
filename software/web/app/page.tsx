@@ -77,6 +77,7 @@ const operationSymbols: Record<Operation, string> = {
   verify: "驗",
   read: "讀",
 };
+const operationOrder = Object.keys(operationLabels) as Operation[];
 
 function isRunning(channel: Channel): boolean {
   return runningStages.includes(channel.stage);
@@ -99,6 +100,7 @@ export default function Home() {
   const [firmware, setFirmware] = useState<File | null>(null);
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
+  const [selectedBatchOperations, setSelectedBatchOperations] = useState<Operation[]>(["program"]);
   const [logs, setLogs] = useState<string[]>(["[SYSTEM] Plasma Web Console ready"]);
   const [detailsChannelId, setDetailsChannelId] = useState<number | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
@@ -112,6 +114,7 @@ export default function Home() {
 
   const visibleChannels = channels.filter(channel => visibleChannelIds.includes(channel.id));
   const enabledCount = channels.filter(channel => channel.enabled).length;
+  const disabledCount = channels.length - enabledCount;
   const detailsChannel = detailsChannelId === null
     ? undefined
     : channels.find(channel => channel.id === detailsChannelId);
@@ -274,6 +277,19 @@ export default function Home() {
     return visibleChannels.some(channel => operationDisabled(channel, operation));
   }
 
+  function toggleBatchOperation(operation: Operation) {
+    setSelectedBatchOperations(current => {
+      if (!current.includes(operation)) {
+        return operationOrder.filter(item => current.includes(item) || item === operation);
+      }
+      if (current.length === 1) {
+        appendLog("[UI] 批次操作至少必須選擇一項");
+        return current;
+      }
+      return current.filter(item => item !== operation);
+    });
+  }
+
   async function runChannel(channelId: number, operation: Operation) {
     const channel = channels[channelId];
     if (operationDisabled(channel, operation)) return;
@@ -317,10 +333,12 @@ export default function Home() {
     }
   }
 
-  async function runBatch(operation: Operation) {
-    if (batchDisabled(operation)) return;
-    appendLog(`[BATCH] ${operation.toUpperCase()} · ${visibleChannelIds.map(id => `CH${id}`).join(", ")}`);
-    await Promise.all(visibleChannelIds.map(channelId => runChannel(channelId, operation)));
+  async function runBatch(operations: Operation[]) {
+    if (operations.length === 0 || operations.some(batchDisabled)) return;
+    appendLog(`[BATCH] QUEUE ${operations.map(operation => operation.toUpperCase()).join(" → ")} · ${visibleChannelIds.map(id => `CH${id}`).join(", ")}`);
+    for (const operation of operations) {
+      await Promise.all(visibleChannelIds.map(channelId => runChannel(channelId, operation)));
+    }
   }
 
   async function cancel(channelId: number) {
@@ -387,11 +405,14 @@ export default function Home() {
           <div className="batchInfo">
             <div><p className="eyebrow">BATCH CONTROL</p><h2 id="batch-title">批次控制</h2><small>目標：{batchTargetText}</small></div>
             <div className="statusSummary" aria-label="選取通道狀態摘要">
-              <span>待命 <b>{statusCounts.idle}</b></span><span className="busy">工作中 <b>{statusCounts.busy}</b></span><span className="success">成功 <b>{statusCounts.success}</b></span><span className="failed">失敗 <b>{statusCounts.failed}</b></span><span>停用 <b>{statusCounts.disabled}</b></span>
+              <span>待命 <b>{statusCounts.idle}</b></span><span className="busy">工作中 <b>{statusCounts.busy}</b></span><span className="success">成功 <b>{statusCounts.success}</b></span><span className="failed">失敗 <b>{statusCounts.failed}</b></span><span>停用 <b>{disabledCount}</b></span>
             </div>
           </div>
           <div className="batchActions">
-            {(Object.keys(operationLabels) as Operation[]).map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} onClick={() => void runBatch(operation)} disabled={batchDisabled(operation)}><span>{operationSymbols[operation]}</span>{operationLabels[operation]}</button>)}
+            <div className="batchOperationChoices" role="group" aria-label="選取批次操作">
+              {operationOrder.map(operation => <button key={operation} type="button" className={selectedBatchOperations.includes(operation) ? "selected" : ""} aria-pressed={selectedBatchOperations.includes(operation)} onClick={() => toggleBatchOperation(operation)}><span>{operationSymbols[operation]}</span>{operationLabels[operation]}</button>)}
+            </div>
+            <button type="button" className="executeBatch" aria-label={`批次執行：${selectedBatchOperations.map(operation => operationLabels[operation]).join("、")}`} onClick={() => void runBatch(selectedBatchOperations)} disabled={selectedBatchOperations.some(batchDisabled)}><span>▶</span>批次執行（{selectedBatchOperations.length}）</button>
           </div>
           {visibleChannels.some(channel => !channel.enabled) && <div className="warning">選取項目包含未啟用通道；取消勾選後才能執行批次工作。</div>}
           {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">Firmware 超過 16 MiB 限制。</div>}

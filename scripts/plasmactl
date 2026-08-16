@@ -29,7 +29,7 @@ gateway_port="${PLASMA_GATEWAY_PORT:-18080}"
 cors_origin="${PLASMA_CORS_ORIGIN:-*}"
 vite_host="${PLASMA_VITE_HOST:-127.0.0.1}"
 vite_port="${PLASMA_VITE_PORT:-5173}"
-public_api_url="${PLASMA_PUBLIC_API_URL:-}"
+public_api_url="${PLASMA_PUBLIC_API_URL:-https://plasma.open4th.com}"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 bin_dir="${PLASMACTL_BIN_DIR:-$HOME/.local/bin}"
 services=(plasma-server.service plasma-web.service plasma-vite.service)
@@ -87,8 +87,8 @@ PLASMA_GATEWAY_PORT=$gateway_port
 PLASMA_CORS_ORIGIN=$cors_origin
 PLASMA_VITE_HOST=$vite_host
 PLASMA_VITE_PORT=$vite_port
-# Optional: URL shown as the Web Console's default Python API.
-# PLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net/api
+# URL shown as the Web Console's default Python API. Do not append /api.
+PLASMA_PUBLIC_API_URL=$public_api_url
 EOF
     say "建立設定檔：$config_file"
   else

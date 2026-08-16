@@ -89,7 +89,7 @@ pytest-cov 同一組參數重新產生。
 | Config | 預設雙通道、最多八通道、重複 ID、hex register base |
 | Manager | 1/2/4/8 CH、全域並行數、disabled/invalid、重複 Job、等待名額時取消 |
 | Fault injection | program failure、retry、timeout、cancel、verify mismatch、safe shutdown failure |
-| Progress | 非阻塞提交、三階段進度、整體進度單調增加、byte count |
+| Progress | 非阻塞提交、各獨立操作進度、整體進度單調增加、byte count |
 | CLI | 動態進度條、`Ctrl+C` 遠端取消、取消後通道恢復 |
 | Isolation | CH0 failed 時 CH1 success |
 | Output | 分段 read、獨立檔名、檔名碰撞拒絕、`job_id` 路徑安全、`result.json`、JSONL 完整性 |
@@ -139,7 +139,7 @@ find logs -maxdepth 4 -type f -print
 - `output/<job-id>/result.json` 存在。
 - read Job 產生兩個不互相覆蓋的 `.bin`。
 - `logs/<date>/CH0/` 同時存在 `.log` 與 `.jsonl`。
-- CLI 依序出現 `ERASE`、`PROGRAM`、`VERIFY`，最後為 `100.0%`。
+- CLI 的 program 工作只出現 `PROGRAM`，不會自動出現 `ERASE` 或 `VERIFY`，最後為 `100.0%`。
 
 ## 5. 進度與取消測試
 

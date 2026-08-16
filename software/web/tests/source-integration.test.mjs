@@ -15,6 +15,8 @@ test("uses the Python Gateway API instead of browser-side job simulation", async
   assert.match(api, /\/api\/status/);
   assert.match(api, /\/api\/jobs/);
   assert.match(api, /await fetch/);
+  assert.match(api, /https:\/\/plasma\.open4th\.com/);
+  assert.doesNotMatch(api, /127\.0\.0\.1:8080/);
 });
 
 test("supports selected-channel batch jobs and per-channel controls", async () => {
@@ -29,5 +31,11 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /工作中 <b>\{statusCounts\.busy\}/);
   assert.match(page, /成功 <b>\{statusCounts\.success\}/);
   assert.match(page, /失敗 <b>\{statusCounts\.failed\}/);
-  assert.match(page, /停用 <b>\{statusCounts\.disabled\}/);
+  assert.match(page, /const disabledCount = channels\.length - enabledCount/);
+  assert.match(page, /停用 <b>\{disabledCount\}/);
+  assert.match(page, /selectedBatchOperations/);
+  assert.match(page, /批次操作至少必須選擇一項/);
+  assert.match(page, /for \(const operation of operations\)/);
+  assert.match(page, /runBatch\(selectedBatchOperations\)/);
+  assert.match(page, /批次執行/);
 });

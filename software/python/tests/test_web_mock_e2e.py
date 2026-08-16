@@ -141,7 +141,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(final["progress_percent"], 100.0)
         self.assertEqual(
             {item["stage"] for item in updates if item["stage"]},
-            {"erase", "program", "verify"},
+            {"program"},
         )
         self.assertTrue(any(0 < item["progress_percent"] < 100 for item in updates))
 
