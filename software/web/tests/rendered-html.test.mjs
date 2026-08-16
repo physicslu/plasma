@@ -39,4 +39,12 @@ test("renders the Plasma programmer console", async () => {
   assert.match(html, />PYTHON MOCK API</);
   assert.match(html, /aria-label="Python API URL"/);
   assert.match(html, />PYTHON GATEWAY</);
+  assert.match(html, />DISPLAY CHANNELS</);
+  assert.match(html, /aria-label="顯示 CH0"/);
+  assert.match(html, /aria-label="顯示 CH7"/);
+  assert.match(html, />BATCH CONTROL</);
+  assert.match(html, />LIVE CHANNEL STATUS</);
+  assert.match(html, />獨立操作</);
+  assert.match(html, /aria-label="CH0 擦除"/);
+  assert.match(html, /aria-label="CH1 讀取"/);
 });
