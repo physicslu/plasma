@@ -25,6 +25,14 @@ scripts/            SWPC deployment and service-control scripts
 docs/               Architecture, development, deployment, hardware, and test documentation
 ```
 
+Execution-zone ownership:
+
+```text
+Codex Cloud   Software engineering, isolated tests, branch/PR delivery
+SWPC          Integration, Vivado build, deployment, shared-service validation
+Z2            Target runtime, FPGA/PS integration, electrical/hardware validation
+```
+
 ## 2. Source-of-truth priority
 
 Do not assume chat history or older documentation is current.
@@ -40,9 +48,35 @@ When sources disagree, use this priority order:
 If an inconsistency is found, report it explicitly and avoid silently choosing the older behavior.
 Update the relevant documentation when behavior is intentionally changed.
 
-## 3. Development host: SWPC
+## 3. Execution zones
 
-SWPC is the primary Plasma development, integration-test, build, and demo server.
+### 3.1 Codex Cloud: software engineering agent
+
+Codex Cloud is the default isolated software-engineering environment. It may edit source,
+run tests that do not need site-specific services or hardware, and deliver changes on an
+`agent/*` branch through a pull request.
+
+Use these repository entry points in Codex Cloud:
+
+```bash
+bash scripts/codex-cloud-setup.sh
+bash scripts/codex-cloud-test.sh
+```
+
+The configured maintenance command is:
+
+```bash
+bash scripts/codex-cloud-maintenance.sh
+```
+
+Codex Cloud does not prove SWPC deployment, Vivado implementation, Z2 runtime behavior,
+FPGA I/O behavior, or real IC programming. Do not add SWPC SSH keys, Z2 credentials,
+GitHub tokens, board certificates, or deployment secrets to the Cloud environment merely
+to collapse these validation boundaries.
+
+### 3.2 Integration and deployment host: SWPC
+
+SWPC is the Plasma integration-test, Vivado build, deployment, and demo server.
 
 ```text
 SSH:        gordon@swpc
@@ -64,6 +98,12 @@ git fetch origin main
 
 Never overwrite unrelated user changes.
 If the worktree contains unrelated modifications, keep them untouched and limit edits to the requested scope.
+
+### 3.3 Target runtime and hardware validation: Z2
+
+Z2 owns embedded runtime, PS/PL integration, FPGA loading, target-interface behavior,
+and hardware validation. A passing Cloud or SWPC Mock test must never be reported as a
+passing Z2 or real-target test.
 
 ## 4. Current software architecture
 

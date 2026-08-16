@@ -17,3 +17,5 @@ Software 的版本、限制與測試方式請參考 [`software/README.md`](softw
 [`docs/development/multi-machine-development-guide.md`](docs/development/multi-machine-development-guide.md)。
 SWPC 自動部署與外部 SSH 操作請參考
 [`docs/development/swpc-deployment.md`](docs/development/swpc-deployment.md)。
+Codex Cloud、SWPC 與 Z2 的分工及雲端環境設定請參考
+[`docs/development/codex-cloud-environment.md`](docs/development/codex-cloud-environment.md)。

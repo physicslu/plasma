@@ -28,6 +28,15 @@ pl/build/
 # Python generated files
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.coverage
+software/python/.venv/
+
+# Web generated files
+software/web/node_modules/
+software/web/.next/
+software/web/.sites-runtime/
+software/web/dist/
 
 # OS and editor files
 .DS_Store
