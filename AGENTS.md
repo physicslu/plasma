@@ -157,6 +157,8 @@ cd /storage/projects/plasma/software/python
 ```
 
 Do not replace pytest with unittest based on stale documentation or CI configuration.
+`pytest` is the repository-wide test runner. Existing `unittest.TestCase` classes may
+remain while pytest collects them; do not reintroduce a separate unittest command path.
 If a Python dependency changes, update `pyproject.toml` and verify the SWPC install/deploy path still works.
 
 ## 6. Web environment
@@ -208,7 +210,8 @@ plasmactl logs
 plasmactl deploy
 ```
 
-`plasmactl test` is the preferred full SWPC validation because it runs the repository's Python and Web checks together.
+`plasmactl test` is the preferred full SWPC validation because it runs the repository's
+Python and PL source-layout pytest collection plus the Web checks together.
 
 The normal deployment flow is:
 
@@ -611,11 +614,10 @@ Before standardizing a Z2 Python environment, verify compatibility with the PYNQ
 
 Agents should be aware of these items and must not silently propagate them:
 
-1. `software/python/pyproject.toml` and `scripts/plasmactl` use pytest, while the current GitHub Python workflow still runs `unittest discover`; CI should eventually be aligned with the repository-defined test entry point.
-2. SWPC development currently uses Python 3.11 while the GitHub Python workflow uses Python 3.12; this is valid under the declared `>=3.11` requirement but differences must be considered when diagnosing CI-only failures.
-3. The SWPC operational Gateway port is 18080, while the Python gateway module has a code-level default of 8080.
-4. Older architecture discussion may describe FastAPI/WebSocket, but the current checked-in Gateway uses Python standard-library HTTP and REST polling.
-5. Older descriptions may call the Web stack simply React/TypeScript/Vite; current `package.json` also includes Next.js/Vinext. Always inspect the current package metadata before making stack assumptions.
+1. SWPC development currently uses Python 3.11 while the GitHub Python workflow uses Python 3.12; this is valid under the declared `>=3.11` requirement but differences must be considered when diagnosing CI-only failures.
+2. The SWPC operational Gateway port is 18080, while the Python gateway module has a code-level default of 8080.
+3. Older architecture discussion may describe FastAPI/WebSocket, but the current checked-in Gateway uses Python standard-library HTTP and REST polling.
+4. Older descriptions may call the Web stack simply React/TypeScript/Vite; current `package.json` also includes Next.js/Vinext. Always inspect the current package metadata before making stack assumptions.
 
 When working near one of these areas, either resolve the inconsistency as part of the task or call it out clearly in the final report.
 

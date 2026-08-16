@@ -49,11 +49,10 @@ bash scripts/codex-cloud-test.sh
 
 這個入口會依序執行：
 
-1. Python `pytest`。
-2. 不需要 Vivado 的 PL source-layout tests。
-3. Web lint。
-4. Web build 與 Node tests。
-5. Sites artifact validation。
+1. 單一 `pytest` runner 收集 Python 與不需要 Vivado 的 PL source-layout tests。
+2. Web lint。
+3. Web build 與 Node tests。
+4. Sites artifact validation。
 
 Cloud 不執行 `plasmactl deploy`、systemd restart、Vivado bitstream build、Z2 overlay
 載入、DUT power control 或實體 IC programming。

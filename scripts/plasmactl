@@ -258,8 +258,8 @@ update_code() {
 run_tests() {
   require_repo
   require_runtime
-  say "執行 Python 測試"
-  (cd "$python_dir" && "$python_bin" -m pytest -q) || return 1
+  say "執行 Python 與 PL source-layout pytest"
+  (cd "$python_dir" && "$python_bin" -m pytest -q tests "$repo/pl/tests") || return 1
   say "執行 Web lint、test 與 artifact validation"
   (cd "$web_dir" && "$npm_bin" run lint) || return 1
   (cd "$web_dir" && "$npm_bin" test) || return 1
@@ -375,7 +375,7 @@ Usage: plasmactl COMMAND
 Commands:
   install              安裝相依套件與 user systemd units（不立即啟動）
   update               從 GitHub main 做 fast-forward 更新
-  test                 執行完整 Python 與 Web 測試
+  test                 執行完整 Python、PL source-layout 與 Web 測試
   restart              重新啟動服務並執行 health check
   deploy               update → test → restart（建議日常使用）
   update-and-restart   deploy 的別名

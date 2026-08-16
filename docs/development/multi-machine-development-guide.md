@@ -359,7 +359,7 @@ cd software/python
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e .
+python -m pip install -e '.[dev]'
 ```
 
 Windows PowerShell 啟用 venv：
@@ -368,13 +368,13 @@ Windows PowerShell 啟用 venv：
 cd software/python
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e .
+python -m pip install -e '.[dev]'
 ```
 
 測試：
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m pytest -q
 ```
 
 啟動 Mock Server：
@@ -463,7 +463,7 @@ pl/build/btled/btled.runs/impl_1/btled.bit
 不需 Vivado 的 repository 檢查：
 
 ```bash
-python3 -m unittest discover -s pl/tests -v
+python3 -m pytest -q pl/tests
 ```
 
 注意：
@@ -498,7 +498,7 @@ git fetch origin
 git switch feature/web-python-api
 git pull --ff-only origin feature/web-python-api
 cd software/python
-python3 -m unittest discover -s tests -v
+python3 -m pytest -q
 ```
 
 SWPC 若要修 Python，不要直接在 Web 電腦尚未 pull 的同一 branch 任意改寫歷史。
@@ -518,7 +518,7 @@ SWPC 若要修 Python，不要直接在 Web 電腦尚未 pull 的同一 branch �
 5. 測試通過後 merge。
 6. 各台電腦執行 `git switch main` 與 `git pull --ff-only origin main`。
 
-目前 GitHub Actions 會分別執行 Python 與 Web 測試。紅色失敗狀態代表遠端環境未
+目前 GitHub Actions 會分別執行 Python／PL source-layout 與 Web 測試。紅色失敗狀態代表遠端環境未
 通過，應先閱讀 log 並修正，不要因本機可執行就忽略。
 
 ---

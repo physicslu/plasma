@@ -15,7 +15,7 @@
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e .
+python -m pip install -e '.[dev]'
 ```
 
 ## 2. 一鍵執行全部純軟體測試
@@ -27,17 +27,15 @@ python -m pip install -e .
 預期最後顯示：
 
 ```text
-Ran 66 tests in ...
-
-OK
+75 passed, 8 subtests passed in ...
 ```
 
-若未來增加測試，數字可以大於 66；判定基準是 exit code `0` 且結果為 `OK`。
+若未來增加測試，數字可以大於 75；判定基準是 exit code `0` 且沒有 failed/error。
 
 不使用 script：
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m pytest -q
 ```
 
 另可執行真實 Server process + CLI process 的端對端測試：
@@ -63,25 +61,25 @@ CLI Ctrl+C E2E: remote cancel and channel recovery passed
 只跑單一測試檔：
 
 ```bash
-python3 -m unittest tests.test_protocol -v
-python3 -m unittest tests.test_channel_manager -v
-python3 -m unittest tests.test_client_server -v
+python3 -m pytest -q tests/test_protocol.py
+python3 -m pytest -q tests/test_channel_manager.py
+python3 -m pytest -q tests/test_client_server.py
 ```
 
-若已安裝 pytest：
+Coverage：
 
 ```bash
-pytest -q
-pytest --cov=plasma_core --cov=plasma_server --cov-report=term-missing
+python3 -m pytest -q --cov=plasma_core --cov=plasma_server --cov-report=term-missing
 ```
 
-不安裝 pytest-cov，也可使用 Python 內建 trace：
+相容入口（目前同樣委派給 pytest-cov）：
 
 ```bash
 ./scripts/run_trace_coverage.sh
 ```
 
-本次內建 trace 的 production source 加權結果約為 **81%**。排除未實機驗證的 OpenOCD scaffold 後約為 **83%**。內建 trace 與 coverage.py 的 branch/line 計算方式不同，兩者數值不可直接混用。
+歷史 trace 百分比不可與目前 pytest-cov 結果直接比較；新的 coverage 基準應以
+pytest-cov 同一組參數重新產生。
 
 ## 3. 測試涵蓋範圍
 

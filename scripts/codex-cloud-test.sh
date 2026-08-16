@@ -14,16 +14,10 @@ if [[ ! -x "$python_bin" ]]; then
   exit 69
 fi
 
-printf '[codex-cloud] Running Python tests\n'
-(
-  cd "$python_dir"
-  "$python_bin" -m pytest -q
-)
-
-printf '[codex-cloud] Running PL source-layout tests (no Vivado)\n'
+printf '[codex-cloud] Running Python and PL source tests with pytest\n'
 (
   cd "$repo"
-  "$python_bin" -m unittest discover -s pl/tests -v
+  "$python_bin" -m pytest -q software/python/tests pl/tests
 )
 
 if [[ ! -x "$web_dir/node_modules/.bin/vinext" ]]; then

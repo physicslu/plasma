@@ -16,7 +16,8 @@ software/
 
 ```bash
 cd software/python
-python3 -m unittest discover -s tests -v
+python -m pip install -e '.[dev]'
+python -m pytest -q
 ```
 
 目前 REST Gateway 使用 Python standard library，Web 已可經由 Gateway 與 Plasma

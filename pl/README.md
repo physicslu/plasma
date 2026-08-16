@@ -39,7 +39,7 @@ pl/
 不需安裝 Vivado，即可在 repository 根目錄執行：
 
 ```bash
-python3 -m unittest discover -s pl/tests -v
+python3 -m pytest -q pl/tests
 ```
 
 這組測試會檢查唯一 RTL 正本、XDC port/pin 完整性、Tcl 的可攜式路徑，以及
