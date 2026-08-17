@@ -135,11 +135,22 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /成功 <b>\{statusCounts\.success\}/);
   assert.match(page, /失敗 <b>\{statusCounts\.failed\}/);
   assert.match(page, /const disabledCount = channels\.length - enabledCount/);
-  assert.match(page, /停用 <b>\{disabledCount\}/);
-  assert.match(page, /selectedBatchOperations/);
-  assert.match(page, /批次操作至少必須選擇一項/);
+  assert.match(page, /aria-label="通道配置摘要"/);
+  assert.match(page, /顯示 <b>\{visibleChannelIds\.length\} \/ 8<\/b>/);
+  assert.match(page, /停用 <b>\{disabledCount\}<\/b>/);
+
+  const batchStatus = page.match(
+    /<div className="statusSummary" aria-label="選取通道狀態摘要">([\s\S]*?)<\/div>/,
+  )?.[1];
+  assert.ok(batchStatus, "batch status summary is missing");
+  assert.doesNotMatch(batchStatus, /停用/);
+
+  assert.match(page, /useState<Operation\[]>\(\[\]\)/);
+  assert.doesNotMatch(page, /批次操作至少必須選擇一項/);
   assert.match(page, /aria-label=\{`批次操作：\$\{operationLabels\[operation\]\}`\}/);
   assert.match(page, /type="checkbox"/);
+  assert.match(page, /selectedBatchOperations\.length === 0/);
+  assert.match(page, /批次執行：尚未選擇操作/);
   assert.match(page, /runBatch\(selectedBatchOperations\)/);
   assert.match(page, /批次執行/);
 });
