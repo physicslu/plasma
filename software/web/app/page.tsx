@@ -41,6 +41,7 @@ type Channel = {
 };
 type Theme = "dark" | "light";
 type ConnectionState = "connecting" | "online" | "offline";
+type BatchChannelState = "running" | "cancelling" | "success" | "cancelled" | "failed";
 
 const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
 const BATCH_JOB_POLL_INTERVAL_MS = 500;
@@ -67,6 +68,13 @@ const stageLabels: Record<Stage, string> = {
   failed: "失敗",
   timeout: "逾時",
   aborted: "已中止",
+};
+const batchStateLabels: Record<BatchChannelState, string> = {
+  running: "執行中",
+  cancelling: "取消中",
+  success: "完成",
+  cancelled: "已取消",
+  failed: "失敗",
 };
 const operationLabels: Record<Operation, string> = {
   erase: "擦除",
@@ -113,6 +121,7 @@ export default function Home() {
   const [submittingChannelIds, setSubmittingChannelIds] = useState<number[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchCancelling, setBatchCancelling] = useState(false);
+  const [batchChannelStates, setBatchChannelStates] = useState<Record<number, BatchChannelState>>({});
   const trackedJobs = useRef<Record<number, string>>({});
   const transitionKeys = useRef<Record<string, string>>({});
   const connectionRef = useRef<ConnectionState>("connecting");
@@ -126,19 +135,25 @@ export default function Home() {
   const detailsChannel = detailsChannelId === null
     ? undefined
     : channels.find(channel => channel.id === detailsChannelId);
+  const detailsBatchState = detailsChannelId === null ? undefined : batchChannelStates[detailsChannelId];
   const readRangeValid = Number.isInteger(Number(readOffset))
     && Number(readOffset) >= 0
     && Number.isInteger(Number(readLength))
     && Number(readLength) > 0;
 
   const statusCounts = useMemo(() => visibleChannels.reduce((counts, channel) => {
+    const batchState = batchChannelStates[channel.id];
     if (!channel.enabled) counts.disabled += 1;
+    else if (batchState === "cancelling" || batchState === "cancelled") counts.cancelled += 1;
+    else if (batchState === "running") counts.busy += 1;
+    else if (batchState === "success") counts.success += 1;
+    else if (batchState === "failed") counts.failed += 1;
     else if (submittingChannelIds.includes(channel.id) || isRunning(channel)) counts.busy += 1;
     else if (channel.stage === "success") counts.success += 1;
     else if (failedStages.includes(channel.stage)) counts.failed += 1;
     else counts.idle += 1;
     return counts;
-  }, { idle: 0, busy: 0, success: 0, failed: 0, disabled: 0 }), [submittingChannelIds, visibleChannels]);
+  }, { idle: 0, busy: 0, success: 0, failed: 0, cancelled: 0, disabled: 0 }), [batchChannelStates, submittingChannelIds, visibleChannels]);
 
   const appendLog = useCallback((message: string) => {
     const time = new Date().toLocaleTimeString("zh-TW", { hour12: false });
@@ -259,6 +274,32 @@ export default function Home() {
     }
   }
 
+  function setBatchChannelState(channelId: number, state: BatchChannelState) {
+    setBatchChannelStates(current => ({ ...current, [channelId]: state }));
+  }
+
+  function clearBatchChannelState(channelId: number) {
+    setBatchChannelStates(current => {
+      if (!(channelId in current)) return current;
+      const next = { ...current };
+      delete next[channelId];
+      return next;
+    });
+  }
+
+  function channelDisplayState(channel: Channel): { state: Stage | "submitting"; label: string } {
+    const batchState = batchChannelStates[channel.id];
+    const submitting = submittingChannelIds.includes(channel.id);
+    if (!channel.enabled) return { state: "idle", label: "停用" };
+    if (batchState === "cancelling") return { state: "cancelled", label: "批次取消中" };
+    if (batchState === "cancelled") return { state: "cancelled", label: "批次已取消" };
+    if (batchState === "failed") return { state: "failed", label: "批次失敗" };
+    if (batchState === "success") return { state: "success", label: "批次完成" };
+    if (submitting) return { state: "submitting", label: "提交中" };
+    if (batchState === "running" && channel.stage === "success") return { state: "queued", label: "批次進行中" };
+    return { state: channel.stage, label: stageLabels[channel.stage] };
+  }
+
   function toggleChannel(channelId: number) {
     const channel = channels[channelId];
     if (batchRunning || isRunning(channel) || submittingChannelIds.includes(channelId)) return;
@@ -303,6 +344,7 @@ export default function Home() {
       return;
     }
 
+    if (!forBatch) clearBatchChannelState(channelId);
     setSubmittingChannelIds(current => current.includes(channelId) ? current : [...current, channelId]);
     try {
       const job = await startJob(apiBase, {
@@ -367,6 +409,10 @@ export default function Home() {
     const batchChannelIds = [...visibleChannelIds];
     batchCancelRequested.current = false;
     batchActiveJobs.current = {};
+    setBatchChannelStates(batchChannelIds.reduce<Record<number, BatchChannelState>>((states, channelId) => {
+      states[channelId] = "running";
+      return states;
+    }, {}));
     setBatchCancelling(false);
     setBatchRunning(true);
     appendLog(`[BATCH] START ${batchOperations.map(operation => operation.toUpperCase()).join(" → ")} · ${batchChannelIds.map(id => `CH${id}`).join(", ")}`);
@@ -374,13 +420,18 @@ export default function Home() {
       const outcomes = await Promise.all(batchChannelIds.map(async channelId => {
         for (const operation of batchOperations) {
           if (batchCancelRequested.current) {
+            setBatchChannelState(channelId, "cancelled");
             appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED`);
-            return { channelId, succeeded: false };
+            return { channelId, state: "cancelled" as const };
           }
 
           appendLog(`[CH${channelId}] Batch ${operation.toUpperCase()}`);
           const job = await runChannel(channelId, operation, true);
-          if (!job) return { channelId, succeeded: false };
+          if (!job) {
+            const state = batchCancelRequested.current ? "cancelled" : "failed";
+            setBatchChannelState(channelId, state);
+            return { channelId, state };
+          }
           batchActiveJobs.current[channelId] = job.job_id;
 
           if (batchCancelRequested.current) {
@@ -392,30 +443,46 @@ export default function Home() {
             if (batchActiveJobs.current[channelId] === job.job_id) {
               delete batchActiveJobs.current[channelId];
             }
-            if (finalJob.state !== "success") {
-              appendLog(`[CH${channelId}] Batch stopped · ${finalJob.state.toUpperCase()}`);
-              return { channelId, succeeded: false };
+
+            const cancelWasRequested = batchCancelRequested.current || cancelRequests.current.has(job.job_id);
+            if (cancelWasRequested) {
+              setBatchChannelState(channelId, "cancelled");
+              appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED · last job ${finalJob.state.toUpperCase()}`);
+              return { channelId, state: "cancelled" as const };
             }
-            if (batchCancelRequested.current) {
-              appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED`);
-              return { channelId, succeeded: false };
+            if (finalJob.state === "cancelled") {
+              setBatchChannelState(channelId, "cancelled");
+              appendLog(`[CH${channelId}] Batch stopped · CANCELLED`);
+              return { channelId, state: "cancelled" as const };
+            }
+            if (finalJob.state !== "success") {
+              setBatchChannelState(channelId, "failed");
+              appendLog(`[CH${channelId}] Batch stopped · ${finalJob.state.toUpperCase()}`);
+              return { channelId, state: "failed" as const };
             }
           } catch (error) {
             if (batchActiveJobs.current[channelId] === job.job_id) {
               delete batchActiveJobs.current[channelId];
             }
+            const cancelWasRequested = batchCancelRequested.current || cancelRequests.current.has(job.job_id);
+            const state = cancelWasRequested ? "cancelled" : "failed";
+            setBatchChannelState(channelId, state);
             appendLog(`[CH${channelId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`);
-            return { channelId, succeeded: false };
+            return { channelId, state };
           }
         }
+        setBatchChannelState(channelId, "success");
         appendLog(`[CH${channelId}] Batch complete`);
-        return { channelId, succeeded: true };
+        return { channelId, state: "success" as const };
       }));
-      const successfulChannelIds = outcomes.filter(outcome => outcome.succeeded).map(outcome => outcome.channelId);
-      const stoppedChannelIds = outcomes.filter(outcome => !outcome.succeeded).map(outcome => outcome.channelId);
-      const summary = `success: ${successfulChannelIds.length ? successfulChannelIds.map(id => `CH${id}`).join(", ") : "none"}` +
-        (stoppedChannelIds.length ? ` · stopped: ${stoppedChannelIds.map(id => `CH${id}`).join(", ")}` : "");
-      appendLog(`[BATCH] ${batchCancelRequested.current ? "CANCELLED" : "COMPLETE"} · ${summary}`);
+      const successfulChannelIds = outcomes.filter(outcome => outcome.state === "success").map(outcome => outcome.channelId);
+      const cancelledChannelIds = outcomes.filter(outcome => outcome.state === "cancelled").map(outcome => outcome.channelId);
+      const failedChannelIds = outcomes.filter(outcome => outcome.state === "failed").map(outcome => outcome.channelId);
+      const summary = `success: ${successfulChannelIds.length ? successfulChannelIds.map(id => `CH${id}`).join(", ") : "none"}`
+        + (cancelledChannelIds.length ? ` · cancelled: ${cancelledChannelIds.map(id => `CH${id}`).join(", ")}` : "")
+        + (failedChannelIds.length ? ` · failed: ${failedChannelIds.map(id => `CH${id}`).join(", ")}` : "");
+      const batchOutcome = cancelledChannelIds.length ? "CANCELLED" : failedChannelIds.length ? "FAILED" : "COMPLETE";
+      appendLog(`[BATCH] ${batchOutcome} · ${summary}`);
     } finally {
       batchActiveJobs.current = {};
       setBatchRunning(false);
@@ -427,6 +494,9 @@ export default function Home() {
     if (!batchRunning || batchCancelling) return;
     batchCancelRequested.current = true;
     setBatchCancelling(true);
+    setBatchChannelStates(current => Object.fromEntries(
+      Object.entries(current).map(([channelId, state]) => [channelId, state === "running" ? "cancelling" : state]),
+    ) as Record<number, BatchChannelState>);
     const activeJobs = Object.entries(batchActiveJobs.current);
     appendLog(`[BATCH] CANCEL requested · active jobs: ${activeJobs.length}`);
     await Promise.all(activeJobs.map(([channelId, jobId]) => requestJobCancel(Number(channelId), jobId, true)));
@@ -435,6 +505,9 @@ export default function Home() {
   async function cancel(channelId: number) {
     const channel = channels[channelId];
     if (!channel.jobId || !isRunning(channel)) return;
+    if (batchRunning && batchChannelStates[channelId] === "running") {
+      setBatchChannelState(channelId, "cancelling");
+    }
     await requestJobCancel(channelId, channel.jobId, false);
   }
 
@@ -471,9 +544,10 @@ export default function Home() {
           <div className="channelChecks">
             {channels.map(channel => {
               const locked = batchRunning || isRunning(channel) || submittingChannelIds.includes(channel.id);
+              const displayState = channelDisplayState(channel);
               return <label key={channel.id} className={`${visibleChannelIds.includes(channel.id) ? "checked" : ""} ${!channel.enabled ? "disabled" : ""}`}>
                 <input type="checkbox" aria-label={`顯示 CH${channel.id}`} checked={visibleChannelIds.includes(channel.id)} disabled={locked} onChange={() => toggleChannel(channel.id)}/>
-                <span>CH{channel.id}</span><small>{channel.enabled ? stageLabels[channel.stage] : "停用"}</small>
+                <span>CH{channel.id}</span><small>{displayState.label}</small>
               </label>;
             })}
           </div>
@@ -494,7 +568,7 @@ export default function Home() {
           <div className="batchInfo">
             <div><p className="eyebrow">BATCH CONTROL</p><h2 id="batch-title">批次控制</h2><small>目標：{batchTargetText}</small></div>
             <div className="statusSummary" aria-label="選取通道狀態摘要">
-              <span>待命 <b>{statusCounts.idle}</b></span><span className="busy">工作中 <b>{statusCounts.busy}</b></span><span className="success">成功 <b>{statusCounts.success}</b></span><span className="failed">失敗 <b>{statusCounts.failed}</b></span>
+              <span>待命 <b>{statusCounts.idle}</b></span><span className="busy">工作中 <b>{statusCounts.busy}</b></span><span className="success">成功 <b>{statusCounts.success}</b></span><span className="failed">取消 <b>{statusCounts.cancelled}</b></span><span className="failed">失敗 <b>{statusCounts.failed}</b></span>
             </div>
           </div>
           <div className="batchActions">
@@ -523,14 +597,12 @@ export default function Home() {
               <thead><tr><th>通道</th><th>目標／介面</th><th>目前工作</th><th>狀態</th><th>進度</th><th>獨立操作</th></tr></thead>
               <tbody>
                 {visibleChannels.map(channel => {
-                  const submitting = submittingChannelIds.includes(channel.id);
-                  const rowState = submitting ? "submitting" : channel.stage;
-                  const status = !channel.enabled ? "停用" : submitting ? "提交中" : stageLabels[channel.stage];
+                  const displayState = channelDisplayState(channel);
                   return <tr key={channel.id}>
                     <td><button className="channelDetails" onClick={() => setDetailsChannelId(channel.id)}><b>CH{channel.id}</b><small>詳細資料 ↗</small></button></td>
                     <td><b>{channel.target ?? "STM32F103C8T6"}</b><small>{channel.interface ?? "Mock / SWD"}</small></td>
                     <td>{channel.operation ? operationLabels[channel.operation] : "—"}{channel.error && <small className="errorText">{channel.error}</small>}</td>
-                    <td><span className={`state ${rowState}`}>{status}</span></td>
+                    <td><span className={`state ${displayState.state}`}>{displayState.label}</span></td>
                     <td><div className="tableProgress"><div className="track"><i style={{ width: `${channel.progress}%` }}/></div><b>{Math.round(channel.progress)}%</b></div></td>
                     <td><div className="rowActions">
                       {(Object.keys(operationLabels) as Operation[]).map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`CH${channel.id} ${operationLabels[operation]}`} title={operationLabels[operation]} onClick={() => void runChannel(channel.id, operation)} disabled={operationDisabled(channel, operation)}>{operationSymbols[operation]}</button>)}
@@ -552,8 +624,8 @@ export default function Home() {
 
       {detailsChannel && <div className="modalBackdrop" onClick={() => setDetailsChannelId(null)}><section className="details" onClick={event => event.stopPropagation()}>
         <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Channel {detailsChannel.id} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsChannelId(null)}>×</button></div>
-        <dl><div><dt>Python API</dt><dd>{apiBase}</dd></div><div><dt>Job ID</dt><dd>{detailsChannel.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsChannel.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>State</dt><dd>{detailsChannel.stage.toUpperCase()}</dd></div><div><dt>Firmware</dt><dd>{detailsChannel.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsChannel.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsChannel.target ?? "STM32F103C8T6"} ({detailsChannel.interface ?? "Mock"})</dd></div></dl>
-        <p>狀態由 Python Job Manager 與目前的通道介面回傳。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
+        <dl><div><dt>Python API</dt><dd>{apiBase}</dd></div><div><dt>Job ID</dt><dd>{detailsChannel.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsChannel.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsChannel.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsChannel.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsChannel.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsChannel.target ?? "STM32F103C8T6"} ({detailsChannel.interface ?? "Mock"})</dd></div></dl>
+        <p>Job State 保留 Python Job Manager 回傳的真實結果；Batch State 描述該通道在本次批次流程的結果。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
       </section></div>}
     </main>
   );
