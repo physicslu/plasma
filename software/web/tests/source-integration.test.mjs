@@ -19,6 +19,18 @@ test("uses the Python Gateway API instead of browser-side job simulation", async
   assert.doesNotMatch(api, /127\.0\.0\.1:8080/);
 });
 
+test("migrates known legacy browser API bases without overwriting custom overrides", async () => {
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+
+  assert.match(layout, /plasma-api-base-version/);
+  assert.match(layout, /https:\/\/swpc\.tail820e64\.ts\.net:8443/);
+  assert.match(layout, /http:\/\/127\.0\.0\.1:8080/);
+  assert.match(layout, /legacyApiBases\.has\(normalized\)/);
+  assert.match(layout, /localStorage\.removeItem\(apiKey\)/);
+  assert.match(layout, /localStorage\.setItem\(versionKey, "2"\)/);
+  assert.doesNotMatch(layout, /localStorage\.setItem\(apiKey, "https:\/\/plasma\.open4th\.com"\)/);
+});
+
 test("supports selected-channel batch jobs and per-channel controls", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
