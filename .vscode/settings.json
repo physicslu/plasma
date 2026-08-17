@@ -1,0 +1,30 @@
+{
+  "files.associations": {
+    "*.sv": "systemverilog",
+    "*.svh": "systemverilog"
+  },
+  "systemverilog.compileOnSave": false,
+  "systemverilog.compileOnOpen": false,
+  "systemverilog.compilerType": "Verilator",
+  "systemverilog.excludeIndexing": [
+    "**/pl/build/**",
+    "**/pl/.venv/**",
+    "**/software/python/.venv/**",
+    "**/software/web/node_modules/**",
+    "**/software/web/.next/**"
+  ],
+  "files.watcherExclude": {
+    "**/pl/build/**": true,
+    "**/pl/.venv/**": true,
+    "**/software/python/.venv/**": true,
+    "**/software/web/node_modules/**": true,
+    "**/software/web/.next/**": true
+  },
+  "search.exclude": {
+    "**/pl/build/**": true,
+    "**/pl/.venv/**": true,
+    "**/software/python/.venv/**": true,
+    "**/software/web/node_modules/**": true,
+    "**/software/web/.next/**": true
+  }
+}
