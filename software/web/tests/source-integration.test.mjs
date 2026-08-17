@@ -41,7 +41,7 @@ function runBrowserApiMigration(script, initial) {
   return localStorage.snapshot();
 }
 
-test("uses the Python Gateway API instead of browser-side job simulation", async () => {
+test("uses the Plasma Web REST Gateway instead of browser-side job simulation", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 

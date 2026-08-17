@@ -238,14 +238,14 @@ export default function Home() {
         if (connectionRef.current !== "online") {
           connectionRef.current = "online";
           setConnection("online");
-          appendLog(`[NET] Python Mock API connected · ${apiBase}`);
+          appendLog(`[NET] Plasma Web REST Gateway connected · ${apiBase}`);
         }
       } catch (error) {
         if (stopped) return;
         if (connectionRef.current !== "offline") {
           connectionRef.current = "offline";
           setConnection("offline");
-          appendLog(`[NET] Python API offline · ${error instanceof Error ? error.message : "connection failed"}`);
+          appendLog(`[NET] Plasma Web REST Gateway offline · ${error instanceof Error ? error.message : "connection failed"}`);
         }
       } finally {
         if (!stopped) pollTimer = window.setTimeout(poll, 500);
@@ -525,7 +525,7 @@ export default function Home() {
             <button className={theme === "light" ? "active" : ""} onClick={() => setTheme("light")} aria-pressed={theme === "light"}>淺色</button>
           </div>
           <form className={`connection ${connection}`} onSubmit={connect}>
-            <span className="pulse"/><div><b>PYTHON MOCK API</b><input aria-label="Python API URL" value={apiDraft} onChange={event => setApiDraft(event.target.value)}/></div><button type="submit">連線</button>
+            <span className="pulse"/><div><b>Plasma Web REST Gateway</b><input aria-label="Plasma Web REST Gateway URL" value={apiDraft} onChange={event => setApiDraft(event.target.value)}/></div><button type="submit">連線</button>
           </form>
         </div>
       </header>
@@ -533,7 +533,7 @@ export default function Home() {
       <section className="console overviewConsole">
         <div className="pageHeading">
           <div><p className="eyebrow">CHANNEL MATRIX</p><h1>多通道工作總覽</h1></div>
-          <div className={`gatewayHealth ${connection}`}><span className="pulse"/><div><small>PYTHON GATEWAY</small><b>{connection === "online" ? "Online" : connection === "connecting" ? "Connecting" : "Offline"}</b></div><em>{enabledCount}/8 Enabled</em></div>
+          <div className={`gatewayHealth ${connection}`}><span className="pulse"/><div><small>Plasma Web REST Gateway</small><b>{connection === "online" ? "Online" : connection === "connecting" ? "Connecting" : "Offline"}</b></div><em>{enabledCount}/8 Enabled</em></div>
         </div>
 
         <section className="selectorPanel" aria-labelledby="channel-selector-title">
@@ -624,7 +624,7 @@ export default function Home() {
 
       {detailsChannel && <div className="modalBackdrop" onClick={() => setDetailsChannelId(null)}><section className="details" onClick={event => event.stopPropagation()}>
         <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Channel {detailsChannel.id} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsChannelId(null)}>×</button></div>
-        <dl><div><dt>Python API</dt><dd>{apiBase}</dd></div><div><dt>Job ID</dt><dd>{detailsChannel.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsChannel.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsChannel.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsChannel.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsChannel.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsChannel.target ?? "STM32F103C8T6"} ({detailsChannel.interface ?? "Mock"})</dd></div></dl>
+        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Job ID</dt><dd>{detailsChannel.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsChannel.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsChannel.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsChannel.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsChannel.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsChannel.target ?? "STM32F103C8T6"} ({detailsChannel.interface ?? "Mock"})</dd></div></dl>
         <p>Job State 保留 Python Job Manager 回傳的真實結果；Batch State 描述該通道在本次批次流程的結果。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
       </section></div>}
     </main>

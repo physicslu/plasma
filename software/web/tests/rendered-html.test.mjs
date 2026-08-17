@@ -36,9 +36,9 @@ test("renders the Plasma programmer console", async () => {
   assert.match(html, />深色</);
   assert.match(html, />淺色</);
   assert.match(html, /class="active"[^>]*aria-pressed="true"[^>]*>淺色</);
-  assert.match(html, />PYTHON MOCK API</);
-  assert.match(html, /aria-label="Python API URL"/);
-  assert.match(html, />PYTHON GATEWAY</);
+  assert.match(html, />Plasma Web REST Gateway</);
+  assert.match(html, /aria-label="Plasma Web REST Gateway URL"/);
+  assert.match(html, /<small>Plasma Web REST Gateway<\/small>/);
   assert.match(html, />DISPLAY CHANNELS</);
   assert.match(html, /aria-label="通道配置摘要"/);
   assert.match(html, /<span>停用 <b>6<\/b><\/span>/);
