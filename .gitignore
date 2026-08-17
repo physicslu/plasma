@@ -31,6 +31,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 software/python/.venv/
+pl/.venv/
 
 # Web generated files
 software/web/node_modules/

@@ -1,0 +1,65 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "FPGA: Verify Current Target",
+      "type": "shell",
+      "command": "source pl/env.sh && python pl/tools/fpga.py verify --file \"${file}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "FPGA: Lint Current Target",
+      "type": "shell",
+      "command": "source pl/env.sh && python pl/tools/fpga.py lint --file \"${file}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "FPGA: Test Current Target",
+      "type": "shell",
+      "command": "source pl/env.sh && python pl/tools/fpga.py test --file \"${file}\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "FPGA: List Targets",
+      "type": "shell",
+      "command": "source pl/env.sh && python pl/tools/fpga.py list",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}
