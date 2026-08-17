@@ -5,6 +5,8 @@ script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 default_repo="$(cd "$(dirname "$script_path")/.." && pwd)"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 config_file="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
+current_config_version=2
+default_public_api_url="https://plasma.open4th.com"
 
 if [[ -f "$config_file" ]]; then
   # shellcheck source=/dev/null
@@ -29,7 +31,8 @@ gateway_port="${PLASMA_GATEWAY_PORT:-18080}"
 cors_origin="${PLASMA_CORS_ORIGIN:-*}"
 vite_host="${PLASMA_VITE_HOST:-127.0.0.1}"
 vite_port="${PLASMA_VITE_PORT:-5173}"
-public_api_url="${PLASMA_PUBLIC_API_URL:-https://plasma.open4th.com}"
+public_api_url="${PLASMA_PUBLIC_API_URL:-$default_public_api_url}"
+config_version="${PLASMA_CONFIG_VERSION:-1}"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 bin_dir="${PLASMACTL_BIN_DIR:-$HOME/.local/bin}"
 services=(plasma-server.service plasma-web.service plasma-vite.service)
@@ -73,11 +76,62 @@ require_user_units() {
   done
 }
 
+replace_config_assignment() {
+  local key="$1" value="$2" temporary
+  temporary="$(mktemp "${config_file}.tmp.XXXXXX")"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { replaced = 0 }
+    $0 ~ ("^" key "=") {
+      if (!replaced) {
+        print key "=" value
+        replaced = 1
+      }
+      next
+    }
+    { print }
+    END {
+      if (!replaced) {
+        print key "=" value
+      }
+    }
+  ' "$config_file" >"$temporary"
+  mv "$temporary" "$config_file"
+}
+
+migrate_config() {
+  [[ -f "$config_file" ]] || return 0
+  [[ "$config_version" =~ ^[0-9]+$ ]] || die "PLASMA_CONFIG_VERSION 必須是整數：$config_version"
+  (( config_version < current_config_version )) || return 0
+
+  local previous_public_api_url="$public_api_url"
+  case "$public_api_url" in
+    https://swpc.tail820e64.ts.net|https://swpc.tail820e64.ts.net:8443|http://127.0.0.1:8080)
+      public_api_url="$default_public_api_url"
+      PLASMA_PUBLIC_API_URL="$public_api_url"
+      ;;
+    *)
+      # Unknown values are treated as an explicit operator override and preserved.
+      ;;
+  esac
+
+  replace_config_assignment PLASMA_PUBLIC_API_URL "$public_api_url"
+  replace_config_assignment PLASMA_CONFIG_VERSION "$current_config_version"
+  config_version="$current_config_version"
+  PLASMA_CONFIG_VERSION="$current_config_version"
+
+  if [[ "$previous_public_api_url" != "$public_api_url" ]]; then
+    say "遷移舊 API Base：$previous_public_api_url → $public_api_url"
+  else
+    say "設定檔已升級至 schema v$current_config_version；保留 API Base：$public_api_url"
+  fi
+}
+
 write_config() {
   mkdir -p "$(dirname "$config_file")"
   if [[ ! -f "$config_file" ]]; then
     cat >"$config_file" <<EOF
 # SWPC Plasma deployment settings
+PLASMA_CONFIG_VERSION=$current_config_version
 PLASMA_REPO=$repo
 PLASMA_BRANCH=$branch
 PLASMA_NPM=$npm_bin
@@ -90,8 +144,10 @@ PLASMA_VITE_PORT=$vite_port
 # URL shown as the Web Console's default Python API. Do not append /api.
 PLASMA_PUBLIC_API_URL=$public_api_url
 EOF
+    config_version="$current_config_version"
     say "建立設定檔：$config_file"
   else
+    migrate_config
     say "保留既有設定檔：$config_file"
   fi
 }
@@ -207,8 +263,8 @@ install_services() {
   require_repo
   require_command systemctl
   install_dependencies
-  validate_unit_values
   write_config
+  validate_unit_values
   write_units
   mkdir -p "$bin_dir"
   ln -sfn "$script_path" "$bin_dir/plasmactl"
@@ -258,6 +314,8 @@ update_code() {
 run_tests() {
   require_repo
   require_runtime
+  say "執行 deployment config migration 測試"
+  bash "$repo/scripts/tests/test-plasmactl-config.sh" || return 1
   say "執行 Python 與 PL source-layout pytest"
   (cd "$python_dir" && "$python_bin" -m pytest -q tests "$repo/pl/tests") || return 1
   say "執行 Web lint、test 與 artifact validation"
@@ -300,14 +358,23 @@ health_check() {
   wait_for_http "http://127.0.0.1:$vite_port/" "Vite Web Console"
 }
 
-start_services() {
+reconcile_service_units() {
   require_user_units
+  require_command systemctl
+  write_config
+  validate_unit_values
+  write_units
+  systemctl --user daemon-reload
+}
+
+start_services() {
+  reconcile_service_units
   systemctl --user start "${services[@]}"
   health_check
 }
 
 restart_services() {
-  require_user_units
+  reconcile_service_units
   say "重新啟動 Plasma 服務"
   systemctl --user restart "${services[@]}"
   health_check
@@ -360,7 +427,12 @@ show_logs() {
 }
 
 deploy() {
-  update_code
+  if [[ "${PLASMACTL_DEPLOY_REEXEC:-0}" != "1" ]]; then
+    update_code
+    say "重新載入更新後的部署邏輯"
+    PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy
+  fi
+
   if ! run_tests; then
     die "測試失敗；程式已更新，但既有服務未重新啟動"
   fi
@@ -375,9 +447,9 @@ Usage: plasmactl COMMAND
 Commands:
   install              安裝相依套件與 user systemd units（不立即啟動）
   update               從 GitHub main 做 fast-forward 更新
-  test                 執行完整 Python、PL source-layout 與 Web 測試
-  restart              重新啟動服務並執行 health check
-  deploy               update → test → restart（建議日常使用）
+  test                 執行 deployment migration、Python、PL source-layout 與 Web 測試
+  restart              重新產生 systemd units、重新啟動服務並執行 health check
+  deploy               update → re-exec latest plasmactl → test → reconcile units → restart
   update-and-restart   deploy 的別名
   start | stop         啟動或停止全部 Plasma 服務
   status               顯示 Git、systemd 與 Port 狀態
@@ -386,6 +458,10 @@ Commands:
   help                 顯示本說明
 EOF
 }
+
+if [[ "${PLASMACTL_LIB_ONLY:-0}" == "1" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 command="${1:-help}"
 shift || true
