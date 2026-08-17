@@ -19,3 +19,5 @@ SWPC 自動部署與外部 SSH 操作請參考
 [`docs/development/swpc-deployment.md`](docs/development/swpc-deployment.md)。
 Codex Cloud、SWPC 與 Z2 的分工及雲端環境設定請參考
 [`docs/development/codex-cloud-environment.md`](docs/development/codex-cloud-environment.md)。
+本地 AI（Cline / Ollama / Qwen）與 SWPC Remote-SSH 的開發設定請參考
+[`docs/development/local-ai-development-guide.md`](docs/development/local-ai-development-guide.md)。
