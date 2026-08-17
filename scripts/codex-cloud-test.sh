@@ -14,6 +14,9 @@ if [[ ! -x "$python_bin" ]]; then
   exit 69
 fi
 
+printf '[codex-cloud] Running deployment config migration test\n'
+bash "$repo/scripts/tests/test-plasmactl-config.sh"
+
 printf '[codex-cloud] Running Python and PL source tests with pytest\n'
 (
   cd "$repo"

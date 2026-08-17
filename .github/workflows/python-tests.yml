@@ -8,6 +8,8 @@ on:
       - "pl/constraints/**"
       - "pl/projects/**"
       - "pl/tests/**"
+      - "scripts/plasmactl"
+      - "scripts/tests/**"
       - "scripts/codex-cloud-*.sh"
       - ".github/workflows/python-tests.yml"
   pull_request:
@@ -17,6 +19,8 @@ on:
       - "pl/constraints/**"
       - "pl/projects/**"
       - "pl/tests/**"
+      - "scripts/plasmactl"
+      - "scripts/tests/**"
       - "scripts/codex-cloud-*.sh"
       - ".github/workflows/python-tests.yml"
 
@@ -34,6 +38,8 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: software/python/pyproject.toml
+      - name: Test deployment config migration
+        run: bash scripts/tests/test-plasmactl-config.sh
       - name: Install package
         run: python -m pip install -e "./software/python[dev]"
       - name: Run pytest
