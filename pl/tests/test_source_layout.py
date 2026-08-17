@@ -9,6 +9,7 @@ PL_DIR = Path(__file__).resolve().parents[1]
 RTL_FILE = PL_DIR / "rtl" / "examples" / "btled.sv"
 XDC_FILE = PL_DIR / "constraints" / "pynq-z2" / "btled.xdc"
 CREATE_TCL = PL_DIR / "projects" / "btled" / "create_project.tcl"
+VERIFICATION_DIR = PL_DIR / "verification"
 
 
 class BtledSourceLayoutTest(unittest.TestCase):
@@ -60,6 +61,25 @@ class BtledSourceLayoutTest(unittest.TestCase):
         ]
         self.assertEqual(forbidden_files, [])
         self.assertEqual(forbidden_dirs, [])
+
+    def test_generated_simulation_artifacts_are_not_in_verification_tree(self) -> None:
+        forbidden_patterns = (
+            "*.vcd",
+            "*.fst",
+            "*.ghw",
+            "*.result.xml",
+            "results.xml",
+        )
+        forbidden_files = sorted(
+            path
+            for pattern in forbidden_patterns
+            for path in VERIFICATION_DIR.rglob(pattern)
+        )
+        self.assertEqual(
+            forbidden_files,
+            [],
+            "Generated simulation artifacts must live under pl/build/, not pl/verification/",
+        )
 
 
 if __name__ == "__main__":
