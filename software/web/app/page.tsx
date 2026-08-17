@@ -103,7 +103,7 @@ export default function Home() {
   const [firmware, setFirmware] = useState<File | null>(null);
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
-  const [selectedBatchOperations, setSelectedBatchOperations] = useState<Operation[]>(["program"]);
+  const [selectedBatchOperations, setSelectedBatchOperations] = useState<Operation[]>([]);
   const [logs, setLogs] = useState<string[]>(["[SYSTEM] Plasma Web Console ready"]);
   const [detailsChannelId, setDetailsChannelId] = useState<number | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
@@ -291,10 +291,6 @@ export default function Home() {
       if (!current.includes(operation)) {
         return operationOrder.filter(item => current.includes(item) || item === operation);
       }
-      if (current.length === 1) {
-        appendLog("[UI] 批次操作至少必須選擇一項");
-        return current;
-      }
       return current.filter(item => item !== operation);
     });
   }
@@ -468,7 +464,10 @@ export default function Home() {
         </div>
 
         <section className="selectorPanel" aria-labelledby="channel-selector-title">
-          <div className="sectionHeading"><div><p className="eyebrow">DISPLAY CHANNELS</p><h2 id="channel-selector-title">顯示與批次操作通道</h2></div><b>{visibleChannelIds.length} / 8</b></div>
+          <div className="sectionHeading">
+            <div><p className="eyebrow">DISPLAY CHANNELS</p><h2 id="channel-selector-title">顯示與批次操作通道</h2></div>
+            <div className="statusSummary" aria-label="通道配置摘要"><span>顯示 <b>{visibleChannelIds.length} / 8</b></span><span>停用 <b>{disabledCount}</b></span></div>
+          </div>
           <div className="channelChecks">
             {channels.map(channel => {
               const locked = batchRunning || isRunning(channel) || submittingChannelIds.includes(channel.id);
@@ -495,7 +494,7 @@ export default function Home() {
           <div className="batchInfo">
             <div><p className="eyebrow">BATCH CONTROL</p><h2 id="batch-title">批次控制</h2><small>目標：{batchTargetText}</small></div>
             <div className="statusSummary" aria-label="選取通道狀態摘要">
-              <span>待命 <b>{statusCounts.idle}</b></span><span className="busy">工作中 <b>{statusCounts.busy}</b></span><span className="success">成功 <b>{statusCounts.success}</b></span><span className="failed">失敗 <b>{statusCounts.failed}</b></span><span>停用 <b>{disabledCount}</b></span>
+              <span>待命 <b>{statusCounts.idle}</b></span><span className="busy">工作中 <b>{statusCounts.busy}</b></span><span className="success">成功 <b>{statusCounts.success}</b></span><span className="failed">失敗 <b>{statusCounts.failed}</b></span>
             </div>
           </div>
           <div className="batchActions">
@@ -509,7 +508,7 @@ export default function Home() {
               })}
             </div>
             <div className="batchExecutionControls">
-              <button type="button" className="executeBatch" aria-label={`批次執行：${selectedBatchOperations.map(operation => operationLabels[operation]).join("、")}`} onClick={() => void runBatch(selectedBatchOperations)} disabled={batchRunning || selectedBatchOperations.some(batchDisabled)}><span>▶</span>{batchRunning ? "批次執行中" : `批次執行（${selectedBatchOperations.length}）`}</button>
+              <button type="button" className="executeBatch" aria-label={selectedBatchOperations.length ? `批次執行：${selectedBatchOperations.map(operation => operationLabels[operation]).join("、")}` : "批次執行：尚未選擇操作"} onClick={() => void runBatch(selectedBatchOperations)} disabled={batchRunning || selectedBatchOperations.length === 0 || selectedBatchOperations.some(batchDisabled)}><span>▶</span>{batchRunning ? "批次執行中" : `批次執行（${selectedBatchOperations.length}）`}</button>
               <button type="button" className="cancelBatch" aria-label="取消批次工作" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}><span>■</span>{batchCancelling ? "取消中…" : "取消批次"}</button>
             </div>
           </div>
