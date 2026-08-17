@@ -112,9 +112,13 @@ export default function Home() {
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [submittingChannelIds, setSubmittingChannelIds] = useState<number[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
+  const [batchCancelling, setBatchCancelling] = useState(false);
   const trackedJobs = useRef<Record<number, string>>({});
   const transitionKeys = useRef<Record<string, string>>({});
   const connectionRef = useRef<ConnectionState>("connecting");
+  const batchCancelRequested = useRef(false);
+  const batchActiveJobs = useRef<Record<number, string>>({});
+  const cancelRequests = useRef<Set<string>>(new Set());
 
   const visibleChannels = channels.filter(channel => visibleChannelIds.includes(channel.id));
   const enabledCount = channels.filter(channel => channel.enabled).length;
@@ -268,8 +272,8 @@ export default function Home() {
     });
   }
 
-  function operationDisabled(channel: Channel, operation: Operation): boolean {
-    if (batchRunning || connection !== "online" || !channel.enabled || isRunning(channel)) return true;
+  function operationDisabled(channel: Channel, operation: Operation, forBatch = false): boolean {
+    if ((!forBatch && batchRunning) || connection !== "online" || !channel.enabled || isRunning(channel)) return true;
     if (submittingChannelIds.includes(channel.id)) return true;
     if ((operation === "program" || operation === "verify") && !firmware) return true;
     if ((operation === "program" || operation === "verify") && firmware.size > MAX_FIRMWARE_BYTES) return true;
@@ -295,9 +299,9 @@ export default function Home() {
     });
   }
 
-  async function runChannel(channelId: number, operation: Operation): Promise<JobSnapshot | undefined> {
+  async function runChannel(channelId: number, operation: Operation, forBatch = false): Promise<JobSnapshot | undefined> {
     const channel = channels[channelId];
-    if (operationDisabled(channel, operation)) return;
+    if (operationDisabled(channel, operation, forBatch)) return;
     if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
       appendLog(`[CH${channelId}] Firmware 超過 16 MiB 限制`);
       return;
@@ -349,25 +353,61 @@ export default function Home() {
     throw new Error(`${job.job_id} 等待完成逾時`);
   }
 
+  async function requestJobCancel(channelId: number, jobId: string, fromBatch: boolean) {
+    if (cancelRequests.current.has(jobId)) return;
+    cancelRequests.current.add(jobId);
+    try {
+      await cancelJob(apiBase, jobId);
+      appendLog(`[CH${channelId}] ${fromBatch ? "Batch cancel" : "Cancel"} requested · waiting for Python safe shutdown`);
+    } catch (error) {
+      cancelRequests.current.delete(jobId);
+      appendLog(`[CH${channelId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`);
+    }
+  }
+
   async function runBatch(operations: Operation[]) {
     if (batchRunning || operations.length === 0 || operations.some(batchDisabled)) return;
     const batchOperations = [...operations];
     const batchChannelIds = [...visibleChannelIds];
+    batchCancelRequested.current = false;
+    batchActiveJobs.current = {};
+    setBatchCancelling(false);
     setBatchRunning(true);
     appendLog(`[BATCH] START ${batchOperations.map(operation => operation.toUpperCase()).join(" → ")} · ${batchChannelIds.map(id => `CH${id}`).join(", ")}`);
     try {
       const outcomes = await Promise.all(batchChannelIds.map(async channelId => {
         for (const operation of batchOperations) {
+          if (batchCancelRequested.current) {
+            appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED`);
+            return { channelId, succeeded: false };
+          }
+
           appendLog(`[CH${channelId}] Batch ${operation.toUpperCase()}`);
-          const job = await runChannel(channelId, operation);
+          const job = await runChannel(channelId, operation, true);
           if (!job) return { channelId, succeeded: false };
+          batchActiveJobs.current[channelId] = job.job_id;
+
+          if (batchCancelRequested.current) {
+            await requestJobCancel(channelId, job.job_id, true);
+          }
+
           try {
             const finalJob = await waitForTerminalJob(job);
+            if (batchActiveJobs.current[channelId] === job.job_id) {
+              delete batchActiveJobs.current[channelId];
+            }
             if (finalJob.state !== "success") {
               appendLog(`[CH${channelId}] Batch stopped · ${finalJob.state.toUpperCase()}`);
               return { channelId, succeeded: false };
             }
+            if (batchCancelRequested.current) {
+              appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED`);
+              return { channelId, succeeded: false };
+            }
           } catch (error) {
+            if (batchActiveJobs.current[channelId] === job.job_id) {
+              delete batchActiveJobs.current[channelId];
+            }
             appendLog(`[CH${channelId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`);
             return { channelId, succeeded: false };
           }
@@ -377,22 +417,29 @@ export default function Home() {
       }));
       const successfulChannelIds = outcomes.filter(outcome => outcome.succeeded).map(outcome => outcome.channelId);
       const stoppedChannelIds = outcomes.filter(outcome => !outcome.succeeded).map(outcome => outcome.channelId);
-      appendLog(`[BATCH] COMPLETE · success: ${successfulChannelIds.length ? successfulChannelIds.map(id => `CH${id}`).join(", ") : "none"}` +
-        (stoppedChannelIds.length ? ` · stopped: ${stoppedChannelIds.map(id => `CH${id}`).join(", ")}` : ""));
+      const summary = `success: ${successfulChannelIds.length ? successfulChannelIds.map(id => `CH${id}`).join(", ") : "none"}` +
+        (stoppedChannelIds.length ? ` · stopped: ${stoppedChannelIds.map(id => `CH${id}`).join(", ")}` : "");
+      appendLog(`[BATCH] ${batchCancelRequested.current ? "CANCELLED" : "COMPLETE"} · ${summary}`);
     } finally {
+      batchActiveJobs.current = {};
       setBatchRunning(false);
+      setBatchCancelling(false);
     }
+  }
+
+  async function cancelBatch() {
+    if (!batchRunning || batchCancelling) return;
+    batchCancelRequested.current = true;
+    setBatchCancelling(true);
+    const activeJobs = Object.entries(batchActiveJobs.current);
+    appendLog(`[BATCH] CANCEL requested · active jobs: ${activeJobs.length}`);
+    await Promise.all(activeJobs.map(([channelId, jobId]) => requestJobCancel(Number(channelId), jobId, true)));
   }
 
   async function cancel(channelId: number) {
     const channel = channels[channelId];
     if (!channel.jobId || !isRunning(channel)) return;
-    try {
-      await cancelJob(apiBase, channel.jobId);
-      appendLog(`[CH${channelId}] Cancel requested · waiting for Python safe shutdown`);
-    } catch (error) {
-      appendLog(`[CH${channelId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`);
-    }
+    await requestJobCancel(channelId, channel.jobId, false);
   }
 
   const batchTargetText = visibleChannelIds.length === 8
@@ -453,9 +500,18 @@ export default function Home() {
           </div>
           <div className="batchActions">
             <div className="batchOperationChoices" role="group" aria-label="選取批次操作">
-              {operationOrder.map(operation => <button key={operation} type="button" className={selectedBatchOperations.includes(operation) ? "selected" : ""} aria-pressed={selectedBatchOperations.includes(operation)} onClick={() => toggleBatchOperation(operation)} disabled={batchRunning}><span>{operationSymbols[operation]}</span>{operationLabels[operation]}</button>)}
+              {operationOrder.map(operation => {
+                const selected = selectedBatchOperations.includes(operation);
+                return <label key={operation} className={selected ? "selected" : ""}>
+                  <input type="checkbox" aria-label={`批次操作：${operationLabels[operation]}`} checked={selected} onChange={() => toggleBatchOperation(operation)} disabled={batchRunning}/>
+                  <span>{operationSymbols[operation]}</span><b>{operationLabels[operation]}</b>
+                </label>;
+              })}
             </div>
-            <button type="button" className="executeBatch" aria-label={`批次執行：${selectedBatchOperations.map(operation => operationLabels[operation]).join("、")}`} onClick={() => void runBatch(selectedBatchOperations)} disabled={batchRunning || selectedBatchOperations.some(batchDisabled)}><span>▶</span>{batchRunning ? "批次執行中" : `批次執行（${selectedBatchOperations.length}）`}</button>
+            <div className="batchExecutionControls">
+              <button type="button" className="executeBatch" aria-label={`批次執行：${selectedBatchOperations.map(operation => operationLabels[operation]).join("、")}`} onClick={() => void runBatch(selectedBatchOperations)} disabled={batchRunning || selectedBatchOperations.some(batchDisabled)}><span>▶</span>{batchRunning ? "批次執行中" : `批次執行（${selectedBatchOperations.length}）`}</button>
+              <button type="button" className="cancelBatch" aria-label="取消批次工作" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}><span>■</span>{batchCancelling ? "取消中…" : "取消批次"}</button>
+            </div>
           </div>
           {visibleChannels.some(channel => !channel.enabled) && <div className="warning">選取項目包含未啟用通道；取消勾選後才能執行批次工作。</div>}
           {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">Firmware 超過 16 MiB 限制。</div>}
