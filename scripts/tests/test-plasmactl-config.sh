@@ -66,6 +66,16 @@ bash -c 'source "$1"; write_config' _ "$plasmactl_path" >/dev/null
 assert_file_line "$new_config" 'PLASMA_CONFIG_VERSION=2'
 assert_file_line "$new_config" 'PLASMA_PUBLIC_API_URL=https://plasma.open4th.com'
 
+unit_config="$temporary/unit-migration.env"
+printf '%s\n' 'PLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net:8443' >"$unit_config"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$unit_config" \
+XDG_CONFIG_HOME="$temporary/xdg-unit" \
+bash -c 'source "$1"; migrate_config; write_units' _ "$plasmactl_path" >/dev/null
+assert_file_line \
+  "$temporary/xdg-unit/systemd/user/plasma-vite.service" \
+  'Environment=NEXT_PUBLIC_PLASMA_API_URL=https://plasma.open4th.com'
+
 grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy' "$plasmactl_path" || fail 'deploy does not re-exec updated plasmactl'
 grep -Fq 'reconcile_service_units' "$plasmactl_path" || fail 'service-unit reconciliation is missing'
 
