@@ -1,0 +1,11 @@
+name = "adder"
+top = "adder"
+simulator = "verilator"
+
+sources = [
+  "pl/rtl/examples/adder.sv",
+]
+
+[verification]
+runner = "pl/verification/cocotb/adder/test_runner.py"
+waveform = "pl/build/cocotb/adder/dump.vcd"
