@@ -11,11 +11,11 @@
 
 ## 目錄
 
-目前已存在的主要結構：
+目前的 PL 結構已預留正式 Plasma RTL 與 verification 骨架：
 
 ```text
 pl/
-├── AGENTS.md              # PL/FPGA scoped agent rules
+├── AGENTS.md                  # PL/FPGA scoped agent rules
 ├── constraints/
 │   └── pynq-z2/
 │       ├── pynq-z2-base.xdc  # 完整 PYNQ-Z2 腳位範本（預設註解）
@@ -26,27 +26,24 @@ pl/
 │       ├── create_project.tcl
 │       └── build_bitstream.tcl
 ├── rtl/
-│   └── examples/
-│       └── btled.sv
-├── tests/
-│   └── test_source_layout.py  # 不需 Vivado 的結構一致性測試
-└── build/                     # Vivado 產物，不提交 Git
-```
-
-正式 Plasma RTL 開始後，驗證檔案採下列目標結構，並依實際需求逐步建立：
-
-```text
-pl/
-├── rtl/                      # synthesizable SystemVerilog
+│   ├── examples/
+│   │   └── btled.sv
+│   ├── channel/              # production channel RTL
+│   ├── bus/                  # shared bus/interconnect RTL
+│   └── top/                  # Plasma PL top-level integration
 ├── verification/
 │   ├── cocotb/               # Python functional tests
 │   ├── sva/                  # separate SystemVerilog assertions
 │   └── models/               # Python reference/golden models
 ├── sim/                      # minimal HDL simulation harnesses when needed
-├── constraints/
-├── projects/
-└── tests/                    # repository/source-layout pytest checks
+├── tests/
+│   └── test_source_layout.py # 不需 Vivado 的結構一致性測試
+└── build/                    # Vivado 產物，不提交 Git
 ```
+
+目前尚未有正式 Plasma FPGA module，因此新建立的 production/verification 目錄以
+`.gitkeep` 保留於 Git。開始實作後，實際 RTL、cocotb、SVA、reference model 或 simulation
+harness 檔案應取代相對應的 placeholder。
 
 ## 原則
 
@@ -60,8 +57,8 @@ pl/
 8. 可以保留最小的 SystemVerilog simulation harness，但不要重新建立大型傳統 self-checking HDL testbench。
 9. CI、Vivado build 與 hardware validation 必須分別回報，不可用 source-layout pytest 宣稱 FPGA 已驗證。
 
-目前的 `btled` 是開發流程驗證範例；正式的 Plasma 通道 RTL 會另外放在
-`rtl/channel/`、`rtl/bus/`、`rtl/top/` 與實際需要的 protocol 子目錄。
+目前的 `btled` 是開發流程驗證範例；正式的 Plasma 通道 RTL 會放在
+`rtl/channel/`、`rtl/bus/`、`rtl/top/`，並依實際介面需求再新增 protocol 子目錄。
 
 ## 快速測試
 
