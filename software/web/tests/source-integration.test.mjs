@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 
-function extractTemplateLiteral(source, constantName) {
+function extractTemplateLiteral(source, constantName, context = {}) {
   const marker = `const ${constantName} = \``;
   const start = source.indexOf(marker);
   assert.notEqual(start, -1, `${constantName} template literal is missing`);
@@ -11,7 +11,7 @@ function extractTemplateLiteral(source, constantName) {
   const end = source.indexOf("`;", contentStart);
   assert.notEqual(end, -1, `${constantName} template literal is unterminated`);
   const literalSource = source.slice(contentStart, end);
-  return runInNewContext(`\`${literalSource}\``);
+  return runInNewContext(`\`${literalSource}\``, context);
 }
 
 function createLocalStorage(initial = {}) {
@@ -93,9 +93,14 @@ test("keeps the Web fallback aligned with the deployment default without fixing 
   assert.equal(webDefault, deploymentDefault);
 });
 
-test("executes browser API migration behavior for legacy, invalid, custom, and already-versioned values", async () => {
+test("executes browser API migration behavior for legacy, invalid, default, custom, and already-versioned values", async () => {
   const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
-  const migration = extractTemplateLiteral(layout, "apiBaseStorageMigration");
+  const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
+  const defaultApiBase = api.match(
+    /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?\s*"([^"]+)"/,
+  )?.[1];
+  assert.ok(defaultApiBase, "Web fallback API URL is missing");
+  const migration = extractTemplateLiteral(layout, "apiBaseStorageMigration", { DEFAULT_API_BASE: defaultApiBase });
 
   for (const legacyApiBase of [
     "https://swpc.tail820e64.ts.net",
@@ -114,6 +119,13 @@ test("executes browser API migration behavior for legacy, invalid, custom, and a
   });
   assert.equal(invalid["plasma-api-base"], undefined);
   assert.equal(invalid["plasma-api-base-version"], "2");
+
+  const savedDefault = runBrowserApiMigration(migration, {
+    "plasma-api-base": defaultApiBase,
+    "plasma-api-base-version": "2",
+  });
+  assert.equal(savedDefault["plasma-api-base"], undefined);
+  assert.equal(savedDefault["plasma-api-base-version"], "2");
 
   const customApiBase = "https://programmer.customer.example.invalid";
   const custom = runBrowserApiMigration(migration, {
