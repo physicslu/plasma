@@ -219,5 +219,5 @@ test("cancel request wins batch classification when the last job races to succes
 
   await page.locator(".channelDetails").filter({ hasText: "CH0" }).click();
   await expect(page.getByText("Job State", { exact: true }).locator("..").locator("dd")).toHaveText("SUCCESS");
-  await expect(page.getByText("Batch State", { exact: true }).locator("..").locator("dd")).toHaveText("CANCELLED");
+  await expect(page.getByText("Batch State", { exact: true }).locator("..").locator("dd")).toHaveText("已取消");
 });
