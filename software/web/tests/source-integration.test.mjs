@@ -124,6 +124,7 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /const batchChannelIds = \[\.\.\.visibleChannelIds\]/);
   assert.match(page, /Promise\.all\(batchChannelIds\.map/);
   assert.match(page, /for \(const operation of batchOperations\)/);
+  assert.match(page, /runChannel\(channelId, operation, true\)/);
   assert.match(page, /Batch stopped/);
   assert.match(page, /Batch complete/);
   assert.match(page, /runChannel\(channel\.id, operation\)/);
@@ -137,6 +138,25 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /停用 <b>\{disabledCount\}/);
   assert.match(page, /selectedBatchOperations/);
   assert.match(page, /批次操作至少必須選擇一項/);
+  assert.match(page, /aria-label=\{`批次操作：\$\{operationLabels\[operation\]\}`\}/);
+  assert.match(page, /type="checkbox"/);
   assert.match(page, /runBatch\(selectedBatchOperations\)/);
   assert.match(page, /批次執行/);
+});
+
+test("cancels active batch jobs without coupling channel pipelines", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(page, /const batchCancelRequested = useRef\(false\)/);
+  assert.match(page, /const batchActiveJobs = useRef<Record<number, string>>\(\{\}\)/);
+  assert.match(page, /async function cancelBatch\(\)/);
+  assert.match(page, /batchCancelRequested\.current = true/);
+  assert.match(page, /Object\.entries\(batchActiveJobs\.current\)/);
+  assert.match(page, /Promise\.all\(activeJobs\.map/);
+  assert.match(page, /requestJobCancel\(Number\(channelId\), jobId, true\)/);
+  assert.match(page, /if \(batchCancelRequested\.current\)/);
+  assert.match(page, /delete batchActiveJobs\.current\[channelId\]/);
+  assert.match(page, /className="cancelBatch"/);
+  assert.match(page, /aria-label="取消批次工作"/);
+  assert.match(page, /取消批次/);
 });
