@@ -58,6 +58,24 @@ test("uses the Plasma Web REST Gateway instead of browser-side job simulation", 
   assert.doesNotMatch(api, /127\.0\.0\.1:8080/);
 });
 
+test("keeps live log messages English and marks error severity explicitly", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(page, /type LogLevel = "info" \| "error"/);
+  assert.match(page, /const logStageLabels: Record<Stage, string>/);
+  assert.match(page, /const prefix = level === "error" \? "\[ERROR\] " : ""/);
+  assert.match(page, /data-level=\{log\.level\}/);
+  assert.match(page, /color: "var\(--red\)"/);
+  assert.match(page, /Plasma Web REST Gateway offline/);
+  assert.match(page, /Firmware exceeds the 16 MiB limit/);
+  assert.match(page, /timed out waiting for completion/);
+  assert.match(page, /At least one channel must remain visible/);
+  assert.doesNotMatch(page, /主畫面至少必須保留一個通道/);
+  assert.doesNotMatch(page, /Firmware 超過 16 MiB 限制`/);
+  assert.doesNotMatch(page, /等待完成逾時/);
+  assert.doesNotMatch(page, /API URL 無效/);
+});
+
 test("keeps the Web fallback aligned with the deployment default without fixing the endpoint in tests", async () => {
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
   const plasmactl = await readFile(new URL("../../../scripts/plasmactl", import.meta.url), "utf8");
@@ -128,7 +146,7 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /Batch stopped/);
   assert.match(page, /Batch complete/);
   assert.match(page, /runChannel\(channel\.id, operation\)/);
-  assert.match(page, /主畫面至少必須保留一個通道/);
+  assert.match(page, /At least one channel must remain visible/);
   assert.match(page, /disabled=\{locked\}/);
   assert.match(page, /待命 <b>\{statusCounts\.idle\}/);
   assert.match(page, /工作中 <b>\{statusCounts\.busy\}/);
