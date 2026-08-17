@@ -42,6 +42,8 @@ type Channel = {
 type Theme = "dark" | "light";
 type ConnectionState = "connecting" | "online" | "offline";
 type BatchChannelState = "running" | "cancelling" | "success" | "cancelled" | "failed";
+type LogLevel = "info" | "error";
+type LogEntry = { id: number; text: string; level: LogLevel };
 
 const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
 const BATCH_JOB_POLL_INTERVAL_MS = 500;
@@ -68,6 +70,19 @@ const stageLabels: Record<Stage, string> = {
   failed: "失敗",
   timeout: "逾時",
   aborted: "已中止",
+};
+const logStageLabels: Record<Stage, string> = {
+  idle: "IDLE",
+  queued: "QUEUED",
+  erase: "ERASING",
+  program: "PROGRAMMING",
+  verify: "VERIFYING",
+  read: "READING",
+  success: "SUCCESS",
+  cancelled: "CANCELLED",
+  failed: "FAILED",
+  timeout: "TIMEOUT",
+  aborted: "ABORTED",
 };
 const batchStateLabels: Record<BatchChannelState, string> = {
   running: "執行中",
@@ -112,7 +127,7 @@ export default function Home() {
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
   const [selectedBatchOperations, setSelectedBatchOperations] = useState<Operation[]>([]);
-  const [logs, setLogs] = useState<string[]>(["[SYSTEM] Plasma Web Console ready"]);
+  const [logs, setLogs] = useState<LogEntry[]>([{ id: 0, text: "[SYSTEM] Plasma Web Console ready", level: "info" }]);
   const [detailsChannelId, setDetailsChannelId] = useState<number | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
@@ -128,6 +143,7 @@ export default function Home() {
   const batchCancelRequested = useRef(false);
   const batchActiveJobs = useRef<Record<number, string>>({});
   const cancelRequests = useRef<Set<string>>(new Set());
+  const logSequence = useRef(0);
 
   const visibleChannels = channels.filter(channel => visibleChannelIds.includes(channel.id));
   const enabledCount = channels.filter(channel => channel.enabled).length;
@@ -155,9 +171,11 @@ export default function Home() {
     return counts;
   }, { idle: 0, busy: 0, success: 0, failed: 0, cancelled: 0, disabled: 0 }), [batchChannelStates, submittingChannelIds, visibleChannels]);
 
-  const appendLog = useCallback((message: string) => {
-    const time = new Date().toLocaleTimeString("zh-TW", { hour12: false });
-    setLogs(items => [...items.slice(-80), `${time}  ${message}`]);
+  const appendLog = useCallback((message: string, level: LogLevel = "info") => {
+    const time = new Date().toLocaleTimeString("en-GB", { hour12: false });
+    const prefix = level === "error" ? "[ERROR] " : "";
+    const entry: LogEntry = { id: ++logSequence.current, text: `${time}  ${prefix}${message}`, level };
+    setLogs(items => [...items.slice(-80), entry]);
   }, []);
 
   const applyJob = useCallback((job: JobSnapshot) => {
@@ -179,9 +197,11 @@ export default function Home() {
     const transitionKey = `${job.state}:${job.stage ?? "-"}`;
     if (transitionKeys.current[job.job_id] !== transitionKey) {
       transitionKeys.current[job.job_id] = transitionKey;
+      const level: LogLevel = error || stage === "failed" || stage === "timeout" || stage === "aborted" ? "error" : "info";
       appendLog(
-        `[CH${job.channel_id}] ${job.job_id} · ${stageLabels[stage]}` +
+        `[CH${job.channel_id}] ${job.job_id} · ${logStageLabels[stage]}` +
         (error ? ` · ${error}` : ""),
+        level,
       );
     }
   }, [appendLog]);
@@ -245,7 +265,7 @@ export default function Home() {
         if (connectionRef.current !== "offline") {
           connectionRef.current = "offline";
           setConnection("offline");
-          appendLog(`[NET] Plasma Web REST Gateway offline · ${error instanceof Error ? error.message : "connection failed"}`);
+          appendLog(`[NET] Plasma Web REST Gateway offline · ${error instanceof Error ? error.message : "connection failed"}`, "error");
         }
       } finally {
         if (!stopped) pollTimer = window.setTimeout(poll, 500);
@@ -270,7 +290,7 @@ export default function Home() {
       setConnection("connecting");
       setApiBase(normalized);
     } catch (error) {
-      appendLog(`[NET] ${error instanceof Error ? error.message : "API URL 無效"}`);
+      appendLog(`[NET] ${error instanceof Error ? error.message : "Invalid API URL"}`, "error");
     }
   }
 
@@ -306,7 +326,7 @@ export default function Home() {
     setVisibleChannelIds(current => {
       if (!current.includes(channelId)) return [...current, channelId].sort((left, right) => left - right);
       if (current.length === 1) {
-        appendLog("[UI] 主畫面至少必須保留一個通道");
+        appendLog("[UI] At least one channel must remain visible");
         return current;
       }
       return current.filter(id => id !== channelId);
@@ -340,7 +360,7 @@ export default function Home() {
     const channel = channels[channelId];
     if (operationDisabled(channel, operation, forBatch)) return;
     if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
-      appendLog(`[CH${channelId}] Firmware 超過 16 MiB 限制`);
+      appendLog(`[CH${channelId}] Firmware exceeds the 16 MiB limit`, "error");
       return;
     }
 
@@ -366,10 +386,10 @@ export default function Home() {
         error: undefined,
         outputFile: undefined,
       } : item));
-      appendLog(`[CH${channelId}] ${job.job_id} accepted by Python · ${operation.toUpperCase()}`);
+      appendLog(`[CH${channelId}] ${job.job_id} accepted by Plasma · ${operation.toUpperCase()}`);
       return job;
     } catch (error) {
-      appendLog(`[CH${channelId}] Submit failed · ${error instanceof Error ? error.message : "unknown error"}`);
+      appendLog(`[CH${channelId}] Submit failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
       setChannels(items => items.map(item => item.id === channelId ? {
         ...item,
         stage: "failed",
@@ -388,7 +408,7 @@ export default function Home() {
       if (terminalJobStates.has(current.state)) return current;
       await new Promise(resolve => window.setTimeout(resolve, BATCH_JOB_POLL_INTERVAL_MS));
     }
-    throw new Error(`${job.job_id} 等待完成逾時`);
+    throw new Error(`${job.job_id} timed out waiting for completion`);
   }
 
   async function requestJobCancel(channelId: number, jobId: string, fromBatch: boolean) {
@@ -396,10 +416,10 @@ export default function Home() {
     cancelRequests.current.add(jobId);
     try {
       await cancelJob(apiBase, jobId);
-      appendLog(`[CH${channelId}] ${fromBatch ? "Batch cancel" : "Cancel"} requested · waiting for Python safe shutdown`);
+      appendLog(`[CH${channelId}] ${fromBatch ? "Batch cancel" : "Cancel"} requested · waiting for safe shutdown`);
     } catch (error) {
       cancelRequests.current.delete(jobId);
-      appendLog(`[CH${channelId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`);
+      appendLog(`[CH${channelId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
     }
   }
 
@@ -457,7 +477,7 @@ export default function Home() {
             }
             if (finalJob.state !== "success") {
               setBatchChannelState(channelId, "failed");
-              appendLog(`[CH${channelId}] Batch stopped · ${finalJob.state.toUpperCase()}`);
+              appendLog(`[CH${channelId}] Batch stopped · ${finalJob.state.toUpperCase()}`, "error");
               return { channelId, state: "failed" as const };
             }
           } catch (error) {
@@ -467,7 +487,7 @@ export default function Home() {
             const cancelWasRequested = batchCancelRequested.current || cancelRequests.current.has(job.job_id);
             const state = cancelWasRequested ? "cancelled" : "failed";
             setBatchChannelState(channelId, state);
-            appendLog(`[CH${channelId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`);
+            appendLog(`[CH${channelId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
             return { channelId, state };
           }
         }
@@ -482,7 +502,7 @@ export default function Home() {
         + (cancelledChannelIds.length ? ` · cancelled: ${cancelledChannelIds.map(id => `CH${id}`).join(", ")}` : "")
         + (failedChannelIds.length ? ` · failed: ${failedChannelIds.map(id => `CH${id}`).join(", ")}` : "");
       const batchOutcome = cancelledChannelIds.length ? "CANCELLED" : failedChannelIds.length ? "FAILED" : "COMPLETE";
-      appendLog(`[BATCH] ${batchOutcome} · ${summary}`);
+      appendLog(`[BATCH] ${batchOutcome} · ${summary}`, failedChannelIds.length ? "error" : "info");
     } finally {
       batchActiveJobs.current = {};
       setBatchRunning(false);
@@ -618,7 +638,7 @@ export default function Home() {
 
         <section className="logCard">
           <div className="logHead"><div><span/>LIVE JOB LOG</div><button onClick={() => setLogs([])}>清除</button></div>
-          <pre>{logs.length ? logs.join("\n") : "Log cleared."}</pre>
+          <pre aria-label="Live job log">{logs.length ? logs.map(log => <span key={log.id} data-level={log.level} style={log.level === "error" ? { display: "block", color: "var(--red)", background: "color-mix(in srgb, var(--red) 10%, transparent)", borderLeft: "3px solid var(--red)", paddingLeft: "8px", marginLeft: "-8px", fontWeight: 700 } : { display: "block" }}>{log.text}</span>) : "Log cleared."}</pre>
         </section>
       </section>
 
