@@ -3,7 +3,13 @@
 SWPC 是 Plasma 的整合測試與 Demo Server。日常部署固定執行：
 
 ```text
-GitHub main → SWPC fast-forward 更新 → 完整測試 → 重新啟動 → health check
+GitHub main
+  → SWPC fast-forward 更新
+  → 重新執行更新後的 plasmactl
+  → 完整測試
+  → 設定檔 migration / systemd unit reconciliation
+  → 重新啟動
+  → health check
 ```
 
 管理指令命名為 `plasmactl`，避免與既有燒錄 CLI `plasma` 衝突。
@@ -14,9 +20,9 @@ GitHub main → SWPC fast-forward 更新 → 完整測試 → 重新啟動 → h
 |---|---|
 | `plasmactl status` | 顯示 Git 版本、工作目錄、systemd 與 Port 狀態 |
 | `plasmactl update` | 從 GitHub `main` 做 fast-forward 更新 |
-| `plasmactl test` | 執行完整 Python、PL source-layout 與 Web 測試 |
-| `plasmactl restart` | 重新啟動三個服務並執行 health check |
-| `plasmactl deploy` | 依序執行 update、test、restart |
+| `plasmactl test` | 執行 deployment migration、Python、PL source-layout 與 Web 測試 |
+| `plasmactl restart` | reconcile 設定、重新產生 systemd units、restart 並執行 health check |
+| `plasmactl deploy` | update → re-exec 最新腳本 → test → reconcile units → restart |
 | `plasmactl logs` | 同時查看三個服務的即時 Log |
 | `plasmactl logs server` | 只看 Plasma Server Log |
 | `plasmactl logs web` | 只看 Python Gateway Log |
@@ -46,9 +52,10 @@ chmod +x scripts/plasmactl
 1. 建立或使用 `software/python/.venv`。
 2. 安裝 Python 開發相依套件；venv 沒有 pip 時自動改用 `uv pip`。
 3. 執行 `npm ci`。
-4. 建立三個 user systemd services。
-5. 在 `~/.local/bin/plasmactl` 建立連結。
-6. enable 服務，但不立即啟動。
+4. 建立或 migration `~/.config/plasma/plasmactl.env`。
+5. 建立三個 user systemd services。
+6. 在 `~/.local/bin/plasmactl` 建立連結。
+7. enable 服務，但不立即啟動。
 
 服務沒有立即啟動，是為了避免與 SWPC 目前手動啟動的 Python 或 Vite
 程序爭用 Port。
@@ -100,8 +107,24 @@ plasmactl deploy
 - SWPC 有尚未推送的本機 commit 時拒絕更新。
 - 只允許 fast-forward，不自動 merge 或 rebase。
 - Python 或 Node 相依設定改變時才重新同步相依套件。
-- 測試失敗時不重新啟動現有服務。
+- fast-forward 完成後以 `exec` 重新載入更新後的 `plasmactl`，避免一次部署仍執行舊腳本邏輯。
+- 先完成 migration regression、Python/PL 與 Web 驗證；測試失敗時不重新啟動現有服務。
+- restart/start 前會依目前設定檔重新產生 systemd units 並執行 `daemon-reload`，避免 persistent config 與 active unit 漂移。
 - restart 後等待並檢查 TCP 9900、Gateway API 與 Vite HTTP；服務啟動較慢時會自動重試。
+
+### 4.1 導入新版 deployment contract 的第一次升級
+
+舊版 `plasmactl` 在執行 `deploy` 的當下已經把舊函式與變數載入 shell；即使
+`update_code` 把磁碟上的腳本更新，正在執行的舊 process 不會自動取得新邏輯。
+因此第一次導入支援 re-exec / config schema migration 的版本時，應分成兩步：
+
+```bash
+plasmactl update
+plasmactl deploy
+```
+
+第一步只更新程式碼，不 restart；第二步從新版腳本開始完整部署。完成這次 bootstrap
+後，後續日常 `plasmactl deploy` 會自行 update 後 re-exec，不再需要手動拆成兩步。
 
 ## 5. 從外面透過 Tailscale SSH 部署
 
@@ -187,7 +210,7 @@ https://plasma.open4th.com
 Tailscale 網址 `https://swpc.tail820e64.ts.net` 保留作為內部維護入口；
 Gateway 的內部維護網址為 `https://swpc.tail820e64.ts.net:8443`。
 
-## 6. 設定檔
+## 6. 設定檔、schema 與 migration
 
 第一次安裝會建立：
 
@@ -195,9 +218,10 @@ Gateway 的內部維護網址為 `https://swpc.tail820e64.ts.net:8443`。
 ~/.config/plasma/plasmactl.env
 ```
 
-預設內容包括：
+目前 schema 為 v2。預設內容包括：
 
 ```bash
+PLASMA_CONFIG_VERSION=2
 PLASMA_REPO=/storage/projects/plasma
 PLASMA_BRANCH=main
 PLASMA_NPM=/home/gordon/.nvm/versions/node/v22.23.2/bin/npm
@@ -207,16 +231,50 @@ PLASMA_GATEWAY_PORT=18080
 PLASMA_CORS_ORIGIN='*'
 PLASMA_VITE_HOST=127.0.0.1
 PLASMA_VITE_PORT=5173
-```
-
-公開部署使用下列 API Base：
-
-```bash
 PLASMA_PUBLIC_API_URL=https://plasma.open4th.com
 ```
 
-API Base 後面不能加入 `/api`；Web Console 會自行在 Base URL 後附加 API
-路徑。
+API Base 後面不能加入 `/api`；Web Console 會自行在 Base URL 後附加 API 路徑。
+
+### 6.1 為什麼要有 config schema version
+
+Repository 中的 default 是「新安裝或未指定值時的預設」，persistent config 則是跨版本保存的
+runtime state。若沒有 schema/version，deployment 無法區分：
+
+- 舊版本自動留下的過期值；
+- 使用者刻意設定的 override。
+
+這會讓已經修正的 source default 被舊 persistent state 長期覆蓋。因此 v2 migration 的規則是：
+
+- v1 / 無版本設定中的已知舊值 `https://swpc.tail820e64.ts.net:8443`、
+  `https://swpc.tail820e64.ts.net`、`http://127.0.0.1:8080` 會 migration 到
+  `https://plasma.open4th.com`。
+- 其他未知 API Base 視為 operator override，保留不動，再將 config 標記為 v2。
+- 已是 v2 的設定不再猜測其意圖；即使值與歷史值相同，也視為使用者明確 override。
+
+這個邊界避免「每次部署都強制改成 default」而破壞真正需要的客製環境。
+
+### 6.2 Runtime unit reconciliation
+
+`plasma-vite.service` 內的 `NEXT_PUBLIC_PLASMA_API_URL` 是由設定檔產生的 systemd
+Environment。只有修改 repository source 並不會自動改掉已存在的 unit file。因此
+`plasmactl start` 與 `plasmactl restart` 現在都會先：
+
+```text
+config migration
+  → validate values
+  → regenerate units
+  → systemctl --user daemon-reload
+  → start/restart
+```
+
+修改 `plasmactl.env` 後，不需要再執行 `install`；直接：
+
+```bash
+plasmactl restart
+```
+
+即可重新產生 units 並套用設定。
 
 Cloudflare Tunnel 只需將整個 hostname 代理到 Vite：
 
@@ -233,14 +291,6 @@ http://127.0.0.1:18080
 建議使用 Cloudflare Access 保護整個 `plasma.open4th.com` hostname。
 
 既有 Tailscale 網址仍保留作為內部維護入口，不受公開 Cloudflare 路由影響。
-
-修改設定檔後，重新產生 unit 並啟動：
-
-```bash
-cd /storage/projects/plasma
-./scripts/plasmactl install
-plasmactl restart
-```
 
 Gateway 預設監聽 `0.0.0.0:18080`，只能透過 UFW、Tailscale ACL 或反向代理
 限制在可信任網路，不應直接將 18080 暴露至公用 Internet。
