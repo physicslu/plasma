@@ -1,0 +1,51 @@
+# Plasma Cline context exclusions
+# Keep source code, tests, configuration, and documentation visible to Cline.
+
+# Version-control metadata
+.git/
+
+# Python environments and caches
+software/python/.venv/
+pl/.venv/
+**/__pycache__/
+**/.pytest_cache/
+.coverage
+
+# Web dependencies and generated output
+software/web/node_modules/
+software/web/.next/
+software/web/.sites-runtime/
+software/web/dist/
+
+# Vivado / FPGA generated workspaces and artifacts
+pl/build/
+**/*.cache/
+**/*.runs/
+**/*.sim/
+**/*.hw/
+**/*.srcs/
+**/*.gen/
+**/*.ip_user_files/
+**/.Xil/
+
+*.jou
+*.log
+*.str
+*.pb
+*.wdb
+*.dcp
+*.bit
+*.bin
+*.ltx
+*.xpr
+*.xsa
+*.hwh
+
+# OS/editor noise
+.DS_Store
+*~
+*.swp
+
+# Local secrets and environment overrides
+.env
+.env.*
