@@ -133,6 +133,7 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /待命 <b>\{statusCounts\.idle\}/);
   assert.match(page, /工作中 <b>\{statusCounts\.busy\}/);
   assert.match(page, /成功 <b>\{statusCounts\.success\}/);
+  assert.match(page, /取消 <b>\{statusCounts\.cancelled\}/);
   assert.match(page, /失敗 <b>\{statusCounts\.failed\}/);
   assert.match(page, /const disabledCount = channels\.length - enabledCount/);
   assert.match(page, /aria-label="通道配置摘要"/);
@@ -165,9 +166,40 @@ test("cancels active batch jobs without coupling channel pipelines", async () =>
   assert.match(page, /Object\.entries\(batchActiveJobs\.current\)/);
   assert.match(page, /Promise\.all\(activeJobs\.map/);
   assert.match(page, /requestJobCancel\(Number\(channelId\), jobId, true\)/);
-  assert.match(page, /if \(batchCancelRequested\.current\)/);
   assert.match(page, /delete batchActiveJobs\.current\[channelId\]/);
   assert.match(page, /className="cancelBatch"/);
   assert.match(page, /aria-label="取消批次工作"/);
   assert.match(page, /取消批次/);
+});
+
+test("keeps batch cancellation authoritative without rewriting the final job result", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(page, /type BatchChannelState = "running" \| "cancelling" \| "success" \| "cancelled" \| "failed"/);
+  assert.match(page, /batchChannelStates/);
+  assert.match(page, /state === "running" \? "cancelling" : state/);
+  assert.match(page, /批次取消中/);
+  assert.match(page, /批次已取消/);
+  assert.match(page, /批次進行中/);
+  assert.match(page, /clearBatchChannelState\(channelId\)/);
+  assert.match(page, /Job State/);
+  assert.match(page, /Batch State/);
+  assert.match(page, /Job State 保留 Python Job Manager 回傳的真實結果/);
+
+  const cancellationPrecedence = page.indexOf(
+    "const cancelWasRequested = batchCancelRequested.current || cancelRequests.current.has(job.job_id);",
+  );
+  const finalStateHandling = page.indexOf('if (finalJob.state === "cancelled")', cancellationPrecedence);
+  const batchSuccess = page.indexOf('setBatchChannelState(channelId, "success")', cancellationPrecedence);
+  assert.notEqual(cancellationPrecedence, -1, "batch cancellation precedence check is missing");
+  assert.notEqual(finalStateHandling, -1, "final job state handling is missing");
+  assert.notEqual(batchSuccess, -1, "batch success transition is missing");
+  assert.ok(cancellationPrecedence < finalStateHandling, "cancel request must win before final job state classification");
+  assert.ok(cancellationPrecedence < batchSuccess, "cancel request must win before batch success is published");
+
+  const cancellingDisplay = page.indexOf('if (batchState === "cancelling")');
+  const rawJobDisplay = page.indexOf("return { state: channel.stage, label: stageLabels[channel.stage] };");
+  assert.notEqual(cancellingDisplay, -1, "batch cancelling display override is missing");
+  assert.notEqual(rawJobDisplay, -1, "raw job display fallback is missing");
+  assert.ok(cancellingDisplay < rawJobDisplay, "batch cancellation must override a racing job success in the channel UI");
 });
