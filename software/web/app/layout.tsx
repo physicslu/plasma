@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./details.css";
+import { DEFAULT_API_BASE } from "./plasma-api";
 
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
@@ -9,9 +10,9 @@ const apiBaseStorageMigration = `
 (() => {
   try {
     const versionKey = "plasma-api-base-version";
-    if (window.localStorage.getItem(versionKey) === "2") return;
-
+    const migrationComplete = window.localStorage.getItem(versionKey) === "2";
     const apiKey = "plasma-api-base";
+    const defaultApiBase = new URL(${JSON.stringify(DEFAULT_API_BASE)}).toString().replace(/\\/$/, "");
     const savedApi = window.localStorage.getItem(apiKey);
     if (savedApi) {
       try {
@@ -21,7 +22,7 @@ const apiBaseStorageMigration = `
           "https://swpc.tail820e64.ts.net:8443",
           "http://127.0.0.1:8080",
         ]);
-        if (legacyApiBases.has(normalized)) {
+        if (normalized === defaultApiBase || (!migrationComplete && legacyApiBases.has(normalized))) {
           window.localStorage.removeItem(apiKey);
         }
       } catch {
@@ -29,7 +30,9 @@ const apiBaseStorageMigration = `
       }
     }
 
-    window.localStorage.setItem(versionKey, "2");
+    if (!migrationComplete) {
+      window.localStorage.setItem(versionKey, "2");
+    }
   } catch {
     // Storage may be unavailable; the normal DEFAULT_API_BASE path still works.
   }
