@@ -214,6 +214,8 @@ export default function Home() {
       if (savedApi) {
         try {
           const normalized = normalizeApiBase(savedApi);
+          connectionRef.current = "connecting";
+          setConnection("connecting");
           setApiDraft(normalized);
           setApiBase(normalized);
         } catch {
@@ -272,7 +274,6 @@ export default function Home() {
       }
     }
 
-    connectionRef.current = "connecting";
     void poll();
     return () => {
       stopped = true;
@@ -501,7 +502,13 @@ export default function Home() {
       const summary = `success: ${successfulChannelIds.length ? successfulChannelIds.map(id => `CH${id}`).join(", ") : "none"}`
         + (cancelledChannelIds.length ? ` · cancelled: ${cancelledChannelIds.map(id => `CH${id}`).join(", ")}` : "")
         + (failedChannelIds.length ? ` · failed: ${failedChannelIds.map(id => `CH${id}`).join(", ")}` : "");
-      const batchOutcome = cancelledChannelIds.length ? "CANCELLED" : failedChannelIds.length ? "FAILED" : "COMPLETE";
+      const batchOutcome = failedChannelIds.length
+        ? "FAILED"
+        : batchCancelRequested.current
+          ? "CANCELLED"
+          : cancelledChannelIds.length
+            ? "PARTIAL"
+            : "COMPLETE";
       appendLog(`[BATCH] ${batchOutcome} · ${summary}`, failedChannelIds.length ? "error" : "info");
     } finally {
       batchActiveJobs.current = {};

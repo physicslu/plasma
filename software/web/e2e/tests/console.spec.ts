@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 type Operation = "erase" | "program" | "verify" | "read";
 type JobState = "queued" | "running" | "success" | "failed" | "cancelled" | "timeout" | "aborted";
-type MockMode = "auto-success" | "wait-for-cancel" | "cancel-race-success";
+type MockMode = "auto-success" | "wait-for-cancel" | "cancel-race-success" | "individual-cancel-partial";
 
 type MockJob = {
   jobId: string;
@@ -87,6 +87,8 @@ async function installMockApi(page: Page, options: MockOptions = {}) {
         state = mode === "cancel-race-success" ? "success" : "cancelled";
       } else if (mode === "auto-success" && startRequests.length >= waitForStarts) {
         state = "success";
+      } else if (mode === "individual-cancel-partial" && startRequests.length >= waitForStarts && job.channelId === 1) {
+        state = "success";
       }
 
       await route.fulfill({
@@ -140,6 +142,7 @@ async function openConsole(page: Page, options: MockOptions = {}) {
 }
 
 const batchSummary = (page: Page) => page.getByLabel("選取通道狀態摘要");
+const liveLog = (page: Page) => page.getByLabel("Live job log");
 
 test("starts with CH0/CH1 visible and no batch operation selected", async ({ page }) => {
   await openConsole(page);
@@ -154,6 +157,12 @@ test("starts with CH0/CH1 visible and no batch operation selected", async ({ pag
     await expect(page.getByLabel(`批次操作：${operation}`)).not.toBeChecked();
   }
   await expect(page.getByLabel("批次執行：尚未選擇操作")).toBeDisabled();
+
+  await expect(liveLog(page)).toContainText("Plasma Web REST Gateway connected");
+  await expect.poll(async () => {
+    const text = await liveLog(page).textContent();
+    return text?.match(/Plasma Web REST Gateway connected/g)?.length ?? 0;
+  }).toBe(1);
 });
 
 test("selects batch operations and completes them through the browser", async ({ page }) => {
@@ -199,7 +208,25 @@ test("batch cancel stops active jobs and prevents later operations", async ({ pa
 
   await expect.poll(() => mock.cancelRequests.length).toBe(2);
   await expect(batchSummary(page)).toContainText("取消 2");
+  await expect(liveLog(page)).toContainText("[BATCH] CANCELLED");
   expect(mock.startRequests.every(request => request.operation === "erase")).toBe(true);
+});
+
+test("reports PARTIAL when one channel is cancelled independently", async ({ page }) => {
+  const mock = await openConsole(page, { mode: "individual-cancel-partial", waitForStarts: 2 });
+
+  await page.getByLabel("批次操作：擦除").check();
+  await page.getByRole("button", { name: "批次執行：擦除" }).click();
+
+  await expect.poll(() => mock.startRequests.length).toBe(2);
+  const cancelCh0 = page.getByLabel("取消 CH0 工作");
+  await expect(cancelCh0).toBeEnabled();
+  await cancelCh0.click();
+
+  await expect.poll(() => mock.cancelRequests.length).toBe(1);
+  await expect(batchSummary(page)).toContainText("成功 1");
+  await expect(batchSummary(page)).toContainText("取消 1");
+  await expect(liveLog(page)).toContainText("[BATCH] PARTIAL · success: CH1 · cancelled: CH0");
 });
 
 test("cancel request wins batch classification when the last job races to success", async ({ page }) => {
@@ -215,6 +242,7 @@ test("cancel request wins batch classification when the last job races to succes
 
   await expect(page.locator(".channelTable .state").filter({ hasText: "批次已取消" })).toHaveCount(2);
   await expect(batchSummary(page)).toContainText("取消 2");
+  await expect(liveLog(page)).toContainText("[BATCH] CANCELLED");
   expect(mock.startRequests.every(request => request.operation === "erase")).toBe(true);
 
   await page.locator(".channelDetails").filter({ hasText: "CH0" }).click();
