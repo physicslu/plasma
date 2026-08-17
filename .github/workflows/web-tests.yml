@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - "software/web/**"
+      - "scripts/plasmactl"
       - ".github/workflows/web-tests.yml"
   pull_request:
     paths:
       - "software/web/**"
+      - "scripts/plasmactl"
       - ".github/workflows/web-tests.yml"
 
 permissions:

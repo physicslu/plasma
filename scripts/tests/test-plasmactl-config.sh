@@ -17,6 +17,13 @@ assert_file_line() {
   grep -Fxq "$expected" "$file" || fail "$file missing: $expected"
 }
 
+resolve_default_public_api_url() {
+  PLASMACTL_LIB_ONLY=1 \
+  PLASMACTL_CONFIG="$temporary/no-config.env" \
+  XDG_CONFIG_HOME="$temporary/xdg-default" \
+  bash -c 'source "$1"; printf "%s\n" "$default_public_api_url"' _ "$plasmactl_path"
+}
+
 run_migration_case() {
   local name="$1" initial="$2" expected_url="$3" expected_version="$4"
   local config="$temporary/$name.env" output
@@ -34,16 +41,19 @@ run_migration_case() {
   assert_file_line "$config" "PLASMA_PUBLIC_API_URL=$expected_url"
 }
 
+default_public_api_url="$(resolve_default_public_api_url)"
+[[ "$default_public_api_url" =~ ^https?:// ]] || fail "default public API URL is invalid: $default_public_api_url"
+
 run_migration_case \
   legacy-tailscale \
   'PLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net:8443' \
-  'https://plasma.open4th.com' \
+  "$default_public_api_url" \
   '2'
 
 run_migration_case \
   legacy-localhost \
   'PLASMA_PUBLIC_API_URL=http://127.0.0.1:8080' \
-  'https://plasma.open4th.com' \
+  "$default_public_api_url" \
   '2'
 
 run_migration_case \
@@ -64,7 +74,7 @@ PLASMACTL_CONFIG="$new_config" \
 XDG_CONFIG_HOME="$temporary/xdg-new" \
 bash -c 'source "$1"; write_config' _ "$plasmactl_path" >/dev/null
 assert_file_line "$new_config" 'PLASMA_CONFIG_VERSION=2'
-assert_file_line "$new_config" 'PLASMA_PUBLIC_API_URL=https://plasma.open4th.com'
+assert_file_line "$new_config" "PLASMA_PUBLIC_API_URL=$default_public_api_url"
 
 unit_config="$temporary/unit-migration.env"
 printf '%s\n' 'PLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net:8443' >"$unit_config"
@@ -74,7 +84,26 @@ XDG_CONFIG_HOME="$temporary/xdg-unit" \
 bash -c 'source "$1"; migrate_config; write_units' _ "$plasmactl_path" >/dev/null
 assert_file_line \
   "$temporary/xdg-unit/systemd/user/plasma-vite.service" \
-  'Environment=NEXT_PUBLIC_PLASMA_API_URL=https://plasma.open4th.com'
+  "Environment=NEXT_PUBLIC_PLASMA_API_URL=$default_public_api_url"
+
+# The endpoint is configuration, not a fixed product constant. A valid explicit
+# site value must survive schema handling and propagate unchanged into the
+# generated runtime unit.
+custom_runtime_url='https://programmer.customer.example.invalid'
+custom_unit_config="$temporary/unit-custom.env"
+printf '%s\n' \
+  'PLASMA_CONFIG_VERSION=2' \
+  "PLASMA_PUBLIC_API_URL=$custom_runtime_url" \
+  >"$custom_unit_config"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$custom_unit_config" \
+XDG_CONFIG_HOME="$temporary/xdg-custom-unit" \
+bash -c 'source "$1"; migrate_config; write_units' _ "$plasmactl_path" >/dev/null
+assert_file_line "$custom_unit_config" 'PLASMA_CONFIG_VERSION=2'
+assert_file_line "$custom_unit_config" "PLASMA_PUBLIC_API_URL=$custom_runtime_url"
+assert_file_line \
+  "$temporary/xdg-custom-unit/systemd/user/plasma-vite.service" \
+  "Environment=NEXT_PUBLIC_PLASMA_API_URL=$custom_runtime_url"
 
 grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy' "$plasmactl_path" || fail 'deploy does not re-exec updated plasmactl'
 grep -Fq 'reconcile_service_units' "$plasmactl_path" || fail 'service-unit reconciliation is missing'

@@ -1,6 +1,45 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
+
+function extractTemplateLiteral(source, constantName) {
+  const marker = `const ${constantName} = \``;
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, `${constantName} template literal is missing`);
+  const contentStart = start + marker.length;
+  const end = source.indexOf("`;", contentStart);
+  assert.notEqual(end, -1, `${constantName} template literal is unterminated`);
+  const literalSource = source.slice(contentStart, end);
+  return runInNewContext(`\`${literalSource}\``);
+}
+
+function createLocalStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+    snapshot() {
+      return Object.fromEntries(values);
+    },
+  };
+}
+
+function runBrowserApiMigration(script, initial) {
+  const localStorage = createLocalStorage(initial);
+  runInNewContext(script, {
+    URL,
+    window: { localStorage },
+  });
+  return localStorage.snapshot();
+}
 
 test("uses the Python Gateway API instead of browser-side job simulation", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
@@ -15,20 +54,65 @@ test("uses the Python Gateway API instead of browser-side job simulation", async
   assert.match(api, /\/api\/status/);
   assert.match(api, /\/api\/jobs/);
   assert.match(api, /await fetch/);
-  assert.match(api, /https:\/\/plasma\.open4th\.com/);
+  assert.match(api, /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?/);
   assert.doesNotMatch(api, /127\.0\.0\.1:8080/);
 });
 
-test("migrates known legacy browser API bases without overwriting custom overrides", async () => {
-  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+test("keeps the Web fallback aligned with the deployment default without fixing the endpoint in tests", async () => {
+  const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
+  const plasmactl = await readFile(new URL("../../../scripts/plasmactl", import.meta.url), "utf8");
 
-  assert.match(layout, /plasma-api-base-version/);
-  assert.match(layout, /https:\/\/swpc\.tail820e64\.ts\.net:8443/);
-  assert.match(layout, /http:\/\/127\.0\.0\.1:8080/);
-  assert.match(layout, /legacyApiBases\.has\(normalized\)/);
-  assert.match(layout, /localStorage\.removeItem\(apiKey\)/);
-  assert.match(layout, /localStorage\.setItem\(versionKey, "2"\)/);
-  assert.doesNotMatch(layout, /localStorage\.setItem\(apiKey, "https:\/\/plasma\.open4th\.com"\)/);
+  const webDefault = api.match(
+    /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?\s*"([^"]+)"/,
+  )?.[1];
+  const deploymentDefault = plasmactl.match(
+    /default_public_api_url="([^"]+)"/,
+  )?.[1];
+
+  assert.ok(webDefault, "Web fallback API URL is missing");
+  assert.ok(deploymentDefault, "deployment default API URL is missing");
+  assert.match(webDefault, /^https?:\/\//);
+  assert.equal(webDefault, deploymentDefault);
+});
+
+test("executes browser API migration behavior for legacy, invalid, custom, and already-versioned values", async () => {
+  const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+  const migration = extractTemplateLiteral(layout, "apiBaseStorageMigration");
+
+  for (const legacyApiBase of [
+    "https://swpc.tail820e64.ts.net",
+    "https://swpc.tail820e64.ts.net:8443",
+    "http://127.0.0.1:8080",
+  ]) {
+    const migrated = runBrowserApiMigration(migration, {
+      "plasma-api-base": legacyApiBase,
+    });
+    assert.equal(migrated["plasma-api-base"], undefined);
+    assert.equal(migrated["plasma-api-base-version"], "2");
+  }
+
+  const invalid = runBrowserApiMigration(migration, {
+    "plasma-api-base": "not a URL",
+  });
+  assert.equal(invalid["plasma-api-base"], undefined);
+  assert.equal(invalid["plasma-api-base-version"], "2");
+
+  const customApiBase = "https://programmer.customer.example.invalid";
+  const custom = runBrowserApiMigration(migration, {
+    "plasma-api-base": customApiBase,
+  });
+  assert.equal(custom["plasma-api-base"], customApiBase);
+  assert.equal(custom["plasma-api-base-version"], "2");
+
+  const explicitVersionedLegacy = runBrowserApiMigration(migration, {
+    "plasma-api-base": "https://swpc.tail820e64.ts.net:8443",
+    "plasma-api-base-version": "2",
+  });
+  assert.equal(
+    explicitVersionedLegacy["plasma-api-base"],
+    "https://swpc.tail820e64.ts.net:8443",
+  );
+  assert.equal(explicitVersionedLegacy["plasma-api-base-version"], "2");
 });
 
 test("supports selected-channel batch jobs and per-channel controls", async () => {
