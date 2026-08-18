@@ -9,7 +9,7 @@ from plasma_server.site_manager import SiteManager
 
 
 class PPUStatusTests(unittest.TestCase):
-    def test_status_exposes_ppu_identity_and_dynamic_site_count(self) -> None:
+    def test_v32_status_exposes_ppu_identity_and_one_based_sites(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             config = PlasmaConfig(
@@ -19,7 +19,7 @@ class PPUStatusTests(unittest.TestCase):
                     output_root=root / "output",
                     log_root=root / "logs",
                 ),
-                sites=[SiteConfig(id=0), SiteConfig(id=1), SiteConfig(id=2)],
+                sites=[SiteConfig(id=1), SiteConfig(id=2), SiteConfig(id=3)],
                 ppu=PPUConfig(
                     id="ppu-42",
                     facility_id="factory-a",
@@ -45,21 +45,24 @@ class PPUStatusTests(unittest.TestCase):
                     },
                 },
             )
-            self.assertEqual([item["site_id"] for item in status["sites"]], [0, 1, 2])
+            self.assertEqual([item["site_id"] for item in status["sites"]], [1, 2, 3])
+            self.assertNotIn("programmer", status)
+            self.assertNotIn("channels", status)
 
-    def test_status_retains_legacy_programmer_channel_shape_during_migration(self) -> None:
+    def test_v31_status_retains_zero_based_channel_shape(self) -> None:
         config = PlasmaConfig(
             server=ServerConfig(max_supported_sites=2, max_concurrent_jobs=1),
-            sites=[SiteConfig(id=0), SiteConfig(id=1)],
+            sites=[SiteConfig(id=1), SiteConfig(id=2)],
             ppu=PPUConfig(id="ppu-legacy", facility_id="facility-1"),
         )
 
-        status = SiteManager(config).status(site_id=1)
+        status = SiteManager(config).status(channel_id=0, protocol_version="3.1")
 
         self.assertEqual(status["programmer"]["programmer_id"], "ppu-legacy")
         self.assertEqual(status["programmer"]["site_id"], "facility-1")
-        self.assertEqual(status["channels"][0]["channel_id"], 1)
-        self.assertEqual(status["sites"][0]["site_id"], 1)
+        self.assertEqual(status["channels"][0]["channel_id"], 0)
+        self.assertNotIn("ppu", status)
+        self.assertNotIn("sites", status)
 
 
 if __name__ == "__main__":
