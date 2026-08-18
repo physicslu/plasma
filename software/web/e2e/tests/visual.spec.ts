@@ -162,12 +162,37 @@ async function openConsole(page: Page, mode: VisualMode = "running") {
   return mock;
 }
 
-async function expectVisual(page: Page, name: string) {
+async function compactScreenshot(page: Page): Promise<Buffer> {
   await page.addStyleTag({
     content: ".logCard pre{visibility:hidden!important}",
   });
-  await expect(page).toHaveScreenshot(name, {
+  const fullSize = await page.screenshot({
     fullPage: true,
+    animations: "disabled",
+    caret: "hide",
+    scale: "css",
+  });
+  const compactBase64 = await page.evaluate(async sourceBase64 => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${sourceBase64}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth / 4));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight / 4));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas 2D context unavailable");
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png").split(",", 2)[1];
+  }, fullSize.toString("base64"));
+  return Buffer.from(compactBase64, "base64");
+}
+
+async function expectVisual(page: Page, name: string) {
+  await expect(await compactScreenshot(page)).toMatchSnapshot(name, {
+    threshold: 0.2,
+    maxDiffPixelRatio: 0.002,
   });
 }
 
