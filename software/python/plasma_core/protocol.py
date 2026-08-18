@@ -10,8 +10,15 @@ from typing import Any
 
 from .errors import ErrorCode, PlasmaError
 
-PROTOCOL_VERSION = "3.1"
-MAGIC = b"PLASMA31"
+PROTOCOL_VERSION = "3.2"
+LEGACY_PROTOCOL_VERSION = "3.1"
+SUPPORTED_PROTOCOL_VERSIONS = frozenset({LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION})
+MAGIC_BY_VERSION = {
+    LEGACY_PROTOCOL_VERSION: b"PLASMA31",
+    PROTOCOL_VERSION: b"PLASMA32",
+}
+VERSION_BY_MAGIC = {magic: version for version, magic in MAGIC_BY_VERSION.items()}
+MAGIC = MAGIC_BY_VERSION[PROTOCOL_VERSION]
 HEADER = struct.Struct("!8sIII")
 
 
@@ -40,14 +47,27 @@ def _json_bytes(value: dict[str, Any]) -> bytes:
         ) from exc
 
 
+def _magic_version(magic: bytes) -> str:
+    try:
+        return VERSION_BY_MAGIC[magic]
+    except KeyError as exc:
+        raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "invalid protocol magic") from exc
+
+
 def encode_frame(frame: Frame, limits: ProtocolLimits = ProtocolLimits()) -> bytes:
     metadata = dict(frame.metadata)
     metadata.setdefault("protocol_version", PROTOCOL_VERSION)
+    version = metadata.get("protocol_version")
+    if version not in SUPPORTED_PROTOCOL_VERSIONS:
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
+            f"unsupported protocol version: {version!r}",
+        )
     metadata_bytes = _json_bytes(metadata)
     map_bytes = _json_bytes(frame.map_data) if frame.map_data else b""
     lengths = (len(metadata_bytes), len(map_bytes), len(frame.binary))
     _validate_lengths(lengths, limits)
-    return HEADER.pack(MAGIC, *lengths) + metadata_bytes + map_bytes + frame.binary
+    return HEADER.pack(MAGIC_BY_VERSION[str(version)], *lengths) + metadata_bytes + map_bytes + frame.binary
 
 
 def _validate_lengths(lengths: tuple[int, int, int], limits: ProtocolLimits) -> None:
@@ -82,8 +102,7 @@ def decode_frame_bytes(data: bytes, limits: ProtocolLimits = ProtocolLimits()) -
     if len(data) < HEADER.size:
         raise PlasmaError(ErrorCode.PROTOCOL_INCOMPLETE, "incomplete protocol header")
     magic, metadata_len, map_len, binary_len = HEADER.unpack_from(data)
-    if magic != MAGIC:
-        raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "invalid protocol magic")
+    magic_version = _magic_version(magic)
     lengths = (metadata_len, map_len, binary_len)
     _validate_lengths(lengths, limits)
     expected = HEADER.size + sum(lengths)
@@ -102,7 +121,7 @@ def decode_frame_bytes(data: bytes, limits: ProtocolLimits = ProtocolLimits()) -
         map_data=_decode_json(map_raw, "map"),
         binary=data[cursor : cursor + binary_len],
     )
-    _validate_frame(frame)
+    _validate_frame(frame, magic_version)
     return frame
 
 
@@ -119,8 +138,7 @@ async def read_frame(
             original_exception=exc,
         ) from exc
     magic, metadata_len, map_len, binary_len = HEADER.unpack(header)
-    if magic != MAGIC:
-        raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "invalid protocol magic")
+    magic_version = _magic_version(magic)
     lengths = (metadata_len, map_len, binary_len)
     _validate_lengths(lengths, limits)
     try:
@@ -138,16 +156,21 @@ async def read_frame(
         map_data=_decode_json(map_raw, "map"),
         binary=binary,
     )
-    _validate_frame(frame)
+    _validate_frame(frame, magic_version)
     return frame
 
 
-def _validate_frame(frame: Frame) -> None:
+def _validate_frame(frame: Frame, magic_version: str | None = None) -> None:
     version = frame.metadata.get("protocol_version")
-    if version != PROTOCOL_VERSION:
+    if version not in SUPPORTED_PROTOCOL_VERSIONS:
         raise PlasmaError(
             ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
             f"unsupported protocol version: {version!r}",
+        )
+    if magic_version is not None and version != magic_version:
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_HEADER_INVALID,
+            f"protocol magic/version mismatch: magic={magic_version!r}, metadata={version!r}",
         )
     expected_size = frame.metadata.get("firmware_size")
     if expected_size is not None:

@@ -55,18 +55,24 @@ class HardwareBoundaryTests(unittest.IsolatedAsyncioTestCase):
             await interface.erase()
         self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
 
-    async def test_fpga_placeholder_uses_site_identity(self) -> None:
-        interface = FPGAInterface(site_id=0, register_base=0)
-        self.assertEqual(interface.site_id, 0)
+    async def test_fpga_placeholder_uses_one_based_site_identity(self) -> None:
+        interface = FPGAInterface(site_id=1, register_base=0)
+        self.assertEqual(interface.site_id, 1)
         self.assertEqual(interface.channel_id, 0)
         with self.assertRaises(PlasmaError) as caught:
             await interface.read(0, 4)
         self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
-        self.assertEqual(caught.exception.context["site_id"], 0)
-        self.assertEqual(caught.exception.context["channel_id"], 0)
+        self.assertEqual(caught.exception.context["site_id"], 1)
+        self.assertNotIn("channel_id", caught.exception.context)
 
-    async def test_fpga_legacy_channel_keyword_remains_compatible(self) -> None:
-        interface = FPGAInterface(channel_id=1, register_base=0)
+    async def test_fpga_legacy_channel_keyword_maps_zero_to_site_one(self) -> None:
+        interface = FPGAInterface(channel_id=0, register_base=0)
         self.assertEqual(interface.site_id, 1)
+        self.assertEqual(interface.channel_id, 0)
         with self.assertRaises(TypeError):
-            FPGAInterface(site_id=1, channel_id=2, register_base=0)
+            FPGAInterface(site_id=1, channel_id=1, register_base=0)
+
+    async def test_fpga_rejects_site_zero(self) -> None:
+        with self.assertRaises(PlasmaError) as caught:
+            FPGAInterface(site_id=0, register_base=0)
+        self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)

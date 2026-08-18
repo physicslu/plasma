@@ -50,7 +50,8 @@ test("uses the Plasma Web REST Gateway instead of browser-side job simulation", 
   assert.match(page, /getJob/);
   assert.match(page, /startJob/);
   assert.match(page, /cancelJob/);
-  assert.match(page, /REST → Plasma v3\.1 TCP/);
+  assert.match(page, /REST → Plasma v3\.2 TCP/);
+  assert.doesNotMatch(page, /REST → Plasma v3\.1 TCP/);
   assert.match(api, /\/api\/status/);
   assert.match(api, /\/api\/jobs/);
   assert.match(api, /await fetch/);
@@ -86,13 +87,17 @@ test("derives PPU identity and Site topology from canonical status instead of fi
   assert.doesNotMatch(page, /visibleSiteIds\.length\} \/ 8/);
 });
 
-test("uses canonical Site requests while preserving the v3.1 channel compatibility field", async () => {
+test("uses canonical Site requests while keeping v3.1 compatibility read-only", async () => {
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
   assert.match(api, /siteId: number/);
   assert.match(api, /site_id: options\.siteId/);
-  assert.match(api, /channel_id: options\.siteId/);
-  assert.match(api, /const siteId = job\.site_id \?\? job\.channel_id/);
+  assert.doesNotMatch(api, /channel_id:\s*options\.siteId/);
+  assert.match(
+    api,
+    /job\.site_id \?\? \(job\.channel_id === undefined \? undefined : job\.channel_id \+ 1\)/,
+  );
+  assert.match(api, /site_id: channel\.channel_id \+ 1/);
   assert.match(api, /Job snapshot is missing site_id/);
 });
 

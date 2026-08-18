@@ -39,7 +39,7 @@ export type PPUStatus = {
   sites: SiteSnapshot[];
 };
 
-// Transitional shapes accepted from pre-PPU/pre-Site backends during rolling updates.
+// Transitional shapes accepted only from protocol/API v3.1 backends.
 type LegacyChannelSnapshot = {
   channel_id: number;
   enabled: boolean;
@@ -74,7 +74,6 @@ type StatusPayload = {
 export type JobSnapshot = {
   job_id: string;
   site_id: number;
-  channel_id?: number;
   operation: Operation;
   state: JobState;
   cancel_requested: boolean;
@@ -123,20 +122,21 @@ export class PlasmaSubmissionBlockedError extends Error {
 export function normalizeApiBase(value: string): string {
   const url = new URL(value.trim());
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Python API URL 必須使用 http:// 或 https://");
+    throw new Error("Plasma Web REST Gateway URL 必須使用 http:// 或 https://");
   }
   return url.toString().replace(/\/$/, "");
 }
 
 function normalizeJobSnapshot(job: WireJobSnapshot): JobSnapshot {
-  const siteId = job.site_id ?? job.channel_id;
+  const siteId = job.site_id ?? (job.channel_id === undefined ? undefined : job.channel_id + 1);
   if (siteId === undefined) {
     throw new PlasmaApiError("Job snapshot is missing site_id");
   }
-  const normalized: JobSnapshot = {
+  const normalized = {
     ...job,
     site_id: siteId,
-  };
+  } as JobSnapshot & { channel_id?: number };
+  delete normalized.channel_id;
   if (normalized.state !== "cancelled" || !normalized.result?.error) return normalized;
   return {
     ...normalized,
@@ -164,7 +164,7 @@ function legacyPPU(programmer: LegacyProgrammerSnapshot): PPUSnapshot {
 
 function legacySite(channel: LegacyChannelSnapshot): SiteSnapshot {
   return {
-    site_id: channel.channel_id,
+    site_id: channel.channel_id + 1,
     enabled: channel.enabled,
     state: channel.state,
     current_job_id: channel.current_job_id,
@@ -195,18 +195,18 @@ async function requestJson<T>(
     const payload = (await response.json()) as T & ApiErrorPayload;
     if (!response.ok) {
       const detail = payload.error?.error_code
-        ? `${payload.error.error_code}: ${payload.error.message ?? "Python API error"}`
-        : payload.error?.message ?? `Python API HTTP ${response.status}`;
+        ? `${payload.error.error_code}: ${payload.error.message ?? "Plasma REST error"}`
+        : payload.error?.message ?? `Plasma REST HTTP ${response.status}`;
       throw new PlasmaApiError(detail, response.status);
     }
     return payload;
   } catch (error) {
     if (error instanceof PlasmaApiError) throw error;
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new PlasmaApiError("Python API 連線逾時");
+      throw new PlasmaApiError("Plasma Web REST Gateway 連線逾時");
     }
     throw new PlasmaApiError(
-      error instanceof Error ? error.message : "無法連接 Python API",
+      error instanceof Error ? error.message : "無法連接 Plasma Web REST Gateway",
     );
   } finally {
     window.clearTimeout(timer);
@@ -260,9 +260,6 @@ export async function startJob(
       method: "POST",
       body: JSON.stringify({
         site_id: options.siteId,
-        // Keep the v3.1/legacy field during rolling upgrades. The Gateway
-        // rejects disagreement between these two values.
-        channel_id: options.siteId,
         operation: options.operation,
         firmware_name: options.firmware?.name,
         firmware_base64: firmwareBase64,

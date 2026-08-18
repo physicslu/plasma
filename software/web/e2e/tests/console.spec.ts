@@ -22,7 +22,6 @@ function jobPayload(job: MockJob, state: JobState) {
   return {
     job_id: job.jobId,
     site_id: job.siteId,
-    channel_id: job.siteId,
     operation: job.operation,
     state,
     cancel_requested: job.cancelRequested,
@@ -75,15 +74,18 @@ async function installMockApi(page: Page, options: MockOptions = {}) {
                 operations: ["erase", "program", "verify", "read"],
               },
             },
-            sites: Array.from({ length: 8 }, (_, siteId) => ({
-              site_id: siteId,
-              enabled: siteId < 2,
-              state: "idle",
-              current_job_id: null,
-              queued_jobs: 0,
-              interface: siteId < 2 ? "Mock" : null,
-              target: siteId < 2 ? "STM32F103C8T6" : null,
-            })),
+            sites: Array.from({ length: 8 }, (_, index) => {
+              const siteId = index + 1;
+              return {
+                site_id: siteId,
+                enabled: siteId <= 2,
+                state: "idle",
+                current_job_id: null,
+                queued_jobs: 0,
+                interface: siteId <= 2 ? "Mock" : null,
+                target: siteId <= 2 ? "STM32F103C8T6" : null,
+              };
+            }),
           }),
         });
         return;
@@ -100,7 +102,7 @@ async function installMockApi(page: Page, options: MockOptions = {}) {
         state = mode === "cancel-race-success" ? "success" : "cancelled";
       } else if (mode === "auto-success" && startRequests.length >= waitForStarts) {
         state = "success";
-      } else if (mode === "individual-cancel-partial" && startRequests.length >= waitForStarts && job.siteId === 1) {
+      } else if (mode === "individual-cancel-partial" && startRequests.length >= waitForStarts && job.siteId === 2) {
         state = "success";
       }
 
@@ -113,7 +115,7 @@ async function installMockApi(page: Page, options: MockOptions = {}) {
     }
 
     if (request.method() === "POST" && path === "/api/jobs") {
-      const body = request.postDataJSON() as { site_id: number; channel_id: number; operation: Operation };
+      const body = request.postDataJSON() as { site_id: number; operation: Operation };
       const jobId = `e2e-job-${nextJobId++}`;
       const job: MockJob = {
         jobId,
@@ -157,13 +159,14 @@ async function openConsole(page: Page, options: MockOptions = {}) {
 const batchSummary = (page: Page) => page.getByLabel("選取 Site 狀態摘要");
 const liveLog = (page: Page) => page.getByLabel("Live job log");
 
-test("starts with SITE 0/SITE 1 visible and no batch operation selected", async ({ page }) => {
+test("starts with SITE 1/SITE 2 visible and no batch operation selected", async ({ page }) => {
   await openConsole(page);
 
-  await expect(page.getByLabel("顯示 SITE 0")).toBeChecked();
   await expect(page.getByLabel("顯示 SITE 1")).toBeChecked();
-  await expect(page.getByLabel("顯示 SITE 2")).not.toBeChecked();
-  await expect(page.getByLabel("顯示 SITE 2").locator("..")).toContainText("停用");
+  await expect(page.getByLabel("顯示 SITE 2")).toBeChecked();
+  await expect(page.getByLabel("顯示 SITE 3")).not.toBeChecked();
+  await expect(page.getByLabel("顯示 SITE 3").locator("..")).toContainText("停用");
+  await expect(page.getByLabel("顯示 SITE 0")).toHaveCount(0);
   await expect(page.getByLabel("Site 配置摘要")).toContainText("停用 6");
 
   for (const operation of ["擦除", "燒錄", "驗證", "讀取"]) {
@@ -196,6 +199,7 @@ test("selects batch operations and completes them through the browser", async ({
   await expect(batchSummary(page)).toContainText("成功 2");
   await expect.poll(() => mock.startRequests.length).toBe(4);
   expect(mock.startRequests.map(request => request.operation)).toEqual(["erase", "erase", "program", "program"]);
+  expect(new Set(mock.startRequests.map(request => request.siteId))).toEqual(new Set([1, 2]));
 });
 
 test("starts selected sites concurrently instead of serializing site pipelines", async ({ page }) => {
@@ -205,7 +209,7 @@ test("starts selected sites concurrently instead of serializing site pipelines",
   await page.getByRole("button", { name: "批次執行：擦除" }).click();
 
   await expect.poll(() => mock.startRequests.length).toBe(2);
-  expect(new Set(mock.startRequests.map(request => request.siteId))).toEqual(new Set([0, 1]));
+  expect(new Set(mock.startRequests.map(request => request.siteId))).toEqual(new Set([1, 2]));
   await expect(batchSummary(page)).toContainText("成功 2");
 });
 
@@ -232,14 +236,14 @@ test("reports PARTIAL when one Site is cancelled independently", async ({ page }
   await page.getByRole("button", { name: "批次執行：擦除" }).click();
 
   await expect.poll(() => mock.startRequests.length).toBe(2);
-  const cancelSite0 = page.getByLabel("取消 SITE 0 工作");
-  await expect(cancelSite0).toBeEnabled();
-  await cancelSite0.click();
+  const cancelSite1 = page.getByLabel("取消 SITE 1 工作");
+  await expect(cancelSite1).toBeEnabled();
+  await cancelSite1.click();
 
   await expect.poll(() => mock.cancelRequests.length).toBe(1);
   await expect(batchSummary(page)).toContainText("成功 1");
   await expect(batchSummary(page)).toContainText("取消 1");
-  await expect(liveLog(page)).toContainText("[BATCH] PARTIAL · success: SITE 1 · cancelled: SITE 0");
+  await expect(liveLog(page)).toContainText("[BATCH] PARTIAL · success: SITE 2 · cancelled: SITE 1");
 });
 
 test("cancel request wins batch classification when the last job races to success", async ({ page }) => {
@@ -258,7 +262,8 @@ test("cancel request wins batch classification when the last job races to succes
   await expect(liveLog(page)).toContainText("[BATCH] CANCELLED");
   expect(mock.startRequests.every(request => request.operation === "erase")).toBe(true);
 
-  await page.locator(".channelDetails").filter({ hasText: "SITE 0" }).click();
+  await page.locator(".channelDetails").filter({ hasText: "SITE 1" }).click();
   await expect(page.getByText("Job State", { exact: true }).locator("..").locator("dd")).toHaveText("SUCCESS");
   await expect(page.getByText("Batch State", { exact: true }).locator("..").locator("dd")).toHaveText("已取消");
+  await expect(page.getByText("Protocol", { exact: true }).locator("..").locator("dd")).toHaveText("REST → Plasma v3.2 TCP");
 });

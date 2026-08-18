@@ -9,15 +9,18 @@ type MockJob = {
 };
 
 function sites() {
-  return Array.from({ length: 8 }, (_, siteId) => ({
-    site_id: siteId,
-    enabled: siteId < 2,
-    state: "idle",
-    current_job_id: null,
-    queued_jobs: 0,
-    interface: siteId < 2 ? "Mock" : null,
-    target: siteId < 2 ? "STM32F103C8T6" : null,
-  }));
+  return Array.from({ length: 8 }, (_, index) => {
+    const siteId = index + 1;
+    return {
+      site_id: siteId,
+      enabled: siteId <= 2,
+      state: "idle",
+      current_job_id: null,
+      queued_jobs: 0,
+      interface: siteId <= 2 ? "Mock" : null,
+      target: siteId <= 2 ? "STM32F103C8T6" : null,
+    };
+  });
 }
 
 async function json(route: Route, body: unknown) {
@@ -39,7 +42,7 @@ async function installMock(page: Page) {
     }
 
     if (request.method() === "POST" && url.pathname === "/api/jobs") {
-      const body = request.postDataJSON() as { site_id: number; channel_id: number; operation: Operation };
+      const body = request.postDataJSON() as { site_id: number; operation: Operation };
       const jobId = `barrier-job-${nextId++}`;
       jobs.set(jobId, { jobId, siteId: body.site_id, operation: body.operation });
       starts.push({ siteId: body.site_id, operation: body.operation });
@@ -48,7 +51,6 @@ async function installMock(page: Page) {
         job: {
           job_id: jobId,
           site_id: body.site_id,
-          channel_id: body.channel_id,
           operation: body.operation,
           state: "queued",
           cancel_requested: false,
@@ -75,7 +77,6 @@ async function installMock(page: Page) {
         job: {
           job_id: job.jobId,
           site_id: job.siteId,
-          channel_id: job.siteId,
           operation: job.operation,
           state: "success",
           cancel_requested: false,
@@ -138,7 +139,7 @@ test("cancel barrier blocks PROGRAM before transport dispatch", async ({ page })
 
   await expect.poll(() => mock.starts.length).toBe(2);
   expect(mock.starts).toEqual([
-    { siteId: 0, operation: "erase" },
     { siteId: 1, operation: "erase" },
+    { siteId: 2, operation: "erase" },
   ]);
 });

@@ -437,7 +437,6 @@ export default function Home() {
       setSubmittingSiteIds(current => current.filter(id => id !== siteId));
     }
   }
-
   async function waitForTerminalJob(job: JobSnapshot): Promise<JobSnapshot> {
     for (let attempt = 0; attempt < BATCH_JOB_POLL_ATTEMPTS; attempt += 1) {
       const current = await getJob(apiBase, job.job_id);
@@ -700,7 +699,7 @@ export default function Home() {
 
       {detailsSite && <div className="modalBackdrop" onClick={() => setDetailsSiteId(null)}><section className="details" onClick={event => event.stopPropagation()}>
         <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Site {detailsSite.id} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsSiteId(null)}>×</button></div>
-        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Facility</dt><dd>{ppu?.facility_id ?? "—"}</dd></div><div><dt>PPU</dt><dd>{ppu?.ppu_id ?? "—"}</dd></div><div><dt>Job ID</dt><dd>{detailsSite.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsSite.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsSite.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsSite.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsSite.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsSite.target ?? "STM32F103C8T6"} ({detailsSite.interface ?? "Mock"})</dd></div></dl>
+        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Facility</dt><dd>{ppu?.facility_id ?? "—"}</dd></div><div><dt>PPU</dt><dd>{ppu?.ppu_id ?? "—"}</dd></div><div><dt>Job ID</dt><dd>{detailsSite.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsSite.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsSite.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsSite.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsSite.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.2 TCP</dd></div><div><dt>Target</dt><dd>{detailsSite.target ?? "STM32F103C8T6"} ({detailsSite.interface ?? "Mock"})</dd></div></dl>
         <p>Job State 保留 Python Job Manager 回傳的真實結果；Batch State 描述該 Site 在本次批次流程的結果。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
       </section></div>}
     </main>

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .enums import JobState, Operation
-from .errors import ErrorCode, PlasmaError
+from .errors import ErrorCode, PlasmaError, error_name
 
 
 JOB_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -18,8 +18,8 @@ RESERVED_METADATA_KEYS = frozenset(
         "protocol_version",
         "message_type",
         "job_id",
-        "channel_id",
         "site_id",
+        "channel_id",
         "operation",
         "timeout_s",
         "max_retries",
@@ -55,6 +55,32 @@ def validate_job_id(job_id: str) -> None:
         )
 
 
+def validate_site_id(site_id: int) -> int:
+    if isinstance(site_id, bool) or not isinstance(site_id, int) or site_id < 1:
+        raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must be a positive integer starting at 1")
+    return site_id
+
+
+def site_id_from_legacy_channel(channel_id: int) -> int:
+    if isinstance(channel_id, bool) or not isinstance(channel_id, int) or channel_id < 0:
+        raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "channel_id must be a non-negative integer")
+    return channel_id + 1
+
+
+def legacy_channel_id_from_site(site_id: int) -> int:
+    return validate_site_id(site_id) - 1
+
+
+def _resolve_site_identity(site_id: int | None, channel_id: int | None) -> int:
+    if site_id is None and channel_id is None:
+        raise TypeError("site_id is required")
+    canonical = validate_site_id(site_id) if site_id is not None else None
+    legacy = site_id_from_legacy_channel(channel_id) if channel_id is not None else None
+    if canonical is not None and legacy is not None and canonical != legacy:
+        raise TypeError("site_id and legacy channel_id disagree")
+    return canonical if canonical is not None else legacy  # type: ignore[return-value]
+
+
 @dataclass(slots=True)
 class ErrorDetail:
     error_code: str
@@ -62,7 +88,7 @@ class ErrorDetail:
     message: str
     recoverable: bool
     timestamp: str = field(default_factory=iso_now)
-    channel_id: int | None = None
+    site_id: int | None = None
     job_id: str | None = None
     operation: str | None = None
     retry_count: int = 0
@@ -70,25 +96,32 @@ class ErrorDetail:
     context: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def site_id(self) -> int | None:
-        return self.channel_id
+    def channel_id(self) -> int | None:
+        """Legacy v3.1 identity derived from the canonical one-based Site ID."""
+        return legacy_channel_id_from_site(self.site_id) if self.site_id is not None else None
 
     @classmethod
     def from_exception(
         cls,
         error: PlasmaError,
         *,
+        site_id: int | None = None,
         channel_id: int | None = None,
         job_id: str | None = None,
         operation: Operation | str | None = None,
         retry_count: int = 0,
     ) -> "ErrorDetail":
+        resolved_site = (
+            _resolve_site_identity(site_id, channel_id)
+            if site_id is not None or channel_id is not None
+            else None
+        )
         return cls(
             error_code=error.code.value,
             error_type=error.error_type,
             message=error.message,
             recoverable=error.recoverable,
-            channel_id=channel_id,
+            site_id=resolved_site,
             job_id=job_id,
             operation=operation.value if isinstance(operation, Operation) else operation,
             retry_count=retry_count,
@@ -96,38 +129,68 @@ class ErrorDetail:
             context=dict(error.context),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, protocol_version: str = "3.2") -> dict[str, Any]:
         data = asdict(self)
-        data["site_id"] = self.channel_id
+        try:
+            data["error_type"] = error_name(ErrorCode(self.error_code), protocol_version)
+        except ValueError:
+            pass
+        if protocol_version == "3.1":
+            data["channel_id"] = self.channel_id
+            data.pop("site_id", None)
         return data
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, init=False)
 class JobRequest:
-    # channel_id remains the Plasma v3.1 wire field. Domain/API code should
-    # treat the same local resource as a Programming Site via site_id.
-    channel_id: int
+    site_id: int
     operation: Operation
-    firmware: bytes = b""
-    map_data: dict[str, Any] = field(default_factory=dict)
-    job_id: str = field(default_factory=new_job_id)
-    timeout_s: float = 30.0
-    max_retries: int = 0
-    retry_backoff_s: float = 0.05
-    client_id: str = "local"
-    target: str = "STM32F103C8T6"
-    metadata: dict[str, Any] = field(default_factory=dict)
+    firmware: bytes
+    map_data: dict[str, Any]
+    job_id: str
+    timeout_s: float
+    max_retries: int
+    retry_backoff_s: float
+    client_id: str
+    target: str
+    metadata: dict[str, Any]
 
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        site_id: int | None = None,
+        operation: Operation | None = None,
+        firmware: bytes = b"",
+        map_data: dict[str, Any] | None = None,
+        job_id: str | None = None,
+        timeout_s: float = 30.0,
+        max_retries: int = 0,
+        retry_backoff_s: float = 0.05,
+        client_id: str = "local",
+        target: str = "STM32F103C8T6",
+        metadata: dict[str, Any] | None = None,
+        *,
+        channel_id: int | None = None,
+    ) -> None:
+        self.site_id = _resolve_site_identity(site_id, channel_id)
+        self.operation = operation  # type: ignore[assignment]
+        self.firmware = firmware
+        self.map_data = dict(map_data or {})
+        self.job_id = job_id or new_job_id()
+        self.timeout_s = timeout_s
+        self.max_retries = max_retries
+        self.retry_backoff_s = retry_backoff_s
+        self.client_id = client_id
+        self.target = target
+        self.metadata = dict(metadata or {})
         self.validate()
 
     @property
-    def site_id(self) -> int:
-        return self.channel_id
+    def channel_id(self) -> int:
+        """Legacy v3.1 channel identity. New code must use site_id."""
+        return legacy_channel_id_from_site(self.site_id)
 
     def validate(self) -> None:
-        if isinstance(self.channel_id, bool) or not isinstance(self.channel_id, int) or self.channel_id < 0:
-            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "channel_id must be a non-negative integer")
+        validate_site_id(self.site_id)
         if not isinstance(self.operation, Operation):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "operation must be a valid Operation")
         validate_job_id(self.job_id)
@@ -169,15 +232,24 @@ class JobRequest:
     def firmware_sha256(self) -> str:
         return hashlib.sha256(self.firmware).hexdigest()
 
-    def protocol_metadata(self) -> dict[str, Any]:
+    def protocol_metadata(self, protocol_version: str = "3.2") -> dict[str, Any]:
         self.validate()
+        if protocol_version not in {"3.1", "3.2"}:
+            raise PlasmaError(
+                ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
+                f"unsupported protocol version: {protocol_version!r}",
+            )
+        identity = (
+            {"site_id": self.site_id}
+            if protocol_version == "3.2"
+            else {"channel_id": self.channel_id}
+        )
         return {
             **self.metadata,
-            "protocol_version": "3.1",
+            "protocol_version": protocol_version,
             "message_type": "request",
             "job_id": self.job_id,
-            # Deliberately preserved until a protocol-version migration.
-            "channel_id": self.channel_id,
+            **identity,
             "operation": self.operation.value,
             "timeout_s": self.timeout_s,
             "max_retries": self.max_retries,
@@ -195,10 +267,10 @@ class ExecutionOutput:
     details: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, init=False)
 class JobResult:
     job_id: str
-    channel_id: int
+    site_id: int
     operation: Operation
     state: JobState
     created_at: str
@@ -206,24 +278,65 @@ class JobResult:
     finished_at: str
     elapsed_ms: int
     attempts: int
-    firmware_name: str | None = None
-    firmware_size: int = 0
-    firmware_sha256: str | None = None
-    output_files: list[str] = field(default_factory=list)
-    error: ErrorDetail | None = None
-    details: dict[str, Any] = field(default_factory=dict)
+    firmware_name: str | None
+    firmware_size: int
+    firmware_sha256: str | None
+    output_files: list[str]
+    error: ErrorDetail | None
+    details: dict[str, Any]
+
+    def __init__(
+        self,
+        job_id: str,
+        site_id: int | None = None,
+        operation: Operation | None = None,
+        state: JobState | None = None,
+        created_at: str = "",
+        started_at: str | None = None,
+        finished_at: str = "",
+        elapsed_ms: int = 0,
+        attempts: int = 0,
+        firmware_name: str | None = None,
+        firmware_size: int = 0,
+        firmware_sha256: str | None = None,
+        output_files: list[str] | None = None,
+        error: ErrorDetail | None = None,
+        details: dict[str, Any] | None = None,
+        *,
+        channel_id: int | None = None,
+    ) -> None:
+        self.job_id = job_id
+        self.site_id = _resolve_site_identity(site_id, channel_id)
+        self.operation = operation  # type: ignore[assignment]
+        self.state = state  # type: ignore[assignment]
+        self.created_at = created_at
+        self.started_at = started_at
+        self.finished_at = finished_at
+        self.elapsed_ms = elapsed_ms
+        self.attempts = attempts
+        self.firmware_name = firmware_name
+        self.firmware_size = firmware_size
+        self.firmware_sha256 = firmware_sha256
+        self.output_files = list(output_files or [])
+        self.error = error
+        self.details = dict(details or {})
 
     @property
-    def site_id(self) -> int:
-        return self.channel_id
+    def channel_id(self) -> int:
+        """Legacy v3.1 channel identity. New code must use site_id."""
+        return legacy_channel_id_from_site(self.site_id)
 
     @property
     def success(self) -> bool:
         return self.state is JobState.SUCCESS
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, protocol_version: str = "3.2") -> dict[str, Any]:
         data = asdict(self)
-        data["site_id"] = self.channel_id
         data["operation"] = self.operation.value
         data["state"] = self.state.value
+        if self.error is not None:
+            data["error"] = self.error.to_dict(protocol_version)
+        if protocol_version == "3.1":
+            data["channel_id"] = self.channel_id
+            data.pop("site_id", None)
         return data

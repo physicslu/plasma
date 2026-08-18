@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from plasma_client.client import PlasmaClient
 from plasma_core.enums import Operation
 from plasma_core.errors import PlasmaError
-from plasma_core.models import JobRequest, validate_job_id
+from plasma_core.models import JobRequest, site_id_from_legacy_channel, validate_job_id
 
 
 def _run(coro: Any) -> Any:
@@ -22,26 +22,40 @@ def _run(coro: Any) -> Any:
 
 def _parse_site_id(value: Any) -> int:
     if isinstance(value, bool):
-        raise ValueError("site_id must be a non-negative integer")
+        raise ValueError("site_id must be a positive integer starting at 1")
     if isinstance(value, int):
         parsed = value
     elif isinstance(value, str) and value and value.isascii() and value.isdecimal():
         parsed = int(value)
     else:
-        raise ValueError("site_id must be a non-negative integer")
-    if parsed < 0:
-        raise ValueError("site_id must be a non-negative integer")
+        raise ValueError("site_id must be a positive integer starting at 1")
+    if parsed < 1:
+        raise ValueError("site_id must be a positive integer starting at 1")
     return parsed
+
+
+def _parse_legacy_channel_id(value: Any) -> int:
+    if isinstance(value, bool):
+        raise ValueError("legacy channel_id must be a non-negative integer")
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, str) and value and value.isascii() and value.isdecimal():
+        parsed = int(value)
+    else:
+        raise ValueError("legacy channel_id must be a non-negative integer")
+    if parsed < 0:
+        raise ValueError("legacy channel_id must be a non-negative integer")
+    return site_id_from_legacy_channel(parsed)
 
 
 def _site_value(canonical: Any, legacy: Any) -> int | None:
     if canonical is None and legacy is None:
         return None
     canonical_id = _parse_site_id(canonical) if canonical is not None else None
-    legacy_id = _parse_site_id(legacy) if legacy is not None else None
-    if canonical_id is not None and legacy_id is not None and canonical_id != legacy_id:
-        raise ValueError("site_id and legacy channel_id disagree")
-    return canonical_id if canonical_id is not None else legacy_id
+    legacy_site_id = _parse_legacy_channel_id(legacy) if legacy is not None else None
+    if canonical_id is not None and legacy_site_id is not None and canonical_id != legacy_site_id:
+        raise ValueError("site_id and legacy channel_id refer to different Sites")
+    return canonical_id if canonical_id is not None else legacy_site_id
 
 
 class PlasmaWebHandler(BaseHTTPRequestHandler):
@@ -115,8 +129,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 site = query.get("site", [None])[0]
                 legacy_channel = query.get("channel", [None])[0]
                 site_id = _site_value(site, legacy_channel)
-                # Plasma protocol v3.1 still addresses the local resource as channel_id.
-                self._json(HTTPStatus.OK, _run(self.client_factory().status(job_id=job, channel_id=site_id)))
+                self._json(HTTPStatus.OK, _run(self.client_factory().status(job_id=job, site_id=site_id)))
                 return
             parts = parsed.path.split("/")
             if len(parts) == 6 and parts[1:3] == ["api", "jobs"] and parts[4] == "files":
@@ -172,8 +185,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             if site_id is None:
                 raise ValueError("job requires site_id")
             request = JobRequest(
-                # Compatibility translation into the Plasma v3.1 wire model.
-                channel_id=site_id,
+                site_id=site_id,
                 operation=operation,
                 firmware=firmware,
                 map_data=map_data,

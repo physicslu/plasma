@@ -10,8 +10,16 @@ from typing import Any
 
 from plasma_core.enums import JobState, Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import JobRequest
-from plasma_core.protocol import Frame, ProtocolLimits, encode_frame, read_frame
+from plasma_core.models import JobRequest, legacy_channel_id_from_site
+from plasma_core.protocol import (
+    LEGACY_PROTOCOL_VERSION,
+    PROTOCOL_VERSION,
+    SUPPORTED_PROTOCOL_VERSIONS,
+    Frame,
+    ProtocolLimits,
+    encode_frame,
+    read_frame,
+)
 
 
 class PlasmaClient:
@@ -20,12 +28,16 @@ class PlasmaClient:
         host: str = "127.0.0.1",
         port: int = 9900,
         *,
+        protocol_version: str = PROTOCOL_VERSION,
         connect_timeout_s: float = 5.0,
         response_timeout_s: float = 60.0,
         limits: ProtocolLimits = ProtocolLimits(),
     ) -> None:
+        if protocol_version not in SUPPORTED_PROTOCOL_VERSIONS:
+            raise ValueError(f"unsupported Plasma protocol version: {protocol_version}")
         self.host = host
         self.port = port
+        self.protocol_version = protocol_version
         self.connect_timeout_s = connect_timeout_s
         self.response_timeout_s = response_timeout_s
         self.limits = limits
@@ -83,7 +95,7 @@ class PlasmaClient:
         timeout = max(self.response_timeout_s, request.timeout_s * (request.max_retries + 1) + 10)
         return await self.send(
             Frame(
-                metadata=request.protocol_metadata(),
+                metadata=request.protocol_metadata(self.protocol_version),
                 map_data=request.map_data,
                 binary=request.firmware,
             ),
@@ -92,7 +104,7 @@ class PlasmaClient:
 
     async def start(self, request: JobRequest) -> dict[str, Any]:
         """Queue a Job and return its ID immediately, without waiting for completion."""
-        metadata = request.protocol_metadata()
+        metadata = request.protocol_metadata(self.protocol_version)
         metadata["wait_for_completion"] = False
         return await self.send(
             Frame(
@@ -136,7 +148,7 @@ class PlasmaClient:
 
     async def program(
         self,
-        channel_id: int,
+        site_id: int,
         firmware: bytes,
         *,
         firmware_name: str | None = None,
@@ -147,7 +159,7 @@ class PlasmaClient:
     ) -> dict[str, Any]:
         return await self.submit(
             JobRequest(
-                channel_id=channel_id,
+                site_id=site_id,
                 operation=Operation.PROGRAM,
                 firmware=firmware,
                 map_data=map_data or {},
@@ -158,37 +170,40 @@ class PlasmaClient:
             )
         )
 
-    async def erase(self, channel_id: int, **options: Any) -> dict[str, Any]:
-        return await self.submit(JobRequest(channel_id=channel_id, operation=Operation.ERASE, **options))
+    async def erase(self, site_id: int, **options: Any) -> dict[str, Any]:
+        return await self.submit(JobRequest(site_id=site_id, operation=Operation.ERASE, **options))
 
-    async def verify(self, channel_id: int, firmware: bytes, **options: Any) -> dict[str, Any]:
+    async def verify(self, site_id: int, firmware: bytes, **options: Any) -> dict[str, Any]:
         return await self.submit(
-            JobRequest(channel_id=channel_id, operation=Operation.VERIFY, firmware=firmware, **options)
+            JobRequest(site_id=site_id, operation=Operation.VERIFY, firmware=firmware, **options)
         )
 
     async def read(
         self,
-        channel_id: int,
+        site_id: int,
         map_data: dict[str, Any],
         **options: Any,
     ) -> dict[str, Any]:
         return await self.submit(
-            JobRequest(channel_id=channel_id, operation=Operation.READ, map_data=map_data, **options)
+            JobRequest(site_id=site_id, operation=Operation.READ, map_data=map_data, **options)
         )
 
     async def status(
         self,
         *,
-        channel_id: int | None = None,
+        site_id: int | None = None,
         job_id: str | None = None,
     ) -> dict[str, Any]:
         metadata: dict[str, Any] = {
-            "protocol_version": "3.1",
+            "protocol_version": self.protocol_version,
             "message_type": "request",
             "operation": Operation.STATUS.value,
         }
-        if channel_id is not None:
-            metadata["channel_id"] = channel_id
+        if site_id is not None:
+            if self.protocol_version == LEGACY_PROTOCOL_VERSION:
+                metadata["channel_id"] = legacy_channel_id_from_site(site_id)
+            else:
+                metadata["site_id"] = site_id
         if job_id is not None:
             metadata["target_job_id"] = job_id
         return await self.send(Frame(metadata=metadata))
@@ -197,7 +212,7 @@ class PlasmaClient:
         return await self.send(
             Frame(
                 metadata={
-                    "protocol_version": "3.1",
+                    "protocol_version": self.protocol_version,
                     "message_type": "request",
                     "operation": Operation.CANCEL.value,
                     "target_job_id": job_id,

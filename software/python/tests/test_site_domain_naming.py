@@ -7,7 +7,7 @@ from pathlib import Path
 
 from plasma_core.config import PPUConfig, PlasmaConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation, SiteState
-from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.errors import ErrorCode, PlasmaError, error_name
 from plasma_core.job_logging import JobEventLogger, OutputManager
 from plasma_core.models import JobRequest
 from plasma_server import SiteManager, SiteWorker
@@ -37,24 +37,33 @@ class SiteDomainNamingTests(unittest.TestCase):
 
     def test_site_manager_and_worker_are_canonical_exports(self) -> None:
         self.assertIs(SiteManager, ModuleSiteManager)
-        self.assertIs(ChannelManager, SiteManager)
+        self.assertIsNot(ChannelManager, SiteManager)
         self.assertIs(SiteWorker, ModuleSiteWorker)
         self.assertIs(ChannelWorker, SiteWorker)
 
-    def test_site_error_symbols_keep_v31_wire_identity(self) -> None:
+    def test_site_error_symbols_are_v32_canonical_and_v31_serializable(self) -> None:
         self.assertIs(ErrorCode.SITE_INVALID, ErrorCode.CHANNEL_INVALID)
         self.assertIs(ErrorCode.SITE_DISABLED, ErrorCode.CHANNEL_DISABLED)
         self.assertIs(ErrorCode.SITE_BUSY, ErrorCode.CHANNEL_BUSY)
         error = PlasmaError(ErrorCode.SITE_INVALID, "missing site")
         self.assertEqual(error.code.value, "E4001")
-        self.assertEqual(error.error_type, "CHANNEL_INVALID")
+        self.assertEqual(error.error_type, "SITE_INVALID")
+        self.assertEqual(error_name(ErrorCode.SITE_INVALID, "3.1"), "CHANNEL_INVALID")
 
-    def test_job_request_exposes_site_but_serializes_v31_channel_id(self) -> None:
-        request = JobRequest(channel_id=3, operation=Operation.ERASE)
+    def test_job_request_serializes_v32_site_id_and_can_adapt_v31_channel_id(self) -> None:
+        request = JobRequest(site_id=4, operation=Operation.ERASE)
         metadata = request.protocol_metadata()
-        self.assertEqual(request.site_id, 3)
-        self.assertEqual(metadata["channel_id"], 3)
-        self.assertNotIn("site_id", metadata)
+        self.assertEqual(request.site_id, 4)
+        self.assertEqual(metadata["site_id"], 4)
+        self.assertNotIn("channel_id", metadata)
+
+        legacy_metadata = request.protocol_metadata("3.1")
+        self.assertEqual(legacy_metadata["channel_id"], 3)
+        self.assertNotIn("site_id", legacy_metadata)
+
+        legacy_request = JobRequest(channel_id=3, operation=Operation.ERASE)
+        self.assertEqual(legacy_request.site_id, 4)
+        self.assertEqual(legacy_request.channel_id, 3)
 
     def test_site_audit_paths_and_readback_names_are_canonical(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -65,9 +74,12 @@ class SiteDomainNamingTests(unittest.TestCase):
             self.assertEqual(logger.text_path.parent.name, "SITE2")
             record = json.loads(logger.jsonl_path.read_text(encoding="utf-8").strip())
             self.assertEqual(record["site_id"], 2)
-            self.assertEqual(record["channel_id"], 2)
-            self.assertTrue(logger.legacy_jsonl_path.is_file())
-            self.assertEqual(logger.legacy_jsonl_path.parent.name, "CH2")
+            self.assertNotIn("channel_id", record)
+
+            legacy_record = json.loads(logger.legacy_jsonl_path.read_text(encoding="utf-8").strip())
+            self.assertEqual(logger.legacy_jsonl_path.parent.name, "CH1")
+            self.assertEqual(legacy_record["channel_id"], 1)
+            self.assertNotIn("site_id", legacy_record)
 
             output = OutputManager(root / "output")
             paths = output.write_read_sections("site-readback", 2, {"flash": b"abc"})
@@ -87,7 +99,7 @@ class SiteDomainNamingTests(unittest.TestCase):
                     log_root=root / "logs",
                 ),
                 ppu=PPUConfig(id="ppu-test", facility_id="facility-test"),
-                sites=[SiteConfig(id=0, enabled=False)],
+                sites=[SiteConfig(id=1, enabled=False)],
             )
             server = PlasmaServer(config)
             self.assertIsInstance(server.manager, SiteManager)

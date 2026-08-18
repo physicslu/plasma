@@ -35,7 +35,9 @@ class ProgressRenderer:
         if job.get("bytes_total") is not None:
             byte_text = f"  {int(job.get('bytes_done') or 0):,}/{int(job['bytes_total']):,} B"
         cancel_text = "  CANCEL REQUESTED" if job.get("cancel_requested") else ""
-        site_id = job.get("site_id", job.get("channel_id"))
+        site_id = job.get("site_id")
+        if site_id is None and job.get("channel_id") is not None:
+            site_id = int(job["channel_id"]) + 1
         line = (
             f"SITE{site_id} {stage:<9} [{bar}] {percent:5.1f}%"
             f"  stage {stage_percent:5.1f}%{byte_text}{cancel_text}"
@@ -71,7 +73,10 @@ def _load_map(path: Path | None) -> dict[str, Any]:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="plasma", description="Plasma PPU programming client")
+    parser = argparse.ArgumentParser(
+        prog="plasma",
+        description="Plasma PPU programming client (protocol v3.2)",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=9900)
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -80,11 +85,10 @@ def _parser() -> argparse.ArgumentParser:
         command = subcommands.add_parser(name)
         command.add_argument(
             "--site",
-            "--channel",
             dest="site",
             type=int,
             required=True,
-            help="Programming Site ID (--channel is a legacy alias)",
+            help="one-based Programming Site ID (1..N)",
         )
         command.add_argument("--timeout", type=float, default=30.0)
         command.add_argument("--retries", type=int, default=0)
@@ -105,13 +109,7 @@ def _parser() -> argparse.ArgumentParser:
     read.add_argument("--map", type=Path, required=True)
 
     status = subcommands.add_parser("status")
-    status.add_argument(
-        "--site",
-        "--channel",
-        dest="site",
-        type=int,
-        help="Programming Site ID (--channel is a legacy alias)",
-    )
+    status.add_argument("--site", dest="site", type=int, help="one-based Programming Site ID (1..N)")
     status.add_argument("--job")
 
     cancel = subcommands.add_parser("cancel")
@@ -122,8 +120,7 @@ def _parser() -> argparse.ArgumentParser:
 def _build_request(args: argparse.Namespace) -> JobRequest:
     if args.command == "program":
         return JobRequest(
-            # JobRequest.channel_id is deliberately retained as the v3.1 wire field.
-            channel_id=args.site,
+            site_id=args.site,
             operation=Operation.PROGRAM,
             firmware=args.bin.read_bytes(),
             map_data=_load_map(args.map),
@@ -134,7 +131,7 @@ def _build_request(args: argparse.Namespace) -> JobRequest:
         )
     if args.command == "erase":
         return JobRequest(
-            channel_id=args.site,
+            site_id=args.site,
             operation=Operation.ERASE,
             timeout_s=args.timeout,
             max_retries=args.retries,
@@ -142,7 +139,7 @@ def _build_request(args: argparse.Namespace) -> JobRequest:
         )
     if args.command == "verify":
         return JobRequest(
-            channel_id=args.site,
+            site_id=args.site,
             operation=Operation.VERIFY,
             firmware=args.bin.read_bytes(),
             timeout_s=args.timeout,
@@ -151,7 +148,7 @@ def _build_request(args: argparse.Namespace) -> JobRequest:
         )
     if args.command == "read":
         return JobRequest(
-            channel_id=args.site,
+            site_id=args.site,
             operation=Operation.READ,
             map_data=_load_map(args.map),
             timeout_s=args.timeout,
@@ -197,8 +194,7 @@ async def _run_work(
 async def _execute(args: argparse.Namespace) -> dict[str, Any]:
     client = PlasmaClient(args.host, args.port)
     if args.command == "status":
-        # PlasmaClient is the v3.1 transport adapter, so it still sends channel_id.
-        return await client.status(channel_id=args.site, job_id=args.job)
+        return await client.status(site_id=args.site, job_id=args.job)
     if args.command == "cancel":
         return await client.cancel(args.job)
     renderer = ProgressRenderer(enabled=not args.no_progress)
