@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import ErrorCode, PlasmaError
-from .models import JobResult, iso_now, validate_job_id
+from .models import JobResult, iso_now, legacy_channel_id_from_site, validate_job_id
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:
@@ -63,15 +63,15 @@ class ServerEventLogger:
 class JobEventLogger:
     def __init__(self, root: Path, site_id: int, job_id: str) -> None:
         validate_job_id(job_id)
+        channel_id = legacy_channel_id_from_site(site_id)
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         directory = root / date / f"SITE{site_id}"
-        legacy_directory = root / date / f"CH{site_id}"
+        legacy_directory = root / date / f"CH{channel_id}"
         directory.mkdir(parents=True, exist_ok=True)
         legacy_directory.mkdir(parents=True, exist_ok=True)
         self.text_path = directory / f"{job_id}.log"
         self.jsonl_path = directory / f"{job_id}.jsonl"
-        # Temporary filesystem compatibility for tools that still discover
-        # audit logs via CH<n>. New code must use SITE<n>.
+        # Temporary filesystem/schema compatibility for v3.1-era tools.
         self.legacy_text_path = legacy_directory / f"{job_id}.log"
         self.legacy_jsonl_path = legacy_directory / f"{job_id}.jsonl"
         self.site_id = site_id
@@ -80,35 +80,53 @@ class JobEventLogger:
 
     @property
     def channel_id(self) -> int:
-        """Legacy alias retained for code reading the pre-Site logger attribute."""
-        return self.site_id
+        """Legacy v3.1 identity derived from the canonical one-based Site ID."""
+        return legacy_channel_id_from_site(self.site_id)
 
-    def event(self, event: str, *, level: str = "INFO", **fields: Any) -> None:
-        record = {
-            "timestamp": iso_now(),
-            "level": level.upper(),
-            "event": event,
-            "site_id": self.site_id,
-            # Transitional compatibility for existing JSONL consumers.
-            "channel_id": self.site_id,
-            "job_id": self.job_id,
-            **{key: value for key, value in fields.items() if value is not None},
-        }
+    @staticmethod
+    def _text_line(record: dict[str, Any]) -> str:
         human_fields = " ".join(
             f"{key}={value!r}"
             for key, value in record.items()
             if key not in {"timestamp", "level", "event"}
         )
-        text_line = f"{record['timestamp']} {record['level']:<5} {event} {human_fields}".rstrip() + "\n"
-        json_line = json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
+        return (
+            f"{record['timestamp']} {record['level']:<5} {record['event']} {human_fields}"
+            .rstrip()
+            + "\n"
+        )
+
+    def event(self, event: str, *, level: str = "INFO", **fields: Any) -> None:
+        timestamp = iso_now()
+        common = {
+            "timestamp": timestamp,
+            "level": level.upper(),
+            "event": event,
+            "job_id": self.job_id,
+            **{key: value for key, value in fields.items() if value is not None},
+        }
+        canonical_record = {
+            **common,
+            "site_id": self.site_id,
+        }
+        legacy_record = {
+            **common,
+            "channel_id": self.channel_id,
+        }
+        canonical_text = self._text_line(canonical_record)
+        legacy_text = self._text_line(legacy_record)
+        canonical_json = json.dumps(canonical_record, ensure_ascii=False, separators=(",", ":")) + "\n"
+        legacy_json = json.dumps(legacy_record, ensure_ascii=False, separators=(",", ":")) + "\n"
         try:
             with self._lock:
-                for text_path in (self.text_path, self.legacy_text_path):
-                    with text_path.open("a", encoding="utf-8") as stream:
-                        stream.write(text_line)
-                for jsonl_path in (self.jsonl_path, self.legacy_jsonl_path):
-                    with jsonl_path.open("a", encoding="utf-8") as stream:
-                        stream.write(json_line)
+                with self.text_path.open("a", encoding="utf-8") as stream:
+                    stream.write(canonical_text)
+                with self.jsonl_path.open("a", encoding="utf-8") as stream:
+                    stream.write(canonical_json)
+                with self.legacy_text_path.open("a", encoding="utf-8") as stream:
+                    stream.write(legacy_text)
+                with self.legacy_jsonl_path.open("a", encoding="utf-8") as stream:
+                    stream.write(legacy_json)
         except OSError as exc:
             raise PlasmaError(
                 ErrorCode.OUTPUT_WRITE_FAILED,
