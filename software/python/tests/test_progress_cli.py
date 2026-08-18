@@ -12,8 +12,8 @@ from plasma_client.client import PlasmaClient
 from plasma_core.enums import JobState, Operation
 from plasma_core.models import JobRequest
 from plasma_interfaces.mock import MockInterface
-from plasma_server.channel_manager import ChannelManager
 from plasma_server.server import PlasmaServer
+from plasma_server.site_manager import SiteManager
 
 from tests.helpers import make_config
 
@@ -32,15 +32,15 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
     async def start_server(self, delays: dict[str, float]) -> tuple[PlasmaClient, PlasmaServer]:
         config = make_config(
             self.root,
-            enabled_channels=1,
-            channel_options={
+            enabled_sites=1,
+            site_options={
                 0: {
                     "operation_timeout_s": 3.0,
                     "mock": {"delays": delays, "progress_steps": 12},
                 }
             },
         )
-        server = PlasmaServer(config, ChannelManager(config))
+        server = PlasmaServer(config, SiteManager(config))
         await server.start()
         self.servers.append(server)
         return PlasmaClient(*server.address, response_timeout_s=2.0), server
@@ -54,12 +54,12 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
             operation=Operation.PROGRAM,
             firmware=bytes(range(64)),
             job_id="progress-stages",
-            # This test validates progress semantics, so leave scheduling margin for loaded CI runners.
             timeout_s=10.0,
         )
         accepted = await client.start(request)
         self.assertTrue(accepted["accepted"])
         self.assertEqual(accepted["job"]["job_id"], request.job_id)
+        self.assertEqual(accepted["job"]["site_id"], 0)
 
         updates: list[dict[str, object]] = []
         result = await client.wait_for_job(
@@ -83,7 +83,7 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(interface.calls["program"], 1)
         self.assertEqual(interface.calls["verify"], 0)
 
-    async def test_cli_progress_renderer_shows_program_only(self) -> None:
+    async def test_cli_progress_renderer_shows_site_and_program_only(self) -> None:
         client, _server = await self.start_server(
             {"erase": 0.09, "program": 0.12, "verify": 0.09}
         )
@@ -103,6 +103,8 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         )
         rendered = stream.getvalue()
         self.assertEqual(result["result"]["state"], "success")
+        self.assertIn("SITE0", rendered)
+        self.assertNotIn("CH0", rendered)
         self.assertIn("PROGRAM", rendered)
         self.assertNotIn("ERASE", rendered)
         self.assertNotIn("VERIFY", rendered)
