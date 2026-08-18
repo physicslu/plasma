@@ -20,6 +20,17 @@ def _run(coro: Any) -> Any:
     return asyncio.run(coro)
 
 
+def _site_value(canonical: Any, legacy: Any) -> int | None:
+    if canonical is not None and legacy is not None and str(canonical) != str(legacy):
+        raise ValueError("site_id and legacy channel_id disagree")
+    value = canonical if canonical is not None else legacy
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError("site_id must be an integer")
+    return int(value)
+
+
 class PlasmaWebHandler(BaseHTTPRequestHandler):
     client_factory: Callable[[], PlasmaClient] = PlasmaClient
     max_body_bytes = 24 * 1024 * 1024
@@ -88,8 +99,11 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/status":
                 query = parse_qs(parsed.query)
                 job = query.get("job", [None])[0]
-                channel = query.get("channel", [None])[0]
-                self._json(HTTPStatus.OK, _run(self.client_factory().status(job_id=job, channel_id=int(channel) if channel is not None else None)))
+                site = query.get("site", [None])[0]
+                legacy_channel = query.get("channel", [None])[0]
+                site_id = _site_value(site, legacy_channel)
+                # Plasma protocol v3.1 still addresses the local resource as channel_id.
+                self._json(HTTPStatus.OK, _run(self.client_factory().status(job_id=job, channel_id=site_id)))
                 return
             parts = parsed.path.split("/")
             if len(parts) == 6 and parts[1:3] == ["api", "jobs"] and parts[4] == "files":
@@ -141,9 +155,15 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             map_data = body.get("map_data") or {}
             if operation is Operation.READ:
                 map_data = self._read_map(body, map_data)
+            site_id = _site_value(body.get("site_id"), body.get("channel_id"))
+            if site_id is None:
+                raise ValueError("job requires site_id")
             request = JobRequest(
-                channel_id=int(body["channel_id"]), operation=operation,
-                firmware=firmware, map_data=map_data,
+                # Compatibility translation into the Plasma v3.1 wire model.
+                channel_id=site_id,
+                operation=operation,
+                firmware=firmware,
+                map_data=map_data,
                 timeout_s=float(body.get("timeout_s", 30)),
                 client_id="plasma-web",
                 metadata={"firmware_name": str(body.get("firmware_name", "browser-upload.bin"))},
@@ -187,7 +207,7 @@ def serve(
     PlasmaWebHandler.allowed_origins = frozenset(cors_origins)
     PlasmaWebHandler.output_root = output_root.resolve()
     server = ThreadingHTTPServer((host, port), PlasmaWebHandler)
-    print(f"Plasma Web API listening on http://{host}:{port}")
+    print(f"Plasma Web REST Gateway listening on http://{host}:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
