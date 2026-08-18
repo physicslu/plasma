@@ -15,6 +15,11 @@ class ErrorCode(StrEnum):
     PROTOCOL_PAYLOAD_TOO_LARGE = "E3004"
     PROTOCOL_JSON_INVALID = "E3005"
     PROTOCOL_CHECKSUM_MISMATCH = "E3006"
+    SITE_INVALID = "E4001"
+    SITE_DISABLED = "E4002"
+    SITE_BUSY = "E4003"
+    # Legacy symbolic aliases. E400x values and serialized error_type names are
+    # retained for v3.1 compatibility while Site is canonical in Python code.
     CHANNEL_INVALID = "E4001"
     CHANNEL_DISABLED = "E4002"
     CHANNEL_BUSY = "E4003"
@@ -46,9 +51,11 @@ ERROR_NAMES: dict[ErrorCode, str] = {
     ErrorCode.PROTOCOL_PAYLOAD_TOO_LARGE: "PROTOCOL_PAYLOAD_TOO_LARGE",
     ErrorCode.PROTOCOL_JSON_INVALID: "PROTOCOL_JSON_INVALID",
     ErrorCode.PROTOCOL_CHECKSUM_MISMATCH: "PROTOCOL_CHECKSUM_MISMATCH",
-    ErrorCode.CHANNEL_INVALID: "CHANNEL_INVALID",
-    ErrorCode.CHANNEL_DISABLED: "CHANNEL_DISABLED",
-    ErrorCode.CHANNEL_BUSY: "CHANNEL_BUSY",
+    # Keep the published v3.1 error_type strings stable even though Python
+    # code now uses ErrorCode.SITE_* as the canonical symbolic names.
+    ErrorCode.SITE_INVALID: "CHANNEL_INVALID",
+    ErrorCode.SITE_DISABLED: "CHANNEL_DISABLED",
+    ErrorCode.SITE_BUSY: "CHANNEL_BUSY",
     ErrorCode.JOB_NOT_FOUND: "JOB_NOT_FOUND",
     ErrorCode.OPERATION_UNSUPPORTED: "OPERATION_UNSUPPORTED",
     ErrorCode.DUPLICATE_JOB: "DUPLICATE_JOB",
