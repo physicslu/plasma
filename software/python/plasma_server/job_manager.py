@@ -35,12 +35,15 @@ class JobRuntime:
         if not self.updated_at:
             self.updated_at = self.created_at
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self, protocol_version: str = "3.2") -> dict[str, Any]:
+        identity = (
+            {"site_id": self.request.site_id}
+            if protocol_version == "3.2"
+            else {"channel_id": self.request.channel_id}
+        )
         data: dict[str, Any] = {
             "job_id": self.request.job_id,
-            "site_id": self.request.site_id,
-            # Compatibility field for Plasma protocol v3.1 clients.
-            "channel_id": self.request.channel_id,
+            **identity,
             "operation": self.request.operation.value,
             "state": self.state.value,
             "created_at": self.created_at,
@@ -56,7 +59,7 @@ class JobRuntime:
             "updated_at": self.updated_at,
         }
         if self.result:
-            data["result"] = self.result.to_dict()
+            data["result"] = self.result.to_dict(protocol_version)
         return data
 
 
