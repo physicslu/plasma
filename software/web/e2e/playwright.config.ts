@@ -22,6 +22,7 @@ export default defineConfig({
   use: {
     ...devices["Desktop Chrome"],
     baseURL: "http://127.0.0.1:4173",
+    // Fixed to the accepted maximized desktop reference supplied after PR #29.
     viewport: { width: 1680, height: 900 },
     deviceScaleFactor: 1,
     colorScheme: "light",
