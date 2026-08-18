@@ -4,8 +4,9 @@ set -Eeuo pipefail
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repo="$(cd "$(dirname "$script_path")/../.." && pwd)"
 gitignore="$repo/.gitignore"
+clineignore="$repo/.clineignore"
 
-required_patterns=(
+gitignore_patterns=(
   '.env'
   '.env.*'
   '!.env.example'
@@ -20,10 +21,30 @@ required_patterns=(
   'secrets.*'
 )
 
+clineignore_patterns=(
+  '.env'
+  '.env.*'
+  '*.pem'
+  '*.key'
+  '*.p8'
+  '*.p12'
+  '*.pfx'
+  '*.jks'
+  'credentials.*'
+  'secrets.*'
+)
+
 missing=0
-for pattern in "${required_patterns[@]}"; do
+for pattern in "${gitignore_patterns[@]}"; do
   if ! grep -Fqx -- "$pattern" "$gitignore"; then
     printf 'ERROR: missing secret exclusion in .gitignore: %s\n' "$pattern" >&2
+    missing=1
+  fi
+done
+
+for pattern in "${clineignore_patterns[@]}"; do
+  if ! grep -Fqx -- "$pattern" "$clineignore"; then
+    printf 'ERROR: missing secret exclusion in .clineignore: %s\n' "$pattern" >&2
     missing=1
   fi
 done
