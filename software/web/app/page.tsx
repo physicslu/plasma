@@ -6,14 +6,20 @@ import { BatchLifecycle } from "./batch-lifecycle";
 import {
   cancelJob,
   DEFAULT_API_BASE,
-  getChannels,
   getJob,
+  getProgrammerStatus,
   normalizeApiBase,
   PlasmaSubmissionBlockedError,
   readDownloadUrl,
   startJob,
 } from "./plasma-api";
-import type { JobSnapshot, JobState, Operation } from "./plasma-api";
+import type {
+  ChannelSnapshot,
+  JobSnapshot,
+  JobState,
+  Operation,
+  ProgrammerSnapshot,
+} from "./plasma-api";
 
 type Stage =
   | "idle"
@@ -53,13 +59,6 @@ const BATCH_JOB_POLL_ATTEMPTS = 120;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
 const failedStages: Stage[] = ["cancelled", "failed", "timeout", "aborted"];
 const terminalJobStates = new Set<JobState>(["success", "failed", "cancelled", "timeout", "aborted"]);
-const initialChannels: Channel[] = Array.from({ length: 8 }, (_, id) => ({
-  id,
-  enabled: id < 2,
-  stage: "idle",
-  progress: 0,
-  stageProgress: 0,
-}));
 const stageLabels: Record<Stage, string> = {
   idle: "待命",
   queued: "排隊中",
@@ -122,9 +121,27 @@ function uiStage(job: JobSnapshot): Stage {
   return job.state;
 }
 
+function channelFromStatus(backend: ChannelSnapshot, existing?: Channel): Channel {
+  return {
+    id: backend.channel_id,
+    enabled: backend.enabled,
+    stage: existing?.stage ?? "idle",
+    progress: existing?.progress ?? 0,
+    stageProgress: existing?.stageProgress ?? 0,
+    operation: existing?.operation,
+    jobId: backend.current_job_id ?? existing?.jobId,
+    file: existing?.file,
+    target: backend.target ?? undefined,
+    interface: backend.interface ?? undefined,
+    error: existing?.error,
+    outputFile: existing?.outputFile,
+  };
+}
+
 export default function Home() {
-  const [channels, setChannels] = useState(initialChannels);
-  const [visibleChannelIds, setVisibleChannelIds] = useState<number[]>([0, 1]);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [visibleChannelIds, setVisibleChannelIds] = useState<number[]>([]);
+  const [programmer, setProgrammer] = useState<ProgrammerSnapshot | null>(null);
   const [firmware, setFirmware] = useState<File | null>(null);
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
@@ -239,19 +256,30 @@ export default function Home() {
 
     async function poll() {
       try {
-        const backendChannels = await getChannels(apiBase);
+        const status = await getProgrammerStatus(apiBase);
         if (stopped) return;
-        setChannels(current => current.map(channel => {
-          const backend = backendChannels.find(item => item.channel_id === channel.id);
-          if (!backend) return channel;
-          if (backend.current_job_id) trackedJobs.current[channel.id] = backend.current_job_id;
-          return {
-            ...channel,
-            enabled: backend.enabled,
-            target: backend.target ?? undefined,
-            interface: backend.interface ?? undefined,
-          };
-        }));
+        setProgrammer(status.programmer ?? null);
+
+        const availableChannelIds = new Set(status.channels.map(channel => channel.channel_id));
+        Object.keys(trackedJobs.current).forEach(channelId => {
+          if (!availableChannelIds.has(Number(channelId))) delete trackedJobs.current[Number(channelId)];
+        });
+        status.channels.forEach(channel => {
+          if (channel.current_job_id) trackedJobs.current[channel.channel_id] = channel.current_job_id;
+        });
+
+        setChannels(current => status.channels.map(backend => (
+          channelFromStatus(backend, current.find(channel => channel.id === backend.channel_id))
+        )));
+        setVisibleChannelIds(current => {
+          const retained = current.filter(channelId => availableChannelIds.has(channelId));
+          if (retained.length > 0) return retained;
+          const enabledChannelIds = status.channels
+            .filter(channel => channel.enabled)
+            .map(channel => channel.channel_id);
+          if (enabledChannelIds.length > 0) return enabledChannelIds;
+          return status.channels.length > 0 ? [status.channels[0].channel_id] : [];
+        });
 
         const jobs = await Promise.all(
           Object.values(trackedJobs.current).map(jobId => getJob(apiBase, jobId)),
@@ -323,8 +351,8 @@ export default function Home() {
   }
 
   function toggleChannel(channelId: number) {
-    const channel = channels[channelId];
-    if (batchRunning || isRunning(channel) || submittingChannelIds.includes(channelId)) return;
+    const channel = channels.find(item => item.id === channelId);
+    if (!channel || batchRunning || isRunning(channel) || submittingChannelIds.includes(channelId)) return;
     setVisibleChannelIds(current => {
       if (!current.includes(channelId)) return [...current, channelId].sort((left, right) => left - right);
       if (current.length === 1) {
@@ -345,7 +373,7 @@ export default function Home() {
   }
 
   function batchDisabled(operation: Operation): boolean {
-    return visibleChannels.some(channel => operationDisabled(channel, operation));
+    return visibleChannels.length === 0 || visibleChannels.some(channel => operationDisabled(channel, operation));
   }
 
   function toggleBatchOperation(operation: Operation) {
@@ -364,8 +392,8 @@ export default function Home() {
     forBatch = false,
     submissionGuard?: () => boolean,
   ): Promise<JobSnapshot | undefined> {
-    const channel = channels[channelId];
-    if (operationDisabled(channel, operation, forBatch)) return;
+    const channel = channels.find(item => item.id === channelId);
+    if (!channel || operationDisabled(channel, operation, forBatch)) return;
     if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
       appendLog(`[CH${channelId}] Firmware exceeds the 16 MiB limit`, "error");
       return;
@@ -543,17 +571,17 @@ export default function Home() {
   }
 
   async function cancel(channelId: number) {
-    const channel = channels[channelId];
-    if (!channel.jobId || !isRunning(channel)) return;
+    const channel = channels.find(item => item.id === channelId);
+    if (!channel || !channel.jobId || !isRunning(channel)) return;
     if (batchRunning && batchChannelStates[channelId] === "running") {
       setBatchChannelState(channelId, "cancelling");
     }
     await requestJobCancel(channelId, channel.jobId, false);
   }
 
-  const batchTargetText = visibleChannelIds.length === 8
-    ? "CH0～CH7"
-    : visibleChannelIds.map(id => `CH${id}`).join("、");
+  const batchTargetText = visibleChannelIds.length
+    ? visibleChannelIds.map(id => `CH${id}`).join("、")
+    : "—";
 
   return (
     <main>
@@ -572,14 +600,22 @@ export default function Home() {
 
       <section className="console overviewConsole">
         <div className="pageHeading">
-          <div><p className="eyebrow">CHANNEL MATRIX</p><h1>多通道工作總覽</h1></div>
-          <div className={`gatewayHealth ${connection}`}><span className="pulse"/><div><small>Plasma Web REST Gateway</small><b>{connection === "online" ? "Online" : connection === "connecting" ? "Connecting" : "Offline"}</b></div><em>{enabledCount}/8 Enabled</em></div>
+          <div>
+            <p className="eyebrow">CHANNEL MATRIX</p>
+            <h1>多通道工作總覽</h1>
+            {programmer && <div className="statusSummary" aria-label="Programmer identity">
+              <span>Site <b>{programmer.site_id}</b></span>
+              <span>Programmer <b>{programmer.programmer_id}</b></span>
+              <span>Model <b>{programmer.model}</b></span>
+            </div>}
+          </div>
+          <div className={`gatewayHealth ${connection}`}><span className="pulse"/><div><small>Plasma Web REST Gateway</small><b>{connection === "online" ? "Online" : connection === "connecting" ? "Connecting" : "Offline"}</b></div><em>{enabledCount}/{channels.length} Enabled</em></div>
         </div>
 
         <section className="selectorPanel" aria-labelledby="channel-selector-title">
           <div className="sectionHeading">
             <div><p className="eyebrow">DISPLAY CHANNELS</p><h2 id="channel-selector-title">顯示與批次操作通道</h2></div>
-            <div className="statusSummary" aria-label="通道配置摘要"><span>顯示 <b>{visibleChannelIds.length} / 8</b></span><span>停用 <b>{disabledCount}</b></span></div>
+            <div className="statusSummary" aria-label="通道配置摘要"><span>顯示 <b>{visibleChannelIds.length} / {channels.length}</b></span><span>停用 <b>{disabledCount}</b></span></div>
           </div>
           <div className="channelChecks">
             {channels.map(channel => {
@@ -664,7 +700,7 @@ export default function Home() {
 
       {detailsChannel && <div className="modalBackdrop" onClick={() => setDetailsChannelId(null)}><section className="details" onClick={event => event.stopPropagation()}>
         <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Channel {detailsChannel.id} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsChannelId(null)}>×</button></div>
-        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Job ID</dt><dd>{detailsChannel.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsChannel.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsChannel.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsChannel.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsChannel.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsChannel.target ?? "STM32F103C8T6"} ({detailsChannel.interface ?? "Mock"})</dd></div></dl>
+        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Site</dt><dd>{programmer?.site_id ?? "—"}</dd></div><div><dt>Programmer</dt><dd>{programmer?.programmer_id ?? "—"}</dd></div><div><dt>Job ID</dt><dd>{detailsChannel.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsChannel.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsChannel.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsChannel.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsChannel.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsChannel.target ?? "STM32F103C8T6"} ({detailsChannel.interface ?? "Mock"})</dd></div></dl>
         <p>Job State 保留 Python Job Manager 回傳的真實結果；Batch State 描述該通道在本次批次流程的結果。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
       </section></div>}
     </main>
