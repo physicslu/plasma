@@ -1,20 +1,20 @@
 # Plasma 錯誤碼
 
-| Code | Type | 說明 |
+| Code | v3.2 Type | 說明 |
 |---|---|---|
-| E1001 | INVALID_ARGUMENT | CLI、map、timeout 或其他參數錯誤 |
-| E1002 | CONFIG_INVALID | YAML 或通道設定不合法 |
+| E1001 | INVALID_ARGUMENT | CLI、map、timeout、Site ID 或其他參數錯誤 |
+| E1002 | CONFIG_INVALID | YAML 或 Site 設定不合法 |
 | E2001 | CONNECTION_FAILED | Client 無法建立連線 |
 | E2002 | CONNECTION_TIMEOUT | 連線或 response 等待逾時 |
-| E3001 | PROTOCOL_HEADER_INVALID | Magic/header 不合法 |
+| E3001 | PROTOCOL_HEADER_INVALID | Magic/header 不合法或 Magic/版本不一致 |
 | E3002 | PROTOCOL_INCOMPLETE | 半包或宣告長度不符 |
 | E3003 | PROTOCOL_VERSION_UNSUPPORTED | 協定版本不支援 |
 | E3004 | PROTOCOL_PAYLOAD_TOO_LARGE | Payload 超過設定上限 |
 | E3005 | PROTOCOL_JSON_INVALID | Metadata/map JSON 不合法 |
 | E3006 | PROTOCOL_CHECKSUM_MISMATCH | Binary SHA-256 不符 |
-| E4001 | CHANNEL_INVALID | Channel ID 不存在 |
-| E4002 | CHANNEL_DISABLED | Channel 存在但已停用 |
-| E4003 | CHANNEL_BUSY | 通道 queue 已滿 |
+| E4001 | SITE_INVALID | one-based Site ID 不存在 |
+| E4002 | SITE_DISABLED | Site 存在但已停用 |
+| E4003 | SITE_BUSY | Site queue 已滿 |
 | E4004 | JOB_NOT_FOUND | Job ID 不存在 |
 | E4005 | OPERATION_UNSUPPORTED | 操作不支援 |
 | E4006 | DUPLICATE_JOB | Job ID 重複 |
@@ -31,6 +31,16 @@
 | E9001 | INTERNAL_ERROR | 未預期的軟體錯誤 |
 | E9002 | JOB_ABORTED | Server 重啟時發現未完成 Job |
 
+Protocol v3.1 compatibility response 仍以相同數值 E4001/E4002/E4003 序列化 legacy 名稱：
+
+```text
+v3.2 SITE_INVALID   <-> v3.1 CHANNEL_INVALID
+v3.2 SITE_DISABLED  <-> v3.1 CHANNEL_DISABLED
+v3.2 SITE_BUSY      <-> v3.1 CHANNEL_BUSY
+```
+
+錯誤碼數值沒有因 domain rename 重新編號；差異只在 protocol-version-specific `error_type` 字串。
+
 `recoverable=true` 只表示軟體允許依政策重試，不代表重試必然安全。對於不確定 target 是否已部分寫入的操作，handler 必須先執行明確的復原流程，例如 reset、重新 halt 與完整 erase。
 
-若工作本身完成、但 `safe_shutdown()` 失敗，結果仍必須是 `failed/E5002`；因為系統無法保證該通道已回到安全狀態。
+若工作本身完成、但 `safe_shutdown()` 失敗，結果仍必須是 `failed/E5002`；因為系統無法保證該 Site 已回到安全狀態。
