@@ -17,23 +17,6 @@ server:
   max_binary_bytes: 67108864
 
 sites:
-  - id: 0
-    enabled: true
-    interface: mock
-    target: STM32F103C8T6
-    operation_timeout_s: 30.0
-    max_retries: 1
-    retry_backoff_s: 0.05
-    mock:
-      flash_size: 262144
-      default_delay_s: 0.8
-      progress_steps: 30
-      delays:
-        erase: 1.5
-        program: 3.0
-        verify: 1.5
-        read: 0.8
-
   - id: 1
     enabled: true
     interface: mock
@@ -51,9 +34,26 @@ sites:
         verify: 1.5
         read: 0.8
 
-  - {id: 2, enabled: false, interface: mock}
+  - id: 2
+    enabled: true
+    interface: mock
+    target: STM32F103C8T6
+    operation_timeout_s: 30.0
+    max_retries: 1
+    retry_backoff_s: 0.05
+    mock:
+      flash_size: 262144
+      default_delay_s: 0.8
+      progress_steps: 30
+      delays:
+        erase: 1.5
+        program: 3.0
+        verify: 1.5
+        read: 0.8
+
   - {id: 3, enabled: false, interface: mock}
   - {id: 4, enabled: false, interface: mock}
   - {id: 5, enabled: false, interface: mock}
   - {id: 6, enabled: false, interface: mock}
   - {id: 7, enabled: false, interface: mock}
+  - {id: 8, enabled: false, interface: mock}
