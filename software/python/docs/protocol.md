@@ -1,5 +1,19 @@
 # Plasma v3.1 通訊協定
 
+## Domain naming compatibility
+
+Plasma 的 canonical domain vocabulary 已統一為：
+
+```text
+Facility -> PPU (Plasma Programming Unit) -> Site (Programming Site)
+```
+
+但 Plasma protocol v3.1 在這次命名確立之前就已發布，因此 wire metadata 仍使用 `channel_id`。在 v3.1 中：
+
+> `channel_id` 的語意就是「目前這台 PPU 內的 local Programming Site ID」。
+
+這次 domain rename **不修改 v3.1 wire field，也不變更 protocol version**。新的 REST/domain code 使用 `site_id`，在 protocol boundary 轉成 `channel_id`。未來若要修改 wire field，必須以獨立且明確的 protocol-version migration 處理。
+
 ## Frame 格式
 
 每個 frame 由固定 20-byte header 加三段 payload 組成：
@@ -42,6 +56,7 @@ Header 的 Python 定義是 `struct.Struct("!8sIII")`。Receiver 必須先檢查
 Server 同時檢查：
 
 - `protocol_version` 必須是 `3.1`。
+- `channel_id` 是 local Programming Site ID；名稱保留是 v3.1 compatibility requirement。
 - `firmware_size` 必須等於 header 的 BINLEN。
 - `firmware_sha256` 必須等於實際 binary SHA-256。
 - metadata／map 必須是 JSON object。
@@ -88,6 +103,8 @@ Server 同時檢查：
 
 | 欄位 | 意義 |
 |---|---|
+| `site_id` | canonical domain alias，對應同一個 local Site |
+| `channel_id` | v3.1 compatibility field，與 `site_id` 指向同一 local Site |
 | `stage` | `erase`、`program`、`verify` 或 read section |
 | `stage_state` | `started`、`progress`、`completed`、`failed`、`cancelled` |
 | `stage_progress_percent` | 目前階段 0～100% |
@@ -108,11 +125,13 @@ Request-level error：
   "error": {
     "error_code": "E4002",
     "error_type": "CHANNEL_DISABLED",
-    "message": "channel is disabled: CH7",
+    "message": "site is disabled: SITE7",
     "recoverable": false
   }
 }
 ```
+
+`CHANNEL_*` error type/code 也屬於既有 v3.1 compatibility surface；新的 domain terminology 是 Site，但錯誤碼不在這次 rename 中重新編號。
 
 ## v0.3.1 的連線模型
 
