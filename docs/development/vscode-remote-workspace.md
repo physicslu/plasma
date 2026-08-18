@@ -2,31 +2,28 @@
 
 ## 1. Purpose
 
-Plasma uses one primary Linux engineering workspace on SWPC and multiple VS Code client machines.
-The goal is to keep the deterministic toolchain in one place instead of maintaining different
-Python, Verilator, cocotb, Node, and Vivado installations on every client computer.
+Plasma uses one primary Linux integration workspace and multiple VS Code client machines. The goal is to keep the deterministic toolchain in one place instead of maintaining divergent Python, Verilator, cocotb, Node, and Vivado installations on every client.
 
-GitHub remains the source of truth for published repository history. SWPC is the primary active
-integration/development workspace used by VS Code Remote - SSH.
+GitHub remains the source of truth for published repository history. The integration host is the primary active engineering workspace used through VS Code Remote-SSH.
 
 ## 2. Machine roles
 
-| Machine | Role | Normal Plasma access | Local special capability |
-|---|---|---|---|
-| SWPC (Linux) | Primary development and integration host | Local repository `/storage/projects/plasma` | Verilator, cocotb, pytest, Python environments, Node/Web tools, Vivado |
-| Mac | Primary engineering client | VS Code Remote - SSH to SWPC | Ollama and optional local-AI coding tools |
-| SHNB (Dell) | Portable engineering client | VS Code Remote - SSH to SWPC | Optional standalone Windows/Vivado experiments only |
-| DESKTOP-1 | Company thin client | VS Code Remote - SSH to SWPC | Keep local Plasma footprint minimal |
+| Role | Normal Plasma access | Responsibility |
+|---|---|---|
+| Integration Host | Local `$PLASMA_REPO` | Verilator, cocotb, pytest, Python environments, Node/Web tools, Vivado |
+| Engineering Client | VS Code Remote-SSH | Interactive editing, review, optional local AI tooling |
+| Portable Client | VS Code Remote-SSH | Remote development and bounded platform-specific experiments |
+| Managed Thin Client | VS Code Remote-SSH | Minimal local footprint and minimal local data retention |
 
-The normal development path is therefore:
+Normal development path:
 
 ```text
-Mac / SHNB / DESKTOP-1
+Engineering clients
         |
-        | VS Code Remote - SSH
+        | VS Code Remote-SSH
         v
-       SWPC
-/storage/projects/plasma
+Integration Host
+    $PLASMA_REPO
         |
         +-- Git / GitHub
         +-- Python environments
@@ -35,45 +32,26 @@ Mac / SHNB / DESKTOP-1
         +-- Vivado
 ```
 
-Client machines do not need a second normal Plasma clone or duplicate FPGA/Python toolchain merely
-to edit and verify code. A local clone is allowed for a specific isolated experiment, but it is not
-the standard daily workflow.
+Private machine names, real SSH usernames, private DNS/VPN identifiers, and site-specific absolute paths are intentionally not part of the public workspace standard.
 
-## 3. VS Code repository configuration
+## 3. Shared VS Code repository configuration
 
-The repository owns these shared files:
+The repository owns:
 
 ```text
 .vscode/
-├── tasks.json       # executable project actions
-├── extensions.json  # recommended extensions
-└── settings.json    # project-level engineering settings
+├── tasks.json
+├── extensions.json
+└── settings.json
 ```
 
-Personal preferences such as theme, font, window layout, and machine-specific AI configuration do
-not belong in repository workspace settings.
+Personal preferences such as theme, font, window layout, SSH targets, credentials, and machine-specific AI configuration do not belong in shared workspace settings.
 
-### 3.1 Recommended extensions
+Recommended extension categories include Remote-SSH, SystemVerilog support, waveform viewing, Python/Pylance, ESLint, and Prettier.
 
-The repository recommends:
+## 4. FPGA workflow
 
-- `ms-vscode-remote.remote-ssh` — Remote - SSH client connection.
-- `eirikpre.systemverilog` — SystemVerilog editing/navigation support.
-- `surfer-project.surfer` — VCD/FST/GHW waveform viewing.
-- `ms-python.python` — Python support.
-- `ms-python.vscode-pylance` — Python language services.
-- `dbaeumer.vscode-eslint` — Web/TypeScript lint integration.
-- `esbenp.prettier-vscode` — Web/TypeScript formatting support.
-
-Continue, Cline, Ollama integrations, themes, and other personal extensions are intentionally not
-workspace recommendations. In particular, local-AI extensions on the Mac are machine-specific and
-must not become a dependency for SHNB or DESKTOP-1.
-
-## 4. FPGA workflow from VS Code
-
-The SystemVerilog extension is configured not to compile a single file automatically on save/open.
-Plasma FPGA compilation and verification must go through the repository target workflow so that
-source dependencies and the correct top module are respected.
+The SystemVerilog extension must not substitute single-file compile-on-save for Plasma's target-based build model.
 
 ```text
 Open an RTL file
@@ -94,75 +72,55 @@ python pl/tools/fpga.py verify --file <current-file>
       +-- cocotb / pytest regression
 ```
 
-Do not re-enable `systemverilog.compileOnSave` as a substitute for this workflow. Single-file
-compilation is not a correct build model once a target contains multiple RTL sources.
+A target may contain multiple RTL sources, constraints, and tests. Verification must therefore resolve the target rather than treating the current source file as an isolated build unit.
 
-## 5. First use on a client machine
+## 5. First use on a client
 
-### Mac
-
-1. Install VS Code and Remote - SSH locally.
-2. Ensure SSH/Tailscale access to SWPC works.
-3. Connect to SWPC with VS Code Remote - SSH.
-4. Open `/storage/projects/plasma`.
+1. Install VS Code and Remote-SSH locally.
+2. Establish an approved SSH/private-network path to the integration host.
+3. Connect using an operator-local SSH alias such as `<integration-host-alias>`.
+4. Open `$PLASMA_REPO`.
 5. Accept the workspace recommended extensions.
-6. Open an RTL file and use `Cmd+Shift+B` for the default FPGA Verify task.
+6. Use the default FPGA Verify task for RTL validation.
 
-Ollama and local-AI extensions remain on the Mac. The source workspace and deterministic build tools
-remain on SWPC.
-
-### SHNB / DESKTOP-1
-
-1. Install VS Code and Remote - SSH locally.
-2. Connect to SWPC.
-3. Open `/storage/projects/plasma`.
-4. Accept the workspace recommended extensions.
-5. Use `Ctrl+Shift+B` for the default FPGA Verify task.
-
-DESKTOP-1 should remain a thin client where practical. Do not copy credentials, firmware artifacts,
-or a complete local FPGA toolchain onto a company-managed computer without a specific need and
-appropriate policy approval.
+The actual hostname, username, private IP, VPN/Tailscale hostname, and SSH key path belong in the operator's local SSH configuration, not the public repository.
 
 ## 6. Python environment boundary
 
 Plasma intentionally has separate Python environments:
 
 ```text
-pl/.venv/                 FPGA verification (cocotb/pytest)
+pl/.venv/                 FPGA verification
 software/python/.venv/    Plasma software/server tests
 ```
 
-The workspace does not pin one global Python interpreter because doing so would incorrectly make one
-of these environments authoritative for the entire repository.
+Do not pin one global Python interpreter as authoritative for the entire repository. Use the FPGA tasks for FPGA verification and the software environment for `software/python/` work.
 
-Use the FPGA VS Code tasks for FPGA verification. Use the software Python environment when working
-under `software/python/`.
+## 7. Centralized versus per-client state
 
-## 7. What is centralized and what is not
+Centralized on the integration host:
 
-Centralized on SWPC:
-
-- repository working tree used for normal interactive development
+- normal repository working tree
 - FPGA simulation toolchain
-- Python project environments
+- Python environments
 - Web build/test environment
 - Vivado integration environment
 
 Shared through GitHub:
 
 - source code
-- `.vscode` project configuration
-- documentation
+- project `.vscode` configuration
+- architecture/development documentation
 - target manifests and tests
 - reviewed branch/PR history
 
-Kept per client machine:
+Kept per client/operator:
 
 - SSH private keys
-- Tailscale client state
-- VS Code theme/font/layout
-- Mac Ollama models and local-AI configuration
-- company-device-specific security settings
+- private-network client state
+- SSH host aliases and usernames
+- personal editor/UI settings
+- local AI models and machine-specific AI configuration
+- managed-device security settings
 
-This separation minimizes configuration drift while keeping client-specific credentials and personal
-tooling out of the repository.
+This separation minimizes configuration drift while keeping private infrastructure and credentials out of the repository.
