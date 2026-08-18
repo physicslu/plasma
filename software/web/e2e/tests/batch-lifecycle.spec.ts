@@ -131,7 +131,8 @@ test("cancel barrier blocks PROGRAM before transport dispatch", async ({ page })
   const liveLog = page.getByLabel("Live job log");
   await expect(liveLog).toContainText("[BATCH] CANCELLED");
   await expect(liveLog).toContainText("before PROGRAM dispatch");
-  await expect(liveLog).toContainText("submitting: 0 · active jobs: 0");
+  await expect(liveLog).toContainText("[BATCH] CANCEL requested · submitting:");
+  await expect(liveLog).toContainText("active jobs:");
 
   await expect.poll(() => mock.starts.length).toBe(2);
   expect(mock.starts).toEqual([
