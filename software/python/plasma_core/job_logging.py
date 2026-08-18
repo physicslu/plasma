@@ -61,23 +61,30 @@ class ServerEventLogger:
 
 
 class JobEventLogger:
-    def __init__(self, root: Path, channel_id: int, job_id: str) -> None:
+    def __init__(self, root: Path, site_id: int, job_id: str) -> None:
         validate_job_id(job_id)
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        directory = root / date / f"CH{channel_id}"
+        directory = root / date / f"SITE{site_id}"
         directory.mkdir(parents=True, exist_ok=True)
         self.text_path = directory / f"{job_id}.log"
         self.jsonl_path = directory / f"{job_id}.jsonl"
-        self.channel_id = channel_id
+        self.site_id = site_id
         self.job_id = job_id
         self._lock = threading.Lock()
+
+    @property
+    def channel_id(self) -> int:
+        """Legacy alias retained for code reading the pre-Site logger attribute."""
+        return self.site_id
 
     def event(self, event: str, *, level: str = "INFO", **fields: Any) -> None:
         record = {
             "timestamp": iso_now(),
             "level": level.upper(),
             "event": event,
-            "channel_id": self.channel_id,
+            "site_id": self.site_id,
+            # Transitional compatibility for existing JSONL consumers.
+            "channel_id": self.site_id,
             "job_id": self.job_id,
             **{key: value for key, value in fields.items() if value is not None},
         }
@@ -123,7 +130,7 @@ class OutputManager:
     def write_read_sections(
         self,
         job_id: str,
-        channel_id: int,
+        site_id: int,
         sections: dict[str, bytes],
     ) -> list[Path]:
         directory = self.job_directory(job_id)
@@ -143,7 +150,7 @@ class OutputManager:
                     context={"section_name": raw_name, "safe_name": safe_name},
                 )
             used_names.add(safe_name)
-            path = directory / f"read_CH{channel_id}_{safe_name}.bin"
+            path = directory / f"read_SITE{site_id}_{safe_name}.bin"
             prepared.append((path, data))
 
         paths: list[Path] = []
