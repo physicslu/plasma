@@ -7,18 +7,18 @@ import {
   cancelJob,
   DEFAULT_API_BASE,
   getJob,
-  getProgrammerStatus,
+  getPPUStatus,
   normalizeApiBase,
   PlasmaSubmissionBlockedError,
   readDownloadUrl,
   startJob,
 } from "./plasma-api";
 import type {
-  ChannelSnapshot,
   JobSnapshot,
   JobState,
   Operation,
-  ProgrammerSnapshot,
+  PPUSnapshot,
+  SiteSnapshot,
 } from "./plasma-api";
 
 type Stage =
@@ -33,7 +33,7 @@ type Stage =
   | "failed"
   | "timeout"
   | "aborted";
-type Channel = {
+type Site = {
   id: number;
   enabled: boolean;
   stage: Stage;
@@ -49,7 +49,7 @@ type Channel = {
 };
 type Theme = "dark" | "light";
 type ConnectionState = "connecting" | "online" | "offline";
-type BatchChannelState = "running" | "cancelling" | "success" | "cancelled" | "failed";
+type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "failed";
 type LogLevel = "info" | "error";
 type LogEntry = { id: number; text: string; level: LogLevel };
 
@@ -85,7 +85,7 @@ const logStageLabels: Record<Stage, string> = {
   timeout: "TIMEOUT",
   aborted: "ABORTED",
 };
-const batchStateLabels: Record<BatchChannelState, string> = {
+const batchStateLabels: Record<BatchSiteState, string> = {
   running: "執行中",
   cancelling: "取消中",
   success: "完成",
@@ -106,8 +106,8 @@ const operationSymbols: Record<Operation, string> = {
 };
 const operationOrder = Object.keys(operationLabels) as Operation[];
 
-function isRunning(channel: Channel): boolean {
-  return runningStages.includes(channel.stage);
+function isRunning(site: Site): boolean {
+  return runningStages.includes(site.stage);
 }
 
 function uiStage(job: JobSnapshot): Stage {
@@ -121,9 +121,9 @@ function uiStage(job: JobSnapshot): Stage {
   return job.state;
 }
 
-function channelFromStatus(backend: ChannelSnapshot, existing?: Channel): Channel {
+function siteFromStatus(backend: SiteSnapshot, existing?: Site): Site {
   return {
-    id: backend.channel_id,
+    id: backend.site_id,
     enabled: backend.enabled,
     stage: existing?.stage ?? "idle",
     progress: existing?.progress ?? 0,
@@ -139,23 +139,23 @@ function channelFromStatus(backend: ChannelSnapshot, existing?: Channel): Channe
 }
 
 export default function Home() {
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [visibleChannelIds, setVisibleChannelIds] = useState<number[]>([]);
-  const [programmer, setProgrammer] = useState<ProgrammerSnapshot | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [visibleSiteIds, setVisibleSiteIds] = useState<number[]>([]);
+  const [ppu, setPPU] = useState<PPUSnapshot | null>(null);
   const [firmware, setFirmware] = useState<File | null>(null);
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
   const [selectedBatchOperations, setSelectedBatchOperations] = useState<Operation[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([{ id: 0, text: "[SYSTEM] Plasma Web Console ready", level: "info" }]);
-  const [detailsChannelId, setDetailsChannelId] = useState<number | null>(null);
+  const [detailsSiteId, setDetailsSiteId] = useState<number | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
   const [apiDraft, setApiDraft] = useState(DEFAULT_API_BASE);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
-  const [submittingChannelIds, setSubmittingChannelIds] = useState<number[]>([]);
+  const [submittingSiteIds, setSubmittingSiteIds] = useState<number[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchCancelling, setBatchCancelling] = useState(false);
-  const [batchChannelStates, setBatchChannelStates] = useState<Record<number, BatchChannelState>>({});
+  const [batchSiteStates, setBatchSiteStates] = useState<Record<number, BatchSiteState>>({});
   const trackedJobs = useRef<Record<number, string>>({});
   const transitionKeys = useRef<Record<string, string>>({});
   const connectionRef = useRef<ConnectionState>("connecting");
@@ -163,31 +163,31 @@ export default function Home() {
   const cancelRequests = useRef<Set<string>>(new Set());
   const logSequence = useRef(0);
 
-  const visibleChannels = channels.filter(channel => visibleChannelIds.includes(channel.id));
-  const enabledCount = channels.filter(channel => channel.enabled).length;
-  const disabledCount = channels.length - enabledCount;
-  const detailsChannel = detailsChannelId === null
+  const visibleSites = sites.filter(site => visibleSiteIds.includes(site.id));
+  const enabledCount = sites.filter(site => site.enabled).length;
+  const disabledCount = sites.length - enabledCount;
+  const detailsSite = detailsSiteId === null
     ? undefined
-    : channels.find(channel => channel.id === detailsChannelId);
-  const detailsBatchState = detailsChannelId === null ? undefined : batchChannelStates[detailsChannelId];
+    : sites.find(site => site.id === detailsSiteId);
+  const detailsBatchState = detailsSiteId === null ? undefined : batchSiteStates[detailsSiteId];
   const readRangeValid = Number.isInteger(Number(readOffset))
     && Number(readOffset) >= 0
     && Number.isInteger(Number(readLength))
     && Number(readLength) > 0;
 
-  const statusCounts = useMemo(() => visibleChannels.reduce((counts, channel) => {
-    const batchState = batchChannelStates[channel.id];
-    if (!channel.enabled) counts.disabled += 1;
+  const statusCounts = useMemo(() => visibleSites.reduce((counts, site) => {
+    const batchState = batchSiteStates[site.id];
+    if (!site.enabled) counts.disabled += 1;
     else if (batchState === "cancelling" || batchState === "cancelled") counts.cancelled += 1;
     else if (batchState === "running") counts.busy += 1;
     else if (batchState === "success") counts.success += 1;
     else if (batchState === "failed") counts.failed += 1;
-    else if (submittingChannelIds.includes(channel.id) || isRunning(channel)) counts.busy += 1;
-    else if (channel.stage === "success") counts.success += 1;
-    else if (failedStages.includes(channel.stage)) counts.failed += 1;
+    else if (submittingSiteIds.includes(site.id) || isRunning(site)) counts.busy += 1;
+    else if (site.stage === "success") counts.success += 1;
+    else if (failedStages.includes(site.stage)) counts.failed += 1;
     else counts.idle += 1;
     return counts;
-  }, { idle: 0, busy: 0, success: 0, failed: 0, cancelled: 0, disabled: 0 }), [batchChannelStates, submittingChannelIds, visibleChannels]);
+  }, { idle: 0, busy: 0, success: 0, failed: 0, cancelled: 0, disabled: 0 }), [batchSiteStates, submittingSiteIds, visibleSites]);
 
   const appendLog = useCallback((message: string, level: LogLevel = "info") => {
     const time = new Date().toLocaleTimeString("en-GB", { hour12: false });
@@ -197,12 +197,12 @@ export default function Home() {
   }, []);
 
   const applyJob = useCallback((job: JobSnapshot) => {
-    trackedJobs.current[job.channel_id] = job.job_id;
+    trackedJobs.current[job.site_id] = job.job_id;
     const stage = uiStage(job);
     const error = job.result?.error?.message;
     const outputFile = job.result?.output_files?.[0]?.split(/[\\/]/).pop();
-    setChannels(items => items.map(channel => channel.id === job.channel_id ? {
-      ...channel,
+    setSites(items => items.map(site => site.id === job.site_id ? {
+      ...site,
       stage,
       operation: job.operation,
       progress: Number(job.progress_percent ?? 0),
@@ -210,14 +210,14 @@ export default function Home() {
       jobId: job.job_id,
       error,
       outputFile,
-    } : channel));
+    } : site));
 
     const transitionKey = `${job.state}:${job.stage ?? "-"}`;
     if (transitionKeys.current[job.job_id] !== transitionKey) {
       transitionKeys.current[job.job_id] = transitionKey;
       const level: LogLevel = error || stage === "failed" || stage === "timeout" || stage === "aborted" ? "error" : "info";
       appendLog(
-        `[CH${job.channel_id}] ${job.job_id} · ${logStageLabels[stage]}` +
+        `[SITE ${job.site_id}] ${job.job_id} · ${logStageLabels[stage]}` +
         (error ? ` · ${error}` : ""),
         level,
       );
@@ -256,29 +256,29 @@ export default function Home() {
 
     async function poll() {
       try {
-        const status = await getProgrammerStatus(apiBase);
+        const status = await getPPUStatus(apiBase);
         if (stopped) return;
-        setProgrammer(status.programmer ?? null);
+        setPPU(status.ppu ?? null);
 
-        const availableChannelIds = new Set(status.channels.map(channel => channel.channel_id));
-        Object.keys(trackedJobs.current).forEach(channelId => {
-          if (!availableChannelIds.has(Number(channelId))) delete trackedJobs.current[Number(channelId)];
+        const availableSiteIds = new Set(status.sites.map(site => site.site_id));
+        Object.keys(trackedJobs.current).forEach(siteId => {
+          if (!availableSiteIds.has(Number(siteId))) delete trackedJobs.current[Number(siteId)];
         });
-        status.channels.forEach(channel => {
-          if (channel.current_job_id) trackedJobs.current[channel.channel_id] = channel.current_job_id;
+        status.sites.forEach(site => {
+          if (site.current_job_id) trackedJobs.current[site.site_id] = site.current_job_id;
         });
 
-        setChannels(current => status.channels.map(backend => (
-          channelFromStatus(backend, current.find(channel => channel.id === backend.channel_id))
+        setSites(current => status.sites.map(backend => (
+          siteFromStatus(backend, current.find(site => site.id === backend.site_id))
         )));
-        setVisibleChannelIds(current => {
-          const retained = current.filter(channelId => availableChannelIds.has(channelId));
+        setVisibleSiteIds(current => {
+          const retained = current.filter(siteId => availableSiteIds.has(siteId));
           if (retained.length > 0) return retained;
-          const enabledChannelIds = status.channels
-            .filter(channel => channel.enabled)
-            .map(channel => channel.channel_id);
-          if (enabledChannelIds.length > 0) return enabledChannelIds;
-          return status.channels.length > 0 ? [status.channels[0].channel_id] : [];
+          const enabledSiteIds = status.sites
+            .filter(site => site.enabled)
+            .map(site => site.site_id);
+          if (enabledSiteIds.length > 0) return enabledSiteIds;
+          return status.sites.length > 0 ? [status.sites[0].site_id] : [];
         });
 
         const jobs = await Promise.all(
@@ -324,48 +324,48 @@ export default function Home() {
     }
   }
 
-  function setBatchChannelState(channelId: number, state: BatchChannelState) {
-    setBatchChannelStates(current => ({ ...current, [channelId]: state }));
+  function setBatchSiteState(siteId: number, state: BatchSiteState) {
+    setBatchSiteStates(current => ({ ...current, [siteId]: state }));
   }
 
-  function clearBatchChannelState(channelId: number) {
-    setBatchChannelStates(current => {
-      if (!(channelId in current)) return current;
+  function clearBatchSiteState(siteId: number) {
+    setBatchSiteStates(current => {
+      if (!(siteId in current)) return current;
       const next = { ...current };
-      delete next[channelId];
+      delete next[siteId];
       return next;
     });
   }
 
-  function channelDisplayState(channel: Channel): { state: Stage | "submitting"; label: string } {
-    const batchState = batchChannelStates[channel.id];
-    const submitting = submittingChannelIds.includes(channel.id);
-    if (!channel.enabled) return { state: "idle", label: "停用" };
+  function siteDisplayState(site: Site): { state: Stage | "submitting"; label: string } {
+    const batchState = batchSiteStates[site.id];
+    const submitting = submittingSiteIds.includes(site.id);
+    if (!site.enabled) return { state: "idle", label: "停用" };
     if (batchState === "cancelling") return { state: "cancelled", label: "批次取消中" };
     if (batchState === "cancelled") return { state: "cancelled", label: "批次已取消" };
     if (batchState === "failed") return { state: "failed", label: "批次失敗" };
     if (batchState === "success") return { state: "success", label: "批次完成" };
     if (submitting) return { state: "submitting", label: "提交中" };
-    if (batchState === "running" && channel.stage === "success") return { state: "queued", label: "批次進行中" };
-    return { state: channel.stage, label: stageLabels[channel.stage] };
+    if (batchState === "running" && site.stage === "success") return { state: "queued", label: "批次進行中" };
+    return { state: site.stage, label: stageLabels[site.stage] };
   }
 
-  function toggleChannel(channelId: number) {
-    const channel = channels.find(item => item.id === channelId);
-    if (!channel || batchRunning || isRunning(channel) || submittingChannelIds.includes(channelId)) return;
-    setVisibleChannelIds(current => {
-      if (!current.includes(channelId)) return [...current, channelId].sort((left, right) => left - right);
+  function toggleSite(siteId: number) {
+    const site = sites.find(item => item.id === siteId);
+    if (!site || batchRunning || isRunning(site) || submittingSiteIds.includes(siteId)) return;
+    setVisibleSiteIds(current => {
+      if (!current.includes(siteId)) return [...current, siteId].sort((left, right) => left - right);
       if (current.length === 1) {
-        appendLog("[UI] At least one channel must remain visible");
+        appendLog("[UI] At least one site must remain visible");
         return current;
       }
-      return current.filter(id => id !== channelId);
+      return current.filter(id => id !== siteId);
     });
   }
 
-  function operationDisabled(channel: Channel, operation: Operation, forBatch = false): boolean {
-    if ((!forBatch && batchRunning) || connection !== "online" || !channel.enabled || isRunning(channel)) return true;
-    if (submittingChannelIds.includes(channel.id)) return true;
+  function operationDisabled(site: Site, operation: Operation, forBatch = false): boolean {
+    if ((!forBatch && batchRunning) || connection !== "online" || !site.enabled || isRunning(site)) return true;
+    if (submittingSiteIds.includes(site.id)) return true;
     if ((operation === "program" || operation === "verify") && !firmware) return true;
     if ((operation === "program" || operation === "verify") && firmware.size > MAX_FIRMWARE_BYTES) return true;
     if (operation === "read" && !readRangeValid) return true;
@@ -373,7 +373,7 @@ export default function Home() {
   }
 
   function batchDisabled(operation: Operation): boolean {
-    return visibleChannels.length === 0 || visibleChannels.some(channel => operationDisabled(channel, operation));
+    return visibleSites.length === 0 || visibleSites.some(site => operationDisabled(site, operation));
   }
 
   function toggleBatchOperation(operation: Operation) {
@@ -386,32 +386,32 @@ export default function Home() {
     });
   }
 
-  async function runChannel(
-    channelId: number,
+  async function runSite(
+    siteId: number,
     operation: Operation,
     forBatch = false,
     submissionGuard?: () => boolean,
   ): Promise<JobSnapshot | undefined> {
-    const channel = channels.find(item => item.id === channelId);
-    if (!channel || operationDisabled(channel, operation, forBatch)) return;
+    const site = sites.find(item => item.id === siteId);
+    if (!site || operationDisabled(site, operation, forBatch)) return;
     if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
-      appendLog(`[CH${channelId}] Firmware exceeds the 16 MiB limit`, "error");
+      appendLog(`[SITE ${siteId}] Firmware exceeds the 16 MiB limit`, "error");
       return;
     }
 
-    if (!forBatch) clearBatchChannelState(channelId);
-    setSubmittingChannelIds(current => current.includes(channelId) ? current : [...current, channelId]);
+    if (!forBatch) clearBatchSiteState(siteId);
+    setSubmittingSiteIds(current => current.includes(siteId) ? current : [...current, siteId]);
     try {
       const job = await startJob(apiBase, {
-        channelId,
+        siteId,
         operation,
         firmware: operation === "erase" || operation === "read" ? null : firmware,
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
         submissionGuard,
       });
-      trackedJobs.current[channelId] = job.job_id;
-      setChannels(items => items.map(item => item.id === channelId ? {
+      trackedJobs.current[siteId] = job.job_id;
+      setSites(items => items.map(item => item.id === siteId ? {
         ...item,
         stage: "queued",
         operation,
@@ -422,19 +422,19 @@ export default function Home() {
         error: undefined,
         outputFile: undefined,
       } : item));
-      appendLog(`[CH${channelId}] ${job.job_id} accepted by Plasma · ${operation.toUpperCase()}`);
+      appendLog(`[SITE ${siteId}] ${job.job_id} accepted by Plasma · ${operation.toUpperCase()}`);
       return job;
     } catch (error) {
       if (error instanceof PlasmaSubmissionBlockedError) return;
-      appendLog(`[CH${channelId}] Submit failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
-      setChannels(items => items.map(item => item.id === channelId ? {
+      appendLog(`[SITE ${siteId}] Submit failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
+      setSites(items => items.map(item => item.id === siteId ? {
         ...item,
         stage: "failed",
         operation,
         error: error instanceof Error ? error.message : "unknown error",
       } : item));
     } finally {
-      setSubmittingChannelIds(current => current.filter(id => id !== channelId));
+      setSubmittingSiteIds(current => current.filter(id => id !== siteId));
     }
   }
 
@@ -448,108 +448,108 @@ export default function Home() {
     throw new Error(`${job.job_id} timed out waiting for completion`);
   }
 
-  async function requestJobCancel(channelId: number, jobId: string, fromBatch: boolean) {
+  async function requestJobCancel(siteId: number, jobId: string, fromBatch: boolean) {
     if (cancelRequests.current.has(jobId)) return;
     cancelRequests.current.add(jobId);
     try {
       await cancelJob(apiBase, jobId);
-      appendLog(`[CH${channelId}] ${fromBatch ? "Batch cancel" : "Cancel"} requested · waiting for safe shutdown`);
+      appendLog(`[SITE ${siteId}] ${fromBatch ? "Batch cancel" : "Cancel"} requested · waiting for safe shutdown`);
     } catch (error) {
       cancelRequests.current.delete(jobId);
-      appendLog(`[CH${channelId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
+      appendLog(`[SITE ${siteId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
     }
   }
 
   async function runBatch(operations: Operation[]) {
     if (batchRunning || operations.length === 0 || operations.some(batchDisabled)) return;
     const batchOperations = [...operations];
-    const batchChannelIds = [...visibleChannelIds];
-    const lifecycle = new BatchLifecycle(batchChannelIds);
+    const batchSiteIds = [...visibleSiteIds];
+    const lifecycle = new BatchLifecycle(batchSiteIds);
     batchLifecycle.current = lifecycle;
-    setBatchChannelStates(batchChannelIds.reduce<Record<number, BatchChannelState>>((states, channelId) => {
-      states[channelId] = "running";
+    setBatchSiteStates(batchSiteIds.reduce<Record<number, BatchSiteState>>((states, siteId) => {
+      states[siteId] = "running";
       return states;
     }, {}));
     setBatchCancelling(false);
     setBatchRunning(true);
-    appendLog(`[BATCH] START ${batchOperations.map(operation => operation.toUpperCase()).join(" → ")} · ${batchChannelIds.map(id => `CH${id}`).join(", ")}`);
+    appendLog(`[BATCH] START ${batchOperations.map(operation => operation.toUpperCase()).join(" → ")} · ${batchSiteIds.map(id => `SITE ${id}`).join(", ")}`);
     try {
-      const outcomes = await Promise.all(batchChannelIds.map(async channelId => {
+      const outcomes = await Promise.all(batchSiteIds.map(async siteId => {
         const stopBeforeDispatch = (operation: Operation) => {
-          lifecycle.finish(channelId);
-          setBatchChannelState(channelId, "cancelled");
-          appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED · before ${operation.toUpperCase()} dispatch`);
-          return { channelId, state: "cancelled" as const };
+          lifecycle.finish(siteId);
+          setBatchSiteState(siteId, "cancelled");
+          appendLog(`[SITE ${siteId}] Batch stopped · CANCEL REQUESTED · before ${operation.toUpperCase()} dispatch`);
+          return { siteId, state: "cancelled" as const };
         };
 
         for (const operation of batchOperations) {
-          if (!lifecycle.prepare(channelId, operation)) return stopBeforeDispatch(operation);
+          if (!lifecycle.prepare(siteId, operation)) return stopBeforeDispatch(operation);
 
-          appendLog(`[CH${channelId}] Batch ${operation.toUpperCase()}`);
+          appendLog(`[SITE ${siteId}] Batch ${operation.toUpperCase()}`);
           await new Promise(resolve => window.setTimeout(resolve, 0));
-          if (!lifecycle.beginSubmit(channelId)) return stopBeforeDispatch(operation);
+          if (!lifecycle.beginSubmit(siteId)) return stopBeforeDispatch(operation);
 
-          const job = await runChannel(channelId, operation, true, () => lifecycle.canDispatch(channelId));
+          const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
           if (!job) {
             if (lifecycle.cancelRequested) return stopBeforeDispatch(operation);
-            lifecycle.finish(channelId);
-            setBatchChannelState(channelId, "failed");
-            return { channelId, state: "failed" as const };
+            lifecycle.finish(siteId);
+            setBatchSiteState(siteId, "failed");
+            return { siteId, state: "failed" as const };
           }
 
-          const cancelAfterAccept = lifecycle.accepted(channelId, job.job_id);
+          const cancelAfterAccept = lifecycle.accepted(siteId, job.job_id);
           if (cancelAfterAccept) {
-            await requestJobCancel(channelId, job.job_id, true);
+            await requestJobCancel(siteId, job.job_id, true);
           }
 
           try {
             const finalJob = await waitForTerminalJob(job);
-            lifecycle.finish(channelId);
+            lifecycle.finish(siteId);
 
             const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);
             if (cancelWasRequested) {
-              setBatchChannelState(channelId, "cancelled");
-              appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED · last job ${finalJob.state.toUpperCase()}`);
-              return { channelId, state: "cancelled" as const };
+              setBatchSiteState(siteId, "cancelled");
+              appendLog(`[SITE ${siteId}] Batch stopped · CANCEL REQUESTED · last job ${finalJob.state.toUpperCase()}`);
+              return { siteId, state: "cancelled" as const };
             }
             if (finalJob.state === "cancelled") {
-              setBatchChannelState(channelId, "cancelled");
-              appendLog(`[CH${channelId}] Batch stopped · CANCELLED`);
-              return { channelId, state: "cancelled" as const };
+              setBatchSiteState(siteId, "cancelled");
+              appendLog(`[SITE ${siteId}] Batch stopped · CANCELLED`);
+              return { siteId, state: "cancelled" as const };
             }
             if (finalJob.state !== "success") {
-              setBatchChannelState(channelId, "failed");
-              appendLog(`[CH${channelId}] Batch stopped · ${finalJob.state.toUpperCase()}`, "error");
-              return { channelId, state: "failed" as const };
+              setBatchSiteState(siteId, "failed");
+              appendLog(`[SITE ${siteId}] Batch stopped · ${finalJob.state.toUpperCase()}`, "error");
+              return { siteId, state: "failed" as const };
             }
           } catch (error) {
-            lifecycle.finish(channelId);
+            lifecycle.finish(siteId);
             const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);
             const state = cancelWasRequested ? "cancelled" : "failed";
-            setBatchChannelState(channelId, state);
-            appendLog(`[CH${channelId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
-            return { channelId, state };
+            setBatchSiteState(siteId, state);
+            appendLog(`[SITE ${siteId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
+            return { siteId, state };
           }
         }
-        lifecycle.finish(channelId);
-        setBatchChannelState(channelId, "success");
-        appendLog(`[CH${channelId}] Batch complete`);
-        return { channelId, state: "success" as const };
+        lifecycle.finish(siteId);
+        setBatchSiteState(siteId, "success");
+        appendLog(`[SITE ${siteId}] Batch complete`);
+        return { siteId, state: "success" as const };
       }));
-      const successfulChannelIds = outcomes.filter(outcome => outcome.state === "success").map(outcome => outcome.channelId);
-      const cancelledChannelIds = outcomes.filter(outcome => outcome.state === "cancelled").map(outcome => outcome.channelId);
-      const failedChannelIds = outcomes.filter(outcome => outcome.state === "failed").map(outcome => outcome.channelId);
-      const summary = `success: ${successfulChannelIds.length ? successfulChannelIds.map(id => `CH${id}`).join(", ") : "none"}`
-        + (cancelledChannelIds.length ? ` · cancelled: ${cancelledChannelIds.map(id => `CH${id}`).join(", ")}` : "")
-        + (failedChannelIds.length ? ` · failed: ${failedChannelIds.map(id => `CH${id}`).join(", ")}` : "");
-      const batchOutcome = failedChannelIds.length
+      const successfulSiteIds = outcomes.filter(outcome => outcome.state === "success").map(outcome => outcome.siteId);
+      const cancelledSiteIds = outcomes.filter(outcome => outcome.state === "cancelled").map(outcome => outcome.siteId);
+      const failedSiteIds = outcomes.filter(outcome => outcome.state === "failed").map(outcome => outcome.siteId);
+      const summary = `success: ${successfulSiteIds.length ? successfulSiteIds.map(id => `SITE ${id}`).join(", ") : "none"}`
+        + (cancelledSiteIds.length ? ` · cancelled: ${cancelledSiteIds.map(id => `SITE ${id}`).join(", ")}` : "")
+        + (failedSiteIds.length ? ` · failed: ${failedSiteIds.map(id => `SITE ${id}`).join(", ")}` : "");
+      const batchOutcome = failedSiteIds.length
         ? "FAILED"
         : lifecycle.cancelRequested
           ? "CANCELLED"
-          : cancelledChannelIds.length
+          : cancelledSiteIds.length
             ? "PARTIAL"
             : "COMPLETE";
-      appendLog(`[BATCH] ${batchOutcome} · ${summary}`, failedChannelIds.length ? "error" : "info");
+      appendLog(`[BATCH] ${batchOutcome} · ${summary}`, failedSiteIds.length ? "error" : "info");
     } finally {
       if (batchLifecycle.current === lifecycle) batchLifecycle.current = null;
       setBatchRunning(false);
@@ -561,32 +561,32 @@ export default function Home() {
     if (!batchRunning || batchCancelling) return;
     const lifecycle = batchLifecycle.current;
     if (!lifecycle) return;
-    const { submittingChannels, activeJobs } = lifecycle.cancel();
+    const { submittingSites, activeJobs } = lifecycle.cancel();
     setBatchCancelling(true);
-    setBatchChannelStates(current => Object.fromEntries(
-      Object.entries(current).map(([channelId, state]) => [channelId, state === "running" ? "cancelling" : state]),
-    ) as Record<number, BatchChannelState>);
-    appendLog(`[BATCH] CANCEL requested · submitting: ${submittingChannels.length} · active jobs: ${activeJobs.length}`);
-    await Promise.all(activeJobs.map(([channelId, jobId]) => requestJobCancel(channelId, jobId, true)));
+    setBatchSiteStates(current => Object.fromEntries(
+      Object.entries(current).map(([siteId, state]) => [siteId, state === "running" ? "cancelling" : state]),
+    ) as Record<number, BatchSiteState>);
+    appendLog(`[BATCH] CANCEL requested · submitting: ${submittingSites.length} · active jobs: ${activeJobs.length}`);
+    await Promise.all(activeJobs.map(([siteId, jobId]) => requestJobCancel(siteId, jobId, true)));
   }
 
-  async function cancel(channelId: number) {
-    const channel = channels.find(item => item.id === channelId);
-    if (!channel || !channel.jobId || !isRunning(channel)) return;
-    if (batchRunning && batchChannelStates[channelId] === "running") {
-      setBatchChannelState(channelId, "cancelling");
+  async function cancel(siteId: number) {
+    const site = sites.find(item => item.id === siteId);
+    if (!site || !site.jobId || !isRunning(site)) return;
+    if (batchRunning && batchSiteStates[siteId] === "running") {
+      setBatchSiteState(siteId, "cancelling");
     }
-    await requestJobCancel(channelId, channel.jobId, false);
+    await requestJobCancel(siteId, site.jobId, false);
   }
 
-  const batchTargetText = visibleChannelIds.length
-    ? visibleChannelIds.map(id => `CH${id}`).join("、")
+  const batchTargetText = visibleSiteIds.length
+    ? visibleSiteIds.map(id => `SITE ${id}`).join("、")
     : "—";
 
   return (
     <main>
       <header className="topbar">
-        <div className="brand"><span className="brandmark">P</span><div><b>PLASMA</b><small>PROGRAMMER CONTROL</small></div></div>
+        <div className="brand"><span className="brandmark">P</span><div><b>PLASMA</b><small>PPU CONTROL</small></div></div>
         <div className="topActions">
           <div className="themeSwitch" role="group" aria-label="介面主題">
             <button className={theme === "dark" ? "active" : ""} onClick={() => setTheme("dark")} aria-pressed={theme === "dark"}>深色</button>
@@ -601,29 +601,29 @@ export default function Home() {
       <section className="console overviewConsole">
         <div className="pageHeading">
           <div>
-            <p className="eyebrow">CHANNEL MATRIX</p>
-            <h1>多通道工作總覽</h1>
-            {programmer && <div className="statusSummary" aria-label="Programmer identity">
-              <span>Site <b>{programmer.site_id}</b></span>
-              <span>Programmer <b>{programmer.programmer_id}</b></span>
-              <span>Model <b>{programmer.model}</b></span>
+            <p className="eyebrow">SITE MATRIX</p>
+            <h1>Programming Site 工作總覽</h1>
+            {ppu && <div className="statusSummary" aria-label="PPU identity">
+              <span>Facility <b>{ppu.facility_id}</b></span>
+              <span>PPU <b>{ppu.ppu_id}</b></span>
+              <span>Model <b>{ppu.model}</b></span>
             </div>}
           </div>
-          <div className={`gatewayHealth ${connection}`}><span className="pulse"/><div><small>Plasma Web REST Gateway</small><b>{connection === "online" ? "Online" : connection === "connecting" ? "Connecting" : "Offline"}</b></div><em>{enabledCount}/{channels.length} Enabled</em></div>
+          <div className={`gatewayHealth ${connection}`}><span className="pulse"/><div><small>Plasma Web REST Gateway</small><b>{connection === "online" ? "Online" : connection === "connecting" ? "Connecting" : "Offline"}</b></div><em>{enabledCount}/{sites.length} Enabled</em></div>
         </div>
 
-        <section className="selectorPanel" aria-labelledby="channel-selector-title">
+        <section className="selectorPanel" aria-labelledby="site-selector-title">
           <div className="sectionHeading">
-            <div><p className="eyebrow">DISPLAY CHANNELS</p><h2 id="channel-selector-title">顯示與批次操作通道</h2></div>
-            <div className="statusSummary" aria-label="通道配置摘要"><span>顯示 <b>{visibleChannelIds.length} / {channels.length}</b></span><span>停用 <b>{disabledCount}</b></span></div>
+            <div><p className="eyebrow">DISPLAY SITES</p><h2 id="site-selector-title">顯示與批次操作 Site</h2></div>
+            <div className="statusSummary" aria-label="Site 配置摘要"><span>顯示 <b>{visibleSiteIds.length} / {sites.length}</b></span><span>停用 <b>{disabledCount}</b></span></div>
           </div>
           <div className="channelChecks">
-            {channels.map(channel => {
-              const locked = batchRunning || isRunning(channel) || submittingChannelIds.includes(channel.id);
-              const displayState = channelDisplayState(channel);
-              return <label key={channel.id} className={`${visibleChannelIds.includes(channel.id) ? "checked" : ""} ${!channel.enabled ? "disabled" : ""}`}>
-                <input type="checkbox" aria-label={`顯示 CH${channel.id}`} checked={visibleChannelIds.includes(channel.id)} disabled={locked} onChange={() => toggleChannel(channel.id)}/>
-                <span>CH{channel.id}</span><small>{displayState.label}</small>
+            {sites.map(site => {
+              const locked = batchRunning || isRunning(site) || submittingSiteIds.includes(site.id);
+              const displayState = siteDisplayState(site);
+              return <label key={site.id} className={`${visibleSiteIds.includes(site.id) ? "checked" : ""} ${!site.enabled ? "disabled" : ""}`}>
+                <input type="checkbox" aria-label={`顯示 SITE ${site.id}`} checked={visibleSiteIds.includes(site.id)} disabled={locked} onChange={() => toggleSite(site.id)}/>
+                <span>SITE {site.id}</span><small>{displayState.label}</small>
               </label>;
             })}
           </div>
@@ -643,7 +643,7 @@ export default function Home() {
         <section className="batchPanel" aria-labelledby="batch-title">
           <div className="batchInfo">
             <div><p className="eyebrow">BATCH CONTROL</p><h2 id="batch-title">批次控制</h2><small>目標：{batchTargetText}</small></div>
-            <div className="statusSummary" aria-label="選取通道狀態摘要">
+            <div className="statusSummary" aria-label="選取 Site 狀態摘要">
               <span>待命 <b>{statusCounts.idle}</b></span><span className="busy">工作中 <b>{statusCounts.busy}</b></span><span className="success">成功 <b>{statusCounts.success}</b></span><span className="failed">取消 <b>{statusCounts.cancelled}</b></span><span className="failed">失敗 <b>{statusCounts.failed}</b></span>
             </div>
           </div>
@@ -662,28 +662,28 @@ export default function Home() {
               <button type="button" className="cancelBatch" aria-label="取消批次工作" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}><span>■</span>{batchCancelling ? "取消中…" : "取消批次"}</button>
             </div>
           </div>
-          {visibleChannels.some(channel => !channel.enabled) && <div className="warning">選取項目包含未啟用通道；取消勾選後才能執行批次工作。</div>}
+          {visibleSites.some(site => !site.enabled) && <div className="warning">選取項目包含未啟用 Site；取消勾選後才能執行批次工作。</div>}
           {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">Firmware 超過 16 MiB 限制。</div>}
         </section>
 
         <section className="overviewCard" aria-labelledby="overview-title">
-          <div className="overviewHead"><div><p className="eyebrow">LIVE CHANNEL STATUS</p><h2 id="overview-title">通道執行狀態</h2></div><small>REST polling 500 ms</small></div>
+          <div className="overviewHead"><div><p className="eyebrow">LIVE SITE STATUS</p><h2 id="overview-title">Site 執行狀態</h2></div><small>REST polling 500 ms</small></div>
           <div className="channelTableWrap">
             <table className="channelTable">
-              <thead><tr><th>通道</th><th>目標／介面</th><th>目前工作</th><th>狀態</th><th>進度</th><th>獨立操作</th></tr></thead>
+              <thead><tr><th>Site</th><th>目標／介面</th><th>目前工作</th><th>狀態</th><th>進度</th><th>獨立操作</th></tr></thead>
               <tbody>
-                {visibleChannels.map(channel => {
-                  const displayState = channelDisplayState(channel);
-                  return <tr key={channel.id}>
-                    <td><button className="channelDetails" onClick={() => setDetailsChannelId(channel.id)}><b>CH{channel.id}</b><small>詳細資料 ↗</small></button></td>
-                    <td><b>{channel.target ?? "STM32F103C8T6"}</b><small>{channel.interface ?? "Mock / SWD"}</small></td>
-                    <td>{channel.operation ? operationLabels[channel.operation] : "—"}{channel.error && <small className="errorText">{channel.error}</small>}</td>
+                {visibleSites.map(site => {
+                  const displayState = siteDisplayState(site);
+                  return <tr key={site.id}>
+                    <td><button className="channelDetails" onClick={() => setDetailsSiteId(site.id)}><b>SITE {site.id}</b><small>詳細資料 ↗</small></button></td>
+                    <td><b>{site.target ?? "STM32F103C8T6"}</b><small>{site.interface ?? "Mock / SWD"}</small></td>
+                    <td>{site.operation ? operationLabels[site.operation] : "—"}{site.error && <small className="errorText">{site.error}</small>}</td>
                     <td><span className={`state ${displayState.state}`}>{displayState.label}</span></td>
-                    <td><div className="tableProgress"><div className="track"><i style={{ width: `${channel.progress}%` }}/></div><b>{Math.round(channel.progress)}%</b></div></td>
+                    <td><div className="tableProgress"><div className="track"><i style={{ width: `${site.progress}%` }}/></div><b>{Math.round(site.progress)}%</b></div></td>
                     <td><div className="rowActions">
-                      {(Object.keys(operationLabels) as Operation[]).map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`CH${channel.id} ${operationLabels[operation]}`} title={operationLabels[operation]} onClick={() => void runChannel(channel.id, operation)} disabled={operationDisabled(channel, operation)}>{operationSymbols[operation]}</button>)}
-                      <button className="stop" aria-label={`取消 CH${channel.id} 工作`} title="取消工作" onClick={() => void cancel(channel.id)} disabled={!isRunning(channel)}>■</button>
-                      {channel.stage === "success" && channel.jobId && channel.outputFile && <a className="rowDownload" aria-label={`下載 CH${channel.id} 讀取檔案`} title="下載 BIN" href={readDownloadUrl(apiBase, channel.jobId, channel.outputFile)}>↓</a>}
+                      {(Object.keys(operationLabels) as Operation[]).map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.id} ${operationLabels[operation]}`} title={operationLabels[operation]} onClick={() => void runSite(site.id, operation)} disabled={operationDisabled(site, operation)}>{operationSymbols[operation]}</button>)}
+                      <button className="stop" aria-label={`取消 SITE ${site.id} 工作`} title="取消工作" onClick={() => void cancel(site.id)} disabled={!isRunning(site)}>■</button>
+                      {site.stage === "success" && site.jobId && site.outputFile && <a className="rowDownload" aria-label={`下載 SITE ${site.id} 讀取檔案`} title="下載 BIN" href={readDownloadUrl(apiBase, site.jobId, site.outputFile)}>↓</a>}
                     </div></td>
                   </tr>;
                 })}
@@ -698,10 +698,10 @@ export default function Home() {
         </section>
       </section>
 
-      {detailsChannel && <div className="modalBackdrop" onClick={() => setDetailsChannelId(null)}><section className="details" onClick={event => event.stopPropagation()}>
-        <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Channel {detailsChannel.id} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsChannelId(null)}>×</button></div>
-        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Site</dt><dd>{programmer?.site_id ?? "—"}</dd></div><div><dt>Programmer</dt><dd>{programmer?.programmer_id ?? "—"}</dd></div><div><dt>Job ID</dt><dd>{detailsChannel.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsChannel.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsChannel.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsChannel.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsChannel.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsChannel.target ?? "STM32F103C8T6"} ({detailsChannel.interface ?? "Mock"})</dd></div></dl>
-        <p>Job State 保留 Python Job Manager 回傳的真實結果；Batch State 描述該通道在本次批次流程的結果。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
+      {detailsSite && <div className="modalBackdrop" onClick={() => setDetailsSiteId(null)}><section className="details" onClick={event => event.stopPropagation()}>
+        <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Site {detailsSite.id} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsSiteId(null)}>×</button></div>
+        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Facility</dt><dd>{ppu?.facility_id ?? "—"}</dd></div><div><dt>PPU</dt><dd>{ppu?.ppu_id ?? "—"}</dd></div><div><dt>Job ID</dt><dd>{detailsSite.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsSite.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsSite.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsSite.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsSite.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.1 TCP</dd></div><div><dt>Target</dt><dd>{detailsSite.target ?? "STM32F103C8T6"} ({detailsSite.interface ?? "Mock"})</dd></div></dl>
+        <p>Job State 保留 Python Job Manager 回傳的真實結果；Batch State 描述該 Site 在本次批次流程的結果。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
       </section></div>}
     </main>
   );

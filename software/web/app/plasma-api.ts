@@ -9,7 +9,38 @@ export type JobState =
 
 export type Operation = "erase" | "program" | "verify" | "read";
 
-export type ChannelSnapshot = {
+export type SiteSnapshot = {
+  site_id: number;
+  enabled: boolean;
+  state: string;
+  current_job_id: string | null;
+  queued_jobs: number;
+  interface: string | null;
+  target: string | null;
+};
+
+export type PPUCapabilities = {
+  max_supported_sites: number;
+  operations: Operation[];
+};
+
+export type PPUSnapshot = {
+  ppu_id: string;
+  facility_id: string;
+  model: string;
+  display_name: string;
+  site_count: number;
+  enabled_site_count: number;
+  capabilities: PPUCapabilities;
+};
+
+export type PPUStatus = {
+  ppu?: PPUSnapshot;
+  sites: SiteSnapshot[];
+};
+
+// Transitional shapes accepted from pre-PPU/pre-Site backends during rolling updates.
+type LegacyChannelSnapshot = {
   channel_id: number;
   enabled: boolean;
   state: string;
@@ -19,29 +50,31 @@ export type ChannelSnapshot = {
   target: string | null;
 };
 
-export type ProgrammerCapabilities = {
-  max_supported_channels: number;
-  operations: Operation[];
-};
-
-export type ProgrammerSnapshot = {
+type LegacyProgrammerSnapshot = {
   programmer_id: string;
   site_id: string;
   model: string;
   display_name: string;
   channel_count: number;
   enabled_channel_count: number;
-  capabilities: ProgrammerCapabilities;
+  capabilities: {
+    max_supported_channels: number;
+    operations: Operation[];
+  };
 };
 
-export type ProgrammerStatus = {
-  programmer?: ProgrammerSnapshot;
-  channels: ChannelSnapshot[];
+type StatusPayload = {
+  ok: boolean;
+  ppu?: PPUSnapshot;
+  sites?: SiteSnapshot[];
+  programmer?: LegacyProgrammerSnapshot;
+  channels?: LegacyChannelSnapshot[];
 };
 
 export type JobSnapshot = {
   job_id: string;
-  channel_id: number;
+  site_id: number;
+  channel_id?: number;
   operation: Operation;
   state: JobState;
   cancel_requested: boolean;
@@ -56,6 +89,11 @@ export type JobSnapshot = {
     output_files?: string[];
     error?: { message?: string } | null;
   };
+};
+
+type WireJobSnapshot = Omit<JobSnapshot, "site_id"> & {
+  site_id?: number;
+  channel_id?: number;
 };
 
 type ApiErrorPayload = {
@@ -90,14 +128,49 @@ export function normalizeApiBase(value: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
-function normalizeJobSnapshot(job: JobSnapshot): JobSnapshot {
-  if (job.state !== "cancelled" || !job.result?.error) return job;
-  return {
+function normalizeJobSnapshot(job: WireJobSnapshot): JobSnapshot {
+  const siteId = job.site_id ?? job.channel_id;
+  if (siteId === undefined) {
+    throw new PlasmaApiError("Job snapshot is missing site_id");
+  }
+  const normalized: JobSnapshot = {
     ...job,
+    site_id: siteId,
+  };
+  if (normalized.state !== "cancelled" || !normalized.result?.error) return normalized;
+  return {
+    ...normalized,
     result: {
-      ...job.result,
+      ...normalized.result,
       error: null,
     },
+  };
+}
+
+function legacyPPU(programmer: LegacyProgrammerSnapshot): PPUSnapshot {
+  return {
+    ppu_id: programmer.programmer_id,
+    facility_id: programmer.site_id,
+    model: programmer.model,
+    display_name: programmer.display_name,
+    site_count: programmer.channel_count,
+    enabled_site_count: programmer.enabled_channel_count,
+    capabilities: {
+      max_supported_sites: programmer.capabilities.max_supported_channels,
+      operations: programmer.capabilities.operations,
+    },
+  };
+}
+
+function legacySite(channel: LegacyChannelSnapshot): SiteSnapshot {
+  return {
+    site_id: channel.channel_id,
+    enabled: channel.enabled,
+    state: channel.state,
+    current_job_id: channel.current_job_id,
+    queued_jobs: channel.queued_jobs,
+    interface: channel.interface,
+    target: channel.target,
   };
 }
 
@@ -140,26 +213,23 @@ async function requestJson<T>(
   }
 }
 
-export async function getProgrammerStatus(apiBase: string): Promise<ProgrammerStatus> {
-  const payload = await requestJson<{ ok: boolean; programmer?: ProgrammerSnapshot; channels: ChannelSnapshot[] }>(
-    apiBase,
-    "/api/status",
-  );
+export async function getPPUStatus(apiBase: string): Promise<PPUStatus> {
+  const payload = await requestJson<StatusPayload>(apiBase, "/api/status");
   return {
-    programmer: payload.programmer,
-    channels: payload.channels,
+    ppu: payload.ppu ?? (payload.programmer ? legacyPPU(payload.programmer) : undefined),
+    sites: payload.sites ?? (payload.channels ?? []).map(legacySite),
   };
 }
 
-export async function getChannels(apiBase: string): Promise<ChannelSnapshot[]> {
-  return (await getProgrammerStatus(apiBase)).channels;
+export async function getSites(apiBase: string): Promise<SiteSnapshot[]> {
+  return (await getPPUStatus(apiBase)).sites;
 }
 
 export async function getJob(
   apiBase: string,
   jobId: string,
 ): Promise<JobSnapshot> {
-  const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
+  const payload = await requestJson<{ ok: boolean; job: WireJobSnapshot }>(
     apiBase,
     `/api/status?job=${encodeURIComponent(jobId)}`,
   );
@@ -169,7 +239,7 @@ export async function getJob(
 export async function startJob(
   apiBase: string,
   options: {
-    channelId: number;
+    siteId: number;
     operation: Operation;
     firmware?: File | null;
     offset?: number;
@@ -183,13 +253,16 @@ export async function startJob(
   if (options.submissionGuard && !options.submissionGuard()) {
     throw new PlasmaSubmissionBlockedError();
   }
-  const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
+  const payload = await requestJson<{ ok: boolean; job: WireJobSnapshot }>(
     apiBase,
     "/api/jobs",
     {
       method: "POST",
       body: JSON.stringify({
-        channel_id: options.channelId,
+        site_id: options.siteId,
+        // Keep the v3.1/legacy field during rolling upgrades. The Gateway
+        // rejects disagreement between these two values.
+        channel_id: options.siteId,
         operation: options.operation,
         firmware_name: options.firmware?.name,
         firmware_base64: firmwareBase64,
