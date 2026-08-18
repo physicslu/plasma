@@ -277,6 +277,35 @@ install_services() {
   say "若要開機後不登入也自動啟動，另執行：sudo loginctl enable-linger $login_user"
 }
 
+web_runtime_changed() {
+  local changed="$1"
+  grep -Eq '^software/web/' <<<"$changed"
+}
+
+web_dependencies_changed() {
+  local changed="$1"
+  grep -Eq '^software/web/package-lock\.json$' <<<"$changed"
+}
+
+web_manifest_matches_lock() {
+  "$python_bin" - "$web_dir/package.json" "$web_dir/package-lock.json" <<'PY'
+import json
+import sys
+
+package_path, lock_path = sys.argv[1:]
+with open(package_path, encoding="utf-8") as handle:
+    package = json.load(handle)
+with open(lock_path, encoding="utf-8") as handle:
+    lock = json.load(handle)
+
+root = lock.get("packages", {}).get("", {})
+keys = ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies")
+for key in keys:
+    if package.get(key, {}) != root.get(key, {}):
+        raise SystemExit(1)
+PY
+}
+
 sync_changed_dependencies() {
   local before="$1" after="$2" changed
   [[ "$before" != "$after" ]] || return 0
@@ -285,14 +314,19 @@ sync_changed_dependencies() {
     say "Python 相依設定有更新，重新安裝"
     install_python_dependencies
   fi
-  if grep -Eq '^software/web/(package.json|package-lock.json)$' <<<"$changed"; then
-    say "Web 相依設定有更新，執行 npm ci"
+  if web_dependencies_changed "$changed"; then
+    say "Web lockfile 有更新，執行 npm ci"
     (cd "$web_dir" && "$npm_bin" ci)
+  elif grep -Eq '^software/web/package\.json$' <<<"$changed"; then
+    if ! web_manifest_matches_lock; then
+      die "software/web/package.json 的 dependency manifest 與 package-lock.json 不一致"
+    fi
+    say "Web package metadata 有更新但 lockfile 未變；略過 npm ci，避免擾動執行中的 Vite runtime"
   fi
 }
 
 update_code() {
-  local before local_ahead remote_ahead after
+  local before local_ahead remote_ahead after changed
   require_repo
   require_runtime
   require_clean_tree
@@ -307,14 +341,19 @@ update_code() {
   [[ "$local_ahead" == "0" ]] || die "SWPC 有 $local_ahead 個尚未推送的本機 commit，拒絕自動部署"
   git -C "$repo" merge --ff-only "origin/$branch"
   after="$(git -C "$repo" rev-parse HEAD)"
+  changed="$(git -C "$repo" diff --name-only "$before" "$after")"
   sync_changed_dependencies "$before" "$after"
   say "目前版本：$(git -C "$repo" log -1 --oneline)"
+  if web_runtime_changed "$changed"; then
+    say "Web source 已更新；長駐 Vite/HMR 不視為已完成部署"
+    say "瀏覽器驗證前請執行 plasmactl web-restart；plasmactl deploy 會在測試通過後自動重新啟動全部服務"
+  fi
 }
 
 run_tests() {
   require_repo
   require_runtime
-  say "執行 deployment config migration 測試"
+  say "執行 deployment config migration 與 Web lifecycle 測試"
   bash "$repo/scripts/tests/test-plasmactl-config.sh" || return 1
   say "執行 Python 與 PL source-layout pytest"
   (cd "$python_dir" && "$python_bin" -m pytest -q tests "$repo/pl/tests") || return 1
@@ -351,11 +390,16 @@ wait_for_http() {
   die "$label 未在期限內通過健康檢查：$url"
 }
 
+web_health_check() {
+  require_command curl
+  wait_for_http "http://127.0.0.1:$vite_port/" "Vite Web Console"
+}
+
 health_check() {
   require_command curl
   wait_for_port 127.0.0.1 9900 "Plasma Server"
   wait_for_http "http://127.0.0.1:$gateway_port/api/status" "Python Gateway API"
-  wait_for_http "http://127.0.0.1:$vite_port/" "Vite Web Console"
+  web_health_check
 }
 
 reconcile_service_units() {
@@ -378,6 +422,16 @@ restart_services() {
   say "重新啟動 Plasma 服務"
   systemctl --user restart "${services[@]}"
   health_check
+}
+
+restart_web_console() {
+  require_repo
+  require_runtime
+  reconcile_service_units
+  say "重新啟動 Vite Web Console，丟棄舊的 in-memory module graph / HMR state"
+  systemctl --user restart plasma-vite.service
+  web_health_check
+  say "Web runtime 已重新載入；若瀏覽器仍持有舊 ESM module，請執行 hard reload"
 }
 
 stop_services() {
@@ -446,9 +500,10 @@ Usage: plasmactl COMMAND
 
 Commands:
   install              安裝相依套件與 user systemd units（不立即啟動）
-  update               從 GitHub main 做 fast-forward 更新
-  test                 執行 deployment migration、Python、PL source-layout 與 Web 測試
-  restart              重新產生 systemd units、重新啟動服務並執行 health check
+  update               從 GitHub main 做 fast-forward 更新；Web 變更後需 restart 才算 runtime 完成
+  test                 執行 deployment migration/lifecycle、Python、PL source-layout 與 Web 測試
+  restart              重新產生 systemd units、重新啟動全部服務並執行 health check
+  web-restart          只重新啟動 Vite Web Console 並執行 Web HTTP health check
   deploy               update → re-exec latest plasmactl → test → reconcile units → restart
   update-and-restart   deploy 的別名
   start | stop         啟動或停止全部 Plasma 服務
@@ -470,6 +525,7 @@ case "$command" in
   update) update_code ;;
   test) run_tests ;;
   restart) restart_services ;;
+  web-restart|restart-web) restart_web_console ;;
   deploy|update-and-restart) deploy ;;
   start) start_services ;;
   stop) stop_services ;;
