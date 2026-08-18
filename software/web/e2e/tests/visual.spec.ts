@@ -163,8 +163,8 @@ async function openConsole(page: Page, mode: VisualMode = "running") {
 }
 
 async function expectVisual(page: Page, name: string) {
-  await page.locator(".logCard pre").evaluate(element => {
-    element.textContent = "";
+  await page.addStyleTag({
+    content: ".logCard pre{visibility:hidden!important}",
   });
   await expect(page).toHaveScreenshot(name, {
     fullPage: true,
