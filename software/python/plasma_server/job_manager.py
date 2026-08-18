@@ -38,6 +38,8 @@ class JobRuntime:
     def snapshot(self) -> dict[str, Any]:
         data: dict[str, Any] = {
             "job_id": self.request.job_id,
+            "site_id": self.request.site_id,
+            # Compatibility field for Plasma protocol v3.1 clients.
             "channel_id": self.request.channel_id,
             "operation": self.request.operation.value,
             "state": self.state.value,
