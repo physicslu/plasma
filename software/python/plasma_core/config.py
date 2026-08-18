@@ -26,9 +26,21 @@ class ServerConfig:
     max_map_bytes: int = 1_048_576
     max_binary_bytes: int = 67_108_864
 
+    @property
+    def max_supported_sites(self) -> int:
+        """Canonical domain name; max_supported_channels is the v3.1 compatibility field."""
+        return self.max_supported_channels
+
+    @property
+    def max_queue_depth_per_site(self) -> int:
+        """Canonical domain name; max_queue_depth_per_channel is the v3.1 compatibility field."""
+        return self.max_queue_depth_per_channel
+
 
 @dataclass(slots=True)
-class ChannelConfig:
+class SiteConfig:
+    """One independently controlled programming site inside a PPU."""
+
     id: int
     enabled: bool = False
     interface: str = "mock"
@@ -41,32 +53,107 @@ class ChannelConfig:
     openocd: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
-class ProgrammerConfig:
-    id: str = "local-programmer"
-    site_id: str = "default-site"
-    model: str = "generic"
-    display_name: str = "Plasma Programmer"
+# Compatibility alias for code that still imports the pre-domain-rename type.
+ChannelConfig = SiteConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, init=False)
+class PPUConfig:
+    """Identity of one physical Plasma Programming Unit (PPU)."""
+
+    id: str
+    facility_id: str
+    model: str
+    display_name: str
+
+    def __init__(
+        self,
+        id: str = "local-ppu",
+        facility_id: str | None = None,
+        model: str = "generic",
+        display_name: str = "Plasma Programming Unit",
+        *,
+        site_id: str | None = None,
+    ) -> None:
+        # site_id used to mean the deployment location. Keep it only as an
+        # input compatibility alias while Facility becomes the canonical term.
+        if facility_id is not None and site_id is not None and facility_id != site_id:
+            raise TypeError("facility_id and legacy site_id disagree")
+        self.id = id
+        if facility_id is not None:
+            self.facility_id = facility_id
+        elif site_id is not None:
+            self.facility_id = site_id
+        else:
+            self.facility_id = "default-facility"
+        self.model = model
+        self.display_name = display_name
+
+    @property
+    def site_id(self) -> str:
+        """Legacy deployment-location alias. Prefer facility_id."""
+        return self.facility_id
+
+
+# Compatibility alias for code that still imports the pre-domain-rename type.
+ProgrammerConfig = PPUConfig
+
+
+@dataclass(slots=True, init=False)
 class PlasmaConfig:
     server: ServerConfig
-    channels: list[ChannelConfig]
-    programmer: ProgrammerConfig = field(default_factory=ProgrammerConfig)
+    sites: list[SiteConfig]
+    ppu: PPUConfig
+
+    def __init__(
+        self,
+        server: ServerConfig,
+        sites: list[SiteConfig] | None = None,
+        ppu: PPUConfig | None = None,
+        *,
+        channels: list[SiteConfig] | None = None,
+        programmer: PPUConfig | None = None,
+    ) -> None:
+        if sites is not None and channels is not None:
+            raise TypeError("use either sites or legacy channels, not both")
+        if ppu is not None and programmer is not None:
+            raise TypeError("use either ppu or legacy programmer, not both")
+        self.server = server
+        self.sites = list(sites if sites is not None else (channels or []))
+        self.ppu = ppu if ppu is not None else (programmer or PPUConfig())
+
+    @property
+    def site_count(self) -> int:
+        return len(self.sites)
+
+    @property
+    def enabled_site_count(self) -> int:
+        return sum(site.enabled for site in self.sites)
+
+    @property
+    def channels(self) -> list[SiteConfig]:
+        """Legacy alias for sites."""
+        return self.sites
+
+    @property
+    def programmer(self) -> PPUConfig:
+        """Legacy alias for ppu."""
+        return self.ppu
 
     @property
     def channel_count(self) -> int:
-        return len(self.channels)
+        """Legacy alias for site_count."""
+        return self.site_count
 
     @property
     def enabled_channel_count(self) -> int:
-        return sum(channel.enabled for channel in self.channels)
+        """Legacy alias for enabled_site_count."""
+        return self.enabled_site_count
 
     def validate(self) -> None:
         for field_name, value in (
-            ("programmer.id", self.programmer.id),
-            ("programmer.site_id", self.programmer.site_id),
+            ("ppu.id", self.ppu.id),
+            ("ppu.facility_id", self.ppu.facility_id),
         ):
             if not isinstance(value, str) or IDENTITY_PATTERN.fullmatch(value) is None:
                 raise PlasmaError(
@@ -74,8 +161,8 @@ class PlasmaConfig:
                     f"{field_name} must be 1-128 ASCII letters, digits, '.', '_' or '-', starting with a letter or digit",
                 )
         for field_name, value in (
-            ("programmer.model", self.programmer.model),
-            ("programmer.display_name", self.programmer.display_name),
+            ("ppu.model", self.ppu.model),
+            ("ppu.display_name", self.ppu.display_name),
         ):
             if not isinstance(value, str) or not value.strip() or len(value) > 256:
                 raise PlasmaError(
@@ -83,56 +170,65 @@ class PlasmaConfig:
                     f"{field_name} must be 1-256 characters",
                 )
 
-        maximum = self.server.max_supported_channels
+        maximum = self.server.max_supported_sites
         if not 1 <= maximum <= 8:
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
-                "max_supported_channels must be between 1 and 8",
+                "max_supported_sites must be between 1 and 8",
             )
         if not 1 <= self.server.max_concurrent_jobs <= maximum:
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
-                "max_concurrent_jobs must be between 1 and max_supported_channels",
+                "max_concurrent_jobs must be between 1 and max_supported_sites",
             )
-        if self.server.max_queue_depth_per_channel < 1:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "max_queue_depth_per_channel must be positive")
-        ids = [channel.id for channel in self.channels]
+        if self.server.max_queue_depth_per_site < 1:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "max_queue_depth_per_site must be positive")
+        ids = [site.id for site in self.sites]
         if len(ids) != len(set(ids)):
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "channel IDs must be unique")
-        if any(channel_id < 0 or channel_id >= maximum for channel_id in ids):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "site IDs must be unique")
+        if any(site_id < 0 or site_id >= maximum for site_id in ids):
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
-                f"channel IDs must be in range 0..{maximum - 1}",
+                f"site IDs must be in range 0..{maximum - 1}",
             )
         supported_interfaces = {"mock", "openocd", "fpga"}
-        for channel in self.channels:
-            if channel.interface not in supported_interfaces:
+        for site in self.sites:
+            if site.interface not in supported_interfaces:
                 raise PlasmaError(
                     ErrorCode.CONFIG_INVALID,
-                    f"unsupported interface '{channel.interface}' on CH{channel.id}",
+                    f"unsupported interface '{site.interface}' on SITE{site.id}",
                 )
-            if channel.operation_timeout_s <= 0 or channel.max_retries < 0:
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, f"invalid retry/timeout settings on CH{channel.id}")
+            if site.operation_timeout_s <= 0 or site.max_retries < 0:
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, f"invalid retry/timeout settings on SITE{site.id}")
 
 
 def _server_from_dict(raw: dict[str, Any], base_dir: Path) -> ServerConfig:
     values = dict(raw)
+    aliases = (
+        ("max_supported_sites", "max_supported_channels"),
+        ("max_queue_depth_per_site", "max_queue_depth_per_channel"),
+    )
+    for canonical, legacy in aliases:
+        if canonical in values and legacy in values:
+            raise TypeError(f"use either {canonical} or legacy {legacy}, not both")
+        if canonical in values:
+            values[legacy] = values.pop(canonical)
     for key in ("output_root", "log_root"):
         path = Path(values.get(key, key.removesuffix("_root")))
         values[key] = path if path.is_absolute() else (base_dir / path).resolve()
     return ServerConfig(**values)
 
 
-def _channel_from_dict(raw: dict[str, Any]) -> ChannelConfig:
+def _site_from_dict(raw: dict[str, Any]) -> SiteConfig:
     values = dict(raw)
     register_base = values.get("register_base")
     if isinstance(register_base, str):
         values["register_base"] = int(register_base, 0)
-    return ChannelConfig(**values)
+    return SiteConfig(**values)
 
 
-def _programmer_from_dict(raw: dict[str, Any]) -> ProgrammerConfig:
-    return ProgrammerConfig(**dict(raw))
+def _ppu_from_dict(raw: dict[str, Any]) -> PPUConfig:
+    return PPUConfig(**dict(raw))
 
 
 def load_config(path: str | Path) -> PlasmaConfig:
@@ -148,15 +244,20 @@ def load_config(path: str | Path) -> PlasmaConfig:
     if not isinstance(raw, dict):
         raise PlasmaError(ErrorCode.CONFIG_INVALID, "configuration root must be a mapping")
     try:
+        if "ppu" in raw and "programmer" in raw:
+            raise TypeError("use either ppu or legacy programmer, not both")
+        if "sites" in raw and "channels" in raw:
+            raise TypeError("use either sites or legacy channels, not both")
         server = _server_from_dict(raw.get("server", {}), config_path.parent.parent)
-        programmer = _programmer_from_dict(raw.get("programmer", {}))
-        channels = [_channel_from_dict(item) for item in raw.get("channels", [])]
+        ppu = _ppu_from_dict(raw.get("ppu", raw.get("programmer", {})))
+        site_items = raw.get("sites", raw.get("channels", []))
+        sites = [_site_from_dict(item) for item in site_items]
     except (TypeError, ValueError) as exc:
         raise PlasmaError(
             ErrorCode.CONFIG_INVALID,
             "configuration contains invalid fields",
             original_exception=exc,
         ) from exc
-    config = PlasmaConfig(server=server, channels=channels, programmer=programmer)
+    config = PlasmaConfig(server=server, sites=sites, ppu=ppu)
     config.validate()
     return config
