@@ -37,7 +37,7 @@ class SiteDomainNamingTests(unittest.TestCase):
 
     def test_site_manager_and_worker_are_canonical_exports(self) -> None:
         self.assertIs(SiteManager, ModuleSiteManager)
-        self.assertIs(ChannelManager, SiteManager)
+        self.assertIsNot(ChannelManager, SiteManager)
         self.assertIs(SiteWorker, ModuleSiteWorker)
         self.assertIs(ChannelWorker, SiteWorker)
 
