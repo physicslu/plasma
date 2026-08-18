@@ -13,28 +13,69 @@ from .errors import ErrorCode, PlasmaError
 IDENTITY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, init=False)
 class ServerConfig:
-    host: str = "127.0.0.1"
-    port: int = 9900
-    max_supported_channels: int = 8
-    max_concurrent_jobs: int = 2
-    max_queue_depth_per_channel: int = 16
-    output_root: Path = Path("output")
-    log_root: Path = Path("logs")
-    max_metadata_bytes: int = 65_536
-    max_map_bytes: int = 1_048_576
-    max_binary_bytes: int = 67_108_864
+    host: str
+    port: int
+    max_supported_sites: int
+    max_concurrent_jobs: int
+    max_queue_depth_per_site: int
+    output_root: Path
+    log_root: Path
+    max_metadata_bytes: int
+    max_map_bytes: int
+    max_binary_bytes: int
+
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 9900,
+        max_supported_sites: int | None = None,
+        max_concurrent_jobs: int = 2,
+        max_queue_depth_per_site: int | None = None,
+        output_root: Path = Path("output"),
+        log_root: Path = Path("logs"),
+        max_metadata_bytes: int = 65_536,
+        max_map_bytes: int = 1_048_576,
+        max_binary_bytes: int = 67_108_864,
+        *,
+        max_supported_channels: int | None = None,
+        max_queue_depth_per_channel: int | None = None,
+    ) -> None:
+        if max_supported_sites is not None and max_supported_channels is not None:
+            raise TypeError("use either max_supported_sites or legacy max_supported_channels, not both")
+        if max_queue_depth_per_site is not None and max_queue_depth_per_channel is not None:
+            raise TypeError(
+                "use either max_queue_depth_per_site or legacy max_queue_depth_per_channel, not both"
+            )
+        self.host = host
+        self.port = port
+        self.max_supported_sites = (
+            max_supported_sites
+            if max_supported_sites is not None
+            else (max_supported_channels if max_supported_channels is not None else 8)
+        )
+        self.max_concurrent_jobs = max_concurrent_jobs
+        self.max_queue_depth_per_site = (
+            max_queue_depth_per_site
+            if max_queue_depth_per_site is not None
+            else (max_queue_depth_per_channel if max_queue_depth_per_channel is not None else 16)
+        )
+        self.output_root = output_root
+        self.log_root = log_root
+        self.max_metadata_bytes = max_metadata_bytes
+        self.max_map_bytes = max_map_bytes
+        self.max_binary_bytes = max_binary_bytes
 
     @property
-    def max_supported_sites(self) -> int:
-        """Canonical domain name; max_supported_channels is the v3.1 compatibility field."""
-        return self.max_supported_channels
+    def max_supported_channels(self) -> int:
+        """Legacy compatibility alias. Prefer max_supported_sites."""
+        return self.max_supported_sites
 
     @property
-    def max_queue_depth_per_site(self) -> int:
-        """Canonical domain name; max_queue_depth_per_channel is the v3.1 compatibility field."""
-        return self.max_queue_depth_per_channel
+    def max_queue_depth_per_channel(self) -> int:
+        """Legacy compatibility alias. Prefer max_queue_depth_per_site."""
+        return self.max_queue_depth_per_site
 
 
 @dataclass(slots=True)
@@ -211,8 +252,8 @@ def _server_from_dict(raw: dict[str, Any], base_dir: Path) -> ServerConfig:
     for canonical, legacy in aliases:
         if canonical in values and legacy in values:
             raise TypeError(f"use either {canonical} or legacy {legacy}, not both")
-        if canonical in values:
-            values[legacy] = values.pop(canonical)
+        if legacy in values:
+            values[canonical] = values.pop(legacy)
     for key in ("output_root", "log_root"):
         path = Path(values.get(key, key.removesuffix("_root")))
         values[key] = path if path.is_absolute() else (base_dir / path).resolve()
