@@ -19,6 +19,7 @@ RESERVED_METADATA_KEYS = frozenset(
         "message_type",
         "job_id",
         "channel_id",
+        "site_id",
         "operation",
         "timeout_s",
         "max_retries",
@@ -68,6 +69,10 @@ class ErrorDetail:
     original_exception: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def site_id(self) -> int | None:
+        return self.channel_id
+
     @classmethod
     def from_exception(
         cls,
@@ -92,11 +97,15 @@ class ErrorDetail:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        data["site_id"] = self.channel_id
+        return data
 
 
 @dataclass(slots=True)
 class JobRequest:
+    # channel_id remains the Plasma v3.1 wire field. Domain/API code should
+    # treat the same local resource as a Programming Site via site_id.
     channel_id: int
     operation: Operation
     firmware: bytes = b""
@@ -111,6 +120,10 @@ class JobRequest:
 
     def __post_init__(self) -> None:
         self.validate()
+
+    @property
+    def site_id(self) -> int:
+        return self.channel_id
 
     def validate(self) -> None:
         if isinstance(self.channel_id, bool) or not isinstance(self.channel_id, int) or self.channel_id < 0:
@@ -163,6 +176,7 @@ class JobRequest:
             "protocol_version": "3.1",
             "message_type": "request",
             "job_id": self.job_id,
+            # Deliberately preserved until a protocol-version migration.
             "channel_id": self.channel_id,
             "operation": self.operation.value,
             "timeout_s": self.timeout_s,
@@ -200,11 +214,16 @@ class JobResult:
     details: dict[str, Any] = field(default_factory=dict)
 
     @property
+    def site_id(self) -> int:
+        return self.channel_id
+
+    @property
     def success(self) -> bool:
         return self.state is JobState.SUCCESS
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
+        data["site_id"] = self.channel_id
         data["operation"] = self.operation.value
         data["state"] = self.state.value
         return data
