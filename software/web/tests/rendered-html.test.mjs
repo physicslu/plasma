@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-test("renders the Plasma programmer console", async () => {
+test("renders the Plasma programmer console shell before topology discovery", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -31,8 +31,6 @@ test("renders the Plasma programmer console", async () => {
   assert.match(html, /<title>Plasma Programmer Console<\/title>/i);
   assert.match(html, />PLASMA</);
   assert.match(html, />CHANNEL MATRIX</);
-  assert.match(html, />CH<!-- -->0</);
-  assert.match(html, />CH<!-- -->7</);
   assert.match(html, />深色</);
   assert.match(html, />淺色</);
   assert.match(html, /class="active"[^>]*aria-pressed="true"[^>]*>淺色</);
@@ -41,15 +39,10 @@ test("renders the Plasma programmer console", async () => {
   assert.match(html, /<small>Plasma Web REST Gateway<\/small>/);
   assert.match(html, />DISPLAY CHANNELS</);
   assert.match(html, /aria-label="通道配置摘要"/);
-  assert.match(html, /<span>停用 <b>6<\/b><\/span>/);
-  assert.match(html, /aria-label="顯示 CH0"/);
-  assert.match(html, /aria-label="顯示 CH7"/);
   assert.match(html, />BATCH CONTROL</);
   assert.match(html, /aria-label="選取批次操作"/);
   assert.match(html, /aria-label="批次執行：尚未選擇操作"[^>]*disabled/);
   assert.match(html, />批次執行（0）</);
   assert.match(html, />LIVE CHANNEL STATUS</);
   assert.match(html, />獨立操作</);
-  assert.match(html, /aria-label="CH0 擦除"/);
-  assert.match(html, /aria-label="CH1 讀取"/);
 });
