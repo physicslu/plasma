@@ -30,15 +30,18 @@ test("renders PPU identity and a four-site topology from canonical status", asyn
             operations: ["erase", "program", "verify", "read"],
           },
         },
-        sites: Array.from({ length: 4 }, (_, siteId) => ({
-          site_id: siteId,
-          enabled: siteId < 3,
-          state: siteId < 3 ? "idle" : "disabled",
-          current_job_id: null,
-          queued_jobs: 0,
-          interface: siteId < 3 ? "mock" : null,
-          target: siteId < 3 ? "STM32F103C8T6" : null,
-        })),
+        sites: Array.from({ length: 4 }, (_, index) => {
+          const siteId = index + 1;
+          return {
+            site_id: siteId,
+            enabled: siteId <= 3,
+            state: siteId <= 3 ? "idle" : "disabled",
+            current_job_id: null,
+            queued_jobs: 0,
+            interface: siteId <= 3 ? "mock" : null,
+            target: siteId <= 3 ? "STM32F103C8T6" : null,
+          };
+        }),
       }),
     });
   });
@@ -54,17 +57,18 @@ test("renders PPU identity and a four-site topology from canonical status", asyn
   await expect(identity).toContainText("z2-e2e-04");
   await expect(identity).toContainText("PYNQ-Z2");
 
-  await expect(page.getByLabel("顯示 SITE 0")).toBeChecked();
   await expect(page.getByLabel("顯示 SITE 1")).toBeChecked();
   await expect(page.getByLabel("顯示 SITE 2")).toBeChecked();
-  await expect(page.getByLabel("顯示 SITE 3")).not.toBeChecked();
-  await expect(page.getByLabel("顯示 SITE 4")).toHaveCount(0);
+  await expect(page.getByLabel("顯示 SITE 3")).toBeChecked();
+  await expect(page.getByLabel("顯示 SITE 4")).not.toBeChecked();
+  await expect(page.getByLabel("顯示 SITE 0")).toHaveCount(0);
+  await expect(page.getByLabel("顯示 SITE 5")).toHaveCount(0);
 
   const topologySummary = page.getByLabel("Site 配置摘要");
   await expect(topologySummary).toContainText("顯示 3 / 4");
   await expect(topologySummary).toContainText("停用 1");
-  await expect(page.getByLabel("顯示 SITE 3").locator("..")).toContainText("停用");
+  await expect(page.getByLabel("顯示 SITE 4").locator("..")).toContainText("停用");
 
   await expect(page.locator(".channelDetails")).toHaveCount(3);
-  await expect(page.locator(".channelDetails").first()).toContainText("SITE 0");
+  await expect(page.locator(".channelDetails").first()).toContainText("SITE 1");
 });
