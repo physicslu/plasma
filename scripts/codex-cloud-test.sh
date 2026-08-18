@@ -14,6 +14,9 @@ if [[ ! -x "$python_bin" ]]; then
   exit 69
 fi
 
+printf '[codex-cloud] Running repository secret-file safety test\n'
+bash "$repo/scripts/tests/test-repository-secret-safety.sh"
+
 printf '[codex-cloud] Running deployment config migration test\n'
 bash "$repo/scripts/tests/test-plasmactl-config.sh"
 

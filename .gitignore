@@ -39,6 +39,20 @@ software/web/.next/
 software/web/.sites-runtime/
 software/web/dist/
 
+# Local secrets and credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+credentials.*
+secrets.*
+
 # OS and editor files
 .DS_Store
 *~

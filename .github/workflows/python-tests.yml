@@ -3,6 +3,8 @@ name: Python and PL source tests
 on:
   push:
     paths:
+      - ".gitignore"
+      - ".clineignore"
       - "software/python/**"
       - "pl/rtl/**"
       - "pl/constraints/**"
@@ -14,6 +16,8 @@ on:
       - ".github/workflows/python-tests.yml"
   pull_request:
     paths:
+      - ".gitignore"
+      - ".clineignore"
       - "software/python/**"
       - "pl/rtl/**"
       - "pl/constraints/**"
@@ -33,11 +37,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: software/python/pyproject.toml
+      - name: Test repository secret-file safety
+        run: bash scripts/tests/test-repository-secret-safety.sh
       - name: Test deployment config migration
         run: bash scripts/tests/test-plasmactl-config.sh
       - name: Install package
