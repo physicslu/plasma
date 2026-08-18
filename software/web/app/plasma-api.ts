@@ -132,11 +132,11 @@ function normalizeJobSnapshot(job: WireJobSnapshot): JobSnapshot {
   if (siteId === undefined) {
     throw new PlasmaApiError("Job snapshot is missing site_id");
   }
-  const { channel_id: _legacyChannelId, ...rest } = job;
-  const normalized: JobSnapshot = {
-    ...rest,
+  const normalized = {
+    ...job,
     site_id: siteId,
-  };
+  } as JobSnapshot & { channel_id?: number };
+  delete normalized.channel_id;
   if (normalized.state !== "cancelled" || !normalized.result?.error) return normalized;
   return {
     ...normalized,
