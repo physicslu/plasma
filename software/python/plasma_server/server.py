@@ -13,13 +13,13 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import ErrorDetail, JobRequest, new_job_id
 from plasma_core.protocol import Frame, ProtocolLimits, encode_frame, read_frame
 
-from .channel_manager import ChannelManager
+from .site_manager import SiteManager
 
 
 class PlasmaServer:
-    def __init__(self, config: PlasmaConfig, manager: ChannelManager | None = None) -> None:
+    def __init__(self, config: PlasmaConfig, manager: SiteManager | None = None) -> None:
         self.config = config
-        self.manager = manager or ChannelManager(config)
+        self.manager = manager or SiteManager(config)
         self._server: asyncio.Server | None = None
         self.limits = ProtocolLimits(
             metadata=config.server.max_metadata_bytes,
@@ -44,6 +44,8 @@ class PlasmaServer:
         self.manager.server_log.event(
             "INFO",
             "server_started",
+            ppu_id=self.config.ppu.id,
+            facility_id=self.config.ppu.facility_id,
             host=self.address[0],
             port=self.address[1],
         )
@@ -69,18 +71,18 @@ class PlasmaServer:
     ) -> None:
         peer = writer.get_extra_info("peername")
         job_id: str | None = None
-        channel_id: int | None = None
+        wire_channel_id: int | None = None
         operation: str | None = None
         try:
             frame = await read_frame(reader, self.limits)
             job_id = frame.metadata.get("job_id")
-            channel_id = frame.metadata.get("channel_id")
+            wire_channel_id = frame.metadata.get("channel_id")
             operation = frame.metadata.get("operation")
             response = await self._dispatch(frame, peer)
         except PlasmaError as exc:
             detail = ErrorDetail.from_exception(
                 exc,
-                channel_id=channel_id,
+                channel_id=wire_channel_id,
                 job_id=job_id,
                 operation=operation,
             )
@@ -97,7 +99,7 @@ class PlasmaServer:
                 "request_failed",
                 peer=peer,
                 job_id=job_id,
-                channel_id=channel_id,
+                site_id=wire_channel_id,
                 operation=operation,
                 error_code=exc.code.value,
                 message=exc.message,
@@ -140,11 +142,12 @@ class PlasmaServer:
             ) from exc
 
         if operation is Operation.STATUS:
-            channel_id = metadata.get("channel_id")
-            if isinstance(channel_id, bool):
+            # v3.1 wire metadata still calls the local Programming Site channel_id.
+            wire_channel_id = metadata.get("channel_id")
+            if isinstance(wire_channel_id, bool):
                 raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "channel_id must be an integer")
             try:
-                parsed_channel_id = int(channel_id) if channel_id is not None else None
+                parsed_site_id = int(wire_channel_id) if wire_channel_id is not None else None
             except (TypeError, ValueError, OverflowError) as exc:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
@@ -152,7 +155,7 @@ class PlasmaServer:
                     original_exception=exc,
                 ) from exc
             result = self.manager.status(
-                channel_id=parsed_channel_id,
+                site_id=parsed_site_id,
                 job_id=metadata.get("target_job_id"),
             )
             return self._success(result)
@@ -164,26 +167,26 @@ class PlasmaServer:
             return self._success(self.manager.cancel(str(target_job_id)))
 
         try:
-            channel_raw = metadata["channel_id"]
-            if isinstance(channel_raw, bool):
+            wire_channel_raw = metadata["channel_id"]
+            if isinstance(wire_channel_raw, bool):
                 raise ValueError("boolean is not a channel ID")
-            channel_id = int(channel_raw)
+            site_id = int(wire_channel_raw)
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
             raise PlasmaError(
                 ErrorCode.INVALID_ARGUMENT,
                 "work request requires an integer channel_id",
                 original_exception=exc,
             ) from exc
-        channel_config = self.manager._channel_configs.get(channel_id)
+        site_config = self.manager._site_configs.get(site_id)
         try:
             timeout_raw = metadata.get(
-                "timeout_s", channel_config.operation_timeout_s if channel_config else 30.0
+                "timeout_s", site_config.operation_timeout_s if site_config else 30.0
             )
             retries_raw = metadata.get(
-                "max_retries", channel_config.max_retries if channel_config else 0
+                "max_retries", site_config.max_retries if site_config else 0
             )
             backoff_raw = metadata.get(
-                "retry_backoff_s", channel_config.retry_backoff_s if channel_config else 0.05
+                "retry_backoff_s", site_config.retry_backoff_s if site_config else 0.05
             )
             if any(isinstance(value, bool) for value in (timeout_raw, retries_raw, backoff_raw)):
                 raise ValueError("boolean is not a numeric retry setting")
@@ -247,7 +250,8 @@ class PlasmaServer:
         if not isinstance(wait_for_completion, bool):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "wait_for_completion must be boolean")
         request = JobRequest(
-            channel_id=channel_id,
+            # Compatibility translation into the Plasma v3.1 wire model.
+            channel_id=site_id,
             operation=operation,
             firmware=frame.binary,
             map_data=frame.map_data,
@@ -289,7 +293,7 @@ async def _run_server(config_path: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Plasma multi-channel programming server")
+    parser = argparse.ArgumentParser(description="Plasma multi-site programming server")
     parser.add_argument("--config", type=Path, default=Path("config/plasma.yaml"))
     args = parser.parse_args()
     try:

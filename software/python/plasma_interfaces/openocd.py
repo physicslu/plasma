@@ -12,7 +12,7 @@ from .base import BaseInterface, ProgressCallback
 class OpenOCDInterface(BaseInterface):
     """OpenOCD process boundary.
 
-    This v0.1 class validates per-channel configuration and process/error
+    This v0.1 class validates per-Site configuration and process/error
     handling. Target-specific command templates require hardware validation.
     """
 

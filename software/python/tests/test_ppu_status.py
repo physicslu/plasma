@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from plasma_core.config import PPUConfig, PlasmaConfig, ServerConfig, SiteConfig
-from plasma_server.channel_manager import SiteManager
+from plasma_server.site_manager import SiteManager
 
 
 class PPUStatusTests(unittest.TestCase):
@@ -14,7 +14,7 @@ class PPUStatusTests(unittest.TestCase):
             root = Path(temporary)
             config = PlasmaConfig(
                 server=ServerConfig(
-                    max_supported_channels=8,
+                    max_supported_sites=8,
                     max_concurrent_jobs=1,
                     output_root=root / "output",
                     log_root=root / "logs",
@@ -49,7 +49,7 @@ class PPUStatusTests(unittest.TestCase):
 
     def test_status_retains_legacy_programmer_channel_shape_during_migration(self) -> None:
         config = PlasmaConfig(
-            server=ServerConfig(max_supported_channels=2, max_concurrent_jobs=1),
+            server=ServerConfig(max_supported_sites=2, max_concurrent_jobs=1),
             sites=[SiteConfig(id=0), SiteConfig(id=1)],
             ppu=PPUConfig(id="ppu-legacy", facility_id="facility-1"),
         )
