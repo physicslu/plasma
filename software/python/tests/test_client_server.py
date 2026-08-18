@@ -144,6 +144,38 @@ class ClientServerTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
 
+    async def test_v32_site_id_requires_json_integer_without_coercion(self) -> None:
+        client = await self.start_server(enabled_sites=1)
+        for value in (1.0, 1.5, "1"):
+            with self.subTest(site_id=value):
+                with self.assertRaises(PlasmaError) as caught:
+                    await client.send(
+                        Frame(
+                            metadata={
+                                "protocol_version": "3.2",
+                                "operation": "erase",
+                                "site_id": value,
+                            }
+                        )
+                    )
+                self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
+
+    async def test_v31_channel_id_requires_json_integer_without_coercion(self) -> None:
+        client = await self.start_server(enabled_sites=1)
+        for value in (0.0, 0.5, "0"):
+            with self.subTest(channel_id=value):
+                with self.assertRaises(PlasmaError) as caught:
+                    await client.send(
+                        Frame(
+                            metadata={
+                                "protocol_version": "3.1",
+                                "operation": "erase",
+                                "channel_id": value,
+                            }
+                        )
+                    )
+                self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
+
     async def test_v32_rejects_channel_id_field(self) -> None:
         client = await self.start_server(enabled_sites=1)
         with self.assertRaises(PlasmaError) as caught:
