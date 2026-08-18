@@ -49,3 +49,11 @@ pl/build/
 # Local secrets and environment overrides
 .env
 .env.*
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+credentials.*
+secrets.*
