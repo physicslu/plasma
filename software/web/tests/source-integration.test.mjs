@@ -46,7 +46,7 @@ test("uses the Plasma Web REST Gateway instead of browser-side job simulation", 
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
   assert.doesNotMatch(page, /setInterval\s*\(/);
-  assert.match(page, /getProgrammerStatus/);
+  assert.match(page, /getPPUStatus/);
   assert.match(page, /getJob/);
   assert.match(page, /startJob/);
   assert.match(page, /cancelJob/);
@@ -58,27 +58,42 @@ test("uses the Plasma Web REST Gateway instead of browser-side job simulation", 
   assert.doesNotMatch(api, /127\.0\.0\.1:8080/);
 });
 
-test("derives Programmer identity and channel topology from status instead of fixed eight-channel UI assumptions", async () => {
+test("derives PPU identity and Site topology from canonical status instead of fixed eight-site assumptions", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
-  assert.match(api, /export type ProgrammerSnapshot/);
-  assert.match(api, /export async function getProgrammerStatus/);
-  assert.match(page, /useState<Channel\[]>\(\[\]\)/);
-  assert.match(page, /useState<ProgrammerSnapshot \| null>\(null\)/);
-  assert.match(page, /const status = await getProgrammerStatus\(apiBase\)/);
-  assert.match(page, /status\.channels\.map/);
-  assert.match(page, /current\.find\(channel => channel\.id === backend\.channel_id\)/);
-  assert.match(page, /channels\.find\(item => item\.id === channelId\)/);
-  assert.match(page, /aria-label="Programmer identity"/);
-  assert.match(page, /programmer\.site_id/);
-  assert.match(page, /programmer\.programmer_id/);
-  assert.match(page, /programmer\.model/);
-  assert.ok(page.includes("{enabledCount}/{channels.length} Enabled"));
-  assert.ok(page.includes("{visibleChannelIds.length} / {channels.length}"));
+  assert.match(api, /export type PPUSnapshot/);
+  assert.match(api, /export type SiteSnapshot/);
+  assert.match(api, /export async function getPPUStatus/);
+  assert.match(api, /payload\.ppu/);
+  assert.match(api, /payload\.sites/);
+  assert.match(api, /payload\.programmer/);
+  assert.match(api, /payload\.channels/);
+  assert.match(page, /useState<Site\[]>\(\[\]\)/);
+  assert.match(page, /useState<PPUSnapshot \| null>\(null\)/);
+  assert.match(page, /const status = await getPPUStatus\(apiBase\)/);
+  assert.match(page, /status\.sites\.map/);
+  assert.match(page, /current\.find\(site => site\.id === backend\.site_id\)/);
+  assert.match(page, /sites\.find\(item => item\.id === siteId\)/);
+  assert.match(page, /aria-label="PPU identity"/);
+  assert.match(page, /ppu\.facility_id/);
+  assert.match(page, /ppu\.ppu_id/);
+  assert.match(page, /ppu\.model/);
+  assert.ok(page.includes("{enabledCount}/{sites.length} Enabled"));
+  assert.ok(page.includes("{visibleSiteIds.length} / {sites.length}"));
   assert.doesNotMatch(page, /Array\.from\(\{ length: 8 \}/);
   assert.doesNotMatch(page, /enabledCount\}\/8 Enabled/);
-  assert.doesNotMatch(page, /visibleChannelIds\.length\} \/ 8/);
+  assert.doesNotMatch(page, /visibleSiteIds\.length\} \/ 8/);
+});
+
+test("uses canonical Site requests while preserving the v3.1 channel compatibility field", async () => {
+  const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
+
+  assert.match(api, /siteId: number/);
+  assert.match(api, /site_id: options\.siteId/);
+  assert.match(api, /channel_id: options\.siteId/);
+  assert.match(api, /const siteId = job\.site_id \?\? job\.channel_id/);
+  assert.match(api, /Job snapshot is missing site_id/);
 });
 
 test("keeps live log messages English and marks error severity explicitly", async () => {
@@ -94,7 +109,8 @@ test("keeps live log messages English and marks error severity explicitly", asyn
   assert.match(page, /Plasma Web REST Gateway rejected · \$\{apiDraft\.trim\(\)/);
   assert.match(page, /Firmware exceeds the 16 MiB limit/);
   assert.match(page, /timed out waiting for completion/);
-  assert.match(page, /At least one channel must remain visible/);
+  assert.match(page, /At least one site must remain visible/);
+  assert.doesNotMatch(page, /At least one channel must remain visible/);
   assert.doesNotMatch(page, /主畫面至少必須保留一個通道/);
   assert.doesNotMatch(page, /Firmware 超過 16 MiB 限制`/);
   assert.doesNotMatch(page, /等待完成逾時/);
@@ -170,33 +186,33 @@ test("executes browser API migration behavior for legacy, invalid, default, cust
   assert.equal(explicitVersionedLegacy["plasma-api-base-version"], "2");
 });
 
-test("supports selected-channel batch jobs and per-channel controls", async () => {
+test("supports selected-site batch jobs and per-site controls", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(page, /visibleChannelIds/);
+  assert.match(page, /visibleSiteIds/);
   assert.match(page, /waitForTerminalJob/);
   assert.match(page, /terminalJobStates\.has\(current\.state\)/);
-  assert.match(page, /const batchChannelIds = \[\.\.\.visibleChannelIds\]/);
-  assert.match(page, /Promise\.all\(batchChannelIds\.map/);
+  assert.match(page, /const batchSiteIds = \[\.\.\.visibleSiteIds\]/);
+  assert.match(page, /Promise\.all\(batchSiteIds\.map/);
   assert.match(page, /for \(const operation of batchOperations\)/);
-  assert.match(page, /runChannel\(channelId, operation, true, \(\) => lifecycle\.canDispatch\(channelId\)\)/);
+  assert.match(page, /runSite\(siteId, operation, true, \(\) => lifecycle\.canDispatch\(siteId\)\)/);
   assert.match(page, /Batch stopped/);
   assert.match(page, /Batch complete/);
-  assert.match(page, /runChannel\(channel\.id, operation\)/);
-  assert.match(page, /At least one channel must remain visible/);
+  assert.match(page, /runSite\(site\.id, operation\)/);
+  assert.match(page, /At least one site must remain visible/);
   assert.match(page, /disabled=\{locked\}/);
   assert.match(page, /待命 <b>\{statusCounts\.idle\}/);
   assert.match(page, /工作中 <b>\{statusCounts\.busy\}/);
   assert.match(page, /成功 <b>\{statusCounts\.success\}/);
   assert.match(page, /取消 <b>\{statusCounts\.cancelled\}/);
   assert.match(page, /失敗 <b>\{statusCounts\.failed\}/);
-  assert.match(page, /const disabledCount = channels\.length - enabledCount/);
-  assert.match(page, /aria-label="通道配置摘要"/);
-  assert.ok(page.includes("顯示 <b>{visibleChannelIds.length} / {channels.length}</b>"));
+  assert.match(page, /const disabledCount = sites\.length - enabledCount/);
+  assert.match(page, /aria-label="Site 配置摘要"/);
+  assert.ok(page.includes("顯示 <b>{visibleSiteIds.length} / {sites.length}</b>"));
   assert.match(page, /停用 <b>\{disabledCount\}<\/b>/);
 
   const batchStatus = page.match(
-    /<div className="statusSummary" aria-label="選取通道狀態摘要">([\s\S]*?)<\/div>/,
+    /<div className="statusSummary" aria-label="選取 Site 狀態摘要">([\s\S]*?)<\/div>/,
   )?.[1];
   assert.ok(batchStatus, "batch status summary is missing");
   assert.doesNotMatch(batchStatus, /停用/);
@@ -217,14 +233,14 @@ test("uses an explicit batch lifecycle and a cancel barrier at dispatch", async 
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
   assert.match(page, /const batchLifecycle = useRef<BatchLifecycle \| null>\(null\)/);
-  assert.match(page, /const lifecycle = new BatchLifecycle\(batchChannelIds\)/);
+  assert.match(page, /const lifecycle = new BatchLifecycle\(batchSiteIds\)/);
   assert.match(lifecycle, /BatchCommandPhase = "ready" \| "submitting" \| "active" \| "terminal"/);
-  assert.match(lifecycle, /beginSubmit\(channelId: number\)/);
-  assert.match(lifecycle, /canDispatch\(channelId: number\)/);
-  assert.match(lifecycle, /accepted\(channelId: number, jobId: string\)/);
+  assert.match(lifecycle, /beginSubmit\(siteId: number\)/);
+  assert.match(lifecycle, /canDispatch\(siteId: number\)/);
+  assert.match(lifecycle, /accepted\(siteId: number, jobId: string\)/);
   assert.match(lifecycle, /cancel\(\): BatchCancelSnapshot/);
-  assert.match(page, /const \{ submittingChannels, activeJobs \} = lifecycle\.cancel\(\)/);
-  assert.match(page, /submitting: \$\{submittingChannels\.length\} · active jobs: \$\{activeJobs\.length\}/);
+  assert.match(page, /const \{ submittingSites, activeJobs \} = lifecycle\.cancel\(\)/);
+  assert.match(page, /submitting: \$\{submittingSites\.length\} · active jobs: \$\{activeJobs\.length\}/);
   assert.match(page, /Promise\.all\(activeJobs\.map/);
   assert.doesNotMatch(page, /batchActiveJobs/);
   assert.doesNotMatch(page, /batchCancelRequested/);
@@ -242,13 +258,13 @@ test("uses an explicit batch lifecycle and a cancel barrier at dispatch", async 
 test("keeps batch cancellation authoritative without rewriting the final job result", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
-  assert.match(page, /type BatchChannelState = "running" \| "cancelling" \| "success" \| "cancelled" \| "failed"/);
-  assert.match(page, /batchChannelStates/);
+  assert.match(page, /type BatchSiteState = "running" \| "cancelling" \| "success" \| "cancelled" \| "failed"/);
+  assert.match(page, /batchSiteStates/);
   assert.match(page, /state === "running" \? "cancelling" : state/);
   assert.match(page, /批次取消中/);
   assert.match(page, /批次已取消/);
   assert.match(page, /批次進行中/);
-  assert.match(page, /clearBatchChannelState\(channelId\)/);
+  assert.match(page, /clearBatchSiteState\(siteId\)/);
   assert.match(page, /Job State/);
   assert.match(page, /Batch State/);
   assert.match(page, /Job State 保留 Python Job Manager 回傳的真實結果/);
@@ -257,7 +273,7 @@ test("keeps batch cancellation authoritative without rewriting the final job res
     "const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);",
   );
   const finalStateHandling = page.indexOf('if (finalJob.state === "cancelled")', cancellationPrecedence);
-  const batchSuccess = page.indexOf('setBatchChannelState(channelId, "success")', cancellationPrecedence);
+  const batchSuccess = page.indexOf('setBatchSiteState(siteId, "success")', cancellationPrecedence);
   assert.notEqual(cancellationPrecedence, -1, "batch cancellation precedence check is missing");
   assert.notEqual(finalStateHandling, -1, "final job state handling is missing");
   assert.notEqual(batchSuccess, -1, "batch success transition is missing");
@@ -265,8 +281,8 @@ test("keeps batch cancellation authoritative without rewriting the final job res
   assert.ok(cancellationPrecedence < batchSuccess, "cancel request must win before batch success is published");
 
   const cancellingDisplay = page.indexOf('if (batchState === "cancelling")');
-  const rawJobDisplay = page.indexOf("return { state: channel.stage, label: stageLabels[channel.stage] };");
+  const rawJobDisplay = page.indexOf("return { state: site.stage, label: stageLabels[site.stage] };");
   assert.notEqual(cancellingDisplay, -1, "batch cancelling display override is missing");
   assert.notEqual(rawJobDisplay, -1, "raw job display fallback is missing");
-  assert.ok(cancellingDisplay < rawJobDisplay, "batch cancellation must override a racing job success in the channel UI");
+  assert.ok(cancellingDisplay < rawJobDisplay, "batch cancellation must override a racing job success in the Site UI");
 });
