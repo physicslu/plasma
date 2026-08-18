@@ -1,22 +1,22 @@
-programmer:
-  id: z2-dev-01
-  site_id: swpc-lab
+ppu:
+  id: ppu-dev-01
+  facility_id: swpc-lab
   model: PYNQ-Z2
   display_name: Plasma Z2 Prototype
 
 server:
   host: 127.0.0.1
   port: 9900
-  max_supported_channels: 8
+  max_supported_sites: 8
   max_concurrent_jobs: 2
-  max_queue_depth_per_channel: 16
+  max_queue_depth_per_site: 16
   output_root: output
   log_root: logs
   max_metadata_bytes: 65536
   max_map_bytes: 1048576
   max_binary_bytes: 67108864
 
-channels:
+sites:
   - id: 0
     enabled: true
     interface: mock
