@@ -63,6 +63,17 @@ export function normalizeApiBase(value: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
+function normalizeJobSnapshot(job: JobSnapshot): JobSnapshot {
+  if (job.state !== "cancelled" || !job.result?.error) return job;
+  return {
+    ...job,
+    result: {
+      ...job.result,
+      error: null,
+    },
+  };
+}
+
 async function requestJson<T>(
   apiBase: string,
   path: string,
@@ -118,7 +129,7 @@ export async function getJob(
     apiBase,
     `/api/status?job=${encodeURIComponent(jobId)}`,
   );
-  return payload.job;
+  return normalizeJobSnapshot(payload.job);
 }
 
 export async function startJob(
@@ -152,7 +163,7 @@ export async function startJob(
       }),
     },
   );
-  return payload.job;
+  return normalizeJobSnapshot(payload.job);
 }
 
 export async function cancelJob(
