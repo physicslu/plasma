@@ -10,7 +10,7 @@ cd "$repo"
 patterns=(
   '/home/[[:alnum:]_.-]+/'
   '/storage/projects/'
-  '[[:alnum:]_.-]+@[[:alnum:]_.-]*swpc([[:space:]`"'"']|$)'
+  '[[:alnum:]_.-]+@[[:alnum:]_.-]*swpc'
   'tail[[:alnum:]-]*\.ts\.net'
   'DESKTOP-[[:alnum:]_-]+'
 )
