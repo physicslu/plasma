@@ -177,21 +177,36 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(follow_up["result"]["state"], "success")
 
     async def test_explicit_cancel_command_stops_detached_job(self) -> None:
-        client, _server = await self.start_server({"erase": 0.6})
+        client, _server = await self.start_server({})
+        erase_entered = asyncio.Event()
+        keep_erasing = asyncio.Event()
+
+        async def gated_erase(interface: MockInterface, progress=None) -> None:
+            interface.calls["erase"] += 1
+            if progress:
+                await progress(1, 100)
+            erase_entered.set()
+            await keep_erasing.wait()
+
         request = JobRequest(
             site_id=1,
             operation=Operation.ERASE,
             job_id="explicit-cancel",
-            timeout_s=2.0,
+            timeout_s=10.0,
         )
-        await client.start(request)
-        for _ in range(100):
+        with mock.patch.object(MockInterface, "erase", gated_erase):
+            await client.start(request)
+            await asyncio.wait_for(erase_entered.wait(), timeout=5.0)
             status = await client.status(job_id=request.job_id)
-            if status["job"]["state"] == "running":
-                break
-            await asyncio.sleep(0.005)
-        cancel = await client.cancel(request.job_id)
-        result = await client.wait_for_job(request.job_id, poll_interval_s=0.01, timeout_s=1.0)
+            self.assertEqual(status["job"]["state"], "running")
+
+            cancel = await client.cancel(request.job_id)
+            result = await client.wait_for_job(
+                request.job_id,
+                poll_interval_s=0.01,
+                timeout_s=2.0,
+            )
+
         self.assertTrue(cancel["accepted"])
         self.assertTrue(cancel["cancel_requested"])
         self.assertEqual(result["result"]["state"], "cancelled")
