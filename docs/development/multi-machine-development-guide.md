@@ -1,22 +1,11 @@
-# Plasma 多電腦開發指南
+# Plasma Multi-Machine Development Guide
 
-> 專案：`physicslu/plasma`  
-> 目前標準：SWPC 中央 Linux 工作區 + VS Code Remote - SSH clients  
-> 更新日期：2026-08-17
+> Project: `physicslu/plasma`
+> Standard: one primary Linux integration workspace + multiple VS Code Remote-SSH clients
 
-###### tags: `Plasma` `GitHub` `VS Code` `Remote-SSH` `FPGA` `Python` `Web`
+## 1. Development model
 
----
-
-## 1. 現行架構
-
-Plasma 不再把「每台電腦各自維護完整開發環境與 repository clone」作為日常標準。
-目前的標準是：
-
-- **GitHub**：已發布 Git history、Pull Request 與 CI 的 source of truth。
-- **SWPC**：主要 Development / Integration Linux workspace。
-- **Mac、SHNB、DESKTOP-1**：透過 VS Code Remote - SSH 操作 SWPC。
-- **Z2**：embedded runtime、PS/PL integration 與 hardware validation target；不是日常程式編輯主機。
+Plasma uses GitHub as the publication/integration source of truth and one primary Linux host as the deterministic development and integration workspace.
 
 ```text
                     GitHub
@@ -24,160 +13,90 @@ Plasma 不再把「每台電腦各自維護完整開發環境與 repository clon
                       |
                  branch / PR
                       |
-                     SWPC
-        /storage/projects/plasma
-          /        |         \
-         /         |          \
-      Mac        SHNB      DESKTOP-1
-      VS Code     VS Code     VS Code
-         \         |          /
-          +---- Remote SSH ---+
+             Integration Host
+                $PLASMA_REPO
+               /      |      \
+              /       |       \
+       Client A   Client B   Thin Client
+          \          |          /
+           +---- Remote SSH ----+
 
-                     |
-                     | approved target validation
-                     v
+                      |
+                      | approved target validation
+                      v
                      Z2
 ```
 
-這個模型的目的不是把 GitHub 拿掉，而是避免每台 client 都維護不同版本的 Python、
-Verilator、cocotb、Node、Vivado 與 build artifacts。
+The purpose is to avoid maintaining divergent Python, Verilator, cocotb, Node, and Vivado environments on every client computer.
 
----
+## 2. Role boundaries
 
-## 2. 四台電腦的角色
+| Role | Normal access | Responsibility |
+|---|---|---|
+| Integration Host | Local repository | Deterministic build/test, Vivado integration, shared runtime validation |
+| Engineering Client | VS Code Remote-SSH | Interactive editing, review, optional local AI tooling |
+| Portable Client | VS Code Remote-SSH | Remote engineering work; isolated local experiments only when necessary |
+| Managed Thin Client | VS Code Remote-SSH | Minimal local footprint; avoid storing source artifacts or credentials unnecessarily |
+| Z2 Target | Approved target access | Embedded runtime, PS/PL integration, electrical and real-device validation |
 
-| 主機 | 正式角色 | 正常 Plasma 使用方式 | 本機特殊用途 |
-|---|---|---|---|
-| SWPC (Linux) | Primary Development & Integration Host | 直接使用 `/storage/projects/plasma` | Verilator、cocotb、pytest、Python venv、Node/Web、Vivado |
-| Mac | Primary Engineering Client | VS Code Remote - SSH → SWPC | Ollama / local AI，可選 Continue/Cline |
-| SHNB (Dell) | Portable Engineering Client | VS Code Remote - SSH → SWPC | Windows Vivado 可保留作隔離實驗，不作正式 build source of truth |
-| DESKTOP-1 | Company Thin Client | VS Code Remote - SSH → SWPC | 盡量不保存 Plasma source/toolchain/firmware |
+Machine names, usernames, private DNS names, VPN/Tailscale identifiers, and physical-device inventory belong in operator-local configuration or protected infrastructure records. They are not part of the public Plasma architecture contract.
 
-### 2.1 SWPC
+## 3. Repository location
 
-SWPC 是日常開發的實際執行環境：
+The absolute repository path is site-specific. Public examples use:
 
-```text
-SSH:        gordon@swpc
-Repository: /storage/projects/plasma
+```bash
+export PLASMA_REPO=/path/to/plasma
+cd "$PLASMA_REPO"
 ```
 
-FPGA、Python、Web 等 deterministic tools 應以 SWPC 已驗證環境為準。
-
-### 2.2 Mac
-
-Mac 是主要 UI/client，並可執行本機 Ollama 與 local AI。
+Repository layout:
 
 ```text
-Mac AI inference
-      |
-      | edit / agent interaction
-      v
-VS Code Remote - SSH
-      |
-      v
-SWPC Plasma workspace
-```
-
-Local AI 可以協助編輯 SWPC workspace，但 deterministic compile/test 仍由 SWPC 執行。
-
-### 2.3 SHNB
-
-SHNB 正常工作模式仍是 Remote - SSH → SWPC。
-若 Windows 上已安裝 Vivado，可保留作獨立 FPGA GUI experiment；正式 Plasma integration
-結果仍回到 SWPC 驗證，避免建立第二套不受控 toolchain。
-
-### 2.4 DESKTOP-1
-
-公司電腦應盡可能維持 thin-client 模式：
-
-- VS Code
-- Remote - SSH
-- 必要的 SSH/Tailscale access
-
-除非有明確需要且符合公司政策，不要在 DESKTOP-1 建立完整 Plasma toolchain、複製
-firmware artifacts、credentials 或長期維護另一份 repository clone。
-
----
-
-## 3. Repository 與工具位置
-
-主要 repository：
-
-```text
-/storage/projects/plasma/
+$PLASMA_REPO/
 ├── .vscode/
-│   ├── tasks.json
-│   ├── extensions.json
-│   └── settings.json
 ├── pl/
-│   ├── env.sh
-│   ├── rtl/
-│   ├── targets/
-│   ├── tools/
-│   ├── verification/
-│   └── build/
 ├── software/python/
 ├── software/web/
+├── scripts/
 └── docs/
 ```
 
-重要 Python environment boundary：
+Important Python environment boundary:
 
 ```text
 pl/.venv/                 FPGA verification
 software/python/.venv/    Plasma software/server
 ```
 
-不要因為 VS Code 只能顯示一個 global Python interpreter，就把兩個 environment 混成一個。
+Do not merge these environments merely to make one editor setting convenient.
 
----
+## 4. Client setup
 
-## 4. 每台 client 第一次設定
-
-### 4.1 必要本機工具
-
-Mac、SHNB、DESKTOP-1 至少需要：
+A normal client needs only:
 
 - Visual Studio Code
 - OpenSSH client
-- VS Code Remote - SSH
-- 可連線到 SWPC 的網路路徑（例如既有 Tailscale/SSH setup）
+- VS Code Remote-SSH
+- an approved network path to the integration host
 
-不需要為正常 Remote-SSH workflow 在每台 client 重裝：
+The client does not need a second normal installation of Verilator, cocotb, Plasma Python environments, Node/Web dependencies, or Vivado.
 
-- Verilator
-- cocotb
-- FPGA `pl/.venv`
-- Plasma software Python venv
-- Node/Web build environment
-- Vivado
-
-這些工具應由 SWPC 提供。
-
-### 4.2 Remote - SSH
-
-VS Code：
+Connect using an operator-local SSH alias:
 
 ```text
 Cmd/Ctrl + Shift + P
-→ Remote-SSH: Connect to Host...
-→ SWPC
+-> Remote-SSH: Connect to Host...
+-> <integration-host-alias>
 ```
 
-連線後開啟：
+Then open `$PLASMA_REPO`.
 
-```text
-/storage/projects/plasma
-```
+The real SSH username, hostname, private IP, overlay-network hostname, and key path must remain outside public repository documentation.
 
-左下角必須顯示 Remote SSH host。若 terminal prompt 不是 SWPC，先確認位置再執行命令。
+## 5. VS Code workspace standard
 
----
-
-## 5. VS Code Workspace 標準
-
-Repository 會提供：
+The repository provides shared project configuration:
 
 ```text
 .vscode/tasks.json
@@ -185,33 +104,14 @@ Repository 會提供：
 .vscode/settings.json
 ```
 
-### 5.1 Workspace recommended extensions
+Project configuration may define deterministic engineering behavior. Personal themes, fonts, local AI credentials, machine names, and SSH connection details must remain per-client settings.
 
-建議安裝：
-
-- Remote - SSH
-- SystemVerilog - Language Support
-- Surfer waveform viewer
-- Python
-- Pylance
-- ESLint
-- Prettier
-
-Mac 的 Ollama/Continue/Cline、theme、font 等屬 machine/personal settings，不放進 shared
-workspace requirements。
-
-### 5.2 SystemVerilog compile policy
-
-SystemVerilog extension 的單檔 compile-on-save / compile-on-open 會被 workspace 關閉。
-原因是 Plasma 採 target-based build：真正 build unit 是 `pl/targets/*.toml`，不是單一 `.sv`。
-
-FPGA 正常操作：
+### FPGA workflow
 
 ```text
-開啟 RTL
+Open RTL
    |
-   | macOS:   Cmd + Shift + B
-   | Windows/Linux: Ctrl + Shift + B
+   | Cmd/Ctrl + Shift + B
    v
 FPGA: Verify Current Target
    |
@@ -226,203 +126,116 @@ pl/tools/fpga.py
    +-- cocotb / pytest
 ```
 
-加入新 RTL 時通常只新增/修改 target manifest；不要為每個 `.sv` 複製 VS Code task。
+The build unit is a target manifest, not an arbitrary single `.sv` file.
 
----
+## 6. Git workflow
 
-## 6. Git 工作模式
-
-雖然日常編輯集中在 SWPC，GitHub 仍是 publication/integration source of truth。
-
-開始 code-changing work 前：
+Before code-changing work:
 
 ```bash
-cd /storage/projects/plasma
+cd "$PLASMA_REPO"
 git status -sb
 git branch --show-current
 git fetch origin main
 ```
 
-乾淨的 local `main` 若只落後遠端：
+Update a clean local `main` with:
 
 ```bash
 git switch main
 git pull --ff-only origin main
 ```
 
-新功能使用 feature branch：
+Create feature work on a separate branch:
 
 ```bash
 git switch -c agent/<feature-name>
 ```
 
-AI/agent 可在 feature branch 完成 routine implementation、test、commit、push、PR 與 CI repair；
-merge 到 `main`、deployment/restart、hardware-affecting operation 仍依 root `AGENTS.md` approval gate。
+Routine engineering may continue through implementation, tests, commits, push, PR creation, and CI repair. Merge to `main`, deployment/restart, hardware-affecting operations, and destructive history changes remain explicit approval gates defined by `AGENTS.md`.
 
-不要用 `git reset --hard`、`git clean -fd` 或 force push 作為一般同步方法。
+Do not use `git reset --hard`, `git clean -fd`, or force push as ordinary synchronization tools.
 
----
+## 7. FPGA development
 
-## 7. FPGA 開發
-
-日常 FPGA functional verification 不需要直接輸入完整 command line；優先使用 VS Code default
-build task。
-
-必要時 CLI 等價入口：
+Preferred entry point:
 
 ```bash
-cd /storage/projects/plasma
+cd "$PLASMA_REPO"
 source pl/env.sh
 python pl/tools/fpga.py list
 python pl/tools/fpga.py verify <target>
 ```
 
-Target manifest 位於：
+Target manifests live under `pl/targets/`; generated build artifacts live under `pl/build/` and are not repository source of truth.
 
-```text
-pl/targets/
-```
+Verilator/cocotb PASS does not prove Vivado timing closure or real hardware behavior.
 
-Build artifacts 位於：
+## 8. Python development
 
-```text
-pl/build/
-```
-
-`pl/build/` 與 `pl/.venv/` 不進 Git。
-
-Vivado synthesis/implementation/bitstream 與 Z2 hardware validation 是後續不同 gate；
-Verilator/cocotb PASS 不代表 timing closure 或 hardware PASS。
-
----
-
-## 8. Python 開發
-
-### FPGA verification
-
-使用：
+FPGA verification uses:
 
 ```text
 pl/.venv/
 ```
 
-正常由 FPGA VS Code tasks 啟動，不要用這個 environment 對整個 repository 任意跑 pytest。
-
-### Plasma software
-
-使用：
+Plasma software uses:
 
 ```text
 software/python/.venv/
 ```
 
-正式直接測試入口：
+Software tests:
 
 ```bash
-cd /storage/projects/plasma/software/python
+cd "$PLASMA_REPO/software/python"
 .venv/bin/python -m pytest -q
 ```
 
-不要為了讓錯誤 environment 跑過測試，就把另一個子專案的 dependency 裝進去。
-
----
-
-## 9. Web 開發
-
-Web source 位於：
-
-```text
-software/web/
-```
-
-正常 checks 以 repository `package.json` 與 root `AGENTS.md` 為準：
+## 9. Web development
 
 ```bash
-cd /storage/projects/plasma/software/web
+cd "$PLASMA_REPO/software/web"
 npm run lint
 npm test
 npm run validate:artifact
 ```
 
-Node/npm 是 SWPC 開發與 build toolchain 的一部分；正常 thin client 不需要另一套 Node 環境。
+Use `package.json` and `AGENTS.md` as the source of truth for the current Web toolchain and validation contract.
 
----
+## 10. Runtime ports
 
-## 10. SWPC runtime 與 ports
+The current development/runtime service contract is public and may remain documented:
 
-目前 SWPC operational ports：
-
-| Service | Port |
+| Service | Default port |
 |---|---:|
 | Plasma Server | 9900 |
 | Python HTTP REST Gateway | 18080 |
 | Web Console development/demo service | 5173 |
 
-`8080` 不是目前 SWPC Gateway operational port；不要依舊文件把部署改回 8080。
+A port number is not a credential. The security boundary is whether that port is exposed to an untrusted network and what authentication/authorization protects it.
 
-Service/deployment 操作以：
+## 11. When a local clone is appropriate
 
-```text
-scripts/plasmactl
-```
+A client-local clone is an exception for a defined use case such as an isolated experiment, offline work, or a platform-specific tool test.
 
-為準。部署與 restart 是 protected operational gate，不因 Remote-SSH 方便就跳過 approval。
+When using one:
 
----
+1. use a separate branch;
+2. avoid concurrent edits to the same branch from multiple workspaces;
+3. commit/push before transferring work between machines;
+4. return final integration validation to the integration host;
+5. never treat local build artifacts as repository source of truth.
 
-## 11. Local clone 何時才合理
+## 12. Security boundary
 
-Client 本機 clone 不是禁止，而是從「default workflow」降為「specific isolated use case」。
-例如：
+Keep these out of the public repository:
 
-- Mac local AI sandbox 需要完全隔離的 experiment
-- SHNB Windows Vivado 的獨立 project experiment
-- 離線工作，無法連 SWPC
+- SSH private keys and credentials
+- personal usernames and email addresses in documentation
+- private DNS/VPN/Tailscale hostnames
+- workstation-specific absolute home paths
+- customer firmware and customer credentials
+- production certificates/tokens
 
-若建立 local clone：
-
-1. 使用獨立 branch。
-2. 不要與 SWPC 同時改同一 branch 的相同檔案。
-3. 要跨機接續前先 commit/push。
-4. 最終 integration 仍回到 SWPC 驗證。
-5. 不把 local build artifacts 當成 repository source of truth。
-
----
-
-## 12. 快速檢查表
-
-### 在任一 client 開始工作
-
-- [ ] VS Code 已連到 `SWPC`。
-- [ ] Workspace 是 `/storage/projects/plasma`。
-- [ ] `git status -sb` 沒有不明修改。
-- [ ] 正在正確 branch。
-- [ ] Workspace recommended extensions 已安裝。
-
-### FPGA
-
-- [ ] 開啟的 RTL 已屬於正確 target manifest。
-- [ ] 使用 `Cmd/Ctrl + Shift + B` 執行 `FPGA: Verify Current Target`。
-- [ ] Lint PASS。
-- [ ] cocotb/pytest PASS。
-- [ ] 沒有把 `pl/build/` 或 `.venv/` 加入 Git。
-
-### Commit / PR
-
-- [ ] 看過 diff。
-- [ ] 跑過 affected-scope validation。
-- [ ] 只 stage intended files。
-- [ ] Push feature branch。
-- [ ] CI PASS 後才進入 merge approval gate。
-
----
-
-## 13. Related documents
-
-- `docs/development/vscode-remote-workspace.md`
-- `docs/development/fpga-development-guide.md`
-- `docs/development/fpga-verification-guide.md`
-- `docs/development/local-ai-development-guide.md`
-- `docs/development/swpc-deployment.md`
-- root `AGENTS.md`
-- `pl/AGENTS.md`
+Generic architecture, service contracts, port assignments, target manifests, tests, and public API behavior may remain documented when they are intentionally part of the project interface.
