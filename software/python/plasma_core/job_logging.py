@@ -65,9 +65,15 @@ class JobEventLogger:
         validate_job_id(job_id)
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         directory = root / date / f"SITE{site_id}"
+        legacy_directory = root / date / f"CH{site_id}"
         directory.mkdir(parents=True, exist_ok=True)
+        legacy_directory.mkdir(parents=True, exist_ok=True)
         self.text_path = directory / f"{job_id}.log"
         self.jsonl_path = directory / f"{job_id}.jsonl"
+        # Temporary filesystem compatibility for tools that still discover
+        # audit logs via CH<n>. New code must use SITE<n>.
+        self.legacy_text_path = legacy_directory / f"{job_id}.log"
+        self.legacy_jsonl_path = legacy_directory / f"{job_id}.jsonl"
         self.site_id = site_id
         self.job_id = job_id
         self._lock = threading.Lock()
@@ -97,10 +103,12 @@ class JobEventLogger:
         json_line = json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
         try:
             with self._lock:
-                with self.text_path.open("a", encoding="utf-8") as stream:
-                    stream.write(text_line)
-                with self.jsonl_path.open("a", encoding="utf-8") as stream:
-                    stream.write(json_line)
+                for text_path in (self.text_path, self.legacy_text_path):
+                    with text_path.open("a", encoding="utf-8") as stream:
+                        stream.write(text_line)
+                for jsonl_path in (self.jsonl_path, self.legacy_jsonl_path):
+                    with jsonl_path.open("a", encoding="utf-8") as stream:
+                        stream.write(json_line)
         except OSError as exc:
             raise PlasmaError(
                 ErrorCode.OUTPUT_WRITE_FAILED,
