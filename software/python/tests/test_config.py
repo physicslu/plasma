@@ -20,7 +20,7 @@ class ConfigTests(unittest.TestCase):
     def test_default_file_enables_two_of_eight_sites(self) -> None:
         config = load_config(Path(__file__).parents[1] / "config" / "plasma.yaml")
         self.assertEqual(config.server.max_supported_sites, 8)
-        self.assertEqual(config.ppu.id, "ppu-dev-01")
+        self.assertEqual(config.ppu.id, "z2-dev-01")
         self.assertEqual(config.ppu.facility_id, "swpc-lab")
         self.assertEqual(config.ppu.model, "PYNQ-Z2")
         self.assertEqual(config.site_count, 8)
@@ -68,6 +68,16 @@ class ConfigTests(unittest.TestCase):
             server=ServerConfig(max_supported_channels=2, max_concurrent_jobs=1),
             sites=[SiteConfig(id=0)],
             ppu=PPUConfig(id="bad ppu id"),
+        )
+        with self.assertRaises(PlasmaError) as caught:
+            config.validate()
+        self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
+
+    def test_empty_facility_identity_rejected(self) -> None:
+        config = PlasmaConfig(
+            server=ServerConfig(max_supported_channels=2, max_concurrent_jobs=1),
+            sites=[SiteConfig(id=0)],
+            ppu=PPUConfig(id="ppu-1", facility_id=""),
         )
         with self.assertRaises(PlasmaError) as caught:
             config.validate()
