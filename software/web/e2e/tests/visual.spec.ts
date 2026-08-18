@@ -184,7 +184,7 @@ async function compactScreenshot(page: Page): Promise<Buffer> {
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/png").split(",", 2)[1];
+    return canvas.toDataURL("image/webp", 0.78).split(",", 2)[1];
   }, fullSize.toString("base64"));
   return Buffer.from(compactBase64, "base64");
 }
@@ -202,7 +202,7 @@ test.describe("maximized desktop visual regression", () => {
   test("idle console", async ({ page }) => {
     await openConsole(page);
     await expect(batchSummary(page)).toContainText("待命 2");
-    await expectVisual(page, "desktop-max-idle.png");
+    await expectVisual(page, "desktop-max-idle.webp");
   });
 
   test("batch running", async ({ page }) => {
@@ -211,7 +211,7 @@ test.describe("maximized desktop visual regression", () => {
     await page.getByRole("button", { name: "批次執行：擦除" }).click();
     await expect.poll(() => mock.startRequests.length).toBe(2);
     await expect(batchSummary(page)).toContainText("工作中 2");
-    await expectVisual(page, "desktop-max-batch-running.png");
+    await expectVisual(page, "desktop-max-batch-running.webp");
   });
 
   test("batch cancelled", async ({ page }) => {
@@ -223,7 +223,7 @@ test.describe("maximized desktop visual regression", () => {
     await page.getByLabel("取消批次工作").click();
     await expect.poll(() => mock.cancelRequests.length).toBe(2);
     await expect(batchSummary(page)).toContainText("取消 2");
-    await expectVisual(page, "desktop-max-batch-cancelled.png");
+    await expectVisual(page, "desktop-max-batch-cancelled.webp");
   });
 
   test("batch failed", async ({ page }) => {
@@ -232,6 +232,6 @@ test.describe("maximized desktop visual regression", () => {
     await page.getByRole("button", { name: "批次執行：擦除" }).click();
     await expect.poll(() => mock.startRequests.length).toBe(2);
     await expect(batchSummary(page)).toContainText("失敗 2");
-    await expectVisual(page, "desktop-max-batch-failed.png");
+    await expectVisual(page, "desktop-max-batch-failed.webp");
   });
 });
