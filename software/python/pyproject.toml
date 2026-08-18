@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # Distribution identity is retained for installation compatibility. The
 # canonical Plasma domain vocabulary is Facility -> PPU -> Site.
 name = "plasma-multichannel"
-version = "0.3.1"
+version = "0.3.2"
 description = "Configurable 1-8 Site Plasma PPU control-plane prototype"
 readme = "README.md"
 requires-python = ">=3.11"
