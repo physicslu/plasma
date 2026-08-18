@@ -20,15 +20,28 @@ def _run(coro: Any) -> Any:
     return asyncio.run(coro)
 
 
-def _site_value(canonical: Any, legacy: Any) -> int | None:
-    if canonical is not None and legacy is not None and str(canonical) != str(legacy):
-        raise ValueError("site_id and legacy channel_id disagree")
-    value = canonical if canonical is not None else legacy
-    if value is None:
-        return None
+def _parse_site_id(value: Any) -> int:
     if isinstance(value, bool):
-        raise ValueError("site_id must be an integer")
-    return int(value)
+        raise ValueError("site_id must be a non-negative integer")
+    if isinstance(value, int):
+        parsed = value
+    elif isinstance(value, str) and value and value.isascii() and value.isdecimal():
+        parsed = int(value)
+    else:
+        raise ValueError("site_id must be a non-negative integer")
+    if parsed < 0:
+        raise ValueError("site_id must be a non-negative integer")
+    return parsed
+
+
+def _site_value(canonical: Any, legacy: Any) -> int | None:
+    if canonical is None and legacy is None:
+        return None
+    canonical_id = _parse_site_id(canonical) if canonical is not None else None
+    legacy_id = _parse_site_id(legacy) if legacy is not None else None
+    if canonical_id is not None and legacy_id is not None and canonical_id != legacy_id:
+        raise ValueError("site_id and legacy channel_id disagree")
+    return canonical_id if canonical_id is not None else legacy_id
 
 
 class PlasmaWebHandler(BaseHTTPRequestHandler):
