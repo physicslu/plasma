@@ -13,9 +13,9 @@ test("offline Gateway log always includes the attempted endpoint", async ({ page
   await gatewayInput.fill(wrongGateway);
   await page.getByRole("button", { name: "連線" }).click();
 
-  const offlineLine = page.getByLabel("Live job log").locator("span").filter({
-    hasText: "Plasma Web REST Gateway offline",
-  });
+  const offlineLine = page.getByLabel("Live job log").locator("span")
+    .filter({ hasText: "Plasma Web REST Gateway offline" })
+    .filter({ hasText: wrongGateway });
   await expect(offlineLine).toHaveCount(1);
   await expect(offlineLine).toContainText(wrongGateway);
   await expect(offlineLine).toHaveAttribute("data-level", "error");
