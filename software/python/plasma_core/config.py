@@ -80,7 +80,12 @@ class PPUConfig:
         if facility_id is not None and site_id is not None and facility_id != site_id:
             raise TypeError("facility_id and legacy site_id disagree")
         self.id = id
-        self.facility_id = facility_id or site_id or "default-facility"
+        if facility_id is not None:
+            self.facility_id = facility_id
+        elif site_id is not None:
+            self.facility_id = site_id
+        else:
+            self.facility_id = "default-facility"
         self.model = model
         self.display_name = display_name
 
