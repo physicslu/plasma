@@ -1,19 +1,19 @@
-"""Async Plasma server and multi-channel scheduler."""
+"""Async Plasma server and local Programming Site scheduler."""
 
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .channel_manager import ChannelManager
+    from .channel_manager import ChannelManager, SiteManager
     from .server import PlasmaServer
 
-__all__ = ["ChannelManager", "PlasmaServer"]
+__all__ = ["ChannelManager", "PlasmaServer", "SiteManager"]
 
 
 def __getattr__(name: str) -> Any:
-    if name == "ChannelManager":
-        from .channel_manager import ChannelManager
+    if name in {"ChannelManager", "SiteManager"}:
+        from .channel_manager import ChannelManager, SiteManager
 
-        return ChannelManager
+        return SiteManager if name == "SiteManager" else ChannelManager
     if name == "PlasmaServer":
         from .server import PlasmaServer
 
