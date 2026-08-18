@@ -4,8 +4,8 @@ import asyncio
 from collections.abc import Callable
 from typing import Any
 
-from plasma_core.config import ChannelConfig, PlasmaConfig
-from plasma_core.enums import ChannelState, Operation
+from plasma_core.config import PlasmaConfig, SiteConfig
+from plasma_core.enums import Operation, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.job_logging import OutputManager, ServerEventLogger
 from plasma_core.models import JobRequest, JobResult, iso_now
@@ -18,10 +18,12 @@ from plasma_interfaces.openocd import OpenOCDInterface
 from .channel_worker import ChannelWorker
 from .job_manager import JobRegistry, JobRuntime
 
-InterfaceFactory = Callable[[ChannelConfig], BaseInterface]
+InterfaceFactory = Callable[[SiteConfig], BaseInterface]
 
 
-class ChannelManager:
+class SiteManager:
+    """Own the Programming Sites local to exactly one physical PPU."""
+
     def __init__(
         self,
         config: PlasmaConfig,
@@ -34,42 +36,44 @@ class ChannelManager:
         self.server_log = ServerEventLogger(config.server.log_root)
         self.registry = JobRegistry()
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
-        self._channel_configs = {channel.id: channel for channel in config.channels}
+        self._site_configs = {site.id: site for site in config.sites}
+        # Compatibility alias for v3.1 server code/plugins during the migration.
+        self._channel_configs = self._site_configs
         self.interfaces: dict[int, BaseInterface] = {}
         self.workers: dict[int, ChannelWorker] = {}
         self._started = False
 
-        for channel in config.channels:
-            if not channel.enabled:
+        for site in config.sites:
+            if not site.enabled:
                 continue
             interface = (
-                interface_factory(channel)
+                interface_factory(site)
                 if interface_factory
-                else self._default_interface(channel, mock_tracker)
+                else self._default_interface(site, mock_tracker)
             )
-            self.interfaces[channel.id] = interface
+            self.interfaces[site.id] = interface
             handler = STM32F103Handler(interface)
-            self.workers[channel.id] = ChannelWorker(
-                channel,
+            self.workers[site.id] = ChannelWorker(
+                site,
                 handler,
                 self.output,
                 config.server.log_root,
                 self._semaphore,
-                config.server.max_queue_depth_per_channel,
+                config.server.max_queue_depth_per_site,
             )
 
     @staticmethod
     def _default_interface(
-        channel: ChannelConfig,
+        site: SiteConfig,
         tracker: MockActivityTracker | None,
     ) -> BaseInterface:
-        if channel.interface == "mock":
-            return MockInterface.from_options(channel.mock, tracker=tracker)
-        if channel.interface == "openocd":
-            return OpenOCDInterface(channel.openocd)
-        if channel.interface == "fpga":
-            return FPGAInterface(channel.id, channel.register_base)
-        raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unsupported interface: {channel.interface}")
+        if site.interface == "mock":
+            return MockInterface.from_options(site.mock, tracker=tracker)
+        if site.interface == "openocd":
+            return OpenOCDInterface(site.openocd)
+        if site.interface == "fpga":
+            return FPGAInterface(site.id, site.register_base)
+        raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unsupported interface: {site.interface}")
 
     async def start(self) -> list[str]:
         if self._started:
@@ -80,10 +84,10 @@ class ChannelManager:
         self._started = True
         self.server_log.event(
             "INFO",
-            "channel_manager_started",
-            programmer_id=self.config.programmer.id,
-            site_id=self.config.programmer.site_id,
-            enabled_channels=sorted(self.workers),
+            "site_manager_started",
+            ppu_id=self.config.ppu.id,
+            facility_id=self.config.ppu.facility_id,
+            enabled_sites=sorted(self.workers),
             recovered_jobs=recovered,
         )
         return recovered
@@ -93,37 +97,41 @@ class ChannelManager:
             return
         for runtime in self.registry.all():
             if not runtime.state.terminal:
-                worker = self.workers.get(runtime.request.channel_id)
+                worker = self.workers.get(runtime.request.site_id)
                 if worker:
                     worker.cancel(runtime)
         await asyncio.gather(*(worker.stop() for worker in self.workers.values()))
         self._started = False
         self.server_log.event(
             "INFO",
-            "channel_manager_stopped",
-            programmer_id=self.config.programmer.id,
-            site_id=self.config.programmer.site_id,
+            "site_manager_stopped",
+            ppu_id=self.config.ppu.id,
+            facility_id=self.config.ppu.facility_id,
         )
 
-    def _resolve_channel(self, channel_id: int) -> ChannelWorker:
-        config = self._channel_configs.get(channel_id)
+    def _resolve_site(self, site_id: int) -> ChannelWorker:
+        config = self._site_configs.get(site_id)
         if config is None:
-            raise PlasmaError(ErrorCode.CHANNEL_INVALID, f"channel does not exist: CH{channel_id}")
+            raise PlasmaError(ErrorCode.CHANNEL_INVALID, f"site does not exist: SITE{site_id}")
         if not config.enabled:
-            raise PlasmaError(ErrorCode.CHANNEL_DISABLED, f"channel is disabled: CH{channel_id}")
-        return self.workers[channel_id]
+            raise PlasmaError(ErrorCode.CHANNEL_DISABLED, f"site is disabled: SITE{site_id}")
+        return self.workers[site_id]
+
+    def _resolve_channel(self, channel_id: int) -> ChannelWorker:
+        """Legacy alias for v3.1 code/plugins."""
+        return self._resolve_site(channel_id)
 
     def enqueue(self, request: JobRequest) -> asyncio.Future[JobResult]:
         if not self._started:
-            raise PlasmaError(ErrorCode.INTERNAL_ERROR, "channel manager is not started")
+            raise PlasmaError(ErrorCode.INTERNAL_ERROR, "site manager is not started")
         request.validate()
         if request.operation in {Operation.STATUS, Operation.CANCEL}:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "status/cancel are control operations")
-        worker = self._resolve_channel(request.channel_id)
+        worker = self._resolve_site(request.site_id)
         if worker.queue.full():
             raise PlasmaError(
                 ErrorCode.CHANNEL_BUSY,
-                f"CH{request.channel_id} queue is full",
+                f"SITE{request.site_id} queue is full",
                 recoverable=True,
             )
         runtime = self.registry.create(request)
@@ -136,10 +144,10 @@ class ChannelManager:
         self.server_log.event(
             "INFO",
             "job_queued",
-            programmer_id=self.config.programmer.id,
-            site_id=self.config.programmer.site_id,
+            ppu_id=self.config.ppu.id,
+            facility_id=self.config.ppu.facility_id,
             job_id=request.job_id,
-            channel_id=request.channel_id,
+            site_id=request.site_id,
             operation=request.operation.value,
         )
         return runtime.future
@@ -149,17 +157,17 @@ class ChannelManager:
 
     def cancel(self, job_id: str) -> dict[str, Any]:
         runtime = self.registry.get(job_id)
-        worker = self._resolve_channel(runtime.request.channel_id)
+        worker = self._resolve_site(runtime.request.site_id)
         already_terminal = runtime.state.terminal
         worker.cancel(runtime)
         runtime.updated_at = iso_now()
         self.server_log.event(
             "INFO",
             "job_cancel_requested",
-            programmer_id=self.config.programmer.id,
-            site_id=self.config.programmer.site_id,
+            ppu_id=self.config.ppu.id,
+            facility_id=self.config.ppu.facility_id,
             job_id=job_id,
-            channel_id=runtime.request.channel_id,
+            site_id=runtime.request.site_id,
             already_terminal=already_terminal,
         )
         return {
@@ -169,17 +177,17 @@ class ChannelManager:
             "cancel_requested": runtime.cancel_requested,
         }
 
-    def programmer_snapshot(self) -> dict[str, Any]:
-        programmer = self.config.programmer
+    def ppu_snapshot(self) -> dict[str, Any]:
+        ppu = self.config.ppu
         return {
-            "programmer_id": programmer.id,
-            "site_id": programmer.site_id,
-            "model": programmer.model,
-            "display_name": programmer.display_name,
-            "channel_count": self.config.channel_count,
-            "enabled_channel_count": self.config.enabled_channel_count,
+            "ppu_id": ppu.id,
+            "facility_id": ppu.facility_id,
+            "model": ppu.model,
+            "display_name": ppu.display_name,
+            "site_count": self.config.site_count,
+            "enabled_site_count": self.config.enabled_site_count,
             "capabilities": {
-                "max_supported_channels": self.config.server.max_supported_channels,
+                "max_supported_sites": self.config.server.max_supported_sites,
                 "operations": [
                     Operation.ERASE.value,
                     Operation.PROGRAM.value,
@@ -189,21 +197,46 @@ class ChannelManager:
             },
         }
 
-    def status(self, *, channel_id: int | None = None, job_id: str | None = None) -> dict[str, Any]:
+    def programmer_snapshot(self) -> dict[str, Any]:
+        """Legacy STATUS shape retained while clients migrate to ppu/sites."""
+        ppu = self.ppu_snapshot()
+        return {
+            "programmer_id": ppu["ppu_id"],
+            "site_id": ppu["facility_id"],
+            "model": ppu["model"],
+            "display_name": ppu["display_name"],
+            "channel_count": ppu["site_count"],
+            "enabled_channel_count": ppu["enabled_site_count"],
+            "capabilities": {
+                "max_supported_channels": ppu["capabilities"]["max_supported_sites"],
+                "operations": list(ppu["capabilities"]["operations"]),
+            },
+        }
+
+    def status(
+        self,
+        *,
+        site_id: int | None = None,
+        channel_id: int | None = None,
+        job_id: str | None = None,
+    ) -> dict[str, Any]:
         if job_id:
             return {"job": self.registry.get(job_id).snapshot()}
-        channel_ids = [channel_id] if channel_id is not None else sorted(self._channel_configs)
-        channels: list[dict[str, Any]] = []
-        for current_id in channel_ids:
-            config = self._channel_configs.get(current_id)
+        if site_id is not None and channel_id is not None and site_id != channel_id:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id and legacy channel_id disagree")
+        selected_site_id = site_id if site_id is not None else channel_id
+        site_ids = [selected_site_id] if selected_site_id is not None else sorted(self._site_configs)
+        sites: list[dict[str, Any]] = []
+        for current_id in site_ids:
+            config = self._site_configs.get(current_id)
             if config is None:
-                raise PlasmaError(ErrorCode.CHANNEL_INVALID, f"channel does not exist: CH{current_id}")
+                raise PlasmaError(ErrorCode.CHANNEL_INVALID, f"site does not exist: SITE{current_id}")
             worker = self.workers.get(current_id)
-            channels.append(
+            sites.append(
                 {
-                    "channel_id": current_id,
+                    "site_id": current_id,
                     "enabled": config.enabled,
-                    "state": worker.state.value if worker else ChannelState.DISABLED.value,
+                    "state": worker.state.value if worker else SiteState.DISABLED.value,
                     "current_job_id": (
                         worker.current.request.job_id if worker and worker.current else None
                     ),
@@ -212,7 +245,18 @@ class ChannelManager:
                     "target": config.target if config.enabled else None,
                 }
             )
+        legacy_channels = [
+            {"channel_id": item["site_id"], **{key: value for key, value in item.items() if key != "site_id"}}
+            for item in sites
+        ]
         return {
+            "ppu": self.ppu_snapshot(),
+            "sites": sites,
+            # Transitional compatibility for the pre-PPU/pre-Site REST/UI shape.
             "programmer": self.programmer_snapshot(),
-            "channels": channels,
+            "channels": legacy_channels,
         }
+
+
+# Compatibility alias. New domain code should import SiteManager.
+ChannelManager = SiteManager
