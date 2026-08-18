@@ -3,9 +3,11 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
+# Distribution identity is retained for installation compatibility. The
+# canonical Plasma domain vocabulary is Facility -> PPU -> Site.
 name = "plasma-multichannel"
 version = "0.3.1"
-description = "Configurable 1-8 channel IC programmer control-plane prototype"
+description = "Configurable 1-8 Site Plasma PPU control-plane prototype"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["PyYAML>=6.0"]
