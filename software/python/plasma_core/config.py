@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -7,6 +8,9 @@ from typing import Any
 import yaml
 
 from .errors import ErrorCode, PlasmaError
+
+
+IDENTITY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
 @dataclass(slots=True)
@@ -38,11 +42,47 @@ class ChannelConfig:
 
 
 @dataclass(slots=True)
+class ProgrammerConfig:
+    id: str = "local-programmer"
+    site_id: str = "default-site"
+    model: str = "generic"
+    display_name: str = "Plasma Programmer"
+
+
+@dataclass(slots=True)
 class PlasmaConfig:
     server: ServerConfig
     channels: list[ChannelConfig]
+    programmer: ProgrammerConfig = field(default_factory=ProgrammerConfig)
+
+    @property
+    def channel_count(self) -> int:
+        return len(self.channels)
+
+    @property
+    def enabled_channel_count(self) -> int:
+        return sum(channel.enabled for channel in self.channels)
 
     def validate(self) -> None:
+        for field_name, value in (
+            ("programmer.id", self.programmer.id),
+            ("programmer.site_id", self.programmer.site_id),
+        ):
+            if not isinstance(value, str) or IDENTITY_PATTERN.fullmatch(value) is None:
+                raise PlasmaError(
+                    ErrorCode.CONFIG_INVALID,
+                    f"{field_name} must be 1-128 ASCII letters, digits, '.', '_' or '-', starting with a letter or digit",
+                )
+        for field_name, value in (
+            ("programmer.model", self.programmer.model),
+            ("programmer.display_name", self.programmer.display_name),
+        ):
+            if not isinstance(value, str) or not value.strip() or len(value) > 256:
+                raise PlasmaError(
+                    ErrorCode.CONFIG_INVALID,
+                    f"{field_name} must be 1-256 characters",
+                )
+
         maximum = self.server.max_supported_channels
         if not 1 <= maximum <= 8:
             raise PlasmaError(
@@ -91,6 +131,10 @@ def _channel_from_dict(raw: dict[str, Any]) -> ChannelConfig:
     return ChannelConfig(**values)
 
 
+def _programmer_from_dict(raw: dict[str, Any]) -> ProgrammerConfig:
+    return ProgrammerConfig(**dict(raw))
+
+
 def load_config(path: str | Path) -> PlasmaConfig:
     config_path = Path(path).resolve()
     try:
@@ -105,6 +149,7 @@ def load_config(path: str | Path) -> PlasmaConfig:
         raise PlasmaError(ErrorCode.CONFIG_INVALID, "configuration root must be a mapping")
     try:
         server = _server_from_dict(raw.get("server", {}), config_path.parent.parent)
+        programmer = _programmer_from_dict(raw.get("programmer", {}))
         channels = [_channel_from_dict(item) for item in raw.get("channels", [])]
     except (TypeError, ValueError) as exc:
         raise PlasmaError(
@@ -112,6 +157,6 @@ def load_config(path: str | Path) -> PlasmaConfig:
             "configuration contains invalid fields",
             original_exception=exc,
         ) from exc
-    config = PlasmaConfig(server=server, channels=channels)
+    config = PlasmaConfig(server=server, channels=channels, programmer=programmer)
     config.validate()
     return config

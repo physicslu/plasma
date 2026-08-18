@@ -1,3 +1,9 @@
+programmer:
+  id: z2-dev-01
+  site_id: swpc-lab
+  model: PYNQ-Z2
+  display_name: Plasma Z2 Prototype
+
 server:
   host: 127.0.0.1
   port: 9900

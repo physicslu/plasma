@@ -81,6 +81,8 @@ class ChannelManager:
         self.server_log.event(
             "INFO",
             "channel_manager_started",
+            programmer_id=self.config.programmer.id,
+            site_id=self.config.programmer.site_id,
             enabled_channels=sorted(self.workers),
             recovered_jobs=recovered,
         )
@@ -96,7 +98,12 @@ class ChannelManager:
                     worker.cancel(runtime)
         await asyncio.gather(*(worker.stop() for worker in self.workers.values()))
         self._started = False
-        self.server_log.event("INFO", "channel_manager_stopped")
+        self.server_log.event(
+            "INFO",
+            "channel_manager_stopped",
+            programmer_id=self.config.programmer.id,
+            site_id=self.config.programmer.site_id,
+        )
 
     def _resolve_channel(self, channel_id: int) -> ChannelWorker:
         config = self._channel_configs.get(channel_id)
@@ -129,6 +136,8 @@ class ChannelManager:
         self.server_log.event(
             "INFO",
             "job_queued",
+            programmer_id=self.config.programmer.id,
+            site_id=self.config.programmer.site_id,
             job_id=request.job_id,
             channel_id=request.channel_id,
             operation=request.operation.value,
@@ -147,6 +156,8 @@ class ChannelManager:
         self.server_log.event(
             "INFO",
             "job_cancel_requested",
+            programmer_id=self.config.programmer.id,
+            site_id=self.config.programmer.site_id,
             job_id=job_id,
             channel_id=runtime.request.channel_id,
             already_terminal=already_terminal,
@@ -156,6 +167,26 @@ class ChannelManager:
             "accepted": not already_terminal,
             "state": runtime.state.value,
             "cancel_requested": runtime.cancel_requested,
+        }
+
+    def programmer_snapshot(self) -> dict[str, Any]:
+        programmer = self.config.programmer
+        return {
+            "programmer_id": programmer.id,
+            "site_id": programmer.site_id,
+            "model": programmer.model,
+            "display_name": programmer.display_name,
+            "channel_count": self.config.channel_count,
+            "enabled_channel_count": self.config.enabled_channel_count,
+            "capabilities": {
+                "max_supported_channels": self.config.server.max_supported_channels,
+                "operations": [
+                    Operation.ERASE.value,
+                    Operation.PROGRAM.value,
+                    Operation.VERIFY.value,
+                    Operation.READ.value,
+                ],
+            },
         }
 
     def status(self, *, channel_id: int | None = None, job_id: str | None = None) -> dict[str, Any]:
@@ -181,4 +212,7 @@ class ChannelManager:
                     "target": config.target if config.enabled else None,
                 }
             )
-        return {"channels": channels}
+        return {
+            "programmer": self.programmer_snapshot(),
+            "channels": channels,
+        }
