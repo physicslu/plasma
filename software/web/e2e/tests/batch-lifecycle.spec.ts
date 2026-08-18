@@ -4,19 +4,19 @@ type Operation = "erase" | "program" | "verify" | "read";
 
 type MockJob = {
   jobId: string;
-  channelId: number;
+  siteId: number;
   operation: Operation;
 };
 
-function channels() {
-  return Array.from({ length: 8 }, (_, channelId) => ({
-    channel_id: channelId,
-    enabled: channelId < 2,
+function sites() {
+  return Array.from({ length: 8 }, (_, siteId) => ({
+    site_id: siteId,
+    enabled: siteId < 2,
     state: "idle",
     current_job_id: null,
     queued_jobs: 0,
-    interface: channelId < 2 ? "Mock" : null,
-    target: channelId < 2 ? "STM32F103C8T6" : null,
+    interface: siteId < 2 ? "Mock" : null,
+    target: siteId < 2 ? "STM32F103C8T6" : null,
   }));
 }
 
@@ -26,7 +26,7 @@ async function json(route: Route, body: unknown) {
 
 async function installMock(page: Page) {
   const jobs = new Map<string, MockJob>();
-  const starts: Array<{ channelId: number; operation: Operation }> = [];
+  const starts: Array<{ siteId: number; operation: Operation }> = [];
   let nextId = 1;
 
   await page.route("**/api/**", async route => {
@@ -34,19 +34,20 @@ async function installMock(page: Page) {
     const url = new URL(request.url());
 
     if (request.method() === "GET" && url.pathname === "/api/status" && !url.searchParams.has("job")) {
-      await json(route, { ok: true, channels: channels() });
+      await json(route, { ok: true, sites: sites() });
       return;
     }
 
     if (request.method() === "POST" && url.pathname === "/api/jobs") {
-      const body = request.postDataJSON() as { channel_id: number; operation: Operation };
+      const body = request.postDataJSON() as { site_id: number; channel_id: number; operation: Operation };
       const jobId = `barrier-job-${nextId++}`;
-      jobs.set(jobId, { jobId, channelId: body.channel_id, operation: body.operation });
-      starts.push({ channelId: body.channel_id, operation: body.operation });
+      jobs.set(jobId, { jobId, siteId: body.site_id, operation: body.operation });
+      starts.push({ siteId: body.site_id, operation: body.operation });
       await json(route, {
         ok: true,
         job: {
           job_id: jobId,
+          site_id: body.site_id,
           channel_id: body.channel_id,
           operation: body.operation,
           state: "queued",
@@ -73,7 +74,8 @@ async function installMock(page: Page) {
         ok: true,
         job: {
           job_id: job.jobId,
-          channel_id: job.channelId,
+          site_id: job.siteId,
+          channel_id: job.siteId,
           operation: job.operation,
           state: "success",
           cancel_requested: false,
@@ -136,7 +138,7 @@ test("cancel barrier blocks PROGRAM before transport dispatch", async ({ page })
 
   await expect.poll(() => mock.starts.length).toBe(2);
   expect(mock.starts).toEqual([
-    { channelId: 0, operation: "erase" },
-    { channelId: 1, operation: "erase" },
+    { siteId: 0, operation: "erase" },
+    { siteId: 1, operation: "erase" },
   ]);
 });
