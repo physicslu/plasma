@@ -1,1 +1,0 @@
-Web deployment hygiene is enforced by scripts/plasmactl and its tests.
