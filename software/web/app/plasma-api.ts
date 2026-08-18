@@ -19,6 +19,26 @@ export type ChannelSnapshot = {
   target: string | null;
 };
 
+export type ProgrammerCapabilities = {
+  max_supported_channels: number;
+  operations: Operation[];
+};
+
+export type ProgrammerSnapshot = {
+  programmer_id: string;
+  site_id: string;
+  model: string;
+  display_name: string;
+  channel_count: number;
+  enabled_channel_count: number;
+  capabilities: ProgrammerCapabilities;
+};
+
+export type ProgrammerStatus = {
+  programmer?: ProgrammerSnapshot;
+  channels: ChannelSnapshot[];
+};
+
 export type JobSnapshot = {
   job_id: string;
   channel_id: number;
@@ -120,12 +140,19 @@ async function requestJson<T>(
   }
 }
 
-export async function getChannels(apiBase: string): Promise<ChannelSnapshot[]> {
-  const payload = await requestJson<{ ok: boolean; channels: ChannelSnapshot[] }>(
+export async function getProgrammerStatus(apiBase: string): Promise<ProgrammerStatus> {
+  const payload = await requestJson<{ ok: boolean; programmer?: ProgrammerSnapshot; channels: ChannelSnapshot[] }>(
     apiBase,
     "/api/status",
   );
-  return payload.channels;
+  return {
+    programmer: payload.programmer,
+    channels: payload.channels,
+  };
+}
+
+export async function getChannels(apiBase: string): Promise<ChannelSnapshot[]> {
+  return (await getProgrammerStatus(apiBase)).channels;
 }
 
 export async function getJob(
