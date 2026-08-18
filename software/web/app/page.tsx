@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { BatchLifecycle } from "./batch-lifecycle";
 import {
   cancelJob,
   DEFAULT_API_BASE,
   getChannels,
   getJob,
   normalizeApiBase,
+  PlasmaSubmissionBlockedError,
   readDownloadUrl,
   startJob,
 } from "./plasma-api";
@@ -140,8 +142,7 @@ export default function Home() {
   const trackedJobs = useRef<Record<number, string>>({});
   const transitionKeys = useRef<Record<string, string>>({});
   const connectionRef = useRef<ConnectionState>("connecting");
-  const batchCancelRequested = useRef(false);
-  const batchActiveJobs = useRef<Record<number, string>>({});
+  const batchLifecycle = useRef<BatchLifecycle | null>(null);
   const cancelRequests = useRef<Set<string>>(new Set());
   const logSequence = useRef(0);
 
@@ -267,7 +268,7 @@ export default function Home() {
         if (connectionRef.current !== "offline") {
           connectionRef.current = "offline";
           setConnection("offline");
-          appendLog(`[NET] Plasma Web REST Gateway offline · ${error instanceof Error ? error.message : "connection failed"}`, "error");
+          appendLog(`[NET] Plasma Web REST Gateway offline · ${apiBase} · ${error instanceof Error ? error.message : "connection failed"}`, "error");
         }
       } finally {
         if (!stopped) pollTimer = window.setTimeout(poll, 500);
@@ -291,7 +292,7 @@ export default function Home() {
       setConnection("connecting");
       setApiBase(normalized);
     } catch (error) {
-      appendLog(`[NET] ${error instanceof Error ? error.message : "Invalid API URL"}`, "error");
+      appendLog(`[NET] Plasma Web REST Gateway rejected · ${apiDraft.trim() || "(empty)"} · ${error instanceof Error ? error.message : "Invalid API URL"}`, "error");
     }
   }
 
@@ -357,7 +358,12 @@ export default function Home() {
     });
   }
 
-  async function runChannel(channelId: number, operation: Operation, forBatch = false): Promise<JobSnapshot | undefined> {
+  async function runChannel(
+    channelId: number,
+    operation: Operation,
+    forBatch = false,
+    submissionGuard?: () => boolean,
+  ): Promise<JobSnapshot | undefined> {
     const channel = channels[channelId];
     if (operationDisabled(channel, operation, forBatch)) return;
     if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
@@ -374,6 +380,7 @@ export default function Home() {
         firmware: operation === "erase" || operation === "read" ? null : firmware,
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
+        submissionGuard,
       });
       trackedJobs.current[channelId] = job.job_id;
       setChannels(items => items.map(item => item.id === channelId ? {
@@ -390,6 +397,7 @@ export default function Home() {
       appendLog(`[CH${channelId}] ${job.job_id} accepted by Plasma · ${operation.toUpperCase()}`);
       return job;
     } catch (error) {
+      if (error instanceof PlasmaSubmissionBlockedError) return;
       appendLog(`[CH${channelId}] Submit failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
       setChannels(items => items.map(item => item.id === channelId ? {
         ...item,
@@ -428,8 +436,8 @@ export default function Home() {
     if (batchRunning || operations.length === 0 || operations.some(batchDisabled)) return;
     const batchOperations = [...operations];
     const batchChannelIds = [...visibleChannelIds];
-    batchCancelRequested.current = false;
-    batchActiveJobs.current = {};
+    const lifecycle = new BatchLifecycle(batchChannelIds);
+    batchLifecycle.current = lifecycle;
     setBatchChannelStates(batchChannelIds.reduce<Record<number, BatchChannelState>>((states, channelId) => {
       states[channelId] = "running";
       return states;
@@ -439,33 +447,38 @@ export default function Home() {
     appendLog(`[BATCH] START ${batchOperations.map(operation => operation.toUpperCase()).join(" → ")} · ${batchChannelIds.map(id => `CH${id}`).join(", ")}`);
     try {
       const outcomes = await Promise.all(batchChannelIds.map(async channelId => {
+        const stopBeforeDispatch = (operation: Operation) => {
+          lifecycle.finish(channelId);
+          setBatchChannelState(channelId, "cancelled");
+          appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED · before ${operation.toUpperCase()} dispatch`);
+          return { channelId, state: "cancelled" as const };
+        };
+
         for (const operation of batchOperations) {
-          if (batchCancelRequested.current) {
-            setBatchChannelState(channelId, "cancelled");
-            appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED`);
-            return { channelId, state: "cancelled" as const };
-          }
+          if (!lifecycle.prepare(channelId, operation)) return stopBeforeDispatch(operation);
 
           appendLog(`[CH${channelId}] Batch ${operation.toUpperCase()}`);
-          const job = await runChannel(channelId, operation, true);
-          if (!job) {
-            const state = batchCancelRequested.current ? "cancelled" : "failed";
-            setBatchChannelState(channelId, state);
-            return { channelId, state };
-          }
-          batchActiveJobs.current[channelId] = job.job_id;
+          await new Promise(resolve => window.setTimeout(resolve, 0));
+          if (!lifecycle.beginSubmit(channelId)) return stopBeforeDispatch(operation);
 
-          if (batchCancelRequested.current) {
+          const job = await runChannel(channelId, operation, true, () => lifecycle.canDispatch(channelId));
+          if (!job) {
+            if (lifecycle.cancelRequested) return stopBeforeDispatch(operation);
+            lifecycle.finish(channelId);
+            setBatchChannelState(channelId, "failed");
+            return { channelId, state: "failed" as const };
+          }
+
+          const cancelAfterAccept = lifecycle.accepted(channelId, job.job_id);
+          if (cancelAfterAccept) {
             await requestJobCancel(channelId, job.job_id, true);
           }
 
           try {
             const finalJob = await waitForTerminalJob(job);
-            if (batchActiveJobs.current[channelId] === job.job_id) {
-              delete batchActiveJobs.current[channelId];
-            }
+            lifecycle.finish(channelId);
 
-            const cancelWasRequested = batchCancelRequested.current || cancelRequests.current.has(job.job_id);
+            const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);
             if (cancelWasRequested) {
               setBatchChannelState(channelId, "cancelled");
               appendLog(`[CH${channelId}] Batch stopped · CANCEL REQUESTED · last job ${finalJob.state.toUpperCase()}`);
@@ -482,16 +495,15 @@ export default function Home() {
               return { channelId, state: "failed" as const };
             }
           } catch (error) {
-            if (batchActiveJobs.current[channelId] === job.job_id) {
-              delete batchActiveJobs.current[channelId];
-            }
-            const cancelWasRequested = batchCancelRequested.current || cancelRequests.current.has(job.job_id);
+            lifecycle.finish(channelId);
+            const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);
             const state = cancelWasRequested ? "cancelled" : "failed";
             setBatchChannelState(channelId, state);
             appendLog(`[CH${channelId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
             return { channelId, state };
           }
         }
+        lifecycle.finish(channelId);
         setBatchChannelState(channelId, "success");
         appendLog(`[CH${channelId}] Batch complete`);
         return { channelId, state: "success" as const };
@@ -504,14 +516,14 @@ export default function Home() {
         + (failedChannelIds.length ? ` · failed: ${failedChannelIds.map(id => `CH${id}`).join(", ")}` : "");
       const batchOutcome = failedChannelIds.length
         ? "FAILED"
-        : batchCancelRequested.current
+        : lifecycle.cancelRequested
           ? "CANCELLED"
           : cancelledChannelIds.length
             ? "PARTIAL"
             : "COMPLETE";
       appendLog(`[BATCH] ${batchOutcome} · ${summary}`, failedChannelIds.length ? "error" : "info");
     } finally {
-      batchActiveJobs.current = {};
+      if (batchLifecycle.current === lifecycle) batchLifecycle.current = null;
       setBatchRunning(false);
       setBatchCancelling(false);
     }
@@ -519,14 +531,15 @@ export default function Home() {
 
   async function cancelBatch() {
     if (!batchRunning || batchCancelling) return;
-    batchCancelRequested.current = true;
+    const lifecycle = batchLifecycle.current;
+    if (!lifecycle) return;
+    const { submittingChannels, activeJobs } = lifecycle.cancel();
     setBatchCancelling(true);
     setBatchChannelStates(current => Object.fromEntries(
       Object.entries(current).map(([channelId, state]) => [channelId, state === "running" ? "cancelling" : state]),
     ) as Record<number, BatchChannelState>);
-    const activeJobs = Object.entries(batchActiveJobs.current);
-    appendLog(`[BATCH] CANCEL requested · active jobs: ${activeJobs.length}`);
-    await Promise.all(activeJobs.map(([channelId, jobId]) => requestJobCancel(Number(channelId), jobId, true)));
+    appendLog(`[BATCH] CANCEL requested · submitting: ${submittingChannels.length} · active jobs: ${activeJobs.length}`);
+    await Promise.all(activeJobs.map(([channelId, jobId]) => requestJobCancel(channelId, jobId, true)));
   }
 
   async function cancel(channelId: number) {
