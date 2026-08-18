@@ -82,22 +82,13 @@ class PlasmaServer:
                     "protocol v3.2 uses site_id; channel_id is a v3.1 field",
                 )
             raw = metadata.get("site_id")
-            label = "site_id"
             if raw is None and not required:
                 return None
-            if isinstance(raw, bool):
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must be an integer")
-            try:
-                site_id = int(raw)
-            except (TypeError, ValueError, OverflowError) as exc:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT,
-                    "site_id must be an integer",
-                    original_exception=exc,
-                ) from exc
-            if site_id < 1:
+            if isinstance(raw, bool) or not isinstance(raw, int):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must be a JSON integer")
+            if raw < 1:
                 raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must start at 1")
-            return site_id
+            return raw
         if version == LEGACY_PROTOCOL_VERSION:
             if "site_id" in metadata:
                 raise PlasmaError(
@@ -105,23 +96,14 @@ class PlasmaServer:
                     "protocol v3.1 uses channel_id; site_id requires v3.2",
                 )
             raw = metadata.get("channel_id")
-            label = "channel_id"
             if raw is None and not required:
                 return None
-            if isinstance(raw, bool):
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "channel_id must be an integer")
+            if isinstance(raw, bool) or not isinstance(raw, int):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "channel_id must be a JSON integer")
             try:
-                channel_id = int(raw)
-            except (TypeError, ValueError, OverflowError) as exc:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT,
-                    "channel_id must be an integer",
-                    original_exception=exc,
-                ) from exc
-            try:
-                return site_id_from_legacy_channel(channel_id)
+                return site_id_from_legacy_channel(raw)
             except PlasmaError as exc:
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, f"invalid {label}") from exc
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid channel_id") from exc
         raise PlasmaError(
             ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
             f"unsupported protocol version: {version!r}",
