@@ -8,7 +8,13 @@ from plasma_core.config import PlasmaConfig, SiteConfig
 from plasma_core.enums import Operation, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.job_logging import OutputManager, ServerEventLogger
-from plasma_core.models import JobRequest, JobResult, iso_now
+from plasma_core.models import (
+    JobRequest,
+    JobResult,
+    iso_now,
+    legacy_channel_id_from_site,
+    site_id_from_legacy_channel,
+)
 from plasma_handlers.stm32 import STM32F103Handler
 from plasma_interfaces.base import BaseInterface
 from plasma_interfaces.fpga import FPGAInterface
@@ -37,8 +43,6 @@ class SiteManager:
         self.registry = JobRegistry()
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
-        # Compatibility alias for v3.1 server code/plugins during the migration.
-        self._channel_configs = self._site_configs
         self.interfaces: dict[int, BaseInterface] = {}
         self.workers: dict[int, SiteWorker] = {}
         self._started = False
@@ -118,8 +122,8 @@ class SiteManager:
         return self.workers[site_id]
 
     def _resolve_channel(self, channel_id: int) -> SiteWorker:
-        """Legacy alias for v3.1 code/plugins."""
-        return self._resolve_site(channel_id)
+        """Legacy v3.1 adapter from 0-based channel to one-based Site."""
+        return self._resolve_site(site_id_from_legacy_channel(channel_id))
 
     def enqueue(self, request: JobRequest) -> asyncio.Future[JobResult]:
         if not self._started:
@@ -198,7 +202,7 @@ class SiteManager:
         }
 
     def programmer_snapshot(self) -> dict[str, Any]:
-        """Legacy STATUS shape retained while clients migrate to ppu/sites."""
+        """Legacy STATUS shape retained for v3.1 compatibility."""
         ppu = self.ppu_snapshot()
         return {
             "programmer_id": ppu["ppu_id"],
@@ -219,12 +223,16 @@ class SiteManager:
         site_id: int | None = None,
         channel_id: int | None = None,
         job_id: str | None = None,
+        protocol_version: str = "3.2",
     ) -> dict[str, Any]:
         if job_id:
-            return {"job": self.registry.get(job_id).snapshot()}
-        if site_id is not None and channel_id is not None and site_id != channel_id:
+            return {"job": self.registry.get(job_id).snapshot(protocol_version)}
+        legacy_site_id = (
+            site_id_from_legacy_channel(channel_id) if channel_id is not None else None
+        )
+        if site_id is not None and legacy_site_id is not None and site_id != legacy_site_id:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id and legacy channel_id disagree")
-        selected_site_id = site_id if site_id is not None else channel_id
+        selected_site_id = site_id if site_id is not None else legacy_site_id
         site_ids = [selected_site_id] if selected_site_id is not None else sorted(self._site_configs)
         sites: list[dict[str, Any]] = []
         for current_id in site_ids:
@@ -245,16 +253,20 @@ class SiteManager:
                     "target": config.target if config.enabled else None,
                 }
             )
-        legacy_channels = [
-            {"channel_id": item["site_id"], **{key: value for key, value in item.items() if key != "site_id"}}
-            for item in sites
-        ]
+        if protocol_version == "3.1":
+            return {
+                "programmer": self.programmer_snapshot(),
+                "channels": [
+                    {
+                        "channel_id": legacy_channel_id_from_site(item["site_id"]),
+                        **{key: value for key, value in item.items() if key != "site_id"},
+                    }
+                    for item in sites
+                ],
+            }
         return {
             "ppu": self.ppu_snapshot(),
             "sites": sites,
-            # Transitional compatibility for the pre-PPU/pre-Site REST/UI shape.
-            "programmer": self.programmer_snapshot(),
-            "channels": legacy_channels,
         }
 
 
