@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -80,7 +80,7 @@ class ServerConfig:
 
 @dataclass(slots=True)
 class SiteConfig:
-    """One independently controlled programming site inside a PPU."""
+    """One independently controlled, one-based programming Site inside a PPU."""
 
     id: int
     enabled: bool = False
@@ -160,7 +160,12 @@ class PlasmaConfig:
         if ppu is not None and programmer is not None:
             raise TypeError("use either ppu or legacy programmer, not both")
         self.server = server
-        self.sites = list(sites if sites is not None else (channels or []))
+        if sites is not None:
+            self.sites = list(sites)
+        else:
+            # Legacy ChannelConfig objects used 0-based IDs. Convert them once
+            # at the compatibility boundary so the domain model stays 1-based.
+            self.sites = [replace(channel, id=channel.id + 1) for channel in (channels or [])]
         self.ppu = ppu if ppu is not None else (programmer or PPUConfig())
 
     @property
@@ -173,7 +178,7 @@ class PlasmaConfig:
 
     @property
     def channels(self) -> list[SiteConfig]:
-        """Legacy alias for sites."""
+        """Legacy alias for sites. IDs are canonical one-based Site IDs."""
         return self.sites
 
     @property
@@ -227,10 +232,10 @@ class PlasmaConfig:
         ids = [site.id for site in self.sites]
         if len(ids) != len(set(ids)):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "site IDs must be unique")
-        if any(site_id < 0 or site_id >= maximum for site_id in ids):
+        if any(site_id < 1 or site_id > maximum for site_id in ids):
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
-                f"site IDs must be in range 0..{maximum - 1}",
+                f"site IDs must be in range 1..{maximum}",
             )
         supported_interfaces = {"mock", "openocd", "fpga"}
         for site in self.sites:
@@ -260,8 +265,10 @@ def _server_from_dict(raw: dict[str, Any], base_dir: Path) -> ServerConfig:
     return ServerConfig(**values)
 
 
-def _site_from_dict(raw: dict[str, Any]) -> SiteConfig:
+def _site_from_dict(raw: dict[str, Any], *, legacy_channel: bool = False) -> SiteConfig:
     values = dict(raw)
+    if legacy_channel and "id" in values:
+        values["id"] = int(values["id"]) + 1
     register_base = values.get("register_base")
     if isinstance(register_base, str):
         values["register_base"] = int(register_base, 0)
@@ -291,8 +298,13 @@ def load_config(path: str | Path) -> PlasmaConfig:
             raise TypeError("use either sites or legacy channels, not both")
         server = _server_from_dict(raw.get("server", {}), config_path.parent.parent)
         ppu = _ppu_from_dict(raw.get("ppu", raw.get("programmer", {})))
-        site_items = raw.get("sites", raw.get("channels", []))
-        sites = [_site_from_dict(item) for item in site_items]
+        if "sites" in raw:
+            sites = [_site_from_dict(item) for item in raw.get("sites", [])]
+        else:
+            sites = [
+                _site_from_dict(item, legacy_channel=True)
+                for item in raw.get("channels", [])
+            ]
     except (TypeError, ValueError) as exc:
         raise PlasmaError(
             ErrorCode.CONFIG_INVALID,
