@@ -108,4 +108,48 @@ assert_file_line \
 grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy' "$plasmactl_path" || fail 'deploy does not re-exec updated plasmactl'
 grep -Fq 'reconcile_service_units' "$plasmactl_path" || fail 'service-unit reconciliation is missing'
 
+# Web deployment hygiene: source changes make a long-running Vite runtime stale,
+# but package metadata alone must not cause npm ci under the live dev server.
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$temporary/no-hygiene-config.env" \
+PLASMA_PYTHON="$(command -v python3)" \
+XDG_CONFIG_HOME="$temporary/xdg-hygiene" \
+bash -c '
+  set -Eeuo pipefail
+  source "$1"
+  web_runtime_changed "software/web/app/page.tsx" || exit 11
+  web_runtime_changed "software/python/plasma_core/config.py" && exit 12
+  web_dependencies_changed "software/web/package.json" && exit 13
+  web_dependencies_changed "software/web/package-lock.json" || exit 14
+  web_manifest_matches_lock || exit 15
+' _ "$plasmactl_path" || fail 'Web runtime/dependency classification contract failed'
+
+# A targeted Web recovery must reconcile the unit, restart only Vite, then
+# execute the Web health check. It must not bounce the programming server or
+# REST Gateway.
+web_restart_calls="$temporary/web-restart-calls.txt"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$temporary/no-restart-config.env" \
+PLASMA_PYTHON="$(command -v python3)" \
+XDG_CONFIG_HOME="$temporary/xdg-restart" \
+PLASMACTL_TEST_CALLS="$web_restart_calls" \
+bash -c '
+  set -Eeuo pipefail
+  source "$1"
+  require_repo() { :; }
+  require_runtime() { :; }
+  reconcile_service_units() { printf "reconcile\n" >>"$PLASMACTL_TEST_CALLS"; }
+  systemctl() { printf "systemctl %s\n" "$*" >>"$PLASMACTL_TEST_CALLS"; }
+  web_health_check() { printf "web-health\n" >>"$PLASMACTL_TEST_CALLS"; }
+  restart_web_console >/dev/null
+' _ "$plasmactl_path" || fail 'web-restart execution contract failed'
+assert_file_line "$web_restart_calls" 'reconcile'
+assert_file_line "$web_restart_calls" 'systemctl --user restart plasma-vite.service'
+assert_file_line "$web_restart_calls" 'web-health'
+if grep -Eq 'plasma-(server|web)\.service' "$web_restart_calls"; then
+  fail 'web-restart unexpectedly restarts Plasma Server or REST Gateway'
+fi
+
+grep -Fq 'web-restart|restart-web) restart_web_console' "$plasmactl_path" || fail 'web-restart command is not wired into plasmactl'
+
 printf '[plasmactl-test] PASS\n'
