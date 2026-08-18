@@ -1,5 +1,5 @@
 ppu:
-  id: ppu-dev-01
+  id: z2-dev-01
   facility_id: swpc-lab
   model: PYNQ-Z2
   display_name: Plasma Z2 Prototype
