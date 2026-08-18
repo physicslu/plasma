@@ -67,6 +67,8 @@ test("keeps live log messages English and marks error severity explicitly", asyn
   assert.match(page, /data-level=\{log\.level\}/);
   assert.match(page, /color: "var\(--red\)"/);
   assert.match(page, /Plasma Web REST Gateway offline/);
+  assert.match(page, /offline · \$\{apiBase\} ·/);
+  assert.match(page, /Plasma Web REST Gateway rejected · \$\{apiDraft\.trim\(\)/);
   assert.match(page, /Firmware exceeds the 16 MiB limit/);
   assert.match(page, /timed out waiting for completion/);
   assert.match(page, /At least one channel must remain visible/);
@@ -154,7 +156,7 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /const batchChannelIds = \[\.\.\.visibleChannelIds\]/);
   assert.match(page, /Promise\.all\(batchChannelIds\.map/);
   assert.match(page, /for \(const operation of batchOperations\)/);
-  assert.match(page, /runChannel\(channelId, operation, true\)/);
+  assert.match(page, /runChannel\(channelId, operation, true, \(\) => lifecycle\.canDispatch\(channelId\)\)/);
   assert.match(page, /Batch stopped/);
   assert.match(page, /Batch complete/);
   assert.match(page, /runChannel\(channel\.id, operation\)/);
@@ -186,20 +188,32 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /批次執行/);
 });
 
-test("cancels active batch jobs without coupling channel pipelines", async () => {
+test("uses an explicit batch lifecycle and a cancel barrier at dispatch", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const lifecycle = await readFile(new URL("../app/batch-lifecycle.ts", import.meta.url), "utf8");
+  const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
-  assert.match(page, /const batchCancelRequested = useRef\(false\)/);
-  assert.match(page, /const batchActiveJobs = useRef<Record<number, string>>\(\{\}\)/);
-  assert.match(page, /async function cancelBatch\(\)/);
-  assert.match(page, /batchCancelRequested\.current = true/);
-  assert.match(page, /Object\.entries\(batchActiveJobs\.current\)/);
+  assert.match(page, /const batchLifecycle = useRef<BatchLifecycle \| null>\(null\)/);
+  assert.match(page, /const lifecycle = new BatchLifecycle\(batchChannelIds\)/);
+  assert.match(lifecycle, /BatchCommandPhase = "ready" \| "submitting" \| "active" \| "terminal"/);
+  assert.match(lifecycle, /beginSubmit\(channelId: number\)/);
+  assert.match(lifecycle, /canDispatch\(channelId: number\)/);
+  assert.match(lifecycle, /accepted\(channelId: number, jobId: string\)/);
+  assert.match(lifecycle, /cancel\(\): BatchCancelSnapshot/);
+  assert.match(page, /const \{ submittingChannels, activeJobs \} = lifecycle\.cancel\(\)/);
+  assert.match(page, /submitting: \$\{submittingChannels\.length\} · active jobs: \$\{activeJobs\.length\}/);
   assert.match(page, /Promise\.all\(activeJobs\.map/);
-  assert.match(page, /requestJobCancel\(Number\(channelId\), jobId, true\)/);
-  assert.match(page, /delete batchActiveJobs\.current\[channelId\]/);
-  assert.match(page, /className="cancelBatch"/);
-  assert.match(page, /aria-label="取消批次工作"/);
-  assert.match(page, /取消批次/);
+  assert.doesNotMatch(page, /batchActiveJobs/);
+  assert.doesNotMatch(page, /batchCancelRequested/);
+
+  const encode = api.indexOf("await fileToBase64(options.firmware)");
+  const guard = api.indexOf("if (options.submissionGuard && !options.submissionGuard())");
+  const dispatch = api.indexOf('"/api/jobs"', guard);
+  assert.notEqual(encode, -1, "firmware preparation is missing");
+  assert.notEqual(guard, -1, "submission guard is missing");
+  assert.notEqual(dispatch, -1, "job dispatch is missing");
+  assert.ok(encode < guard, "cancel barrier must be checked after firmware preparation");
+  assert.ok(guard < dispatch, "cancel barrier must be checked before POST /api/jobs");
 });
 
 test("keeps batch cancellation authoritative without rewriting the final job result", async () => {
@@ -217,7 +231,7 @@ test("keeps batch cancellation authoritative without rewriting the final job res
   assert.match(page, /Job State 保留 Python Job Manager 回傳的真實結果/);
 
   const cancellationPrecedence = page.indexOf(
-    "const cancelWasRequested = batchCancelRequested.current || cancelRequests.current.has(job.job_id);",
+    "const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);",
   );
   const finalStateHandling = page.indexOf('if (finalJob.state === "cancelled")', cancellationPrecedence);
   const batchSuccess = page.indexOf('setBatchChannelState(channelId, "success")', cancellationPrecedence);

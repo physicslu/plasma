@@ -55,6 +55,13 @@ export class PlasmaApiError extends Error {
   }
 }
 
+export class PlasmaSubmissionBlockedError extends Error {
+  constructor() {
+    super("Job submission blocked by cancel barrier");
+    this.name = "PlasmaSubmissionBlockedError";
+  }
+}
+
 export function normalizeApiBase(value: string): string {
   const url = new URL(value.trim());
   if (url.protocol !== "http:" && url.protocol !== "https:") {
@@ -140,11 +147,15 @@ export async function startJob(
     firmware?: File | null;
     offset?: number;
     length?: number;
+    submissionGuard?: () => boolean;
   },
 ): Promise<JobSnapshot> {
   const firmwareBase64 = options.firmware
     ? await fileToBase64(options.firmware)
     : "";
+  if (options.submissionGuard && !options.submissionGuard()) {
+    throw new PlasmaSubmissionBlockedError();
+  }
   const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
     apiBase,
     "/api/jobs",
