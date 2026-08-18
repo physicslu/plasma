@@ -18,8 +18,7 @@ class ErrorCode(StrEnum):
     SITE_INVALID = "E4001"
     SITE_DISABLED = "E4002"
     SITE_BUSY = "E4003"
-    # Legacy symbolic aliases. E400x values and serialized error_type names are
-    # retained for v3.1 compatibility while Site is canonical in Python code.
+    # Legacy symbolic aliases keep source compatibility; v3.2 serializes SITE_*.
     CHANNEL_INVALID = "E4001"
     CHANNEL_DISABLED = "E4002"
     CHANNEL_BUSY = "E4003"
@@ -51,11 +50,9 @@ ERROR_NAMES: dict[ErrorCode, str] = {
     ErrorCode.PROTOCOL_PAYLOAD_TOO_LARGE: "PROTOCOL_PAYLOAD_TOO_LARGE",
     ErrorCode.PROTOCOL_JSON_INVALID: "PROTOCOL_JSON_INVALID",
     ErrorCode.PROTOCOL_CHECKSUM_MISMATCH: "PROTOCOL_CHECKSUM_MISMATCH",
-    # Keep the published v3.1 error_type strings stable even though Python
-    # code now uses ErrorCode.SITE_* as the canonical symbolic names.
-    ErrorCode.SITE_INVALID: "CHANNEL_INVALID",
-    ErrorCode.SITE_DISABLED: "CHANNEL_DISABLED",
-    ErrorCode.SITE_BUSY: "CHANNEL_BUSY",
+    ErrorCode.SITE_INVALID: "SITE_INVALID",
+    ErrorCode.SITE_DISABLED: "SITE_DISABLED",
+    ErrorCode.SITE_BUSY: "SITE_BUSY",
     ErrorCode.JOB_NOT_FOUND: "JOB_NOT_FOUND",
     ErrorCode.OPERATION_UNSUPPORTED: "OPERATION_UNSUPPORTED",
     ErrorCode.DUPLICATE_JOB: "DUPLICATE_JOB",
@@ -72,6 +69,18 @@ ERROR_NAMES: dict[ErrorCode, str] = {
     ErrorCode.INTERNAL_ERROR: "INTERNAL_ERROR",
     ErrorCode.JOB_ABORTED: "JOB_ABORTED",
 }
+
+LEGACY_V31_ERROR_NAMES: dict[ErrorCode, str] = {
+    ErrorCode.SITE_INVALID: "CHANNEL_INVALID",
+    ErrorCode.SITE_DISABLED: "CHANNEL_DISABLED",
+    ErrorCode.SITE_BUSY: "CHANNEL_BUSY",
+}
+
+
+def error_name(code: ErrorCode, protocol_version: str = "3.2") -> str:
+    if protocol_version == "3.1" and code in LEGACY_V31_ERROR_NAMES:
+        return LEGACY_V31_ERROR_NAMES[code]
+    return ERROR_NAMES[code]
 
 
 class PlasmaError(Exception):
