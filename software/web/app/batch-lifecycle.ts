@@ -9,17 +9,17 @@ type BatchCommand = {
 };
 
 export type BatchCancelSnapshot = {
-  submittingChannels: number[];
-  activeJobs: Array<[channelId: number, jobId: string]>;
+  submittingSites: number[];
+  activeJobs: Array<[siteId: number, jobId: string]>;
 };
 
 export class BatchLifecycle {
   private cancelBarrier = false;
   private readonly commands: Record<number, BatchCommand>;
 
-  constructor(channelIds: number[]) {
+  constructor(siteIds: number[]) {
     this.commands = Object.fromEntries(
-      channelIds.map(channelId => [channelId, { phase: "ready" as const }]),
+      siteIds.map(siteId => [siteId, { phase: "ready" as const }]),
     );
   }
 
@@ -27,52 +27,52 @@ export class BatchLifecycle {
     return this.cancelBarrier;
   }
 
-  prepare(channelId: number, operation: Operation): boolean {
+  prepare(siteId: number, operation: Operation): boolean {
     if (this.cancelBarrier) {
-      this.commands[channelId] = { phase: "terminal", operation };
+      this.commands[siteId] = { phase: "terminal", operation };
       return false;
     }
-    this.commands[channelId] = { phase: "ready", operation };
+    this.commands[siteId] = { phase: "ready", operation };
     return true;
   }
 
-  beginSubmit(channelId: number): boolean {
-    const command = this.commands[channelId];
+  beginSubmit(siteId: number): boolean {
+    const command = this.commands[siteId];
     if (!command || this.cancelBarrier) {
-      if (command) this.commands[channelId] = { ...command, phase: "terminal" };
+      if (command) this.commands[siteId] = { ...command, phase: "terminal" };
       return false;
     }
-    this.commands[channelId] = { ...command, phase: "submitting" };
+    this.commands[siteId] = { ...command, phase: "submitting" };
     return true;
   }
 
-  canDispatch(channelId: number): boolean {
-    return !this.cancelBarrier && this.commands[channelId]?.phase === "submitting";
+  canDispatch(siteId: number): boolean {
+    return !this.cancelBarrier && this.commands[siteId]?.phase === "submitting";
   }
 
-  accepted(channelId: number, jobId: string): boolean {
-    const command = this.commands[channelId] ?? { phase: "submitting" as const };
-    this.commands[channelId] = { ...command, phase: "active", jobId };
+  accepted(siteId: number, jobId: string): boolean {
+    const command = this.commands[siteId] ?? { phase: "submitting" as const };
+    this.commands[siteId] = { ...command, phase: "active", jobId };
     return this.cancelBarrier;
   }
 
-  finish(channelId: number): void {
-    const command = this.commands[channelId];
+  finish(siteId: number): void {
+    const command = this.commands[siteId];
     if (!command) return;
-    this.commands[channelId] = { ...command, phase: "terminal" };
+    this.commands[siteId] = { ...command, phase: "terminal" };
   }
 
   cancel(): BatchCancelSnapshot {
     this.cancelBarrier = true;
-    const submittingChannels: number[] = [];
+    const submittingSites: number[] = [];
     const activeJobs: Array<[number, string]> = [];
 
-    for (const [channelIdText, command] of Object.entries(this.commands)) {
-      const channelId = Number(channelIdText);
-      if (command.phase === "submitting") submittingChannels.push(channelId);
-      if (command.phase === "active" && command.jobId) activeJobs.push([channelId, command.jobId]);
+    for (const [siteIdText, command] of Object.entries(this.commands)) {
+      const siteId = Number(siteIdText);
+      if (command.phase === "submitting") submittingSites.push(siteId);
+      if (command.phase === "active" && command.jobId) activeJobs.push([siteId, command.jobId]);
     }
 
-    return { submittingChannels, activeJobs };
+    return { submittingSites, activeJobs };
   }
 }
