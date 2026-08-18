@@ -55,8 +55,18 @@ class HardwareBoundaryTests(unittest.IsolatedAsyncioTestCase):
             await interface.erase()
         self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
 
-    async def test_fpga_placeholder_is_explicit(self) -> None:
-        interface = FPGAInterface(channel_id=0, register_base=0)
+    async def test_fpga_placeholder_uses_site_identity(self) -> None:
+        interface = FPGAInterface(site_id=0, register_base=0)
+        self.assertEqual(interface.site_id, 0)
+        self.assertEqual(interface.channel_id, 0)
         with self.assertRaises(PlasmaError) as caught:
             await interface.read(0, 4)
         self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
+        self.assertEqual(caught.exception.context["site_id"], 0)
+        self.assertEqual(caught.exception.context["channel_id"], 0)
+
+    async def test_fpga_legacy_channel_keyword_remains_compatible(self) -> None:
+        interface = FPGAInterface(channel_id=1, register_base=0)
+        self.assertEqual(interface.site_id, 1)
+        with self.assertRaises(TypeError):
+            FPGAInterface(site_id=1, channel_id=2, register_base=0)
