@@ -660,3 +660,22 @@ Next approval gate:
 ```
 
 Be precise. Never report a test, build, service restart, deployment, FPGA build, or hardware programming operation as successful unless it was actually executed and observed to succeed.
+
+## 16. SWPC AI workspace boundary
+
+When an AI coding agent operates on SWPC, the Plasma repository root is:
+
+```text
+/storage/projects/plasma
+```
+
+Treat this repository as the normal workspace boundary for AI-assisted Plasma development.
+
+- Read, create, modify, move, and delete files only inside the Plasma repository unless the user explicitly authorizes access outside it.
+- Keep ordinary development commands in the repository root or one of its subdirectories.
+- Do not `cd` outside the repository merely to inspect or modify unrelated host content.
+- Do not access unrelated SWPC repositories, personal files, credentials, SSH configuration, Docker/Nextcloud data, or system configuration as part of ordinary Plasma work.
+- Access outside the repository is allowed only when it is genuinely required by the assigned task and either already covered by an explicit repository-defined operational procedure or explicitly approved by the user.
+- If a required task cannot be completed without leaving the workspace boundary, stop at a safe checkpoint, explain exactly what external path/resource is needed and why, and request approval before accessing it.
+
+This is an agent-behavior boundary, not an operating-system sandbox. Cline/Continue file permissions and terminal approval settings should still be configured to enforce project-only access where possible. Do not assume this rule alone prevents a shell command from reaching files elsewhere on SWPC.
