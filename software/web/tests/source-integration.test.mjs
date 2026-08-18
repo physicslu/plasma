@@ -46,7 +46,7 @@ test("uses the Plasma Web REST Gateway instead of browser-side job simulation", 
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
   assert.doesNotMatch(page, /setInterval\s*\(/);
-  assert.match(page, /getChannels/);
+  assert.match(page, /getProgrammerStatus/);
   assert.match(page, /getJob/);
   assert.match(page, /startJob/);
   assert.match(page, /cancelJob/);
@@ -56,6 +56,29 @@ test("uses the Plasma Web REST Gateway instead of browser-side job simulation", 
   assert.match(api, /await fetch/);
   assert.match(api, /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?/);
   assert.doesNotMatch(api, /127\.0\.0\.1:8080/);
+});
+
+test("derives Programmer identity and channel topology from status instead of fixed eight-channel UI assumptions", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
+
+  assert.match(api, /export type ProgrammerSnapshot/);
+  assert.match(api, /export async function getProgrammerStatus/);
+  assert.match(page, /useState<Channel\[]>\(\[\]\)/);
+  assert.match(page, /useState<ProgrammerSnapshot \| null>\(null\)/);
+  assert.match(page, /const status = await getProgrammerStatus\(apiBase\)/);
+  assert.match(page, /status\.channels\.map/);
+  assert.match(page, /current\.find\(channel => channel\.id === backend\.channel_id\)/);
+  assert.match(page, /channels\.find\(item => item\.id === channelId\)/);
+  assert.match(page, /aria-label="Programmer identity"/);
+  assert.match(page, /programmer\.site_id/);
+  assert.match(page, /programmer\.programmer_id/);
+  assert.match(page, /programmer\.model/);
+  assert.ok(page.includes("{enabledCount}/{channels.length} Enabled"));
+  assert.ok(page.includes("{visibleChannelIds.length} / {channels.length}"));
+  assert.doesNotMatch(page, /Array\.from\(\{ length: 8 \}/);
+  assert.doesNotMatch(page, /enabledCount\}\/8 Enabled/);
+  assert.doesNotMatch(page, /visibleChannelIds\.length\} \/ 8/);
 });
 
 test("keeps live log messages English and marks error severity explicitly", async () => {
@@ -169,7 +192,7 @@ test("supports selected-channel batch jobs and per-channel controls", async () =
   assert.match(page, /失敗 <b>\{statusCounts\.failed\}/);
   assert.match(page, /const disabledCount = channels\.length - enabledCount/);
   assert.match(page, /aria-label="通道配置摘要"/);
-  assert.match(page, /顯示 <b>\{visibleChannelIds\.length\} \/ 8<\/b>/);
+  assert.ok(page.includes("顯示 <b>{visibleChannelIds.length} / {channels.length}</b>"));
   assert.match(page, /停用 <b>\{disabledCount\}<\/b>/);
 
   const batchStatus = page.match(
