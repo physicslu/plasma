@@ -10,8 +10,15 @@ from typing import Any
 from plasma_core.config import PlasmaConfig, load_config
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import ErrorDetail, JobRequest, new_job_id
-from plasma_core.protocol import Frame, ProtocolLimits, encode_frame, read_frame
+from plasma_core.models import ErrorDetail, JobRequest, new_job_id, site_id_from_legacy_channel
+from plasma_core.protocol import (
+    LEGACY_PROTOCOL_VERSION,
+    PROTOCOL_VERSION,
+    Frame,
+    ProtocolLimits,
+    encode_frame,
+    read_frame,
+)
 
 from .site_manager import SiteManager
 
@@ -46,6 +53,7 @@ class PlasmaServer:
             "server_started",
             ppu_id=self.config.ppu.id,
             facility_id=self.config.ppu.facility_id,
+            protocol_version=PROTOCOL_VERSION,
             host=self.address[0],
             port=self.address[1],
         )
@@ -64,6 +72,61 @@ class PlasmaServer:
         async with self._server:
             await self._server.serve_forever()
 
+    @staticmethod
+    def _site_id_from_wire(metadata: dict[str, Any], *, required: bool) -> int | None:
+        version = metadata.get("protocol_version")
+        if version == PROTOCOL_VERSION:
+            if "channel_id" in metadata:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "protocol v3.2 uses site_id; channel_id is a v3.1 field",
+                )
+            raw = metadata.get("site_id")
+            label = "site_id"
+            if raw is None and not required:
+                return None
+            if isinstance(raw, bool):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must be an integer")
+            try:
+                site_id = int(raw)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "site_id must be an integer",
+                    original_exception=exc,
+                ) from exc
+            if site_id < 1:
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must start at 1")
+            return site_id
+        if version == LEGACY_PROTOCOL_VERSION:
+            if "site_id" in metadata:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "protocol v3.1 uses channel_id; site_id requires v3.2",
+                )
+            raw = metadata.get("channel_id")
+            label = "channel_id"
+            if raw is None and not required:
+                return None
+            if isinstance(raw, bool):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "channel_id must be an integer")
+            try:
+                channel_id = int(raw)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "channel_id must be an integer",
+                    original_exception=exc,
+                ) from exc
+            try:
+                return site_id_from_legacy_channel(channel_id)
+            except PlasmaError as exc:
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, f"invalid {label}") from exc
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
+            f"unsupported protocol version: {version!r}",
+        )
+
     async def _handle_connection(
         self,
         reader: asyncio.StreamReader,
@@ -71,27 +134,29 @@ class PlasmaServer:
     ) -> None:
         peer = writer.get_extra_info("peername")
         job_id: str | None = None
-        wire_channel_id: int | None = None
+        site_id: int | None = None
         operation: str | None = None
+        response_version = PROTOCOL_VERSION
         try:
             frame = await read_frame(reader, self.limits)
+            response_version = str(frame.metadata.get("protocol_version", PROTOCOL_VERSION))
             job_id = frame.metadata.get("job_id")
-            wire_channel_id = frame.metadata.get("channel_id")
+            site_id = self._site_id_from_wire(frame.metadata, required=False)
             operation = frame.metadata.get("operation")
             response = await self._dispatch(frame, peer)
         except PlasmaError as exc:
             detail = ErrorDetail.from_exception(
                 exc,
-                channel_id=wire_channel_id,
+                site_id=site_id,
                 job_id=job_id,
                 operation=operation,
             )
             response = Frame(
                 metadata={
-                    "protocol_version": "3.1",
+                    "protocol_version": response_version,
                     "message_type": "response",
                     "ok": False,
-                    "error": detail.to_dict(),
+                    "error": detail.to_dict(response_version),
                 }
             )
             self.manager.server_log.event(
@@ -99,7 +164,7 @@ class PlasmaServer:
                 "request_failed",
                 peer=peer,
                 job_id=job_id,
-                site_id=wire_channel_id,
+                site_id=site_id,
                 operation=operation,
                 error_code=exc.code.value,
                 message=exc.message,
@@ -112,10 +177,10 @@ class PlasmaServer:
             )
             response = Frame(
                 metadata={
-                    "protocol_version": "3.1",
+                    "protocol_version": response_version,
                     "message_type": "response",
                     "ok": False,
-                    "error": ErrorDetail.from_exception(error).to_dict(),
+                    "error": ErrorDetail.from_exception(error).to_dict(response_version),
                 }
             )
             self.manager.server_log.event("ERROR", "server_exception", peer=peer, error=str(exc))
@@ -132,6 +197,7 @@ class PlasmaServer:
 
     async def _dispatch(self, frame: Frame, peer: Any) -> Frame:
         metadata = frame.metadata
+        protocol_version = str(metadata["protocol_version"])
         try:
             operation = Operation(str(metadata["operation"]))
         except (KeyError, ValueError) as exc:
@@ -142,41 +208,22 @@ class PlasmaServer:
             ) from exc
 
         if operation is Operation.STATUS:
-            # v3.1 wire metadata still calls the local Programming Site channel_id.
-            wire_channel_id = metadata.get("channel_id")
-            if isinstance(wire_channel_id, bool):
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "channel_id must be an integer")
-            try:
-                parsed_site_id = int(wire_channel_id) if wire_channel_id is not None else None
-            except (TypeError, ValueError, OverflowError) as exc:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT,
-                    "channel_id must be an integer",
-                    original_exception=exc,
-                ) from exc
+            site_id = self._site_id_from_wire(metadata, required=False)
             result = self.manager.status(
-                site_id=parsed_site_id,
+                site_id=site_id,
                 job_id=metadata.get("target_job_id"),
+                protocol_version=protocol_version,
             )
-            return self._success(result)
+            return self._success(result, protocol_version)
 
         if operation is Operation.CANCEL:
             target_job_id = metadata.get("target_job_id")
             if not target_job_id:
                 raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "cancel requires target_job_id")
-            return self._success(self.manager.cancel(str(target_job_id)))
+            return self._success(self.manager.cancel(str(target_job_id)), protocol_version)
 
-        try:
-            wire_channel_raw = metadata["channel_id"]
-            if isinstance(wire_channel_raw, bool):
-                raise ValueError("boolean is not a channel ID")
-            site_id = int(wire_channel_raw)
-        except (KeyError, TypeError, ValueError, OverflowError) as exc:
-            raise PlasmaError(
-                ErrorCode.INVALID_ARGUMENT,
-                "work request requires an integer channel_id",
-                original_exception=exc,
-            ) from exc
+        site_id = self._site_id_from_wire(metadata, required=True)
+        assert site_id is not None
         site_config = self.manager._site_configs.get(site_id)
         try:
             timeout_raw = metadata.get(
@@ -232,6 +279,7 @@ class PlasmaServer:
             "protocol_version",
             "message_type",
             "job_id",
+            "site_id",
             "channel_id",
             "operation",
             "timeout_s",
@@ -250,8 +298,7 @@ class PlasmaServer:
         if not isinstance(wait_for_completion, bool):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "wait_for_completion must be boolean")
         request = JobRequest(
-            # Compatibility translation into the Plasma v3.1 wire model.
-            channel_id=site_id,
+            site_id=site_id,
             operation=operation,
             firmware=frame.binary,
             map_data=frame.map_data,
@@ -266,15 +313,18 @@ class PlasmaServer:
         future = self.manager.enqueue(request)
         if not wait_for_completion:
             runtime = self.manager.registry.get(request.job_id)
-            return self._success({"accepted": True, "job": runtime.snapshot()})
+            return self._success(
+                {"accepted": True, "job": runtime.snapshot(protocol_version)},
+                protocol_version,
+            )
         result = await future
-        return self._success({"result": result.to_dict()})
+        return self._success({"result": result.to_dict(protocol_version)}, protocol_version)
 
     @staticmethod
-    def _success(payload: dict[str, Any]) -> Frame:
+    def _success(payload: dict[str, Any], protocol_version: str = PROTOCOL_VERSION) -> Frame:
         return Frame(
             metadata={
-                "protocol_version": "3.1",
+                "protocol_version": protocol_version,
                 "message_type": "response",
                 "ok": True,
                 **payload,
@@ -285,7 +335,10 @@ class PlasmaServer:
 async def _run_server(config_path: Path) -> None:
     server = PlasmaServer(load_config(config_path))
     await server.start()
-    print(f"Plasma Server listening on {server.address[0]}:{server.address[1]}")
+    print(
+        f"Plasma Server v{PROTOCOL_VERSION} listening on "
+        f"{server.address[0]}:{server.address[1]}"
+    )
     try:
         await server.serve_forever()
     finally:
