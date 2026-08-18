@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 from plasma_core.config import PPUConfig, PlasmaConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.job_logging import JobEventLogger, OutputManager
 from plasma_core.models import JobRequest
 from plasma_server import SiteManager, SiteWorker
 from plasma_server.channel_manager import ChannelManager
@@ -53,6 +55,24 @@ class SiteDomainNamingTests(unittest.TestCase):
         self.assertEqual(request.site_id, 3)
         self.assertEqual(metadata["channel_id"], 3)
         self.assertNotIn("site_id", metadata)
+
+    def test_site_audit_paths_and_readback_names_are_canonical(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            logger = JobEventLogger(root / "logs", 2, "site-audit")
+            logger.event("test_event")
+
+            self.assertEqual(logger.text_path.parent.name, "SITE2")
+            record = json.loads(logger.jsonl_path.read_text(encoding="utf-8").strip())
+            self.assertEqual(record["site_id"], 2)
+            self.assertEqual(record["channel_id"], 2)
+            self.assertTrue(logger.legacy_jsonl_path.is_file())
+            self.assertEqual(logger.legacy_jsonl_path.parent.name, "CH2")
+
+            output = OutputManager(root / "output")
+            paths = output.write_read_sections("site-readback", 2, {"flash": b"abc"})
+            self.assertEqual([path.name for path in paths], ["read_SITE2_flash.bin"])
+            self.assertEqual(paths[0].read_bytes(), b"abc")
 
     def test_plasma_server_defaults_to_site_manager(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
