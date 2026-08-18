@@ -3,6 +3,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const apiBase = "https://plasma.open4th.com";
 
 function channelPayload() {
+  // Keep one legacy status fixture to exercise the Web compatibility adapter.
   return Array.from({ length: 8 }, (_, channelId) => ({
     channel_id: channelId,
     enabled: channelId < 2,
@@ -74,6 +75,7 @@ test("operator-requested cancellation stays INFO even when backend includes an e
         ok: true,
         job: {
           job_id: jobId,
+          site_id: 0,
           channel_id: 0,
           operation: "erase",
           state: "queued",
@@ -100,11 +102,12 @@ test("operator-requested cancellation stays INFO even when backend includes an e
         ok: true,
         job: {
           job_id: jobId,
+          site_id: 0,
           channel_id: 0,
           operation: "erase",
           state: cancelled ? "cancelled" : "running",
           cancel_requested: cancelled,
-          stage: cancelled ? "erase" : "erase",
+          stage: "erase",
           stage_state: cancelled ? "cancelled" : "running",
           stage_progress_percent: cancelled ? 50 : 25,
           progress_percent: cancelled ? 50 : 25,
@@ -124,9 +127,9 @@ test("operator-requested cancellation stays INFO even when backend includes an e
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
 
-  await page.getByLabel("CH0 擦除").click();
-  await expect(page.getByLabel("取消 CH0 工作")).toBeEnabled();
-  await page.getByLabel("取消 CH0 工作").click();
+  await page.getByLabel("SITE 0 擦除").click();
+  await expect(page.getByLabel("取消 SITE 0 工作")).toBeEnabled();
+  await page.getByLabel("取消 SITE 0 工作").click();
 
   const cancelledLine = page.getByLabel("Live job log").locator("span").filter({ hasText: `${jobId} · CANCELLED` });
   await expect(cancelledLine).toHaveCount(1);
