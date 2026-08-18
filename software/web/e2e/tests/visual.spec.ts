@@ -6,7 +6,7 @@ type VisualMode = "running" | "cancelled" | "failed";
 
 type MockJob = {
   jobId: string;
-  channelId: number;
+  siteId: number;
   operation: Operation;
   cancelRequested: boolean;
 };
@@ -17,7 +17,8 @@ function jobPayload(job: MockJob, state: JobState) {
   const failed = state === "failed";
   return {
     job_id: job.jobId,
-    channel_id: job.channelId,
+    site_id: job.siteId,
+    channel_id: job.siteId,
     operation: job.operation,
     state,
     cancel_requested: job.cancelRequested,
@@ -39,7 +40,7 @@ function jobPayload(job: MockJob, state: JobState) {
 
 async function installMockApi(page: Page, mode: VisualMode = "running") {
   const jobs = new Map<string, MockJob>();
-  const startRequests: Array<{ channelId: number; operation: Operation; jobId: string }> = [];
+  const startRequests: Array<{ siteId: number; operation: Operation; jobId: string }> = [];
   const cancelRequests: string[] = [];
   let nextJobId = 1;
 
@@ -56,26 +57,26 @@ async function installMockApi(page: Page, mode: VisualMode = "running") {
           contentType: "application/json",
           body: JSON.stringify({
             ok: true,
-            programmer: {
-              programmer_id: "z2-visual-01",
-              site_id: "visual-lab",
+            ppu: {
+              ppu_id: "z2-visual-01",
+              facility_id: "visual-lab",
               model: "PYNQ-Z2",
               display_name: "Plasma Visual Fixture",
-              channel_count: 8,
-              enabled_channel_count: 2,
+              site_count: 8,
+              enabled_site_count: 2,
               capabilities: {
-                max_supported_channels: 8,
+                max_supported_sites: 8,
                 operations: ["erase", "program", "verify", "read"],
               },
             },
-            channels: Array.from({ length: 8 }, (_, channelId) => ({
-              channel_id: channelId,
-              enabled: channelId < 2,
-              state: channelId < 2 ? "idle" : "disabled",
+            sites: Array.from({ length: 8 }, (_, siteId) => ({
+              site_id: siteId,
+              enabled: siteId < 2,
+              state: siteId < 2 ? "idle" : "disabled",
               current_job_id: null,
               queued_jobs: 0,
-              interface: channelId < 2 ? "mock" : null,
-              target: channelId < 2 ? "STM32F103C8T6" : null,
+              interface: siteId < 2 ? "mock" : null,
+              target: siteId < 2 ? "STM32F103C8T6" : null,
             })),
           }),
         });
@@ -105,16 +106,24 @@ async function installMockApi(page: Page, mode: VisualMode = "running") {
     }
 
     if (request.method() === "POST" && path === "/api/jobs") {
-      const body = request.postDataJSON() as { channel_id: number; operation: Operation };
+      const body = request.postDataJSON() as { site_id: number; channel_id: number; operation: Operation };
+      if (body.site_id !== body.channel_id) {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ error: { message: "site/channel compatibility fields disagree" } }),
+        });
+        return;
+      }
       const jobId = `visual-job-${nextJobId++}`;
       const job: MockJob = {
         jobId,
-        channelId: body.channel_id,
+        siteId: body.site_id,
         operation: body.operation,
         cancelRequested: false,
       };
       jobs.set(jobId, job);
-      startRequests.push({ channelId: job.channelId, operation: job.operation, jobId });
+      startRequests.push({ siteId: job.siteId, operation: job.operation, jobId });
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -151,7 +160,7 @@ async function openConsole(page: Page, mode: VisualMode = "running") {
   const mock = await installMockApi(page, mode);
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
-  await expect(page.getByLabel("Programmer identity")).toContainText("z2-visual-01");
+  await expect(page.getByLabel("PPU identity")).toContainText("z2-visual-01");
   await expect(page.getByRole("button", { name: "淺色" })).toHaveAttribute("aria-pressed", "true");
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -196,7 +205,7 @@ async function expectVisual(page: Page, name: string) {
   });
 }
 
-const batchSummary = (page: Page) => page.getByLabel("選取通道狀態摘要");
+const batchSummary = (page: Page) => page.getByLabel("選取 Site 狀態摘要");
 
 test.describe("maximized desktop visual regression", () => {
   test("idle console", async ({ page }) => {
