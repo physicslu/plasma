@@ -5,6 +5,8 @@ on:
     paths:
       - ".gitignore"
       - ".clineignore"
+      - "README.md"
+      - "docs/**"
       - "software/python/**"
       - "pl/rtl/**"
       - "pl/constraints/**"
@@ -18,6 +20,8 @@ on:
     paths:
       - ".gitignore"
       - ".clineignore"
+      - "README.md"
+      - "docs/**"
       - "software/python/**"
       - "pl/rtl/**"
       - "pl/constraints/**"
@@ -46,6 +50,8 @@ jobs:
           cache-dependency-path: software/python/pyproject.toml
       - name: Test repository secret-file safety
         run: bash scripts/tests/test-repository-secret-safety.sh
+      - name: Test public documentation sanitization
+        run: bash scripts/tests/test-public-doc-sanitization.sh
       - name: Test deployment config migration
         run: bash scripts/tests/test-plasmactl-config.sh
       - name: Install package

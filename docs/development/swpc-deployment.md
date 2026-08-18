@@ -1,176 +1,96 @@
-# Plasma SWPC 自動更新與部署指南
+# Plasma Integration Host Deployment Guide
 
-SWPC 是 Plasma 的整合測試與 Demo Server。日常部署固定執行：
+This guide documents the deployment contract for the Plasma integration host without publishing site-specific account names, private DNS names, or workstation-specific absolute paths.
+
+## 1. Deployment model
 
 ```text
 GitHub main
-  → SWPC fast-forward 更新
-  → 重新執行更新後的 plasmactl
-  → 完整測試
-  → 設定檔 migration / systemd unit reconciliation
-  → 重新啟動
-  → health check
+  -> integration host fast-forward update
+  -> re-exec updated plasmactl
+  -> validation
+  -> configuration migration / systemd reconciliation
+  -> restart
+  -> health check
 ```
 
-管理指令命名為 `plasmactl`，避免與既有燒錄 CLI `plasma` 衝突。
+`plasmactl` is the operational entry point. It is intentionally separate from the programmer CLI named `plasma`.
 
-## 1. 指令一覽
+## 2. Repository location
 
-| 指令 | 功能 |
-|---|---|
-| `plasmactl status` | 顯示 Git 版本、工作目錄、systemd 與 Port 狀態 |
-| `plasmactl update` | 從 GitHub `main` 做 fast-forward 更新 |
-| `plasmactl test` | 執行 deployment migration、Python、PL source-layout 與 Web 測試 |
-| `plasmactl restart` | reconcile 設定、重新產生 systemd units、restart 並執行 health check |
-| `plasmactl deploy` | update → re-exec 最新腳本 → test → reconcile units → restart |
-| `plasmactl logs` | 同時查看三個服務的即時 Log |
-| `plasmactl logs server` | 只看 Plasma Server Log |
-| `plasmactl logs web` | 只看 Python Gateway Log |
-| `plasmactl logs vite` | 只看 Vite Log |
-
-`plasmactl deploy` 是日常建議指令。測試失敗時不會重新啟動服務。
-
-## 2. 第一次在 SWPC 安裝
-
-先更新 repository：
+The repository location is site configuration, not a public contract. In examples below, use:
 
 ```bash
-cd /storage/projects/plasma
+export PLASMA_REPO=/path/to/plasma
+cd "$PLASMA_REPO"
+```
+
+Do not publish a developer username, home-directory name, private hostname, or private overlay-network address in shared documentation.
+
+## 3. First install
+
+Update the repository:
+
+```bash
+cd "$PLASMA_REPO"
 git status
 git pull --ff-only origin main
 ```
 
-工作目錄必須是乾淨的，再執行：
+Then install the user services:
 
 ```bash
 chmod +x scripts/plasmactl
 ./scripts/plasmactl install
 ```
 
-安裝程序會：
+The installer creates or uses the Python environment, installs dependencies, runs `npm ci`, creates the persistent deployment configuration, generates user-level systemd units, and creates the `plasmactl` command link. Services are enabled but are not started automatically during the initial install.
 
-1. 建立或使用 `software/python/.venv`。
-2. 安裝 Python 開發相依套件；venv 沒有 pip 時自動改用 `uv pip`。
-3. 執行 `npm ci`。
-4. 建立或 migration `~/.config/plasma/plasmactl.env`。
-5. 建立三個 user systemd services。
-6. 在 `~/.local/bin/plasmactl` 建立連結。
-7. enable 服務，但不立即啟動。
+## 4. Runtime services
 
-服務沒有立即啟動，是為了避免與 SWPC 目前手動啟動的 Python 或 Vite
-程序爭用 Port。
+The current service contract is intentionally public because clients and tests depend on it:
 
-## 3. 第一次從手動程序切換到 systemd
-
-先確認目前的監聽程序：
-
-```bash
-plasmactl ports
-ps -fp PID
-```
-
-必須先用 `ps -fp PID` 確認 PID 確實是 Plasma Server、Gateway 或 Vite，
-才能停止。不要使用未限制範圍的 `pkill python` 或 `pkill node`。
-
-停止舊程序後啟動 systemd services：
-
-```bash
-plasmactl start
-plasmactl status
-```
-
-三個服務為：
-
-| systemd unit | 預設 Port | 功能 |
+| systemd unit | Default port | Role |
 |---|---:|---|
-| `plasma-server.service` | 9900 | Plasma v3.1 TCP Server |
-| `plasma-web.service` | 18080 | Python HTTP Gateway |
-| `plasma-vite.service` | 5173 | React/Vite Web Console |
+| `plasma-server.service` | 9900 | Plasma v3.1 TCP server |
+| `plasma-web.service` | 18080 | Python HTTP REST Gateway |
+| `plasma-vite.service` | 5173 | Web Console development/demo service |
 
-若要讓 user services 在 SWPC 開機、尚未登入時也能啟動，執行一次：
+These ports are architectural defaults, not credentials. Network exposure must still be controlled by firewall, private-network policy, or reverse proxy.
 
-```bash
-sudo loginctl enable-linger "$USER"
-```
-
-## 4. 日常更新與部署
-
-在 SWPC 執行：
+## 5. Normal deployment
 
 ```bash
 plasmactl deploy
 ```
 
-腳本有以下保護：
+The deployment contract is:
 
-- 工作目錄有未提交修改時拒絕更新。
-- SWPC 有尚未推送的本機 commit 時拒絕更新。
-- 只允許 fast-forward，不自動 merge 或 rebase。
-- Python 或 Node 相依設定改變時才重新同步相依套件。
-- fast-forward 完成後以 `exec` 重新載入更新後的 `plasmactl`，避免一次部署仍執行舊腳本邏輯。
-- 先完成 migration regression、Python/PL 與 Web 驗證；測試失敗時不重新啟動現有服務。
-- restart/start 前會依目前設定檔重新產生 systemd units 並執行 `daemon-reload`，避免 persistent config 與 active unit 漂移。
-- restart 後等待並檢查 TCP 9900、Gateway API 與 Vite HTTP；服務啟動較慢時會自動重試。
+- refuse update when the working tree contains uncommitted changes;
+- refuse update when the integration host contains local unpublished commits;
+- use fast-forward only;
+- synchronize dependencies only when their definitions change;
+- re-exec the updated `plasmactl` after the fast-forward;
+- run validation before restart;
+- regenerate systemd units before start/restart;
+- perform health checks after restart.
 
-### 4.1 導入新版 deployment contract 的第一次升級
+A failed validation must not replace a healthy running service with an unvalidated revision.
 
-舊版 `plasmactl` 在執行 `deploy` 的當下已經把舊函式與變數載入 shell；即使
-`update_code` 把磁碟上的腳本更新，正在執行的舊 process 不會自動取得新邏輯。
-因此第一次導入支援 re-exec / config schema migration 的版本時，應分成兩步：
+## 6. Remote operations
 
-```bash
-plasmactl update
-plasmactl deploy
-```
-
-第一步只更新程式碼，不 restart；第二步從新版腳本開始完整部署。完成這次 bootstrap
-後，後續日常 `plasmactl deploy` 會自行 update 後 re-exec，不再需要手動拆成兩步。
-
-## 5. 從外面透過 Tailscale SSH 部署
-
-Mac 已在 `~/.ssh/config` 設定 `swpc` alias，因此 SSH 連線使用 `gordon@swpc`。
-
-完整更新、測試與重啟：
+Remote access details are operator-local configuration. Shared documentation uses an SSH alias instead of publishing a real account or hostname:
 
 ```bash
-ssh gordon@swpc 'plasmactl deploy'
+ssh <integration-host-alias> 'plasmactl status'
+ssh <integration-host-alias> 'plasmactl update'
+ssh <integration-host-alias> 'plasmactl deploy'
+ssh -t <integration-host-alias> 'plasmactl logs'
 ```
 
-只查看狀態：
+The actual SSH `HostName`, `User`, private-network address, keys, and ACL policy belong in the operator's local SSH configuration or protected infrastructure documentation, not in this public repository.
 
-```bash
-ssh gordon@swpc 'plasmactl status'
-```
-
-只從 GitHub `main` fast-forward 更新程式碼，不執行測試或 restart：
-
-```bash
-ssh gordon@swpc 'plasmactl update'
-```
-
-查看即時 Log（`-t` 會配置互動終端）：
-
-```bash
-ssh -t gordon@swpc 'plasmactl logs'
-```
-
-### 5.1 Non-interactive SSH 的 PATH
-
-`ssh gordon@swpc 'command'` 使用 non-interactive shell。Ubuntu 的 `~/.bashrc`
-通常會在偵測到 non-interactive shell 後提早 `return`，因此如果
-`~/.local/bin` 的 PATH 設定寫在該 `return` 之後，SSH 遠端命令可能會出現：
-
-```text
-plasmactl: command not found
-```
-
-即使 `~/.local/bin/plasmactl` symlink 本身已存在。
-
-SWPC 目前已調整 `~/.bashrc`：在 non-interactive shell 的 early return **之前**，
-以有條件的方式將 `$HOME/.local/bin` 加入 `PATH`，避免重複加入。修改 shell
-設定前應先備份原始檔案。
-
-等效設定可採用：
+For non-interactive SSH, ensure `$HOME/.local/bin` is available before the shell's early return:
 
 ```bash
 case ":$PATH:" in
@@ -179,53 +99,28 @@ case ":$PATH:" in
 esac
 ```
 
-這段必須位於 `.bashrc` 的 non-interactive early return 之前。
-
-修改後，從 Mac 驗證：
-
-```bash
-ssh gordon@swpc 'command -v plasmactl && plasmactl status'
-```
-
-預期 `command -v` 回傳：
+The expected command location is expressed generically as:
 
 ```text
-/home/gordon/.local/bin/plasmactl
+$HOME/.local/bin/plasmactl
 ```
 
-並且 `plasmactl status` 能正常顯示 Plasma Git、systemd services 與 Port 狀態。
+## 7. Persistent deployment configuration
 
-若 PATH 尚未修正，可暫時使用完整路徑：
-
-```bash
-ssh gordon@swpc '~/.local/bin/plasmactl status'
-```
-
-公開 Web Console 網址：
+The persistent deployment file is:
 
 ```text
-https://plasma.open4th.com
+$HOME/.config/plasma/plasmactl.env
 ```
 
-Tailscale 網址 `https://swpc.tail820e64.ts.net` 保留作為內部維護入口；
-Gateway 的內部維護網址為 `https://swpc.tail820e64.ts.net:8443`。
-
-## 6. 設定檔、schema 與 migration
-
-第一次安裝會建立：
-
-```text
-~/.config/plasma/plasmactl.env
-```
-
-目前 schema 為 v2。預設內容包括：
+The current schema is v2. A public example should use placeholders for machine-specific paths:
 
 ```bash
 PLASMA_CONFIG_VERSION=2
-PLASMA_REPO=/storage/projects/plasma
+PLASMA_REPO=/path/to/plasma
 PLASMA_BRANCH=main
-PLASMA_NPM=/home/gordon/.nvm/versions/node/v22.23.2/bin/npm
-PLASMA_UV=/home/gordon/.local/bin/uv
+PLASMA_NPM=/path/to/npm
+PLASMA_UV=/path/to/uv
 PLASMA_GATEWAY_HOST=0.0.0.0
 PLASMA_GATEWAY_PORT=18080
 PLASMA_CORS_ORIGIN='*'
@@ -234,93 +129,36 @@ PLASMA_VITE_PORT=5173
 PLASMA_PUBLIC_API_URL=https://plasma.open4th.com
 ```
 
-API Base 後面不能加入 `/api`；Web Console 會自行在 Base URL 後附加 API 路徑。
+The Web Console appends API paths to the configured API Base; do not append `/api` to the base value itself.
 
-### 6.1 為什麼要有 config schema version
+## 8. Migration and reconciliation
 
-Repository 中的 default 是「新安裝或未指定值時的預設」，persistent config 則是跨版本保存的
-runtime state。若沒有 schema/version，deployment 無法區分：
+Persistent configuration survives source-code upgrades. Therefore deployment must distinguish an old generated value from an intentional operator override.
 
-- 舊版本自動留下的過期值；
-- 使用者刻意設定的 override。
+The migration policy is:
 
-這會讓已經修正的 source default 被舊 persistent state 長期覆蓋。因此 v2 migration 的規則是：
+- known obsolete historical defaults may migrate to the current default;
+- unknown/custom values are preserved as explicit operator overrides;
+- already-versioned configuration is not guessed or silently rewritten;
+- generated systemd units are derived state and are regenerated from validated configuration.
 
-- v1 / 無版本設定中的已知舊值 `https://swpc.tail820e64.ts.net:8443`、
-  `https://swpc.tail820e64.ts.net`、`http://127.0.0.1:8080` 會 migration 到
-  `https://plasma.open4th.com`。
-- 其他未知 API Base 視為 operator override，保留不動，再將 config 標記為 v2。
-- 已是 v2 的設定不再猜測其意圖；即使值與歷史值相同，也視為使用者明確 override。
+The specific private addresses used by an individual development site are intentionally not documented here. Compatibility logic in executable source remains the source of truth for any historical migration values that must still be recognized.
 
-這個邊界避免「每次部署都強制改成 default」而破壞真正需要的客製環境。
+## 9. Public routing boundary
 
-### 6.2 Runtime unit reconciliation
+The public Web Console endpoint may be documented when it is intentionally public. Internal maintenance routes, private overlay-network hostnames, and administrative gateway addresses must not be copied into public documentation.
 
-`plasma-vite.service` 內的 `NEXT_PUBLIC_PLASMA_API_URL` 是由設定檔產生的 systemd
-Environment。只有修改 repository source 並不會自動改掉已存在的 unit file。因此
-`plasmactl start` 與 `plasmactl restart` 現在都會先：
+A reverse proxy may route the public Web Console to the local Vite service, with `/api/*` forwarded to the REST Gateway. The Gateway should not be exposed directly to the public Internet without an explicit security design.
 
-```text
-config migration
-  → validate values
-  → regenerate units
-  → systemctl --user daemon-reload
-  → start/restart
-```
-
-修改 `plasmactl.env` 後，不需要再執行 `install`；直接：
-
-```bash
-plasmactl restart
-```
-
-即可重新產生 units 並套用設定。
-
-Cloudflare Tunnel 只需將整個 hostname 代理到 Vite：
-
-```text
-plasma.open4th.com → http://127.0.0.1:5173
-```
-
-Vite 會保留原始路徑，將 `/api/*` 代理到：
-
-```text
-http://127.0.0.1:18080
-```
-
-建議使用 Cloudflare Access 保護整個 `plasma.open4th.com` hostname。
-
-既有 Tailscale 網址仍保留作為內部維護入口，不受公開 Cloudflare 路由影響。
-
-Gateway 預設監聽 `0.0.0.0:18080`，只能透過 UFW、Tailscale ACL 或反向代理
-限制在可信任網路，不應直接將 18080 暴露至公用 Internet。
-
-## 7. 疑難排解
-
-查看狀態：
+## 10. Troubleshooting
 
 ```bash
 plasmactl status
-```
-
-查看各服務最近 100 行並持續追蹤：
-
-```bash
+plasmactl ports
 plasmactl logs server
 plasmactl logs web
 plasmactl logs vite
-```
-
-systemd 詳細狀態：
-
-```bash
 systemctl --user status plasma-server plasma-web plasma-vite --no-pager
 ```
 
-如果顯示 `Address already in use`，先執行：
-
-```bash
-plasmactl ports
-```
-
-找出並確認舊程序後再停止它，不能直接終止不明 PID。
+If a port is already in use, identify the owning process before stopping anything. Do not use broad process-kill commands as a substitute for diagnosis.
