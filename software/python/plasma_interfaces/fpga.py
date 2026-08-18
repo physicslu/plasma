@@ -8,8 +8,19 @@ from .base import BaseInterface, ProgressCallback
 class FPGAInterface(BaseInterface):
     """Reserved PS/PL boundary for one Programming Site's future FPGA bus layer."""
 
-    def __init__(self, site_id: int, register_base: int | None) -> None:
-        self.site_id = site_id
+    def __init__(
+        self,
+        site_id: int | None = None,
+        register_base: int | None = None,
+        *,
+        channel_id: int | None = None,
+    ) -> None:
+        if site_id is not None and channel_id is not None and site_id != channel_id:
+            raise TypeError("site_id and legacy channel_id disagree")
+        resolved_site_id = site_id if site_id is not None else channel_id
+        if resolved_site_id is None:
+            raise TypeError("site_id is required")
+        self.site_id = resolved_site_id
         self.register_base = register_base
 
     @property
