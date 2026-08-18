@@ -23,16 +23,16 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         self.root = Path(self.temporary.name)
         config = make_config(
             self.root,
-            enabled_channels=2,
-            channel_options={
-                0: {
+            enabled_sites=2,
+            site_options={
+                1: {
                     "operation_timeout_s": 3.0,
                     "mock": {
                         "delays": {"erase": 0.4, "program": 0.15, "verify": 0.1},
                         "progress_steps": 20,
                     },
                 },
-                1: {
+                2: {
                     "operation_timeout_s": 3.0,
                     "mock": {
                         "delays": {"erase": 0.1, "program": 0.15, "verify": 0.1},
@@ -113,20 +113,21 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         self.fail(f"job did not reach a terminal state: {job_id}")
 
     async def test_web_gateway_programs_mock_and_reports_real_progress(self) -> None:
-        status, channels, headers = await self.request("GET", "/api/status")
+        status, topology, headers = await self.request("GET", "/api/status")
         self.assertEqual(status, 200)
         self.assertEqual(headers["Access-Control-Allow-Origin"], "http://localhost:4173")
         self.assertEqual(
-            [item["channel_id"] for item in channels["channels"] if item["enabled"]],
-            [0, 1],
+            [item["site_id"] for item in topology["sites"] if item["enabled"]],
+            [1, 2],
         )
+        self.assertNotIn("channels", topology)
 
         firmware = bytes(range(64))
         status, accepted, _ = await self.request(
             "POST",
             "/api/jobs",
             {
-                "channel_id": 1,
+                "site_id": 2,
                 "operation": "program",
                 "firmware_name": "web-e2e.bin",
                 "firmware_base64": base64.b64encode(firmware).decode(),
@@ -135,6 +136,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(status, 202)
         job_id = accepted["job"]["job_id"]
+        self.assertEqual(accepted["job"]["site_id"], 2)
 
         final, updates = await self.wait_for_terminal(job_id)
         self.assertEqual(final["state"], "success")
@@ -149,7 +151,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         status, accepted, _ = await self.request(
             "POST",
             "/api/jobs",
-            {"channel_id": 0, "operation": "erase"},
+            {"site_id": 1, "operation": "erase"},
         )
         self.assertEqual(status, 202)
         job_id = accepted["job"]["job_id"]
@@ -177,7 +179,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
     async def test_program_then_read_and_download_exact_mock_bytes(self) -> None:
         firmware = bytes(range(64))
         status, accepted, _ = await self.request("POST", "/api/jobs", {
-            "channel_id": 1, "operation": "program", "firmware_name": "known.bin",
+            "site_id": 2, "operation": "program", "firmware_name": "known.bin",
             "firmware_base64": base64.b64encode(firmware).decode(),
         })
         self.assertEqual(status, 202)
@@ -185,7 +187,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(programmed["state"], "success")
 
         status, accepted, _ = await self.request("POST", "/api/jobs", {
-            "channel_id": 1, "operation": "read", "offset": 7, "length": 29,
+            "site_id": 2, "operation": "read", "offset": 7, "length": 29,
         })
         self.assertEqual(status, 202)
         read_job, updates = await self.wait_for_terminal(accepted["job"]["job_id"])
@@ -194,6 +196,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         output_file = Path(read_job["result"]["output_files"][0])
         self.assertTrue(output_file.is_file())
         self.assertEqual(output_file.read_bytes(), firmware[7:36])
+        self.assertIn("read_SITE2_", output_file.name)
 
         status, downloaded, headers = await self.request(
             "GET", f"/api/jobs/{read_job['job_id']}/files/{output_file.name}"
