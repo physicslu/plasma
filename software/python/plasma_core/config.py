@@ -140,6 +140,16 @@ class PPUConfig:
 ProgrammerConfig = PPUConfig
 
 
+def _legacy_channel_to_site(channel: SiteConfig) -> SiteConfig:
+    channel_id = channel.id
+    if isinstance(channel_id, bool) or not isinstance(channel_id, int) or channel_id < 0:
+        raise PlasmaError(
+            ErrorCode.CONFIG_INVALID,
+            "legacy channel IDs must be non-negative integers",
+        )
+    return replace(channel, id=channel_id + 1)
+
+
 @dataclass(slots=True, init=False)
 class PlasmaConfig:
     server: ServerConfig
@@ -165,7 +175,7 @@ class PlasmaConfig:
         else:
             # Legacy ChannelConfig objects used 0-based IDs. Convert them once
             # at the compatibility boundary so the domain model stays 1-based.
-            self.sites = [replace(channel, id=channel.id + 1) for channel in (channels or [])]
+            self.sites = [_legacy_channel_to_site(channel) for channel in (channels or [])]
         self.ppu = ppu if ppu is not None else (programmer or PPUConfig())
 
     @property
@@ -230,13 +240,19 @@ class PlasmaConfig:
         if self.server.max_queue_depth_per_site < 1:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "max_queue_depth_per_site must be positive")
         ids = [site.id for site in self.sites]
-        if len(ids) != len(set(ids)):
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "site IDs must be unique")
-        if any(site_id < 1 or site_id > maximum for site_id in ids):
+        if any(
+            isinstance(site_id, bool)
+            or not isinstance(site_id, int)
+            or site_id < 1
+            or site_id > maximum
+            for site_id in ids
+        ):
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
-                f"site IDs must be in range 1..{maximum}",
+                f"site IDs must be integer values in range 1..{maximum}",
             )
+        if len(ids) != len(set(ids)):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "site IDs must be unique")
         supported_interfaces = {"mock", "openocd", "fpga"}
         for site in self.sites:
             if site.interface not in supported_interfaces:
@@ -268,7 +284,10 @@ def _server_from_dict(raw: dict[str, Any], base_dir: Path) -> ServerConfig:
 def _site_from_dict(raw: dict[str, Any], *, legacy_channel: bool = False) -> SiteConfig:
     values = dict(raw)
     if legacy_channel and "id" in values:
-        values["id"] = int(values["id"]) + 1
+        channel_id = values["id"]
+        if isinstance(channel_id, bool) or not isinstance(channel_id, int) or channel_id < 0:
+            raise ValueError("legacy channel IDs must be non-negative integers")
+        values["id"] = channel_id + 1
     register_base = values.get("register_base")
     if isinstance(register_base, str):
         values["register_base"] = int(register_base, 0)
