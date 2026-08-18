@@ -18,7 +18,6 @@ function jobPayload(job: MockJob, state: JobState) {
   return {
     job_id: job.jobId,
     site_id: job.siteId,
-    channel_id: job.siteId,
     operation: job.operation,
     state,
     cancel_requested: job.cancelRequested,
@@ -69,15 +68,18 @@ async function installMockApi(page: Page, mode: VisualMode = "running") {
                 operations: ["erase", "program", "verify", "read"],
               },
             },
-            sites: Array.from({ length: 8 }, (_, siteId) => ({
-              site_id: siteId,
-              enabled: siteId < 2,
-              state: siteId < 2 ? "idle" : "disabled",
-              current_job_id: null,
-              queued_jobs: 0,
-              interface: siteId < 2 ? "mock" : null,
-              target: siteId < 2 ? "STM32F103C8T6" : null,
-            })),
+            sites: Array.from({ length: 8 }, (_, index) => {
+              const siteId = index + 1;
+              return {
+                site_id: siteId,
+                enabled: siteId <= 2,
+                state: siteId <= 2 ? "idle" : "disabled",
+                current_job_id: null,
+                queued_jobs: 0,
+                interface: siteId <= 2 ? "mock" : null,
+                target: siteId <= 2 ? "STM32F103C8T6" : null,
+              };
+            }),
           }),
         });
         return;
@@ -106,12 +108,12 @@ async function installMockApi(page: Page, mode: VisualMode = "running") {
     }
 
     if (request.method() === "POST" && path === "/api/jobs") {
-      const body = request.postDataJSON() as { site_id: number; channel_id: number; operation: Operation };
-      if (body.site_id !== body.channel_id) {
+      const body = request.postDataJSON() as { site_id: number; operation: Operation };
+      if (body.site_id < 1) {
         await route.fulfill({
           status: 400,
           contentType: "application/json",
-          body: JSON.stringify({ error: { message: "site/channel compatibility fields disagree" } }),
+          body: JSON.stringify({ error: { message: "site_id must start at 1" } }),
         });
         return;
       }
@@ -161,6 +163,9 @@ async function openConsole(page: Page, mode: VisualMode = "running") {
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
   await expect(page.getByLabel("PPU identity")).toContainText("z2-visual-01");
+  await expect(page.getByLabel("顯示 SITE 0")).toHaveCount(0);
+  await expect(page.getByLabel("顯示 SITE 1")).toBeChecked();
+  await expect(page.getByLabel("顯示 SITE 2")).toBeChecked();
   await expect(page.getByRole("button", { name: "淺色" })).toHaveAttribute("aria-pressed", "true");
   await page.evaluate(async () => {
     await document.fonts.ready;
