@@ -174,13 +174,13 @@ class SiteWorker:
             await self.handler.interface.safe_shutdown()
         detail = ErrorDetail.from_exception(
             error,
-            channel_id=request.channel_id,
+            site_id=request.site_id,
             job_id=request.job_id,
             operation=request.operation,
         )
         result = JobResult(
             job_id=request.job_id,
-            channel_id=request.channel_id,
+            site_id=request.site_id,
             operation=request.operation,
             state=JobState.FAILED,
             created_at=runtime.created_at,
@@ -206,8 +206,6 @@ class SiteWorker:
         return {
             "job_id": request.job_id,
             "site_id": request.site_id,
-            # Retained in persisted job state while Plasma protocol v3.1 uses channel_id.
-            "channel_id": request.channel_id,
             "operation": request.operation.value,
             "state": runtime.state.value,
             "created_at": runtime.created_at,
@@ -230,7 +228,7 @@ class SiteWorker:
 
     async def _process(self, runtime: JobRuntime) -> None:
         request = runtime.request
-        logger = JobEventLogger(self.log_root, request.channel_id, request.job_id)
+        logger = JobEventLogger(self.log_root, request.site_id, request.job_id)
         if runtime.cancel_requested:
             await self._finish_cancelled(runtime, logger, started=False)
             return
@@ -395,7 +393,7 @@ class SiteWorker:
             error_detail = (
                 ErrorDetail.from_exception(
                     final_error,
-                    channel_id=request.channel_id,
+                    site_id=request.site_id,
                     job_id=request.job_id,
                     operation=request.operation,
                     retry_count=max(0, attempts - 1),
@@ -406,7 +404,7 @@ class SiteWorker:
 
             result = JobResult(
                 job_id=request.job_id,
-                channel_id=request.channel_id,
+                site_id=request.site_id,
                 operation=request.operation,
                 state=state,
                 created_at=runtime.created_at,
@@ -425,7 +423,7 @@ class SiteWorker:
                 try:
                     paths = self.output.write_read_sections(
                         request.job_id,
-                        request.channel_id,
+                        request.site_id,
                         output.read_sections,
                     )
                     result.output_files = [str(path) for path in paths]
@@ -433,7 +431,7 @@ class SiteWorker:
                     result.state = JobState.FAILED
                     result.error = ErrorDetail.from_exception(
                         exc,
-                        channel_id=request.channel_id,
+                        site_id=request.site_id,
                         job_id=request.job_id,
                         operation=request.operation,
                     )
@@ -467,13 +465,13 @@ class SiteWorker:
         error = PlasmaError(ErrorCode.OPERATION_CANCELLED, "job was cancelled before execution")
         detail = ErrorDetail.from_exception(
             error,
-            channel_id=request.channel_id,
+            site_id=request.site_id,
             job_id=request.job_id,
             operation=request.operation,
         )
         result = JobResult(
             job_id=request.job_id,
-            channel_id=request.channel_id,
+            site_id=request.site_id,
             operation=request.operation,
             state=JobState.CANCELLED,
             created_at=runtime.created_at,
