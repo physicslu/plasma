@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.models import legacy_channel_id_from_site, site_id_from_legacy_channel, validate_site_id
 
 from .base import BaseInterface, ProgressCallback
 
@@ -15,9 +16,11 @@ class FPGAInterface(BaseInterface):
         *,
         channel_id: int | None = None,
     ) -> None:
-        if site_id is not None and channel_id is not None and site_id != channel_id:
-            raise TypeError("site_id and legacy channel_id disagree")
-        resolved_site_id = site_id if site_id is not None else channel_id
+        canonical = validate_site_id(site_id) if site_id is not None else None
+        legacy = site_id_from_legacy_channel(channel_id) if channel_id is not None else None
+        if canonical is not None and legacy is not None and canonical != legacy:
+            raise TypeError("site_id and legacy channel_id refer to different Sites")
+        resolved_site_id = canonical if canonical is not None else legacy
         if resolved_site_id is None:
             raise TypeError("site_id is required")
         self.site_id = resolved_site_id
@@ -25,8 +28,8 @@ class FPGAInterface(BaseInterface):
 
     @property
     def channel_id(self) -> int:
-        """Legacy alias for pre-Site Python integrations."""
-        return self.site_id
+        """Legacy zero-based v3.1 identity derived from the one-based Site ID."""
+        return legacy_channel_id_from_site(self.site_id)
 
     def _not_ready(self) -> PlasmaError:
         return PlasmaError(
@@ -34,8 +37,6 @@ class FPGAInterface(BaseInterface):
             "FPGA register map is not implemented in the pure-software prototype",
             context={
                 "site_id": self.site_id,
-                # Temporary compatibility for diagnostics consumed by older tools.
-                "channel_id": self.site_id,
                 "register_base": self.register_base,
             },
         )
