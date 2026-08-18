@@ -43,6 +43,16 @@ jobs:
         run: cd e2e && npx playwright install --with-deps chromium
       - name: Playwright E2E
         run: cd e2e && npm test
+      - name: Upload visual regression diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-diagnostics
+          path: |
+            software/web/e2e/test-results/
+            software/web/e2e/tests/__snapshots__/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
