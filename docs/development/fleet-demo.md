@@ -57,6 +57,26 @@ This boundary is covered by browser E2E: CI enables the Fleet setting on the Vit
 
 The current `plasmactl` deployment schema does not yet own these Web-only Fleet variables. Integration-host activation therefore remains an explicit runtime configuration step and must not be performed as part of merge or CI validation. First-class deployment-schema wiring can be added separately once the demo behavior is accepted.
 
+## Post-deploy acceptance
+
+After an approved deployment, run:
+
+```bash
+plasmactl verify fleet
+```
+
+This command is read-only. It does not restart services, modify configuration, write the Manager database, or touch Z2/FPGA hardware. It checks the deployed Git state, Vite/Manager systemd state, Fleet opt-in values in both the service and actual Vite process, loopback Manager scope, Manager liveness/fleet API, the same-origin Fleet BFF, sanitized browser contract, stale/current capacity semantics, and the `/demo`, `/ppu`, `/fleet` server-rendered routes.
+
+The command ends with either:
+
+```text
+RESULT: PASS
+```
+
+or a non-zero exit with explicit `[FAIL]` checks. Its full output is intended to be pasted into an engineering review or AI-assisted acceptance session.
+
+`plasmactl verify fleet` does **not** claim visual correctness, browser layout correctness, responsive behavior, or human usability. Those remain explicit manual UI acceptance steps. It also validates the application through the local Vite listener with the public Host header; it does not by itself prove external DNS/TLS/tunnel availability.
+
 ## Z2 production boundary
 
 Do not infer from the integration-host demo that Z2 must run the Fleet stack. Intended product separation is:
