@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -38,6 +39,25 @@ class ManagerPersistenceSchemaSafetyTests(unittest.TestCase):
 
             persistence = SQLiteObservationPersistence(path)
             with self.assertRaisesRegex(RuntimeError, "schema v1 is missing observations table"):
+                persistence.load()
+
+    def test_timezone_naive_persisted_timestamp_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "naive.sqlite3"
+            persistence = SQLiteObservationPersistence(path)
+            persistence.load()  # initializes the empty schema v1 database
+            record = {
+                "observed_at": "2026-08-19T06:00:00",
+                "ppu": {"ppu_id": "ppu-a"},
+                "sites": [],
+            }
+            with sqlite3.connect(path) as connection:
+                connection.execute(
+                    "INSERT INTO observations(endpoint, record_json) VALUES (?, ?)",
+                    ("http://ppu-a", json.dumps(record)),
+                )
+
+            with self.assertRaisesRegex(RuntimeError, "observed_at must include a timezone"):
                 persistence.load()
 
 
