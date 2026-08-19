@@ -111,7 +111,7 @@ The Manager validates:
 
 The fleet response remains HTTP 200 when one PPU is offline. `ok=true` means the Manager successfully produced a fleet snapshot; `degraded=true` and per-PPU errors represent partial fleet health.
 
-Existing summary fields remain **current-observation fields**: configured, reachable, ready, identified, reported Site count, enabled Site count, and identity conflicts. Facility summaries also use only the current trusted topology. Stale last-known topology is not silently counted as currently available capacity.
+Existing summary fields remain **current-observation fields**: configured, reachable, ready, identified, reported Site count, enabled Site count, and identity conflicts. Facility summaries also use only the current trusted topology. Stale last-known topology is not silently counted as currently available capacity. Heterogeneous **2-Site**, **4-Site**, and **8-Site** PPUs remain supported in the same fleet.
 
 The observation layer adds:
 
