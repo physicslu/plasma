@@ -42,7 +42,12 @@ jobs:
         run: npm --prefix e2e ci
       - name: Install Chromium
         timeout-minutes: 10
-        run: cd e2e && npx playwright install --with-deps chromium
+        # GitHub's Ubuntu runner already carries the system libraries required by
+        # Chromium. Avoid --with-deps here: it runs apt update/install and makes
+        # browser CI depend on external Ubuntu mirror throughput. If the runner
+        # image ever loses a required shared library, browser launch will fail
+        # explicitly in the following Playwright step.
+        run: cd e2e && npx playwright install chromium
       - name: Playwright E2E
         timeout-minutes: 10
         run: cd e2e && npm test
