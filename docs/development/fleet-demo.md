@@ -4,6 +4,8 @@ The Fleet demo is a **Management Host** feature. It is not a required Z2/PPU run
 
 ## Public demo routes
 
+On the public demo host `plasma.open4th.com`:
+
 ```text
 /       -> redirect to /demo
 /demo   -> choose Single PPU or Manager/Fleet demo
@@ -11,7 +13,7 @@ The Fleet demo is a **Management Host** feature. It is not a required Z2/PPU run
 /fleet  -> read-only Fleet UI
 ```
 
-The `/ppu` path remains independent of Manager availability.
+The root redirect is host-scoped to `plasma.open4th.com`; localhost and other development hosts keep the existing root PPU Console behavior so current development/E2E flows do not silently change. `/ppu` is the stable explicit route for the single-PPU demo and remains independent of Manager availability.
 
 ## Fleet BFF boundary
 
