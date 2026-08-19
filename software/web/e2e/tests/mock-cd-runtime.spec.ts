@@ -153,19 +153,23 @@ test("batch membership controls dispatch selected Sites x selected operations", 
   await expect(liveLog(page)).toContainText("[BATCH] COMPLETE", { timeout: 20_000 });
   expect(starts).toEqual([{ siteId: 1, operation: "erase" }]);
 
-  for (const siteId of [2, 4, 6]) {
+  const multiSites = Array.from({ length: expectedSites }, (_, index) => index + 1)
+    .filter(siteId => siteId !== 1 && siteId % 2 === 0)
+    .slice(0, 3);
+  if (multiSites.length === 0) throw new Error("batch membership acceptance requires at least two enabled Sites");
+  for (const siteId of multiSites) {
     await page.getByLabel(`顯示 SITE ${siteId}`).check();
   }
   await page.getByLabel("顯示 SITE 1").uncheck();
-  await expect(page.getByLabel("Site 配置摘要")).toContainText(`顯示 3 / ${expectedSites}`);
-  await expect(page.locator(".batchInfo")).toContainText("目標：SITE 2、SITE 4、SITE 6");
+  await expect(page.getByLabel("Site 配置摘要")).toContainText(`顯示 ${multiSites.length} / ${expectedSites}`);
+  await expect(page.locator(".batchInfo")).toContainText(`目標：${multiSites.map(siteId => `SITE ${siteId}`).join("、")}`);
 
   await page.getByLabel("批次操作：讀取").check();
   const secondExecute = page.getByRole("button", { name: "批次執行：擦除、讀取" });
   await expect(secondExecute).toBeEnabled();
   const beforeSecondBatch = starts.length;
   await secondExecute.click();
-  await expect.poll(() => starts.length, { timeout: 30_000 }).toBe(beforeSecondBatch + 6);
+  await expect.poll(() => starts.length, { timeout: 30_000 }).toBe(beforeSecondBatch + multiSites.length * 2);
   await expect.poll(
     () => liveLog(page).locator("span").filter({ hasText: "[BATCH] COMPLETE" }).count(),
     { timeout: 30_000 },
@@ -174,9 +178,9 @@ test("batch membership controls dispatch selected Sites x selected operations", 
   const actual = starts.slice(beforeSecondBatch)
     .map(item => `${item.siteId}:${item.operation}`)
     .sort();
-  const expected = [2, 4, 6]
+  const expected = multiSites
     .flatMap(siteId => [`${siteId}:erase`, `${siteId}:read`])
     .sort();
   expect(actual).toEqual(expected);
-  expect(new Set(starts.slice(beforeSecondBatch).map(item => item.siteId))).toEqual(new Set([2, 4, 6]));
+  expect(new Set(starts.slice(beforeSecondBatch).map(item => item.siteId))).toEqual(new Set(multiSites));
 });
