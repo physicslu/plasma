@@ -16,6 +16,10 @@ from plasma_core.errors import PlasmaError
 from plasma_core.models import JobRequest, site_id_from_legacy_channel, validate_job_id
 
 
+FLEET_CONTRACT_VERSION = "1"
+GATEWAY_SERVICE_NAME = "plasma-web-rest-gateway"
+
+
 def _run(coro: Any) -> Any:
     return asyncio.run(coro)
 
@@ -110,9 +114,32 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
 
     def _error(self, exc: Exception) -> None:
         if isinstance(exc, PlasmaError):
-            self._json(HTTPStatus.BAD_GATEWAY, {"ok": False, "error": {"error_code": exc.code.value, "message": exc.message}})
+            self._json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": {"error_code": exc.code.value, "message": exc.message}},
+            )
         else:
             self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"message": str(exc)}})
+
+    def _local_snapshot(self) -> dict[str, Any]:
+        snapshot = _run(self.client_factory().status(job_id=None, site_id=None))
+        if not isinstance(snapshot, dict) or snapshot.get("ok") is not True:
+            raise RuntimeError("local Plasma Server is not ready")
+        ppu = snapshot.get("ppu")
+        if not isinstance(ppu, dict) or not ppu.get("ppu_id"):
+            raise RuntimeError("local Plasma Server STATUS is missing canonical PPU identity")
+        return snapshot
+
+    def _execution_unavailable(self) -> None:
+        self._json(
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {
+                "ok": False,
+                "gateway": "alive",
+                "execution": "unavailable",
+                "error": {"message": "local Plasma Server is unavailable"},
+            },
+        )
 
     def do_OPTIONS(self) -> None:
         self.send_response(HTTPStatus.NO_CONTENT)
@@ -123,13 +150,66 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         try:
             parsed = urlparse(self.path)
+            if parsed.path == "/api/health/live":
+                self._json(
+                    HTTPStatus.OK,
+                    {
+                        "ok": True,
+                        "service": GATEWAY_SERVICE_NAME,
+                        "gateway": "alive",
+                    },
+                )
+                return
+            if parsed.path == "/api/health/ready":
+                try:
+                    snapshot = self._local_snapshot()
+                except Exception:
+                    self._execution_unavailable()
+                    return
+                self._json(
+                    HTTPStatus.OK,
+                    {
+                        "ok": True,
+                        "service": GATEWAY_SERVICE_NAME,
+                        "gateway": "alive",
+                        "execution": "ready",
+                        "ppu_id": snapshot["ppu"]["ppu_id"],
+                    },
+                )
+                return
+            if parsed.path == "/api/node":
+                try:
+                    snapshot = self._local_snapshot()
+                except Exception:
+                    self._execution_unavailable()
+                    return
+                self._json(
+                    HTTPStatus.OK,
+                    {
+                        "ok": True,
+                        "contract_version": FLEET_CONTRACT_VERSION,
+                        "node_role": "ppu",
+                        "manager_required": False,
+                        "ppu": snapshot["ppu"],
+                        "links": {
+                            "status": "/api/status",
+                            "jobs": "/api/jobs",
+                            "liveness": "/api/health/live",
+                            "readiness": "/api/health/ready",
+                        },
+                    },
+                )
+                return
             if parsed.path == "/api/status":
                 query = parse_qs(parsed.query)
                 job = query.get("job", [None])[0]
                 site = query.get("site", [None])[0]
                 legacy_channel = query.get("channel", [None])[0]
                 site_id = _site_value(site, legacy_channel)
-                self._json(HTTPStatus.OK, _run(self.client_factory().status(job_id=job, site_id=site_id)))
+                self._json(
+                    HTTPStatus.OK,
+                    _run(self.client_factory().status(job_id=job, site_id=site_id)),
+                )
                 return
             parts = parsed.path.split("/")
             if len(parts) == 6 and parts[1:3] == ["api", "jobs"] and parts[4] == "files":
@@ -166,7 +246,10 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, _run(self.client_factory().cancel(job_id)))
                 return
             if parsed.path != "/api/jobs":
-                self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
+                self._json(
+                    HTTPStatus.NOT_FOUND,
+                    {"ok": False, "error": {"message": "not found"}},
+                )
                 return
             body = self._body()
             operation = Operation(str(body["operation"]))
@@ -203,7 +286,13 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             raise ValueError("map_data must be an object")
         sections = map_data.get("sections")
         if sections is None:
-            sections = [{"name": "flash", "offset": body.get("offset", 0), "length": body.get("length", 256)}]
+            sections = [
+                {
+                    "name": "flash",
+                    "offset": body.get("offset", 0),
+                    "length": body.get("length", 256),
+                }
+            ]
         if not isinstance(sections, list) or not sections:
             raise ValueError("map_data.sections must be a non-empty array")
         normalized = []
@@ -216,7 +305,13 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 raise ValueError(f"map section {index} range is invalid")
             if offset < 0 or length <= 0:
                 raise ValueError(f"map section {index} range is invalid")
-            normalized.append({"name": str(section.get("name", f"section{index}")), "address": offset, "length": length})
+            normalized.append(
+                {
+                    "name": str(section.get("name", f"section{index}")),
+                    "address": offset,
+                    "length": length,
+                }
+            )
         return {**map_data, "sections": normalized}
 
 
