@@ -1,0 +1,155 @@
+name: Mock CD Browser Runtime Acceptance
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mock-cd-browser.yml"
+      - "scripts/mock-cd.py"
+      - "scripts/mock-cd-browser-stack.py"
+      - "software/python/**"
+      - "software/web/**"
+      - "docs/development/mock-cd.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mock-cd-browser.yml"
+      - "scripts/mock-cd.py"
+      - "scripts/mock-cd-browser-stack.py"
+      - "software/python/**"
+      - "software/web/**"
+      - "docs/development/mock-cd.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: software/python/pyproject.toml
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: |
+            software/web/package-lock.json
+            software/web/e2e/package-lock.json
+
+      - name: Install Python runtime
+        run: python -m pip install -e 'software/python[dev]'
+
+      - name: Install Web runtime
+        working-directory: software/web
+        run: npm ci
+
+      - name: Install Playwright runtime
+        run: npm --prefix software/web/e2e ci
+
+      - name: Install Chromium
+        timeout-minutes: 10
+        run: cd software/web/e2e && npx playwright install chromium
+
+      - name: Start persistent Mock CD stack
+        env:
+          MOCK_CD_ARTIFACT_DIR: ${{ github.workspace }}/artifacts/mock-cd-browser/stack
+          MOCK_CD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p artifacts/mock-cd-browser/stack
+          python scripts/mock-cd-browser-stack.py > artifacts/mock-cd-browser/stack-driver.log 2>&1 &
+          echo $! > artifacts/mock-cd-browser/stack-driver.pid
+          python - <<'PY'
+          import json
+          import time
+          from pathlib import Path
+
+          runtime = Path("artifacts/mock-cd-browser/stack/runtime.json")
+          deadline = time.monotonic() + 60
+          while time.monotonic() < deadline:
+              if runtime.is_file():
+                  payload = json.loads(runtime.read_text(encoding="utf-8"))
+                  if payload.get("state") == "ready":
+                      print(json.dumps(payload, indent=2, sort_keys=True))
+                      break
+              time.sleep(0.25)
+          else:
+              raise SystemExit("Mock CD browser stack did not become ready within 60 seconds")
+          PY
+
+      - name: Run real-stack Playwright acceptance
+        id: browser
+        continue-on-error: true
+        working-directory: software/web/e2e
+        env:
+          MOCK_CD_WEB_URL: http://127.0.0.1:15173
+          MOCK_CD_GATEWAY_URL: http://127.0.0.1:19801
+          MOCK_CD_UNREACHABLE_GATEWAY_URL: http://127.0.0.1:19899
+          MOCK_CD_EXPECTED_SITES: "8"
+        run: npx playwright test --config=playwright.mock-cd.config.ts
+
+      - name: Publish browser acceptance summary
+        if: ${{ always() }}
+        env:
+          BROWSER_OUTCOME: ${{ steps.browser.outcome }}
+          MOCK_CD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          outcome = os.environ.get("BROWSER_OUTCOME") or "not_run"
+          passed = outcome == "success"
+          payload = {
+              "schema_version": 1,
+              "commit": os.environ.get("MOCK_CD_COMMIT", "unknown"),
+              "result": "PASS" if passed else "FAIL",
+              "stack": {"ppu": "mock-ppu-a", "enabled_sites": 8, "gateway": "real", "api_mocking": False},
+              "scenarios": {
+                  "gateway_offline_recovery": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "per_site_erase_program_verify_read_download": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "batch_membership_selected_sites_x_operations": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+              },
+          }
+          path = Path("artifacts/mock-cd-browser/browser-acceptance.json")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(path.read_text(encoding="utf-8"))
+          PY
+
+      - name: Stop Mock CD browser stack
+        if: ${{ always() }}
+        run: |
+          if [[ -f artifacts/mock-cd-browser/stack-driver.pid ]]; then
+            pid="$(cat artifacts/mock-cd-browser/stack-driver.pid)"
+            kill "$pid" 2>/dev/null || true
+            for _ in $(seq 1 40); do
+              kill -0 "$pid" 2>/dev/null || break
+              sleep 0.1
+            done
+            kill -9 "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+          fi
+          tail -n 120 artifacts/mock-cd-browser/stack-driver.log 2>/dev/null || true
+
+      - name: Upload Mock CD browser acceptance artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-cd-browser-acceptance
+          path: artifacts/mock-cd-browser/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce browser acceptance result
+        if: ${{ steps.browser.outcome != 'success' }}
+        run: exit 1
