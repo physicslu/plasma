@@ -1,14 +1,6 @@
 @import "tailwindcss";
 
 .fleetPage { min-height: 100vh; background: var(--navy); color: var(--text); }
-.fleetTopbar { height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 32px; border-bottom: 1px solid var(--line); background: var(--topbar); }
-.fleetBrand { display: flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; }
-.fleetBrand > span { display: grid; place-items: center; width: 38px; height: 38px; background: var(--cyan); color: #04111c; font-weight: 900; font-size: 24px; clip-path: polygon(0 0, 80% 0, 100% 20%, 100% 100%, 20% 100%, 0 80%); }
-.fleetBrand b { display: block; letter-spacing: .18em; font-size: 16px; }
-.fleetBrand small { display: block; color: var(--muted); font-size: 10px; letter-spacing: .1em; margin-top: 3px; }
-.fleetTopbar nav { display: flex; align-items: center; gap: 7px; }
-.fleetTopbar nav a { border: 1px solid var(--line); border-radius: 6px; color: var(--text-soft); text-decoration: none; padding: 7px 10px; font-size: 10px; background: var(--panel); }
-.fleetTopbar nav a:hover, .fleetTopbar nav a.active { border-color: var(--cyan); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 8%, var(--panel)); }
 
 .fleetShell { width: min(1420px, 100%); margin: 0 auto; padding: 30px clamp(18px, 4vw, 54px) 48px; display: grid; gap: 14px; }
 .fleetHeading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
@@ -66,8 +58,6 @@
 }
 
 @media (max-width: 680px) {
-  .fleetTopbar { height: auto; align-items: flex-start; padding: 14px 18px; flex-direction: column; }
-  .fleetTopbar nav { width: 100%; overflow-x: auto; }
   .fleetHeading { align-items: flex-start; flex-direction: column; }
   .fleetSummary { grid-template-columns: repeat(2, 1fr); }
   .ppuGrid { grid-template-columns: 1fr; }
