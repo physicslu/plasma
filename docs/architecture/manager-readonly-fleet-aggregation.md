@@ -39,7 +39,8 @@ manager:
   port: 18180
   request_timeout_s: 2.0
   poll_interval_s: 2.0
-  observation_db_path: /var/lib/plasma/manager-observations.sqlite3
+  # Optional; choose a writable operator-local absolute path.
+  # observation_db_path: /absolute/operator/local/path/manager-observations.sqlite3
 
 ppus:
   - alias: ppu-a
@@ -50,7 +51,7 @@ ppus:
 
 `poll_interval_s` controls background fleet observation cadence and defaults to 2 seconds. Client request frequency does not multiply outbound PPU polling.
 
-`observation_db_path` is optional. When omitted, Manager preserves the PR #45 memory-only behavior: last-known history is lost on Manager restart. When present, it must be an absolute operator-local filesystem path and enables SQLite persistence of the latest trusted observation per configured endpoint.
+`observation_db_path` is optional. When omitted, last-known history remains process memory and is lost on Manager restart. When present, it must be a writable absolute operator-local filesystem path and enables SQLite persistence of the latest trusted observation per configured endpoint.
 
 The endpoint identifies the root of one autonomous PPU's Plasma Web REST Gateway. `alias` is operator-facing registry metadata only; canonical `ppu_id`, `facility_id`, model, capabilities, and Site counts come from the PPU itself.
 
