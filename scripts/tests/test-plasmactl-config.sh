@@ -173,6 +173,7 @@ bash -c 'source "$1"; validate_manager_settings' _ "$plasmactl_path" >/dev/null 
 grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy' "$plasmactl_path" || fail 'deploy does not re-exec updated plasmactl'
 grep -Fq 'reconcile_service_units' "$plasmactl_path" || fail 'service-unit reconciliation is missing'
 grep -Fq 'manager_health_check' "$plasmactl_path" || fail 'Manager health check integration is missing'
+grep -Fq 'systemctl --user is-active --quiet plasma-manager.service' "$plasmactl_path" || fail 'Manager health check does not verify systemd service ownership'
 grep -Fq 'manager) units=(-u plasma-manager.service)' "$plasmactl_path" || fail 'Manager log target is missing'
 
 # Web deployment hygiene: source changes make a long-running Vite runtime stale,
