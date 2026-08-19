@@ -157,6 +157,7 @@ export default function Home() {
   const [batchCancelling, setBatchCancelling] = useState(false);
   const [batchSiteStates, setBatchSiteStates] = useState<Record<number, BatchSiteState>>({});
   const trackedJobs = useRef<Record<number, string>>({});
+  const submissionGenerations = useRef<Record<number, number>>({});
   const transitionKeys = useRef<Record<string, string>>({});
   const connectionRef = useRef<ConnectionState>("connecting");
   const batchLifecycle = useRef<BatchLifecycle | null>(null);
@@ -197,7 +198,6 @@ export default function Home() {
   }, []);
 
   const applyJob = useCallback((job: JobSnapshot) => {
-    trackedJobs.current[job.site_id] = job.job_id;
     const stage = uiStage(job);
     const error = job.result?.error?.message;
     const outputFile = job.result?.output_files?.[0]?.split(/[\\/]/).pop();
@@ -256,6 +256,7 @@ export default function Home() {
 
     async function poll() {
       try {
+        const submissionSnapshot = { ...submissionGenerations.current };
         const status = await getPPUStatus(apiBase);
         if (stopped) return;
         setPPU(status.ppu ?? null);
@@ -265,7 +266,11 @@ export default function Home() {
           if (!availableSiteIds.has(Number(siteId))) delete trackedJobs.current[Number(siteId)];
         });
         status.sites.forEach(site => {
-          if (site.current_job_id) trackedJobs.current[site.site_id] = site.current_job_id;
+          const submissionChanged = (submissionGenerations.current[site.site_id] ?? 0)
+            !== (submissionSnapshot[site.site_id] ?? 0);
+          if (site.current_job_id && !submissionChanged) {
+            trackedJobs.current[site.site_id] = site.current_job_id;
+          }
         });
 
         setSites(current => status.sites.map(backend => (
@@ -281,11 +286,16 @@ export default function Home() {
           return status.sites.length > 0 ? [status.sites[0].site_id] : [];
         });
 
-        const jobs = await Promise.all(
-          Object.values(trackedJobs.current).map(jobId => getJob(apiBase, jobId)),
-        );
+        const jobIds = [...new Set(Object.values(trackedJobs.current))];
+        const jobs = await Promise.all(jobIds.map(jobId => getJob(apiBase, jobId)));
         if (stopped) return;
-        jobs.forEach(applyJob);
+        jobs.forEach(job => {
+          if (trackedJobs.current[job.site_id] !== job.job_id) return;
+          applyJob(job);
+          if (terminalJobStates.has(job.state) && trackedJobs.current[job.site_id] === job.job_id) {
+            delete trackedJobs.current[job.site_id];
+          }
+        });
         if (connectionRef.current !== "online") {
           connectionRef.current = "online";
           setConnection("online");
@@ -400,6 +410,7 @@ export default function Home() {
     }
 
     if (!forBatch) clearBatchSiteState(siteId);
+    submissionGenerations.current[siteId] = (submissionGenerations.current[siteId] ?? 0) + 1;
     setSubmittingSiteIds(current => current.includes(siteId) ? current : [...current, siteId]);
     try {
       const job = await startJob(apiBase, {
