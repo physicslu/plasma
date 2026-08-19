@@ -1,0 +1,302 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+plasmactl_path="$script_dir/plasmactl"
+
+# Reuse the canonical deployment configuration without invoking plasmactl's
+# command dispatcher. This verifier is deliberately read-only.
+PLASMACTL_LIB_ONLY=1
+# shellcheck source=../scripts/plasmactl
+source "$plasmactl_path"
+
+verify_failures=0
+
+verify_pass() {
+  printf '[PASS] %-34s %s\n' "$1" "${2:-}"
+}
+
+verify_warn() {
+  printf '[WARN] %-34s %s\n' "$1" "${2:-}"
+}
+
+verify_fail() {
+  printf '[FAIL] %-34s %s\n' "$1" "${2:-}"
+  verify_failures=$((verify_failures + 1))
+}
+
+service_environment_value() {
+  local key="$1" text="$2"
+  printf '%s\n' "$text" | tr ' ' '\n' | sed -n "s/^${key}=//p" | tail -n 1
+}
+
+process_environment_value() {
+  local pid="$1" key="$2"
+  [[ "$pid" =~ ^[1-9][0-9]*$ && -r "/proc/$pid/environ" ]] || return 1
+  tr '\0' '\n' <"/proc/$pid/environ" | sed -n "s/^${key}=//p" | tail -n 1
+}
+
+validate_fleet_payload() {
+  "$python_bin" -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+if payload.get("ok") is not True:
+    raise SystemExit("fleet payload ok != true")
+if payload.get("contract_version") != "1":
+    raise SystemExit("unexpected fleet contract_version")
+
+summary = payload.get("summary")
+manager = payload.get("manager")
+ppus = payload.get("ppus")
+if not isinstance(summary, dict) or not isinstance(manager, dict) or not isinstance(ppus, list):
+    raise SystemExit("fleet payload shape is incomplete")
+
+for key in (
+    "configured_ppus",
+    "reachable_ppus",
+    "ready_ppus",
+    "current_ppus",
+    "stale_ppus",
+    "unknown_ppus",
+    "reported_sites",
+    "enabled_sites",
+    "identity_conflicts",
+):
+    if not isinstance(summary.get(key), int) or summary[key] < 0:
+        raise SystemExit(f"invalid summary field: {key}")
+
+store = manager.get("observation_store")
+if not isinstance(store, dict):
+    raise SystemExit("observation_store missing")
+
+forbidden = {"endpoint", "errors", "last_refresh_error", "observation_db_path"}
+def walk(value):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in forbidden:
+                raise SystemExit(f"browser payload exposes forbidden key: {key}")
+            walk(child)
+    elif isinstance(value, list):
+        for child in value:
+            walk(child)
+walk(payload)
+
+for ppu in ppus:
+    if not isinstance(ppu, dict):
+        raise SystemExit("invalid PPU entry")
+    observation = ppu.get("observation")
+    capacity = ppu.get("current_capacity")
+    if not isinstance(observation, dict) or not isinstance(capacity, dict):
+        raise SystemExit("PPU observation/capacity missing")
+    state = observation.get("state")
+    if state not in {"current", "stale", "unknown"}:
+        raise SystemExit("invalid observation state")
+    if state != "current" and (
+        capacity.get("site_count") != 0 or capacity.get("enabled_site_count") != 0
+    ):
+        raise SystemExit("stale/unknown PPU contributes current capacity")
+
+print(f"configured_ppus={summary['configured_ppus']}")
+print(f"reachable_ppus={summary['reachable_ppus']}")
+print(f"ready_ppus={summary['ready_ppus']}")
+print(f"current_ppus={summary['current_ppus']}")
+print(f"stale_ppus={summary['stale_ppus']}")
+print(f"unknown_ppus={summary['unknown_ppus']}")
+print(f"reported_sites={summary['reported_sites']}")
+print(f"enabled_sites={summary['enabled_sites']}")
+print(f"fleet_degraded={str(bool(payload.get('degraded'))).lower()}")
+print(f"observation_store={store.get('mode', 'unknown')}")
+print(f"observation_store_healthy={str(store.get('healthy') is True).lower()}")
+'
+}
+
+verify_fleet() {
+  require_repo
+  require_runtime
+  require_command curl
+  require_command git
+  require_command systemctl
+  require_command sed
+  require_command tr
+  require_command awk
+
+  printf 'Plasma Fleet Runtime Acceptance\n'
+  printf '================================\n'
+  printf 'Version:  %s\n' "$(git -C "$repo" log -1 --oneline)"
+  printf 'Branch:   %s\n' "$(git -C "$repo" branch --show-current)"
+  printf 'Worktree: %s\n\n' "$(if [[ -z "$(git -C "$repo" status --porcelain)" ]]; then echo clean; else echo modified; fi)"
+
+  if [[ "$(git -C "$repo" branch --show-current)" == "$branch" ]]; then
+    verify_pass "Git branch" "$branch"
+  else
+    verify_fail "Git branch" "expected $branch"
+  fi
+  if [[ -z "$(git -C "$repo" status --porcelain)" ]]; then
+    verify_pass "Git worktree" "clean"
+  else
+    verify_fail "Git worktree" "modified"
+  fi
+
+  if systemctl --user is-active --quiet plasma-vite.service; then
+    verify_pass "plasma-vite.service" "active"
+  else
+    verify_fail "plasma-vite.service" "not active"
+  fi
+
+  if [[ "$manager_enabled" == "1" ]]; then
+    verify_pass "Manager deployment" "enabled"
+  else
+    verify_fail "Manager deployment" "PLASMA_MANAGER_ENABLED != 1"
+  fi
+
+  if systemctl --user is-active --quiet plasma-manager.service; then
+    verify_pass "plasma-manager.service" "active"
+  else
+    verify_fail "plasma-manager.service" "not active"
+  fi
+
+  local service_env fleet_flag manager_binding vite_pid process_fleet_flag process_manager_binding
+  service_env="$(systemctl --user show plasma-vite.service --property=Environment --value 2>/dev/null || true)"
+  fleet_flag="$(service_environment_value PLASMA_FLEET_UI_ENABLED "$service_env")"
+  manager_binding="$(service_environment_value PLASMA_MANAGER_API_URL "$service_env")"
+
+  if [[ "$fleet_flag" == "1" ]]; then
+    verify_pass "Fleet systemd opt-in" "PLASMA_FLEET_UI_ENABLED=1"
+  else
+    verify_fail "Fleet systemd opt-in" "value=${fleet_flag:-missing}"
+  fi
+
+  if [[ -n "$manager_binding" ]]; then
+    verify_pass "Manager BFF systemd URL" "$manager_binding"
+  else
+    verify_fail "Manager BFF systemd URL" "missing"
+  fi
+
+  vite_pid="$(systemctl --user show plasma-vite.service --property=MainPID --value 2>/dev/null || true)"
+  process_fleet_flag="$(process_environment_value "$vite_pid" PLASMA_FLEET_UI_ENABLED 2>/dev/null || true)"
+  process_manager_binding="$(process_environment_value "$vite_pid" PLASMA_MANAGER_API_URL 2>/dev/null || true)"
+
+  if [[ "$process_fleet_flag" == "1" ]]; then
+    verify_pass "Fleet Vite process opt-in" "PID=$vite_pid"
+  else
+    verify_fail "Fleet Vite process opt-in" "PID=${vite_pid:-unknown} value=${process_fleet_flag:-missing}"
+  fi
+  if [[ -n "$process_manager_binding" && "$process_manager_binding" == "$manager_binding" ]]; then
+    verify_pass "Manager Vite process URL" "$process_manager_binding"
+  else
+    verify_fail "Manager Vite process URL" "service=${manager_binding:-missing} process=${process_manager_binding:-missing}"
+  fi
+
+  local manager_host manager_url
+  if [[ "$manager_enabled" == "1" && -f "$manager_config" ]]; then
+    manager_host="$($python_bin -c 'from plasma_manager.config import load_manager_config; import sys; print(load_manager_config(sys.argv[1]).host)' "$manager_config" 2>/dev/null || true)"
+    manager_url="$(manager_probe_url 2>/dev/null || true)"
+  else
+    manager_host=""
+    manager_url=""
+  fi
+
+  case "$manager_host" in
+    127.0.0.1|localhost|::1) verify_pass "Manager listener scope" "$manager_host" ;;
+    *) verify_fail "Manager listener scope" "expected loopback, got ${manager_host:-unknown}" ;;
+  esac
+
+  if [[ -n "$manager_binding" && -n "$manager_url" && "${manager_binding%/}" == "${manager_url%/}" ]]; then
+    verify_pass "Manager URL consistency" "$manager_url"
+  else
+    verify_fail "Manager URL consistency" "BFF=${manager_binding:-missing} Manager=${manager_url:-missing}"
+  fi
+
+  if [[ -n "$manager_url" ]] && curl --fail --silent --show-error --max-time 5 "$manager_url/api/health/live" >/dev/null 2>&1; then
+    verify_pass "Manager liveness" "$manager_url/api/health/live"
+  else
+    verify_fail "Manager liveness" "unreachable"
+  fi
+
+  if [[ -n "$manager_url" ]] && curl --fail --silent --show-error --max-time 5 "$manager_url/api/fleet" >/dev/null 2>&1; then
+    verify_pass "Manager fleet API" "$manager_url/api/fleet"
+  else
+    verify_fail "Manager fleet API" "unreachable or non-2xx"
+  fi
+
+  local local_web="http://127.0.0.1:$vite_port" fleet_payload fleet_summary
+  if fleet_payload="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/api/fleet" 2>/dev/null)"; then
+    verify_pass "Fleet Web BFF HTTP" "200"
+    if fleet_summary="$(printf '%s' "$fleet_payload" | validate_fleet_payload 2>&1)"; then
+      verify_pass "Fleet browser contract" "sanitized + capacity-safe"
+    else
+      verify_fail "Fleet browser contract" "$fleet_summary"
+      fleet_summary=""
+    fi
+  else
+    verify_fail "Fleet Web BFF HTTP" "expected 2xx from $local_web/api/fleet"
+    fleet_summary=""
+  fi
+
+  local root_headers root_location demo_html ppu_html fleet_html
+  root_headers="$(curl --silent --show-error --max-time 5 -D - -o /dev/null -H 'Host: plasma.open4th.com' "$local_web/" 2>/dev/null || true)"
+  root_location="$(printf '%s\n' "$root_headers" | awk 'BEGIN { IGNORECASE=1 } /^location:/ { gsub("\\r", ""); sub(/^[^:]*:[[:space:]]*/, ""); print; exit }')"
+  if [[ "$root_location" == "/demo" ]]; then
+    verify_pass "Public-host root routing" "/ -> /demo"
+  else
+    verify_fail "Public-host root routing" "location=${root_location:-missing}"
+  fi
+
+  if demo_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/demo" 2>/dev/null)" && grep -Fq 'Choose a Demo' <<<"$demo_html"; then
+    verify_pass "/demo SSR" "two-demo landing"
+  else
+    verify_fail "/demo SSR" "missing expected landing content"
+  fi
+
+  if ppu_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/ppu" 2>/dev/null)" && grep -Fq 'SITE MATRIX' <<<"$ppu_html"; then
+    verify_pass "/ppu SSR" "single-PPU console"
+  else
+    verify_fail "/ppu SSR" "missing PPU console content"
+  fi
+
+  if fleet_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/fleet" 2>/dev/null)" && grep -Fq 'Facility / PPU Fleet Overview' <<<"$fleet_html"; then
+    verify_pass "/fleet SSR" "read-only Fleet UI"
+  else
+    verify_fail "/fleet SSR" "missing Fleet UI content"
+  fi
+
+  if [[ -n "$fleet_summary" ]]; then
+    printf '\nFleet snapshot\n--------------\n%s\n' "$fleet_summary"
+  fi
+
+  printf '\nManual UI acceptance (not automated here)\n'
+  printf '  %s/demo\n' "$default_public_api_url"
+  printf '  %s/ppu\n' "$default_public_api_url"
+  printf '  %s/fleet\n' "$default_public_api_url"
+
+  if (( verify_failures == 0 )); then
+    printf '\nRESULT: PASS\n'
+    return 0
+  fi
+
+  printf '\nRESULT: FAIL (%d check%s)\n' "$verify_failures" "$(if (( verify_failures == 1 )); then printf ''; else printf 's'; fi)"
+  return 1
+}
+
+usage_verify() {
+  cat <<'EOF'
+Usage: plasmactl verify TARGET
+
+Targets:
+  fleet    Read-only post-deploy acceptance for Manager/Fleet runtime chain
+EOF
+}
+
+if [[ "${PLASMACTL_VERIFY_LIB_ONLY:-0}" == "1" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+
+target="${1:-}"
+case "$target" in
+  fleet) verify_fleet ;;
+  help|-h|--help|"") usage_verify ;;
+  *) usage_verify >&2; die "verify 不支援 target：$target" ;;
+esac
