@@ -18,9 +18,34 @@ const operationLabels: Record<Operation, string> = {
   verify: "驗證",
   read: "讀取",
 };
+const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
 
 const liveLog = (page: Page) => page.getByLabel("Live job log");
 const siteRow = (page: Page, siteId: number) => page.locator(".channelTable tbody tr").filter({ hasText: `SITE ${siteId}` }).first();
+const allSiteIds = () => Array.from({ length: expectedSites }, (_, index) => index + 1);
+
+function representativeSelections(siteCount: number): number[][] {
+  if (!Number.isInteger(siteCount) || siteCount < 1) {
+    throw new Error(`invalid Site count for Browser Runtime Acceptance: ${siteCount}`);
+  }
+  const all = Array.from({ length: siteCount }, (_, index) => index + 1);
+  const candidates: number[][] = [[1]];
+  if (siteCount >= 2) candidates.push([1, siteCount]);
+  if (siteCount >= 3) {
+    const interior = Math.max(2, Math.min(siteCount - 1, Math.floor(siteCount / 2) + 1));
+    candidates.push([1, interior, siteCount]);
+  }
+  if (siteCount >= 2) candidates.push(all.slice(0, -1));
+  candidates.push(all);
+
+  const seen = new Set<string>();
+  return candidates.filter(selection => {
+    const key = selection.join(",");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 async function openRuntimeConsole(page: Page) {
   await page.goto("/");
@@ -43,6 +68,68 @@ async function runSiteOperation(page: Page, siteId: number, operation: Operation
   await expect.poll(() => accepted.count(), { timeout: 15_000 }).toBe(before + 1);
   await expect(row.locator("td").nth(2)).toContainText(label);
   await expect(row.locator(".state")).toHaveText("成功", { timeout: 15_000 });
+}
+
+async function setSelectedSites(page: Page, selectedSites: number[]) {
+  const desired = new Set(selectedSites);
+  if (desired.size === 0) throw new Error("Browser Runtime Acceptance does not permit an empty Site selection");
+
+  for (const siteId of selectedSites) {
+    const checkbox = page.getByLabel(`顯示 SITE ${siteId}`);
+    if (!(await checkbox.isChecked())) await checkbox.check();
+  }
+  for (const siteId of allSiteIds()) {
+    if (desired.has(siteId)) continue;
+    const checkbox = page.getByLabel(`顯示 SITE ${siteId}`);
+    if (await checkbox.isChecked()) await checkbox.uncheck();
+  }
+
+  await expect(page.getByLabel("Site 配置摘要")).toContainText(`顯示 ${selectedSites.length} / ${expectedSites}`);
+  await expect(page.locator(".batchInfo")).toContainText(
+    `目標：${selectedSites.map(siteId => `SITE ${siteId}`).join("、")}`,
+  );
+}
+
+async function setBatchOperations(page: Page, operations: Operation[]) {
+  const desired = new Set(operations);
+  for (const operation of operationOrder) {
+    const checkbox = page.getByLabel(`批次操作：${operationLabels[operation]}`);
+    const checked = await checkbox.isChecked();
+    if (desired.has(operation) && !checked) await checkbox.check();
+    if (!desired.has(operation) && checked) await checkbox.uncheck();
+  }
+}
+
+async function runBatchAndAssert(
+  page: Page,
+  starts: StartRequest[],
+  selectedSites: number[],
+  operations: Operation[],
+  expectedCompleteCount: number,
+) {
+  await setSelectedSites(page, selectedSites);
+  await setBatchOperations(page, operations);
+
+  const executeName = `批次執行：${operations.map(operation => operationLabels[operation]).join("、")}`;
+  const execute = page.getByRole("button", { name: executeName });
+  await expect(execute).toBeEnabled();
+
+  const before = starts.length;
+  await execute.click();
+  await expect.poll(() => starts.length, { timeout: 30_000 }).toBe(before + selectedSites.length * operations.length);
+  await expect.poll(
+    () => liveLog(page).locator("span").filter({ hasText: "[BATCH] COMPLETE" }).count(),
+    { timeout: 30_000 },
+  ).toBe(expectedCompleteCount);
+
+  const actual = starts.slice(before)
+    .map(item => `${item.siteId}:${item.operation}`)
+    .sort();
+  const expected = selectedSites
+    .flatMap(siteId => operations.map(operation => `${siteId}:${operation}`))
+    .sort();
+  expect(actual).toEqual(expected);
+  expect(new Set(starts.slice(before).map(item => item.siteId))).toEqual(new Set(selectedSites));
 }
 
 test("real Gateway reports offline and recovers cleanly", async ({ page }) => {
@@ -81,6 +168,16 @@ test("real Gateway reports offline and recovers cleanly", async ({ page }) => {
 });
 
 test("every enabled Site runs Erase Program Verify Read and downloads exact bytes", async ({ page }) => {
+  const starts: StartRequest[] = [];
+  page.on("request", request => {
+    const url = new URL(request.url());
+    if (request.method() !== "POST" || url.pathname !== "/api/jobs") return;
+    const body = request.postDataJSON() as { site_id?: number; operation?: Operation };
+    if (typeof body.site_id === "number" && body.operation) {
+      starts.push({ siteId: body.site_id, operation: body.operation });
+    }
+  });
+
   await openRuntimeConsole(page);
 
   await page.getByLabel("選擇 Firmware 檔案").setInputFiles({
@@ -93,10 +190,12 @@ test("every enabled Site runs Erase Program Verify Read and downloads exact byte
 
   for (let siteId = 1; siteId <= expectedSites; siteId += 1) {
     await test.step(`SITE ${siteId}: Erase -> Program -> Verify -> Read -> download`, async () => {
-      await runSiteOperation(page, siteId, "erase");
-      await runSiteOperation(page, siteId, "program");
-      await runSiteOperation(page, siteId, "verify");
-      await runSiteOperation(page, siteId, "read");
+      for (const operation of operationOrder) {
+        const before = starts.length;
+        await runSiteOperation(page, siteId, operation);
+        await expect.poll(() => starts.length).toBe(before + 1);
+        expect(starts[before]).toEqual({ siteId, operation });
+      }
 
       const downloadLink = page.getByLabel(`下載 SITE ${siteId} 讀取檔案`);
       await expect(downloadLink).toBeVisible();
@@ -114,7 +213,7 @@ test("every enabled Site runs Erase Program Verify Read and downloads exact byte
   }
 });
 
-test("batch membership controls dispatch selected Sites x selected operations", async ({ page }) => {
+test("batch membership supports representative arbitrary Site subsets and selected operations", async ({ page }) => {
   const starts: StartRequest[] = [];
   page.on("request", request => {
     const url = new URL(request.url());
@@ -138,49 +237,23 @@ test("batch membership controls dispatch selected Sites x selected operations", 
     });
   }
 
-  for (let siteId = 2; siteId <= expectedSites; siteId += 1) {
-    await page.getByLabel(`顯示 SITE ${siteId}`).uncheck();
+  const selections = representativeSelections(expectedSites);
+  let completeCount = 0;
+  for (const [index, selection] of selections.entries()) {
+    const operations: Operation[] = index === 2 || index === selections.length - 1
+      ? ["erase", "read"]
+      : index === 1
+        ? ["read"]
+        : ["erase"];
+    completeCount += 1;
+    await test.step(
+      `batch subset ${selection.join(",")} x ${operations.join(",")}`,
+      () => runBatchAndAssert(page, starts, selection, operations, completeCount),
+    );
   }
-  await expect(page.getByLabel("Site 配置摘要")).toContainText(`顯示 1 / ${expectedSites}`);
-  await expect(page.locator(".batchInfo")).toContainText("目標：SITE 1");
-  await expect(page.getByLabel("批次執行：尚未選擇操作")).toBeDisabled();
 
-  await page.getByLabel("批次操作：擦除").check();
-  const firstExecute = page.getByRole("button", { name: "批次執行：擦除" });
-  await expect(firstExecute).toBeEnabled();
-  await firstExecute.click();
-  await expect.poll(() => starts.length, { timeout: 20_000 }).toBe(1);
-  await expect(liveLog(page)).toContainText("[BATCH] COMPLETE", { timeout: 20_000 });
-  expect(starts).toEqual([{ siteId: 1, operation: "erase" }]);
-
-  const multiSites = Array.from({ length: expectedSites }, (_, index) => index + 1)
-    .filter(siteId => siteId !== 1 && siteId % 2 === 0)
-    .slice(0, 3);
-  if (multiSites.length === 0) throw new Error("batch membership acceptance requires at least two enabled Sites");
-  for (const siteId of multiSites) {
-    await page.getByLabel(`顯示 SITE ${siteId}`).check();
+  if (expectedSites >= 3) {
+    expect(selections).toContainEqual([1, Math.max(2, Math.min(expectedSites - 1, Math.floor(expectedSites / 2) + 1)), expectedSites]);
   }
-  await page.getByLabel("顯示 SITE 1").uncheck();
-  await expect(page.getByLabel("Site 配置摘要")).toContainText(`顯示 ${multiSites.length} / ${expectedSites}`);
-  await expect(page.locator(".batchInfo")).toContainText(`目標：${multiSites.map(siteId => `SITE ${siteId}`).join("、")}`);
-
-  await page.getByLabel("批次操作：讀取").check();
-  const secondExecute = page.getByRole("button", { name: "批次執行：擦除、讀取" });
-  await expect(secondExecute).toBeEnabled();
-  const beforeSecondBatch = starts.length;
-  await secondExecute.click();
-  await expect.poll(() => starts.length, { timeout: 30_000 }).toBe(beforeSecondBatch + multiSites.length * 2);
-  await expect.poll(
-    () => liveLog(page).locator("span").filter({ hasText: "[BATCH] COMPLETE" }).count(),
-    { timeout: 30_000 },
-  ).toBe(2);
-
-  const actual = starts.slice(beforeSecondBatch)
-    .map(item => `${item.siteId}:${item.operation}`)
-    .sort();
-  const expected = multiSites
-    .flatMap(siteId => [`${siteId}:erase`, `${siteId}:read`])
-    .sort();
-  expect(actual).toEqual(expected);
-  expect(new Set(starts.slice(beforeSecondBatch).map(item => item.siteId))).toEqual(new Set(multiSites));
+  expect(selections.at(-1)).toEqual(allSiteIds());
 });
