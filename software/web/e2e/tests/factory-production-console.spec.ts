@@ -86,7 +86,7 @@ test("Production Mode shows heterogeneous PPUs, E/P/V/R and per-PPU selection", 
   await expect(ppuA.locator("[data-site-id]")).toHaveCount(4);
   await ppuA.getByRole("button", { name: "全選" }).click();
   await expect(ppuA.getByRole("checkbox", { name: /PPU-A SITE/ })).toHaveCount(4);
-  await expect(ppuA.getByRole("checkbox", { name: /PPU-A SITE/ }).filter({ has: page.locator(":checked") })).toHaveCount(3);
+  await expect(ppuA.locator('input[type="checkbox"]:checked')).toHaveCount(3);
   await expect(ppuA.getByRole("checkbox", { name: "PPU-A SITE 4" })).toBeDisabled();
 
   await ppuA.getByRole("button", { name: "全部取消" }).click();
