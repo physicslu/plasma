@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 from .config import ManagerConfig, load_manager_config
 from .fleet import MANAGER_CONTRACT_VERSION, MANAGER_SERVICE_NAME, FleetAggregator
-from .observation import FleetObservationStore
+from .observation import FleetObservationStore, FleetSnapshotSource
 from .persistence import SQLiteObservationPersistence
 from .poller import FleetPoller
 
@@ -84,14 +84,21 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._read_only()
 
 
-def serve(config: ManagerConfig) -> None:
-    aggregator = FleetAggregator(config)
+def _build_observation_store(
+    config: ManagerConfig,
+    source: FleetSnapshotSource,
+) -> FleetObservationStore:
     persistence = (
         SQLiteObservationPersistence(config.observation_db_path)
         if config.observation_db_path is not None
         else None
     )
-    observations = FleetObservationStore(aggregator, persistence=persistence)
+    return FleetObservationStore(source, persistence=persistence)
+
+
+def serve(config: ManagerConfig) -> None:
+    aggregator = FleetAggregator(config)
+    observations = _build_observation_store(config, aggregator)
     poller = FleetPoller(observations, config.poll_interval_s)
     PlasmaManagerHandler.aggregator = aggregator
     PlasmaManagerHandler.poller = poller
