@@ -33,9 +33,7 @@ CURRENT_GUIDANCE = (
     "pl/README.md",
 )
 
-LEGACY_CURRENT_GUIDANCE_PHRASES = (
-    "CH0",
-    "CH1",
+RETIRED_CURRENT_GUIDANCE_PHRASES = (
     "Plasma protocol v3.1 over TCP",
     "Plasma v3.1 TCP Server",
     "Plasma v3.1 TCP server",
@@ -44,6 +42,11 @@ LEGACY_CURRENT_GUIDANCE_PHRASES = (
     "Plasma Python Web Gateway",
     "Python Gateway API",
     "Plasma Programmer Console",
+    "prototype currently enables CH0",
+    "Prototype currently enables CH0",
+    "CH0 / CH1",
+    "CH0/CH1",
+    "CH0、CH1",
 )
 
 
@@ -57,7 +60,7 @@ def test_current_guidance_does_not_reintroduce_retired_runtime_vocabulary(
 ) -> None:
     text = _read(relative_path)
 
-    for legacy in LEGACY_CURRENT_GUIDANCE_PHRASES:
+    for legacy in RETIRED_CURRENT_GUIDANCE_PHRASES:
         assert legacy not in text, f"{relative_path} contains retired current-guidance text: {legacy}"
 
 
