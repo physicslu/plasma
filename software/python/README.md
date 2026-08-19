@@ -67,6 +67,7 @@ v3.1 使用 `PLASMA31`、zero-based `channel_id` 與 legacy `programmer/channels
 - 原子寫檔；Server 啟動時會把先前未完成的工作標記為 `ABORTED`。
 - Plasma Web REST Gateway 提供狀態、工作提交、取消與 read-back 下載。
 - Optional `plasma_manager` 提供手動 PPU registry 與 read-only fleet aggregation；Manager 不參與 PPU 本地工作執行。
+- `scripts/plasmactl` 支援 opt-in `plasma-manager.service` deployment；預設仍是 Manager disabled。
 - `pytest` 是統一 Python test runner。
 
 ## Python 結構
@@ -148,7 +149,16 @@ GET /api/fleet
 
 每台 PPU 由設定檔提供 Plasma Web REST Gateway root URL。Manager 會讀取 PPU 的 `/api/health/live`、`/api/health/ready`、`/api/node`、`/api/status`，並彙整 Facility / PPU / Site 狀態。不同 PPU 可有不同 Site 數量，例如 2、4、8 Sites；單一 PPU offline 不會讓其他 PPU 的 fleet status 無法回傳。
 
-目前 Manager **不提供** job command routing、central scheduling、mDNS discovery、authentication policy、Fleet Web UI 或 `plasmactl`/systemd deployment integration。這些功能必須在保持 PPU standalone-first invariant 的前提下分階段加入。
+Integration-host deployment 已支援 opt-in `plasma-manager.service`。真正的 Manager registry/config 應放在 Git worktree 之外，並由 operator-local deployment config 指定：
+
+```text
+PLASMA_MANAGER_ENABLED=1
+PLASMA_MANAGER_CONFIG=/absolute/operator/local/path/manager.yaml
+```
+
+`PLASMA_MANAGER_ENABLED=0` 是預設值，因此既有 PPU/Integration host 升級不會自動增加 Manager runtime dependency。啟用時 `plasmactl` 會先驗證 Manager YAML，再產生/enable service 並檢查 `/api/health/live`。Manager unit 只依賴 network-online，不依賴同一台主機上的 `plasma-web.service`。
+
+目前 Manager **不提供** job command routing、central scheduling、mDNS discovery、authentication policy 或 Fleet Web UI。這些功能必須在保持 PPU standalone-first invariant 的前提下分階段加入。
 
 ## CLI
 
@@ -262,6 +272,6 @@ mock:
 - TCP 仍採一個 request 對一個 connection，沒有長連線多工或 server-push event stream。
 - v3.1 compatibility adapter 暫時保留；移除時必須另做 deprecation/removal decision。
 - Server 重啟可辨識未完成工作，但不會自動重做燒錄。
-- Plasma Manager 目前只做手動 registry 與 read-only aggregation，尚未整合 production deployment、command routing、auth 或 Fleet UI。
+- Plasma Manager 目前只做手動 registry、read-only aggregation 與 opt-in deployment，尚無 command routing、auth 或 Fleet UI。
 - OpenOCD binary staging、adapter isolation、port 配置與實體 target 尚未完成完整驗證。
 - FPGA register map、AXI/FIFO、SWD engine、power-good 與安全關電仍屬後續硬體整合工作。
