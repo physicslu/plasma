@@ -3,10 +3,25 @@ export type FleetTransportState = "reachable" | "unreachable" | "unknown";
 export type FleetExecutionState = "ready" | "unavailable" | "unknown";
 export type FleetTopologySource = "current" | "last_known" | "none";
 
+export type FleetJobSummary = {
+  job_id: string;
+  operation: "erase" | "program" | "verify" | "read" | "unknown";
+  state: string;
+  stage: string | null;
+  stage_state: string | null;
+  progress_percent: number;
+  created_at: string | null;
+  started_at: string | null;
+  updated_at: string | null;
+  cancel_requested: boolean;
+};
+
 export type FleetSiteView = {
   site_id: number;
   enabled: boolean;
   state: string;
+  current_job_id: string | null;
+  latest_job: FleetJobSummary | null;
   interface: string | null;
   target: string | null;
 };
@@ -105,6 +120,30 @@ function executionState(value: unknown): FleetExecutionState {
   return value === "ready" || value === "unavailable" || value === "unknown" ? value : "unknown";
 }
 
+function operation(value: unknown): FleetJobSummary["operation"] {
+  return value === "erase" || value === "program" || value === "verify" || value === "read"
+    ? value
+    : "unknown";
+}
+
+function jobSummary(value: unknown): FleetJobSummary | null {
+  const job = object(value);
+  const jobId = text(job?.job_id);
+  if (!job || !jobId) return null;
+  return {
+    job_id: jobId,
+    operation: operation(job.operation),
+    state: text(job.state) ?? "unknown",
+    stage: text(job.stage),
+    stage_state: text(job.stage_state),
+    progress_percent: Math.max(0, Math.min(100, number(job.progress_percent))),
+    created_at: text(job.created_at),
+    started_at: text(job.started_at),
+    updated_at: text(job.updated_at),
+    cancel_requested: boolean(job.cancel_requested),
+  };
+}
+
 function siteView(value: unknown): FleetSiteView | null {
   const site = object(value);
   if (!site) return null;
@@ -114,6 +153,8 @@ function siteView(value: unknown): FleetSiteView | null {
     site_id: siteId,
     enabled: boolean(site.enabled),
     state: text(site.state) ?? "unknown",
+    current_job_id: text(site.current_job_id),
+    latest_job: jobSummary(site.latest_job),
     interface: text(site.interface),
     target: text(site.target),
   };
