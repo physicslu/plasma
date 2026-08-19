@@ -1,0 +1,87 @@
+.globalAppNav {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 6px clamp(14px, 3vw, 32px);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--topbar) 96%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 5px 18px var(--card-shadow);
+}
+
+.globalAppNavBrand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.globalAppNavBrand > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--cyan);
+  color: #04111c;
+  font-weight: 900;
+  font-size: 17px;
+  clip-path: polygon(0 0, 80% 0, 100% 20%, 100% 100%, 20% 100%, 0 80%);
+}
+
+.globalAppNavBrand b {
+  font-size: 12px;
+  letter-spacing: .17em;
+}
+
+.globalAppNav nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.globalAppNav nav a {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-soft);
+  text-decoration: none;
+  padding: 7px 11px;
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.globalAppNav nav a:hover,
+.globalAppNav nav a[aria-current="page"] {
+  border-color: color-mix(in srgb, var(--cyan) 55%, var(--line));
+  background: color-mix(in srgb, var(--cyan) 9%, var(--panel));
+  color: var(--cyan);
+}
+
+@media (max-width: 520px) {
+  .globalAppNav {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  .globalAppNavBrand b {
+    display: none;
+  }
+
+  .globalAppNav nav {
+    flex: 1;
+    justify-content: flex-end;
+    overflow-x: auto;
+  }
+
+  .globalAppNav nav a {
+    padding: 7px 8px;
+  }
+}
