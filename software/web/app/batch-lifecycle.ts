@@ -6,6 +6,7 @@ type BatchCommand = {
   phase: BatchCommandPhase;
   operation?: Operation;
   jobId?: string;
+  cancelRequested?: boolean;
 };
 
 export type BatchCancelSnapshot = {
@@ -27,9 +28,14 @@ export class BatchLifecycle {
     return this.cancelBarrier;
   }
 
+  isCancelRequested(siteId: number): boolean {
+    return this.cancelBarrier || this.commands[siteId]?.cancelRequested === true;
+  }
+
   prepare(siteId: number, operation: Operation): boolean {
-    if (this.cancelBarrier) {
-      this.commands[siteId] = { phase: "terminal", operation };
+    if (this.isCancelRequested(siteId)) {
+      const command = this.commands[siteId] ?? { phase: "ready" as const };
+      this.commands[siteId] = { ...command, phase: "terminal", operation };
       return false;
     }
     this.commands[siteId] = { phase: "ready", operation };
@@ -38,7 +44,7 @@ export class BatchLifecycle {
 
   beginSubmit(siteId: number): boolean {
     const command = this.commands[siteId];
-    if (!command || this.cancelBarrier) {
+    if (!command || this.isCancelRequested(siteId)) {
       if (command) this.commands[siteId] = { ...command, phase: "terminal" };
       return false;
     }
@@ -47,19 +53,27 @@ export class BatchLifecycle {
   }
 
   canDispatch(siteId: number): boolean {
-    return !this.cancelBarrier && this.commands[siteId]?.phase === "submitting";
+    return !this.isCancelRequested(siteId) && this.commands[siteId]?.phase === "submitting";
   }
 
   accepted(siteId: number, jobId: string): boolean {
     const command = this.commands[siteId] ?? { phase: "submitting" as const };
     this.commands[siteId] = { ...command, phase: "active", jobId };
-    return this.cancelBarrier;
+    return this.isCancelRequested(siteId);
   }
 
   finish(siteId: number): void {
     const command = this.commands[siteId];
     if (!command) return;
     this.commands[siteId] = { ...command, phase: "terminal" };
+  }
+
+  cancelSite(siteId: number): string | undefined {
+    const command = this.commands[siteId];
+    if (!command) return undefined;
+    this.commands[siteId] = { ...command, cancelRequested: true };
+    if (command.phase === "active") return command.jobId;
+    return undefined;
   }
 
   cancel(): BatchCancelSnapshot {

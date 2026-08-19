@@ -437,6 +437,7 @@ export default function Home() {
       setSubmittingSiteIds(current => current.filter(id => id !== siteId));
     }
   }
+
   async function waitForTerminalJob(job: JobSnapshot): Promise<JobSnapshot> {
     for (let attempt = 0; attempt < BATCH_JOB_POLL_ATTEMPTS; attempt += 1) {
       const current = await getJob(apiBase, job.job_id);
@@ -490,7 +491,7 @@ export default function Home() {
 
           const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
           if (!job) {
-            if (lifecycle.cancelRequested) return stopBeforeDispatch(operation);
+            if (lifecycle.isCancelRequested(siteId)) return stopBeforeDispatch(operation);
             lifecycle.finish(siteId);
             setBatchSiteState(siteId, "failed");
             return { siteId, state: "failed" as const };
@@ -505,7 +506,7 @@ export default function Home() {
             const finalJob = await waitForTerminalJob(job);
             lifecycle.finish(siteId);
 
-            const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);
+            const cancelWasRequested = lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id);
             if (cancelWasRequested) {
               setBatchSiteState(siteId, "cancelled");
               appendLog(`[SITE ${siteId}] Batch stopped · CANCEL REQUESTED · last job ${finalJob.state.toUpperCase()}`);
@@ -523,7 +524,7 @@ export default function Home() {
             }
           } catch (error) {
             lifecycle.finish(siteId);
-            const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);
+            const cancelWasRequested = lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id);
             const state = cancelWasRequested ? "cancelled" : "failed";
             setBatchSiteState(siteId, state);
             appendLog(`[SITE ${siteId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, "error");
@@ -573,6 +574,17 @@ export default function Home() {
     const site = sites.find(item => item.id === siteId);
     if (!site || !site.jobId || !isRunning(site)) return;
     if (batchRunning && batchSiteStates[siteId] === "running") {
+      const lifecycle = batchLifecycle.current;
+      if (lifecycle) {
+        const activeJobId = lifecycle.cancelSite(siteId);
+        setBatchSiteState(siteId, "cancelling");
+        if (!activeJobId) {
+          appendLog(`[SITE ${siteId}] Cancel requested · next batch operation suppressed`);
+          return;
+        }
+        await requestJobCancel(siteId, activeJobId, false);
+        return;
+      }
       setBatchSiteState(siteId, "cancelling");
     }
     await requestJobCancel(siteId, site.jobId, false);
