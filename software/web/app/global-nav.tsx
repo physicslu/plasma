@@ -3,23 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./i18n";
-
-const scopeItems = [
-  { href: "/demo", labelKey: "nav.entry" },
-  { href: "/ppu", labelKey: "nav.singlePpu" },
-  { href: "/fleet", labelKey: "nav.fleet" },
-] as const;
-
-function isScopeActive(pathname: string, href: string): boolean {
-  if (href === "/ppu") return pathname === "/" || pathname === "/ppu" || pathname.startsWith("/ppu/");
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+import { PRODUCT_MODE_ROUTES, productModeForPath } from "./product-mode";
 
 export function GlobalNav() {
   const pathname = usePathname();
   const { locale, setLocale, t } = useI18n();
-  const productionActive = pathname === "/fleet" || pathname.startsWith("/fleet/");
-  const engineeringActive = pathname === "/engineering" || pathname.startsWith("/engineering/");
+  const activeMode = productModeForPath(pathname);
+  const entryActive = pathname === "/demo";
 
   return (
     <header className="globalAppNav">
@@ -29,22 +19,14 @@ export function GlobalNav() {
       </Link>
 
       <div className="globalNavControls">
-        <nav className="globalScopeNav" aria-label="Plasma global navigation">
-          {scopeItems.map(item => {
-            const active = isScopeActive(pathname, item.href);
-            return (
-              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}>
-                {t(item.labelKey)}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <nav className="globalModeNav" aria-label={t("mode.label")}>
-          <Link href="/fleet" aria-current={productionActive ? "page" : undefined}>
+        <nav className="globalProductNav" aria-label={t("mode.label")}>
+          <Link href="/demo" aria-current={entryActive ? "page" : undefined}>
+            {t("nav.entry")}
+          </Link>
+          <Link href={PRODUCT_MODE_ROUTES.production} aria-current={activeMode === "production" ? "page" : undefined}>
             {t("mode.production")}
           </Link>
-          <Link href="/engineering" aria-current={engineeringActive ? "page" : undefined}>
+          <Link href={PRODUCT_MODE_ROUTES.engineering} aria-current={activeMode === "engineering" ? "page" : undefined}>
             {t("mode.engineering")}
           </Link>
         </nav>
