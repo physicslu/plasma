@@ -17,6 +17,12 @@ assert_file_line() {
   grep -Fxq "$expected" "$file" || fail "$file missing: $expected"
 }
 
+assert_assignment_count() {
+  local file="$1" key="$2" expected="$3" count
+  count="$(grep -Ec "^${key}=" "$file" || true)"
+  [[ "$count" == "$expected" ]] || fail "$file has $count assignments for $key; expected $expected"
+}
+
 resolve_default_public_api_url() {
   PLASMACTL_LIB_ONLY=1 \
   PLASMACTL_CONFIG="$temporary/no-config.env" \
@@ -82,6 +88,73 @@ assert_file_line "$new_config" 'PLASMA_CONFIG_VERSION=3'
 assert_file_line "$new_config" "PLASMA_PUBLIC_API_URL=$default_public_api_url"
 assert_file_line "$new_config" 'PLASMA_MANAGER_ENABLED=0'
 assert_file_line "$new_config" "PLASMA_MANAGER_CONFIG=$temporary/xdg-new/plasma/manager.yaml"
+
+# A schema-version marker is not sufficient evidence that every field added by
+# that schema is present. Reconcile an already-v3 but incomplete file using the
+# resolved safe defaults, then prove the repair is idempotent.
+incomplete_v3="$temporary/incomplete-v3.env"
+printf '%s\n' \
+  'PLASMA_CONFIG_VERSION=3' \
+  'PLASMA_PUBLIC_API_URL=https://operator.example.invalid' \
+  >"$incomplete_v3"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$incomplete_v3" \
+XDG_CONFIG_HOME="$temporary/xdg-incomplete-v3" \
+bash -c 'source "$1"; write_config' _ "$plasmactl_path" >/dev/null
+assert_file_line "$incomplete_v3" 'PLASMA_CONFIG_VERSION=3'
+assert_file_line "$incomplete_v3" 'PLASMA_PUBLIC_API_URL=https://operator.example.invalid'
+assert_file_line "$incomplete_v3" 'PLASMA_MANAGER_ENABLED=0'
+assert_file_line "$incomplete_v3" "PLASMA_MANAGER_CONFIG=$temporary/xdg-incomplete-v3/plasma/manager.yaml"
+assert_assignment_count "$incomplete_v3" PLASMA_MANAGER_ENABLED 1
+assert_assignment_count "$incomplete_v3" PLASMA_MANAGER_CONFIG 1
+incomplete_hash_before="$(sha256sum "$incomplete_v3" | awk '{print $1}')"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$incomplete_v3" \
+XDG_CONFIG_HOME="$temporary/xdg-incomplete-v3" \
+bash -c 'source "$1"; write_config' _ "$plasmactl_path" >/dev/null
+incomplete_hash_after="$(sha256sum "$incomplete_v3" | awk '{print $1}')"
+[[ "$incomplete_hash_before" == "$incomplete_hash_after" ]] || \
+  fail 'schema-v3 completeness repair is not idempotent'
+
+# Partial v3 files preserve operator-owned values and synthesize only the
+# missing field. Never rewrite an explicit enablement or Manager config path.
+partial_enabled="$temporary/partial-enabled-v3.env"
+printf '%s\n' \
+  'PLASMA_CONFIG_VERSION=3' \
+  'PLASMA_MANAGER_ENABLED=1' \
+  >"$partial_enabled"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$partial_enabled" \
+XDG_CONFIG_HOME="$temporary/xdg-partial-enabled" \
+bash -c 'source "$1"; migrate_config' _ "$plasmactl_path" >/dev/null
+assert_file_line "$partial_enabled" 'PLASMA_MANAGER_ENABLED=1'
+assert_file_line "$partial_enabled" "PLASMA_MANAGER_CONFIG=$temporary/xdg-partial-enabled/plasma/manager.yaml"
+assert_assignment_count "$partial_enabled" PLASMA_MANAGER_ENABLED 1
+assert_assignment_count "$partial_enabled" PLASMA_MANAGER_CONFIG 1
+
+partial_path="$temporary/partial-path-v3.env"
+custom_manager_path="$temporary/operator/manager.yaml"
+printf '%s\n' \
+  'PLASMA_CONFIG_VERSION=3' \
+  "PLASMA_MANAGER_CONFIG=$custom_manager_path" \
+  >"$partial_path"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$partial_path" \
+XDG_CONFIG_HOME="$temporary/xdg-partial-path" \
+bash -c 'source "$1"; migrate_config' _ "$plasmactl_path" >/dev/null
+assert_file_line "$partial_path" 'PLASMA_MANAGER_ENABLED=0'
+assert_file_line "$partial_path" "PLASMA_MANAGER_CONFIG=$custom_manager_path"
+assert_assignment_count "$partial_path" PLASMA_MANAGER_ENABLED 1
+assert_assignment_count "$partial_path" PLASMA_MANAGER_CONFIG 1
+
+# An older plasmactl must not mutate a future schema it does not understand.
+future_config="$temporary/future-schema.env"
+printf '%s\n' 'PLASMA_CONFIG_VERSION=4' >"$future_config"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$future_config" \
+XDG_CONFIG_HOME="$temporary/xdg-future" \
+bash -c 'source "$1"; migrate_config' _ "$plasmactl_path" >/dev/null 2>&1 && \
+  fail 'future deployment schema was accepted and could be mutated by an older plasmactl'
 
 unit_config="$temporary/unit-migration.env"
 printf '%s\n' 'PLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net:8443' >"$unit_config"
@@ -172,6 +245,7 @@ bash -c 'source "$1"; validate_manager_settings' _ "$plasmactl_path" >/dev/null 
 
 grep -Fq 'PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy' "$plasmactl_path" || fail 'deploy does not re-exec updated plasmactl'
 grep -Fq 'reconcile_service_units' "$plasmactl_path" || fail 'service-unit reconciliation is missing'
+grep -Fq 'ensure_config_completeness' "$plasmactl_path" || fail 'deployment config completeness reconciliation is missing'
 grep -Fq 'manager_health_check' "$plasmactl_path" || fail 'Manager health check integration is missing'
 grep -Fq 'systemctl --user is-active --quiet plasma-manager.service' "$plasmactl_path" || fail 'Manager health check does not verify systemd service ownership'
 grep -Fq 'manager) units=(-u plasma-manager.service)' "$plasmactl_path" || fail 'Manager log target is missing'
