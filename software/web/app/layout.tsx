@@ -5,6 +5,7 @@ import "./details.css";
 import "./global-nav.css";
 import { DEFAULT_API_BASE } from "./plasma-api";
 import { GlobalNav } from "./global-nav";
+import { I18nProvider } from "./i18n";
 
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
@@ -48,13 +49,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-Hant">
+    <html lang="zh-TW">
       <head>
         <script dangerouslySetInnerHTML={{ __html: apiBaseStorageMigration }} />
       </head>
       <body className={`${sans.variable} ${mono.variable}`}>
-        <GlobalNav />
-        {children}
+        <I18nProvider>
+          <GlobalNav />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );
