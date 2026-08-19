@@ -39,7 +39,7 @@ class FakePPUClient:
             "ok": True,
             "gateway": "alive",
             "execution": "ready",
-            "ppu_id": self.scenario["ppu_id"],
+            "ppu_id": self.scenario.get("readiness_ppu_id", self.scenario["ppu_id"]),
         }
 
     def node(self):
@@ -74,9 +74,12 @@ class FakePPUClient:
         _, node = self.node()
         site_count = self.scenario["site_count"]
         enabled_site_count = self.scenario.get("enabled_site_count", site_count)
+        ppu = dict(node["ppu"])
+        if "status_ppu_id" in self.scenario:
+            ppu["ppu_id"] = self.scenario["status_ppu_id"]
         return 200, {
             "ok": True,
-            "ppu": node["ppu"],
+            "ppu": ppu,
             "sites": [
                 {
                     "site_id": site_id,
@@ -169,6 +172,7 @@ class FleetAggregatorTests(unittest.TestCase):
         self.assertFalse(snapshot["degraded"])
         self.assertEqual(snapshot["summary"]["configured_ppus"], 3)
         self.assertEqual(snapshot["summary"]["ready_ppus"], 3)
+        self.assertEqual(snapshot["summary"]["identified_ppus"], 3)
         self.assertEqual(snapshot["summary"]["reported_sites"], 14)
         self.assertEqual(snapshot["summary"]["enabled_sites"], 11)
         self.assertEqual([item["ppu"]["site_count"] for item in snapshot["ppus"]], [2, 4, 8])
@@ -201,13 +205,14 @@ class FleetAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot["summary"]["configured_ppus"], 3)
         self.assertEqual(snapshot["summary"]["reachable_ppus"], 2)
         self.assertEqual(snapshot["summary"]["ready_ppus"], 2)
+        self.assertEqual(snapshot["summary"]["identified_ppus"], 2)
         self.assertEqual(snapshot["summary"]["reported_sites"], 10)
         self.assertTrue(snapshot["ppus"][0]["execution_ready"])
         self.assertFalse(snapshot["ppus"][1]["gateway_live"])
         self.assertIn("simulated PPU offline", snapshot["ppus"][1]["errors"][0])
         self.assertTrue(snapshot["ppus"][2]["execution_ready"])
 
-    def test_duplicate_ppu_identity_is_reported_as_fleet_integrity_conflict(self):
+    def test_duplicate_ppu_identity_is_excluded_from_trusted_topology_totals(self):
         FakePPUClient.scenarios["http://duplicate"] = {
             "ppu_id": "ppu-2",
             "facility_id": "factory-a",
@@ -221,8 +226,39 @@ class FleetAggregatorTests(unittest.TestCase):
 
         self.assertTrue(snapshot["degraded"])
         self.assertEqual(snapshot["summary"]["identity_conflicts"], 1)
+        self.assertEqual(snapshot["summary"]["identified_ppus"], 0)
+        self.assertEqual(snapshot["summary"]["reported_sites"], 0)
+        self.assertEqual(snapshot["facilities"], [])
         self.assertTrue(snapshot["ppus"][0]["identity_conflict"])
         self.assertTrue(snapshot["ppus"][1]["identity_conflict"])
+
+    def test_readiness_node_and_status_identity_must_agree(self):
+        FakePPUClient.scenarios["http://ready-mismatch"] = {
+            "ppu_id": "ppu-real",
+            "readiness_ppu_id": "ppu-other",
+            "site_count": 2,
+        }
+        FakePPUClient.scenarios["http://status-mismatch"] = {
+            "ppu_id": "ppu-status-real",
+            "status_ppu_id": "ppu-status-other",
+            "site_count": 2,
+        }
+
+        ready_mismatch = FleetAggregator(
+            self.config(["http://ready-mismatch"]),
+            FakePPUClient,
+        ).fleet_snapshot()
+        status_mismatch = FleetAggregator(
+            self.config(["http://status-mismatch"]),
+            FakePPUClient,
+        ).fleet_snapshot()
+
+        self.assertTrue(ready_mismatch["degraded"])
+        self.assertEqual(ready_mismatch["summary"]["identified_ppus"], 0)
+        self.assertIn("disagree on ppu_id", ready_mismatch["ppus"][0]["errors"][0])
+        self.assertTrue(status_mismatch["degraded"])
+        self.assertEqual(status_mismatch["summary"]["identified_ppus"], 0)
+        self.assertIn("disagree on ppu.ppu_id", status_mismatch["ppus"][0]["errors"][0])
 
 
 class FakeAggregator:
