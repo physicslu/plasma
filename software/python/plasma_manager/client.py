@@ -22,9 +22,9 @@ class PPUHttpClient:
             method="GET",
         )
         try:
-            response = urlopen(request, timeout=self.timeout_s)
-            status = response.status
-            data = response.read()
+            with urlopen(request, timeout=self.timeout_s) as response:
+                status = response.status
+                data = response.read()
         except HTTPError as exc:
             status = exc.code
             data = exc.read()
