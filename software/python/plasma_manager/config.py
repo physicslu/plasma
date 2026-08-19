@@ -24,8 +24,8 @@ class ManagerConfig:
     port: int = 18180
     request_timeout_s: float = 2.0
     poll_interval_s: float = 2.0
-    observation_db_path: Path | None = None
     ppus: tuple[PPURegistryEntry, ...] = ()
+    observation_db_path: Path | None = None
 
 
 def normalize_endpoint(value: Any) -> str:
@@ -132,6 +132,6 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
         port=port,
         request_timeout_s=request_timeout_s,
         poll_interval_s=poll_interval_s,
-        observation_db_path=observation_db_path,
         ppus=ppus,
+        observation_db_path=observation_db_path,
     )
