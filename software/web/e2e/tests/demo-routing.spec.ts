@@ -59,16 +59,20 @@ test("demo entry exposes only canonical Product Modes in top-level navigation", 
   await expectProductNavigation(page, "入口");
 });
 
-test("language switching updates Product Mode navigation immediately", async ({ page }) => {
+test("language switching becomes interactive after hydration and then updates immediately", async ({ page }) => {
   await page.goto("/fleet");
   await expect(page.getByRole("navigation", { name: "產品模式" })).toBeVisible();
 
-  await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByRole("navigation", { name: "Product mode" }), "locale change should not wait on polling/storage propagation").toBeVisible({ timeout: 300 });
+  const english = page.getByRole("button", { name: "EN", exact: true });
+  await expect(english, "locale control must not accept a click before hydration is interactive").toBeEnabled();
+  await english.click();
+  await expect(page.getByRole("navigation", { name: "Product mode" }), "locale change should not wait on polling/storage propagation after the control is enabled").toBeVisible({ timeout: 300 });
   await expect(page.getByRole("link", { name: "Production Mode", exact: true })).toBeVisible({ timeout: 300 });
   await expect(page.locator("html")).toHaveAttribute("lang", "en-US", { timeout: 300 });
 
-  await page.getByRole("button", { name: "繁中", exact: true }).click();
+  const traditionalChinese = page.getByRole("button", { name: "繁中", exact: true });
+  await expect(traditionalChinese).toBeEnabled();
+  await traditionalChinese.click();
   await expect(page.getByRole("navigation", { name: "產品模式" })).toBeVisible({ timeout: 300 });
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-TW", { timeout: 300 });
 });
