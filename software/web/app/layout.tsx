@@ -49,7 +49,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-TW">
+    <html lang="zh-Hant">
       <head>
         <script dangerouslySetInnerHTML={{ __html: apiBaseStorageMigration }} />
       </head>
