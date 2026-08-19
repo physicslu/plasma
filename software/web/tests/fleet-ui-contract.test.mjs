@@ -82,6 +82,7 @@ test("fleet page is read-only and fleet API is opt-in by default", async () => {
 test("fleet BFF source enforces loopback Manager and strips internal endpoint/error fields", async () => {
   const route = await fs.readFile(new URL("../app/api/fleet/route.ts", import.meta.url), "utf8");
   const contract = await fs.readFile(new URL("../app/fleet/fleet-contract.ts", import.meta.url), "utf8");
+  const vite = await fs.readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
 
   assert.match(route, /LOOPBACK_HOSTS/);
   assert.match(route, /must remain loopback-only/);
@@ -91,4 +92,6 @@ test("fleet BFF source enforces loopback Manager and strips internal endpoint/er
   assert.doesNotMatch(contract, /errors:\s*/);
   assert.match(contract, /last_known/);
   assert.match(contract, /current_capacity/);
+  assert.match(vite, /\^\/api\/\(\?!fleet/);
+  assert.match(vite, /target: "http:\/\/127\.0\.0\.1:18080"/);
 });
