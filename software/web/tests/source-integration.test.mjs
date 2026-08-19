@@ -275,7 +275,7 @@ test("keeps batch cancellation authoritative without rewriting the final job res
   assert.match(page, /Job State 保留 Python Job Manager 回傳的真實結果/);
 
   const cancellationPrecedence = page.indexOf(
-    "const cancelWasRequested = lifecycle.cancelRequested || cancelRequests.current.has(job.job_id);",
+    "const cancelWasRequested = lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id);",
   );
   const finalStateHandling = page.indexOf('if (finalJob.state === "cancelled")', cancellationPrecedence);
   const batchSuccess = page.indexOf('setBatchSiteState(siteId, "success")', cancellationPrecedence);
