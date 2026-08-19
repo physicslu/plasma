@@ -164,8 +164,13 @@ Policy:
 - known obsolete historical defaults may migrate to the current default only at the schema version where that migration is defined;
 - unknown/custom values are preserved as explicit operator overrides;
 - schema v2 -> v3 adds Manager settings with Manager disabled by default and does not reinterpret an already-versioned API Base;
+- a `PLASMA_CONFIG_VERSION=3` marker does not suppress completeness checks: if either Manager deployment field is missing, `plasmactl` appends only the missing assignment using the already-resolved value and preserves every explicit operator value already present;
+- completeness reconciliation is idempotent and must not create duplicate Manager assignments on repeated `restart` / `deploy` runs;
+- a configuration schema newer than the running `plasmactl` supports is rejected rather than mutated by an older deployment tool;
 - generated systemd units are derived state and are regenerated from validated configuration;
 - disabling Manager removes it from the managed start/restart service set and stops any stale Manager process during runtime reconciliation.
+
+This distinction matters operationally: a version number is metadata, not proof that every field introduced by that schema is physically present. Runtime defaults may keep a service safe, but persistent configuration still needs deterministic reconciliation so the next operator sees the same state that the runtime is using.
 
 Systemd Description values are also generated state. After terminology changes, `plasmactl restart` / `deploy` reconciles the units so new journal entries use the canonical operator names.
 
