@@ -46,8 +46,11 @@ def test_browser_spec_uses_real_gateway_without_api_route_mocking() -> None:
     assert "waitForEvent(\"download\")" in source
     assert "read_SITE${siteId}_flash.bin" in source
     assert "bytes.equals(firmware)" in source
-    assert "batch membership" in source
-    assert "starts.slice(beforeSecondBatch)" in source
+    assert "representativeSelections(expectedSites)" in source
+    assert "runBatchAndAssert" in source
+    assert "selectedSites.length * operations.length" in source
+    assert "starts.slice(before)" in source
+    assert "siteId % 2" not in source
 
 
 def test_browser_playwright_config_does_not_start_a_fake_web_server() -> None:
