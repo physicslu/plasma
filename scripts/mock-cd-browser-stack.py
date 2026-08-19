@@ -61,6 +61,9 @@ def main() -> None:
                 cwd=cd.PYTHON_DIR,
             )
             processes.append((f"{item['name']}-server", server))
+            # Read downloads are served by the REST Gateway from the same job
+            # output directory written by the Plasma Server.
+            output_root = work / f"{item['ppu_id']}-output"
             gateway = cd.start_process(
                 f"{item['name']}-gateway",
                 [
@@ -76,7 +79,7 @@ def main() -> None:
                     "--plasma-port",
                     str(item["server_port"]),
                     "--output-root",
-                    str(work / f"{item['name']}-gateway-output"),
+                    str(output_root),
                 ],
                 cwd=cd.PYTHON_DIR,
             )
