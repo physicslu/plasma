@@ -143,12 +143,38 @@ replace_config_assignment() {
   mv "$temporary" "$config_file"
 }
 
+config_has_assignment() {
+  local key="$1"
+  grep -Eq "^${key}=" "$config_file"
+}
+
+ensure_config_completeness() {
+  local repaired=0
+
+  if ! config_has_assignment PLASMA_MANAGER_ENABLED; then
+    replace_config_assignment PLASMA_MANAGER_ENABLED "$manager_enabled"
+    PLASMA_MANAGER_ENABLED="$manager_enabled"
+    repaired=1
+  fi
+
+  if ! config_has_assignment PLASMA_MANAGER_CONFIG; then
+    replace_config_assignment PLASMA_MANAGER_CONFIG "$manager_config"
+    PLASMA_MANAGER_CONFIG="$manager_config"
+    repaired=1
+  fi
+
+  if (( repaired )); then
+    say "補齊 schema v$current_config_version 缺少的 Manager deployment 欄位：$config_file"
+  fi
+}
+
 migrate_config() {
   [[ -f "$config_file" ]] || return 0
   [[ "$config_version" =~ ^[0-9]+$ ]] || die "PLASMA_CONFIG_VERSION 必須是整數：$config_version"
-  (( config_version < current_config_version )) || return 0
+  (( config_version <= current_config_version )) || \
+    die "設定檔 schema v$config_version 高於此 plasmactl 支援的 v$current_config_version，拒絕修改"
 
-  local previous_public_api_url="$public_api_url"
+  local previous_public_api_url="$public_api_url" migrated=0
   if (( config_version < 2 )); then
     case "$public_api_url" in
       https://swpc.tail820e64.ts.net|https://swpc.tail820e64.ts.net:8443|http://127.0.0.1:8080)
@@ -169,14 +195,21 @@ migrate_config() {
     PLASMA_MANAGER_CONFIG="$manager_config"
   fi
 
-  replace_config_assignment PLASMA_CONFIG_VERSION "$current_config_version"
-  config_version="$current_config_version"
-  PLASMA_CONFIG_VERSION="$current_config_version"
+  if (( config_version < current_config_version )); then
+    replace_config_assignment PLASMA_CONFIG_VERSION "$current_config_version"
+    config_version="$current_config_version"
+    PLASMA_CONFIG_VERSION="$current_config_version"
+    migrated=1
+  fi
 
-  if [[ "$previous_public_api_url" != "$public_api_url" ]]; then
-    say "遷移舊 API Base：$previous_public_api_url → $public_api_url"
-  else
-    say "設定檔已升級至 schema v$current_config_version；保留 API Base：$public_api_url"
+  ensure_config_completeness
+
+  if (( migrated )); then
+    if [[ "$previous_public_api_url" != "$public_api_url" ]]; then
+      say "遷移舊 API Base：$previous_public_api_url → $public_api_url"
+    else
+      say "設定檔已升級至 schema v$current_config_version；保留 API Base：$public_api_url"
+    fi
   fi
 }
 
