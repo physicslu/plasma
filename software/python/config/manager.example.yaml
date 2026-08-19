@@ -1,0 +1,12 @@
+manager:
+  host: 127.0.0.1
+  port: 18180
+  request_timeout_s: 2.0
+
+# Manual enrollment is intentional in the first Manager release.
+# Each endpoint is the root URL of one autonomous PPU's Plasma Web REST Gateway.
+ppus:
+  - alias: ppu-a
+    endpoint: http://127.0.0.1:18080
+  - alias: ppu-b
+    endpoint: http://192.0.2.20:18080

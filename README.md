@@ -19,12 +19,12 @@ Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。目前 prototype 預�
 ## 目前目錄
 
 - `pl/`：Zynq Programmable Logic 的 RTL、constraints、模擬、verification 與 Vivado 建置資產。
-- `software/python/`：Plasma PPU control plane、Protocol v3.2 TCP Server、CLI、Plasma Web REST Gateway 與測試。
+- `software/python/`：Plasma PPU control plane、Protocol v3.2 TCP Server、CLI、Plasma Web REST Gateway、optional read-only Plasma Manager 與測試。
 - `software/web/`：React + TypeScript Plasma PPU Console。
 - `scripts/plasmactl`：integration host 的更新、測試、systemd reconciliation、重啟與服務管理入口。
 - `docs/`：architecture、development 與 deployment 文件。
 
-## Current software path
+## Current PPU-local software path
 
 ```text
 Browser / Plasma PPU Console
@@ -44,6 +44,23 @@ SiteManager / SiteWorker
 MockInterface today; Z2/FPGA/real-target validation is a separate stage
 ```
 
+PPU 是 autonomous execution node；本地燒錄不依賴 Plasma Manager。
+
+Optional fleet path：
+
+```text
+Fleet client
+    |
+    v
+Plasma Manager (read-only registry / aggregation)
+    |
+    +--> PPU A Plasma Web REST Gateway -> local execution
+    +--> PPU B Plasma Web REST Gateway -> local execution
+    +--> ...
+```
+
+第一版 Plasma Manager 只使用手動設定的 PPU Gateway endpoints 彙整 health、identity 與 Site topology，不提供 job routing、central scheduling、discovery、Fleet Web UI 或 production deployment integration。
+
 目前 Plasma Web REST Gateway 使用 Python standard-library `ThreadingHTTPServer` 與 REST polling；**不是 FastAPI，也沒有使用 WebSocket**。
 
 Protocol v3.2 的 canonical wire identity 是 one-based `site_id = 1..N`。Protocol v3.1 的 zero-based `channel_id` 只保留在明確的 compatibility boundary，不是新程式的 domain contract。
@@ -52,6 +69,8 @@ Protocol v3.2 的 canonical wire identity 是 one-based `site_id = 1..N`。Proto
 
 - Domain / naming / identity：[`docs/architecture/domain-naming-migration.md`](docs/architecture/domain-naming-migration.md)
 - Facility / PPU / Site architecture：[`docs/architecture/ppu-facility-sites.md`](docs/architecture/ppu-facility-sites.md)
+- Optional Manager invariant：[`docs/architecture/manager-optional-control-plane.md`](docs/architecture/manager-optional-control-plane.md)
+- Read-only Manager implementation：[`docs/architecture/manager-readonly-fleet-aggregation.md`](docs/architecture/manager-readonly-fleet-aggregation.md)
 - Protocol v3.2：[`software/python/docs/protocol.md`](software/python/docs/protocol.md)
 - Python software：[`software/python/README.md`](software/python/README.md)
 - Web Console：[`software/web/README.md`](software/web/README.md)

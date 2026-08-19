@@ -66,6 +66,7 @@ v3.1 使用 `PLASMA31`、zero-based `channel_id` 與 legacy `programmer/channels
 - `job_state.json`、`result.json` 與 read-back binary。
 - 原子寫檔；Server 啟動時會把先前未完成的工作標記為 `ABORTED`。
 - Plasma Web REST Gateway 提供狀態、工作提交、取消與 read-back 下載。
+- Optional `plasma_manager` 提供手動 PPU registry 與 read-only fleet aggregation；Manager 不參與 PPU 本地工作執行。
 - `pytest` 是統一 Python test runner。
 
 ## Python 結構
@@ -73,11 +74,13 @@ v3.1 使用 `PLASMA31`、zero-based `channel_id` 與 legacy `programmer/channels
 ```text
 software/python/
 ├── config/
-│   └── plasma.yaml
+│   ├── plasma.yaml
+│   └── manager.example.yaml
 ├── plasma_client/
 ├── plasma_core/
 ├── plasma_handlers/
 ├── plasma_interfaces/
+├── plasma_manager/          # optional read-only fleet control plane
 ├── plasma_server/
 │   ├── site_manager.py      # canonical one-based domain
 │   ├── site_worker.py       # canonical one-based execution
@@ -126,6 +129,26 @@ plasma-web --host 127.0.0.1 --port 8080 \
 Gateway 提供 `GET /api/status`、`POST /api/jobs`、`POST /api/jobs/{job_id}/cancel` 與 read-back file download。Canonical REST request 使用 one-based `site_id`，Gateway 以 v3.2 與 Server 溝通。舊 `channel/channel_id` 只在 REST compatibility boundary 被視為 zero-based legacy identity 並轉成 Site。
 
 > 實際部署參數由 repository `scripts/plasmactl` 與本機 deployment config 決定；不要把上述 code-level default 當成部署端口的 source of truth。
+
+## 啟動 Plasma Manager（read-only）
+
+第一版 Manager 是 optional control plane，只讀取多台 PPU 的 fleet-facing REST contract，不會成為本地燒錄的必要條件：
+
+```bash
+plasma-manager --config config/manager.example.yaml
+```
+
+Manager 目前提供：
+
+```text
+GET /api/health/live
+GET /api/registry
+GET /api/fleet
+```
+
+每台 PPU 由設定檔提供 Plasma Web REST Gateway root URL。Manager 會讀取 PPU 的 `/api/health/live`、`/api/health/ready`、`/api/node`、`/api/status`，並彙整 Facility / PPU / Site 狀態。不同 PPU 可有不同 Site 數量，例如 2、4、8 Sites；單一 PPU offline 不會讓其他 PPU 的 fleet status 無法回傳。
+
+目前 Manager **不提供** job command routing、central scheduling、mDNS discovery、authentication policy、Fleet Web UI 或 `plasmactl`/systemd deployment integration。這些功能必須在保持 PPU standalone-first invariant 的前提下分階段加入。
 
 ## CLI
 
@@ -239,5 +262,6 @@ mock:
 - TCP 仍採一個 request 對一個 connection，沒有長連線多工或 server-push event stream。
 - v3.1 compatibility adapter 暫時保留；移除時必須另做 deprecation/removal decision。
 - Server 重啟可辨識未完成工作，但不會自動重做燒錄。
+- Plasma Manager 目前只做手動 registry 與 read-only aggregation，尚未整合 production deployment、command routing、auth 或 Fleet UI。
 - OpenOCD binary staging、adapter isolation、port 配置與實體 target 尚未完成完整驗證。
 - FPGA register map、AXI/FIFO、SWD engine、power-good 與安全關電仍屬後續硬體整合工作。
