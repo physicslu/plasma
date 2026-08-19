@@ -3,7 +3,7 @@ import "./demo.css";
 
 export default function DemoLandingPage() {
   return (
-    <main className="demoLanding">
+    <main className="demoLanding" data-route-marker="Choose a Demo">
       <section className="demoHero">
         <div className="demoBrand"><span>P</span><div><b>PLASMA</b><small>PROGRAMMING PLATFORM</small></div></div>
         <p className="demoEyebrow">PLASMA PRODUCT ENTRY</p>
