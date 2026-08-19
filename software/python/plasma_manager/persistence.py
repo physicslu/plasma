@@ -103,11 +103,15 @@ class SQLiteObservationPersistence:
                 f"observation record for {endpoint} is missing observed_at"
             )
         try:
-            datetime.fromisoformat(observed_at)
+            parsed_observed_at = datetime.fromisoformat(observed_at)
         except ValueError as exc:
             raise ObservationPersistenceError(
                 f"observation record for {endpoint} has invalid observed_at"
             ) from exc
+        if parsed_observed_at.tzinfo is None or parsed_observed_at.utcoffset() is None:
+            raise ObservationPersistenceError(
+                f"observation record for {endpoint} observed_at must include a timezone"
+            )
         if not isinstance(ppu, dict):
             raise ObservationPersistenceError(f"observation record for {endpoint} is missing ppu")
         if not isinstance(sites, list):
