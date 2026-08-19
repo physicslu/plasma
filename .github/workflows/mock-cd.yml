@@ -1,0 +1,70 @@
+name: Mock CD
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mock-cd.yml"
+      - "scripts/mock-cd.py"
+      - "software/python/**"
+      - "software/web/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mock-cd.yml"
+      - "scripts/mock-cd.py"
+      - "software/python/**"
+      - "software/web/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-stack-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: software/python/pyproject.toml
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: software/web/package-lock.json
+
+      - name: Install Python runtime
+        run: python -m pip install -e 'software/python[dev]'
+
+      - name: Install Web runtime
+        working-directory: software/web
+        run: npm ci
+
+      - name: Run ephemeral Plasma full-stack acceptance
+        env:
+          MOCK_CD_ARTIFACT_DIR: ${{ github.workspace }}/artifacts/mock-cd
+        run: python scripts/mock-cd.py
+
+      - name: Publish acceptance summary
+        if: ${{ always() }}
+        run: |
+          if [[ -f artifacts/mock-cd/acceptance.json ]]; then
+            cat artifacts/mock-cd/acceptance.json
+          else
+            echo '{"result":"INFRA_FAILURE","error":"acceptance.json was not produced"}'
+          fi
+
+      - name: Upload Mock CD acceptance artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-cd-acceptance
+          path: artifacts/mock-cd/
+          if-no-files-found: warn
+          retention-days: 14
