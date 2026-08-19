@@ -8,7 +8,7 @@ from pathlib import Path
 
 from plasma_manager.config import ManagerConfigError, load_manager_config
 from plasma_manager.observation import FleetObservationStore
-from plasma_manager.persistence import SQLiteObservationPersistence
+from plasma_manager.persistence import ObservationPersistenceError, SQLiteObservationPersistence
 
 
 class SequenceFleetSource:
@@ -196,7 +196,7 @@ class FleetObservationDurabilityTests(unittest.TestCase):
             def replace(self, records):
                 self.replace_calls += 1
                 if self.replace_calls == 1:
-                    raise RuntimeError("simulated write failure")
+                    raise ObservationPersistenceError("simulated write failure")
 
         persistence = FlakyPersistence()
         store = FleetObservationStore(
@@ -227,7 +227,7 @@ class FleetObservationDurabilityTests(unittest.TestCase):
                 self.replace_calls = 0
 
             def load(self):
-                raise RuntimeError("simulated corrupt database")
+                raise ObservationPersistenceError("simulated corrupt database")
 
             def replace(self, records):
                 self.replace_calls += 1
@@ -246,6 +246,25 @@ class FleetObservationDurabilityTests(unittest.TestCase):
         self.assertFalse(snapshot["observation_store"]["writable"])
         self.assertIn("simulated corrupt database", snapshot["observation_store"]["last_error"])
         self.assertEqual(persistence.replace_calls, 0)
+
+    def test_programming_defect_is_not_downgraded_to_storage_health(self):
+        class BrokenPersistence:
+            mode = "sqlite"
+
+            def load(self):
+                return {}
+
+            def replace(self, records):
+                raise AttributeError("simulated programming defect")
+
+        store = FleetObservationStore(
+            SequenceFleetSource(
+                [fleet_snapshot("2026-08-19T06:00:00+00:00", healthy=True)]
+            ),
+            BrokenPersistence(),
+        )
+        with self.assertRaisesRegex(AttributeError, "simulated programming defect"):
+            store.fleet_snapshot()
 
     def test_memory_mode_preserves_pr45_restart_semantics(self):
         first = FleetObservationStore(
