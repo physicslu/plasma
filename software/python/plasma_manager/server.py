@@ -53,7 +53,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             return
         self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
 
-    def do_POST(self) -> None:
+    def _read_only(self) -> None:
         self._json(
             HTTPStatus.METHOD_NOT_ALLOWED,
             {
@@ -61,6 +61,18 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 "error": {"message": "Plasma Manager fleet contract is read-only in this release"},
             },
         )
+
+    def do_POST(self) -> None:
+        self._read_only()
+
+    def do_PUT(self) -> None:
+        self._read_only()
+
+    def do_PATCH(self) -> None:
+        self._read_only()
+
+    def do_DELETE(self) -> None:
+        self._read_only()
 
 
 def serve(config: ManagerConfig) -> None:
@@ -77,7 +89,12 @@ def serve(config: ManagerConfig) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plasma Manager read-only fleet control plane")
-    parser.add_argument("--config", type=Path, default=Path("config/manager.yaml"))
+    parser.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to an explicit Plasma Manager registry configuration",
+    )
     args = parser.parse_args()
     serve(load_manager_config(args.config))
 
