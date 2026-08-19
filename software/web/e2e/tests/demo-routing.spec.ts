@@ -16,5 +16,12 @@ test("demo entry separates Single PPU and Manager/Fleet views", async ({ page })
   await fleet.click();
   await expect(page).toHaveURL(/\/fleet$/);
   await expect(page.getByRole("heading", { name: "Facility / PPU Fleet Overview" })).toBeVisible();
-  await expect(page.getByText("Fleet UI is disabled on this host.")).toBeVisible();
+
+  // Browser CI intentionally does not start Plasma Manager. The Fleet flag is
+  // enabled on the Vite host process, so the Worker route must see that binding
+  // and advance to the Manager connection attempt. If the host -> Worker bridge
+  // regresses, this becomes the old "Fleet UI is disabled" state instead.
+  await expect(page.getByText("Fleet snapshot unavailable")).toBeVisible();
+  await expect(page.getByText("Fleet BFF HTTP 503")).toBeVisible();
+  await expect(page.getByText("Fleet UI is disabled on this host.")).toHaveCount(0);
 });
