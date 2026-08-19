@@ -673,7 +673,7 @@ Commands:
   update               從 GitHub main 做 fast-forward 更新；Web 變更後需 restart 才算 runtime 完成
   test                 執行 deployment migration/Manager lifecycle、Python、PL source-layout 與 Web 測試
   restart              重新產生 systemd units、重新啟動已啟用服務並執行 health check
-  web-restart          只重新啟動 Vite Web Console並執行 Web HTTP health check
+  web-restart          只重新啟動 Vite Web Console 並執行 Web HTTP health check
   deploy               update → re-exec latest plasmactl → test → reconcile units → restart
   update-and-restart   deploy 的別名
   verify fleet         唯讀驗證 Manager/Fleet 部署後 runtime chain；不取代人工 UI 驗收
