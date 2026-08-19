@@ -1,18 +1,24 @@
 # Plasma Software
 
-Software 依執行環境與技術棧分成 Python 控制層及 React Web Console：
+Software 依執行環境與技術棧分成 Python PPU control plane 與 React Web Console：
 
 ```text
 software/
-├── python/   # Plasma control plane v0.3.1 / protocol v3.1
-└── web/      # Plasma Programmer Console v0.1.0
+├── python/   # Plasma PPU control plane v0.3.2 / Protocol v3.2
+└── web/      # Plasma PPU Console
 ```
+
+Canonical domain hierarchy：
+
+```text
+Facility -> PPU -> Site
+```
+
+Canonical Site identity 是 one-based：`SITE 1 .. SITE N`。目前 prototype 預設啟用 SITE 1、SITE 2，軟體可配置 1～8 Sites。
 
 ## Python
 
-`python/` 包含 `plasma_core`、`plasma_server`、`plasma_client`、
-`plasma_handlers`、`plasma_interfaces` 與 `plasma_web`。目前可使用 Mock
-驗證 1～8 通道排程，Prototype 預設只啟用 CH0、CH1。
+`python/` 包含 `plasma_core`、`plasma_server`、`plasma_client`、`plasma_handlers`、`plasma_interfaces` 與 `plasma_web`。
 
 ```bash
 cd software/python
@@ -20,22 +26,44 @@ python -m pip install -e '.[dev]'
 python -m pytest -q
 ```
 
-目前 REST Gateway 使用 Python standard library，Web 已可經由 Gateway 與 Plasma
-v3.1 TCP Server 操作 `MockInterface`。尚未切換到計畫中的 FastAPI/WebSocket；
-OpenOCD、STM32F103C8T6、PYNQ-Z2/FPGA 與雙通道實機燒錄也尚未驗證。
+Current canonical path：
+
+```text
+Plasma Web REST Gateway
+        |
+        | Protocol v3.2 / PLASMA32
+        v
+Plasma Server
+        |
+        v
+SiteManager / SiteWorker
+        |
+        v
+Interface / Handler
+```
+
+Protocol v3.2 使用 one-based `site_id = 1..N`。Server 暫時保留 Protocol v3.1 compatibility adapter，把 zero-based `channel_id` 明確映射到 one-based Site；新的 domain / REST / CLI / Web request 不應再使用 `channel_id`。
+
+Plasma Web REST Gateway 目前使用 Python standard-library `ThreadingHTTPServer`。它不是 FastAPI，也沒有使用 WebSocket；Web 以 REST polling 取得狀態。
 
 ## Web
 
-`web/` 使用 React、TypeScript、Next.js/Vinext，提供八通道監看介面；
-Prototype 中只有 CH0、CH1 可操作。Web 會提交工作到 `python/plasma_web` REST
-Gateway，以 500 ms 輪詢真實的 channel/job 狀態，並可向 Python 送出取消要求。
+`web/` 使用 React、TypeScript、Next.js/Vinext 與 Vite tooling，提供 Plasma PPU Console。UI topology 從 canonical `/api/status` 的 `ppu + sites` 動態建立，而不是固定假設八個通道。
+
+Web 會提交 one-based `site_id` 工作到 Plasma Web REST Gateway，並輪詢真實 Site / Job state。Batch operation 可對選定 Sites 並行執行 Erase / Program / Verify / Read；不同 Site 的 pipeline 必須保持獨立。
 
 ```bash
 cd software/web
 npm run install:ci
 npm run lint
 npm test
+npm run validate:artifact
 ```
 
-目前畫面成功代表 Python Job Manager 與 `MockInterface` 流程成功，不代表真實硬體
-燒錄成功；仍須完成 Z2、FPGA/OpenOCD 與 target 實機整合測試。
+Browser E2E 與 Visual Regression 位於 `software/web/e2e/`，目前 deterministic baseline 使用 SITE 1..N 的 canonical UI。
+
+## Validation boundary
+
+目前 software / Mock 測試成功代表 control-flow、protocol、Site scheduling 與 Web behavior 通過相應測試；不代表 Z2、FPGA/OpenOCD、STM32F103C8T6 或其他 real target 已完成實機燒錄驗證。
+
+詳細 Python contract 請參考 [`python/README.md`](python/README.md) 與 [`python/docs/protocol.md`](python/docs/protocol.md)。

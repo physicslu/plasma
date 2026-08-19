@@ -7,6 +7,8 @@ import unittest
 
 PL_DIR = Path(__file__).resolve().parents[1]
 RTL_FILE = PL_DIR / "rtl" / "examples" / "btled.sv"
+SITE_RTL_DIR = PL_DIR / "rtl" / "site"
+LEGACY_CHANNEL_RTL_DIR = PL_DIR / "rtl" / "channel"
 XDC_FILE = PL_DIR / "constraints" / "pynq-z2" / "btled.xdc"
 CREATE_TCL = PL_DIR / "projects" / "btled" / "create_project.tcl"
 VERIFICATION_DIR = PL_DIR / "verification"
@@ -17,6 +19,13 @@ class BtledSourceLayoutTest(unittest.TestCase):
         for path in (RTL_FILE, XDC_FILE, CREATE_TCL):
             with self.subTest(path=path):
                 self.assertTrue(path.is_file(), f"Missing required file: {path}")
+
+    def test_programming_resource_placeholder_uses_site_terminology(self) -> None:
+        self.assertTrue(SITE_RTL_DIR.is_dir(), "Missing canonical per-Site RTL directory")
+        self.assertFalse(
+            LEGACY_CHANNEL_RTL_DIR.exists(),
+            "Legacy rtl/channel placeholder must not be reintroduced for Programming Site RTL",
+        )
 
     def test_there_is_only_one_btled_module_definition(self) -> None:
         definitions = []

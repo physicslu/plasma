@@ -1,14 +1,11 @@
 # Plasma FPGA Verification Guide
 
-> Project: `physicslu/plasma`  
 > Scope: RTL functional, temporal, regression, and hardware-validation strategy  
-> Updated: 2026-08-17
-
----
+> Updated: 2026-08-19
 
 ## 1. Verification goals
 
-Plasma FPGA verification uses two complementary layers:
+Plasma FPGA verification uses complementary layers:
 
 ```text
 Python / cocotb / pytest
@@ -18,9 +15,7 @@ SystemVerilog Assertions (SVA)
     -> cycle-level protocol, ordering, invariants, bounded timing, illegal states
 ```
 
-The two layers answer different questions and should not replace one another.
-
-The target flow is:
+Target flow:
 
 ```text
 RTL change
@@ -42,42 +37,56 @@ Human deploy approval
 Z2 hardware validation
 ```
 
----
+These layers answer different questions and must not be collapsed into one generic "all tests passed" claim.
 
-## 2. Current repository status
+## 2. Site terminology and isolation
 
-At the time this architecture is defined, `pl/tests/` contains repository/source-layout pytest
-checks, not a complete RTL simulator regression.
+The independently controlled programming resource is a **Programming Site**. Verification for repeated programming resources therefore uses Site terminology:
+
+```text
+SITE 1 .. SITE N
+```
+
+Important invariants include:
+
+- Site-local operations do not alter unrelated Site state;
+- unrelated Sites may progress concurrently unless a real shared resource requires arbitration;
+- Site-local cancel/abort does not cancel unrelated Sites;
+- shared-resource arbitration preserves defined fairness/backpressure/safety behavior;
+- host-visible Site selection maps to the intended hardware resource.
+
+Use `channel` only for a genuine lower-level protocol/bus channel distinct from Programming Site identity.
+
+## 3. Current repository status
+
+At the current baseline, `pl/tests/` contains repository/source-layout pytest checks, not a complete production RTL simulator regression.
 
 Therefore:
 
 - do not claim cocotb regression exists until it is actually added;
-- do not claim SVA coverage exists until assertion sources and a supporting simulator flow are
-  configured;
-- do not block documentation-only work on tools that have not yet been selected/installed;
-- add the verification infrastructure together with the first production RTL that needs it.
+- do not claim SVA coverage exists until assertion sources and a supporting simulator flow are configured;
+- do not block documentation-only work on tools not yet selected/installed;
+- add executable verification infrastructure together with the first production RTL that needs it.
 
----
+## 4. Python-first functional verification
 
-## 3. Python-first functional verification
+New production RTL should use `cocotb` as the primary active functional-test layer and `pytest` as the repository-level Python runner.
 
-New production RTL should use `cocotb` as the primary active functional testbench layer and
-`pytest` as the repository-level Python test runner.
+Typical responsibilities:
 
-Typical test responsibilities include:
-
-- generating clocks and resets;
-- driving module interfaces;
-- constructing protocol transactions;
-- checking outputs/status;
+- clocks and resets;
+- module-interface stimulus;
+- protocol transactions;
+- output/status checking;
 - randomized stimulus;
-- boundary and error cases;
+- boundary/error cases;
 - timeout behavior;
 - back-to-back operations;
-- comparing DUT output with Python reference models;
-- regression parameterization and reporting.
+- multi-Site interleaving/concurrency when applicable;
+- Python reference-model comparison;
+- deterministic regression reporting.
 
-A typical future test shape is:
+A typical future test shape:
 
 ```python
 import cocotb
@@ -93,33 +102,23 @@ async def test_basic_transaction(dut):
         await RisingEdge(dut.clk)
     dut.rst_n.value = 1
 
-    # Drive one transaction.
-    # Compare DUT behavior with the expected result.
+    # Drive one transaction and compare with expected behavior.
 ```
 
-Exact APIs and simulator integration must be defined by the first real module rather than
-copied blindly from an unrelated project.
+Exact APIs and simulator integration must be defined by the first real module, not copied blindly from an unrelated project.
 
----
+## 5. Minimal HDL simulation harness
 
-## 4. Minimal HDL simulation harness
-
-Python-first does not mean HDL-free.
-
-A minimal SystemVerilog simulation harness is allowed when needed for:
+Python-first does not mean HDL-free. A minimal SystemVerilog harness is allowed for:
 
 - top-level clock/interface wiring;
 - vendor simulation primitives;
-- interfaces that are awkward to expose directly to cocotb;
+- interfaces awkward to expose directly to cocotb;
 - SVA `bind` attachment;
 - simulator-specific initialization;
-- reusable wrappers around a production DUT.
+- reusable structural wrappers around a production DUT.
 
-Keep the harness structural and small.
-Do not recreate a second functional test framework in SystemVerilog unless a concrete tool or
-IP requirement justifies it.
-
-The preferred separation is:
+Preferred separation:
 
 ```text
 pl/rtl/                    production synthesizable design
@@ -129,27 +128,24 @@ pl/verification/sva/       temporal/protocol assertions
 pl/verification/models/    Python reference/golden models
 ```
 
----
+Keep the harness structural and small. Do not create a second functional verification framework in HDL without a concrete need.
 
-## 5. SystemVerilog Assertions
+## 6. SystemVerilog Assertions
 
-SVA should capture rules that are easiest and most valuable to check at the exact cycle where
-they can fail.
+SVA should capture rules most valuable to check at the exact cycle of failure. Good candidates include:
 
-Good assertion candidates include:
-
-- request eventually receives an acknowledge/done within a bounded interval;
-- `busy` and `idle` states are mutually consistent;
-- no illegal FSM state is entered;
-- a command is not accepted while the block cannot accept it;
-- a signal remains stable during a required protocol window;
+- request receives acknowledge/done within a bounded interval;
+- `busy` and `idle` states are consistent;
+- illegal FSM states are never entered;
+- commands are not accepted while a block cannot accept them;
+- signals remain stable through required protocol windows;
 - write/read handshakes occur in legal order;
-- clock/output toggling only occurs while an engine is active;
-- reset returns architectural state to a known legal condition;
+- clock/output toggling occurs only while an engine is active;
+- reset returns architectural state to a legal condition;
 - FIFO overflow/underflow is never requested;
-- channel-local operations do not accidentally alter unrelated channel state.
+- Site-local operations do not alter unrelated Site state.
 
-Example pattern:
+Example:
 
 ```systemverilog
 property request_completes;
@@ -161,12 +157,9 @@ endproperty
 assert property (request_completes);
 ```
 
-Do not treat example syntax as a substitute for checking simulator support for the exact SVA
-features used.
+Do not treat example syntax as proof that the selected simulator supports the exact SVA features used.
 
----
-
-## 6. Keep SVA out of production synthesis
+## 7. Keep SVA out of production synthesis
 
 Assertions should normally live in separate files, for example:
 
@@ -174,36 +167,13 @@ Assertions should normally live in separate files, for example:
 pl/verification/sva/swd_engine_sva.sv
 ```
 
-Use a checker/bind style when appropriate:
+Use checker/bind style when appropriate. Verification assertion sources must not enter the production synthesis/bitstream source set unless an assertion is intentionally implemented as synthesizable debug hardware and that exception is explicitly designed/reviewed.
 
-```systemverilog
-bind swd_engine swd_engine_sva checker_i (
-    .clk   (clk),
-    .rst_n (rst_n),
-    ...
-);
-```
+## 8. Simulator strategy
 
-The key rule is structural, not merely stylistic:
-
-> Verification assertion sources must not be included in the production synthesis/bitstream
-> source set unless an assertion is intentionally being implemented as synthesizable debug
-> hardware and that exception is explicitly designed and reviewed.
-
-This prevents verification-only logic from silently becoming FPGA resource usage.
-
----
-
-## 7. Simulator strategy
-
-Do not assume one simulator is equally good at every verification layer.
-
-The intended strategy is:
+Do not assume one simulator is equally strong at every layer.
 
 ### Fast regression simulator
-
-Use a fast simulator for frequent compile/elaboration and cocotb regression when it supports
-the RTL constructs required by the design.
 
 Desired properties:
 
@@ -212,185 +182,103 @@ Desired properties:
 - cocotb integration;
 - deterministic CI behavior;
 - waveform output on failure;
-- enough SystemVerilog support for the production RTL.
+- enough SystemVerilog support for production RTL.
 
 ### Assertion/sign-off simulator
 
-If the fast simulator does not support an SVA feature used by Plasma, run that assertion set in
-a simulator that does support the required semantics.
+If the fast simulator does not support an SVA feature used by Plasma, run that assertion set in a simulator that does. Vivado/XSIM is one integration candidate because the project already depends on Vivado for implementation; another simulator may be selected if it gives better automation/licensing/coverage.
 
-For the AMD/Xilinx flow, Vivado/XSIM is an available integration candidate because the project
-already depends on Vivado for implementation. A different simulator may be selected later if
-it provides better automation/licensing/coverage.
+Never mark an unsupported assertion as passed because the simulator ignored it.
 
-The repository must document the exact supported command once the first simulator flow is
-implemented.
+## 9. pytest integration
 
-Do not mark an unsupported assertion as "passed" merely because the simulator ignored or did
-not elaborate it.
+The long-term goal is a predictable pytest-facing FPGA regression entry point while keeping simulator build details encapsulated.
 
----
-
-## 8. pytest integration
-
-The repository uses pytest as the Python test runner.
-
-The long-term goal is that FPGA functional regression can be invoked from a predictable
-pytest-facing command or wrapper, while keeping simulator build details encapsulated.
-
-A future structure may use:
+Future examples may include:
 
 ```text
+pl/verification/cocotb/test_site_controller.py
 pl/verification/cocotb/test_swd_engine.py
 pl/verification/cocotb/test_spi_engine.py
-pl/verification/cocotb/test_channel_controller.py
 ```
 
-The exact Makefile/runner/plugin mechanism should be selected when the first test is added.
-Avoid defining a fake command in documentation before it exists.
+Do not document a command as supported before it exists. Once configured, CI and developer documentation must use the same entry point.
 
-Once configured, CI and developer documentation must use the same supported entry point.
+## 10. Reference and golden models
 
----
+Python reference models are strongly recommended when expected behavior can be written more simply and independently than RTL.
 
-## 9. Reference and golden models
+Good candidates include:
 
-Python reference models are strongly recommended when expected behavior can be written more
-simply and independently than the RTL implementation.
-
-Good Plasma candidates include:
-
-- CRC/checksum calculation;
+- CRC/checksum;
 - SPI/I2C transaction models;
 - SWD packet/parity behavior;
-- memory/flash content transformations;
+- memory/flash transformations;
 - address/map logic;
-- command/status sequencing;
-- image/data processing if such blocks are introduced later.
+- command/status sequencing.
 
-Conceptual pattern:
+The reference model should not simply mirror the RTL line-for-line; independence is what gives it defect-detection value.
 
-```python
-expected = reference_model(input_data)
-actual = await run_dut_transaction(dut, input_data)
-assert actual == expected
-```
+## 11. Randomized testing
 
-The reference model should not simply duplicate the RTL algorithm line-for-line. Independence
-is valuable because the model can catch a shared misunderstanding in implementation structure.
-
----
-
-## 10. Randomized testing
-
-Randomized tests are useful for exploring combinations humans are unlikely to write by hand,
-but failures must be reproducible.
+Randomized tests are useful only if failures are reproducible.
 
 Rules:
 
 - use/report deterministic seeds;
-- print the seed and relevant generated transaction on failure;
-- keep a fixed regression set of important directed corner cases;
-- convert important discovered random failures into permanent regression cases;
-- do not rely on random testing as a substitute for protocol assertions or formal reasoning.
+- print seed and relevant generated transaction on failure;
+- keep important directed boundary cases;
+- convert important random failures into permanent regression cases;
+- do not replace protocol assertions/formal reasoning with random testing.
 
-Focus randomization on meaningful dimensions such as:
+Meaningful dimensions include length boundaries, address alignment, data patterns, command spacing, backpressure/stall timing, repeated operations, reset near legal boundaries, and multi-Site interleaving.
 
-- length boundaries;
-- address alignment;
-- data patterns;
-- command spacing;
-- backpressure/stall timing;
-- repeated operations;
-- reset near legal transaction boundaries;
-- multi-channel interleaving where the architecture permits concurrency.
+## 12. Coverage expectations
 
----
-
-## 11. Coverage expectations
-
-The first verification goal is correctness, not a vanity coverage number.
-
-For each production block, review at least:
+The first goal is correctness, not a vanity number. For each production block review at least:
 
 - reset behavior;
 - normal transaction path;
-- minimum/maximum/boundary parameters;
-- invalid or rejected command behavior;
+- min/max/boundary parameters;
+- invalid/rejected command behavior;
 - timeout/error behavior where defined;
 - repeated/back-to-back operation;
-- state recovery after completion/error;
-- interaction with shared resources;
-- multi-channel independence when applicable.
+- recovery after completion/error;
+- shared-resource interaction;
+- multi-Site independence when applicable.
 
-Later, code/functional/assertion coverage tooling can be added if it provides actionable value.
-Do not set a numeric coverage threshold before the chosen simulator and coverage model are
-actually established.
+Add code/functional/assertion coverage tooling only when it provides actionable value and the simulator/coverage model is established.
 
----
+## 13. Waveforms and failure artifacts
 
-## 12. Waveforms and failure artifacts
+When simulator support exists, preserve enough failure evidence to reproduce problems:
 
-A failed regression should make diagnosis easy.
-
-When simulator support is added, prefer the ability to retain on failure:
-
-- waveform (`.vcd`, `.fst`, `.wdb`, or tool-appropriate format);
+- waveform (`.vcd`, `.fst`, `.wdb`, or tool-appropriate);
 - seed;
 - simulator stdout/stderr;
-- failing test name and parameters;
+- failing test/parameters;
 - assertion message/time;
 - relevant build/elaboration log.
 
-CI may avoid uploading large waveforms for every passing test, but failures should preserve
-enough information to reproduce the problem.
+Generated artifacts belong in ignored build/output directories, not beside source-of-truth files.
 
-Generated simulation artifacts belong in ignored build/output directories, not alongside the
-source of truth.
+## 14. Verification tiers and claims
 
----
+**Source/layout verified** means repository/layout/static checks passed. It does not mean RTL simulated.
 
-## 13. Verification tiers and claims
+**Functional simulation verified** means the explicitly named simulation passed for the stated simulator/configuration. It does not mean SVA, synthesis, timing, or hardware passed.
 
-Use precise language when reporting results.
+**Assertion verified** means the named SVA set was elaborated and evaluated by a simulator supporting the required constructs.
 
-### Source/layout verified
+**FPGA build verified** means the stated Vivado synthesis/implementation/timing/bitstream stages actually ran and passed.
 
-Means only repository/layout/static checks passed.
-It does not mean RTL simulated.
+**Hardware verified** means the bitstream was loaded on the approved Z2/hardware setup and the stated test was actually observed to pass.
 
-### Functional simulation verified
+Never collapse these into one generic pass claim.
 
-Means cocotb/pytest (or another explicitly named functional simulation) passed for the stated
-simulator/configuration.
-It does not mean SVA coverage, synthesis, timing, or hardware passed.
+## 15. Merge gate
 
-### Assertion verified
-
-Means the named SVA set was elaborated and evaluated by a simulator supporting the required
-constructs.
-
-### FPGA build verified
-
-Means the stated Vivado synthesis/implementation/timing/bitstream stages actually ran and
-passed.
-Report which stages ran.
-
-### Hardware verified
-
-Means the bitstream was actually loaded on the approved Z2/hardware setup and the stated test
-was observed to pass.
-
-Never collapse these labels into one generic "all tests passed" claim.
-
----
-
-## 14. Merge gate
-
-Before an RTL PR is called merge-ready, run all currently configured and applicable automated
-verification.
-
-The expected long-term set is:
+Before an RTL PR is merge-ready, run all currently configured/applicable automated verification. Long-term target:
 
 ```text
 lint/static
@@ -401,59 +289,50 @@ repository pytest
 applicable synthesis/implementation/timing checks
 ```
 
-If a stage is not yet configured, state that clearly in the PR instead of fabricating a pass.
+If a stage is not configured, state that instead of fabricating success. CI green still requires explicit merge approval under root `AGENTS.md`.
 
-CI green still requires human approval before merge according to the root `AGENTS.md`.
+## 16. Deploy and hardware-validation gate
 
----
-
-## 15. Deploy and hardware validation gate
-
-After merge, physical validation is a separate decision.
-
-The intended flow is:
+Physical validation is separate from merge:
 
 ```text
 main
   -> reproducible Vivado build
   -> implementation/timing checks
   -> artifact identified
-  -> explicit user deploy/hardware approval
+  -> explicit deploy/hardware approval
   -> load bitstream on Z2
   -> hardware-in-the-loop test
   -> record observed result
 ```
 
-Typical future hardware-in-the-loop tests may include:
+Future HIL tests may include:
 
 - AXI/register read/write sanity;
-- channel enable/disable behavior;
+- Site enable/disable behavior;
 - SWD transaction against a known target;
 - SPI Flash read/program/verify;
 - I2C EEPROM read/write/verify;
-- multi-channel concurrency/isolation;
+- multi-Site concurrency/isolation;
 - abort/error recovery;
-- throughput and timing measurements.
+- throughput/timing measurements.
 
-Hardware tests must use known-safe electrical configuration and remain behind the repository
-hardware approval gate.
+Hardware tests must use known-safe electrical configuration and remain behind the hardware approval gate.
 
----
+## 17. First production RTL checklist
 
-## 16. First production RTL checklist
+When the first real Plasma FPGA module is introduced:
 
-When the first real Plasma FPGA module is introduced, complete these items together rather than
-leaving verification as a later retrofit:
-
-- choose and document the command-line simulator used for fast regression;
+- use `pl/rtl/site/` for per-Site controller/logic;
+- choose/document the command-line simulator for fast regression;
 - add cocotb to the development/test dependency path;
-- add the first cocotb functional test;
-- define a repeatable local/SWPC test entry point;
-- add SVA if the module has meaningful temporal/protocol invariants;
-- confirm how those assertions are run and that unsupported features are not silently ignored;
+- add the first functional test;
+- define a repeatable local/integration-host test entry point;
+- add SVA when meaningful temporal/protocol invariants exist;
+- confirm assertions are actually evaluated, not silently ignored;
 - configure failure logs/waveforms;
-- add CI only after the same command works reproducibly outside CI;
-- document what remains SWPC/Vivado-only;
-- keep Z2 hardware loading behind explicit approval.
+- add CI only after the same command is reproducible outside CI;
+- document what remains Vivado-only;
+- keep Z2 loading behind explicit approval.
 
-This is the point where the architecture becomes executable rather than documentation-only.
+This is where the verification architecture becomes executable rather than documentation-only.

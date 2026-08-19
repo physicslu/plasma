@@ -1,139 +1,162 @@
-# Plasma Codex Autonomous Development Contract
+# Plasma Autonomous Development Contract
 
-This file is the primary operating contract for AI coding agents working on the Plasma repository.
-Read it before making code, configuration, deployment, hardware, or documentation changes.
+This file is the primary operating contract for AI coding agents working on the Plasma repository. Read it before making code, configuration, deployment, hardware, or documentation changes.
 
-The default operating model is **goal-oriented autonomous execution with explicit approval gates**.
-When the user assigns a feature, bug, maintenance task, CI repair, or PR objective, the agent should normally carry the task through the routine engineering lifecycle without asking the user to relay shell commands or approve every intermediate step.
+The default operating model is **goal-oriented autonomous execution with explicit approval gates**. Routine engineering work should continue without asking the user to relay shell commands or approve every intermediate step. Protected operations remain explicit human gates.
 
-Routine autonomous work includes repository inspection, feature-branch work, implementation, focused validation, full relevant validation, diff review, focused commits, feature-branch pushes, pull-request maintenance, and CI troubleshooting.
+## 1. Project purpose and canonical domain
 
-The agent must stop for explicit approval before crossing a protected boundary such as merging to `main`, deploying/restarting shared runtime services, performing hardware-affecting operations, rewriting published Git history, or making a material architecture/security tradeoff that cannot be resolved from the repository and task requirements.
+Plasma is a configurable multi-Site IC programming system. The current hardware development platform is PYNQ-Z2 (Z2).
 
-## 1. Project purpose
+Canonical product/domain hierarchy:
 
-Plasma is a multi-channel IC programming system using PYNQ-Z2 (Z2) as the hardware development platform.
-The prototype currently enables CH0 and CH1 while keeping the software and RTL architecture extensible to 1–8 channels.
+```text
+Plasma System
+└── Facility
+    └── PPU (Plasma Programming Unit)
+        ├── SITE 1
+        ├── SITE 2
+        └── ... SITE N
+```
+
+Definitions:
+
+- **Facility**: deployment / administrative location.
+- **PPU**: one physical Plasma programming appliance and autonomous local execution node.
+- **Site**: one independently controlled Programming Site inside a PPU.
+- **Socket**: mechanical/electrical IC fixture attached to a Site; it is not the Site identity.
+
+Canonical Site identity is one-based:
+
+```text
+SITE 1 -> site_id = 1
+SITE 2 -> site_id = 2
+...
+SITE N -> site_id = N
+```
+
+There is no canonical `SITE 0`.
+
+Protocol v3.2 is canonical:
+
+```text
+magic:            PLASMA32
+protocol_version: 3.2
+identity:         site_id = 1..N
+```
+
+Protocol v3.1 remains an explicit compatibility adapter only:
+
+```text
+v3.1 channel_id 0 -> canonical SITE 1
+v3.1 channel_id 1 -> canonical SITE 2
+...
+```
+
+New code must not treat `site_id == channel_id` as an invariant, dual-send `channel_id` in v3.2 requests, or introduce new product/domain behavior using retired Programmer/Channel vocabulary.
 
 Repository layout:
 
 ```text
-pl/                 Zynq PL RTL, constraints, simulation, Vivado build assets
-software/python/    Plasma control plane, TCP server, CLI, REST gateway, tests
-software/web/       Plasma Programmer Console
-scripts/            SWPC deployment and service-control scripts
-docs/               Architecture, development, deployment, hardware, and test documentation
-```
-
-Execution-zone ownership:
-
-```text
-Codex Cloud   Software engineering, isolated tests, branch/PR delivery
-SWPC          Integration, Vivado build, deployment, shared-service validation
-Z2            Target runtime, FPGA/PS integration, electrical/hardware validation
+pl/                 Zynq PL RTL, constraints, simulation, verification, Vivado build assets
+software/python/    PPU control plane, Protocol v3.2 TCP server, CLI, REST gateway, tests
+software/web/       Plasma PPU Console
+scripts/            integration/deployment and service-control scripts
+docs/               architecture, development, and deployment documentation
 ```
 
 ## 2. Source-of-truth priority
 
-Do not assume chat history or older documentation is current.
-When sources disagree, use this priority order:
+Do not assume chat history or older documentation is current. When sources disagree, use this priority order:
 
 1. Executable code and checked-in configuration.
-2. `scripts/plasmactl` for SWPC operational behavior.
+2. `scripts/plasmactl` for integration-host operational behavior.
 3. `software/python/pyproject.toml` and `software/web/package.json` for toolchain/dependency requirements.
 4. Current tests.
-5. Documentation.
-6. Historical discussion or assumptions.
+5. Current architecture/development documentation.
+6. Historical/legacy documents and discussion.
 
-If an inconsistency is found, report it explicitly and avoid silently choosing the older behavior.
-Update the relevant documentation when behavior is intentionally changed.
+If an inconsistency is found, report it explicitly. Do not silently propagate stale behavior. Update documentation together with intentional behavior changes.
 
 ## 3. Execution zones
 
-### 3.1 Codex Cloud: software engineering agent
+### 3.1 Cloud / isolated software engineering
 
-Codex Cloud is the default isolated software-engineering environment. It may edit source,
-run tests that do not need site-specific services or hardware, and deliver changes on an
-`agent/*` branch through a pull request.
+The isolated software-engineering environment may edit source, run tests that do not require site-specific services or hardware, and deliver changes on an `agent/*` branch through a pull request.
 
-Use these repository entry points in Codex Cloud:
+Repository entry points:
 
 ```bash
 bash scripts/codex-cloud-setup.sh
 bash scripts/codex-cloud-test.sh
 ```
 
-The configured maintenance command is:
+Maintenance entry point:
 
 ```bash
 bash scripts/codex-cloud-maintenance.sh
 ```
 
-Codex Cloud does not prove SWPC deployment, Vivado implementation, Z2 runtime behavior,
-FPGA I/O behavior, or real IC programming. Do not add SWPC SSH keys, Z2 credentials,
-GitHub tokens, board certificates, or deployment secrets to the Cloud environment merely
-to collapse these validation boundaries.
+Cloud/isolated tests do not prove integration-host deployment, Vivado implementation, Z2 runtime behavior, FPGA I/O behavior, or real IC programming. Do not add integration-host SSH keys, Z2 credentials, GitHub tokens, board certificates, or deployment secrets merely to collapse these validation boundaries.
 
-### 3.2 Integration and deployment host: SWPC
+### 3.2 Integration / deployment host
 
-SWPC is the Plasma integration-test, Vivado build, deployment, and demo server.
+The integration host owns deterministic cross-stack validation, shared runtime deployment, and Vivado integration. Machine names, usernames, private addresses, and absolute paths are operator-local configuration; public repository guidance uses `$PLASMA_REPO` and an integration-host alias.
 
-```text
-SSH:        gordon@swpc
-Repository: /storage/projects/plasma
-Deployment branch: main
-```
-
-Do not treat SWPC as the final production image for Z2. SWPC may contain development-only tools that should not be copied to the embedded target.
-
-Before modifying files on SWPC:
+Before modifying an integration-host workspace:
 
 ```bash
-cd /storage/projects/plasma
+cd "$PLASMA_REPO"
 git status -sb
 git branch --show-current
 git log -1 --oneline
 git fetch origin main
 ```
 
-Never overwrite unrelated user changes.
-If the worktree contains unrelated modifications, keep them untouched and limit edits to the requested scope.
+Never overwrite unrelated user changes. If the worktree contains unrelated modifications, keep them untouched and limit edits to the requested scope.
 
-### 3.3 Target runtime and hardware validation: Z2
+### 3.3 Z2 target / hardware validation
 
-Z2 owns embedded runtime, PS/PL integration, FPGA loading, target-interface behavior,
-and hardware validation. A passing Cloud or SWPC Mock test must never be reported as a
-passing Z2 or real-target test.
+Z2 owns embedded runtime, PS/PL integration, FPGA loading, target-interface behavior, electrical behavior, and hardware validation.
+
+A passing Cloud, CI, or integration-host Mock test must never be reported as a passing Z2 or real-target test.
 
 ## 4. Current software architecture
 
 Current implemented path:
 
 ```text
-Browser Web Console
+Browser / Plasma PPU Console
         |
-        | HTTP REST / polling
+        | HTTP REST polling
         v
-Python REST Gateway
+Plasma Web REST Gateway
         |
-        | Plasma protocol v3.1 over TCP
+        | Plasma Protocol v3.2 / PLASMA32
         v
 Plasma Server :9900
         |
         v
-Channel interface / handler
+SiteManager / SiteWorker
         |
         v
-MockInterface today; Z2/FPGA hardware integration is still a separate validation stage
+Interface / Handler
+        |
+        v
+MockInterface today; Z2/FPGA/real-target validation remains a separate stage
 ```
 
-Important: the current Python Web Gateway is implemented with Python standard-library `ThreadingHTTPServer`.
-It is NOT currently FastAPI and does NOT currently use WebSocket.
-Do not introduce FastAPI/WebSocket merely because they were discussed as a future architecture; make that migration only when the task explicitly requires it and update architecture documentation and tests together.
+Important implementation facts:
 
-Prototype Web status is polled from the Gateway. A successful Mock programming flow does not prove real target hardware programming.
+- The current Plasma Web REST Gateway uses Python standard-library `ThreadingHTTPServer`.
+- It is **not FastAPI**.
+- It does **not use WebSocket**.
+- The Web Console currently uses REST polling.
+- A successful Mock programming flow does not prove real-target hardware programming.
 
-## 5. Python environment
+Do not introduce FastAPI/WebSocket merely because they were discussed as a future option. Such a migration requires an explicit task, corresponding architecture/API decisions, and tests.
+
+## 5. Python environment and domain rules
 
 Python project:
 
@@ -141,25 +164,31 @@ Python project:
 software/python/
 ```
 
-`pyproject.toml` is authoritative for Python requirements.
-Current project requirement is Python >= 3.11.
-The normal SWPC virtual environment is:
+`pyproject.toml` is authoritative for Python requirements. The declared baseline is Python >= 3.11.
 
-```text
-/storage/projects/plasma/software/python/.venv
-```
-
-Preferred direct test command:
+Preferred direct test command inside the configured Python environment:
 
 ```bash
-cd /storage/projects/plasma/software/python
+cd software/python
 .venv/bin/python -m pytest -q
 ```
 
-Do not replace pytest with unittest based on stale documentation or CI configuration.
-`pytest` is the repository-wide test runner. Existing `unittest.TestCase` classes may
-remain while pytest collects them; do not reintroduce a separate unittest command path.
-If a Python dependency changes, update `pyproject.toml` and verify the SWPC install/deploy path still works.
+`pytest` is the repository-wide Python test runner. Existing `unittest.TestCase` classes may remain while pytest collects them; do not reintroduce a separate unittest execution contract.
+
+Canonical Python/domain code uses:
+
+```text
+PPUConfig
+SiteConfig
+SiteManager
+SiteWorker
+SiteState
+ppu_id
+facility_id
+site_id
+```
+
+Legacy `Programmer*`, `Channel*`, `programmer/channels`, and `channel_id` may remain only in explicitly documented compatibility adapters/tests.
 
 ## 6. Web environment
 
@@ -169,35 +198,30 @@ Web project:
 software/web/
 ```
 
-Use `package.json` as the source of truth for the current web stack and versions.
-The project uses React + TypeScript and currently includes Next.js/Vinext and Vite-based tooling.
-Node.js must satisfy the engine declared in `package.json` (currently >= 22.13.0).
+Use `package.json` as the source of truth for the current Web stack and versions. The project uses React + TypeScript and currently includes Next.js/Vinext and Vite tooling. Node.js must satisfy the engine declared in `package.json`.
 
 Normal checks:
 
 ```bash
-cd /storage/projects/plasma/software/web
+cd software/web
 npm run lint
 npm test
 npm run validate:artifact
 ```
 
-Do not assume the production Z2 needs Node.js, npm, or the development server merely because SWPC uses them for development/build/demo work.
-The eventual embedded deployment should minimize runtime dependencies and deploy only what the selected production Web architecture actually requires.
+The Web Console is a PPU Console. It must discover PPU/Site topology from canonical status rather than hard-code an eight-Site product assumption. New job requests send one-based `site_id` only.
 
-## 7. SWPC services and ports
+Do not assume production Z2 needs Node.js, npm, or the development server merely because the integration host uses them for development/build/demo work.
 
-SWPC service management is defined by `scripts/plasmactl`.
-The current user systemd services are:
+## 7. Runtime services and ports
 
-| Service | Port | Role |
+Service management is defined by `scripts/plasmactl`.
+
+| systemd service | Default port | Canonical role |
 |---|---:|---|
-| `plasma-server.service` | 9900 | Plasma v3.1 TCP Server |
-| `plasma-web.service` | 18080 | Python HTTP REST Gateway |
-| `plasma-vite.service` | 5173 | Web Console development/demo service |
-
-Operational SWPC Gateway port is **18080**.
-Although `plasma_web.gateway` has its own code-level default, do not change SWPC deployment back to port 8080 unless the deployment design is intentionally changed.
+| `plasma-server.service` | 9900 | Plasma PPU Programming Server / Protocol v3.2 TCP Server |
+| `plasma-web.service` | 18080 | Plasma Web REST Gateway |
+| `plasma-vite.service` | 5173 | Plasma PPU Console development/demo runtime |
 
 Useful commands:
 
@@ -210,25 +234,36 @@ plasmactl logs
 plasmactl deploy
 ```
 
-`plasmactl test` is the preferred full SWPC validation because it runs the repository's
-Python and PL source-layout pytest collection plus the Web checks together.
+`plasmactl test` is the preferred full integration-host validation for cross-stack changes.
 
-The normal deployment flow is:
+Normal deployment flow:
 
 ```text
 GitHub main
-   -> SWPC fast-forward update
-   -> full test
+   -> fast-forward update
+   -> re-exec latest plasmactl
+   -> full relevant validation
+   -> regenerate/reconcile systemd units
    -> restart services
    -> health check
 ```
 
-Do not bypass failed tests and restart the new code as if validation succeeded.
+Do not bypass failed tests and restart new code as if validation succeeded.
 
-## 8. Service and process safety
+## 8. Site execution invariants
 
-Before stopping a process, identify it first.
-Use `plasmactl ports`, `ss`, and `ps -fp PID` as appropriate.
+Unless a real shared resource requires synchronization:
+
+- Sites execute independently.
+- A Site must not wait for an unrelated Site pipeline.
+- Per-Site cancellation must not cancel unrelated Sites.
+- Batch cancellation is authoritative for batch classification when it races terminal job success, while the underlying final job result remains truthful.
+- `program` means write only; a complete programming flow is composed explicitly as `erase -> program -> verify` when selected.
+- Batch operation selection may include any subset of Erase / Program / Verify / Read.
+
+## 9. Service and process safety
+
+Before stopping a process, identify it first. Use `plasmactl ports`, `ss`, and `ps -fp PID` as appropriate.
 
 Never use broad destructive process commands such as:
 
@@ -239,15 +274,13 @@ killall python
 killall node
 ```
 
-Do not stop Apache, Nextcloud, Docker services, networking, Tailscale, SSH, or unrelated SWPC services while working on Plasma unless the task explicitly requires it and the impact is understood.
+Do not stop unrelated host services, networking, SSH, storage, containers, or other applications while working on Plasma unless the task explicitly requires it and the impact is understood.
 
-Do not expose internal service ports directly to the public Internet as a shortcut for fixing connectivity.
+Do not expose internal service ports directly to an untrusted network as a shortcut for connectivity problems.
 
-## 9. Autonomous task execution contract
+## 10. Autonomous task execution contract
 
-### 9.1 Goal-oriented execution
-
-Treat a user request such as:
+Treat requests such as:
 
 ```text
 Implement <feature>.
@@ -256,273 +289,121 @@ Continue PR #N until merge-ready.
 Resolve the CI failure.
 ```
 
-as authorization to perform the routine engineering work necessary to reach that stated goal within the repository and safety boundaries in this file.
+as authorization to perform routine engineering work necessary to reach the stated goal within this repository and the safety boundaries below.
 
-Do **not** require the user to copy shell commands between ChatGPT, Codex, and SWPC for ordinary development steps.
-Do **not** stop merely to ask permission for routine inspection, editing, tests, diff review, focused commits, feature-branch pushes, PR updates, or CI investigation when those actions are clearly within the assigned goal.
+Routine autonomous work includes:
 
-Prefer independent engineering judgment grounded in source code, tests, current configuration, and observable results.
-Ask the user only when a protected approval gate or genuine material ambiguity is reached.
+- inspect repository, history, configuration, tests, logs, PRs, and CI;
+- fetch/read Git state;
+- fast-forward a clean local `main` when only behind `origin/main`;
+- create/switch to `agent/<feature>` branches;
+- edit files within scope;
+- add/update tests and documentation required by the change;
+- run focused and full relevant validation, builds, linters, and artifact checks;
+- inspect diffs and generated output;
+- create focused feature-branch commits;
+- push feature branches;
+- create/update PRs;
+- inspect and repair deterministic CI failures caused by the branch;
+- rerun a failed CI check once when evidence supports transient flakiness;
+- mark a PR ready for review only when it is actually merge-ready.
 
-### 9.2 Actions the agent may perform autonomously
+Do not turn routine engineering procedure into user-operated command relaying when the agent can perform the work directly.
 
-Within an assigned development/maintenance goal, the agent may normally:
+## 11. Protected approval gates — STOP and ask the user
 
-- Inspect repository state, history, configuration, tests, logs, and current PR/CI state.
-- Run `git fetch` and other read-only Git inspection commands.
-- Fast-forward a clean local `main` to `origin/main` before starting new feature work.
-- Create and switch to an appropriate `agent/<feature>` branch.
-- Modify files within the task scope.
-- Add or update tests and documentation needed by the change.
-- Run focused tests, full relevant validation, builds, linters, and artifact checks.
-- Inspect and review `git diff`, `git diff --check`, staged diffs, and generated output.
-- Stage only intended files and create focused commits on a feature branch.
-- Push a feature branch and set/update its upstream.
-- Create or update a pull request for the feature branch.
-- Update PR descriptions/comments and mark a draft PR ready for review when the branch is actually merge-ready.
-- Inspect GitHub Actions results and logs.
-- Investigate and correct CI failures caused by the branch or by deterministic test/infrastructure issues that are reasonably in scope.
-- Rerun a failed CI check once when there is concrete evidence the failure is transient/flaky; repeated reruns must not substitute for root-cause analysis.
-- Add follow-up commits to the same feature branch when review or CI identifies a narrow correction.
-
-Routine autonomous publication is limited to **feature branches and their PRs**. It does not authorize merging to `main` or deploying runtime changes.
-
-### 9.3 Protected approval gates — stop and ask the user
-
-Explicit user approval is required before any of the following:
+Explicit user approval is required before:
 
 1. **Merge/integration to `main`**
-   - merging a PR to `main`
-   - directly committing code-changing feature work to `main`
-   - closing/replacing a PR in a way that discards reviewed work
+   - merge a PR to `main`;
+   - directly commit code-changing feature work to `main`;
+   - close/replace a PR in a way that discards reviewed work.
 
 2. **Deployment/runtime changes**
-   - `plasmactl deploy`
-   - restarting shared Plasma services to activate new code
-   - changing systemd service definitions, public routing, firewall/network exposure, or production/demo runtime configuration when the effect is operational rather than test-only
+   - `plasmactl deploy`;
+   - restart shared Plasma services to activate new code;
+   - change active systemd definitions, public routing, firewall/network exposure, or shared runtime configuration.
 
 3. **Hardware-affecting operations**
-   - programming a real IC
-   - changing DUT power/voltage
-   - loading a new FPGA bitstream onto hardware
-   - changing hardware I/O behavior on a connected system
-   - any action with credible risk of damaging or electrically stressing hardware
+   - program a real IC;
+   - change DUT power/voltage;
+   - load a new FPGA bitstream onto connected hardware;
+   - change FPGA I/O behavior on a connected system;
+   - perform any action with credible electrical/hardware risk.
 
 4. **Destructive or history-rewriting Git operations**
-   - `git reset --hard`
-   - `git clean -fd` or equivalent destructive cleanup
-   - force checkout/restore that discards user work
-   - rebase of a published/shared branch
-   - `git push --force` / `--force-with-lease`
-   - deleting remote branches/tags that may contain user work
+   - `git reset --hard`;
+   - `git clean -fd` or equivalent destructive cleanup;
+   - force checkout/restore that discards user work;
+   - rebase a published/shared branch;
+   - `git push --force` / `--force-with-lease`;
+   - delete remote branches/tags that may contain user work.
 
-5. **Material design/security decisions**
-   - incompatible protocol/API changes without a clear repository-defined migration path
-   - security/credential/access-policy changes with nontrivial tradeoffs
-   - architecture choices with materially different cost, compatibility, safety, or maintainability consequences when the task does not already select one
-   - scope expansion that substantially changes the original goal
+5. **Material architecture/security decisions**
+   - incompatible protocol/API changes without an already-defined migration contract;
+   - credential/access/security policy changes with nontrivial tradeoffs;
+   - architecture choices with materially different cost, compatibility, safety, or maintainability consequences;
+   - substantial scope expansion beyond the assigned goal.
 
-When a protected gate is reached, stop at the safest clean checkpoint, summarize the state and tradeoff, and ask for the smallest necessary decision.
+When a protected gate is reached, stop at the safest clean checkpoint, summarize evidence/tradeoffs, and request the smallest necessary decision.
 
-### 9.4 Do not interrupt for routine decisions
+## 12. Merge-ready definition
 
-The following are normally **not** reasons to stop and ask the user:
+A feature/PR is merge-ready only when all applicable conditions are true:
 
-- which focused test command to run
-- whether to inspect a file, log, diff, or CI job
-- whether to add a test required to prove the requested behavior
-- whether to create a normal feature-branch commit after successful review/validation
-- whether to push that feature branch so CI can run
-- whether to fix a clear CI failure on that feature branch
-- whether to update the PR body with validation results
-- whether to make a small deterministic cleanup discovered during the assigned task when it is necessary for correctness and remains tightly scoped
-
-Do the work and report meaningful results instead of turning routine engineering procedure into user-operated command relaying.
-
-### 9.5 Definition of merge-ready
-
-When asked to bring a feature or PR to merge-ready state, continue autonomously until all applicable conditions are true:
-
-- intended implementation is complete
-- branch scope is clean and unrelated edits are absent
-- focused tests pass
-- full relevant repository validation passes
-- `git diff --check` passes
-- staged/committed diff has been reviewed for correctness, security, generated files, and scope
-- feature branch is pushed
-- PR accurately describes behavior, validation, limitations, and hardware status
-- required CI checks pass
-- no blocking review findings remain
-- GitHub reports the PR mergeable, or any non-destructive conflict resolution clearly within scope has been completed and retested
-- no claim exceeds what was actually validated
+- intended implementation is complete;
+- branch scope is clean and unrelated edits are absent;
+- focused tests pass;
+- full relevant validation passes;
+- diff whitespace/syntax checks pass where applicable;
+- committed diff was reviewed for correctness, security, generated files, and scope;
+- feature branch is pushed;
+- PR accurately describes behavior, validation, limitations, and hardware status;
+- required CI checks pass;
+- no blocking review findings remain;
+- GitHub reports the PR mergeable, or straightforward non-destructive integration has been completed and retested;
+- no validation claim exceeds what was actually observed.
 
 At that point, stop and request approval to merge to `main`.
 
-## 10. Git workflow and publication policy
+## 13. Git publication policy
 
-The Git workflow exists to keep `main` reviewable and deployable and to prevent an agent from mixing unrelated user work into a change.
+Treat `main` as integration/deployment branch, not as an agent scratch branch.
 
-### 10.1 Inspect before changing anything
-
-Before code-changing work, inspect the repository first:
+Before code-changing work:
 
 ```bash
-cd /storage/projects/plasma
+cd "$PLASMA_REPO"
 git status -sb
 git branch --show-current
 git log -1 --oneline
 git fetch origin main
 ```
 
-After fetching, determine whether the local branch is ahead of or behind `origin/main` before proceeding.
-Fetching is safe because it updates remote-tracking refs without modifying the working tree.
+If a clean local `main` is only behind `origin/main`, synchronize using fast-forward only. Do not silently merge/rebase divergent history.
 
-If local `main` is clean and only behind `origin/main`, synchronize it using fast-forward only:
-
-```bash
-git pull --ff-only origin main
-```
-
-Do not silently merge or rebase divergent history.
-If the worktree already contains modifications, do not pull, merge, rebase, reset, stash, or discard them until their ownership and purpose are understood.
-
-### 10.2 Use feature branches for code changes
-
-New features, bug fixes, refactors, protocol changes, API changes, and hardware-interface changes must not normally be developed directly on `main`.
-After synchronizing a clean `main`, create a dedicated branch before editing code.
-AI-created development branches should normally use:
+New features, bug fixes, refactors, protocol changes, API changes, and hardware-interface changes normally use:
 
 ```text
 agent/<short-feature-name>
 ```
 
-Example:
+Never stage or commit unrelated user work. Never force-push or rewrite published history merely for graph aesthetics.
 
-```bash
-git switch -c agent/read-ic-v1
-```
+After a reviewed feature is merged to GitHub `main`, deployment remains a separate approval gate.
 
-If requested feature work has already been started as uncommitted changes on `main`, do not discard or recreate the work.
-Create a feature branch from the current state while preserving the existing working-tree changes:
+## 14. Validation policy
 
-```bash
-git switch -c agent/<short-feature-name>
-```
+Run the smallest relevant checks during development, then full relevant validation before declaring completion or merge-ready.
 
-Then verify that all intended modifications are still present with `git status -sb` and `git diff --stat`.
-
-Small documentation-only or explicitly requested repository-maintenance changes may be applied directly to `main` when the user intentionally requests that workflow, but code-changing feature development should use a feature branch.
-
-### 10.3 Validate and review before commit
-
-During development, run focused checks as needed.
-Before declaring the implementation ready for review, run the full validation required by the affected scope and then inspect the diff:
-
-```bash
-git diff --check
-git diff --stat
-git diff
-```
-
-For cross-stack Plasma changes, normally run:
-
-```bash
-plasmactl test
-```
-
-Do not equate passing tests with architectural correctness. The diff must still be reviewed for scope, interface changes, security impact, generated files, and unintended edits.
-
-### 10.4 Autonomous feature-branch commits
-
-When the assigned goal authorizes autonomous execution under Section 9, the agent may commit reviewed, validated work on the task's feature branch without a separate user approval for each commit.
-
-Before each commit:
-
-1. Stage only files that belong to the requested change.
-2. Prefer explicit file paths instead of `git add -A` when unrelated modifications may exist.
-3. Inspect exactly what will be committed:
-
-```bash
-git diff --cached --check
-git diff --cached
-```
-
-4. Create a focused commit with a concise message describing the complete change.
-
-Never stage or commit unrelated user work.
-
-If the user explicitly requested a review-only or no-commit task, that narrower instruction overrides autonomous commit permission.
-
-### 10.5 Feature-branch publication
-
-Under an autonomous task, the agent may push the feature branch and create/update its PR without separate approval, because this is necessary for CI and review and does not change deployed `main`.
-
-The normal autonomous feature flow is:
-
-```text
-inspect/synchronize clean main
-    -> create/use feature branch
-    -> implement
-    -> focused tests
-    -> full validation
-    -> diff review
-    -> stage intended files
-    -> review staged diff
-    -> commit
-    -> push feature branch
-    -> create/update PR
-    -> inspect CI/review
-    -> fix branch/CI issues as needed
-    -> merge-ready checkpoint
-    -> STOP FOR USER MERGE APPROVAL
-```
-
-Do not force-push, rewrite a published branch, merge to `main`, tag a release, or deploy without explicit approval.
-Never commit credentials, SSH private keys, tokens, `.env` secrets, or generated credentials.
-
-### 10.6 Keeping a feature branch current
-
-Do not rewrite published history merely to obtain a linear graph.
-If a published feature branch falls behind `origin/main` but GitHub still reports it mergeable and CI is valid, rebasing is not required just for aesthetics.
-
-If integration with newer `main` is actually necessary:
-
-- fetch first and inspect divergence
-- preserve a clean worktree
-- prefer a non-destructive integration method on a published branch
-- resolve straightforward, task-local conflicts only when the correct resolution is unambiguous
-- rerun relevant validation after integration
-- stop for user approval if resolution requires a design choice or would rewrite published history
-
-### 10.7 `main` and deployment rules
-
-Treat `main` as the integration/deployment branch, not as an agent scratch branch.
-SWPC deployment behavior must remain fast-forward based; do not silently resolve deployment-branch divergence with an automatic merge or rebase.
-
-`plasmactl update` and `plasmactl deploy` are intended to operate on the configured deployment branch (`main` by default).
-Do not deploy an unreviewed feature branch as though it were the production/demo `main` branch.
-
-After a feature is reviewed and merged to GitHub `main`, deployment still requires explicit user approval.
-When approval is granted, the normal SWPC deployment sequence is:
-
-```bash
-plasmactl deploy
-```
-
-which performs the repository's update, full validation, service restart, and health checks according to `scripts/plasmactl`.
-
-## 11. Validation policy
-
-Run the smallest relevant checks during development, then run the full relevant validation before declaring the work complete or merge-ready.
-
-For Python-only changes:
+Python-only:
 
 ```bash
 cd software/python
 .venv/bin/python -m pytest -q
 ```
 
-For Web-only changes:
+Web-only:
 
 ```bash
 cd software/web
@@ -531,68 +412,47 @@ npm test
 npm run validate:artifact
 ```
 
-For cross-stack, deployment, configuration, API, or release-affecting changes on SWPC:
+Cross-stack/deployment/config/API/release-affecting integration-host changes:
 
 ```bash
 plasmactl test
 ```
 
-When service behavior changed, service restart/runtime verification may be required eventually, but restarting the shared services is a protected approval gate.
-Do not claim runtime verification if the new code has not actually been activated.
-Do not claim hardware validation if only MockInterface tests ran.
+Testing layers are distinct:
 
-### 11.1 CI failures
+```text
+Unit / Source
+    -> SSR / rendered HTML
+    -> Playwright browser E2E
+    -> deterministic Visual Regression
+    -> deployment/runtime validation
+    -> Z2/hardware validation when applicable
+```
 
-A failed required check blocks merge-ready status until it is understood and resolved.
+A passing lower layer does not prove the next layer. Do not claim runtime verification if code has not been activated. Do not claim FPGA or hardware validation from Mock tests.
 
-When CI fails:
+## 15. FPGA / PL rules
 
-1. Inspect the exact workflow/job logs.
-2. Determine whether the failure is caused by the feature, stale CI configuration, a deterministic infrastructure/test issue, or credible transient flakiness.
-3. Reproduce locally where practical.
-4. Fix the smallest correct layer; do not weaken correctness assertions merely to obtain a green check.
-5. Push the focused fix and allow CI to rerun.
-6. If evidence strongly supports a transient runner failure, one rerun is acceptable; repeated reruns without root-cause work are not.
+`pl/` contains FPGA/PL work for Z2. RTL, XDC, register maps, Vivado scripts, bitstreams, and hardware-visible interfaces are contracts.
 
-### 11.2 Remote-session resilience
+New production RTL uses SystemVerilog and follows `pl/AGENTS.md`, `docs/development/fpga-development-guide.md`, and `docs/development/fpga-verification-guide.md`.
 
-Long validation/build steps must not depend unnecessarily on an iPad/iPhone-to-Mac Remote session remaining connected.
-The engineering operation should live as close as practical to the machine that owns the repository and build environment.
+Canonical repeated programming-resource terminology is **Site**, including the production placeholder `pl/rtl/site/`. Do not create new production `channel` modules/directories merely from legacy software terminology; use `channel` only when it genuinely denotes a lower-level protocol/bus concept and document that distinction.
 
-For long **non-destructive** tests/builds on SWPC, the agent may use a durable host-side execution pattern when useful, for example a background process with a known PID and log file, so a Remote UI disconnect does not destroy the work.
+When PL-visible behavior changes:
 
-When doing so:
+- check Python/PYNQ register access;
+- check register-map documentation;
+- check clock/reset/CDC and XDC/timing constraints;
+- run appropriate simulation/lint/SVA/cocotb validation;
+- do not claim synthesis/implementation/timing/bitstream success unless actually run;
+- do not claim Z2 hardware success from software tests.
 
-- record the exact command, PID, and log path
-- ensure the command is non-interactive and non-destructive
-- check its exit status/result before treating it as validated
-- clean up temporary logs/processes when appropriate
-- never background a deployment, service restart, destructive Git operation, or hardware operation merely to bypass an approval gate
+## 16. Z2 production direction
 
-Prefer short meaningful checkpoints over one unnecessarily long remote-controlled command chain.
+Z2 is the intended embedded PPU controller/runtime, not a clone of the integration workstation.
 
-## 12. Hardware / PL rules
-
-`pl/` contains FPGA/PL work for the Z2 platform.
-Treat RTL, XDC constraints, register maps, Vivado scripts, `.bit`, and `.hwh` artifacts as hardware-interface contracts.
-
-When changing PL-visible behavior:
-
-- Check whether Python/PYNQ register access must change.
-- Check whether register-map documentation must change.
-- Check whether simulation or hardware validation is required.
-- Do not claim Vivado synthesis/implementation/bitstream success unless those steps were actually run.
-- Do not claim Z2 hardware success from software Mock tests.
-- Avoid hand-editing generated Vivado output unless the file is intentionally maintained as source.
-
-Real IC programming, DUT power control, FPGA I/O changes, and target-voltage changes can affect hardware. They are protected approval-gate operations unless the user has explicitly authorized the specific hardware task and its scope.
-
-## 13. Z2 production direction
-
-Z2 is the intended embedded programmer controller/runtime, not a clone of the SWPC development workstation.
-Keep the future production image minimal.
-
-Expected runtime responsibilities include, subject to actual implementation and validation:
+Expected runtime responsibilities, subject to actual implementation/validation:
 
 ```text
 Embedded Linux
@@ -606,76 +466,63 @@ system services
 logs / diagnostics
 ```
 
-Development-only components such as Vivado, pytest, npm build tooling, full source-control credentials, and developer SSH keys should not automatically be included in a production Z2 image.
+Development-only components such as Vivado, pytest, npm build tooling, source-control credentials, and developer SSH keys should not automatically be included in a production image.
 
-Before standardizing a Z2 Python environment, verify compatibility with the PYNQ/XRT environment first. Do not blindly clone the SWPC Python virtual environment onto Z2.
+Before standardizing a Z2 Python environment, verify compatibility with PYNQ/XRT first. Do not blindly clone the integration-host Python virtual environment onto Z2.
 
-## 14. Known current inconsistencies / technical debt
+## 17. Current known boundaries / technical debt
 
-Agents should be aware of these items and must not silently propagate them:
+Agents must not silently propagate these facts into wrong assumptions:
 
-1. SWPC development currently uses Python 3.11 while the GitHub Python workflow uses Python 3.12; this is valid under the declared `>=3.11` requirement but differences must be considered when diagnosing CI-only failures.
-2. The SWPC operational Gateway port is 18080, while the Python gateway module has a code-level default of 8080.
-3. Older architecture discussion may describe FastAPI/WebSocket, but the current checked-in Gateway uses Python standard-library HTTP and REST polling.
-4. Older descriptions may call the Web stack simply React/TypeScript/Vite; current `package.json` also includes Next.js/Vinext. Always inspect the current package metadata before making stack assumptions.
+1. Python supports >=3.11; CI and integration host may use different allowed minor versions.
+2. Integration deployment uses Plasma Web REST Gateway port 18080 while `plasma_web.gateway` retains a code-level local default of 8080.
+3. The current Gateway is standard-library HTTP + REST polling, not FastAPI/WebSocket.
+4. The current Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before making stack assumptions.
+5. Protocol v3.1 compatibility remains temporarily supported; removing it is a separate deprecation decision.
+6. Plasma Manager / fleet control plane is an architectural target, not a currently implemented service.
+7. Mock/software validation still does not prove Z2/FPGA/OpenOCD/real-target behavior.
 
-When working near one of these areas, either resolve the inconsistency as part of the task or call it out clearly in the final report.
+## 18. Communication and completion report
 
-## 15. Agent communication and completion report
+Report at meaningful engineering checkpoints rather than after every routine command. Interrupt the user immediately only for:
 
-Prefer reporting at meaningful engineering checkpoints rather than after every routine shell command.
-Do not require the user to relay command output between systems when the agent can inspect the relevant source, repository, CI, or log directly.
+- a protected approval gate;
+- a material ambiguity requiring a product/architecture decision;
+- a safety/security issue;
+- missing access that genuinely blocks progress;
+- an unexpected state where continuing risks user work.
 
-Interrupt the user immediately only for:
-
-- a protected approval gate
-- a material ambiguity requiring a product/architecture decision
-- a safety/security issue
-- missing credentials/access that genuinely blocks progress
-- an unexpected state where continuing risks losing user work
-
-When a task reaches completion, merge-ready state, or a blocker, report at minimum:
+At completion/merge-ready/blocker, report at minimum:
 
 ```text
 Changed:
-- files changed
-- behavior changed
+- files/behavior changed
 
 Validated:
-- exact meaningful checks run
-- pass/fail result
+- exact meaningful checks and results
 
 Not validated:
-- hardware, service, deployment, or environment checks not actually performed
+- runtime/hardware/environment checks not actually performed
 
 Repository state:
-- branch
-- HEAD/important commit(s)
-- whether worktree is clean
-- feature-branch push / PR / CI state
-- whether any merge, deploy, restart, history rewrite, or hardware action was performed
+- branch / important HEAD
+- PR / CI state
+- whether merge, deploy, restart, history rewrite, or hardware action occurred
 
 Next approval gate:
-- state exactly what user approval is required, if any
+- exact approval required, if any
 ```
 
-Be precise. Never report a test, build, service restart, deployment, FPGA build, or hardware programming operation as successful unless it was actually executed and observed to succeed.
+Never report a test, deployment, FPGA build, or hardware programming operation as successful unless it was actually executed and observed.
 
-## 16. SWPC AI workspace boundary
+## 19. Workspace and information boundary
 
-When an AI coding agent operates on SWPC, the Plasma repository root is:
+Treat the checked-out Plasma repository root (`$PLASMA_REPO`) as the normal workspace boundary for AI-assisted development.
 
-```text
-/storage/projects/plasma
-```
+- Read/create/modify/delete files only inside the repository unless the task genuinely requires an external resource and that access is already explicitly authorized.
+- Keep ordinary development commands inside the repository or its subdirectories.
+- Do not inspect unrelated repositories, personal files, credentials, SSH configuration, container data, or system configuration as ordinary Plasma work.
+- Do not commit usernames, private hostnames, workstation inventory, keys, tokens, or other operator-specific infrastructure metadata into public guidance.
+- If a task cannot be completed without leaving the workspace boundary, stop and explain exactly what external resource is needed and why.
 
-Treat this repository as the normal workspace boundary for AI-assisted Plasma development.
-
-- Read, create, modify, move, and delete files only inside the Plasma repository unless the user explicitly authorizes access outside it.
-- Keep ordinary development commands in the repository root or one of its subdirectories.
-- Do not `cd` outside the repository merely to inspect or modify unrelated host content.
-- Do not access unrelated SWPC repositories, personal files, credentials, SSH configuration, Docker/Nextcloud data, or system configuration as part of ordinary Plasma work.
-- Access outside the repository is allowed only when it is genuinely required by the assigned task and either already covered by an explicit repository-defined operational procedure or explicitly approved by the user.
-- If a required task cannot be completed without leaving the workspace boundary, stop at a safe checkpoint, explain exactly what external path/resource is needed and why, and request approval before accessing it.
-
-This is an agent-behavior boundary, not an operating-system sandbox. Cline/Continue file permissions and terminal approval settings should still be configured to enforce project-only access where possible. Do not assume this rule alone prevents a shell command from reaching files elsewhere on SWPC.
+This policy is not an OS sandbox. Editor/agent permissions should still enforce project-scoped access where possible.
