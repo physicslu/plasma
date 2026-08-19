@@ -25,6 +25,7 @@ class FleetObservationStore:
         self._lock = Lock()
         self._last_known_by_endpoint: dict[str, dict[str, Any]] = {}
         self._persistence_error: str | None = None
+        self._persistence_writable = persistence is not None
         self._restore_persisted_records()
 
     def fleet_snapshot(self) -> dict[str, Any]:
@@ -105,12 +106,14 @@ class FleetObservationStore:
             records = self.persistence.load()
         except Exception as exc:
             self._persistence_error = f"{type(exc).__name__}: {exc}"
+            self._persistence_writable = False
             return
         self._last_known_by_endpoint = deepcopy(records)
         self._persistence_error = None
+        self._persistence_writable = True
 
     def _persist_records(self, records: dict[str, dict[str, Any]]) -> None:
-        if self.persistence is None:
+        if self.persistence is None or not self._persistence_writable:
             return
         try:
             self.persistence.replace(records)
@@ -124,9 +127,11 @@ class FleetObservationStore:
     def _persistence_status(self) -> dict[str, Any]:
         with self._lock:
             error = self._persistence_error
+            writable = self._persistence_writable
         return {
             "mode": self.persistence.mode if self.persistence is not None else "memory",
             "healthy": error is None,
+            "writable": writable if self.persistence is not None else False,
             "last_error": error,
         }
 
