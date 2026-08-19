@@ -673,9 +673,10 @@ Commands:
   update               從 GitHub main 做 fast-forward 更新；Web 變更後需 restart 才算 runtime 完成
   test                 執行 deployment migration/Manager lifecycle、Python、PL source-layout 與 Web 測試
   restart              重新產生 systemd units、重新啟動已啟用服務並執行 health check
-  web-restart          只重新啟動 Vite Web Console 並執行 Web HTTP health check
+  web-restart          只重新啟動 Vite Web Console並執行 Web HTTP health check
   deploy               update → re-exec latest plasmactl → test → reconcile units → restart
   update-and-restart   deploy 的別名
+  verify fleet         唯讀驗證 Manager/Fleet 部署後 runtime chain；不取代人工 UI 驗收
   start | stop         啟動或停止 Plasma 服務；Manager 只有 opt-in enabled 時會啟動
   status               顯示 Git、systemd、Manager opt-in 與 Port 狀態
   ports                顯示 9900、Gateway、Vite，以及啟用時的 Manager Port
@@ -697,6 +698,7 @@ case "$command" in
   restart) restart_services ;;
   web-restart|restart-web) restart_web_console ;;
   deploy|update-and-restart) deploy ;;
+  verify) bash "$repo/scripts/plasmactl-verify" "${1:-}" ;;
   start) start_services ;;
   stop) stop_services ;;
   status) show_status ;;
