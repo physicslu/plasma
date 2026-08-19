@@ -65,10 +65,15 @@
   cursor: pointer;
 }
 
+.globalLocale button:disabled {
+  opacity: .45;
+  cursor: wait;
+}
+
 .globalAppNav nav a:hover,
 .globalAppNav nav a[aria-current="page"],
-.globalLocale button:hover,
-.globalLocale button[aria-pressed="true"] {
+.globalLocale button:not(:disabled):hover,
+.globalLocale button:not(:disabled)[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--cyan) 55%, var(--line));
   background: color-mix(in srgb, var(--cyan) 9%, var(--panel));
   color: var(--cyan);
