@@ -10,10 +10,12 @@ from urllib.parse import urlparse
 
 from .config import ManagerConfig, load_manager_config
 from .fleet import MANAGER_CONTRACT_VERSION, MANAGER_SERVICE_NAME, FleetAggregator
+from .poller import FleetPoller
 
 
 class PlasmaManagerHandler(BaseHTTPRequestHandler):
     aggregator: FleetAggregator | None = None
+    poller: FleetPoller | None = None
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -32,6 +34,11 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             raise RuntimeError("Plasma Manager aggregator is not configured")
         return self.aggregator
 
+    def _poller(self) -> FleetPoller:
+        if self.poller is None:
+            raise RuntimeError("Plasma Manager fleet poller is not configured")
+        return self.poller
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path == "/api/health/live":
@@ -49,7 +56,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, self._aggregator().registry_snapshot())
             return
         if parsed.path == "/api/fleet":
-            self._json(HTTPStatus.OK, self._aggregator().fleet_snapshot())
+            self._json(HTTPStatus.OK, self._poller().snapshot())
             return
         self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
 
@@ -76,8 +83,12 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
 
 
 def serve(config: ManagerConfig) -> None:
-    PlasmaManagerHandler.aggregator = FleetAggregator(config)
+    aggregator = FleetAggregator(config)
+    poller = FleetPoller(aggregator, config.poll_interval_s)
+    PlasmaManagerHandler.aggregator = aggregator
+    PlasmaManagerHandler.poller = poller
     server = ThreadingHTTPServer((config.host, config.port), PlasmaManagerHandler)
+    poller.start()
     print(f"Plasma Manager listening on http://{config.host}:{config.port}")
     try:
         server.serve_forever()
@@ -85,6 +96,7 @@ def serve(config: ManagerConfig) -> None:
         pass
     finally:
         server.server_close()
+        poller.stop(timeout_s=max(5.0, config.request_timeout_s * 4 + 1.0))
 
 
 def main() -> None:

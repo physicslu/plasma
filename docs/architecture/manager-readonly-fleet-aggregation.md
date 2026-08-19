@@ -38,6 +38,7 @@ manager:
   host: 127.0.0.1
   port: 18180
   request_timeout_s: 2.0
+  poll_interval_s: 2.0
 
 ppus:
   - alias: ppu-a
@@ -46,11 +47,13 @@ ppus:
     endpoint: http://ppu-b.example.invalid:18080
 ```
 
+`poll_interval_s` controls the background fleet observation cadence and defaults to 2 seconds. It is intentionally independent of client request frequency so multiple Fleet UI/API readers do not multiply outbound PPU traffic.
+
 The endpoint identifies the root of one autonomous PPU's Plasma Web REST Gateway. `alias` is operator-facing registry metadata only; canonical `ppu_id`, `facility_id`, model, capabilities, and Site counts come from the PPU itself.
 
-Manager configuration rejects duplicate endpoints, embedded URL credentials, query strings, fragments, and nested endpoint paths. Authentication and secret distribution are intentionally not introduced by this phase.
+Manager configuration rejects duplicate endpoints, embedded URL credentials, query strings, fragments, nested endpoint paths, and invalid polling intervals. Authentication and secret distribution are intentionally not introduced by this phase.
 
-For deployment, the Manager registry/configuration is operator-local state and should live outside the Git worktree, for example under `$XDG_CONFIG_HOME/plasma/manager.yaml`. Repository `config/manager.example.yaml` remains example/test material.
+For deployment, the Manager registry/configuration is operator-local state and should live outside the Git worktree, for example under `$XDG_CONFIG_HOME/plasma/manager.yaml`. Repository `software/python/config/manager.example.yaml` remains example/test material.
 
 ## Manager REST contract
 
@@ -73,13 +76,27 @@ Returns the configured read-only PPU endpoint registry without performing fleet 
 
 ### `GET /api/fleet`
 
-Polls each configured PPU independently through the northbound contract established by the Plasma Web REST Gateway:
+Returns the **last completed fleet snapshot from Manager memory**. The HTTP request itself does not contact any PPU.
+
+A dedicated background poller refreshes that snapshot at `manager.poll_interval_s` by querying each configured PPU independently through the northbound contract established by the Plasma Web REST Gateway:
 
 ```text
 GET /api/health/live
 GET /api/health/ready
 GET /api/node
 GET /api/status
+```
+
+This changes the scaling model from request-driven fan-out:
+
+```text
+N fleet readers x M PPUs -> N x M observation fan-out
+```
+
+to Manager-owned observation:
+
+```text
+1 Manager poller x M PPUs -> cached snapshot -> N fleet readers
 ```
 
 The Manager validates:
@@ -96,11 +113,34 @@ The fleet response remains HTTP 200 when one PPU is offline. `ok=true` means the
 
 A summary reports configured, reachable, ready, and identified PPUs plus reported/enabled Site counts. Facility summaries group only trusted canonical PPU identities without hard-coding a uniform Site count, so 2-Site, 4-Site, and 8-Site PPUs may coexist. Duplicate identity conflicts are surfaced instead of being double-counted as trusted topology.
 
+Each cached fleet response also includes cache observation metadata:
+
+```json
+{
+  "cache": {
+    "mode": "background",
+    "poll_interval_s": 2.0,
+    "age_s": 0.314,
+    "last_refresh_error": null
+  }
+}
+```
+
+`age_s` describes the age of the last completed Manager-level snapshot. If an unexpected Manager-level refresh exception occurs, the poller keeps the last completed snapshot and exposes the exception through `last_refresh_error`; the next interval attempts recovery. Normal per-PPU transport/readiness failures are already represented inside a newly completed degraded fleet snapshot and therefore do not count as Manager-level refresh exceptions.
+
+## Background polling lifecycle
+
+At Manager startup, the poller performs one bounded initial fleet refresh before the HTTP serving loop begins. PPU-specific outages are contained by the aggregator, so an unreachable PPU does not prevent Manager startup. After the initial snapshot is published, a single daemon polling thread refreshes it periodically.
+
+Snapshot publication is atomic from the HTTP reader's perspective: readers either see the prior completed snapshot or the new completed snapshot, never a partially assembled fleet result. HTTP reads receive a copy of the cached snapshot and cannot mutate the poller's stored state.
+
+The background poller is stopped during normal Manager shutdown. It never calls local `SiteManager`/`SiteWorker` APIs and does not create a dependency from PPU execution back to Manager.
+
 ## Failure containment
 
 ```text
 One PPU offline
-    -> that registry entry is degraded
+    -> that registry entry is degraded in the next completed observation
     -> other PPU polling and aggregation continue
 
 One PPU local Plasma Server unavailable
@@ -108,12 +148,23 @@ One PPU local Plasma Server unavailable
     -> execution_ready is false for that PPU
     -> other PPUs remain independent
 
+One unexpected Manager refresh failure
+    -> last completed cached snapshot remains readable
+    -> cache.last_refresh_error records the failure
+    -> next background interval retries
+
 Plasma Manager unavailable
     -> fleet aggregation unavailable
     -> all healthy PPUs continue local execution
 ```
 
 The Manager therefore does not become an execution single point of failure.
+
+## Deliberate boundary: cache is not yet durable last-known topology
+
+This phase separates observation cadence from HTTP request cadence, but it does **not** yet implement a durable per-PPU last-known observation model. If a PPU was previously identified and a later normal poll observes it offline, the newly completed fleet snapshot represents that endpoint as currently unreachable; the current aggregator does not preserve that PPU's prior canonical identity/Site topology inside the new observation.
+
+A later observation-state phase may add explicit fields such as `observed_at`, `last_success_at`, transport state, execution state, and stale/last-known topology. That should be implemented as a separate semantic change rather than being hidden inside the cache layer.
 
 ## Deployment baseline
 
@@ -145,7 +196,8 @@ This release intentionally rejects Manager POST/PUT/PATCH/DELETE requests. It do
 - authentication/authorization policy;
 - central audit persistence;
 - firmware catalog or rollout;
-- a Fleet Web UI.
+- a Fleet Web UI;
+- durable per-PPU last-known/staleness persistence.
 
 Those capabilities must be added incrementally above the autonomous PPU boundary. In particular, future command routing must call an existing PPU REST contract rather than bypassing the PPU and invoking internal `SiteManager`/`SiteWorker` APIs directly.
 
