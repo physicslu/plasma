@@ -5,7 +5,7 @@ from datetime import datetime
 from threading import Lock
 from typing import Any, Protocol
 
-from .persistence import ObservationPersistence
+from .persistence import ObservationPersistence, ObservationPersistenceError
 
 
 class FleetSnapshotSource(Protocol):
@@ -104,7 +104,7 @@ class FleetObservationStore:
             return
         try:
             records = self.persistence.load()
-        except Exception as exc:
+        except ObservationPersistenceError as exc:
             self._persistence_error = f"{type(exc).__name__}: {exc}"
             self._persistence_writable = False
             return
@@ -117,7 +117,7 @@ class FleetObservationStore:
             return
         try:
             self.persistence.replace(records)
-        except Exception as exc:
+        except ObservationPersistenceError as exc:
             error = f"{type(exc).__name__}: {exc}"
         else:
             error = None
