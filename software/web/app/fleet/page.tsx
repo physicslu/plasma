@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { FleetPPUView, FleetWebPayload } from "./fleet-contract";
 import "./fleet.css";
@@ -83,15 +82,6 @@ export default function FleetPage() {
 
   return (
     <main className="fleetPage">
-      <header className="fleetTopbar">
-        <Link className="fleetBrand" href="/demo"><span>P</span><div><b>PLASMA</b><small>FLEET DEMO</small></div></Link>
-        <nav aria-label="Demo navigation">
-          <Link href="/demo">Demo Home</Link>
-          <Link href="/ppu">Single PPU</Link>
-          <Link className="active" href="/fleet">Fleet</Link>
-        </nav>
-      </header>
-
       <section className="fleetShell">
         <div className="fleetHeading">
           <div><p>READ-ONLY CONTROL PLANE</p><h1>Facility / PPU Fleet Overview</h1><span>Manager failure never enters the local Site execution path.</span></div>
