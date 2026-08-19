@@ -2,7 +2,7 @@
 
 ## Scope
 
-The first implemented Plasma Manager is an **optional, read-only fleet control plane**. It inventories configured PPU REST Gateway endpoints and aggregates their health, canonical identity, and Site topology. It does not participate in local job execution.
+The implemented Plasma Manager is an **optional, read-only fleet control plane**. It inventories configured PPU REST Gateway endpoints and aggregates their health, canonical identity, and Site topology. It does not participate in local job execution.
 
 The architectural dependency remains one-way:
 
@@ -31,7 +31,7 @@ The Manager is a separate `plasma_manager` Python package and service. It is not
 
 ## Manual registry
 
-The first release uses explicit configuration rather than discovery or mandatory registration:
+The current release uses explicit configuration rather than discovery or mandatory registration:
 
 ```yaml
 manager:
@@ -96,7 +96,7 @@ N fleet readers x M PPUs -> N x M observation fan-out
 to Manager-owned observation:
 
 ```text
-1 Manager poller x M PPUs -> cached snapshot -> N fleet readers
+1 Manager poller x M PPUs -> observation state -> cached snapshot -> N fleet readers
 ```
 
 The Manager validates:
@@ -111,9 +111,117 @@ The Manager validates:
 
 The fleet response remains HTTP 200 when one PPU is offline. `ok=true` means the Manager successfully produced a fleet snapshot; `degraded=true` and per-PPU errors represent partial fleet health.
 
-A summary reports configured, reachable, ready, and identified PPUs plus reported/enabled Site counts. Facility summaries group only trusted canonical PPU identities without hard-coding a uniform Site count, so 2-Site, 4-Site, and 8-Site PPUs may coexist. Duplicate identity conflicts are surfaced instead of being double-counted as trusted topology.
+Existing summary fields remain **current-observation fields**: configured, reachable, ready, identified, reported Site count, enabled Site count, and identity conflicts. Facility summaries also use only the current trusted topology. Stale last-known topology is not silently counted as currently available capacity. Heterogeneous **2-Site**, **4-Site**, and **8-Site** PPUs remain supported in the same fleet.
 
-Each cached fleet response also includes cache observation metadata:
+The observation layer adds:
+
+```text
+known_ppus
+stale_ppus
+unknown_ppus
+```
+
+where `known_ppus` means the Manager has completed at least one trusted observation for that configured endpoint during the current Manager process lifetime.
+
+## Current transport and execution state
+
+Each PPU entry exposes explicit current-state fields in addition to the legacy booleans:
+
+```json
+{
+  "gateway_live": true,
+  "execution_ready": true,
+  "transport_state": "reachable",
+  "execution_state": "ready"
+}
+```
+
+`transport_state` is one of:
+
+```text
+reachable
+unreachable
+unknown
+```
+
+A transport exception while contacting the liveness endpoint is `unreachable`. Receiving an HTTP response that fails the fleet contract is not called a network outage; the transport is `reachable` while the contract error remains in `errors`.
+
+`execution_state` is one of:
+
+```text
+ready
+unavailable
+unknown
+```
+
+A Gateway may therefore be reachable while local PPU execution is unavailable. This prevents Fleet UI or operations code from collapsing network health, Gateway health, and execution readiness into one boolean.
+
+## Last-known observation semantics
+
+The Manager keeps the last trusted canonical PPU/Site observation for each configured endpoint **in memory**. A trusted observation requires a live Gateway, ready local execution, compatible fleet contract, no identity conflict, valid canonical PPU identity/Site topology, and no per-PPU errors.
+
+Each PPU entry contains:
+
+```json
+{
+  "observation": {
+    "state": "current",
+    "stale": false,
+    "last_success_at": "2026-08-19T05:56:26.243307+00:00",
+    "stale_age_s": 0.0
+  },
+  "last_known": {
+    "observed_at": "2026-08-19T05:56:26.243307+00:00",
+    "ppu": {
+      "ppu_id": "z2-dev-01",
+      "facility_id": "swpc-lab",
+      "site_count": 8
+    },
+    "sites": []
+  }
+}
+```
+
+`observation.state` has three meanings:
+
+```text
+current  -> this poll completed a trusted canonical observation
+stale    -> this poll is not trusted/current, but a prior trusted observation exists
+unknown  -> no trusted observation has ever completed for this endpoint in this Manager lifetime
+```
+
+For `current`, `stale=false` and `stale_age_s=0.0`. For `stale`, `last_success_at` remains the prior trusted timestamp and `stale_age_s` measures from that timestamp to the current fleet observation. For `unknown`, there is no fabricated history: `last_success_at`, `stale_age_s`, and `last_known` are null.
+
+When a previously healthy PPU becomes unreachable, the current fields remain truthful:
+
+```text
+ppu = null
+sites = []
+transport_state = unreachable
+execution_state = unknown
+```
+
+while `last_known` retains the prior identity and Site topology and `observation.state=stale`. This deliberately separates **what is true now** from **what was last known to be true**.
+
+Likewise, if the Gateway remains reachable but the local Plasma Server becomes unavailable:
+
+```text
+transport_state = reachable
+execution_state = unavailable
+observation.state = stale   # when prior trusted topology exists
+```
+
+A duplicate current `ppu_id` conflict is never promoted into last-known trusted state. Previously trusted identities remain available as stale observations rather than being overwritten by the conflicted result.
+
+The additions are backward-compatible fields under Manager contract version `1`; existing current booleans and current topology fields retain their existing meanings.
+
+## Background polling and cache lifecycle
+
+At Manager startup, the poller performs one bounded initial fleet refresh before the HTTP serving loop begins. PPU-specific outages are contained by the aggregator, so an unreachable PPU does not prevent Manager startup. After the initial snapshot is published, a single daemon polling thread refreshes it periodically.
+
+Snapshot publication is atomic from the HTTP reader's perspective: readers either see the prior completed snapshot or the new completed snapshot, never a partially assembled fleet result. HTTP reads receive a copy of the cached snapshot and cannot mutate the poller's stored state.
+
+Each cached fleet response also includes cache metadata:
 
 ```json
 {
@@ -126,13 +234,9 @@ Each cached fleet response also includes cache observation metadata:
 }
 ```
 
-`age_s` describes the age of the last completed Manager-level snapshot. If an unexpected Manager-level refresh exception occurs, the poller keeps the last completed snapshot and exposes the exception through `last_refresh_error`; the next interval attempts recovery. Normal per-PPU transport/readiness failures are already represented inside a newly completed degraded fleet snapshot and therefore do not count as Manager-level refresh exceptions.
+`cache.age_s` is the age of the last completed Manager-level snapshot. It is different from per-PPU `observation.stale_age_s`, which measures how long a particular endpoint has lacked a trusted canonical observation.
 
-## Background polling lifecycle
-
-At Manager startup, the poller performs one bounded initial fleet refresh before the HTTP serving loop begins. PPU-specific outages are contained by the aggregator, so an unreachable PPU does not prevent Manager startup. After the initial snapshot is published, a single daemon polling thread refreshes it periodically.
-
-Snapshot publication is atomic from the HTTP reader's perspective: readers either see the prior completed snapshot or the new completed snapshot, never a partially assembled fleet result. HTTP reads receive a copy of the cached snapshot and cannot mutate the poller's stored state.
+If an unexpected Manager-level refresh exception occurs, the poller keeps the last completed cached snapshot and exposes the exception through `last_refresh_error`; the next interval attempts recovery. Normal per-PPU transport/readiness failures are represented inside a newly completed degraded fleet snapshot and do not count as Manager-level refresh exceptions.
 
 The background poller is stopped during normal Manager shutdown. It never calls local `SiteManager`/`SiteWorker` APIs and does not create a dependency from PPU execution back to Manager.
 
@@ -140,12 +244,15 @@ The background poller is stopped during normal Manager shutdown. It never calls 
 
 ```text
 One PPU offline
-    -> that registry entry is degraded in the next completed observation
+    -> current transport/execution state becomes degraded
+    -> prior trusted identity/topology remains explicit as stale last_known data
+    -> current capacity summaries do not count stale topology
     -> other PPU polling and aggregation continue
 
 One PPU local Plasma Server unavailable
-    -> Gateway may remain live
-    -> execution_ready is false for that PPU
+    -> Gateway may remain reachable
+    -> execution_state = unavailable
+    -> prior trusted topology may remain stale
     -> other PPUs remain independent
 
 One unexpected Manager refresh failure
@@ -160,11 +267,11 @@ Plasma Manager unavailable
 
 The Manager therefore does not become an execution single point of failure.
 
-## Deliberate boundary: cache is not yet durable last-known topology
+## Deliberate persistence boundary
 
-This phase separates observation cadence from HTTP request cadence, but it does **not** yet implement a durable per-PPU last-known observation model. If a PPU was previously identified and a later normal poll observes it offline, the newly completed fleet snapshot represents that endpoint as currently unreachable; the current aggregator does not preserve that PPU's prior canonical identity/Site topology inside the new observation.
+Last-known observation state in this phase is **process-memory state, not durable inventory history**. Restarting Plasma Manager clears `last_known`, `last_success_at`, and stale history; each configured endpoint begins as `current` after a successful new observation or `unknown` if the first new observation fails.
 
-A later observation-state phase may add explicit fields such as `observed_at`, `last_success_at`, transport state, execution state, and stale/last-known topology. That should be implemented as a separate semantic change rather than being hidden inside the cache layer.
+This boundary is intentional. Durable storage introduces lifecycle, schema migration, corruption/recovery, backup, retention, and operator-ownership questions. SQLite or another persistence layer should be introduced only as an explicit persistence phase rather than hidden inside the observation-state change.
 
 ## Deployment baseline
 
@@ -197,7 +304,7 @@ This release intentionally rejects Manager POST/PUT/PATCH/DELETE requests. It do
 - central audit persistence;
 - firmware catalog or rollout;
 - a Fleet Web UI;
-- durable per-PPU last-known/staleness persistence.
+- durable per-PPU observation persistence.
 
 Those capabilities must be added incrementally above the autonomous PPU boundary. In particular, future command routing must call an existing PPU REST contract rather than bypassing the PPU and invoking internal `SiteManager`/`SiteWorker` APIs directly.
 

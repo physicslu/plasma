@@ -8,9 +8,10 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from plasma_manager.client import PPUHTTPError
+from plasma_manager.client import PPUHTTPError, PPUTransportError
 from plasma_manager.config import ManagerConfig, ManagerConfigError, PPURegistryEntry, load_manager_config
 from plasma_manager.fleet import FleetAggregator
+from plasma_manager.observation import FleetObservationStore
 from plasma_manager.poller import FleetPoller
 from plasma_manager.server import PlasmaManagerHandler
 
@@ -25,7 +26,9 @@ class FakePPUClient:
 
     def liveness(self):
         if self.scenario.get("offline"):
-            raise PPUHTTPError("simulated PPU offline")
+            raise PPUTransportError("simulated PPU offline")
+        if self.scenario.get("bad_live"):
+            return 200, {"ok": False, "gateway": "alive"}
         return 200, {"ok": True, "service": "plasma-web-rest-gateway", "gateway": "alive"}
 
     def readiness(self):
@@ -164,6 +167,16 @@ class FleetAggregatorTests(unittest.TestCase):
                 "enabled_site_count": 6,
             },
             "http://offline": {"offline": True},
+            "http://unready": {
+                "ppu_id": "ppu-unready",
+                "site_count": 2,
+                "unready": True,
+            },
+            "http://bad-live": {
+                "ppu_id": "ppu-bad-live",
+                "site_count": 2,
+                "bad_live": True,
+            },
         }
 
     def config(self, endpoints) -> ManagerConfig:
@@ -186,6 +199,8 @@ class FleetAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot["summary"]["reported_sites"], 14)
         self.assertEqual(snapshot["summary"]["enabled_sites"], 11)
         self.assertEqual([item["ppu"]["site_count"] for item in snapshot["ppus"]], [2, 4, 8])
+        self.assertTrue(all(item["transport_state"] == "reachable" for item in snapshot["ppus"]))
+        self.assertTrue(all(item["execution_state"] == "ready" for item in snapshot["ppus"]))
         self.assertEqual(
             snapshot["facilities"],
             [
@@ -219,8 +234,34 @@ class FleetAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot["summary"]["reported_sites"], 10)
         self.assertTrue(snapshot["ppus"][0]["execution_ready"])
         self.assertFalse(snapshot["ppus"][1]["gateway_live"])
+        self.assertEqual(snapshot["ppus"][1]["transport_state"], "unreachable")
+        self.assertEqual(snapshot["ppus"][1]["execution_state"], "unknown")
         self.assertIn("simulated PPU offline", snapshot["ppus"][1]["errors"][0])
         self.assertTrue(snapshot["ppus"][2]["execution_ready"])
+
+    def test_unready_execution_is_distinct_from_transport_failure(self):
+        snapshot = FleetAggregator(
+            self.config(["http://unready"]),
+            FakePPUClient,
+        ).fleet_snapshot()
+        item = snapshot["ppus"][0]
+
+        self.assertTrue(item["gateway_live"])
+        self.assertEqual(item["transport_state"], "reachable")
+        self.assertFalse(item["execution_ready"])
+        self.assertEqual(item["execution_state"], "unavailable")
+
+    def test_contract_failure_is_not_misclassified_as_transport_outage(self):
+        snapshot = FleetAggregator(
+            self.config(["http://bad-live"]),
+            FakePPUClient,
+        ).fleet_snapshot()
+        item = snapshot["ppus"][0]
+
+        self.assertFalse(item["gateway_live"])
+        self.assertEqual(item["transport_state"], "reachable")
+        self.assertEqual(item["execution_state"], "unknown")
+        self.assertIn("liveness payload", item["errors"][0])
 
     def test_duplicate_ppu_identity_is_excluded_from_trusted_topology_totals(self):
         FakePPUClient.scenarios["http://duplicate"] = {
@@ -269,6 +310,125 @@ class FleetAggregatorTests(unittest.TestCase):
         self.assertTrue(status_mismatch["degraded"])
         self.assertEqual(status_mismatch["summary"]["identified_ppus"], 0)
         self.assertIn("disagree on ppu.ppu_id", status_mismatch["ppus"][0]["errors"][0])
+
+
+class FleetObservationStoreTests(unittest.TestCase):
+    def setUp(self):
+        FakePPUClient.scenarios = {
+            "http://ppu-a": {
+                "ppu_id": "ppu-a",
+                "facility_id": "factory-a",
+                "site_count": 2,
+                "enabled_site_count": 2,
+            },
+            "http://ppu-b": {
+                "ppu_id": "ppu-b",
+                "facility_id": "factory-b",
+                "site_count": 4,
+                "enabled_site_count": 3,
+            },
+            "http://never-seen": {"offline": True},
+        }
+
+    def config(self, endpoints) -> ManagerConfig:
+        return ManagerConfig(
+            request_timeout_s=0.5,
+            ppus=tuple(PPURegistryEntry(endpoint=endpoint) for endpoint in endpoints),
+        )
+
+    def observer(self, endpoints) -> FleetObservationStore:
+        return FleetObservationStore(FleetAggregator(self.config(endpoints), FakePPUClient))
+
+    def test_success_then_offline_preserves_last_known_without_inflating_current_totals(self):
+        observer = self.observer(["http://ppu-a"])
+        current = observer.fleet_snapshot()
+        current_item = current["ppus"][0]
+        first_success = current_item["observation"]["last_success_at"]
+
+        self.assertEqual(current_item["observation"]["state"], "current")
+        self.assertFalse(current_item["observation"]["stale"])
+        self.assertEqual(current_item["observation"]["stale_age_s"], 0.0)
+        self.assertEqual(current_item["last_known"]["ppu"]["ppu_id"], "ppu-a")
+        self.assertEqual(current["summary"]["known_ppus"], 1)
+        self.assertEqual(current["summary"]["stale_ppus"], 0)
+        self.assertEqual(current["summary"]["unknown_ppus"], 0)
+
+        FakePPUClient.scenarios["http://ppu-a"]["offline"] = True
+        stale = observer.fleet_snapshot()
+        stale_item = stale["ppus"][0]
+
+        self.assertIsNone(stale_item["ppu"])
+        self.assertEqual(stale_item["sites"], [])
+        self.assertEqual(stale_item["transport_state"], "unreachable")
+        self.assertEqual(stale_item["execution_state"], "unknown")
+        self.assertEqual(stale_item["observation"]["state"], "stale")
+        self.assertTrue(stale_item["observation"]["stale"])
+        self.assertEqual(stale_item["observation"]["last_success_at"], first_success)
+        self.assertGreaterEqual(stale_item["observation"]["stale_age_s"], 0.0)
+        self.assertEqual(stale_item["last_known"]["ppu"]["ppu_id"], "ppu-a")
+        self.assertEqual(len(stale_item["last_known"]["sites"]), 2)
+
+        # Existing fleet totals remain current-only; stale topology is explicit metadata,
+        # not silently counted as currently identified/available capacity.
+        self.assertEqual(stale["summary"]["identified_ppus"], 0)
+        self.assertEqual(stale["summary"]["reported_sites"], 0)
+        self.assertEqual(stale["summary"]["known_ppus"], 1)
+        self.assertEqual(stale["summary"]["stale_ppus"], 1)
+        self.assertEqual(stale["summary"]["unknown_ppus"], 0)
+        self.assertEqual(stale["facilities"], [])
+
+        FakePPUClient.scenarios["http://ppu-a"]["offline"] = False
+        recovered = observer.fleet_snapshot()
+        recovered_item = recovered["ppus"][0]
+        self.assertEqual(recovered_item["observation"]["state"], "current")
+        self.assertFalse(recovered_item["observation"]["stale"])
+        self.assertEqual(recovered_item["observation"]["stale_age_s"], 0.0)
+        self.assertEqual(recovered["summary"]["identified_ppus"], 1)
+        self.assertEqual(recovered["summary"]["stale_ppus"], 0)
+
+    def test_first_observation_failure_is_unknown_not_fake_stale_data(self):
+        snapshot = self.observer(["http://never-seen"]).fleet_snapshot()
+        item = snapshot["ppus"][0]
+
+        self.assertEqual(item["observation"]["state"], "unknown")
+        self.assertFalse(item["observation"]["stale"])
+        self.assertIsNone(item["observation"]["last_success_at"])
+        self.assertIsNone(item["observation"]["stale_age_s"])
+        self.assertIsNone(item["last_known"])
+        self.assertEqual(snapshot["summary"]["known_ppus"], 0)
+        self.assertEqual(snapshot["summary"]["stale_ppus"], 0)
+        self.assertEqual(snapshot["summary"]["unknown_ppus"], 1)
+
+    def test_execution_unavailable_preserves_known_topology_as_stale(self):
+        observer = self.observer(["http://ppu-a"])
+        observer.fleet_snapshot()
+        FakePPUClient.scenarios["http://ppu-a"]["unready"] = True
+
+        snapshot = observer.fleet_snapshot()
+        item = snapshot["ppus"][0]
+
+        self.assertEqual(item["transport_state"], "reachable")
+        self.assertEqual(item["execution_state"], "unavailable")
+        self.assertEqual(item["observation"]["state"], "stale")
+        self.assertEqual(item["last_known"]["ppu"]["ppu_id"], "ppu-a")
+        self.assertEqual(len(item["last_known"]["sites"]), 2)
+
+    def test_identity_conflict_does_not_overwrite_previous_trusted_identity(self):
+        observer = self.observer(["http://ppu-a", "http://ppu-b"])
+        first = observer.fleet_snapshot()
+        self.assertEqual(first["summary"]["known_ppus"], 2)
+
+        FakePPUClient.scenarios["http://ppu-b"]["ppu_id"] = "ppu-a"
+        conflicted = observer.fleet_snapshot()
+
+        self.assertEqual(conflicted["summary"]["identity_conflicts"], 1)
+        self.assertEqual(conflicted["summary"]["identified_ppus"], 0)
+        self.assertEqual(conflicted["summary"]["known_ppus"], 2)
+        self.assertEqual(conflicted["summary"]["stale_ppus"], 2)
+        self.assertEqual(conflicted["ppus"][0]["observation"]["state"], "stale")
+        self.assertEqual(conflicted["ppus"][1]["observation"]["state"], "stale")
+        self.assertEqual(conflicted["ppus"][0]["last_known"]["ppu"]["ppu_id"], "ppu-a")
+        self.assertEqual(conflicted["ppus"][1]["last_known"]["ppu"]["ppu_id"], "ppu-b")
 
 
 class CountingFleetSource:
