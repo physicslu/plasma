@@ -11,6 +11,7 @@ type StartRequest = {
 const gatewayUrl = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
 const unreachableGatewayUrl = process.env.MOCK_CD_UNREACHABLE_GATEWAY_URL ?? "http://127.0.0.1:19899";
 const expectedSites = Number(process.env.MOCK_CD_EXPECTED_SITES ?? "8");
+const expectedPpuId = process.env.MOCK_CD_EXPECTED_PPU_ID ?? "mock-ppu-a";
 const firmware = Buffer.from(Array.from({ length: 256 }, (_, index) => (index * 17 + 3) & 0xff));
 const operationLabels: Record<Operation, string> = {
   erase: "擦除",
@@ -51,7 +52,7 @@ async function openRuntimeConsole(page: Page) {
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
   await expect(page.locator(".gatewayHealth")).toContainText(`${expectedSites}/${expectedSites} Enabled`);
-  await expect(page.getByLabel("PPU identity")).toContainText("mock-ppu-a");
+  await expect(page.getByLabel("PPU identity")).toContainText(expectedPpuId);
   await expect(page.locator(".channelDetails")).toHaveCount(expectedSites);
 }
 
@@ -105,7 +106,6 @@ async function runBatchAndAssert(
   starts: StartRequest[],
   selectedSites: number[],
   operations: Operation[],
-  expectedCompleteCount: number,
 ) {
   await setSelectedSites(page, selectedSites);
   await setBatchOperations(page, operations);
@@ -117,10 +117,13 @@ async function runBatchAndAssert(
   const before = starts.length;
   await execute.click();
   await expect.poll(() => starts.length, { timeout: 30_000 }).toBe(before + selectedSites.length * operations.length);
-  await expect.poll(
-    () => liveLog(page).locator("span").filter({ hasText: "[BATCH] COMPLETE" }).count(),
-    { timeout: 30_000 },
-  ).toBe(expectedCompleteCount);
+
+  // The UI intentionally keeps a bounded rolling log. Do not count historical
+  // COMPLETE lines because earlier batches can be evicted. Prove that this
+  // specific batch terminated and emitted its own completion summary instead.
+  await expect(execute).toBeEnabled({ timeout: 30_000 });
+  const expectedSummary = `[BATCH] COMPLETE · success: ${selectedSites.map(siteId => `SITE ${siteId}`).join(", ")}`;
+  await expect(liveLog(page)).toContainText(expectedSummary, { timeout: 30_000 });
 
   const actual = starts.slice(before)
     .map(item => `${item.siteId}:${item.operation}`)
@@ -238,17 +241,15 @@ test("batch membership supports representative arbitrary Site subsets and select
   }
 
   const selections = representativeSelections(expectedSites);
-  let completeCount = 0;
   for (const [index, selection] of selections.entries()) {
     const operations: Operation[] = index === 2 || index === selections.length - 1
       ? ["erase", "read"]
       : index === 1
         ? ["read"]
         : ["erase"];
-    completeCount += 1;
     await test.step(
       `batch subset ${selection.join(",")} x ${operations.join(",")}`,
-      () => runBatchAndAssert(page, starts, selection, operations, completeCount),
+      () => runBatchAndAssert(page, starts, selection, operations),
     );
   }
 
