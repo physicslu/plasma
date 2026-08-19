@@ -71,10 +71,6 @@ function operationCode(site: FleetSiteView): string {
   return "—";
 }
 
-function statusLabel(status: VisualStatus): string {
-  return status.toUpperCase();
-}
-
 function severityFor(status: VisualStatus, ppu?: FleetPPUView): LogSeverity {
   if (status === "fail" || status === "offline") return "ERROR";
   if (ppu?.observation.state === "stale") return "WARN";
@@ -102,17 +98,91 @@ export default function FleetPage() {
   const logSequence = useRef(0);
   const logBodyRef = useRef<HTMLDivElement | null>(null);
 
-  const appendLogs = (entries: Omit<FactoryLogEntry, "id">[]) => {
-    if (entries.length === 0) return;
-    setLogs(current => [
-      ...current,
-      ...entries.map(entry => ({ ...entry, id: ++logSequence.current })),
-    ].slice(-500));
-  };
-
   useEffect(() => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+
+    function processObservation(next: FleetWebPayload) {
+      const nextSnapshot = new Map<string, string>();
+      const entries: Omit<FactoryLogEntry, "id">[] = [];
+
+      if (previousSnapshot.current.size === 0) {
+        entries.push({
+          timestamp: nowTime(), ppu: "FLEET", site: null, severity: "INFO", operation: "—",
+          eventCode: "fleetConnected", detail: `${next.summary.configured_ppus} PPU / ${next.summary.reported_sites} Sites`,
+        });
+      }
+
+      setLatchedResults(current => {
+        const nextLatched = new Map(current);
+        let changed = false;
+
+        for (const ppu of next.ppus) {
+          for (const site of ppu.topology.sites) {
+            const key = siteKey(ppu, site);
+            const base = inferBaseStatus(ppu, site);
+            if (base === "pass" && nextLatched.get(key) !== "PASS") {
+              nextLatched.set(key, "PASS");
+              changed = true;
+            } else if (base === "fail" && nextLatched.get(key) !== "FAIL") {
+              nextLatched.set(key, "FAIL");
+              changed = true;
+            } else if (base === "running" && nextLatched.has(key)) {
+              nextLatched.delete(key);
+              changed = true;
+            }
+          }
+        }
+        return changed ? nextLatched : current;
+      });
+
+      for (const ppu of next.ppus) {
+        const id = ppuKey(ppu);
+        const ppuValue = `${ppu.transport_state}/${ppu.execution_state}/${ppu.observation.state}`;
+        nextSnapshot.set(`ppu:${id}`, ppuValue);
+        const previousPpu = previousSnapshot.current.get(`ppu:${id}`);
+        if (previousPpu && previousPpu !== ppuValue) {
+          entries.push({
+            timestamp: nowTime(), ppu: id, site: null,
+            severity: ppuOperational(ppu) ? "INFO" : ppu.observation.state === "stale" ? "WARN" : "ERROR",
+            operation: "—", eventCode: "ppuChanged", detail: `${previousPpu} → ${ppuValue}`,
+          });
+        }
+
+        for (const site of ppu.topology.sites) {
+          const key = siteKey(ppu, site);
+          const base = inferBaseStatus(ppu, site);
+          const value = `${site.state}/${base}`;
+          nextSnapshot.set(`site:${key}`, value);
+          const previousSite = previousSnapshot.current.get(`site:${key}`);
+          if (previousSite && previousSite !== value) {
+            entries.push({
+              timestamp: nowTime(), ppu: id, site: `SITE ${site.site_id}`,
+              severity: severityFor(base, ppu), operation: operationCode(site),
+              eventCode: "siteChanged", detail: `${previousSite} → ${value}`,
+            });
+          }
+        }
+      }
+
+      previousSnapshot.current = nextSnapshot;
+      if (entries.length > 0) {
+        setLogs(current => [
+          ...current,
+          ...entries.map(entry => ({ ...entry, id: ++logSequence.current })),
+        ].slice(-500));
+      }
+
+      const allowed = new Set<string>();
+      for (const ppu of next.ppus) {
+        if (!ppuOperational(ppu)) continue;
+        for (const site of ppu.topology.sites) if (site.enabled) allowed.add(siteKey(ppu, site));
+      }
+      setSelectedSites(current => {
+        const filtered = new Set([...current].filter(key => allowed.has(key)));
+        return filtered.size === current.size ? current : filtered;
+      });
+    }
 
     async function poll() {
       try {
@@ -127,6 +197,7 @@ export default function FleetPage() {
         if (!response.ok) throw new Error(`Fleet BFF HTTP ${response.status}`);
         const next = await response.json() as FleetWebPayload;
         if (stopped) return;
+        processObservation(next);
         setPayload(next);
         setState("ready");
         setMessage("");
@@ -145,78 +216,6 @@ export default function FleetPage() {
       if (timer) window.clearTimeout(timer);
     };
   }, []);
-
-  useEffect(() => {
-    if (!payload) return;
-    const nextSnapshot = new Map<string, string>();
-    const entries: Omit<FactoryLogEntry, "id">[] = [];
-
-    if (previousSnapshot.current.size === 0) {
-      entries.push({
-        timestamp: nowTime(), ppu: "FLEET", site: null, severity: "INFO", operation: "—",
-        eventCode: "fleetConnected", detail: `${payload.summary.configured_ppus} PPU / ${payload.summary.reported_sites} Sites`,
-      });
-    }
-
-    const nextLatched = new Map(latchedResults);
-    let latchChanged = false;
-
-    for (const ppu of payload.ppus) {
-      const id = ppuKey(ppu);
-      const ppuValue = `${ppu.transport_state}/${ppu.execution_state}/${ppu.observation.state}`;
-      nextSnapshot.set(`ppu:${id}`, ppuValue);
-      const previousPpu = previousSnapshot.current.get(`ppu:${id}`);
-      if (previousPpu && previousPpu !== ppuValue) {
-        entries.push({
-          timestamp: nowTime(), ppu: id, site: null,
-          severity: ppuOperational(ppu) ? "INFO" : ppu.observation.state === "stale" ? "WARN" : "ERROR",
-          operation: "—", eventCode: "ppuChanged", detail: `${previousPpu} → ${ppuValue}`,
-        });
-      }
-
-      for (const site of ppu.topology.sites) {
-        const key = siteKey(ppu, site);
-        const base = inferBaseStatus(ppu, site);
-        const value = `${site.state}/${base}`;
-        nextSnapshot.set(`site:${key}`, value);
-        const previousSite = previousSnapshot.current.get(`site:${key}`);
-        if (previousSite && previousSite !== value) {
-          entries.push({
-            timestamp: nowTime(), ppu: id, site: `SITE ${site.site_id}`,
-            severity: severityFor(base, ppu), operation: operationCode(site),
-            eventCode: "siteChanged", detail: `${previousSite} → ${value}`,
-          });
-        }
-
-        if (base === "pass" && nextLatched.get(key) !== "PASS") {
-          nextLatched.set(key, "PASS");
-          latchChanged = true;
-        } else if (base === "fail" && nextLatched.get(key) !== "FAIL") {
-          nextLatched.set(key, "FAIL");
-          latchChanged = true;
-        } else if (base === "running" && nextLatched.has(key)) {
-          nextLatched.delete(key);
-          latchChanged = true;
-        }
-      }
-    }
-
-    if (latchChanged) setLatchedResults(nextLatched);
-    previousSnapshot.current = nextSnapshot;
-    appendLogs(entries);
-
-    const allowed = new Set<string>();
-    for (const ppu of payload.ppus) {
-      if (!ppuOperational(ppu)) continue;
-      for (const site of ppu.topology.sites) if (site.enabled) allowed.add(siteKey(ppu, site));
-    }
-    setSelectedSites(current => {
-      const next = new Set([...current].filter(key => allowed.has(key)));
-      return next.size === current.size ? current : next;
-    });
-  // latchedResults is intentionally not a dependency: this effect reacts to a new Fleet observation.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payload]);
 
   const facilities = useMemo(() => {
     const groups = new Map<string, FleetPPUView[]>();
@@ -313,10 +312,12 @@ export default function FleetPage() {
       next.delete(detail.key);
       return next;
     });
-    appendLogs([{
+    const entry: FactoryLogEntry = {
+      id: ++logSequence.current,
       timestamp: nowTime(), ppu: ppuKey(detail.ppu), site: `SITE ${detail.site.site_id}`,
       severity: "INFO", operation: operationCode(detail.site), eventCode: "siteResultCleared", detail: detail.latched,
-    }]);
+    };
+    setLogs(current => [...current, entry].slice(-500));
   }
 
   return (
