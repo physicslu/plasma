@@ -45,21 +45,35 @@ READY      cyan / blue
 RUNNING    amber / yellow
 PASS       green
 FAIL       red
+ERROR      red, but explicitly labeled ERROR rather than programming FAIL
 DISABLED   gray
 OFFLINE    dark gray
 ```
 
-Green is reserved for an actual PASS result. A reachable/online PPU must not make an untested Site appear green.
+Green is reserved for an actual successful programming job. A reachable/online PPU must not make an untested Site appear green.
 
-PPU connectivity state and Site operation result are different domains. A PPU transport failure must not be presented as an IC programming FAIL.
+PPU connectivity state, Site operational error, and programming-job result are different domains. A PPU transport failure or Site runtime error must not be presented as an IC programming FAIL.
 
-### 2.2 Latched result presentation
+### 2.2 Source of truth and latched result presentation
 
-Production operators must be able to see a completed PASS or FAIL after active execution has returned to idle. The Web UI therefore treats execution state and last result separately.
+Production operators must be able to see a completed PASS or FAIL after active execution has returned to idle. The Web UI therefore treats Site execution state and latest programming result separately.
 
-The first implementation latches observed PASS/FAIL in the browser session and clears the prior latch when a new running operation is observed or when the operator explicitly clears the displayed result. This is presentation state only; it is not yet a durable backend production-result ledger.
+The PPU v3.2 STATUS contract now exposes a browser-safe `latest_job` summary for each Site. It carries only operational fields such as job ID, operation, state, stage, progress and timestamps; firmware bytes, metadata, output files and raw result payloads are not included.
 
-A future durable result/audit design must not infer persistence from this browser latch.
+Production presentation derives:
+
+```text
+latest_job.state = queued/running       -> RUNNING
+latest_job.state = success              -> PASS
+latest_job.state = failed/timeout/aborted -> FAIL
+no latest job + idle Site               -> READY
+```
+
+E/P/V/R comes from `latest_job.operation`; it must never be guessed by substring matching `site.state`.
+
+A terminal `latest_job` remains visible after the Site returns to idle, which supplies the initial latch semantics. The operator's **Clear Result** action only suppresses that exact terminal job result in the local browser view; it does not mutate the PPU or erase the job. A new job has a different signature and becomes visible normally.
+
+The current latest-job registry is runtime memory, not a durable factory production ledger. Server restart durability, audit retention and production traceability remain separate requirements.
 
 ## 3. Canonical operation display codes
 
@@ -102,7 +116,7 @@ The first localization foundation supports:
 
 ```text
 zh-TW
- en-US
+en-US
 ```
 
 UI components use translation keys instead of accumulating mixed hard-coded Chinese and English labels. Locale choice is a browser preference.
@@ -113,9 +127,9 @@ Canonical engineering vocabulary remains stable where translation would reduce c
 
 Factory logging is a first-class Production requirement. The Production Console keeps a persistent Factory Log Console visible and provides filters, auto-scroll, and a full-screen log view.
 
-The current read-only Fleet contract does **not** yet transport complete programming-job logs across PPUs. Therefore the first Production Console only shows structured Manager/Fleet observation transitions and operator display actions. It must not fabricate PROGRAM/VERIFY/READ events that the Fleet backend did not supply.
+The current read-only Fleet path can now expose safe `latest_job` summaries, so the console can truthfully show observed job identity, operation, state, stage and progress transitions together with Manager/PPU observation transitions. It must not invent events that the PPU did not report.
 
-The existing PPU runtime already has the authoritative source for real programming events: `JobEventLogger` writes structured JSONL records under the Plasma Server `log_root`, including job, Site, stage/progress, completion, failure, cancellation, timeout, and related fields.
+This is still **not** the complete factory programming log. The authoritative detailed event source already exists locally on each PPU: `JobEventLogger` writes structured JSONL under the Plasma Server `log_root`, including job, Site, stage/progress, completion, failure, cancellation, timeout and related events.
 
 The intended next logging transport is:
 
@@ -136,6 +150,8 @@ Required properties:
 - localized display text derived from structured event data rather than parsing translated strings;
 - explicit retention/rotation policy;
 - PPU-local logging continues even if Manager or the management host is unavailable.
+
+Because factory logs are operational evidence, the dedicated log-transport/persistence work should precede treating the Fleet UI as a complete production traceability system.
 
 ## 7. Current security boundary
 
