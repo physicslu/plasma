@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from .config import ManagerConfig, load_manager_config
 from .fleet import MANAGER_CONTRACT_VERSION, MANAGER_SERVICE_NAME, FleetAggregator
+from .observation import FleetObservationStore
 from .poller import FleetPoller
 
 
@@ -84,7 +85,8 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
 
 def serve(config: ManagerConfig) -> None:
     aggregator = FleetAggregator(config)
-    poller = FleetPoller(aggregator, config.poll_interval_s)
+    observations = FleetObservationStore(aggregator)
+    poller = FleetPoller(observations, config.poll_interval_s)
     PlasmaManagerHandler.aggregator = aggregator
     PlasmaManagerHandler.poller = poller
     server = ThreadingHTTPServer((config.host, config.port), PlasmaManagerHandler)
