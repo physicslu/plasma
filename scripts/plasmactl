@@ -492,9 +492,14 @@ web_health_check() {
 manager_health_check() {
   [[ "$manager_enabled" == "1" ]] || return 0
   require_manager_config
+  require_command systemctl
+  systemctl --user is-active --quiet plasma-manager.service || \
+    die "Plasma Manager systemd service 未處於 active 狀態"
   local manager_url
   manager_url="$(manager_probe_url)"
   wait_for_http "$manager_url/api/health/live" "Plasma Manager"
+  systemctl --user is-active --quiet plasma-manager.service || \
+    die "Plasma Manager liveness 回應存在，但 systemd service 已離開 active 狀態"
 }
 
 health_check() {
