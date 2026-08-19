@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 
 export type Locale = "zh-TW" | "en-US";
 
@@ -187,24 +187,34 @@ type I18nContextValue = {
 
 const I18nContext = createContext<I18nContextValue | null>(null);
 const STORAGE_KEY = "plasma-locale";
+const LOCALE_EVENT = "plasma-locale-change";
+
+function readLocale(): Locale {
+  if (typeof window === "undefined") return "zh-TW";
+  const saved = window.localStorage.getItem(STORAGE_KEY);
+  return saved === "en-US" ? "en-US" : "zh-TW";
+}
+
+function subscribeLocale(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(LOCALE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(LOCALE_EVENT, onChange);
+  };
+}
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("zh-TW");
+  const locale = useSyncExternalStore(subscribeLocale, readLocale, () => "zh-TW");
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved === "zh-TW" || saved === "en-US") setLocaleState(saved);
-  }, []);
-
-  const setLocale = (next: Locale) => {
-    setLocaleState(next);
+  const setLocale = useCallback((next: Locale) => {
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
-      document.documentElement.lang = next;
     } catch {
       // Storage can be disabled without blocking the UI.
     }
-  };
+    window.dispatchEvent(new Event(LOCALE_EVENT));
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -214,7 +224,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     locale,
     setLocale,
     t: (key: string) => catalogs[locale][key] ?? catalogs["en-US"][key] ?? key,
-  }), [locale]);
+  }), [locale, setLocale]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
