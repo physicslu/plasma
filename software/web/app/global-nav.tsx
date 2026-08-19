@@ -2,20 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useI18n } from "./i18n";
 
-const navigationItems = [
-  { href: "/demo", label: "入口" },
-  { href: "/ppu", label: "單機 PPU" },
-  { href: "/fleet", label: "多機 Fleet" },
+const scopeItems = [
+  { href: "/demo", labelKey: "nav.entry" },
+  { href: "/ppu", labelKey: "nav.singlePpu" },
+  { href: "/fleet", labelKey: "nav.fleet" },
 ] as const;
 
-function isActive(pathname: string, href: string): boolean {
+function isScopeActive(pathname: string, href: string): boolean {
   if (href === "/ppu") return pathname === "/" || pathname === "/ppu" || pathname.startsWith("/ppu/");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function GlobalNav() {
   const pathname = usePathname();
+  const { locale, setLocale, t } = useI18n();
+  const productionActive = pathname === "/fleet" || pathname.startsWith("/fleet/");
+  const engineeringActive = pathname === "/engineering" || pathname.startsWith("/engineering/");
 
   return (
     <header className="globalAppNav">
@@ -23,16 +27,33 @@ export function GlobalNav() {
         <span>P</span>
         <b>PLASMA</b>
       </Link>
-      <nav aria-label="Plasma global navigation">
-        {navigationItems.map(item => {
-          const active = isActive(pathname, item.href);
-          return (
-            <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+
+      <div className="globalNavControls">
+        <nav className="globalScopeNav" aria-label="Plasma global navigation">
+          {scopeItems.map(item => {
+            const active = isScopeActive(pathname, item.href);
+            return (
+              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}>
+                {t(item.labelKey)}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <nav className="globalModeNav" aria-label={t("mode.label")}>
+          <Link href="/fleet" aria-current={productionActive ? "page" : undefined}>
+            {t("mode.production")}
+          </Link>
+          <Link href="/engineering" aria-current={engineeringActive ? "page" : undefined}>
+            {t("mode.engineering")}
+          </Link>
+        </nav>
+
+        <div className="globalLocale" role="group" aria-label="Language">
+          <button type="button" onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>
+          <button type="button" onClick={() => setLocale("en-US")} aria-pressed={locale === "en-US"}>{t("locale.en")}</button>
+        </div>
+      </div>
     </header>
   );
 }

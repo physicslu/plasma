@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
 
 from plasma_core.config import PPUConfig, PlasmaConfig, ServerConfig, SiteConfig
+from plasma_core.enums import JobState, Operation
+from plasma_core.models import JobRequest
 from plasma_server.site_manager import SiteManager
 
 
@@ -46,8 +49,54 @@ class PPUStatusTests(unittest.TestCase):
                 },
             )
             self.assertEqual([item["site_id"] for item in status["sites"]], [1, 2, 3])
+            self.assertTrue(all(item["latest_job"] is None for item in status["sites"]))
             self.assertNotIn("programmer", status)
             self.assertNotIn("channels", status)
+
+    def test_v32_status_exposes_safe_latest_job_summary_without_result_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manager = SiteManager(
+                PlasmaConfig(
+                    server=ServerConfig(
+                        max_supported_sites=1,
+                        max_concurrent_jobs=1,
+                        output_root=root / "output",
+                        log_root=root / "logs",
+                    ),
+                    sites=[SiteConfig(id=1, enabled=True, interface="mock")],
+                    ppu=PPUConfig(id="ppu-job", facility_id="factory-a"),
+                )
+            )
+
+            async def create_runtime():
+                return manager.registry.create(
+                    JobRequest(
+                        site_id=1,
+                        operation=Operation.VERIFY,
+                        job_id="verify-job-1",
+                        firmware=b"secret-firmware-bytes",
+                        metadata={"private": "do-not-expose"},
+                    )
+                )
+
+            runtime = asyncio.run(create_runtime())
+            runtime.state = JobState.SUCCESS
+            runtime.stage = "verify"
+            runtime.stage_state = "complete"
+            runtime.progress_percent = 100.0
+
+            latest = manager.status()["sites"][0]["latest_job"]
+
+            self.assertEqual(latest["job_id"], "verify-job-1")
+            self.assertEqual(latest["operation"], "verify")
+            self.assertEqual(latest["state"], "success")
+            self.assertEqual(latest["stage"], "verify")
+            self.assertEqual(latest["progress_percent"], 100.0)
+            self.assertNotIn("result", latest)
+            self.assertNotIn("firmware", latest)
+            self.assertNotIn("metadata", latest)
+            self.assertNotIn("output_files", latest)
 
     def test_v31_status_retains_zero_based_channel_shape(self) -> None:
         config = PlasmaConfig(
@@ -61,6 +110,7 @@ class PPUStatusTests(unittest.TestCase):
         self.assertEqual(status["programmer"]["programmer_id"], "ppu-legacy")
         self.assertEqual(status["programmer"]["site_id"], "facility-1")
         self.assertEqual(status["channels"][0]["channel_id"], 0)
+        self.assertIn("latest_job", status["channels"][0])
         self.assertNotIn("ppu", status)
         self.assertNotIn("sites", status)
 
