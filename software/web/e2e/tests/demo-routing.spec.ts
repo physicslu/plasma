@@ -24,7 +24,7 @@ async function expectGlobalNavigation(page: Page, activeLabel: string) {
   return nav;
 }
 
-test("demo, Single PPU, and Fleet share top-level navigation", async ({ page }) => {
+test("demo, Single PPU, Fleet, and product modes share top-level navigation", async ({ page }) => {
   await page.goto("/demo");
   await expectGlobalNavigation(page, "入口");
 
@@ -33,6 +33,10 @@ test("demo, Single PPU, and Fleet share top-level navigation", async ({ page }) 
   await expect(singlePpu).toHaveAttribute("href", "/ppu");
   await expect(fleet).toHaveAttribute("href", "/fleet");
 
+  const modeNav = page.getByRole("navigation", { name: "工作模式" });
+  await expect(modeNav.getByRole("link", { name: "量產模式" })).toHaveAttribute("href", "/fleet");
+  await expect(modeNav.getByRole("link", { name: "工程模式" })).toHaveAttribute("href", "/engineering");
+
   await singlePpu.click();
   await expect(page).toHaveURL(/\/ppu$/);
   await expect(page.getByRole("heading", { name: "Programming Site 工作總覽" })).toBeVisible();
@@ -40,7 +44,7 @@ test("demo, Single PPU, and Fleet share top-level navigation", async ({ page }) 
 
   await ppuNav.getByRole("link", { name: "多機 Fleet", exact: true }).click();
   await expect(page).toHaveURL(/\/fleet$/);
-  await expect(page.getByRole("heading", { name: "Facility / PPU Fleet Overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
   const fleetNav = await expectGlobalNavigation(page, "多機 Fleet");
 
   // Browser CI intentionally does not start Plasma Manager. The Fleet flag is
@@ -51,7 +55,11 @@ test("demo, Single PPU, and Fleet share top-level navigation", async ({ page }) 
   await expect(page.getByText("Fleet BFF HTTP 503")).toBeVisible();
   await expect(page.getByText("Fleet UI is disabled on this host.")).toHaveCount(0);
 
-  await fleetNav.getByRole("link", { name: "入口", exact: true }).click();
+  await page.getByRole("navigation", { name: "工作模式" }).getByRole("link", { name: "工程模式" }).click();
+  await expect(page).toHaveURL(/\/engineering$/);
+  await expect(page.getByRole("heading", { name: "Engineering Mode" })).toBeVisible();
+
+  await page.getByRole("navigation", { name: "Plasma global navigation" }).getByRole("link", { name: "入口", exact: true }).click();
   await expect(page).toHaveURL(/\/demo$/);
   await expect(page.getByRole("heading", { name: "Choose a Demo" })).toBeVisible();
   await expectGlobalNavigation(page, "入口");
