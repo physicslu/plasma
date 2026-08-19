@@ -33,7 +33,7 @@ The BFF rejects non-loopback Manager URLs, strips registry endpoints and raw Man
 
 ## Opt-in runtime variables
 
-Fleet BFF is disabled by default. A Management Host enables it explicitly in the Web runtime environment:
+Fleet BFF is disabled by default. A Management Host enables it explicitly in the Web host-process environment:
 
 ```text
 PLASMA_FLEET_UI_ENABLED=1
@@ -41,6 +41,19 @@ PLASMA_MANAGER_API_URL=http://127.0.0.1:18180
 ```
 
 `PLASMA_MANAGER_API_URL` must remain loopback-only in this phase. Do not point it at a remote unauthenticated Manager. A future separate Management Server requires authenticated service-to-service design rather than relaxing this guard.
+
+The Vinext server routes execute in a Cloudflare Worker runtime. Therefore host process variables are not treated as Worker bindings implicitly. `software/web/vite.config.ts` explicitly bridges the two approved Fleet settings into Worker text bindings and enables `nodejs_compat_populate_process_env` so `/api/fleet` can read the same values through `process.env` inside the Worker runtime:
+
+```text
+systemd / shell environment
+    -> Vite host process
+    -> Cloudflare Vite plugin vars
+    -> Worker bindings
+    -> Worker process.env
+    -> /api/fleet
+```
+
+This boundary is covered by browser E2E: CI enables the Fleet setting on the Vite host process but intentionally starts no Manager. The expected result is a Manager-unavailable response, not `fleet_ui_disabled`; that distinguishes a working host-to-Worker binding bridge from the deployment defect fixed after PR #47.
 
 The current `plasmactl` deployment schema does not yet own these Web-only Fleet variables. Integration-host activation therefore remains an explicit runtime configuration step and must not be performed as part of merge or CI validation. First-class deployment-schema wiring can be added separately once the demo behavior is accepted.
 
