@@ -115,7 +115,7 @@ test("Production Mode uses real job state for lamps, operations, selection and l
   await expect(page.getByText(/latest-job 摘要/)).toBeVisible();
 
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByRole("navigation", { name: "Work mode" }).getByRole("link", { name: "Production Mode", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Product mode" }).getByRole("link", { name: "Production Mode", exact: true })).toBeVisible();
   await expect(ppuA.getByRole("button", { name: "Select All", exact: true })).toBeVisible();
   await expect(page.locator(".operationChecks label").filter({ hasText: "Program" })).toBeVisible();
 });

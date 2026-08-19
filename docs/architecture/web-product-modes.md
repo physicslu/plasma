@@ -1,32 +1,35 @@
 # Plasma Web Product Modes
 
-This document defines the product-level Web mode model introduced with the Factory Production Console work.
+This document defines the product-level Web mode model for Plasma.
 
-## 1. Mode and Scope are independent dimensions
+## 1. Canonical product model
 
-Plasma must not equate a work mode with a hardware scope.
+The product-facing model has one primary discriminator:
 
 ```text
-                    Scope
-              Single PPU     Fleet
-Mode
-Production         yes         yes
-Engineering        yes         yes
+ProductMode
+  ├─ production
+  └─ engineering
 ```
 
 Canonical terms:
 
 - **Production Mode / 量產模式**: factory-operator workflow optimized for fast recognition, low interaction cost, and obvious abnormal-state handling.
 - **Engineering Mode / 工程模式**: extensible engineering workspace for development, diagnostics, programming algorithms, low-level inspection, and maintenance.
-- **Single PPU** and **Fleet** describe the equipment scope, not the user mode.
 
-The two modes share the same Plasma backend/domain model. Plasma must not fork into a Production backend and an Engineering backend.
+`Fleet`, `Single PPU`, `Manager`, and multi-PPU aggregation are **not ProductMode values**. They describe implementation topology, aggregation services, or engineering targets.
+
+The Web product model must therefore not expose Fleet as a peer mode beside Production Mode. Production Mode may observe one or many PPUs without changing its ProductMode value.
+
+The current implementation route for the multi-PPU Production Console remains `/fleet` for compatibility, while the canonical product state is `ProductMode = production`. Internal Manager/BFF names such as `fleet` may remain where they specifically describe multi-PPU aggregation contracts; they are infrastructure vocabulary, not user-facing product taxonomy.
+
+Both product modes share the same Plasma backend/domain model. Plasma must not fork into separate Production and Engineering backends.
 
 ## 2. Production Mode principles
 
 Production Mode is intended for factory operators and line leaders. The primary screen must keep all relevant PPUs and Sites visible together instead of forcing the operator to drill into one PPU at a time.
 
-The current Fleet Production Console groups dynamic Site topology by PPU and therefore does not assume eight Sites per PPU. Two-, four-, eight-, and future N-Site PPUs use the same presentation model.
+The Production Console groups dynamic Site topology by PPU and therefore does not assume eight Sites per PPU. Two-, four-, eight-, and future N-Site PPUs use the same presentation model.
 
 Per-PPU selection provides:
 
@@ -34,7 +37,7 @@ Per-PPU selection provides:
 - Deselect All / 全部取消: clears selection for that PPU;
 - individual Site checkboxes remain available.
 
-The top selection count is global across the visible Fleet.
+The top selection count is global across all PPUs visible in Production Mode.
 
 ### 2.1 Status-light semantics
 
@@ -58,15 +61,15 @@ PPU connectivity state, Site operational error, and programming-job result are d
 
 Production operators must be able to see a completed PASS or FAIL after active execution has returned to idle. The Web UI therefore treats Site execution state and latest programming result separately.
 
-The PPU v3.2 STATUS contract now exposes a browser-safe `latest_job` summary for each Site. It carries only operational fields such as job ID, operation, state, stage, progress and timestamps; firmware bytes, metadata, output files and raw result payloads are not included.
+The PPU v3.2 STATUS contract exposes a browser-safe `latest_job` summary for each Site. It carries only operational fields such as job ID, operation, state, stage, progress and timestamps; firmware bytes, metadata, output files and raw result payloads are not included.
 
 Production presentation derives:
 
 ```text
-latest_job.state = queued/running       -> RUNNING
-latest_job.state = success              -> PASS
+latest_job.state = queued/running         -> RUNNING
+latest_job.state = success                -> PASS
 latest_job.state = failed/timeout/aborted -> FAIL
-no latest job + idle Site               -> READY
+no latest job + idle Site                 -> READY
 ```
 
 E/P/V/R comes from `latest_job.operation`; it must never be guessed by substring matching `site.state`.
@@ -110,6 +113,8 @@ Future engineering capability can include IC/device configuration, programming a
 
 Low-level engineering controls must not leak into Production Mode merely because they exist in the shared backend.
 
+A single-PPU console is an engineering/maintenance capability, not a third product mode.
+
 ## 5. Internationalization
 
 The first localization foundation supports:
@@ -121,13 +126,15 @@ en-US
 
 UI components use translation keys instead of accumulating mixed hard-coded Chinese and English labels. Locale choice is a browser preference.
 
+Language switching is required to update React UI state immediately. Browser storage is persistence only; the UI must not wait for storage-event propagation before changing language. Storage events are used only to synchronize the preference across tabs/windows.
+
 Canonical engineering vocabulary remains stable where translation would reduce cross-team clarity, including PPU, SITE, E/P/V/R, PASS, FAIL, READY, Job ID, SPI, I2C, SWD, and CRC.
 
 ## 6. Factory Log contract and current boundary
 
 Factory logging is a first-class Production requirement. The Production Console keeps a persistent Factory Log Console visible and provides filters, auto-scroll, and a full-screen log view.
 
-The current read-only Fleet path can now expose safe `latest_job` summaries, so the console can truthfully show observed job identity, operation, state, stage and progress transitions together with Manager/PPU observation transitions. It must not invent events that the PPU did not report.
+The current read-only multi-PPU aggregation path can expose safe `latest_job` summaries, so the console can truthfully show observed job identity, operation, state, stage and progress transitions together with Manager/PPU observation transitions. It must not invent events that the PPU did not report.
 
 This is still **not** the complete factory programming log. The authoritative detailed event source already exists locally on each PPU: `JobEventLogger` writes structured JSONL under the Plasma Server `log_root`, including job, Site, stage/progress, completion, failure, cancellation, timeout and related events.
 
@@ -151,11 +158,11 @@ Required properties:
 - explicit retention/rotation policy;
 - PPU-local logging continues even if Manager or the management host is unavailable.
 
-Because factory logs are operational evidence, the dedicated log-transport/persistence work should precede treating the Fleet UI as a complete production traceability system.
+Because factory logs are operational evidence, the dedicated log-transport/persistence work should precede treating Production Mode as a complete production traceability system.
 
 ## 7. Current security boundary
 
-The Factory Production Console may select Sites and operations in the UI, but cross-PPU write execution remains disabled until an authenticated/authorized management control path is separately designed and approved.
+Production Mode may select Sites and operations in the UI, but cross-PPU write execution remains disabled until an authenticated/authorized management control path is separately designed and approved.
 
 The current Manager remains read-only and outside the PPU-local execution path.
 
@@ -166,11 +173,11 @@ Browser / local PPU Console
     -> Plasma Server
     -> Site
 
-Fleet observation:
-Fleet UI
+Production observation:
+Production Mode UI
     -> same-origin Management BFF
     -> read-only Manager
     -> PPU Gateways
 ```
 
-Manager or Fleet failure must never make a standalone PPU unable to continue local programming.
+Manager or management aggregation failure must never make a standalone PPU unable to continue local programming.

@@ -11,7 +11,7 @@ async function workerFor(name) {
 const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 
-test("public Plasma host sends root users to the two-demo landing page", async () => {
+test("public Plasma host sends root users to the product-mode landing page", async () => {
   const worker = await workerFor("demo-root");
   const response = await worker.fetch(new Request("https://plasma.open4th.com/", { headers: { accept: "text/html" }, redirect: "manual" }), env, ctx);
   assert.ok([301, 302, 307, 308].includes(response.status));
@@ -25,19 +25,34 @@ test("non-public local root keeps the original PPU console behavior", async () =
   assert.match(await response.text(), />SITE MATRIX</);
 });
 
-test("demo landing page exposes Single PPU and Manager/Fleet links", async () => {
+test("demo landing page exposes Production and Engineering as the only product modes", async () => {
   const worker = await workerFor("demo-page");
   const response = await worker.fetch(new Request("http://localhost/demo", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, />Choose a Demo</);
-  assert.match(html, /href="\/ppu"/);
-  assert.match(html, />Single PPU Demo</);
+  assert.match(html, />Choose Product Mode</);
   assert.match(html, /href="\/fleet"/);
-  assert.match(html, />Manager \/ Fleet Demo</);
+  assert.match(html, />Production Mode</);
+  assert.match(html, /href="\/engineering"/);
+  assert.match(html, />Engineering Mode</);
+  assert.doesNotMatch(html, />Single PPU Demo</);
+  assert.doesNotMatch(html, />Manager \/ Fleet Demo</);
 });
 
-test("fleet page exposes the Production Console while Fleet write control remains locked", async () => {
+test("Web source defines ProductMode rather than Fleet as a product-mode value", async () => {
+  const model = await fs.readFile(new URL("../app/product-mode.ts", import.meta.url), "utf8");
+  const nav = await fs.readFile(new URL("../app/global-nav.tsx", import.meta.url), "utf8");
+
+  assert.match(model, /ProductMode\s*=\s*"production"\s*\|\s*"engineering"/);
+  assert.match(model, /production:\s*"\/fleet"/);
+  assert.match(model, /engineering:\s*"\/engineering"/);
+  assert.match(nav, /PRODUCT_MODE_ROUTES\.production/);
+  assert.match(nav, /PRODUCT_MODE_ROUTES\.engineering/);
+  assert.doesNotMatch(nav, /nav\.fleet/);
+  assert.doesNotMatch(nav, /nav\.singlePpu/);
+});
+
+test("fleet implementation route exposes the Production Console while cross-PPU writes remain locked", async () => {
   const worker = await workerFor("fleet-page");
   const page = await worker.fetch(new Request("http://localhost/fleet", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(page.status, 200);

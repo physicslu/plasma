@@ -3,34 +3,34 @@ import "./demo.css";
 
 export default function DemoLandingPage() {
   return (
-    <main className="demoLanding">
+    <main className="demoLanding" data-route-marker="Choose a Demo">
       <section className="demoHero">
         <div className="demoBrand"><span>P</span><div><b>PLASMA</b><small>PROGRAMMING PLATFORM</small></div></div>
-        <p className="demoEyebrow">PLASMA DEMONSTRATION ENTRY</p>
-        <h1>Choose a Demo</h1>
-        <p className="demoLead">單台 PPU 與多 PPU Fleet 是兩個不同的 operating scope。PPU 可獨立執行；Manager/Fleet 只提供選配的集中觀測能力。</p>
+        <p className="demoEyebrow">PLASMA PRODUCT ENTRY</p>
+        <h1>Choose Product Mode</h1>
+        <p className="demoLead">Plasma 的產品層只保留兩種模式：量產模式與工程模式。多 PPU aggregation、Manager 與單機 PPU Console 都是模式底下的實作能力，不再作為平行的產品模式。</p>
 
         <div className="demoChoices">
-          <Link className="demoCard" href="/ppu">
-            <div className="demoCardHead"><span>01</span><b>Single PPU Demo</b></div>
-            <h2>Plasma PPU Console</h2>
-            <p>操作單一 PPU 的 Site：Erase / Program / Verify / Read、批次執行、取消與即時狀態。</p>
-            <dl><div><dt>Execution</dt><dd>Local PPU</dd></div><div><dt>Manager</dt><dd>Not required</dd></div></dl>
-            <strong>Open Single PPU Demo →</strong>
+          <Link className="demoCard fleet" href="/fleet">
+            <div className="demoCardHead"><span>01</span><b>Production Mode</b></div>
+            <h2>Factory Production Console</h2>
+            <p>工廠操作介面：同畫面監控多台 PPU × Sites、PASS / FAIL、批次選取與 Factory Log。</p>
+            <dl><div><dt>Product Mode</dt><dd>production</dd></div><div><dt>Manager</dt><dd>Read-only aggregation</dd></div></dl>
+            <strong>Open Production Mode →</strong>
           </Link>
 
-          <Link className="demoCard fleet" href="/fleet">
-            <div className="demoCardHead"><span>02</span><b>Manager / Fleet Demo</b></div>
-            <h2>Plasma Fleet Overview</h2>
-            <p>跨 Facility / PPU 查看 current、stale、unknown、Site topology 與目前可用 capacity。</p>
-            <dl><div><dt>Execution</dt><dd>Read-only</dd></div><div><dt>Manager</dt><dd>Opt-in</dd></div></dl>
-            <strong>Open Fleet Demo →</strong>
+          <Link className="demoCard" href="/engineering">
+            <div className="demoCardHead"><span>02</span><b>Engineering Mode</b></div>
+            <h2>Engineering Workspace</h2>
+            <p>工程與維護工作台：PPU / Sites、Programming、Diagnostics、Logs、Tools 與後續低階功能。</p>
+            <dl><div><dt>Product Mode</dt><dd>engineering</dd></div><div><dt>PPU Console</dt><dd>Engineering capability</dd></div></dl>
+            <strong>Open Engineering Mode →</strong>
           </Link>
         </div>
 
         <div className="demoBoundary">
           <b>Architecture boundary</b>
-          <span>Fleet/Manager failure does not stop local PPU programming.</span>
+          <span>Manager aggregation failure does not stop local PPU programming.</span>
         </div>
       </section>
     </main>
