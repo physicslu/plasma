@@ -7,7 +7,7 @@ test("renders the Plasma PPU Console shell before topology discovery", async () 
   const { default: worker } = await import(workerUrl.href);
 
   const response = await worker.fetch(
-    new Request("http://localhost/", {
+    new Request("http://localhost/ppu", {
       headers: { accept: "text/html" },
     }),
     {
