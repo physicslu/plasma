@@ -69,6 +69,7 @@ jobs:
           echo $! > artifacts/mock-cd-browser/stack-driver.pid
           python - <<'PY'
           import json
+          import os
           import time
           from pathlib import Path
 
@@ -79,6 +80,12 @@ jobs:
                   payload = json.loads(runtime.read_text(encoding="utf-8"))
                   if payload.get("state") == "ready":
                       print(json.dumps(payload, indent=2, sort_keys=True))
+                      with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as stream:
+                          stream.write(f"MOCK_CD_WEB_URL={payload['web_url']}\n")
+                          stream.write(f"MOCK_CD_GATEWAY_URL={payload['gateway_url']}\n")
+                          stream.write(f"MOCK_CD_UNREACHABLE_GATEWAY_URL={payload['unreachable_gateway_url']}\n")
+                          stream.write(f"MOCK_CD_EXPECTED_SITES={payload['enabled_sites']}\n")
+                          stream.write(f"MOCK_CD_EXPECTED_PPU_ID={payload['ppu_id']}\n")
                       break
               time.sleep(0.25)
           else:
@@ -89,11 +96,6 @@ jobs:
         id: browser
         continue-on-error: true
         working-directory: software/web/e2e
-        env:
-          MOCK_CD_WEB_URL: http://127.0.0.1:15173
-          MOCK_CD_GATEWAY_URL: http://127.0.0.1:19801
-          MOCK_CD_UNREACHABLE_GATEWAY_URL: http://127.0.0.1:19899
-          MOCK_CD_EXPECTED_SITES: "8"
         run: npx playwright test --config=playwright.mock-cd.config.ts
 
       - name: Publish browser acceptance summary
@@ -109,11 +111,18 @@ jobs:
 
           outcome = os.environ.get("BROWSER_OUTCOME") or "not_run"
           passed = outcome == "success"
+          runtime_path = Path("artifacts/mock-cd-browser/stack/runtime.json")
+          runtime = json.loads(runtime_path.read_text(encoding="utf-8")) if runtime_path.is_file() else {}
           payload = {
               "schema_version": 1,
               "commit": os.environ.get("MOCK_CD_COMMIT", "unknown"),
               "result": "PASS" if passed else "FAIL",
-              "stack": {"ppu": "mock-ppu-a", "enabled_sites": 8, "gateway": "real", "api_mocking": False},
+              "stack": {
+                  "ppu": runtime.get("ppu_id"),
+                  "enabled_sites": runtime.get("enabled_sites"),
+                  "gateway": "real",
+                  "api_mocking": False,
+              },
               "scenarios": {
                   "gateway_offline_recovery": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "per_site_erase_program_verify_read_download": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
