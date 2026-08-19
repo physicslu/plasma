@@ -129,6 +129,12 @@ class FleetAggregator:
                 result["transport_state"] = "unreachable"
                 result["errors"].append(str(exc))
                 return result
+            except PPUHTTPError as exc:
+                # The client received an HTTP response but could not satisfy the
+                # liveness contract (status/payload/JSON). Transport therefore worked.
+                result["transport_state"] = "reachable"
+                result["errors"].append(str(exc))
+                return result
 
             # Reaching an HTTP response is distinct from satisfying the fleet contract.
             # Contract/payload errors must not be reported as network outages.
