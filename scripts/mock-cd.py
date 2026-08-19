@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -52,7 +52,7 @@ def http_json(url: str, *, host: str | None = None, timeout: float = 3.0) -> dic
 
 def wait_json(
     url: str,
-    predicate,
+    predicate: Callable[[dict[str, Any]], bool],
     *,
     host: str | None = None,
     timeout_s: float = 30.0,
@@ -60,37 +60,34 @@ def wait_json(
 ) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_s
     last_error: Exception | None = None
+    last_payload: dict[str, Any] | None = None
     while time.monotonic() < deadline:
         try:
-            payload = http_json(url, host=host)
-            if predicate(payload):
+            last_payload = http_json(url, host=host)
+            if predicate(last_payload):
                 log(f"PASS {label}")
-                return payload
+                return last_payload
         except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError, MockCDError) as exc:
             last_error = exc
         time.sleep(0.2)
-    raise MockCDError(f"timeout waiting for {label}: {last_error}")
+    detail = f"last_error={last_error}" if last_error else f"last_payload={last_payload!r}"
+    raise MockCDError(f"timeout waiting for {label}: {detail}")
 
 
 def write_ppu_config(path: Path, *, ppu_id: str, site_count: int, port: int, work: Path) -> None:
-    sites = []
-    for site_id in range(1, site_count + 1):
-        sites.append(
-            {
-                "id": site_id,
-                "enabled": True,
-                "interface": "mock",
-                "target": "MOCK-IC",
-                "operation_timeout_s": 5.0,
-                "max_retries": 0,
-                "retry_backoff_s": 0.01,
-                "mock": {
-                    "flash_size": 65536,
-                    "default_delay_s": 0.01,
-                    "progress_steps": 2,
-                },
-            }
-        )
+    sites = [
+        {
+            "id": site_id,
+            "enabled": True,
+            "interface": "mock",
+            "target": "MOCK-IC",
+            "operation_timeout_s": 5.0,
+            "max_retries": 0,
+            "retry_backoff_s": 0.01,
+            "mock": {"flash_size": 65536, "default_delay_s": 0.01, "progress_steps": 2},
+        }
+        for site_id in range(1, site_count + 1)
+    ]
     payload = {
         "ppu": {
             "id": ppu_id,
@@ -132,11 +129,17 @@ def write_manager_config(path: Path, work: Path) -> None:
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
-def start_process(name: str, command: list[str], *, cwd: Path, env: dict[str, str] | None = None) -> subprocess.Popen[str]:
+def start_process(
+    name: str,
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str] | None = None,
+) -> subprocess.Popen[str]:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    log_path = LOG_DIR / f"{name}.log"
-    handle = log_path.open("w", encoding="utf-8")
+    handle = (LOG_DIR / f"{name}.log").open("w", encoding="utf-8")
     merged_env = os.environ.copy()
+    merged_env["PYTHONUNBUFFERED"] = "1"
     if env:
         merged_env.update(env)
     process = subprocess.Popen(
@@ -154,7 +157,7 @@ def start_process(name: str, command: list[str], *, cwd: Path, env: dict[str, st
 
 
 def stop_processes(processes: list[tuple[str, subprocess.Popen[str]]]) -> None:
-    for name, process in reversed(processes):
+    for _, process in reversed(processes):
         if process.poll() is None:
             try:
                 os.killpg(process.pid, signal.SIGTERM)
@@ -170,7 +173,7 @@ def stop_processes(processes: list[tuple[str, subprocess.Popen[str]]]) -> None:
             except ProcessLookupError:
                 pass
         handle = getattr(process, "_mock_cd_log_handle", None)
-        if handle is not None:
+        if handle is not None and not handle.closed:
             handle.close()
 
 
@@ -180,26 +183,35 @@ def assert_processes_alive(processes: list[tuple[str, subprocess.Popen[str]]]) -
         raise MockCDError(f"process exited before acceptance completed: {failed}")
 
 
-def validate_manager_fleet(payload: dict[str, Any]) -> dict[str, int]:
-    if payload.get("ok") is not True:
-        raise MockCDError("Manager fleet payload ok != true")
+def manager_is_current(payload: dict[str, Any]) -> bool:
     summary = payload.get("summary")
-    if not isinstance(summary, dict):
-        raise MockCDError("Manager fleet summary missing")
-    expected = {
-        "configured_ppus": 2,
-        "reachable_ppus": 2,
-        "ready_ppus": 2,
-        "current_ppus": 2,
-        "stale_ppus": 0,
-        "unknown_ppus": 0,
-        "reported_sites": 12,
-        "enabled_sites": 12,
-    }
-    for key, value in expected.items():
-        if summary.get(key) != value:
-            raise MockCDError(f"Manager fleet {key}={summary.get(key)!r}; expected {value}")
-    return expected
+    ppus = payload.get("ppus")
+    if not isinstance(summary, dict) or not isinstance(ppus, list):
+        return False
+    states = [
+        item.get("observation", {}).get("state")
+        for item in ppus
+        if isinstance(item, dict) and isinstance(item.get("observation"), dict)
+    ]
+    return (
+        summary.get("configured_ppus") == 2
+        and summary.get("reachable_ppus") == 2
+        and summary.get("ready_ppus") == 2
+        and summary.get("known_ppus") == 2
+        and summary.get("stale_ppus") == 0
+        and summary.get("unknown_ppus") == 0
+        and summary.get("reported_sites") == 12
+        and summary.get("enabled_sites") == 12
+        and states == ["current", "current"]
+    )
+
+
+def validate_manager_fleet(payload: dict[str, Any]) -> None:
+    if payload.get("ok") is not True or not manager_is_current(payload):
+        raise MockCDError("Manager fleet does not satisfy current two-PPU/12-Site contract")
+    store = payload.get("observation_store")
+    if not isinstance(store, dict) or store.get("mode") != "sqlite" or store.get("healthy") is not True:
+        raise MockCDError("Manager SQLite observation store is not healthy")
 
 
 def walk_forbidden(value: Any, forbidden: set[str]) -> None:
@@ -220,8 +232,19 @@ def validate_web_fleet(payload: dict[str, Any]) -> None:
     ppus = payload.get("ppus")
     if not isinstance(summary, dict) or not isinstance(ppus, list):
         raise MockCDError("Web Fleet BFF payload shape is incomplete")
-    if summary.get("configured_ppus") != 2 or summary.get("reported_sites") != 12:
-        raise MockCDError("Web Fleet BFF summary does not match two-PPU topology")
+    expected = {
+        "configured_ppus": 2,
+        "reachable_ppus": 2,
+        "ready_ppus": 2,
+        "current_ppus": 2,
+        "stale_ppus": 0,
+        "unknown_ppus": 0,
+        "reported_sites": 12,
+        "enabled_sites": 12,
+    }
+    for key, value in expected.items():
+        if summary.get(key) != value:
+            raise MockCDError(f"Web Fleet {key}={summary.get(key)!r}; expected {value}")
     walk_forbidden(payload, {"endpoint", "errors", "last_refresh_error", "observation_db_path"})
     for ppu in ppus:
         if not isinstance(ppu, dict):
@@ -232,6 +255,8 @@ def validate_web_fleet(payload: dict[str, Any]) -> None:
             raise MockCDError("Web Fleet PPU observation/capacity missing")
         if observation.get("state") != "current":
             raise MockCDError("baseline Mock CD expects current PPU observations")
+        if capacity.get("site_count") not in {8, 4}:
+            raise MockCDError("unexpected current Site capacity")
 
 
 def assert_public_routes() -> None:
@@ -243,6 +268,7 @@ def assert_public_routes() -> None:
     connection.close()
     if response.status not in {307, 308} or location != "/demo":
         raise MockCDError(f"public root routing status={response.status} location={location!r}")
+    log("PASS public root -> /demo")
 
     for path, marker in (
         ("/demo", "Choose a Demo"),
@@ -267,58 +293,52 @@ def dump_failure_logs() -> None:
             print(f"cannot read log: {exc}", file=sys.stderr)
 
 
-def write_acceptance(result: str, *, error: str | None = None) -> None:
+def write_acceptance(result: str, scenarios: dict[str, str], *, error: str | None = None) -> None:
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {
+    payload: dict[str, Any] = {
         "schema_version": 1,
-        "commit": os.environ.get("GITHUB_SHA", "local"),
+        "commit": os.environ.get("MOCK_CD_COMMIT", os.environ.get("GITHUB_SHA", "local")),
         "result": result,
-        "stack": {
-            "ppus": 2,
-            "sites": 12,
-            "manager": "read-only",
-            "web_bff": True,
-        },
-        "scenarios": {
-            "full_stack_smoke": result,
-            "two_ppu_heterogeneous_topology": result,
-            "worker_binding": result,
-            "browser_contract_sanitization": result,
-            "public_demo_routing": result,
-        },
+        "stack": {"ppus": 2, "sites": 12, "manager": "read-only", "web_bff": True},
+        "scenarios": scenarios,
     }
     if error:
         payload["error"] = error
     (ARTIFACT_DIR / "acceptance.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
 
 def run() -> None:
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     processes: list[tuple[str, subprocess.Popen[str]]] = []
+    scenarios = {
+        "ppu_runtime_ready": "PENDING",
+        "two_ppu_heterogeneous_topology": "PENDING",
+        "worker_binding": "PENDING",
+        "browser_contract_sanitization": "PENDING",
+        "public_demo_routing": "PENDING",
+    }
     work = Path(tempfile.mkdtemp(prefix="plasma-mock-cd-"))
     try:
-        ppu_configs: list[Path] = []
+        configs: list[Path] = []
         for item in PPUS:
-            config_path = work / f"{item['name']}.yaml"
+            config = work / f"{item['name']}.yaml"
             write_ppu_config(
-                config_path,
+                config,
                 ppu_id=str(item["ppu_id"]),
                 site_count=int(item["sites"]),
                 port=int(item["server_port"]),
                 work=work,
             )
-            ppu_configs.append(config_path)
-
+            configs.append(config)
         manager_config = work / "manager.yaml"
         write_manager_config(manager_config, work)
 
-        for item, config_path in zip(PPUS, ppu_configs, strict=True):
+        for item, config in zip(PPUS, configs, strict=True):
             server = start_process(
                 f"{item['name']}-server",
-                [sys.executable, "-m", "plasma_server.server", "--config", str(config_path)],
+                [sys.executable, "-m", "plasma_server.server", "--config", str(config)],
                 cwd=PYTHON_DIR,
             )
             processes.append((f"{item['name']}-server", server))
@@ -349,6 +369,7 @@ def run() -> None:
                 lambda value: value.get("ok") is True and value.get("execution") == "ready",
                 label=f"{item['name']} gateway ready",
             )
+        scenarios["ppu_runtime_ready"] = "PASS"
 
         manager = start_process(
             "manager",
@@ -363,13 +384,12 @@ def run() -> None:
         )
         manager_fleet = wait_json(
             f"http://127.0.0.1:{MANAGER_PORT}/api/fleet",
-            lambda value: isinstance(value.get("summary"), dict)
-            and value["summary"].get("current_ppus") == 2
-            and value["summary"].get("reported_sites") == 12,
-            timeout_s=30.0,
+            manager_is_current,
+            timeout_s=20.0,
             label="Manager two-PPU fleet",
         )
         validate_manager_fleet(manager_fleet)
+        scenarios["two_ppu_heterogeneous_topology"] = "PASS"
 
         web = start_process(
             "web",
@@ -382,7 +402,6 @@ def run() -> None:
             },
         )
         processes.append(("web", web))
-
         web_fleet = wait_json(
             f"http://127.0.0.1:{WEB_PORT}/api/fleet",
             lambda value: value.get("ok") is True,
@@ -390,15 +409,24 @@ def run() -> None:
             timeout_s=45.0,
             label="Web Fleet BFF",
         )
+        scenarios["worker_binding"] = "PASS"
         validate_web_fleet(web_fleet)
+        scenarios["browser_contract_sanitization"] = "PASS"
         log("PASS Web Fleet browser contract sanitization")
+
         assert_public_routes()
+        scenarios["public_demo_routing"] = "PASS"
         assert_processes_alive(processes)
 
-        write_acceptance("PASS")
+        write_acceptance("PASS", scenarios)
         log("RESULT: PASS")
     except Exception as exc:
-        write_acceptance("FAIL", error=str(exc))
+        for key, value in tuple(scenarios.items()):
+            if value == "PENDING":
+                scenarios[key] = "NOT_REACHED"
+        write_acceptance("FAIL", scenarios, error=str(exc))
+        stop_processes(processes)
+        processes.clear()
         dump_failure_logs()
         raise
     finally:
