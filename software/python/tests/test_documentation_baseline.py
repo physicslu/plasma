@@ -20,6 +20,7 @@ CURRENT_GUIDANCE = (
     "docs/architecture/domain-naming-migration.md",
     "docs/architecture/ppu-facility-sites.md",
     "docs/architecture/configuration-architecture.md",
+    "docs/architecture/manager-readonly-fleet-aggregation.md",
     "docs/deployment/README.md",
     "docs/deployment/web-runtime-hygiene.md",
     "docs/development/codex-cloud-environment.md",
@@ -76,6 +77,10 @@ def test_current_guidance_does_not_reintroduce_retired_runtime_vocabulary(
         ("software/python/docs/test-guide.md", ("SITE 1", "Protocol v3.2", "channel_id 0 -> SITE 1")),
         ("software/web/README.md", ("Plasma PPU Console", "SITE 1", "Protocol v3.2", "Plasma Web REST Gateway")),
         ("docs/architecture/ppu-facility-sites.md", ("Facility", "PPU", "SITE 1", "Protocol v3.2")),
+        (
+            "docs/architecture/manager-readonly-fleet-aggregation.md",
+            ("Plasma Manager", "manager_required = false", "2-Site", "4-Site", "8-Site"),
+        ),
         ("docs/development/swpc-deployment.md", ("Plasma PPU Programming Server", "Plasma Web REST Gateway", "v3.2")),
         ("pl/README.md", ("Programming Site", "rtl/site/")),
     ),
