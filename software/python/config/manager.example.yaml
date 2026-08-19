@@ -2,6 +2,8 @@ manager:
   host: 127.0.0.1
   port: 18180
   request_timeout_s: 2.0
+  # Background fleet polling is decoupled from HTTP /api/fleet reads.
+  poll_interval_s: 2.0
 
 # Manual enrollment is intentional in the first Manager release.
 # Each endpoint is the root URL of one autonomous PPU's Plasma Web REST Gateway.
