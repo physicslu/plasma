@@ -136,6 +136,7 @@ class FleetObservationDurabilityTests(unittest.TestCase):
             self.assertEqual(first["ppus"][0]["observation"]["state"], "current")
             self.assertEqual(first["observation_store"]["mode"], "sqlite")
             self.assertTrue(first["observation_store"]["healthy"])
+            self.assertTrue(first["observation_store"]["writable"])
 
             restarted = FleetObservationStore(
                 SequenceFleetSource(
@@ -182,35 +183,76 @@ class FleetObservationDurabilityTests(unittest.TestCase):
             self.assertEqual(last_known["observed_at"], "2026-08-19T06:01:00+00:00")
             self.assertTrue(last_known["sites"][1]["enabled"])
 
-    def test_persistence_failure_degrades_to_memory_without_losing_current_fleet_state(self):
-        class FailingPersistence:
+    def test_write_failure_keeps_current_fleet_state_and_is_retried(self):
+        class FlakyPersistence:
             mode = "sqlite"
 
+            def __init__(self):
+                self.replace_calls = 0
+
             def load(self):
-                raise RuntimeError("simulated load failure")
+                return {}
 
             def replace(self, records):
-                raise RuntimeError("simulated write failure")
+                self.replace_calls += 1
+                if self.replace_calls == 1:
+                    raise RuntimeError("simulated write failure")
 
+        persistence = FlakyPersistence()
+        store = FleetObservationStore(
+            SequenceFleetSource(
+                [
+                    fleet_snapshot("2026-08-19T06:00:00+00:00", healthy=True),
+                    fleet_snapshot("2026-08-19T06:00:02+00:00", healthy=True),
+                ]
+            ),
+            persistence,
+        )
+        failed = store.fleet_snapshot()
+        self.assertEqual(failed["ppus"][0]["observation"]["state"], "current")
+        self.assertEqual(failed["summary"]["reported_sites"], 2)
+        self.assertFalse(failed["observation_store"]["healthy"])
+        self.assertTrue(failed["observation_store"]["writable"])
+        self.assertIn("simulated write failure", failed["observation_store"]["last_error"])
+
+        recovered = store.fleet_snapshot()
+        self.assertTrue(recovered["observation_store"]["healthy"])
+        self.assertEqual(persistence.replace_calls, 2)
+
+    def test_load_failure_quarantines_database_for_process_lifetime(self):
+        class CorruptPersistence:
+            mode = "sqlite"
+
+            def __init__(self):
+                self.replace_calls = 0
+
+            def load(self):
+                raise RuntimeError("simulated corrupt database")
+
+            def replace(self, records):
+                self.replace_calls += 1
+                raise AssertionError("quarantined database must not be overwritten")
+
+        persistence = CorruptPersistence()
         snapshot = FleetObservationStore(
             SequenceFleetSource(
                 [fleet_snapshot("2026-08-19T06:00:00+00:00", healthy=True)]
             ),
-            FailingPersistence(),
+            persistence,
         ).fleet_snapshot()
-        ppu = snapshot["ppus"][0]
-        self.assertEqual(ppu["observation"]["state"], "current")
-        self.assertEqual(ppu["last_known"]["ppu"]["ppu_id"], "ppu-a")
+        self.assertEqual(snapshot["ppus"][0]["observation"]["state"], "current")
         self.assertEqual(snapshot["summary"]["reported_sites"], 2)
-        self.assertEqual(snapshot["observation_store"]["mode"], "sqlite")
         self.assertFalse(snapshot["observation_store"]["healthy"])
-        self.assertIn("simulated write failure", snapshot["observation_store"]["last_error"])
+        self.assertFalse(snapshot["observation_store"]["writable"])
+        self.assertIn("simulated corrupt database", snapshot["observation_store"]["last_error"])
+        self.assertEqual(persistence.replace_calls, 0)
 
     def test_memory_mode_preserves_pr45_restart_semantics(self):
         first = FleetObservationStore(
             SequenceFleetSource([fleet_snapshot("2026-08-19T06:00:00+00:00", healthy=True)])
         ).fleet_snapshot()
         self.assertEqual(first["observation_store"]["mode"], "memory")
+        self.assertFalse(first["observation_store"]["writable"])
 
         restarted = FleetObservationStore(
             SequenceFleetSource([fleet_snapshot("2026-08-19T06:00:10+00:00", healthy=False)])
