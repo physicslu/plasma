@@ -18,15 +18,27 @@ const ctx = {
   passThroughOnException() {},
 };
 
-test("public root sends users to the two-demo landing page", async () => {
+test("public Plasma host sends root users to the two-demo landing page", async () => {
   const worker = await workerFor("demo-root");
   const response = await worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" }, redirect: "manual" }),
+    new Request("https://plasma.open4th.com/", { headers: { accept: "text/html" }, redirect: "manual" }),
     env,
     ctx,
   );
   assert.ok([301, 302, 307, 308].includes(response.status));
-  assert.equal(new URL(response.headers.get("location"), "http://localhost").pathname, "/demo");
+  assert.equal(new URL(response.headers.get("location"), "https://plasma.open4th.com").pathname, "/demo");
+});
+
+test("non-public local root keeps the original PPU console behavior", async () => {
+  const worker = await workerFor("local-root");
+  const response = await worker.fetch(
+    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    env,
+    ctx,
+  );
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, />SITE MATRIX</);
 });
 
 test("demo landing page exposes Single PPU and Manager/Fleet links", async () => {
