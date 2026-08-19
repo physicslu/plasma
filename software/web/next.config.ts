@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/",
+        has: [{ type: "host", value: "plasma.open4th.com" }],
         destination: "/demo",
         permanent: false,
       },
