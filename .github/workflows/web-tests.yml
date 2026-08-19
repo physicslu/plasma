@@ -18,6 +18,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: software/web
@@ -40,8 +41,10 @@ jobs:
       - name: Install E2E dependencies
         run: npm --prefix e2e ci
       - name: Install Chromium
+        timeout-minutes: 10
         run: cd e2e && npx playwright install --with-deps chromium
       - name: Playwright E2E
+        timeout-minutes: 10
         run: cd e2e && npm test
       - name: Upload visual regression diagnostics
         if: ${{ failure() }}
