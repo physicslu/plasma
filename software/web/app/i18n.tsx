@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 
 export type Locale = "zh-TW" | "en-US";
 type Catalog = Record<string, string>;
@@ -57,24 +57,42 @@ function normalizeLocale(value: string | null): Locale {
   return value === "en-US" ? "en-US" : "zh-TW";
 }
 
+let localeSnapshot: Locale = "zh-TW";
+const localeListeners = new Set<() => void>();
+
+function getLocaleSnapshot(): Locale {
+  return localeSnapshot;
+}
+
+function publishLocale(next: Locale): void {
+  if (next === localeSnapshot) return;
+  localeSnapshot = next;
+  localeListeners.forEach(listener => listener());
+}
+
+function subscribeLocale(listener: () => void): () => void {
+  localeListeners.add(listener);
+  const syncFromStorage = (event: StorageEvent) => {
+    if (event.key === STORAGE_KEY) publishLocale(normalizeLocale(event.newValue));
+  };
+  window.addEventListener("storage", syncFromStorage);
+  return () => {
+    localeListeners.delete(listener);
+    window.removeEventListener("storage", syncFromStorage);
+  };
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  // Keep the first client render identical to SSR, then restore the persisted
-  // preference after hydration. User-triggered changes update React state
-  // directly, so switching language never waits on storage/event propagation.
-  const [locale, setLocaleState] = useState<Locale>("zh-TW");
+  const locale = useSyncExternalStore(subscribeLocale, getLocaleSnapshot, () => "zh-TW");
 
   useEffect(() => {
-    try { setLocaleState(normalizeLocale(window.localStorage.getItem(STORAGE_KEY))); } catch { /* storage is optional */ }
-
-    const syncFromStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) setLocaleState(normalizeLocale(event.newValue));
-    };
-    window.addEventListener("storage", syncFromStorage);
-    return () => window.removeEventListener("storage", syncFromStorage);
+    try { publishLocale(normalizeLocale(window.localStorage.getItem(STORAGE_KEY))); } catch { /* storage is optional */ }
   }, []);
 
   const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
+    // Update the in-memory snapshot first so the current tab re-renders
+    // immediately; persistence and cross-tab synchronization are secondary.
+    publishLocale(next);
     try { window.localStorage.setItem(STORAGE_KEY, next); } catch { /* storage is optional */ }
   }, []);
 
