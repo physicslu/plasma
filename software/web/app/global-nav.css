@@ -40,18 +40,14 @@
   letter-spacing: .17em;
 }
 
-.globalNavControls,
 .globalAppNav nav,
+.globalNavControls,
 .globalLocale {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
-
-.globalNavControls { margin-left: auto; }
-.globalModeNav { padding-left: 8px; border-left: 1px solid var(--line); }
-.globalLocale { padding-left: 8px; border-left: 1px solid var(--line); }
 
 .globalAppNav nav a,
 .globalLocale button {
@@ -60,9 +56,14 @@
   background: transparent;
   color: var(--text-soft);
   text-decoration: none;
-  padding: 7px 10px;
-  font: 650 10px var(--font-sans);
+  padding: 7px 11px;
+  font-size: 10px;
+  font-weight: 650;
   white-space: nowrap;
+}
+
+.globalLocale button {
+  font-family: var(--font-sans);
   cursor: pointer;
 }
 
@@ -75,28 +76,41 @@
   color: var(--cyan);
 }
 
-.globalModeNav a[aria-current="page"] {
-  box-shadow: inset 0 -2px 0 var(--cyan);
-}
+.globalNavControls { margin-left: auto; }
+.globalModeNav { padding-left: 8px; border-left: 1px solid var(--line); }
+.globalLocale { padding-left: 8px; border-left: 1px solid var(--line); }
+.globalModeNav a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--cyan); }
 
 @media (max-width: 900px) {
-  .globalAppNav {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
-  }
-
   .globalNavControls {
-    width: 100%;
     overflow-x: auto;
     padding-bottom: 2px;
   }
 }
 
 @media (max-width: 520px) {
-  .globalAppNav { padding-inline: 10px; }
-  .globalAppNavBrand b { display: none; }
-  .globalNavControls { gap: 4px; }
+  .globalAppNav {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  .globalAppNavBrand b {
+    display: none;
+  }
+
+  .globalAppNav > nav {
+    flex: 1;
+    justify-content: flex-end;
+    overflow-x: auto;
+  }
+
   .globalAppNav nav a,
-  .globalLocale button { padding: 7px 8px; }
+  .globalLocale button {
+    padding: 7px 8px;
+  }
+
+  .globalNavControls {
+    flex: 1;
+    justify-content: flex-end;
+  }
 }
