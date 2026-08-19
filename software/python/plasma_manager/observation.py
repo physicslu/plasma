@@ -5,18 +5,28 @@ from datetime import datetime
 from threading import Lock
 from typing import Any, Protocol
 
+from .persistence import ObservationPersistence, ObservationPersistenceError
+
 
 class FleetSnapshotSource(Protocol):
     def fleet_snapshot(self) -> dict[str, Any]: ...
 
 
 class FleetObservationStore:
-    """Enrich current fleet observations with in-memory last-known PPU state."""
+    """Enrich current fleet observations with last-known PPU state."""
 
-    def __init__(self, source: FleetSnapshotSource) -> None:
+    def __init__(
+        self,
+        source: FleetSnapshotSource,
+        persistence: ObservationPersistence | None = None,
+    ) -> None:
         self.source = source
+        self.persistence = persistence
         self._lock = Lock()
         self._last_known_by_endpoint: dict[str, dict[str, Any]] = {}
+        self._persistence_error: str | None = None
+        self._persistence_writable = persistence is not None
+        self._restore_persisted_records()
 
     def fleet_snapshot(self) -> dict[str, Any]:
         current = self.source.fleet_snapshot()
@@ -83,8 +93,47 @@ class FleetObservationStore:
             summary["known_ppus"] = known_ppus
             summary["stale_ppus"] = stale_ppus
             summary["unknown_ppus"] = unknown_ppus
+            records_to_persist = deepcopy(self._last_known_by_endpoint)
 
+        self._persist_records(records_to_persist)
+        snapshot["observation_store"] = self._persistence_status()
         return snapshot
+
+    def _restore_persisted_records(self) -> None:
+        if self.persistence is None:
+            return
+        try:
+            records = self.persistence.load()
+        except ObservationPersistenceError as exc:
+            self._persistence_error = f"{type(exc).__name__}: {exc}"
+            self._persistence_writable = False
+            return
+        self._last_known_by_endpoint = deepcopy(records)
+        self._persistence_error = None
+        self._persistence_writable = True
+
+    def _persist_records(self, records: dict[str, dict[str, Any]]) -> None:
+        if self.persistence is None or not self._persistence_writable:
+            return
+        try:
+            self.persistence.replace(records)
+        except ObservationPersistenceError as exc:
+            error = f"{type(exc).__name__}: {exc}"
+        else:
+            error = None
+        with self._lock:
+            self._persistence_error = error
+
+    def _persistence_status(self) -> dict[str, Any]:
+        with self._lock:
+            error = self._persistence_error
+            writable = self._persistence_writable
+        return {
+            "mode": self.persistence.mode if self.persistence is not None else "memory",
+            "healthy": error is None,
+            "writable": writable if self.persistence is not None else False,
+            "last_error": error,
+        }
 
     @staticmethod
     def _is_trusted_current_observation(item: dict[str, Any]) -> bool:

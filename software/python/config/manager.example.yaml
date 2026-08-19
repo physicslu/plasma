@@ -4,6 +4,9 @@ manager:
   request_timeout_s: 2.0
   # Background fleet polling is decoupled from HTTP /api/fleet reads.
   poll_interval_s: 2.0
+  # Optional durable last-known observation cache. Use a writable operator-local absolute path.
+  # Omit this field for memory-only restart semantics.
+  # observation_db_path: /absolute/operator/local/path/manager-observations.sqlite3
 
 # Manual enrollment is intentional in the first Manager release.
 # Each endpoint is the root URL of one autonomous PPU's Plasma Web REST Gateway.

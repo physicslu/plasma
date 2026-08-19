@@ -25,6 +25,7 @@ class ManagerConfig:
     request_timeout_s: float = 2.0
     poll_interval_s: float = 2.0
     ppus: tuple[PPURegistryEntry, ...] = ()
+    observation_db_path: Path | None = None
 
 
 def normalize_endpoint(value: Any) -> str:
@@ -57,6 +58,17 @@ def _registry_entry(raw: Any) -> PPURegistryEntry:
     return PPURegistryEntry(endpoint=endpoint, alias=alias)
 
 
+def _observation_db_path(value: Any) -> Path | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ManagerConfigError("manager.observation_db_path must be an absolute path or null")
+    path = Path(value.strip())
+    if not path.is_absolute():
+        raise ManagerConfigError("manager.observation_db_path must be absolute")
+    return path
+
+
 def load_manager_config(path: str | Path) -> ManagerConfig:
     config_path = Path(path).resolve()
     try:
@@ -80,6 +92,7 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
         "port",
         "request_timeout_s",
         "poll_interval_s",
+        "observation_db_path",
     }
     if unexpected_manager:
         raise ManagerConfigError(
@@ -90,6 +103,7 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
     port = manager_raw.get("port", 18180)
     request_timeout_s = manager_raw.get("request_timeout_s", 2.0)
     poll_interval_s = manager_raw.get("poll_interval_s", 2.0)
+    observation_db_path = _observation_db_path(manager_raw.get("observation_db_path"))
     if not isinstance(host, str) or not host.strip():
         raise ManagerConfigError("manager.host must be a non-empty string")
     if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
@@ -119,4 +133,5 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
         request_timeout_s=request_timeout_s,
         poll_interval_s=poll_interval_s,
         ppus=ppus,
+        observation_db_path=observation_db_path,
     )
