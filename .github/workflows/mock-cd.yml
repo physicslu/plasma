@@ -49,6 +49,7 @@ jobs:
       - name: Run ephemeral Plasma full-stack acceptance
         env:
           MOCK_CD_ARTIFACT_DIR: ${{ github.workspace }}/artifacts/mock-cd
+          MOCK_CD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python scripts/mock-cd.py
 
       - name: Publish acceptance summary
