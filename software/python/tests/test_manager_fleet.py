@@ -11,6 +11,7 @@ from pathlib import Path
 from plasma_manager.client import PPUHTTPError
 from plasma_manager.config import ManagerConfig, ManagerConfigError, PPURegistryEntry, load_manager_config
 from plasma_manager.fleet import FleetAggregator
+from plasma_manager.poller import FleetPoller
 from plasma_manager.server import PlasmaManagerHandler
 
 
@@ -107,6 +108,7 @@ manager:
   host: 0.0.0.0
   port: 18180
   request_timeout_s: 1.5
+  poll_interval_s: 3.0
 ppus:
   - alias: line-a
     endpoint: https://ppu-a.example.invalid/
@@ -116,8 +118,16 @@ ppus:
         self.assertEqual(config.host, "0.0.0.0")
         self.assertEqual(config.port, 18180)
         self.assertEqual(config.request_timeout_s, 1.5)
+        self.assertEqual(config.poll_interval_s, 3.0)
         self.assertEqual(config.ppus[0].endpoint, "https://ppu-a.example.invalid")
         self.assertEqual(config.ppus[0].alias, "line-a")
+
+    def test_poll_interval_defaults_and_rejects_busy_loop_values(self):
+        self.assertEqual(self.load("ppus: []\n").poll_interval_s, 2.0)
+        with self.assertRaises(ManagerConfigError):
+            self.load("manager:\n  poll_interval_s: 0\nppus: []\n")
+        with self.assertRaises(ManagerConfigError):
+            self.load("manager:\n  poll_interval_s: 301\nppus: []\n")
 
     def test_rejects_duplicate_or_credentialed_endpoints(self):
         with self.assertRaises(ManagerConfigError):
@@ -261,6 +271,68 @@ class FleetAggregatorTests(unittest.TestCase):
         self.assertIn("disagree on ppu.ppu_id", status_mismatch["ppus"][0]["errors"][0])
 
 
+class CountingFleetSource:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.second_call = threading.Event()
+        self.fail = False
+
+    def fleet_snapshot(self):
+        self.calls += 1
+        if self.calls >= 2:
+            self.second_call.set()
+        if self.fail:
+            raise RuntimeError("simulated refresh failure")
+        return {
+            "ok": True,
+            "degraded": False,
+            "observed_at": f"snapshot-{self.calls}",
+            "ppus": [],
+        }
+
+
+class FleetPollerTests(unittest.TestCase):
+    def test_cached_reads_do_not_poll_source(self):
+        source = CountingFleetSource()
+        poller = FleetPoller(source, 60.0)
+        poller.start()
+        try:
+            first = poller.snapshot()
+            second = poller.snapshot()
+            self.assertEqual(source.calls, 1)
+            self.assertEqual(first["observed_at"], "snapshot-1")
+            self.assertEqual(second["observed_at"], "snapshot-1")
+            self.assertEqual(first["cache"]["mode"], "background")
+            self.assertEqual(first["cache"]["poll_interval_s"], 60.0)
+            self.assertIsNone(first["cache"]["last_refresh_error"])
+        finally:
+            poller.stop(timeout_s=1.0)
+
+    def test_background_thread_refreshes_without_http_request(self):
+        source = CountingFleetSource()
+        poller = FleetPoller(source, 0.05)
+        poller.start()
+        try:
+            self.assertTrue(source.second_call.wait(1.0))
+            self.assertGreaterEqual(source.calls, 2)
+        finally:
+            poller.stop(timeout_s=1.0)
+
+    def test_refresh_failure_preserves_last_completed_snapshot(self):
+        source = CountingFleetSource()
+        poller = FleetPoller(source, 60.0)
+        poller.start()
+        try:
+            source.fail = True
+            with self.assertRaisesRegex(RuntimeError, "simulated refresh failure"):
+                poller.refresh()
+            snapshot = poller.snapshot()
+            self.assertEqual(snapshot["observed_at"], "snapshot-1")
+            self.assertIn("simulated refresh failure", snapshot["cache"]["last_refresh_error"])
+        finally:
+            poller.stop(timeout_s=1.0)
+
+
 class FakeAggregator:
     def __init__(self):
         self.registry_calls = 0
@@ -279,8 +351,12 @@ class ManagerHTTPTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.original_aggregator = PlasmaManagerHandler.aggregator
+        cls.original_poller = PlasmaManagerHandler.poller
         cls.fake = FakeAggregator()
+        cls.poller = FleetPoller(cls.fake, 60.0)
+        cls.poller.start()
         PlasmaManagerHandler.aggregator = cls.fake
+        PlasmaManagerHandler.poller = cls.poller
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaManagerHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -290,7 +366,9 @@ class ManagerHTTPTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join()
+        cls.poller.stop(timeout_s=1.0)
         PlasmaManagerHandler.aggregator = cls.original_aggregator
+        PlasmaManagerHandler.poller = cls.original_poller
 
     def request(self, method: str, path: str):
         conn = HTTPConnection("127.0.0.1", self.server.server_port)
@@ -307,6 +385,14 @@ class ManagerHTTPTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["manager"], "alive")
+        self.assertEqual(self.fake.fleet_calls, before)
+
+    def test_repeated_fleet_reads_use_cache_without_new_poll(self):
+        before = self.fake.fleet_calls
+        for _ in range(3):
+            status, fleet = self.request("GET", "/api/fleet")
+            self.assertEqual(status, 200)
+            self.assertEqual(fleet["cache"]["mode"], "background")
         self.assertEqual(self.fake.fleet_calls, before)
 
     def test_registry_and_fleet_are_read_only(self):
