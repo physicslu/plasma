@@ -11,9 +11,23 @@ const { d1, r2 } = hostingConfig;
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
+// The Cloudflare/Vinext application executes server routes inside a Worker
+// runtime. Host process environment variables are not Worker bindings by
+// themselves, so explicitly bridge the approved Fleet runtime settings into
+// Worker text bindings. The route keeps its own loopback-only validation.
+const fleetWorkerVars = {
+  PLASMA_FLEET_UI_ENABLED: process.env.PLASMA_FLEET_UI_ENABLED ?? "0",
+  PLASMA_MANAGER_API_URL:
+    process.env.PLASMA_MANAGER_API_URL ?? "http://127.0.0.1:18180",
+};
+
 const localBindingConfig = {
   main: "./worker/index.ts",
-  compatibility_flags: ["nodejs_compat"],
+  compatibility_flags: [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env",
+  ],
+  vars: fleetWorkerVars,
   d1_databases: d1
     ? [
         {
