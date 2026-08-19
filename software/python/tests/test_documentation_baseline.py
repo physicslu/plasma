@@ -68,11 +68,26 @@ def test_current_guidance_does_not_reintroduce_retired_runtime_vocabulary(
 @pytest.mark.parametrize(
     ("relative_path", "required"),
     (
-        ("README.md", ("Facility", "PPU", "SITE 1", "Protocol v3.2", "Plasma Web REST Gateway")),
-        ("AGENTS.md", ("Facility", "PPU", "SITE 1", "Protocol v3.2", "Plasma Web REST Gateway")),
-        ("software/README.md", ("Facility", "PPU", "SITE 1", "Protocol v3.2", "Plasma Web REST Gateway")),
-        ("software/python/README.md", ("PPU", "SITE 1", "v3.2", "Plasma Web REST Gateway")),
-        ("software/python/docs/architecture.md", ("PPU", "SITE 1", "v3.2", "SiteManager")),
+        (
+            "README.md",
+            ("Facility", "PPU", "SITE 1", "Protocol v3.2", "Plasma Web REST Gateway", "Plasma Manager"),
+        ),
+        (
+            "AGENTS.md",
+            ("Facility", "PPU", "SITE 1", "Protocol v3.2", "Plasma Web REST Gateway", "Plasma Manager"),
+        ),
+        (
+            "software/README.md",
+            ("Facility", "PPU", "SITE 1", "Protocol v3.2", "Plasma Web REST Gateway", "plasma_manager"),
+        ),
+        (
+            "software/python/README.md",
+            ("PPU", "SITE 1", "v3.2", "Plasma Web REST Gateway", "plasma-manager"),
+        ),
+        (
+            "software/python/docs/architecture.md",
+            ("PPU", "SITE 1", "v3.2", "SiteManager", "plasma_manager"),
+        ),
         ("software/python/docs/protocol.md", ("SITE 1", "site_id = 1", "PLASMA32", "v3.1 compatibility boundary")),
         ("software/python/docs/test-guide.md", ("SITE 1", "Protocol v3.2", "channel_id 0 -> SITE 1")),
         ("software/web/README.md", ("Plasma PPU Console", "SITE 1", "Protocol v3.2", "Plasma Web REST Gateway")),
