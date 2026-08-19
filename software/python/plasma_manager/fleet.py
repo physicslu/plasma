@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from .client import PPUHTTPError, PPUHttpClient
+from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
 from .config import ManagerConfig, PPURegistryEntry
 
 
@@ -112,6 +112,8 @@ class FleetAggregator:
             "alias": entry.alias,
             "gateway_live": False,
             "execution_ready": False,
+            "transport_state": "unknown",
+            "execution_state": "unknown",
             "contract_compatible": False,
             "identity_conflict": False,
             "ppu": None,
@@ -119,14 +121,25 @@ class FleetAggregator:
             "errors": [],
         }
         client = self.client_factory(entry.endpoint, self.config.request_timeout_s)
+
         try:
-            _, live = client.liveness()
+            try:
+                _, live = client.liveness()
+            except PPUTransportError as exc:
+                result["transport_state"] = "unreachable"
+                result["errors"].append(str(exc))
+                return result
+
+            # Reaching an HTTP response is distinct from satisfying the fleet contract.
+            # Contract/payload errors must not be reported as network outages.
+            result["transport_state"] = "reachable"
             if live.get("ok") is not True or live.get("gateway") != "alive":
                 raise PPUHTTPError("liveness payload does not declare an alive Gateway")
             result["gateway_live"] = True
 
             readiness_status, readiness = client.readiness()
             if readiness_status == 503 or readiness.get("execution") != "ready":
+                result["execution_state"] = "unavailable"
                 error = readiness.get("error")
                 message = error.get("message") if isinstance(error, dict) else None
                 result["errors"].append(str(message or "local PPU execution is unavailable"))
@@ -137,6 +150,7 @@ class FleetAggregator:
             if not isinstance(readiness_ppu_id, str) or not readiness_ppu_id:
                 raise PPUHTTPError("readiness payload is missing ppu_id")
             result["execution_ready"] = True
+            result["execution_state"] = "ready"
 
             _, node = client.node()
             self._validate_node(node)
