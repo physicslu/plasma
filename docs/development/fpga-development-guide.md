@@ -1,23 +1,18 @@
 # Plasma FPGA Development Guide
 
-> Project: `physicslu/plasma`  
 > Scope: Zynq PL / FPGA RTL architecture and implementation policy  
 > Status: architecture baseline before production Plasma RTL begins  
-> Updated: 2026-08-17
-
----
+> Updated: 2026-08-19
 
 ## 1. Purpose
 
-This document defines the default FPGA development architecture for Plasma before the first
-production programmer RTL is implemented.
+This document defines the default FPGA development architecture for Plasma before the first production PPU/Site RTL is implemented.
 
-The design principle is:
+Design principle:
 
-> Hardware remains hardware; functional verification is Python-first; temporal/protocol rules
-> are checked close to the RTL; merge and physical deployment remain human-controlled gates.
+> Hardware remains hardware; functional verification is Python-first; temporal/protocol rules are checked close to the RTL; merge and physical deployment remain human-controlled gates.
 
-The resulting development model is:
+Target flow:
 
 ```text
 SystemVerilog RTL
@@ -30,7 +25,7 @@ Static / lint checks
         v                   v
 SVA checks            cocotb + pytest
 Temporal rules        Functional behavior
-Protocol rules        Random/reference-model tests
+Protocol rules        Random/reference models
         |                   |
         +---------+---------+
                   |
@@ -39,7 +34,6 @@ Protocol rules        Random/reference-model tests
                   |
                   v
              Merge gate
-           Human approval
                   |
                   v
       Vivado synthesis / implementation
@@ -47,7 +41,6 @@ Protocol rules        Random/reference-model tests
                   |
                   v
              Deploy gate
-           Human approval
                   |
                   v
                  Z2
@@ -56,64 +49,50 @@ Protocol rules        Random/reference-model tests
          Hardware validation
 ```
 
-This is the target architecture. The current repository does not yet have every simulator,
-assertion, or CI stage wired up. New production RTL should adopt the architecture incrementally
-instead of pretending unconfigured checks already exist.
+Not every stage is wired into CI yet. Report only stages that actually ran.
 
----
+## 2. Canonical Site terminology
 
-## 2. Repository ownership
+The repeated independently controlled programming resource is a **Programming Site**:
 
-Current PL source ownership remains:
+```text
+PPU
+├── SITE 1
+├── SITE 2
+└── ... SITE N
+```
+
+Software/domain Site identity is one-based. Hardware RTL does not need to encode human-visible Site IDs internally unless the interface contract requires it, but module/directory naming for the repeated programming resource should use `site`, not the retired product-domain term `channel`.
+
+Use `channel` only when it genuinely denotes a lower-level bus/protocol channel that is distinct from a Programming Site, and document that distinction.
+
+## 3. Repository ownership
+
+Source ownership:
 
 ```text
 pl/
 ├── rtl/             synthesizable RTL source of truth
+│   ├── examples/
+│   ├── site/        per-Site production RTL
+│   ├── bus/         shared bus/interconnect
+│   └── top/         PPU PL top-level integration
 ├── constraints/     XDC source of truth
-├── projects/        reproducible Vivado project/build Tcl and project notes
-├── tests/           repository/source-layout tests that do not require Vivado
-└── build/           generated Vivado output; not committed
-```
-
-As production RTL begins, use this target verification structure:
-
-```text
-pl/
-├── rtl/
-│   ├── common/
-│   ├── channel/
-│   ├── bus/
-│   ├── top/
-│   ├── swd/
-│   ├── spi/
-│   └── i2c/
-├── constraints/
-├── projects/
+├── projects/        reproducible Vivado project/build Tcl and notes
 ├── verification/
 │   ├── cocotb/
-│   │   ├── test_<module>.py
-│   │   └── ...
 │   ├── sva/
-│   │   ├── <module>_sva.sv
-│   │   └── ...
 │   └── models/
-│       ├── <protocol>_model.py
-│       └── ...
-├── sim/
-│   └── minimal simulator harnesses when required
-└── tests/
+├── sim/             minimal simulator harnesses when needed
+├── tests/           repository/source-layout checks
+└── build/           generated output; not committed
 ```
 
-Do not create directories until they are useful. The structure is a placement rule, not a
-requirement to commit empty folders.
+As production RTL grows, protocol engines may be organized under directories such as `rtl/swd/`, `rtl/spi/`, and `rtl/i2c/`. Do not create directories until concrete modules require them.
 
----
+## 4. RTL language baseline
 
-## 3. RTL language baseline
-
-### 3.1 New RTL uses SystemVerilog
-
-All new production RTL should use `.sv` unless a vendor/IP integration forces another format.
+All new production RTL should use SystemVerilog (`.sv`) unless a vendor/IP integration requires another format.
 
 Preferred style:
 
@@ -135,212 +114,124 @@ always_ff @(posedge clk) begin
 end
 ```
 
-Avoid introducing new code such as:
-
-```systemverilog
-reg [7:0] value;
-always @(*) begin
-    ...
-end
-```
-
-`logic` is the normal default, but `wire` is not forbidden. Use a net type when net semantics
-are actually required, such as appropriate tri-state, `inout`, or multi-driver structures.
-
-### 3.2 Combinational logic
-
-Use `always_comb` for procedural combinational logic.
-
 Rules:
 
-- Assign every output/temporary on every path.
-- Use explicit defaults at the top of a block when that makes coverage clear.
-- Avoid intentional latches unless the design genuinely requires one and the reason is
-  documented.
-- Keep combinational blocks small enough that ownership and priority are obvious.
+- prefer `logic` for ordinary signals/variables;
+- use `always_comb` for procedural combinational logic;
+- use `always_ff` for sequential logic;
+- use nonblocking assignments in `always_ff`;
+- keep explicit widths and signedness where hardware-visible arithmetic depends on them;
+- use `wire`/net types when actual net semantics are required;
+- avoid inferred latches unless intentional and documented;
+- make reset polarity, clock domain, enable/stall behavior, and interface ownership explicit.
 
-`always_comb` improves semantic checking but does not replace lint, review, or simulation.
+Do not refactor working RTL merely for style unless the assigned task requires it.
 
-### 3.3 Sequential logic
+## 5. Clock, reset, and CDC
 
-Use `always_ff` for clocked state.
-
-Rules:
-
-- Use nonblocking assignments (`<=`).
-- One state element should have one clear procedural owner.
-- Reset polarity and synchronous/asynchronous behavior must be explicit.
-- Do not mix unrelated clock domains in one sequential block.
-- Avoid derived/gated clocks unless the architecture explicitly requires them; prefer enables
-  when appropriate.
-
-### 3.4 Types and intent
-
-Prefer intent-rich SystemVerilog constructs where they improve correctness:
-
-- `typedef enum logic [...]` for FSM states.
-- `parameter` / `localparam` for configurable or internal constants.
-- packed structs for strongly related bus fields when tool compatibility is verified.
-- explicit widths rather than unsized assumptions in hardware-visible arithmetic.
-- explicit signedness for arithmetic that depends on sign extension/comparison.
-
-Do not introduce clever syntax merely because SystemVerilog allows it. Synthesis portability,
-reviewability, and simulator consistency matter more than language novelty.
-
----
-
-## 4. Clock and reset policy
-
-Clock/reset decisions are architectural contracts.
-
-For each RTL block, document or make obvious:
+Clock/reset decisions are architecture contracts. For each block make clear:
 
 - clock domain;
-- reset signal and polarity;
-- synchronous vs asynchronous assertion/deassertion behavior;
-- power-up assumptions, if any;
-- enable/stall behavior;
+- reset signal/polarity;
+- synchronous/asynchronous behavior;
+- power-up assumptions;
+- enable/stall semantics;
 - clock-domain crossings.
 
-Avoid assuming two signals are synchronous merely because they are generated on the same FPGA.
-If data crosses clock domains, use an appropriate CDC structure and verify the transfer model.
+Use an appropriate CDC structure for the data semantics. Do not pass a multi-bit bus through independent two-flop synchronizers and assume coherence.
 
-Typical choices include:
+## 6. Site independence and shared resources
 
-- two-flop synchronizers for single-bit level signals;
-- toggle/pulse synchronizers for events;
-- handshake schemes for controlled multi-bit transfers;
-- asynchronous FIFOs for sustained multi-bit streams.
-
-The implementation must match the data semantics. A multi-bit bus must not be passed through
-independent two-flop synchronizers and assumed coherent.
-
----
-
-## 5. Interfaces and module boundaries
-
-Plasma is intended to support multiple programming channels. RTL should preserve that
-independence.
+Plasma is designed for multiple independently controlled Programming Sites.
 
 Guidelines:
 
-- Keep per-channel state local to the channel wherever practical.
-- Make genuinely shared resources explicit rather than serializing unrelated channels by
-  default.
-- Parameterize repeated channel logic when it improves reuse without obscuring debug.
-- Keep protocol engines (for example SWD/SPI/I2C) separate from policy/orchestration logic when
-  practical.
-- Keep host-facing register/bus behavior stable and documented.
-- Treat register addresses, bit definitions, interrupt/status semantics, and software-visible
-  timing as interfaces, not implementation details.
+- keep per-Site state local to the Site wherever practical;
+- do not serialize unrelated Sites merely to simplify RTL;
+- make genuinely shared resources explicit and arbitrate them deliberately;
+- parameterize repeated Site logic when it improves reuse without hiding debug visibility;
+- keep protocol engines (SWD/SPI/I2C) separate from higher-level Site policy/orchestration when practical;
+- keep host-facing register/bus behavior stable and documented.
 
-When RTL-visible behavior changes, check Python/PYNQ register access and higher software layers
-for corresponding changes.
+When a shared resource exists, define what concurrency is legal and what backpressure/arbitration guarantees software can rely on.
 
----
+## 7. Software-visible interfaces
 
-## 6. Constraints are source code
+Treat register addresses, bit definitions, FIFO semantics, interrupts/status, command ordering, timeout behavior, and software-visible timing as interfaces rather than implementation details.
 
-XDC files are part of the design contract.
+When PL-visible behavior changes, inspect impact on:
 
-For new clocks and I/O:
+```text
+RTL / SVA / cocotb
+    ↕
+register map / AXI/FIFO contract
+    ↕
+Python/PYNQ interface
+    ↕
+SiteManager / handler / higher software
+```
+
+Do not invent register addresses or interface behavior without a source specification or an explicitly approved design decision.
+
+## 8. Constraints are source code
+
+XDC is part of the design contract.
 
 - define clocks accurately;
-- define I/O pins and I/O standards deliberately;
-- add timing exceptions only when the underlying path semantics justify them;
-- document non-obvious false paths, multicycle paths, asynchronous clock groups, or generated
-  clocks;
+- define pins and I/O standards deliberately;
+- add timing exceptions only when path semantics justify them;
+- document non-obvious false paths, multicycle paths, asynchronous clock groups, and generated clocks;
 - do not use broad timing exceptions merely to make implementation pass.
 
-A design that generates a bitstream but violates timing is not considered validated.
+A generated bitstream that violates timing is not considered validated.
 
-Timing closure belongs before physical deployment in the target flow.
+## 9. Generated Vivado files
 
----
+Vivado project output is generated state. Keep checked-in source focused on RTL, XDC, reproducible Tcl, intentional IP/block-design configuration, documentation, and explicitly selected deliverable artifacts.
 
-## 7. Generated Vivado files
+Do not hand-edit `.xpr`, `.runs`, `.srcs`, implementation databases, or similar generated output as the primary way to make a design change.
 
-Vivado project output is generated state, not the design source of truth.
+## 10. Static analysis and lint
 
-Keep checked-in sources focused on:
-
-- RTL;
-- XDC;
-- Tcl needed to recreate/build the project;
-- intentional block-design/IP configuration sources when required;
-- documentation;
-- selected deliverable artifacts only when repository policy explicitly calls for them.
-
-Do not hand-edit `.xpr`, `.runs`, `.srcs`, implementation databases, or other generated output
-as the primary way to make a design change.
-
-A clean checkout should be reproducibly buildable from the maintained source inputs once the
-required Vivado environment is present.
-
----
-
-## 8. Static analysis and lint
-
-Static checks are the first guardrail, not the only guardrail.
-
-The intended checks should catch or flag issues such as:
+Static checks should catch/flag issues such as:
 
 - syntax/elaboration errors;
 - width truncation/extension mistakes;
 - unintended latches;
 - multiple procedural drivers;
-- unused or undriven signals;
+- unused/undriven signals;
 - suspicious signed/unsigned operations;
 - incomplete state/case behavior;
-- selected CDC/reset issues where supported by the chosen tooling.
+- selected CDC/reset issues supported by the chosen tooling.
 
-The exact linter/tool is not frozen by this document. When one is added, its configuration must
-be checked into the repository and its warnings must be handled intentionally rather than
-blanket-disabled.
+The exact linter is not frozen here. Once selected, its configuration belongs in the repository and warnings must be handled intentionally rather than blanket-disabled.
 
----
+## 11. Verification architecture
 
-## 9. Verification architecture
-
-Functional verification and temporal verification are complementary.
-
-Use:
+Functional and temporal verification are complementary:
 
 ```text
-cocotb + pytest    -> What result did the design produce?
-SVA                -> Did the design obey the required cycle/protocol rule while producing it?
+cocotb + pytest -> What result did the design produce?
+SVA             -> Did the design obey cycle/protocol invariants while doing it?
 ```
 
-Detailed policy is in:
+Detailed verification policy is in `docs/development/fpga-verification-guide.md`.
 
-```text
-docs/development/fpga-verification-guide.md
-```
+Use Python reference/golden models for data-path/protocol behavior where independent software expression improves confidence. Keep SVA separate from production synthesis sources unless an assertion is intentionally implemented as synthesizable debug hardware.
 
-Do not move all correctness checking into Python and lose cycle-local protocol checks.
-Do not move all correctness checking into SVA and lose high-level reference-model comparison.
+## 12. CI and build tiers
 
----
-
-## 10. CI and build tiers
-
-The recommended long-term split is:
-
-### Tier A — fast checks
-
-Run frequently on development branches:
+### Tier A — fast regression
 
 ```text
 source-layout tests
 static/lint checks
-fast RTL compile/elaboration
+RTL compile/elaboration
 cocotb/pytest functional regression
 supported fast assertion checks
 ```
 
-### Tier B — FPGA build/sign-off checks
-
-Run when appropriate for the change and before hardware deployment:
+### Tier B — FPGA build/sign-off
 
 ```text
 Vivado synthesis
@@ -348,92 +239,71 @@ Vivado implementation
 DRC
 clock/timing analysis
 bitstream generation when required
-full assertion simulation where the selected fast simulator is insufficient
+full assertion simulation where the fast simulator is insufficient
 ```
 
-Do not make Tier A falsely report Tier B success.
-Keep validation reports explicit about what ran and where.
+Do not report Tier A as Tier B success.
 
----
-
-## 11. Merge and deploy gates
+## 13. Merge, deploy, and hardware gates
 
 The repository root `AGENTS.md` defines protected operations.
-
-The intended FPGA lifecycle is:
 
 ```text
 AI / developer change
     -> automated verification
-    -> reviewable feature branch / PR
+    -> feature branch / PR
     -> CI green for configured checks
-    -> human merge approval
+    -> explicit merge approval
     -> main
     -> implementation/timing/artifact validation
-    -> human deploy approval
+    -> explicit deploy/hardware approval
     -> load on Z2
     -> hardware-in-the-loop validation
 ```
 
-A merge decision and a hardware-deploy decision are deliberately separate.
-Passing CI authorizes neither automatically.
+Merge and hardware deployment are separate decisions. Passing CI authorizes neither automatically.
 
----
+## 14. AI-assisted FPGA development
 
-## 12. AI-assisted FPGA development
-
-AI agents are useful for:
-
-- implementing synthesizable RTL;
-- writing assertions;
-- writing cocotb tests and reference models;
-- generating boundary/randomized test cases;
-- reviewing interfaces and state machines;
-- diagnosing simulation failures and waveforms;
-- maintaining build/verification scripts and documentation.
+AI agents may implement RTL, assertions, cocotb tests, reference models, boundary/random cases, interface reviews, and build/verification scripts.
 
 They must not invent:
 
 - register addresses;
 - pin assignments;
-- clocks or target timing;
+- clocks or timing requirements;
 - voltage/electrical limits;
-- protocol behavior that conflicts with a source specification;
+- target/protocol behavior conflicting with authoritative specifications;
 - hardware validation results.
 
-For a new RTL feature, the preferred agent workflow is:
+Preferred workflow:
 
 ```text
 read AGENTS.md + pl/AGENTS.md
-    -> inspect interfaces/constraints/specification
+    -> inspect interface/constraints/specification
     -> implement SystemVerilog RTL
-    -> add/update cocotb functional tests
+    -> add/update cocotb tests
     -> add/update SVA for important temporal rules
     -> run available focused regression
     -> run full applicable validation
-    -> review diff and validation claims
+    -> review diff and claims
     -> publish feature branch/PR
     -> stop at merge gate
 ```
 
----
+## 15. First production RTL adoption plan
 
-## 13. Adoption plan
-
-Because production Plasma FPGA work has not started, adopt the architecture cleanly from the
-first real module rather than planning a later wholesale migration.
+Production Plasma FPGA work has not yet started, so establish the Site terminology cleanly from the first real module instead of carrying a legacy `channel` placeholder forward.
 
 Recommended sequence:
 
-1. Keep the existing `btled` flow as a simple build/environment example.
-2. When the first production module is created, add the minimum simulator + cocotb integration
-   needed for that module.
-3. Add `pl/verification/cocotb/` and a first Python test.
-4. Add `pl/verification/sva/` when the module has temporal/protocol invariants worth asserting.
-5. Add a Python reference model where behavior is easier to express independently in software.
-6. Add CI checks only after the selected simulator/tool commands are reproducible locally/SWPC.
-7. Add Vivado synthesis/implementation/timing jobs at the appropriate integration tier.
-8. Keep physical Z2 validation behind the explicit deploy/hardware gate.
+1. Keep `btled` only as a build/environment example.
+2. Implement the first per-Site block under `pl/rtl/site/`.
+3. Add the minimum command-line simulator + cocotb integration required by that block.
+4. Add SVA when temporal/protocol invariants justify it.
+5. Add Python reference models where useful.
+6. Add CI only after the same command is reproducible outside CI.
+7. Add Vivado synthesis/implementation/timing checks at the appropriate integration tier.
+8. Keep physical Z2 loading and target operations behind explicit hardware approval.
 
-This avoids both extremes: carrying legacy testbench habits into new code, and installing a
-large verification framework before there is RTL that benefits from it.
+This avoids both legacy naming debt and premature verification-framework complexity.

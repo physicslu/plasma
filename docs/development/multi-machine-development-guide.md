@@ -5,7 +5,7 @@
 
 ## 1. Development model
 
-Plasma uses GitHub as the publication/integration source of truth and one primary Linux host as the deterministic development and integration workspace.
+Plasma uses GitHub as the publication/integration source of truth and one primary Linux integration host as the deterministic development workspace.
 
 ```text
                     GitHub
@@ -29,7 +29,18 @@ Plasma uses GitHub as the publication/integration source of truth and one primar
 
 The purpose is to avoid maintaining divergent Python, Verilator, cocotb, Node, and Vivado environments on every client computer.
 
-## 2. Role boundaries
+## 2. Domain baseline
+
+All new software/documentation uses:
+
+```text
+Facility -> PPU -> Site
+SITE 1 .. SITE N
+```
+
+The canonical TCP wire contract is Plasma Protocol v3.2 (`PLASMA32`, one-based `site_id`). Protocol v3.1 zero-based `channel_id` exists only in explicit compatibility code/tests.
+
+## 3. Role boundaries
 
 | Role | Normal access | Responsibility |
 |---|---|---|
@@ -39,11 +50,11 @@ The purpose is to avoid maintaining divergent Python, Verilator, cocotb, Node, a
 | Managed Thin Client | VS Code Remote-SSH | Minimal local footprint; avoid storing source artifacts or credentials unnecessarily |
 | Z2 Target | Approved target access | Embedded runtime, PS/PL integration, electrical and real-device validation |
 
-Machine names, usernames, private DNS names, VPN/Tailscale identifiers, and physical-device inventory belong in operator-local configuration or protected infrastructure records. They are not part of the public Plasma architecture contract.
+Machine names, usernames, private DNS names, VPN identifiers, and physical-device inventory belong in operator-local configuration or protected infrastructure records.
 
-## 3. Repository location
+## 4. Repository location
 
-The absolute repository path is site-specific. Public examples use:
+The absolute repository path is deployment-specific. Public examples use:
 
 ```bash
 export PLASMA_REPO=/path/to/plasma
@@ -62,7 +73,7 @@ $PLASMA_REPO/
 └── docs/
 ```
 
-Important Python environment boundary:
+Python environment boundary:
 
 ```text
 pl/.venv/                 FPGA verification
@@ -71,7 +82,7 @@ software/python/.venv/    Plasma software/server
 
 Do not merge these environments merely to make one editor setting convenient.
 
-## 4. Client setup
+## 5. Client setup
 
 A normal client needs only:
 
@@ -92,9 +103,7 @@ Cmd/Ctrl + Shift + P
 
 Then open `$PLASMA_REPO`.
 
-The real SSH username, hostname, private IP, overlay-network hostname, and key path must remain outside public repository documentation.
-
-## 5. VS Code workspace standard
+## 6. VS Code workspace standard
 
 The repository provides shared project configuration:
 
@@ -104,7 +113,7 @@ The repository provides shared project configuration:
 .vscode/settings.json
 ```
 
-Project configuration may define deterministic engineering behavior. Personal themes, fonts, local AI credentials, machine names, and SSH connection details must remain per-client settings.
+Project configuration may define deterministic engineering behavior. Personal themes, fonts, local AI credentials, machine names, and SSH connection details remain per-client settings.
 
 ### FPGA workflow
 
@@ -128,7 +137,7 @@ pl/tools/fpga.py
 
 The build unit is a target manifest, not an arbitrary single `.sv` file.
 
-## 6. Git workflow
+## 7. Git workflow
 
 Before code-changing work:
 
@@ -152,38 +161,11 @@ Create feature work on a separate branch:
 git switch -c agent/<feature-name>
 ```
 
-Routine engineering may continue through implementation, tests, commits, push, PR creation, and CI repair. Merge to `main`, deployment/restart, hardware-affecting operations, and destructive history changes remain explicit approval gates defined by `AGENTS.md`.
+Routine engineering may continue through implementation, tests, commits, push, PR creation, and CI repair. Merge to `main`, deployment/restart, hardware-affecting operations, destructive history changes, and unresolved material architecture/security decisions remain approval gates defined by `AGENTS.md`.
 
 Do not use `git reset --hard`, `git clean -fd`, or force push as ordinary synchronization tools.
 
-## 7. FPGA development
-
-Preferred entry point:
-
-```bash
-cd "$PLASMA_REPO"
-source pl/env.sh
-python pl/tools/fpga.py list
-python pl/tools/fpga.py verify <target>
-```
-
-Target manifests live under `pl/targets/`; generated build artifacts live under `pl/build/` and are not repository source of truth.
-
-Verilator/cocotb PASS does not prove Vivado timing closure or real hardware behavior.
-
 ## 8. Python development
-
-FPGA verification uses:
-
-```text
-pl/.venv/
-```
-
-Plasma software uses:
-
-```text
-software/python/.venv/
-```
 
 Software tests:
 
@@ -191,6 +173,8 @@ Software tests:
 cd "$PLASMA_REPO/software/python"
 .venv/bin/python -m pytest -q
 ```
+
+The Python domain is canonical PPU/Site. New code must not introduce `SITE 0` or treat v3.1 `channel_id` as numerically identical to v3.2 `site_id`.
 
 ## 9. Web development
 
@@ -203,15 +187,17 @@ npm run validate:artifact
 
 Use `package.json` and `AGENTS.md` as the source of truth for the current Web toolchain and validation contract.
 
-## 10. Runtime ports
+The current UI is the **Plasma PPU Console**. It discovers PPU/Site topology dynamically from canonical status and sends one-based `site_id` requests.
 
-The current development/runtime service contract is public and may remain documented:
+## 10. Runtime services and ports
 
-| Service | Default port |
-|---|---:|
-| Plasma Server | 9900 |
-| Python HTTP REST Gateway | 18080 |
-| Web Console development/demo service | 5173 |
+| Service | Default port | Role |
+|---|---:|---|
+| Plasma PPU Programming Server | 9900 | Plasma Protocol v3.2 TCP Server |
+| Plasma Web REST Gateway | 18080 | HTTP REST boundary for the Web Console |
+| Plasma PPU Console development/demo service | 5173 | Vite/Vinext Web runtime |
+
+The current Gateway uses Python standard-library HTTP (`ThreadingHTTPServer`) and REST polling. It is not FastAPI and does not currently use WebSocket.
 
 A port number is not a credential. The security boundary is whether that port is exposed to an untrusted network and what authentication/authorization protects it.
 
@@ -232,10 +218,10 @@ When using one:
 Keep these out of the public repository:
 
 - SSH private keys and credentials
-- personal usernames and email addresses in documentation
-- private DNS/VPN/Tailscale hostnames
+- personal usernames and email addresses in public documentation
+- private DNS/VPN hostnames
 - workstation-specific absolute home paths
 - customer firmware and customer credentials
 - production certificates/tokens
 
-Generic architecture, service contracts, port assignments, target manifests, tests, and public API behavior may remain documented when they are intentionally part of the project interface.
+Generic architecture, service contracts, port assignments, target manifests, tests, and public API behavior may remain documented when intentionally part of the project interface.

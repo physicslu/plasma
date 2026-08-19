@@ -8,17 +8,30 @@ Plasma uses the following product and domain hierarchy:
 Plasma System
 └── Facility
     └── PPU
-        └── Site
+        ├── SITE 1
+        ├── SITE 2
+        └── ... SITE N
 ```
 
-- **Facility**: the deployment / administrative location that owns one or more PPUs, such as a factory, line, laboratory, or customer site.
-- **PPU**: **Plasma Programming Unit**, one physical Plasma programming device and one local execution node.
+- **Facility**: deployment / administrative location that owns one or more PPUs, such as a factory, line, laboratory, or customer location.
+- **PPU**: **Plasma Programming Unit**, one physical Plasma programming device and one autonomous local execution node.
 - **Site**: **Programming Site**, one independently controlled programming position inside a PPU.
-- **Socket**: the mechanical/electrical IC fixture attached to a Site. Site and Socket are deliberately not the same abstraction.
+- **Socket**: mechanical/electrical IC fixture attached to a Site. Site and Socket are deliberately different abstractions.
 
-At the current prototype stage, one Site normally drives one Socket and one target IC. The model does not require that to remain true forever.
+At the current prototype stage, one Site normally drives one Socket and one target IC. The model does not require that relation to remain permanently one-to-one.
 
 ## Identity
+
+Canonical Site identity is one-based:
+
+```text
+SITE 1 -> site_id = 1
+SITE 2 -> site_id = 2
+...
+SITE N -> site_id = N
+```
+
+There is no canonical `SITE 0`.
 
 A Site ID is local to its PPU. A durable fleet identity is therefore:
 
@@ -26,9 +39,7 @@ A Site ID is local to its PPU. A durable fleet identity is therefore:
 (facility_id, ppu_id, site_id)
 ```
 
-Do not flatten all Sites into one global integer namespace.
-
-Changing terminology must not silently change a stable resource identity. For example, an existing PPU may retain the opaque ID `z2-dev-01`; the fact that the resource is now called a PPU does not require renaming its ID.
+Do not flatten all Sites into one global integer namespace. Renaming a domain concept also must not silently mutate a stable PPU resource ID.
 
 ## Standalone invariant
 
@@ -44,17 +55,17 @@ PPU-local Plasma Web REST Gateway
 Plasma Server
         |
         v
-Site Manager
+SiteManager / SiteWorker
         |
         v
 Programming Sites
 ```
 
-Plasma Manager is an optional fleet control plane. Manager failure must not make a healthy local PPU unable to perform local programming work.
+Plasma Manager is an optional future fleet control plane. Manager failure must not make a healthy local PPU unable to perform local programming, maintenance, or diagnostics.
 
 ## Managed fleet
 
-When multiple PPUs are managed centrally, the future topology is:
+When multiple PPUs are managed centrally, the target topology is:
 
 ```text
 Browser / Fleet UI
@@ -67,19 +78,21 @@ Plasma Manager (optional)
 Facility A                Facility B
    |                         |
    +-- PPU A1                +-- PPU B1
-   |    +-- Site 0           |    +-- Site 0
-   |    +-- Site 1           |    +-- Site 1
+   |    +-- SITE 1           |    +-- SITE 1
+   |    +-- SITE 2           |    +-- SITE 2
    |
    +-- PPU A2
-        +-- Site 0
-        +-- ...
+        +-- SITE 1
+        +-- ... SITE N
 ```
 
-The Manager owns fleet concerns such as registration, health, routing, aggregation, authentication and audit. A PPU owns local execution, safety and recovery.
+The Manager owns fleet concerns such as registration, health aggregation, routing, authentication, audit and reconnect policy. Each PPU owns local execution, deterministic protocol timing, Site arbitration, hardware safety and recovery.
+
+The current Web Console is a single-PPU console. A future fleet UI should reuse the same PPU-detail concepts rather than creating an unrelated second control model.
 
 ## Canonical configuration
 
-New configuration uses `ppu`, `facility_id`, and `sites`:
+New configuration uses `ppu`, `facility_id`, and one-based `sites`:
 
 ```yaml
 ppu:
@@ -93,22 +106,30 @@ server:
   max_queue_depth_per_site: 16
 
 sites:
-  - id: 0
+  - id: 1
     enabled: true
     interface: mock
-  - id: 1
+  - id: 2
     enabled: true
     interface: mock
 ```
 
-During the migration, the loader also accepts the legacy `programmer`, deployment `site_id`, `channels`, `max_supported_channels`, and `max_queue_depth_per_channel` names. Canonical and legacy forms for the same concept must not be mixed in one configuration block.
+Legacy YAML rooted at `programmer` / `channels` may still be accepted only through the compatibility loader. Legacy Channel IDs are zero-based and translated exactly once at the configuration boundary:
+
+```text
+channel 0 -> SITE 1
+channel 1 -> SITE 2
+```
+
+After loading, canonical Python domain code must not contain Site 0.
 
 ## Canonical status contract
 
-The canonical local status shape is:
+Protocol v3.2 STATUS exposes canonical `ppu` and `sites` only. Example:
 
 ```json
 {
+  "protocol_version": "3.2",
   "ppu": {
     "ppu_id": "z2-dev-01",
     "facility_id": "lab-01",
@@ -123,7 +144,7 @@ The canonical local status shape is:
   },
   "sites": [
     {
-      "site_id": 0,
+      "site_id": 1,
       "enabled": true,
       "state": "idle"
     }
@@ -131,30 +152,47 @@ The canonical local status shape is:
 }
 ```
 
-For a transition period the server also emits the legacy `programmer` and `channels` views so existing Web/UI and clients can migrate independently.
+The legacy `programmer/channels` shape belongs to v3.1 compatibility responses. It is not emitted as an additional canonical view inside v3.2 STATUS.
 
 ## REST boundary
 
-The Plasma Web REST Gateway accepts canonical Site addressing:
+The Plasma Web REST Gateway uses canonical one-based Site addressing:
 
 ```text
-GET  /api/status?site=0
-POST /api/jobs  { "site_id": 0, ... }
+GET  /api/status?site=1
+POST /api/jobs  { "site_id": 1, ... }
 ```
 
-It temporarily accepts the legacy `channel` query and `channel_id` request field. If both canonical and legacy fields are supplied, they must resolve to the same Site.
+Legacy `channel` / `channel_id` input may be accepted at an explicit compatibility boundary as zero-based identity. It must be translated before entering the canonical domain; new Web/REST clients must send `site_id` only.
 
-## Plasma protocol v3.1 compatibility boundary
+## Plasma Protocol v3.2
 
-Plasma protocol v3.1 predates this vocabulary change and its wire metadata field is still named `channel_id`.
+The canonical TCP wire protocol is v3.2:
 
-That field now means:
+```text
+magic:            PLASMA32
+protocol_version: 3.2
+identity:         site_id = 1..N
+```
 
-> the local **Programming Site ID** inside the already-selected PPU.
+A v3.2 request must not dual-send `channel_id`. A v3.2 response uses `site_id`, `ppu`, and `sites` according to the applicable message shape.
 
-The domain rename does **not** rename the v3.1 wire field and does not bump the protocol version. The REST/domain layer translates `site_id` to v3.1 `channel_id` at the local protocol boundary.
+## Protocol v3.1 compatibility boundary
 
-A future protocol-version migration may rename the wire field, but that must be a separate explicit compatibility decision.
+Protocol v3.1 is a legacy adapter, not a second domain model:
+
+```text
+v3.1                         canonical / v3.2
+PLASMA31                     PLASMA32
+channel_id = 0       ->      site_id = 1
+channel_id = 1       ->      site_id = 2
+...
+channel_id = N-1     ->      site_id = N
+```
+
+A v3.1 request receives a v3.1 response. Its legacy STATUS shape may use `programmer/channels`, and E4001/E4002/E4003 error names may serialize as `CHANNEL_INVALID`, `CHANNEL_DISABLED`, and `CHANNEL_BUSY`.
+
+Do not use `site_id == channel_id` as an invariant.
 
 ## Migration aliases
 
@@ -164,6 +202,7 @@ Canonical new code should use:
 PPUConfig
 SiteConfig
 SiteManager
+SiteWorker
 SiteState
 ppu
 sites
@@ -172,7 +211,7 @@ ppu_id
 site_id
 ```
 
-The following names remain compatibility aliases during migration:
+The following names may exist only where required for legacy compatibility:
 
 ```text
 ProgrammerConfig
@@ -181,7 +220,7 @@ ChannelManager
 ChannelState
 programmer
 channels
-channel_id   # v3.1 wire compatibility
+channel_id
 ```
 
-Compatibility aliases are not a license to introduce new code using the legacy vocabulary.
+Compatibility aliases are not permission to introduce new product/domain code using the retired vocabulary.

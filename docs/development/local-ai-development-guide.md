@@ -10,7 +10,7 @@ This guide describes a reusable local-AI development pattern without publishing 
 The intended topology is:
 
 ```text
-Apple Silicon engineering client
+Engineering client
 ├── Ollama
 ├── VS Code
 │   ├── Continue
@@ -20,9 +20,20 @@ Apple Silicon engineering client
           └── $PLASMA_REPO
 ```
 
-`AGENTS.md` remains the authoritative repository contract for AI-assisted code changes.
+`AGENTS.md` remains the authoritative repository contract for AI-assisted changes.
 
-## 2. Recommended AI role separation
+## 2. Plasma domain baseline
+
+AI tools must use the canonical product/domain vocabulary:
+
+```text
+Facility -> PPU -> Site
+SITE 1 .. SITE N
+```
+
+Protocol v3.2 is canonical (`PLASMA32`, one-based `site_id`). Protocol v3.1 `channel_id` is zero-based legacy compatibility only. New code and current-guidance documentation must not invent `SITE 0` or treat `site_id == channel_id` as an invariant.
+
+## 3. Recommended AI role separation
 
 Use Continue for interactive work such as code completion, code explanation, codebase search, selected-code review, and small edits.
 
@@ -39,11 +50,11 @@ read AGENTS.md
   -> report result
 ```
 
-Protected actions remain governed by `AGENTS.md`, including merge-to-main, deployment/restart, hardware-affecting operations, and destructive Git-history changes.
+Protected actions remain governed by `AGENTS.md`, including merge-to-main, deployment/restart, hardware-affecting operations, destructive Git-history changes, and unresolved material architecture/security tradeoffs.
 
-## 3. Local Ollama models
+## 4. Local Ollama models
 
-A practical Plasma setup may use:
+A practical setup may use:
 
 | Role | Example model | Purpose |
 |---|---|---|
@@ -59,13 +70,13 @@ ollama pull qwen2.5-coder:1.5b
 ollama pull qwen3-embedding:0.6b
 ```
 
-For Apple Silicon systems with sufficient unified memory, a reasonable starting policy is 64K context for normal Continue work and 128K for bounded agent tasks. Treat these as tuning values, not product requirements.
+For Apple Silicon systems with sufficient unified memory, a reasonable starting policy is 64K context for normal interactive work and 128K for bounded agent tasks. These are tuning values, not Plasma product requirements.
 
-## 4. Continue configuration principles
+## 5. Continue configuration principles
 
 Continue configuration is machine-local and normally belongs under the user's home configuration directory, not in this repository.
 
-A reusable example should avoid personal labels and credentials:
+Reusable example:
 
 ```yaml
 name: Plasma Development
@@ -99,7 +110,7 @@ models:
 
 Do not commit local API keys, user-specific configuration, SSH configuration, or machine inventory merely to reproduce an AI setup.
 
-## 5. Cline configuration principles
+## 6. Cline configuration principles
 
 Recommended baseline:
 
@@ -125,7 +136,7 @@ Execute all commands   OFF
 
 Cline permissions are a technical capability boundary; `AGENTS.md` remains the repository policy boundary.
 
-## 6. Remote-SSH and local Ollama
+## 7. Remote-SSH and local Ollama
 
 A VS Code extension running on a Remote-SSH extension host may interpret `127.0.0.1` as the remote integration host rather than the local engineering client.
 
@@ -147,9 +158,9 @@ Host plasma-integration
     ExitOnForwardFailure yes
 ```
 
-The actual username, hostname, private IP, VPN/Tailscale hostname, SSH key path, and ACL configuration must remain outside the public repository.
+The actual username, hostname, private IP, VPN hostname, SSH key path, and ACL configuration remain outside the public repository.
 
-Verify the tunnel from the remote integration host with:
+Verify the tunnel from the integration host with:
 
 ```bash
 curl http://127.0.0.1:11434/api/tags
@@ -157,9 +168,9 @@ curl http://127.0.0.1:11434/api/tags
 
 If remote port 11434 is occupied, choose another remote port and update the remote-side provider URL accordingly.
 
-## 7. Opening the Plasma workspace
+## 8. Opening the Plasma workspace
 
-Connect to the integration host using the operator-local SSH alias and open the configured repository root:
+Connect using the operator-local SSH alias and open:
 
 ```text
 $PLASMA_REPO
@@ -177,21 +188,24 @@ git fetch origin main
 
 Do not overwrite unrelated user changes.
 
-## 8. Plasma-specific AI invariants
+## 9. Plasma-specific AI invariants
 
 AI-generated changes must preserve the same engineering constraints as human-generated changes:
 
 - inspect the current repository before making Plasma-specific claims;
-- preserve independent channel execution unless a real shared resource requires synchronization;
-- scope cancellation to the intended job/channel;
+- use Facility / PPU / Site as canonical domain vocabulary;
+- preserve independent **Site** execution unless a real shared resource requires synchronization;
+- scope cancellation to the intended job/Site;
+- keep canonical Site identity one-based;
+- keep v3.1 `channel_id` inside explicit compatibility boundaries;
+- recognize the current Web boundary as **Plasma Web REST Gateway**, implemented with standard-library HTTP and REST polling;
+- do not invent FastAPI/WebSocket behavior that is not implemented;
 - do not invent hardware register addresses, timing, pin mappings, protocols, or API behavior;
 - add or update regression tests when behavior changes;
 - report what was actually validated;
-- never claim SWPC/Z2/hardware validation unless it was actually performed under the approval policy.
+- never claim integration-host/Z2/hardware validation unless it was actually performed under the approval policy.
 
-## 9. Information classification
-
-Keep machine-specific operational data out of public documentation:
+## 10. Information classification
 
 ```text
 Public repository
@@ -201,7 +215,7 @@ Public repository
 
 Operator-local / protected documentation
   -> real SSH username and hostname
-  -> private overlay-network identifiers
+  -> private network identifiers
   -> workstation inventory
   -> local absolute paths
   -> credentials, tokens, keys

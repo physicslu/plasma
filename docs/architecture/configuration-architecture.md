@@ -1,14 +1,14 @@
 # Plasma Configuration Architecture
 
-> Status: baseline for the current prototype and the next multi-programmer phase.
+> Status: baseline for the current single-PPU prototype and the future multi-PPU / Plasma Manager phase.
 
-This document defines ownership, source-of-truth, precedence, persistence, migration, and reconciliation rules for Plasma configuration. It intentionally avoids site-specific account names, private hostnames, and absolute workstation paths.
+This document defines ownership, source-of-truth, precedence, persistence, migration, and reconciliation rules for Plasma configuration. It intentionally avoids private account names, private hostnames, and workstation-specific absolute paths.
 
 ## 1. First principles
 
-Configuration describes intended or persistent behavior. Runtime state describes what the system is doing now. These are different domains and must not be collapsed merely because both can be serialized.
+Configuration describes intended or persistent behavior. Runtime state describes what the system is doing now. These are separate domains and must not be collapsed merely because both can be serialized.
 
-A permanent configuration value must have explicit answers for:
+Every permanent configuration value needs explicit answers for:
 
 1. **Owner** — which subsystem is responsible?
 2. **Source of Truth** — where is the authoritative value stored or produced?
@@ -16,25 +16,44 @@ A permanent configuration value must have explicit answers for:
 4. **Lifecycle** — when is it created, changed, applied, and retired?
 5. **Version/Migration** — how does persisted old state move to a new schema?
 
-Derived configuration such as generated systemd units, environment blocks, or browser bootstrap values is not a second source of truth. Derived state must be reproducible from authoritative input.
+Generated systemd units, environment blocks, browser bootstrap values, and other derived configuration are not independent sources of truth. They must be reproducible from authoritative input.
 
-## 2. Configuration domains
+## 2. Canonical domain
+
+Configuration follows the product/domain hierarchy:
+
+```text
+Facility -> PPU -> Site
+```
+
+Canonical Site identity is one-based:
+
+```text
+SITE 1 .. SITE N
+```
+
+There is no canonical `SITE 0`.
+
+The word **Facility** is used for a factory/lab/deployment location. **Site** is reserved for a Programming Site inside a PPU. Do not reuse `Site` to mean deployment location in new configuration.
+
+## 3. Configuration domains
 
 | Domain | Examples | Owner | Authoritative source |
 |---|---|---|---|
 | Product defaults | timeout, size limit | Source code | Checked-in code/config |
-| Site/deployment | service ports, repository path, public API URL | Deployment operator | Persistent deployment config |
-| Programmer identity | programmer ID, model, serial identity | Device provisioning | Device-local persistent identity |
-| Programmer capability | channel count, interfaces, FPGA/firmware capability | Programmer runtime/hardware | Device-reported capability |
+| Facility/deployment | service ports, repository path, public API URL | Deployment operator | Persistent deployment config |
+| PPU identity | PPU ID, model, serial identity, facility association | Device provisioning | Device-local persistent identity |
+| PPU capability | Site count, supported operations/interfaces, FPGA/firmware capability | PPU runtime/hardware | Device-reported capability |
+| Site configuration | Site enablement, interface binding, per-Site limits | PPU configuration | Canonical PPU config |
 | Target profile | IC family, memory geometry, interface | Target-definition layer | Checked-in target/profile data |
 | Job configuration | operation, target, file, offset, read length | Job request/server | Accepted server-side job record |
 | Runtime state | online, busy, progress, current job | Runtime services | Live state |
-| User preference | theme, layout, visible channels | Browser/user | Browser-local preference storage |
+| User preference | theme, layout, visible Sites | Browser/user | Browser-local preference storage |
 | Secrets/credentials | certificates, tokens, private keys | Security/deployment layer | Protected secret storage |
 
-A browser may cache presentation preferences, but it must not become authoritative for programmer topology or hardware capability.
+A browser may cache presentation preferences, but it must not become authoritative for PPU inventory, Site topology, Site capability, or hardware capability.
 
-## 3. Deployment configuration
+## 4. Deployment configuration
 
 The integration host uses a persistent operator configuration file under the user's configuration directory:
 
@@ -42,13 +61,13 @@ The integration host uses a persistent operator configuration file under the use
 $HOME/.config/plasma/plasmactl.env
 ```
 
-The current schema version is:
+The current deployment schema version is:
 
 ```bash
 PLASMA_CONFIG_VERSION=2
 ```
 
-A public example uses generic site-specific paths:
+Generic example:
 
 ```bash
 PLASMA_REPO=/path/to/plasma
@@ -60,15 +79,15 @@ PLASMA_GATEWAY_PORT=18080
 PLASMA_CORS_ORIGIN='*'
 PLASMA_VITE_HOST=127.0.0.1
 PLASMA_VITE_PORT=5173
-PLASMA_PUBLIC_API_URL=https://plasma.open4th.com
+PLASMA_PUBLIC_API_URL=https://example.invalid
 ```
 
-The ownership chain is:
+Ownership chain:
 
 ```text
 product/source default
        ↓ fallback only
-persistent site configuration
+persistent Facility/deployment configuration
        ↓ authoritative deployment value
 validation / migration
        ↓
@@ -77,16 +96,50 @@ generated systemd units
 active processes
 ```
 
-Generated systemd units are derived state. Manual edits to generated units are not a supported long-term configuration mechanism.
+Manual edits to generated units are not a supported long-term configuration mechanism.
 
-## 4. Precedence rules
+## 5. Canonical PPU configuration
+
+Current PPU configuration uses `ppu`, `server`, and one-based `sites`:
+
+```yaml
+ppu:
+  id: ppu-01
+  facility_id: lab-01
+  model: PYNQ-Z2
+  display_name: Plasma PPU Prototype
+
+server:
+  host: 127.0.0.1
+  port: 9900
+  max_supported_sites: 8
+  max_concurrent_jobs: 2
+  max_queue_depth_per_site: 16
+
+sites:
+  - {id: 1, enabled: true, interface: mock}
+  - {id: 2, enabled: true, interface: mock}
+```
+
+`max_supported_sites` defines the valid one-based Site ID space `1..N`. `max_concurrent_jobs` limits how many jobs may actually execute concurrently. These are different constraints.
+
+Legacy configuration rooted at `programmer` / `channels` may still be read only through the explicit compatibility loader. Legacy Channel IDs are zero-based and translated once at load time:
+
+```text
+channel_id 0 -> site_id 1
+channel_id 1 -> site_id 2
+```
+
+Canonical and legacy forms for the same concept must not be mixed inside one configuration block.
+
+## 6. Precedence rules
 
 There is no universal precedence chain for every setting. Precedence is domain-specific.
 
-### Site/deployment
+### Facility/deployment
 
 ```text
-1. valid explicit persistent site configuration
+1. valid explicit persistent deployment configuration
 2. product/source default
 ```
 
@@ -107,23 +160,23 @@ valid explicit browser API override
 deployed default API Base
 ```
 
-This value is not topology truth and should not evolve into a browser-owned programmer inventory.
+This value is not topology truth and must not evolve into a browser-owned PPU registry.
 
-### Programmer capability
+### PPU capability
 
 ```text
-1. valid capability reported by the programmer/device
-2. provisioned device-model default, when available
+1. valid capability reported by the PPU/device
+2. provisioned model default, when available
 3. no browser override
 ```
 
 ### Job configuration
 
-Once a job is accepted, the server-side job record becomes authoritative for that execution.
+Once a job is accepted, the server-side job record is authoritative for that execution.
 
-## 5. Schema versioning and migration
+## 7. Schema versioning and migration
 
-Any configuration that survives a software upgrade requires an explicit schema/version strategy. Otherwise deployment cannot distinguish an automatically persisted old default from an intentional operator override.
+Configuration that survives a software upgrade requires an explicit schema/version strategy.
 
 A migration must be:
 
@@ -149,11 +202,11 @@ persist new schema
 reconcile derived runtime state
 ```
 
-Known historical defaults may migrate to the current canonical default. Unknown/custom values are preserved as explicit operator overrides. Already-versioned values are not repeatedly reinterpreted.
+Known historical defaults may migrate to the current canonical default. Unknown/custom values remain explicit operator overrides. Already-versioned values are not repeatedly reinterpreted.
 
-Private addresses used by a development site are compatibility data, not documentation requirements. If executable migration code must still recognize a historical value, executable code and tests remain the source of truth without repeating that infrastructure inventory in public documentation.
+Protocol v3.1 identity migration is separate from deployment-config schema versioning. Protocol v3.1 uses zero-based `channel_id`; canonical Protocol v3.2 uses one-based `site_id`.
 
-## 6. Runtime reconciliation
+## 8. Runtime reconciliation
 
 Deployment is reconciliation, not merely restart:
 
@@ -183,76 +236,74 @@ Invariant:
 
 Re-running `install` must not be required merely to make a normal configuration change take effect.
 
-## 7. Browser storage boundary
+## 9. Browser storage boundary
 
 Browser storage is suitable for user-local presentation state, for example:
 
 ```text
 theme
-visible-channel preference
+visible-Site preference
 layout preference
 language preference
+transitional development API Base override
 ```
 
 The following must not become authoritative browser state:
 
 ```text
-programmer inventory
-programmer channel count
-programmer hardware interfaces
-programmer firmware/FPGA compatibility
+PPU inventory
+PPU Site count
+Site enable/disable truth
+PPU hardware interfaces/capability
 production routing policy
 authentication secrets
 job execution state
 ```
 
-The prototype API Base override is a transitional operator convenience and must not expand into a topology database.
+## 10. PPU identity and capability
 
-## 8. Programmer identity and capability
+Higher-level software must consume PPU identity/capability reported by the PPU side rather than inventing topology in the browser.
 
-Plasma must support programmers exposing different channel counts without creating separate frontend products.
-
-A programmer should expose a machine-readable identity/capability model conceptually similar to:
+Conceptual status/capability shape:
 
 ```json
 {
-  "programmer_id": "PLASMA-Z2-001",
-  "model": "Z2-PROTOTYPE",
-  "channel_count": 8,
-  "interfaces": ["SWD", "SPI", "I2C"],
-  "software_version": "...",
-  "fpga_design_version": "..."
+  "ppu_id": "ppu-01",
+  "facility_id": "lab-01",
+  "model": "PYNQ-Z2",
+  "site_count": 8,
+  "enabled_site_count": 2,
+  "capabilities": {
+    "max_supported_sites": 8,
+    "operations": ["erase", "program", "verify", "read"]
+  }
 }
 ```
 
-The exact final schema is not defined here. The ownership rule is:
+The exact capability schema may evolve, but ownership does not: PPU identity and capability originate from the PPU/device side.
 
-> Programmer identity and capability originate from the programmer/device side and are consumed by higher-level software; they are not invented by the browser.
+## 11. Future multi-PPU topology
 
-## 9. Multi-programmer topology
-
-The current implemented path is one Web Console communicating with one Python HTTP REST Gateway, which communicates with the Plasma Server.
-
-The current Gateway is the repository's implemented Python HTTP Gateway. Future architecture must follow executable code and tests rather than stale assumptions about frameworks discussed earlier.
+The current implemented path is one PPU Web Console communicating with one Plasma Web REST Gateway, which communicates with one local Plasma Server.
 
 Target direction:
 
 ```text
-Web Console
-    │
-    ▼
-Plasma Manager / Registry
-    │
-    ├── Programmer A (2 channels)
-    ├── Programmer B (4 channels)
-    └── Programmer C (8 channels)
+Browser / Fleet UI
+        |
+        v
+Plasma Manager
+        |
+        +-- PPU A (2 Sites)
+        +-- PPU B (4 Sites)
+        +-- PPU C (8 Sites)
 ```
 
-The manager/registry should eventually become authoritative for programmer inventory and connection topology. The browser should query topology rather than permanently store a list of programmer URLs.
+Plasma Manager is a future logical fleet control plane; it is not currently implemented. It should eventually own PPU registration/discovery, health aggregation, routing, authentication/audit and fleet-level coordination. Each PPU remains locally autonomous and owns Site scheduling, protocol timing, safety and recovery.
 
-This is a target boundary, not a claim that a central manager already exists.
+The browser must not fan out directly to a stored list of PPU URLs as the long-term fleet architecture.
 
-## 10. Secrets and credentials
+## 12. Secrets and credentials
 
 Secrets have a separate lifecycle from ordinary configuration.
 
@@ -264,9 +315,9 @@ Rules:
 - prefer OS/service secret mechanisms or a dedicated secret store when production requires one;
 - configuration may reference a secret identifier/path but must not duplicate the secret value.
 
-Private SSH usernames, private DNS/VPN/Tailscale identifiers, and workstation inventory are infrastructure metadata and likewise belong in operator-local or protected documentation.
+Private SSH usernames, private DNS/VPN identifiers, and workstation inventory belong in operator-local or protected documentation.
 
-## 11. Effective-configuration observability
+## 13. Effective-configuration observability
 
 Operators should progressively be able to answer:
 
@@ -275,97 +326,54 @@ What source version is running?
 What config schema is loaded?
 What public API Base is effective?
 What ports are active?
-What programmer identity/capability is active?
-What generated service environment is active?
+What Facility / PPU identity is active?
+What Site topology/capability is active?
 ```
 
-A future structured read-only effective-configuration/status endpoint may reduce ambiguity, but its API contract should be designed separately before implementation.
-
-## 12. Configuration change lifecycle
-
-Before adding a new persistent configuration key:
-
-1. name the configuration domain;
-2. define the owner;
-3. define the authoritative source;
-4. define valid type/range/enum constraints;
-5. define whether a source default exists;
-6. define precedence and allowed overrides;
-7. define persistence scope: repository, site, device, user, or job;
-8. define whether the value is secret;
-9. define how runtime receives it;
-10. define how derived copies are reconciled;
-11. define schema/migration behavior;
-12. define how the effective value is inspected;
-13. add validation/migration/reconciliation tests when applicable;
-14. update documentation with behavior changes.
-
-If ownership or source-of-truth cannot be stated unambiguously, the configuration design is incomplete.
-
-## 13. Anti-patterns
-
-Avoid:
-
-- the same value independently persisted in source defaults, persistent config, generated units, and browser storage;
-- browser storage used as a device-inventory database;
-- runtime progress/state written into static configuration;
-- silent fallback from malformed explicit operator configuration;
-- unconditional migration overwrite of unknown values;
-- public documentation used as an operator infrastructure inventory.
-
-Correct direction:
-
-```text
-authoritative input
-    ↓
-validated model
-    ↓
-generated / derived copies
-```
+A future structured read-only effective-configuration/status endpoint may reduce ambiguity, but its API contract should be designed deliberately rather than inferred from UI convenience.
 
 ## 14. Configuration registry baseline
 
 | Key / concept | Domain | Owner | Source of Truth | Notes |
 |---|---|---|---|---|
-| `PLASMA_CONFIG_VERSION` | Site/deployment | Deployment | `plasmactl.env` | Controls deployment migration |
-| `PLASMA_REPO` | Site/deployment | Deployment | `plasmactl.env` | Site-specific repository location |
-| `PLASMA_BRANCH` | Site/deployment | Deployment | `plasmactl.env` | Normal deployment branch is `main` |
-| `PLASMA_GATEWAY_HOST` | Site/deployment | Deployment | `plasmactl.env` | Runtime binding input |
-| `PLASMA_GATEWAY_PORT` | Site/deployment | Deployment | `plasmactl.env` | Current default 18080 |
-| `PLASMA_VITE_HOST` | Site/deployment | Deployment | `plasmactl.env` | Development/demo Web binding |
-| `PLASMA_VITE_PORT` | Site/deployment | Deployment | `plasmactl.env` | Current default 5173 |
-| `PLASMA_PUBLIC_API_URL` | Site/deployment | Deployment | `plasmactl.env` | Public API Base configuration |
+| `PLASMA_CONFIG_VERSION` | Facility/deployment | Deployment | `plasmactl.env` | Controls deployment migration |
+| `PLASMA_REPO` | Facility/deployment | Deployment | `plasmactl.env` | Host-specific repository location |
+| `PLASMA_BRANCH` | Facility/deployment | Deployment | `plasmactl.env` | Normal deployment branch is `main` |
+| `PLASMA_GATEWAY_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Gateway bind input |
+| `PLASMA_GATEWAY_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current deployment default 18080 |
+| `PLASMA_VITE_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Development/demo Web binding |
+| `PLASMA_VITE_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current default 5173 |
+| `PLASMA_PUBLIC_API_URL` | Facility/deployment | Deployment | `plasmactl.env` | Public API Base configuration |
 | `NEXT_PUBLIC_PLASMA_API_URL` | Derived runtime | Deployment generator | Generated systemd environment | Not independent truth |
 | Browser theme/layout | User preference | Browser/user | Browser storage | User-local only |
-| Browser API Base | Transitional operator override | Browser/operator | Browser storage | Prototype convenience |
-| Programmer ID | Programmer identity | Programmer provisioning | Device-local identity | Exact storage TBD |
-| Channel count | Programmer capability | Programmer/device | Device capability report | Support model variation |
-| Supported interfaces | Programmer capability | Programmer/device | Device capability report | SWD/SPI/I2C/etc. |
+| PPU ID | PPU identity | PPU provisioning | Device-local identity | Stable resource identity |
+| Site count | PPU capability | PPU/device | Device capability report | Support 1–8 in current software |
+| Supported operations/interfaces | PPU capability | PPU/device | Device capability report | Hardware-dependent |
 | Current job/progress | Runtime state | Plasma runtime | Live server state | Never deployment config |
 
 ## 15. Near-term priorities
 
 ```text
-1. Keep ownership and configuration boundaries explicit
+1. Keep configuration ownership and source-of-truth explicit
 2. Keep deployment configuration versioned and reconcilable
-3. Stop adding topology/capability truth to browser storage
-4. Define programmer identity/capability schema before multi-programmer UI expansion
-5. Define manager/registry topology before supporting multiple programmers
-6. Add effective-config observability where ambiguity remains costly
+3. Keep topology/capability truth out of browser storage
+4. Keep canonical Site identity one-based across new layers
+5. Define Plasma Manager registry/trust model before multi-PPU UI implementation
+6. Add effective-config observability where ambiguity remains operationally costly
 ```
 
-Do not build a large generic configuration framework merely because configuration exists. Introduce abstractions only when repeated concrete requirements justify them.
+Do not build a large generic configuration framework merely because configuration exists. Add abstraction only when repeated concrete requirements justify it.
 
 ## 16. Open architecture questions
 
-- Where will permanent programmer identity be provisioned on Z2?
-- Which capabilities are static and which are runtime-discoverable?
-- May individual channels expose different interfaces?
-- What component becomes the multi-programmer registry/manager?
-- How are programmers enrolled, authenticated, and removed?
-- What belongs in target-profile data versus programmer capability data?
+- Where will permanent PPU identity be provisioned on production hardware?
+- Which PPU/Site capabilities are static and which are runtime-discoverable?
+- May individual Sites expose different programming interfaces?
+- What registry/enrollment mechanism will Plasma Manager use?
+- How are PPUs authenticated, removed, and recovered after reconnect?
+- What belongs in target-profile data versus PPU capability data?
 - Which configuration changes require restart versus safe hot reload?
 - What effective-configuration information is safe to expose through an API?
 - When should the browser API Base override be removed or restricted for production?
 
-These questions must be resolved from system requirements and executable constraints rather than convenience of a particular UI implementation.
+Resolve these questions from system requirements and executable constraints, not from convenience of a particular UI implementation.
