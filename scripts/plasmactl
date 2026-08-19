@@ -5,8 +5,9 @@ script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 default_repo="$(cd "$(dirname "$script_path")/.." && pwd)"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 config_file="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
-current_config_version=2
+current_config_version=3
 default_public_api_url="https://plasma.open4th.com"
+default_manager_config="$config_home/plasma/manager.yaml"
 
 if [[ -f "$config_file" ]]; then
   # shellcheck source=/dev/null
@@ -32,10 +33,17 @@ cors_origin="${PLASMA_CORS_ORIGIN:-*}"
 vite_host="${PLASMA_VITE_HOST:-127.0.0.1}"
 vite_port="${PLASMA_VITE_PORT:-5173}"
 public_api_url="${PLASMA_PUBLIC_API_URL:-$default_public_api_url}"
+manager_enabled="${PLASMA_MANAGER_ENABLED:-0}"
+manager_config="${PLASMA_MANAGER_CONFIG:-$default_manager_config}"
 config_version="${PLASMA_CONFIG_VERSION:-1}"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 bin_dir="${PLASMACTL_BIN_DIR:-$HOME/.local/bin}"
-services=(plasma-server.service plasma-web.service plasma-vite.service)
+core_services=(plasma-server.service plasma-web.service plasma-vite.service)
+services=("${core_services[@]}")
+if [[ "$manager_enabled" == "1" ]]; then
+  services+=(plasma-manager.service)
+fi
+status_services=("${core_services[@]}" plasma-manager.service)
 
 say() {
   printf '[plasmactl] %s\n' "$*"
@@ -71,9 +79,46 @@ require_clean_tree() {
 
 require_user_units() {
   local service
-  for service in "${services[@]}"; do
+  for service in "${core_services[@]}"; do
     [[ -f "$unit_dir/$service" ]] || die "尚未安裝 $service；請先執行 ./scripts/plasmactl install"
   done
+}
+
+validate_manager_settings() {
+  [[ "$manager_enabled" == "0" || "$manager_enabled" == "1" ]] || \
+    die "PLASMA_MANAGER_ENABLED 只接受 0 或 1：$manager_enabled"
+  [[ "$manager_config" == /* ]] || \
+    die "PLASMA_MANAGER_CONFIG 必須是絕對路徑：$manager_config"
+}
+
+require_manager_config() {
+  validate_manager_settings
+  [[ "$manager_enabled" == "1" ]] || return 0
+  [[ -f "$manager_config" ]] || \
+    die "Plasma Manager 已啟用，但找不到設定檔：$manager_config"
+  "$python_bin" -c \
+    'from plasma_manager.config import load_manager_config; import sys; load_manager_config(sys.argv[1])' \
+    "$manager_config" >/dev/null || die "Plasma Manager 設定檔驗證失敗：$manager_config"
+}
+
+manager_probe_url() {
+  "$python_bin" -c '
+from plasma_manager.config import load_manager_config
+import sys
+config = load_manager_config(sys.argv[1])
+host = config.host
+if host in {"0.0.0.0", "::"}:
+    host = "127.0.0.1"
+if ":" in host and not host.startswith("["):
+    host = f"[{host}]"
+print(f"http://{host}:{config.port}")
+' "$manager_config"
+}
+
+manager_config_port() {
+  "$python_bin" -c \
+    'from plasma_manager.config import load_manager_config; import sys; print(load_manager_config(sys.argv[1]).port)' \
+    "$manager_config"
 }
 
 replace_config_assignment() {
@@ -104,17 +149,26 @@ migrate_config() {
   (( config_version < current_config_version )) || return 0
 
   local previous_public_api_url="$public_api_url"
-  case "$public_api_url" in
-    https://swpc.tail820e64.ts.net|https://swpc.tail820e64.ts.net:8443|http://127.0.0.1:8080)
-      public_api_url="$default_public_api_url"
-      PLASMA_PUBLIC_API_URL="$public_api_url"
-      ;;
-    *)
-      # Unknown values are treated as an explicit operator override and preserved.
-      ;;
-  esac
+  if (( config_version < 2 )); then
+    case "$public_api_url" in
+      https://swpc.tail820e64.ts.net|https://swpc.tail820e64.ts.net:8443|http://127.0.0.1:8080)
+        public_api_url="$default_public_api_url"
+        PLASMA_PUBLIC_API_URL="$public_api_url"
+        ;;
+      *)
+        # Unknown values are treated as an explicit operator override and preserved.
+        ;;
+    esac
+    replace_config_assignment PLASMA_PUBLIC_API_URL "$public_api_url"
+  fi
 
-  replace_config_assignment PLASMA_PUBLIC_API_URL "$public_api_url"
+  if (( config_version < 3 )); then
+    replace_config_assignment PLASMA_MANAGER_ENABLED "$manager_enabled"
+    replace_config_assignment PLASMA_MANAGER_CONFIG "$manager_config"
+    PLASMA_MANAGER_ENABLED="$manager_enabled"
+    PLASMA_MANAGER_CONFIG="$manager_config"
+  fi
+
   replace_config_assignment PLASMA_CONFIG_VERSION "$current_config_version"
   config_version="$current_config_version"
   PLASMA_CONFIG_VERSION="$current_config_version"
@@ -130,7 +184,7 @@ write_config() {
   mkdir -p "$(dirname "$config_file")"
   if [[ ! -f "$config_file" ]]; then
     cat >"$config_file" <<EOF
-# SWPC Plasma deployment settings
+# Plasma integration-host deployment settings
 PLASMA_CONFIG_VERSION=$current_config_version
 PLASMA_REPO=$repo
 PLASMA_BRANCH=$branch
@@ -143,6 +197,10 @@ PLASMA_VITE_HOST=$vite_host
 PLASMA_VITE_PORT=$vite_port
 # URL shown as the Web Console's default Plasma Web REST Gateway. Do not append /api.
 PLASMA_PUBLIC_API_URL=$public_api_url
+# Plasma Manager is an optional control-plane service. Existing PPU deployments remain standalone by default.
+PLASMA_MANAGER_ENABLED=$manager_enabled
+# Operator-local Manager registry/configuration; keep fleet endpoints outside the Git worktree.
+PLASMA_MANAGER_CONFIG=$manager_config
 EOF
     config_version="$current_config_version"
     say "建立設定檔：$config_file"
@@ -154,12 +212,13 @@ EOF
 
 validate_unit_values() {
   local value
+  validate_manager_settings
   for value in "$repo" "$python_bin" "$npm_bin" "$gateway_host" "$gateway_port" \
-    "$cors_origin" "$vite_host" "$vite_port" "$public_api_url"; do
+    "$cors_origin" "$vite_host" "$vite_port" "$public_api_url" "$manager_config"; do
     [[ "$value" != *$'\n'* ]] || die "systemd 設定值不可包含換行"
   done
-  [[ "$repo" != *' '* && "$python_bin" != *' '* && "$npm_bin" != *' '* ]] || \
-    die "目前安裝腳本不支援含空白的 repository、Python 或 npm 路徑"
+  [[ "$repo" != *' '* && "$python_bin" != *' '* && "$npm_bin" != *' '* && "$manager_config" != *' '* ]] || \
+    die "目前安裝腳本不支援含空白的 repository、Python、npm 或 Manager config 路徑"
 }
 
 write_units() {
@@ -231,6 +290,26 @@ PrivateTmp=true
 [Install]
 WantedBy=default.target
 EOF
+
+  cat >"$unit_dir/plasma-manager.service" <<EOF
+[Unit]
+Description=Plasma Manager Read-only Fleet Control Plane
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=$python_dir
+Environment=PYTHONUNBUFFERED=1
+ExecStart=$python_bin -m plasma_manager.server --config $manager_config
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+EOF
 }
 
 install_dependencies() {
@@ -258,6 +337,15 @@ install_python_dependencies() {
   fi
 }
 
+reconcile_service_enablement() {
+  systemctl --user enable "${core_services[@]}" >/dev/null
+  if [[ "$manager_enabled" == "1" ]]; then
+    systemctl --user enable plasma-manager.service >/dev/null
+  else
+    systemctl --user disable plasma-manager.service >/dev/null 2>&1 || true
+  fi
+}
+
 install_services() {
   local login_user
   require_repo
@@ -265,13 +353,19 @@ install_services() {
   install_dependencies
   write_config
   validate_unit_values
+  require_manager_config
   write_units
   mkdir -p "$bin_dir"
   ln -sfn "$script_path" "$bin_dir/plasmactl"
   systemctl --user daemon-reload
-  systemctl --user enable "${services[@]}"
+  reconcile_service_enablement
   login_user="${USER:-$(id -un)}"
   say "已安裝 user systemd units，但尚未啟動，避免與目前手動程序爭用 Port"
+  if [[ "$manager_enabled" == "1" ]]; then
+    say "Plasma Manager 已設定為 opt-in enabled：$manager_config"
+  else
+    say "Plasma Manager 保持 disabled；PPU standalone execution 不依賴 Manager"
+  fi
   say "管理指令：$bin_dir/plasmactl"
   say "先執行 plasmactl ports，確認舊程序後，再執行 plasmactl start"
   say "若要開機後不登入也自動啟動，另執行：sudo loginctl enable-linger $login_user"
@@ -353,7 +447,7 @@ update_code() {
 run_tests() {
   require_repo
   require_runtime
-  say "執行 deployment config migration 與 Web lifecycle 測試"
+  say "執行 deployment config migration、Manager service 與 Web lifecycle 測試"
   bash "$repo/scripts/tests/test-plasmactl-config.sh" || return 1
   say "執行 Python 與 PL source-layout pytest"
   (cd "$python_dir" && "$python_bin" -m pytest -q tests "$repo/pl/tests") || return 1
@@ -395,11 +489,25 @@ web_health_check() {
   wait_for_http "http://127.0.0.1:$vite_port/" "Vite Web Console"
 }
 
+manager_health_check() {
+  [[ "$manager_enabled" == "1" ]] || return 0
+  require_manager_config
+  require_command systemctl
+  systemctl --user is-active --quiet plasma-manager.service || \
+    die "Plasma Manager systemd service 未處於 active 狀態"
+  local manager_url
+  manager_url="$(manager_probe_url)"
+  wait_for_http "$manager_url/api/health/live" "Plasma Manager"
+  systemctl --user is-active --quiet plasma-manager.service || \
+    die "Plasma Manager liveness 回應存在，但 systemd service 已離開 active 狀態"
+}
+
 health_check() {
   require_command curl
   wait_for_port 127.0.0.1 9900 "Plasma Server"
   wait_for_http "http://127.0.0.1:$gateway_port/api/status" "Plasma Web REST Gateway"
   web_health_check
+  manager_health_check
 }
 
 reconcile_service_units() {
@@ -407,18 +515,28 @@ reconcile_service_units() {
   require_command systemctl
   write_config
   validate_unit_values
+  require_manager_config
   write_units
   systemctl --user daemon-reload
+  reconcile_service_enablement
+}
+
+stop_disabled_manager() {
+  if [[ "$manager_enabled" != "1" ]]; then
+    systemctl --user stop plasma-manager.service >/dev/null 2>&1 || true
+  fi
 }
 
 start_services() {
   reconcile_service_units
+  stop_disabled_manager
   systemctl --user start "${services[@]}"
   health_check
 }
 
 restart_services() {
   reconcile_service_units
+  stop_disabled_manager
   say "重新啟動 Plasma 服務"
   systemctl --user restart "${services[@]}"
   health_check
@@ -436,14 +554,24 @@ restart_web_console() {
 
 stop_services() {
   require_user_units
+  systemctl --user stop plasma-manager.service >/dev/null 2>&1 || true
   systemctl --user stop plasma-vite.service plasma-web.service plasma-server.service
   say "Plasma 服務已停止"
 }
 
 show_ports() {
-  printf '\nListening ports (9900 / %s / %s):\n' "$gateway_port" "$vite_port"
-  ss -lntp 2>/dev/null | awk -v gateway=":$gateway_port" -v vite=":$vite_port" \
-    '$4 ~ /:9900$/ || index($4, gateway) || index($4, vite)'
+  local manager_port_value=""
+  if [[ "$manager_enabled" == "1" && -f "$manager_config" ]]; then
+    manager_port_value="$(manager_config_port 2>/dev/null || true)"
+  fi
+  if [[ -n "$manager_port_value" ]]; then
+    printf '\nListening ports (9900 / %s / %s / Manager %s):\n' "$gateway_port" "$vite_port" "$manager_port_value"
+  else
+    printf '\nListening ports (9900 / %s / %s):\n' "$gateway_port" "$vite_port"
+  fi
+  ss -lntp 2>/dev/null | awk \
+    -v gateway=":$gateway_port" -v vite=":$vite_port" -v manager=":$manager_port_value" \
+    '$4 ~ /:9900$/ || index($4, gateway) || index($4, vite) || (manager != ":" && index($4, manager))'
 }
 
 show_status() {
@@ -451,9 +579,10 @@ show_status() {
   printf 'Version:  %s\n' "$(git -C "$repo" log -1 --oneline)"
   printf 'Branch:   %s\n' "$(git -C "$repo" branch --show-current)"
   printf 'Worktree: %s\n' "$(if [[ -z "$(git -C "$repo" status --porcelain)" ]]; then echo clean; else echo modified; fi)"
+  printf 'Manager:  %s\n' "$(if [[ "$manager_enabled" == "1" ]]; then echo enabled; else echo disabled; fi)"
   printf '\n%-24s %s\n' SERVICE STATE
   local service state load_state
-  for service in "${services[@]}"; do
+  for service in "${status_services[@]}"; do
     load_state="$(systemctl --user show "$service" --property=LoadState --value 2>/dev/null || true)"
     state="$(systemctl --user show "$service" --property=ActiveState --value 2>/dev/null || true)"
     if [[ "$load_state" == "not-found" || -z "$load_state" ]]; then
@@ -463,6 +592,13 @@ show_status() {
     else
       state="systemd-unavailable"
     fi
+    if [[ "$service" == "plasma-manager.service" && "$manager_enabled" != "1" ]]; then
+      if [[ "$state" == "active" ]]; then
+        state="active (config-disabled)"
+      else
+        state="disabled"
+      fi
+    fi
     printf '%-24s %s\n' "$service" "$state"
   done
   show_ports
@@ -471,11 +607,12 @@ show_status() {
 show_logs() {
   local target="${1:-all}" units=()
   case "$target" in
-    all) units=(-u plasma-server.service -u plasma-web.service -u plasma-vite.service) ;;
+    all) units=(-u plasma-server.service -u plasma-web.service -u plasma-vite.service -u plasma-manager.service) ;;
     server) units=(-u plasma-server.service) ;;
     web|gateway) units=(-u plasma-web.service) ;;
     vite|console) units=(-u plasma-vite.service) ;;
-    *) die "logs 只接受 all、server、web/gateway 或 vite/console" ;;
+    manager) units=(-u plasma-manager.service) ;;
+    *) die "logs 只接受 all、server、web/gateway、vite/console 或 manager" ;;
   esac
   journalctl --user "${units[@]}" -n 100 -f
 }
@@ -501,15 +638,15 @@ Usage: plasmactl COMMAND
 Commands:
   install              安裝相依套件與 user systemd units（不立即啟動）
   update               從 GitHub main 做 fast-forward 更新；Web 變更後需 restart 才算 runtime 完成
-  test                 執行 deployment migration/lifecycle、Python、PL source-layout 與 Web 測試
-  restart              重新產生 systemd units、重新啟動全部服務並執行 health check
+  test                 執行 deployment migration/Manager lifecycle、Python、PL source-layout 與 Web 測試
+  restart              重新產生 systemd units、重新啟動已啟用服務並執行 health check
   web-restart          只重新啟動 Vite Web Console 並執行 Web HTTP health check
   deploy               update → re-exec latest plasmactl → test → reconcile units → restart
   update-and-restart   deploy 的別名
-  start | stop         啟動或停止全部 Plasma 服務
-  status               顯示 Git、systemd 與 Port 狀態
-  ports                顯示 9900、18080、5173 的監聽程序
-  logs [TARGET]        即時顯示 Log；TARGET: all/server/web/vite
+  start | stop         啟動或停止 Plasma 服務；Manager 只有 opt-in enabled 時會啟動
+  status               顯示 Git、systemd、Manager opt-in 與 Port 狀態
+  ports                顯示 9900、Gateway、Vite，以及啟用時的 Manager Port
+  logs [TARGET]        即時顯示 Log；TARGET: all/server/web/vite/manager
   help                 顯示本說明
 EOF
 }
