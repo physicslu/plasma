@@ -15,23 +15,11 @@ function isScopeActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function ScopeLinks({ pathname, t }: { pathname: string; t: (key: string) => string }) {
-  return scopeItems.map(item => {
-    const active = isScopeActive(pathname, item.href);
-    return (
-      <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}>
-        {t(item.labelKey)}
-      </Link>
-    );
-  });
-}
-
 export function GlobalNav() {
   const pathname = usePathname();
   const { locale, setLocale, t } = useI18n();
   const productionActive = pathname === "/fleet" || pathname.startsWith("/fleet/");
   const engineeringActive = pathname === "/engineering" || pathname.startsWith("/engineering/");
-  const productModeRoute = productionActive || engineeringActive;
 
   return (
     <header className="globalAppNav">
@@ -40,31 +28,32 @@ export function GlobalNav() {
         <b>PLASMA</b>
       </Link>
 
-      {!productModeRoute ? (
-        <nav aria-label="Plasma global navigation">
-          <ScopeLinks pathname={pathname} t={t} />
+      <div className="globalNavControls">
+        <nav className="globalScopeNav" aria-label="Plasma global navigation">
+          {scopeItems.map(item => {
+            const active = isScopeActive(pathname, item.href);
+            return (
+              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}>
+                {t(item.labelKey)}
+              </Link>
+            );
+          })}
         </nav>
-      ) : (
-        <div className="globalNavControls">
-          <nav className="globalScopeNav" aria-label="Plasma global navigation">
-            <ScopeLinks pathname={pathname} t={t} />
-          </nav>
 
-          <nav className="globalModeNav" aria-label={t("mode.label")}>
-            <Link href="/fleet" aria-current={productionActive ? "page" : undefined}>
-              {t("mode.production")}
-            </Link>
-            <Link href="/engineering" aria-current={engineeringActive ? "page" : undefined}>
-              {t("mode.engineering")}
-            </Link>
-          </nav>
+        <nav className="globalModeNav" aria-label={t("mode.label")}>
+          <Link href="/fleet" aria-current={productionActive ? "page" : undefined}>
+            {t("mode.production")}
+          </Link>
+          <Link href="/engineering" aria-current={engineeringActive ? "page" : undefined}>
+            {t("mode.engineering")}
+          </Link>
+        </nav>
 
-          <div className="globalLocale" role="group" aria-label="Language">
-            <button type="button" onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>
-            <button type="button" onClick={() => setLocale("en-US")} aria-pressed={locale === "en-US"}>{t("locale.en")}</button>
-          </div>
+        <div className="globalLocale" role="group" aria-label="Language">
+          <button type="button" onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>
+          <button type="button" onClick={() => setLocale("en-US")} aria-pressed={locale === "en-US"}>{t("locale.en")}</button>
         </div>
-      )}
+      </div>
     </header>
   );
 }
