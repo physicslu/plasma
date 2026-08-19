@@ -45,7 +45,7 @@ test("demo, Single PPU, Fleet, and product modes share top-level navigation", as
   await ppuNav.getByRole("link", { name: "多機 Fleet", exact: true }).click();
   await expect(page).toHaveURL(/\/fleet$/);
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
-  const fleetNav = await expectGlobalNavigation(page, "多機 Fleet");
+  await expectGlobalNavigation(page, "多機 Fleet");
 
   // Browser CI intentionally does not start Plasma Manager. The Fleet flag is
   // enabled on the Vite host process, so the Worker route must see that binding
