@@ -1,13 +1,19 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./i18n";
 import { PRODUCT_MODE_ROUTES, productModeForPath } from "./product-mode";
 
+function subscribeHydration(): () => void {
+  return () => {};
+}
+
 export function GlobalNav() {
   const pathname = usePathname();
   const { locale, setLocale, t } = useI18n();
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const activeMode = productModeForPath(pathname);
   const entryActive = pathname === "/demo";
 
@@ -31,9 +37,9 @@ export function GlobalNav() {
           </Link>
         </nav>
 
-        <div className="globalLocale" role="group" aria-label="Language">
-          <button type="button" onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>
-          <button type="button" onClick={() => setLocale("en-US")} aria-pressed={locale === "en-US"}>{t("locale.en")}</button>
+        <div className="globalLocale" role="group" aria-label="Language" aria-busy={!hydrated}>
+          <button type="button" disabled={!hydrated} onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>
+          <button type="button" disabled={!hydrated} onClick={() => setLocale("en-US")} aria-pressed={locale === "en-US"}>{t("locale.en")}</button>
         </div>
       </div>
     </header>
