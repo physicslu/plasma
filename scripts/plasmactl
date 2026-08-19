@@ -141,7 +141,7 @@ PLASMA_GATEWAY_PORT=$gateway_port
 PLASMA_CORS_ORIGIN=$cors_origin
 PLASMA_VITE_HOST=$vite_host
 PLASMA_VITE_PORT=$vite_port
-# URL shown as the Web Console's default Python API. Do not append /api.
+# URL shown as the Web Console's default Plasma Web REST Gateway. Do not append /api.
 PLASMA_PUBLIC_API_URL=$public_api_url
 EOF
     config_version="$current_config_version"
@@ -173,7 +173,7 @@ write_units() {
   mkdir -p "$unit_dir"
   cat >"$unit_dir/plasma-server.service" <<EOF
 [Unit]
-Description=Plasma multi-channel programming server
+Description=Plasma PPU Programming Server
 After=network-online.target
 Wants=network-online.target
 
@@ -193,7 +193,7 @@ EOF
 
   cat >"$unit_dir/plasma-web.service" <<EOF
 [Unit]
-Description=Plasma Python Web Gateway
+Description=Plasma Web REST Gateway
 After=network-online.target plasma-server.service
 Wants=network-online.target plasma-server.service
 
@@ -398,7 +398,7 @@ web_health_check() {
 health_check() {
   require_command curl
   wait_for_port 127.0.0.1 9900 "Plasma Server"
-  wait_for_http "http://127.0.0.1:$gateway_port/api/status" "Python Gateway API"
+  wait_for_http "http://127.0.0.1:$gateway_port/api/status" "Plasma Web REST Gateway"
   web_health_check
 }
 
