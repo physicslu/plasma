@@ -166,7 +166,8 @@ Important implementation facts:
 - It does **not use WebSocket**.
 - The Web Console currently uses REST polling.
 - `plasma_manager` is an optional read-only fleet service using manually configured PPU Gateway endpoints; it is not required for local PPU execution.
-- The current Manager does not provide command routing, central scheduling, discovery, auth policy, firmware rollout, Fleet Web UI, or `plasmactl`/systemd deployment integration.
+- `scripts/plasmactl` can generate/manage `plasma-manager.service`, but Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default) and its real registry/config belongs outside the Git worktree.
+- The current Manager does not provide command routing, central scheduling, discovery, auth policy, firmware rollout, or Fleet Web UI.
 - A successful Mock programming flow does not prove real-target hardware programming.
 
 Do not introduce FastAPI/WebSocket merely because they were discussed as a future option. Such a migration requires an explicit task, corresponding architecture/API decisions, and tests.
@@ -237,6 +238,9 @@ Service management is defined by `scripts/plasmactl`.
 | `plasma-server.service` | 9900 | Plasma PPU Programming Server / Protocol v3.2 TCP Server |
 | `plasma-web.service` | 18080 | Plasma Web REST Gateway |
 | `plasma-vite.service` | 5173 | Plasma PPU Console development/demo runtime |
+| `plasma-manager.service` | 18180 | Optional Plasma Manager read-only fleet control plane |
+
+`plasma-manager.service` is opt-in. Existing standalone deployments must remain operational with Manager disabled. An enabled Manager uses an operator-local YAML selected by `PLASMA_MANAGER_CONFIG`; source-controlled example YAML is not deployment state.
 
 Useful commands:
 
@@ -259,11 +263,11 @@ GitHub main
    -> re-exec latest plasmactl
    -> full relevant validation
    -> regenerate/reconcile systemd units
-   -> restart services
+   -> restart configured services
    -> health check
 ```
 
-Do not bypass failed tests and restart new code as if validation succeeded.
+Do not bypass failed tests and restart new code as if validation succeeded. Enabling/disabling Manager or changing its active registry is a deployment/runtime change and remains an explicit approval gate.
 
 ## 8. Site execution invariants
 
@@ -494,7 +498,7 @@ Agents must not silently propagate these facts into wrong assumptions:
 3. The current Gateway is standard-library HTTP + REST polling, not FastAPI/WebSocket.
 4. The current Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before making stack assumptions.
 5. Protocol v3.1 compatibility remains temporarily supported; removing it is a separate deprecation decision.
-6. Plasma Manager currently implements manual read-only PPU registry and fleet aggregation only; command routing, scheduling, discovery, authentication policy, Fleet UI, and deployment integration remain future work.
+6. Plasma Manager currently implements manual read-only PPU registry/fleet aggregation plus opt-in `plasmactl`/systemd deployment; command routing, scheduling, discovery, authentication policy, and Fleet UI remain future work.
 7. Mock/software validation still does not prove Z2/FPGA/OpenOCD/real-target behavior.
 
 ## 18. Communication and completion report
