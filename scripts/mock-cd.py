@@ -273,7 +273,7 @@ def assert_public_routes() -> None:
     for path, marker in (
         ("/demo", "Choose a Demo"),
         ("/ppu", "SITE MATRIX"),
-        ("/fleet", "Facility / PPU Fleet Overview"),
+        ("/fleet", "Factory Production Console"),
     ):
         request = Request(f"http://127.0.0.1:{WEB_PORT}{path}", headers={"Host": "plasma.open4th.com"})
         with urlopen(request, timeout=3) as response_obj:
