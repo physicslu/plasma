@@ -52,7 +52,10 @@ export default defineConfig(async () => {
         "plasma.open4th.com",
       ],
       proxy: {
-        "/api": {
+        // PPU-local API calls still go to the Python Gateway. /api/fleet is
+        // deliberately excluded so Vinext handles the same-origin Fleet BFF
+        // route instead of leaking it into the PPU execution API surface.
+        "^/api/(?!fleet(?:/|$))": {
           target: "http://127.0.0.1:18080",
           changeOrigin: true,
         },
