@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -31,6 +32,7 @@ class SQLiteObservationPersistence:
 
     def load(self) -> dict[str, dict[str, Any]]:
         try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
             with self._connect() as connection:
                 self._ensure_schema(connection)
                 rows = connection.execute(
@@ -57,12 +59,18 @@ class SQLiteObservationPersistence:
         serialized: list[tuple[str, str]] = []
         for endpoint, record in records.items():
             self._validate_record(endpoint, record)
-            serialized.append(
-                (
-                    endpoint,
-                    json.dumps(record, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
+            try:
+                record_json = json.dumps(
+                    record,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
                 )
-            )
+            except (TypeError, ValueError) as exc:
+                raise ObservationPersistenceError(
+                    f"observation record for {endpoint} is not JSON serializable"
+                ) from exc
+            serialized.append((endpoint, record_json))
 
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -94,6 +102,12 @@ class SQLiteObservationPersistence:
             raise ObservationPersistenceError(
                 f"observation record for {endpoint} is missing observed_at"
             )
+        try:
+            datetime.fromisoformat(observed_at)
+        except ValueError as exc:
+            raise ObservationPersistenceError(
+                f"observation record for {endpoint} has invalid observed_at"
+            ) from exc
         if not isinstance(ppu, dict):
             raise ObservationPersistenceError(f"observation record for {endpoint} is missing ppu")
         if not isinstance(sites, list):
@@ -107,14 +121,34 @@ class SQLiteObservationPersistence:
             raise ObservationPersistenceError(
                 f"unsupported observation database schema version: {version}"
             )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS observations (
-                endpoint TEXT PRIMARY KEY,
-                record_json TEXT NOT NULL
-            )
-            """
-        )
+
         if version == 0:
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                ).fetchall()
+            }
+            if tables:
+                raise ObservationPersistenceError(
+                    "unversioned observation database is not empty; refusing to modify it"
+                )
+            connection.execute(
+                """
+                CREATE TABLE observations (
+                    endpoint TEXT PRIMARY KEY,
+                    record_json TEXT NOT NULL
+                )
+                """
+            )
             connection.execute(f"PRAGMA user_version = {OBSERVATION_DB_SCHEMA_VERSION}")
             connection.commit()
+            return
+
+        table = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='observations'"
+        ).fetchone()
+        if table is None:
+            raise ObservationPersistenceError(
+                "observation database schema v1 is missing observations table"
+            )
