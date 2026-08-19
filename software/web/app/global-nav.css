@@ -40,48 +40,63 @@
   letter-spacing: .17em;
 }
 
-.globalAppNav nav {
+.globalNavControls,
+.globalAppNav nav,
+.globalLocale {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
 
-.globalAppNav nav a {
+.globalNavControls { margin-left: auto; }
+.globalModeNav { padding-left: 8px; border-left: 1px solid var(--line); }
+.globalLocale { padding-left: 8px; border-left: 1px solid var(--line); }
+
+.globalAppNav nav a,
+.globalLocale button {
   border: 1px solid transparent;
   border-radius: 6px;
+  background: transparent;
   color: var(--text-soft);
   text-decoration: none;
-  padding: 7px 11px;
-  font-size: 10px;
-  font-weight: 650;
+  padding: 7px 10px;
+  font: 650 10px var(--font-sans);
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .globalAppNav nav a:hover,
-.globalAppNav nav a[aria-current="page"] {
+.globalAppNav nav a[aria-current="page"],
+.globalLocale button:hover,
+.globalLocale button[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--cyan) 55%, var(--line));
   background: color-mix(in srgb, var(--cyan) 9%, var(--panel));
   color: var(--cyan);
 }
 
-@media (max-width: 520px) {
+.globalModeNav a[aria-current="page"] {
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+
+@media (max-width: 900px) {
   .globalAppNav {
-    gap: 8px;
-    padding-inline: 10px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
   }
 
-  .globalAppNavBrand b {
-    display: none;
-  }
-
-  .globalAppNav nav {
-    flex: 1;
-    justify-content: flex-end;
+  .globalNavControls {
+    width: 100%;
     overflow-x: auto;
+    padding-bottom: 2px;
   }
+}
 
-  .globalAppNav nav a {
-    padding: 7px 8px;
-  }
+@media (max-width: 520px) {
+  .globalAppNav { padding-inline: 10px; }
+  .globalAppNavBrand b { display: none; }
+  .globalNavControls { gap: 4px; }
+  .globalAppNav nav a,
+  .globalLocale button { padding: 7px 8px; }
 }
