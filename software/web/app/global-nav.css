@@ -50,7 +50,6 @@
 }
 
 .globalNavControls { margin-left: auto; }
-.globalModeNav { padding-left: 8px; border-left: 1px solid var(--line); }
 .globalLocale { padding-left: 8px; border-left: 1px solid var(--line); }
 
 .globalAppNav nav a,
@@ -75,7 +74,7 @@
   color: var(--cyan);
 }
 
-.globalModeNav a[aria-current="page"] {
+.globalProductNav a[aria-current="page"] {
   box-shadow: inset 0 -2px 0 var(--cyan);
 }
 
