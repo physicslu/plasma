@@ -23,6 +23,7 @@ class ManagerConfig:
     host: str = "127.0.0.1"
     port: int = 18180
     request_timeout_s: float = 2.0
+    poll_interval_s: float = 2.0
     ppus: tuple[PPURegistryEntry, ...] = ()
 
 
@@ -74,7 +75,12 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
     manager_raw = raw.get("manager", {})
     if not isinstance(manager_raw, dict):
         raise ManagerConfigError("manager must be a mapping")
-    unexpected_manager = set(manager_raw) - {"host", "port", "request_timeout_s"}
+    unexpected_manager = set(manager_raw) - {
+        "host",
+        "port",
+        "request_timeout_s",
+        "poll_interval_s",
+    }
     if unexpected_manager:
         raise ManagerConfigError(
             f"unsupported manager fields: {', '.join(sorted(unexpected_manager))}"
@@ -83,6 +89,7 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
     host = manager_raw.get("host", "127.0.0.1")
     port = manager_raw.get("port", 18180)
     request_timeout_s = manager_raw.get("request_timeout_s", 2.0)
+    poll_interval_s = manager_raw.get("poll_interval_s", 2.0)
     if not isinstance(host, str) or not host.strip():
         raise ManagerConfigError("manager.host must be a non-empty string")
     if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
@@ -92,6 +99,11 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
     request_timeout_s = float(request_timeout_s)
     if not 0 < request_timeout_s <= 60:
         raise ManagerConfigError("manager.request_timeout_s must be in range (0, 60]")
+    if isinstance(poll_interval_s, bool) or not isinstance(poll_interval_s, (int, float)):
+        raise ManagerConfigError("manager.poll_interval_s must be numeric")
+    poll_interval_s = float(poll_interval_s)
+    if not 0.1 <= poll_interval_s <= 300:
+        raise ManagerConfigError("manager.poll_interval_s must be in range [0.1, 300]")
 
     ppus_raw = raw.get("ppus", [])
     if not isinstance(ppus_raw, list):
@@ -105,5 +117,6 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
         host=host.strip(),
         port=port,
         request_timeout_s=request_timeout_s,
+        poll_interval_s=poll_interval_s,
         ppus=ppus,
     )
