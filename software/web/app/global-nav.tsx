@@ -29,7 +29,7 @@ export function GlobalNav() {
       </Link>
 
       <div className="globalNavControls">
-        <nav className="globalScopeNav" aria-label="Plasma scope navigation">
+        <nav className="globalScopeNav" aria-label="Plasma global navigation">
           {scopeItems.map(item => {
             const active = isScopeActive(pathname, item.href);
             return (
