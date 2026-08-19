@@ -59,7 +59,7 @@ Repository layout:
 
 ```text
 pl/                 Zynq PL RTL, constraints, simulation, verification, Vivado build assets
-software/python/    PPU control plane, Protocol v3.2 TCP server, CLI, REST gateway, tests
+software/python/    PPU control plane, Protocol v3.2 TCP server, CLI, REST gateway, optional Manager, tests
 software/web/       Plasma PPU Console
 scripts/            integration/deployment and service-control scripts
 docs/               architecture, development, and deployment documentation
@@ -123,7 +123,7 @@ A passing Cloud, CI, or integration-host Mock test must never be reported as a p
 
 ## 4. Current software architecture
 
-Current implemented path:
+Current implemented PPU-local path:
 
 ```text
 Browser / Plasma PPU Console
@@ -146,12 +146,27 @@ Interface / Handler
 MockInterface today; Z2/FPGA/real-target validation remains a separate stage
 ```
 
+Optional implemented fleet path:
+
+```text
+Fleet client
+    |
+    v
+Plasma Manager (read-only registry / aggregation)
+    |
+    +--> PPU A Plasma Web REST Gateway -> local execution
+    +--> PPU B Plasma Web REST Gateway -> local execution
+    +--> ...
+```
+
 Important implementation facts:
 
 - The current Plasma Web REST Gateway uses Python standard-library `ThreadingHTTPServer`.
 - It is **not FastAPI**.
 - It does **not use WebSocket**.
 - The Web Console currently uses REST polling.
+- `plasma_manager` is an optional read-only fleet service using manually configured PPU Gateway endpoints; it is not required for local PPU execution.
+- The current Manager does not provide command routing, central scheduling, discovery, auth policy, firmware rollout, Fleet Web UI, or `plasmactl`/systemd deployment integration.
 - A successful Mock programming flow does not prove real-target hardware programming.
 
 Do not introduce FastAPI/WebSocket merely because they were discussed as a future option. Such a migration requires an explicit task, corresponding architecture/API decisions, and tests.
@@ -479,7 +494,7 @@ Agents must not silently propagate these facts into wrong assumptions:
 3. The current Gateway is standard-library HTTP + REST polling, not FastAPI/WebSocket.
 4. The current Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before making stack assumptions.
 5. Protocol v3.1 compatibility remains temporarily supported; removing it is a separate deprecation decision.
-6. Plasma Manager / fleet control plane is an architectural target, not a currently implemented service.
+6. Plasma Manager currently implements manual read-only PPU registry and fleet aggregation only; command routing, scheduling, discovery, authentication policy, Fleet UI, and deployment integration remain future work.
 7. Mock/software validation still does not prove Z2/FPGA/OpenOCD/real-target behavior.
 
 ## 18. Communication and completion report
