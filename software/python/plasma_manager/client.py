@@ -10,6 +10,10 @@ class PPUHTTPError(RuntimeError):
     """Raised when a configured PPU cannot satisfy the fleet-facing REST contract."""
 
 
+class PPUTransportError(PPUHTTPError):
+    """Raised when Manager cannot establish or complete HTTP transport to a PPU."""
+
+
 class PPUHttpClient:
     def __init__(self, endpoint: str, timeout_s: float) -> None:
         self.endpoint = endpoint.rstrip("/")
@@ -31,7 +35,7 @@ class PPUHttpClient:
             if status not in accepted_statuses:
                 raise PPUHTTPError(f"{path} returned HTTP {status}") from exc
         except (URLError, OSError, TimeoutError) as exc:
-            raise PPUHTTPError(f"{path} request failed: {exc}") from exc
+            raise PPUTransportError(f"{path} request failed: {exc}") from exc
 
         if status not in accepted_statuses:
             raise PPUHTTPError(f"{path} returned HTTP {status}")
