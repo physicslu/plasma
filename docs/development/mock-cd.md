@@ -4,7 +4,7 @@ Mock CD is a software deployment/runtime acceptance layer between source/browser
 
 It answers:
 
-> If this commit is launched as an ephemeral Plasma software stack on a clean GitHub-hosted Ubuntu runner, do the runtime components discover each other and expose the expected read-only Fleet contract?
+> If this commit is launched as an ephemeral Plasma software stack on a clean GitHub-hosted Ubuntu runner, do the runtime components discover each other and expose the expected runtime contracts?
 
 It does **not** answer whether SWPC systemd deployment, public tunnel/TLS, Z2, FPGA, electrical I/O, or real IC programming works.
 
@@ -12,8 +12,9 @@ It does **not** answer whether SWPC systemd deployment, public tunnel/TLS, Z2, F
 
 ```text
 Source CI
-  -> Browser CI
-  -> Mock CD
+  -> Browser CI with mocked API responses
+  -> Mock CD full-stack smoke
+  -> Mock CD Browser Runtime Acceptance
   -> SWPC deployment + plasmactl verify ...
   -> Human UI acceptance
   -> Z2 / FPGA / real-target acceptance when applicable
@@ -23,7 +24,7 @@ A lower layer never proves the next layer.
 
 ## Baseline topology
 
-The workflow starts only ephemeral localhost processes on the GitHub-hosted runner:
+The workflows start only ephemeral localhost processes on the GitHub-hosted runner:
 
 ```text
 Mock PPU A: 8 enabled Sites
@@ -41,11 +42,12 @@ Plasma Manager  :19880
 Vinext/Vite Web :15173
   Fleet enabled
   Manager BFF -> http://127.0.0.1:19880
+  PPU Console default Gateway -> http://127.0.0.1:19801
 ```
 
 Expected Fleet topology is 2 current PPUs and 12 current/enabled Sites.
 
-## Baseline checks
+## Mock CD baseline checks
 
 `scripts/mock-cd.py` validates:
 
@@ -61,9 +63,9 @@ Expected Fleet topology is 2 current PPUs and 12 current/enabled Sites.
 
 The harness terminates its own process groups on success or failure and prints service log tails when acceptance fails.
 
-## Machine-readable artifact
+## Baseline machine-readable artifact
 
-Every run attempts to create:
+Every baseline run attempts to create:
 
 ```text
 artifacts/mock-cd/acceptance.json
@@ -71,74 +73,67 @@ artifacts/mock-cd/acceptance.json
 
 The GitHub workflow uploads the whole `artifacts/mock-cd/` directory as `mock-cd-acceptance`, including process logs. The JSON contains the commit, overall result, stack summary, and named scenario results.
 
-A representative successful result is:
+## Browser Runtime Acceptance
 
-```json
-{
-  "schema_version": 1,
-  "commit": "<sha>",
-  "result": "PASS",
-  "stack": {
-    "ppus": 2,
-    "sites": 12,
-    "manager": "read-only",
-    "web_bff": true
-  },
-  "scenarios": {
-    "full_stack_smoke": "PASS",
-    "two_ppu_heterogeneous_topology": "PASS",
-    "worker_binding": "PASS",
-    "browser_contract_sanitization": "PASS",
-    "public_demo_routing": "PASS"
-  }
-}
-```
+`.github/workflows/mock-cd-browser.yml` drives the actual PPU Web console through Playwright while the persistent harness `scripts/mock-cd-browser-stack.py` keeps the same Mock CD stack alive.
 
-## Security and deployment boundary
-
-Mock CD intentionally uses `ubuntu-latest`, no self-hosted runner, no SSH, no deployment secrets, no `systemctl`, and no `plasmactl deploy`.
-
-It must never silently evolve into a real SWPC or Z2 deployment mechanism. Real deployment remains an explicit human approval gate. A future private deployment workflow/self-hosted runner is a separate design and security decision.
-
-## Required Browser Runtime Acceptance follow-up
-
-The Mock CD baseline intentionally stops at software-stack smoke. A separate Browser Runtime Acceptance layer should reuse the real ephemeral Mock CD stack and drive the UI with Playwright rather than mocking Plasma API responses.
-
-Required scenarios are:
-
-1. **Gateway connection state**
-   - start from a valid Mock Gateway and confirm connected/ready;
-   - enter a syntactically valid but unreachable Gateway and confirm offline/unreachable plus an operator log containing the attempted endpoint;
-   - cover malformed Gateway input separately as client-side validation;
-   - restore the valid Gateway and confirm clean recovery to connected/ready without stale state or duplicate connection events.
-
-2. **Per-Site operator controls and Read download**
-   - discover canonical Site topology dynamically; do not hard-code eight Sites;
-   - for every enabled Site, click the individual `Erase`, `Program`, `Verify`, and `Read` controls through the browser;
-   - verify each operation is dispatched only to that Site and reaches the expected terminal state;
-   - for every `Read`, capture the real browser download event and verify file name, expected/non-zero length, and deterministic content or hash against Mock target contents;
-   - parameterize the same acceptance logic for 2/4/8-Site PPUs.
-
-3. **Site batch membership**
-   - click every enabled Site's add/remove-from-batch control and verify visible selection state and selected count;
-   - cover one-Site, two-Site, and multi-Site selections;
-   - run a real batch and prove only selected Sites receive jobs while unselected Sites remain unchanged;
-   - change membership between runs and prove the next dispatch uses the new selection rather than cached state;
-   - combine selected Sites with selected operation checkboxes so both dimensions are independently proven: `selected Sites × selected operations`;
-   - disabled Sites, when present, must remain non-selectable and must never receive jobs.
-
-The required end-to-end path is:
+The browser test does **not** use `page.route()` to replace Plasma APIs. Its required path is:
 
 ```text
 Playwright browser action
   -> Web UI
-  -> Plasma Web REST Gateway
-  -> Plasma Server
+  -> real Plasma Web REST Gateway
+  -> real Plasma Server
   -> MockInterface
   -> runtime result / Read download
   -> browser assertion
 ```
 
+The acceptance scenarios are:
+
+1. **Gateway connection state**
+   - start from the valid Mock Gateway and confirm connected/ready;
+   - enter a syntactically valid but unreachable Gateway and confirm offline/unreachable;
+   - require the operator log to contain the attempted endpoint exactly once for that outage transition;
+   - restore the valid Gateway and confirm clean recovery to connected/ready;
+   - verify malformed non-HTTP Gateway input is rejected separately without replacing the active valid connection.
+
+2. **Per-Site operator controls and Read download**
+   - discover the enabled Site count from the runtime parameter rather than embedding one Site ID in the test loop;
+   - for every enabled Site, click the individual `Erase`, `Program`, `Verify`, and `Read` controls;
+   - require every operation to be accepted by the real Gateway/Server path and reach `SUCCESS`;
+   - program a deterministic 256-byte firmware pattern, verify it, then Read the same range;
+   - capture the real browser download event for every Site;
+   - require the download name `read_SITE<n>_flash.bin`, exact byte length, and exact byte-for-byte content match.
+
+3. **Site batch membership and operation selection**
+   - click every enabled Site's add/remove-from-batch checkbox and prove the visible selection changes cleanly;
+   - prove a one-Site batch dispatches only that Site;
+   - change membership for the next batch so stale selection cannot leak forward;
+   - choose a topology-derived set of even Site IDs (8-Site baseline -> SITE 2, 4, 6; smaller supported topologies use the available subset);
+   - combine Site membership with multiple operation checkboxes and inspect the browser's real outbound `POST /api/jobs` requests without mocking or fulfilling them;
+   - require the resulting dispatch multiset to equal `selected Sites × selected operations` exactly.
+
+The Playwright configuration preserves trace, screenshot, video, HTML report, and JSON report on failure. The workflow emits:
+
+```text
+artifacts/mock-cd-browser/browser-acceptance.json
+```
+
+and uploads the complete directory as:
+
+```text
+mock-cd-browser-acceptance
+```
+
+A Browser Runtime Acceptance PASS still does not mean SWPC, Z2, FPGA, socket, electrical I/O, or real IC programming passed.
+
+## Security and deployment boundary
+
+Both Mock CD workflows intentionally use `ubuntu-latest`, no self-hosted runner, no SSH, no deployment secrets, no `systemctl`, and no `plasmactl deploy`.
+
+They must never silently evolve into real SWPC or Z2 deployment mechanisms. Real deployment remains an explicit human approval gate. A future private deployment workflow/self-hosted runner is a separate design and security decision.
+
 ## Planned extensions
 
-After the baseline is stable, separate scenarios may also add deterministic PPU outage -> stale, Manager restart -> SQLite restore, recovery -> current, and programming-operation smoke. These should extend the same artifact schema rather than changing the meaning of baseline PASS.
+Separate scenarios may later add deterministic PPU outage -> stale, Manager restart -> SQLite restore, recovery -> current, and additional failure injection. These should extend the artifact schemas rather than changing the meaning of existing PASS results.
