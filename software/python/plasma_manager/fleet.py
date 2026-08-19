@@ -58,40 +58,33 @@ class FleetAggregator:
                         f"duplicate ppu_id '{ppu['ppu_id']}' reported by multiple registry endpoints"
                     )
 
+        trusted_ppus = [
+            item
+            for item in ppus
+            if isinstance(item.get("ppu"), dict) and not item["identity_conflict"]
+        ]
         facilities: dict[str, dict[str, Any]] = {}
-        for item in ppus:
-            ppu = item.get("ppu")
-            if not isinstance(ppu, dict):
-                continue
-            facility_id = ppu.get("facility_id")
-            ppu_id = ppu.get("ppu_id")
-            if not facility_id or not ppu_id:
-                continue
+        for item in trusted_ppus:
+            ppu = item["ppu"]
+            facility_id = ppu["facility_id"]
+            ppu_id = ppu["ppu_id"]
             facility = facilities.setdefault(
-                str(facility_id),
+                facility_id,
                 {
-                    "facility_id": str(facility_id),
+                    "facility_id": facility_id,
                     "ppu_ids": [],
                     "site_count": 0,
                     "enabled_site_count": 0,
                 },
             )
-            facility["ppu_ids"].append(str(ppu_id))
-            facility["site_count"] += int(ppu.get("site_count", 0))
-            facility["enabled_site_count"] += int(ppu.get("enabled_site_count", 0))
+            facility["ppu_ids"].append(ppu_id)
+            facility["site_count"] += ppu["site_count"]
+            facility["enabled_site_count"] += ppu["enabled_site_count"]
 
         reachable = sum(item["gateway_live"] for item in ppus)
         ready = sum(item["execution_ready"] for item in ppus)
-        reported_sites = sum(
-            int(item["ppu"].get("site_count", 0))
-            for item in ppus
-            if isinstance(item.get("ppu"), dict)
-        )
-        enabled_sites = sum(
-            int(item["ppu"].get("enabled_site_count", 0))
-            for item in ppus
-            if isinstance(item.get("ppu"), dict)
-        )
+        reported_sites = sum(item["ppu"]["site_count"] for item in trusted_ppus)
+        enabled_sites = sum(item["ppu"]["enabled_site_count"] for item in trusted_ppus)
         degraded = any(item["errors"] or not item["execution_ready"] for item in ppus)
 
         return {
@@ -104,6 +97,7 @@ class FleetAggregator:
                 "configured_ppus": len(ppus),
                 "reachable_ppus": reachable,
                 "ready_ppus": ready,
+                "identified_ppus": len(trusted_ppus),
                 "reported_sites": reported_sites,
                 "enabled_sites": enabled_sites,
                 "identity_conflicts": len(duplicate_ids),
@@ -133,15 +127,21 @@ class FleetAggregator:
 
             readiness_status, readiness = client.readiness()
             if readiness_status == 503 or readiness.get("execution") != "ready":
-                message = readiness.get("error", {}).get("message") if isinstance(readiness.get("error"), dict) else None
+                error = readiness.get("error")
+                message = error.get("message") if isinstance(error, dict) else None
                 result["errors"].append(str(message or "local PPU execution is unavailable"))
                 return result
             if readiness.get("ok") is not True:
                 raise PPUHTTPError("readiness payload is invalid")
+            readiness_ppu_id = readiness.get("ppu_id")
+            if not isinstance(readiness_ppu_id, str) or not readiness_ppu_id:
+                raise PPUHTTPError("readiness payload is missing ppu_id")
             result["execution_ready"] = True
 
             _, node = client.node()
             self._validate_node(node)
+            if readiness_ppu_id != node["ppu"]["ppu_id"]:
+                raise PPUHTTPError("/api/health/ready and /api/node disagree on ppu_id")
             result["contract_compatible"] = True
 
             _, status = client.status()
@@ -190,8 +190,9 @@ class FleetAggregator:
         sites = status.get("sites")
         if not isinstance(ppu, dict) or not isinstance(sites, list):
             raise PPUHTTPError("/api/status is missing canonical PPU/Site topology")
-        if ppu.get("ppu_id") != node["ppu"]["ppu_id"]:
-            raise PPUHTTPError("/api/node and /api/status disagree on ppu_id")
+        for key in ("ppu_id", "facility_id", "model", "site_count", "enabled_site_count"):
+            if ppu.get(key) != node["ppu"].get(key):
+                raise PPUHTTPError(f"/api/node and /api/status disagree on ppu.{key}")
         if len(sites) != node["ppu"]["site_count"]:
             raise PPUHTTPError("/api/status Site count disagrees with /api/node")
         site_ids = [site.get("site_id") for site in sites if isinstance(site, dict)]
