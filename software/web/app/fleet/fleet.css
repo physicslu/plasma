@@ -73,15 +73,15 @@
 .statusLamp.ready i { background: var(--cyan); box-shadow: 0 0 18px color-mix(in srgb, var(--cyan) 70%, transparent); }
 .statusLamp.running i { background: var(--amber); box-shadow: 0 0 18px color-mix(in srgb, var(--amber) 70%, transparent); }
 .statusLamp.pass i { background: var(--green); box-shadow: 0 0 18px color-mix(in srgb, var(--green) 70%, transparent); }
-.statusLamp.fail i { background: var(--red); box-shadow: 0 0 18px color-mix(in srgb, var(--red) 70%, transparent); }
+.statusLamp.fail i, .statusLamp.error i { background: var(--red); box-shadow: 0 0 18px color-mix(in srgb, var(--red) 70%, transparent); }
 .statusLamp.disabled i { background: var(--disabled); }
 .statusLamp.offline i { background: #303845; box-shadow: none; }
 .productionSite > strong { font: 800 15px var(--font-mono); letter-spacing: .04em; }
 .productionSite.status-ready > strong { color: var(--cyan); }
 .productionSite.status-running > strong { color: var(--amber); }
 .productionSite.status-pass > strong { color: var(--green); }
-.productionSite.status-fail { border-color: color-mix(in srgb, var(--red) 45%, var(--line)); background: color-mix(in srgb, var(--red) 5%, var(--panel-3)); }
-.productionSite.status-fail > strong { color: var(--red); }
+.productionSite.status-fail, .productionSite.status-error { border-color: color-mix(in srgb, var(--red) 45%, var(--line)); background: color-mix(in srgb, var(--red) 5%, var(--panel-3)); }
+.productionSite.status-fail > strong, .productionSite.status-error > strong { color: var(--red); }
 .productionSite.status-disabled, .productionSite.status-offline { opacity: .68; }
 .siteCardMeta { width: 100%; display: grid; gap: 3px; border-top: 1px solid var(--line); padding-top: 6px; }
 .siteCardMeta span { display: flex; justify-content: space-between; gap: 5px; color: var(--muted); font: 7px var(--font-mono); }
@@ -119,10 +119,10 @@
 .detailResult.status-ready i { background: var(--cyan); }
 .detailResult.status-running i { background: var(--amber); }
 .detailResult.status-pass i { background: var(--green); }
-.detailResult.status-fail i { background: var(--red); }
+.detailResult.status-fail i, .detailResult.status-error i { background: var(--red); }
 .detailResult.status-offline i { background: #303845; }
 .detailResult.status-pass b { color: var(--green); }
-.detailResult.status-fail b { color: var(--red); }
+.detailResult.status-fail b, .detailResult.status-error b { color: var(--red); }
 .detailResult span { margin-left: auto; color: var(--muted); font: 7px var(--font-mono); }
 .siteDetailDrawer dl { margin: 0; display: grid; }
 .siteDetailDrawer dl div { display: grid; grid-template-columns: 110px 1fr; gap: 10px; border-top: 1px solid var(--line); padding: 9px 2px; }
