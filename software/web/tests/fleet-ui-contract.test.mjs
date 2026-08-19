@@ -79,7 +79,7 @@ test("fleet page is read-only and fleet API is opt-in by default", async () => {
   assert.equal(payload.error?.code, "fleet_ui_disabled");
 });
 
-test("fleet BFF source enforces loopback Manager and strips internal endpoint/error fields", async () => {
+test("fleet BFF source enforces loopback Manager and bridges host runtime settings into Worker bindings", async () => {
   const route = await fs.readFile(new URL("../app/api/fleet/route.ts", import.meta.url), "utf8");
   const contract = await fs.readFile(new URL("../app/fleet/fleet-contract.ts", import.meta.url), "utf8");
   const vite = await fs.readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
@@ -94,4 +94,8 @@ test("fleet BFF source enforces loopback Manager and strips internal endpoint/er
   assert.match(contract, /current_capacity/);
   assert.match(vite, /\^\/api\/\(\?!fleet/);
   assert.match(vite, /target: "http:\/\/127\.0\.0\.1:18080"/);
+  assert.match(vite, /PLASMA_FLEET_UI_ENABLED:\s*process\.env\.PLASMA_FLEET_UI_ENABLED\s*\?\?\s*"0"/);
+  assert.match(vite, /PLASMA_MANAGER_API_URL:\s*process\.env\.PLASMA_MANAGER_API_URL/);
+  assert.match(vite, /vars:\s*fleetWorkerVars/);
+  assert.match(vite, /nodejs_compat_populate_process_env/);
 });

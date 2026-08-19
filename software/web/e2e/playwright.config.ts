@@ -40,5 +40,13 @@ export default defineConfig({
     timeout: 120_000,
     stdout: "ignore",
     stderr: "pipe",
+    // Exercise the real Vite -> Cloudflare Worker binding path. No Manager is
+    // started in browser CI, so an enabled Fleet BFF must reach the Manager
+    // attempt and report 503 rather than falling back to fleet_ui_disabled.
+    env: {
+      ...process.env,
+      PLASMA_FLEET_UI_ENABLED: "1",
+      PLASMA_MANAGER_API_URL: "http://127.0.0.1:18180",
+    },
   },
 });
