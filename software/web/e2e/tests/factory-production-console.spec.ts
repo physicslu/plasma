@@ -79,10 +79,10 @@ test("Production Mode uses real job state for lamps, operations, selection and l
 
   const ppuA = page.locator('[data-ppu="PPU-A"]');
   await expect(ppuA.locator("[data-site-id]")).toHaveCount(4);
-  await ppuA.getByRole("button", { name: "全選" }).click();
+  await ppuA.getByRole("button", { name: "全選", exact: true }).click();
   await expect(ppuA.locator('input[type="checkbox"]:checked')).toHaveCount(3);
   await expect(ppuA.getByRole("checkbox", { name: "PPU-A SITE 4" })).toBeDisabled();
-  await ppuA.getByRole("button", { name: "全部取消" }).click();
+  await ppuA.getByRole("button", { name: "全部取消", exact: true }).click();
   await expect(page.getByText(/已選 Sites: 0/)).toBeVisible();
 
   // IDLE with no job must remain READY; it must never be misread as READ/RUNNING.
@@ -103,7 +103,7 @@ test("Production Mode uses real job state for lamps, operations, selection and l
   await expect(detail.getByText("LATCHED", { exact: true })).toBeVisible();
   await expect(detail.getByText("job-v", { exact: true })).toBeVisible();
 
-  await detail.getByRole("button", { name: "清除結果" }).click();
+  await detail.getByRole("button", { name: "清除結果", exact: true }).click();
   await expect(ppuA.locator('[data-site-id="3"]')).toHaveAttribute("data-status", "ready");
   await page.waitForTimeout(2_200);
   await expect(ppuA.locator('[data-site-id="3"]')).toHaveAttribute("data-status", "ready");
@@ -115,7 +115,7 @@ test("Production Mode uses real job state for lamps, operations, selection and l
   await expect(page.getByText(/latest-job 摘要/)).toBeVisible();
 
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByRole("navigation", { name: "Work mode" }).getByRole("link", { name: "Production Mode" })).toBeVisible();
-  await expect(ppuA.getByRole("button", { name: "Select All" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Work mode" }).getByRole("link", { name: "Production Mode", exact: true })).toBeVisible();
+  await expect(ppuA.getByRole("button", { name: "Select All", exact: true })).toBeVisible();
   await expect(page.locator(".operationChecks label").filter({ hasText: "Program" })).toBeVisible();
 });
