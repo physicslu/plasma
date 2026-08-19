@@ -8,46 +8,26 @@ async function workerFor(name) {
   return (await import(workerUrl.href)).default;
 }
 
-const env = {
-  ASSETS: {
-    fetch: async () => new Response("Not found", { status: 404 }),
-  },
-};
-const ctx = {
-  waitUntil() {},
-  passThroughOnException() {},
-};
+const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
+const ctx = { waitUntil() {}, passThroughOnException() {} };
 
 test("public Plasma host sends root users to the two-demo landing page", async () => {
   const worker = await workerFor("demo-root");
-  const response = await worker.fetch(
-    new Request("https://plasma.open4th.com/", { headers: { accept: "text/html" }, redirect: "manual" }),
-    env,
-    ctx,
-  );
+  const response = await worker.fetch(new Request("https://plasma.open4th.com/", { headers: { accept: "text/html" }, redirect: "manual" }), env, ctx);
   assert.ok([301, 302, 307, 308].includes(response.status));
   assert.equal(new URL(response.headers.get("location"), "https://plasma.open4th.com").pathname, "/demo");
 });
 
 test("non-public local root keeps the original PPU console behavior", async () => {
   const worker = await workerFor("local-root");
-  const response = await worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
-    env,
-    ctx,
-  );
+  const response = await worker.fetch(new Request("http://localhost/", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(response.status, 200);
-  const html = await response.text();
-  assert.match(html, />SITE MATRIX</);
+  assert.match(await response.text(), />SITE MATRIX</);
 });
 
 test("demo landing page exposes Single PPU and Manager/Fleet links", async () => {
   const worker = await workerFor("demo-page");
-  const response = await worker.fetch(
-    new Request("http://localhost/demo", { headers: { accept: "text/html" } }),
-    env,
-    ctx,
-  );
+  const response = await worker.fetch(new Request("http://localhost/demo", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, />Choose a Demo</);
@@ -59,11 +39,7 @@ test("demo landing page exposes Single PPU and Manager/Fleet links", async () =>
 
 test("fleet page exposes the Production Console while Fleet write control remains locked", async () => {
   const worker = await workerFor("fleet-page");
-  const page = await worker.fetch(
-    new Request("http://localhost/fleet", { headers: { accept: "text/html" } }),
-    env,
-    ctx,
-  );
+  const page = await worker.fetch(new Request("http://localhost/fleet", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, />Factory Production Console</);
@@ -72,17 +48,13 @@ test("fleet page exposes the Production Console while Fleet write control remain
   assert.match(html, /<button[^>]*disabled[^>]*>執行批次<\/button>/);
   assert.match(html, />Factory Log Console</);
 
-  const api = await worker.fetch(
-    new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }),
-    env,
-    ctx,
-  );
+  const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
   assert.equal(api.status, 404);
   const payload = await api.json();
   assert.equal(payload.error?.code, "fleet_ui_disabled");
 });
 
-test("fleet BFF source enforces loopback Manager and bridges host runtime settings into Worker bindings", async () => {
+test("fleet BFF source keeps Manager loopback-only and latest-job summaries browser-safe", async () => {
   const route = await fs.readFile(new URL("../app/api/fleet/route.ts", import.meta.url), "utf8");
   const contract = await fs.readFile(new URL("../app/fleet/fleet-contract.ts", import.meta.url), "utf8");
   const vite = await fs.readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
@@ -95,6 +67,10 @@ test("fleet BFF source enforces loopback Manager and bridges host runtime settin
   assert.doesNotMatch(contract, /errors:\s*/);
   assert.match(contract, /last_known/);
   assert.match(contract, /current_capacity/);
+  assert.match(contract, /latest_job/);
+  assert.match(contract, /progress_percent/);
+  assert.doesNotMatch(contract, /output_files/);
+  assert.doesNotMatch(contract, /firmware/);
   assert.match(vite, /\^\/api\/\(\?!fleet/);
   assert.match(vite, /target: "http:\/\/127\.0\.0\.1:18080"/);
   assert.match(vite, /PLASMA_FLEET_UI_ENABLED:\s*process\.env\.PLASMA_FLEET_UI_ENABLED\s*\?\?\s*"0"/);
