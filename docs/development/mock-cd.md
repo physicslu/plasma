@@ -89,6 +89,8 @@ Playwright browser action
   -> browser assertion
 ```
 
+The persistent stack publishes `runtime.json`. The workflow derives the Web URL, Gateway URL, deliberately unreachable Gateway endpoint, PPU identity, and enabled Site count from that runtime contract instead of duplicating topology constants in the Playwright step.
+
 The acceptance scenarios are:
 
 1. **Gateway connection state**
@@ -99,20 +101,24 @@ The acceptance scenarios are:
    - verify malformed non-HTTP Gateway input is rejected separately without replacing the active valid connection.
 
 2. **Per-Site operator controls and Read download**
-   - discover the enabled Site count from the runtime parameter rather than embedding one Site ID in the test loop;
+   - use the enabled Site count published by the runtime contract rather than embedding one fixed loop boundary in the workflow;
    - for every enabled Site, click the individual `Erase`, `Program`, `Verify`, and `Read` controls;
+   - inspect the browser's real outbound `POST /api/jobs` request and require each click to dispatch exactly to the intended Site and operation;
    - require every operation to be accepted by the real Gateway/Server path and reach `SUCCESS`;
    - program a deterministic 256-byte firmware pattern, verify it, then Read the same range;
    - capture the real browser download event for every Site;
    - require the download name `read_SITE<n>_flash.bin`, exact byte length, and exact byte-for-byte content match.
 
 3. **Site batch membership and operation selection**
-   - click every enabled Site's add/remove-from-batch checkbox and prove the visible selection changes cleanly;
-   - prove a one-Site batch dispatches only that Site;
-   - change membership for the next batch so stale selection cannot leak forward;
-   - choose a topology-derived set of even Site IDs (8-Site baseline -> SITE 2, 4, 6; smaller supported topologies use the available subset);
-   - combine Site membership with multiple operation checkboxes and inspect the browser's real outbound `POST /api/jobs` requests without mocking or fulfilling them;
-   - require the resulting dispatch multiset to equal `selected Sites × selected operations` exactly.
+   - click every enabled Site's add/remove-from-batch checkbox and prove the selection changes cleanly;
+   - do not impose parity, adjacency, or fixed Site-number rules on batch membership;
+   - exercise representative arbitrary non-empty subsets: one Site, two widely separated Sites, a non-contiguous three-Site set, `N-1` Sites, and all enabled Sites, deduplicated for smaller topologies;
+   - include mixed odd/even and non-contiguous selections when the topology permits them;
+   - change membership between runs so stale selection cannot leak forward;
+   - combine Site membership with one or multiple operation checkboxes and inspect the browser's real outbound `POST /api/jobs` requests without mocking or fulfilling them;
+   - require the resulting dispatch multiset to equal `selected Sites × selected operations` exactly, which also proves unselected Sites and unselected operations receive no jobs.
+
+For `N` enabled Sites there are `2^N - 1` possible non-empty subsets. CI intentionally uses representative boundary and non-contiguous subsets rather than exhaustively executing all combinations; exhaustive 8-Site coverage would require 255 membership combinations before considering operation combinations.
 
 The Playwright configuration preserves trace, screenshot, video, HTML report, and JSON report on failure. The workflow emits:
 
