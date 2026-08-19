@@ -217,6 +217,25 @@ class SiteManager:
             },
         }
 
+    def _latest_job_summary(self, site_id: int) -> dict[str, Any] | None:
+        """Return a browser-safe latest-job summary without result files or raw metadata."""
+        for runtime in reversed(self.registry.all()):
+            if runtime.request.site_id != site_id:
+                continue
+            return {
+                "job_id": runtime.request.job_id,
+                "operation": runtime.request.operation.value,
+                "state": runtime.state.value,
+                "stage": runtime.stage,
+                "stage_state": runtime.stage_state,
+                "progress_percent": runtime.progress_percent,
+                "created_at": runtime.created_at,
+                "started_at": runtime.started_at,
+                "updated_at": runtime.updated_at,
+                "cancel_requested": runtime.cancel_requested,
+            }
+        return None
+
     def status(
         self,
         *,
@@ -248,6 +267,7 @@ class SiteManager:
                     "current_job_id": (
                         worker.current.request.job_id if worker and worker.current else None
                     ),
+                    "latest_job": self._latest_job_summary(current_id),
                     "queued_jobs": worker.queue.qsize() if worker else 0,
                     "interface": config.interface if config.enabled else None,
                     "target": config.target if config.enabled else None,
