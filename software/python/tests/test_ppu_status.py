@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
@@ -67,15 +68,19 @@ class PPUStatusTests(unittest.TestCase):
                     ppu=PPUConfig(id="ppu-job", facility_id="factory-a"),
                 )
             )
-            runtime = manager.registry.create(
-                JobRequest(
-                    site_id=1,
-                    operation=Operation.VERIFY,
-                    job_id="verify-job-1",
-                    firmware=b"secret-firmware-bytes",
-                    metadata={"private": "do-not-expose"},
+
+            async def create_runtime():
+                return manager.registry.create(
+                    JobRequest(
+                        site_id=1,
+                        operation=Operation.VERIFY,
+                        job_id="verify-job-1",
+                        firmware=b"secret-firmware-bytes",
+                        metadata={"private": "do-not-expose"},
+                    )
                 )
-            )
+
+            runtime = asyncio.run(create_runtime())
             runtime.state = JobState.SUCCESS
             runtime.stage = "verify"
             runtime.stage_state = "complete"
