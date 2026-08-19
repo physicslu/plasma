@@ -99,17 +99,17 @@ for ppu in ppus:
     ):
         raise SystemExit("stale/unknown PPU contributes current capacity")
 
-print(f"configured_ppus={summary['configured_ppus']}")
-print(f"reachable_ppus={summary['reachable_ppus']}")
-print(f"ready_ppus={summary['ready_ppus']}")
-print(f"current_ppus={summary['current_ppus']}")
-print(f"stale_ppus={summary['stale_ppus']}")
-print(f"unknown_ppus={summary['unknown_ppus']}")
-print(f"reported_sites={summary['reported_sites']}")
-print(f"enabled_sites={summary['enabled_sites']}")
-print(f"fleet_degraded={str(bool(payload.get('degraded'))).lower()}")
-print(f"observation_store={store.get('mode', 'unknown')}")
-print(f"observation_store_healthy={str(store.get('healthy') is True).lower()}")
+print("configured_ppus={}".format(summary["configured_ppus"]))
+print("reachable_ppus={}".format(summary["reachable_ppus"]))
+print("ready_ppus={}".format(summary["ready_ppus"]))
+print("current_ppus={}".format(summary["current_ppus"]))
+print("stale_ppus={}".format(summary["stale_ppus"]))
+print("unknown_ppus={}".format(summary["unknown_ppus"]))
+print("reported_sites={}".format(summary["reported_sites"]))
+print("enabled_sites={}".format(summary["enabled_sites"]))
+print("fleet_degraded={}".format(str(bool(payload.get("degraded"))).lower()))
+print("observation_store={}".format(store.get("mode", "unknown")))
+print("observation_store_healthy={}".format(str(store.get("healthy") is True).lower()))
 '
 }
 
