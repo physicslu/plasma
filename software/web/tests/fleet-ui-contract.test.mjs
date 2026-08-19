@@ -57,7 +57,7 @@ test("demo landing page exposes Single PPU and Manager/Fleet links", async () =>
   assert.match(html, />Manager \/ Fleet Demo</);
 });
 
-test("fleet page is read-only and fleet API is opt-in by default", async () => {
+test("fleet page exposes the Production Console while Fleet write control remains locked", async () => {
   const worker = await workerFor("fleet-page");
   const page = await worker.fetch(
     new Request("http://localhost/fleet", { headers: { accept: "text/html" } }),
@@ -66,8 +66,11 @@ test("fleet page is read-only and fleet API is opt-in by default", async () => {
   );
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, />Facility \/ PPU Fleet Overview</);
-  assert.match(html, />READ-ONLY CONTROL PLANE</);
+  assert.match(html, />Factory Production Console</);
+  assert.match(html, />PRODUCTION MODE</);
+  assert.match(html, /跨 PPU 寫入需另行啟用受認證控制路徑/);
+  assert.match(html, /<button[^>]*disabled[^>]*>執行批次<\/button>/);
+  assert.match(html, />Factory Log Console</);
 
   const api = await worker.fetch(
     new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }),
