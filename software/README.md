@@ -4,7 +4,7 @@ Software 依執行環境與技術棧分成 Python control plane 與 React Web Co
 
 ```text
 software/
-├── python/   # PPU control plane + optional read-only Plasma Manager / Protocol v3.2
+├── python/   # PPU control plane + optional read-only Plasma Manager / Protocol v3.3
 └── web/      # Plasma PPU Console
 ```
 
@@ -31,7 +31,9 @@ PPU-local canonical path：
 ```text
 Plasma Web REST Gateway
         |
-        | Protocol v3.2 / PLASMA32
+        | Web REST v3 Programming Asset boundary
+        | normalize to execution Image
+        | Protocol v3.3 / PLASMA33
         v
 Plasma Server
         |
@@ -52,11 +54,25 @@ Plasma Manager
     +--> ...
 ```
 
-`plasma_manager` 第一版是 read-only fleet control plane：手動設定 PPU Gateway endpoint，獨立讀取每台 PPU 的 liveness、readiness、canonical node identity 與 Site status。Manager failure 不得影響 PPU 本地執行；單一 PPU failure 也不得讓其他 PPU 的 fleet snapshot 消失。
+`plasma_manager` 是 read-only fleet control plane：手動設定 PPU Gateway endpoint，獨立讀取每台 PPU 的 liveness、readiness、canonical node identity 與 Site status。Manager failure 不得影響 PPU 本地執行；單一 PPU failure 也不得讓其他 PPU 的 fleet snapshot 消失。
 
-Protocol v3.2 使用 one-based `site_id = 1..N`。Server 暫時保留 Protocol v3.1 compatibility adapter，把 zero-based `channel_id` 明確映射到 one-based Site；新的 domain / REST / CLI / Web request 不應再使用 `channel_id`。
+Protocol v3.3 使用 one-based `site_id = 1..N`。目前 development runtime 不維護 retired Programmer/Channel compatibility adapter；current code/config/REST/wire 只有 Facility / PPU / Site canonical model。
 
-Plasma Web REST Gateway 目前使用 Python standard-library `ThreadingHTTPServer`。它不是 FastAPI，也沒有使用 WebSocket；Web 以 REST polling 取得狀態。
+Plasma Web REST Gateway 使用 Python standard-library `ThreadingHTTPServer`。它不是 FastAPI，也沒有使用 WebSocket；Web 以 REST polling 取得狀態。
+
+## Programming data boundary
+
+```text
+Programming Asset      # REST/source input
+        |
+        v
+Parser / normalizer
+        |
+        v
+Normalized Image       # Protocol/execution data
+```
+
+Programming Asset types可擴充 Image、Key、Option、Serial Number、Calibration。Programming Recipe 是 control-plane instruction，不屬於 Asset。
 
 ## Web
 
@@ -64,7 +80,7 @@ Plasma Web REST Gateway 目前使用 Python standard-library `ThreadingHTTPServe
 
 Web 會提交 one-based `site_id` 工作到 Plasma Web REST Gateway，並輪詢真實 Site / Job state。Batch operation 可對選定 Sites 並行執行 Erase / Program / Verify / Read；不同 Site 的 pipeline 必須保持獨立。
 
-目前 repository **尚未實作 Fleet Web UI**；不要把 Plasma PPU Console 當成多 PPU Manager UI。
+目前 repository 尚未實作 Fleet Web UI；不要把 Plasma PPU Console 當成多 PPU Manager UI。
 
 ```bash
 cd software/web
@@ -74,10 +90,10 @@ npm test
 npm run validate:artifact
 ```
 
-Browser E2E 與 Visual Regression 位於 `software/web/e2e/`，目前 deterministic baseline 使用 SITE 1..N 的 canonical UI。
+Browser E2E 與 Visual Regression 位於 `software/web/e2e/`。
 
 ## Validation boundary
 
-目前 software / Mock 測試成功代表 control-flow、protocol、Site scheduling、Manager aggregation 與 Web behavior 通過相應測試；不代表 Z2、FPGA/OpenOCD、STM32F103C8T6 或其他 real target 已完成實機燒錄驗證，也不代表 Manager 已完成 integration-host production deployment。
+software / Mock 測試成功代表 control-flow、Protocol v3.3、Site scheduling、Manager aggregation 與 Web behavior 通過相應測試；不代表 Z2、FPGA/OpenOCD、real target 或 production socket 已完成實機驗證。
 
-詳細 Python contract 請參考 [`python/README.md`](python/README.md)、[`python/docs/protocol.md`](python/docs/protocol.md) 與 [`../docs/architecture/manager-readonly-fleet-aggregation.md`](../docs/architecture/manager-readonly-fleet-aggregation.md)。
+詳細 contract 請參考 [`python/README.md`](python/README.md)、[`python/docs/protocol.md`](python/docs/protocol.md) 與 [`../docs/architecture/web-rest-api-contract.md`](../docs/architecture/web-rest-api-contract.md)。
