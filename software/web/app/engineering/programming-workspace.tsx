@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { BatchLifecycle } from "../batch-lifecycle";
 import { useI18n } from "../i18n";
 import {
+  beginEngineeringSession,
   cancelJob,
   DEFAULT_API_BASE,
   engineeringTargetApiBase,
@@ -58,7 +59,7 @@ type LogEntry = { id: number; text: string; error: boolean };
 
 const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
 const POLL_INTERVAL_MS = 500;
-const POLL_ATTEMPTS = 120;
+const POLL_ATTEMPTS = 600;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
 const terminalStates = new Set<JobState>(["success", "failed", "cancelled", "timeout", "aborted"]);
 const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
@@ -113,6 +114,7 @@ export default function ProgrammingWorkspace() {
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
   const [apiDraft, setApiDraft] = useState(DEFAULT_API_BASE);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const [connectionGeneration, setConnectionGeneration] = useState(0);
   const [catalog, setCatalog] = useState<EngineeringTargetCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [selection, setSelection] = useState<TargetSelection>({ facilityId: "", ppuId: "" });
@@ -133,6 +135,7 @@ export default function ProgrammingWorkspace() {
   const submissionGenerations = useRef<Record<number, number>>({});
   const batchLifecycle = useRef<BatchLifecycle | null>(null);
   const cancelRequests = useRef<Set<string>>(new Set());
+  const engineeringSessionId = useRef<string | null>(null);
   const logSequence = useRef(0);
 
   const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
@@ -207,27 +210,36 @@ export default function ProgrammingWorkspace() {
 
   useEffect(() => {
     let cancelled = false;
-    void getEngineeringTargets(apiBase).then(next => {
-      if (cancelled) return;
-      setCatalog(next);
-      setCatalogError(null);
-      setConnection("online");
-      setSelection(current => validSelection(next, current));
-      appendLog(`[ENGINEERING] Provider ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
-    }).catch(error => {
-      if (cancelled) return;
-      const message = error instanceof Error ? error.message : "Engineering target provider unavailable";
-      resetTargetRuntime();
-      setCatalog(null);
-      setCatalogError(message);
-      setSelection({ facilityId: "", ppuId: "" });
-      setConnection("offline");
-      appendLog(`[ENGINEERING] Provider unavailable · ${message}`, true);
-    });
+    void (async () => {
+      try {
+        const session = await beginEngineeringSession(
+          apiBase,
+          engineeringSessionId.current ?? undefined,
+        );
+        engineeringSessionId.current = session.session_id;
+        if (cancelled) return;
+        const next = await getEngineeringTargets(apiBase);
+        if (cancelled) return;
+        setCatalog(next);
+        setCatalogError(null);
+        setConnection("online");
+        setSelection(current => validSelection(next, current));
+        appendLog(`[ENGINEERING] Provider ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Engineering target provider unavailable";
+        resetTargetRuntime();
+        setCatalog(null);
+        setCatalogError(message);
+        setSelection({ facilityId: "", ppuId: "" });
+        setConnection("offline");
+        appendLog(`[ENGINEERING] Provider unavailable · ${message}`, true);
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [apiBase, appendLog, resetTargetRuntime]);
+  }, [apiBase, connectionGeneration, appendLog, resetTargetRuntime]);
 
   useEffect(() => {
     if (!targetApiBase) return;
@@ -278,7 +290,7 @@ export default function ProgrammingWorkspace() {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [targetApiBase, applyJob, appendLog]);
+  }, [targetApiBase, connectionGeneration, applyJob, appendLog]);
 
   function connect(event: FormEvent) {
     event.preventDefault();
@@ -295,6 +307,7 @@ export default function ProgrammingWorkspace() {
       setConnection("connecting");
       setApiDraft(normalized);
       setApiBase(normalized);
+      setConnectionGeneration(current => current + 1);
     } catch (error) {
       appendLog(`[NET] ${error instanceof Error ? error.message : "Invalid Gateway URL"}`, true);
     }
@@ -372,6 +385,7 @@ export default function ProgrammingWorkspace() {
         siteId,
         operation,
         firmware: operation === "erase" || operation === "read" ? null : firmware,
+        engineeringSessionId: engineeringSessionId.current ?? undefined,
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
         submissionGuard,
@@ -603,7 +617,7 @@ export default function ProgrammingWorkspace() {
       <section className="operationConfig" aria-label="Engineering programming parameters">
         <div className="compactFile">
           <div><b>{firmware?.name ?? t("engineeringProgramming.firmware")}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB` : t("engineeringProgramming.firmwareHint")}</small></div>
-          <label>{t("engineeringProgramming.browse")}<input aria-label="Engineering Firmware file" type="file" accept=".bin,application/octet-stream" disabled={batchRunning} onChange={event => setFirmware(event.target.files?.[0] ?? null)} /></label>
+          <label>{t("engineeringProgramming.browse")}<input aria-label="Engineering Firmware file" type="file" accept=".bin,application/octet-stream" disabled={targetLocked} onChange={event => setFirmware(event.target.files?.[0] ?? null)} /></label>
         </div>
         <div className="compactRead">
           <label>READ Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
