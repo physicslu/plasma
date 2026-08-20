@@ -127,7 +127,7 @@ function shortSha256(sha256: string): string {
 }
 
 function siteLabel(siteId: number): string {
-  return `SITE ${String(siteId).padStart(2, "0")}`;
+  return `SITE-${String(siteId).padStart(2, "0")}`;
 }
 
 function siteListLabel(ids: number[]): string {
