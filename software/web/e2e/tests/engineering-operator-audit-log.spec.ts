@@ -146,8 +146,8 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   await openProgramming(page);
   const log = page.getByLabel("Engineering job log");
   await expect(log).toContainText("[NET] [SESSION] NEW · fresh connection");
-  await expect(page.locator(".channelChecks label").first()).toContainText("SITE 01");
-  await expect(page.locator(".channelChecks label").nth(1)).toContainText("SITE 02");
+  await expect(page.locator(".channelChecks label").first()).toContainText("SITE-01");
+  await expect(page.locator(".channelChecks label").nth(1)).toContainText("SITE-02");
 
   await page.getByLabel("Engineering PPU", { exact: true }).selectOption(ppu2);
   await expect(log).toContainText(`[USR] [TARGET] SELECT · ${facilityId} / ${ppu2}`);
@@ -155,14 +155,14 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
   await page.getByLabel("選取 SITE 2").uncheck();
-  await expect(log).toContainText("[USR] [SITE] SELECTION · SITE 01");
+  await expect(log).toContainText("[USR] [SITE] SELECTION · SITE-01");
 
   await page.getByLabel("Engineering Firmware file").setInputFiles({
     name: "operator-audit.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(1024, 0x5a),
   });
-  await expect(log).toContainText("[USR] [FIRMWARE] SELECT · operator-audit.bin · 1.0 KiB");
+  await expect(log).toContainText("[USR] [IMG] SELECT · operator-audit.bin · 1.0 KiB");
 
   await page.getByLabel("Engineering batch erase").check();
   await expect(log).toContainText("[USR] [BATCH] OPERATIONS · ERASE");
@@ -170,18 +170,18 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   await page.locator(".executeBatch").click();
   await expect.poll(() => jobNumber).toBe(1);
   await expect(page.locator(".executeBatch")).toBeEnabled();
-  await expect(log).toContainText("[USR] [BATCH] EXECUTE · ERASE · SITE 01");
-  await expect(log).toContainText("[BAT] [BATCH] START ERASE · SITE 01");
-  await expect(log).toContainText("[PPU] [SITE 01] ERASE accepted · audit-job-1");
-  await expect(log).toContainText("[BAT] [BATCH] COMPLETE · success: SITE 01");
+  await expect(log).toContainText("[USR] [BATCH] EXECUTE · ERASE · SITE-01");
+  await expect(log).toContainText("[BAT] [BATCH] START ERASE · SITE-01");
+  await expect(log).toContainText("[PPU] [SITE-01] ERASE accepted · audit-job-1");
+  await expect(log).toContainText("[BAT] [BATCH] COMPLETE · success: SITE-01");
 
-  await expect(page.getByText("FW", { exact: true })).toBeVisible();
+  await expect(page.getByText("DAT", { exact: true })).toBeVisible();
   const logHeight = await log.evaluate(element => Number.parseFloat(getComputedStyle(element).height));
   expect(logHeight).toBeGreaterThanOrEqual(260);
 
   await page.getByLabel("Engineering log filter NET").uncheck();
   await page.getByLabel("Engineering log filter PPU").uncheck();
-  await page.getByLabel("Engineering log filter FW").uncheck();
+  await page.getByLabel("Engineering log filter DAT").uncheck();
   await page.getByLabel("Engineering log filter BAT").uncheck();
   await page.getByLabel("Engineering log filter SYS").uncheck();
 
@@ -191,7 +191,7 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   for (const category of await visibleEntries.evaluateAll(elements => elements.map(element => element.getAttribute("data-category")))) {
     expect(category).toBe("USR");
   }
-  await expect(log).not.toContainText("[PPU] [SITE 01] ERASE accepted");
+  await expect(log).not.toContainText("[PPU] [SITE-01] ERASE accepted");
   await expect(log).not.toContainText("[NET] [SESSION] NEW");
 
   const downloadPromise = page.waitForEvent("download");
@@ -200,8 +200,9 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   const path = await download.path();
   expect(path).not.toBeNull();
   const fileText = await readFile(path!, "utf8");
-  expect(fileText).toContain("[USR] [BATCH] EXECUTE · ERASE · SITE 01");
+  expect(fileText).toContain("[USR] [IMG] SELECT · operator-audit.bin · 1.0 KiB");
+  expect(fileText).toContain("[USR] [BATCH] EXECUTE · ERASE · SITE-01");
   expect(fileText).toContain("[NET] [SESSION] NEW · fresh connection");
-  expect(fileText).toContain("[PPU] [SITE 01] ERASE accepted · audit-job-1");
-  expect(fileText).toContain("[BAT] [BATCH] COMPLETE · success: SITE 01");
+  expect(fileText).toContain("[PPU] [SITE-01] ERASE accepted · audit-job-1");
+  expect(fileText).toContain("[BAT] [BATCH] COMPLETE · success: SITE-01");
 });
