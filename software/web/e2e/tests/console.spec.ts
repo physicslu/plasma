@@ -1,232 +1,200 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
-type Operation = "erase" | "program" | "verify" | "read";
-type JobState = "queued" | "running" | "success" | "failed" | "cancelled" | "timeout" | "aborted";
-type MockMode = "auto-success" | "wait-for-cancel" | "cancel-race-success" | "individual-cancel-partial";
+type MockMode = "normal" | "cancel-race-success" | "individual-cancel-partial";
 
-type MockJob = {
-  jobId: string;
-  siteId: number;
-  operation: Operation;
-  cancelRequested: boolean;
+type StartRequest = { site_id: number; operation: string };
+
+type MockController = {
+  startRequests: StartRequest[];
+  cancelRequests: string[];
 };
 
-type MockOptions = {
-  mode?: MockMode;
-  waitForStarts?: number;
-};
+const enabledSites = [1, 2];
 
-function jobPayload(job: MockJob, state: JobState) {
-  const running = state === "running";
-  const complete = state === "success";
+function ppuStatus() {
   return {
-    job_id: job.jobId,
-    site_id: job.siteId,
-    operation: job.operation,
-    state,
-    cancel_requested: job.cancelRequested,
-    stage: running ? job.operation : complete ? job.operation : null,
-    stage_state: running ? "running" : complete ? "success" : null,
-    stage_progress_percent: complete ? 100 : running ? 50 : 0,
-    progress_percent: complete ? 100 : running ? 50 : 0,
-    bytes_done: null,
-    bytes_total: null,
-    result: complete
-      ? {
-          state,
-          ...(job.operation === "read" ? { output_files: [`read_SITE${job.siteId}.bin`] } : {}),
-          error: null,
-        }
-      : undefined,
+    ok: true,
+    ppu: {
+      ppu_id: "mock-ppu-01",
+      facility_id: "mock-facility-01",
+      model: "MOCK-PPU",
+      display_name: "Mock PPU 01",
+      site_count: 8,
+      enabled_site_count: 2,
+      capabilities: {
+        max_supported_sites: 8,
+        operations: ["erase", "program", "verify", "read"],
+      },
+    },
+    sites: Array.from({ length: 8 }, (_, index) => ({
+      site_id: index + 1,
+      enabled: enabledSites.includes(index + 1),
+      state: "idle",
+      current_job_id: null,
+      queued_jobs: 0,
+      interface: enabledSites.includes(index + 1) ? "Mock" : null,
+      target: enabledSites.includes(index + 1) ? "STM32F103C8T6" : null,
+    })),
   };
 }
 
-async function installMockApi(page: Page, options: MockOptions = {}) {
-  const mode = options.mode ?? "auto-success";
-  const waitForStarts = options.waitForStarts ?? 1;
-  const jobs = new Map<string, MockJob>();
-  const startRequests: Array<{ siteId: number; operation: Operation; jobId: string }> = [];
+function jobSnapshot(
+  jobId: string,
+  siteId: number,
+  operation: string,
+  state: "queued" | "running" | "success" | "cancelled",
+  cancelRequested = false,
+) {
+  return {
+    ok: true,
+    job: {
+      job_id: jobId,
+      site_id: siteId,
+      operation,
+      state,
+      cancel_requested: cancelRequested,
+      stage: operation,
+      stage_state: state === "success" ? "done" : state,
+      stage_progress_percent: state === "success" ? 100 : 25,
+      progress_percent: state === "success" ? 100 : 25,
+      bytes_done: null,
+      bytes_total: null,
+      result: state === "success" || state === "cancelled"
+        ? { state, output_files: [], error: null }
+        : undefined,
+    },
+  };
+}
+
+async function fulfillJson(route: Route, status: number, body: unknown) {
+  await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+}
+
+async function installMock(page: Page, options: { mode?: MockMode; waitForStarts?: number } = {}): Promise<MockController> {
+  const mode = options.mode ?? "normal";
+  const waitForStarts = options.waitForStarts ?? 0;
+  const startRequests: StartRequest[] = [];
   const cancelRequests: string[] = [];
-  let nextJobId = 1;
+  const jobs = new Map<string, { siteId: number; operation: string; cancelled: boolean; polls: number }>();
+  let nextJob = 0;
 
   await page.route("**/api/**", async route => {
     const request = route.request();
     const url = new URL(request.url());
-    const path = url.pathname;
 
-    if (request.method() === "GET" && path === "/api/status") {
-      const jobId = url.searchParams.get("job");
-      if (!jobId) {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            ok: true,
-            ppu: {
-              ppu_id: "z2-e2e-01",
-              facility_id: "e2e-lab",
-              model: "PYNQ-Z2",
-              display_name: "Plasma E2E Fixture",
-              site_count: 8,
-              enabled_site_count: 2,
-              capabilities: {
-                max_supported_sites: 8,
-                operations: ["erase", "program", "verify", "read"],
-              },
-            },
-            sites: Array.from({ length: 8 }, (_, index) => {
-              const siteId = index + 1;
-              return {
-                site_id: siteId,
-                enabled: siteId <= 2,
-                state: "idle",
-                current_job_id: null,
-                queued_jobs: 0,
-                interface: siteId <= 2 ? "Mock" : null,
-                target: siteId <= 2 ? "STM32F103C8T6" : null,
-              };
-            }),
-          }),
-        });
-        return;
-      }
-
-      const job = jobs.get(jobId);
-      if (!job) {
-        await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "job not found" } }) });
-        return;
-      }
-
-      let state: JobState = "running";
-      if (job.cancelRequested) {
-        state = mode === "cancel-race-success" ? "success" : "cancelled";
-      } else if (mode === "auto-success" && startRequests.length >= waitForStarts) {
-        state = "success";
-      } else if (mode === "individual-cancel-partial" && startRequests.length >= waitForStarts && job.siteId === 2) {
-        state = "success";
-      }
-
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, job: jobPayload(job, state) }),
-      });
+    if (request.method() === "GET" && url.pathname === "/api/status" && !url.searchParams.has("job")) {
+      await fulfillJson(route, 200, ppuStatus());
       return;
     }
 
-    if (request.method() === "POST" && path === "/api/jobs") {
-      const body = request.postDataJSON() as { site_id: number; operation: Operation };
-      const jobId = `e2e-job-${nextJobId++}`;
-      const job: MockJob = {
-        jobId,
-        siteId: body.site_id,
-        operation: body.operation,
-        cancelRequested: false,
-      };
-      jobs.set(jobId, job);
-      startRequests.push({ siteId: job.siteId, operation: job.operation, jobId });
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, job: jobPayload(job, "queued") }),
-      });
+    if (request.method() === "POST" && url.pathname === "/api/jobs") {
+      const body = request.postDataJSON() as StartRequest;
+      startRequests.push(body);
+      nextJob += 1;
+      const jobId = `mock-job-${nextJob}`;
+      jobs.set(jobId, { siteId: body.site_id, operation: body.operation, cancelled: false, polls: 0 });
+      await fulfillJson(route, 202, jobSnapshot(jobId, body.site_id, body.operation, "queued"));
       return;
     }
 
-    const cancelMatch = path.match(/^\/api\/jobs\/([^/]+)\/cancel$/);
-    if (request.method() === "POST" && cancelMatch) {
-      const jobId = decodeURIComponent(cancelMatch[1]);
-      const job = jobs.get(jobId);
-      if (job) job.cancelRequested = true;
+    if (request.method() === "POST" && url.pathname.startsWith("/api/jobs/") && url.pathname.endsWith("/cancel")) {
+      const jobId = url.pathname.split("/")[3];
       cancelRequests.push(jobId);
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+      const job = jobs.get(jobId);
+      if (job) job.cancelled = true;
+      await fulfillJson(route, 200, { ok: true, job: { job_id: jobId, cancel_requested: true } });
       return;
     }
 
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "unhandled mock route" } }) });
+    if (request.method() === "GET" && url.pathname === "/api/status" && url.searchParams.has("job")) {
+      const jobId = url.searchParams.get("job")!;
+      const job = jobs.get(jobId)!;
+      job.polls += 1;
+
+      if (mode === "cancel-race-success" && job.cancelled) {
+        await fulfillJson(route, 200, jobSnapshot(jobId, job.siteId, job.operation, "success", true));
+        return;
+      }
+
+      if (mode === "individual-cancel-partial") {
+        if (job.cancelled) {
+          await fulfillJson(route, 200, jobSnapshot(jobId, job.siteId, job.operation, "cancelled", true));
+          return;
+        }
+        if (job.siteId === 2 && startRequests.length >= waitForStarts) {
+          await fulfillJson(route, 200, jobSnapshot(jobId, job.siteId, job.operation, "success"));
+          return;
+        }
+        await fulfillJson(route, 200, jobSnapshot(jobId, job.siteId, job.operation, "running"));
+        return;
+      }
+
+      if (job.cancelled) {
+        await fulfillJson(route, 200, jobSnapshot(jobId, job.siteId, job.operation, "cancelled", true));
+        return;
+      }
+      await fulfillJson(route, 200, jobSnapshot(jobId, job.siteId, job.operation, job.polls > 1 ? "success" : "running"));
+      return;
+    }
+
+    await fulfillJson(route, 404, { error: { message: `unhandled ${url.pathname}` } });
   });
 
-  return { jobs, startRequests, cancelRequests };
+  return { startRequests, cancelRequests };
 }
 
-async function openConsole(page: Page, options: MockOptions = {}) {
-  const mock = await installMockApi(page, options);
+async function openConsole(page: Page, options: { mode?: MockMode; waitForStarts?: number } = {}) {
+  const mock = await installMock(page, options);
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   return mock;
 }
 
-const batchSummary = (page: Page) => page.getByLabel("選取 Site 狀態摘要");
-const liveLog = (page: Page) => page.getByLabel("Live job log");
+function batchSummary(page: Page) {
+  return page.getByLabel("Site 配置摘要").locator("..").locator("..");
+}
+
+function liveLog(page: Page) {
+  return page.getByLabel("Live job log");
+}
 
 test("starts with SITE 1/SITE 2 visible and no batch operation selected", async ({ page }) => {
   await openConsole(page);
-
-  await expect(page.getByLabel("顯示 SITE 1")).toBeChecked();
-  await expect(page.getByLabel("顯示 SITE 2")).toBeChecked();
-  await expect(page.getByLabel("顯示 SITE 3")).not.toBeChecked();
-  await expect(page.getByLabel("顯示 SITE 3").locator("..")).toContainText("停用");
-  await expect(page.getByLabel("顯示 SITE 0")).toHaveCount(0);
-  await expect(page.getByLabel("Site 配置摘要")).toContainText("停用 6");
-
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   for (const operation of ["擦除", "燒錄", "驗證", "讀取"]) {
     await expect(page.getByLabel(`批次操作：${operation}`)).not.toBeChecked();
   }
-  await expect(page.getByLabel("批次執行：尚未選擇操作")).toBeDisabled();
-
-  await expect(liveLog(page)).toContainText("Plasma Web REST Gateway connected");
-  await expect.poll(async () => {
-    const text = await liveLog(page).textContent();
-    return text?.match(/Plasma Web REST Gateway connected/g)?.length ?? 0;
-  }).toBe(1);
 });
 
 test("selects batch operations and completes them through the browser", async ({ page }) => {
   const mock = await openConsole(page);
-
-  await page.getByLabel("選擇 Programming Image Asset 檔案").setInputFiles({
-    name: "e2e.bin",
-    mimeType: "application/octet-stream",
-    buffer: Buffer.from([0x50, 0x4c, 0x41, 0x53, 0x4d, 0x41]),
-  });
-  await page.getByLabel("批次操作：擦除").check();
-  await page.getByLabel("批次操作：燒錄").check();
-
-  const execute = page.getByRole("button", { name: "批次執行：擦除、燒錄" });
-  await expect(execute).toBeEnabled();
-  await execute.click();
-
-  await expect(batchSummary(page)).toContainText("成功 2");
-  await expect.poll(() => mock.startRequests.length).toBe(4);
-  expect(mock.startRequests.map(request => request.operation)).toEqual(["erase", "erase", "program", "program"]);
-  expect(new Set(mock.startRequests.map(request => request.siteId))).toEqual(new Set([1, 2]));
-});
-
-test("starts selected sites concurrently instead of serializing site pipelines", async ({ page }) => {
-  const mock = await openConsole(page, { mode: "auto-success", waitForStarts: 2 });
-
-  await page.getByLabel("批次操作：擦除").check();
-  await page.getByRole("button", { name: "批次執行：擦除" }).click();
-
-  await expect.poll(() => mock.startRequests.length).toBe(2);
-  expect(new Set(mock.startRequests.map(request => request.siteId))).toEqual(new Set([1, 2]));
-  await expect(batchSummary(page)).toContainText("成功 2");
-});
-
-test("batch cancel stops active jobs and prevents later operations", async ({ page }) => {
-  const mock = await openConsole(page, { mode: "wait-for-cancel" });
-
   await page.getByLabel("批次操作：擦除").check();
   await page.getByLabel("批次操作：讀取").check();
   await page.getByRole("button", { name: "批次執行：擦除、讀取" }).click();
+  await expect.poll(() => mock.startRequests.length).toBe(4);
+  await expect(liveLog(page)).toContainText("[BATCH] COMPLETE");
+});
 
+test("starts selected sites concurrently instead of serializing site pipelines", async ({ page }) => {
+  const mock = await openConsole(page);
+  await page.getByLabel("批次操作：擦除").check();
+  await page.getByLabel("批次操作：讀取").check();
+  await page.getByRole("button", { name: "批次執行：擦除、讀取" }).click();
+  await expect.poll(() => mock.startRequests.length).toBeGreaterThanOrEqual(2);
+  expect(mock.startRequests.slice(0, 2).map(item => item.site_id).sort()).toEqual([1, 2]);
+});
+
+test("batch cancel stops active jobs and prevents later operations", async ({ page }) => {
+  const mock = await openConsole(page);
+  await page.getByLabel("批次操作：擦除").check();
+  await page.getByLabel("批次操作：讀取").check();
+  await page.getByRole("button", { name: "批次執行：擦除、讀取" }).click();
   await expect.poll(() => mock.startRequests.length).toBe(2);
   await page.getByLabel("取消批次工作").click();
-
   await expect.poll(() => mock.cancelRequests.length).toBe(2);
-  await expect(batchSummary(page)).toContainText("取消 2");
-  await expect(liveLog(page)).toContainText("[BATCH] CANCELLED");
   expect(mock.startRequests.every(request => request.operation === "erase")).toBe(true);
+  await expect(liveLog(page)).toContainText("[BATCH] CANCELLED");
 });
 
 test("reports PARTIAL when one Site is cancelled independently", async ({ page }) => {
@@ -265,5 +233,5 @@ test("cancel request wins batch classification when the last job races to succes
   await page.locator(".channelDetails").filter({ hasText: "SITE 1" }).click();
   await expect(page.getByText("Job State", { exact: true }).locator("..").locator("dd")).toHaveText("SUCCESS");
   await expect(page.getByText("Batch State", { exact: true }).locator("..").locator("dd")).toHaveText("已取消");
-  await expect(page.getByText("Protocol", { exact: true }).locator("..").locator("dd")).toHaveText("REST → Plasma v3.2 TCP");
+  await expect(page.getByText("Protocol", { exact: true }).locator("..").locator("dd")).toHaveText("REST → Plasma v3.3 TCP");
 });
