@@ -37,6 +37,8 @@ class MockInterface(BaseInterface):
     flash_size: int = 256 * 1024
     default_delay_s: float = 0.0
     delays: dict[str, float] = field(default_factory=dict)
+    throughput_bytes_per_s: dict[str, float] = field(default_factory=dict)
+    operation_overheads_s: dict[str, float] = field(default_factory=dict)
     failures: dict[str, int] = field(default_factory=dict)
     failure_recoverable: bool = True
     progress_steps: int = 20
@@ -65,24 +67,65 @@ class MockInterface(BaseInterface):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock failure_recoverable must be boolean")
         if not isinstance(self.delays, dict) or not isinstance(self.failures, dict):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock delays and failures must be objects")
+        if not isinstance(self.throughput_bytes_per_s, dict) or not isinstance(self.operation_overheads_s, dict):
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "mock throughput_bytes_per_s and operation_overheads_s must be objects",
+            )
         self.delays = dict(self.delays)
+        self.throughput_bytes_per_s = dict(self.throughput_bytes_per_s)
+        self.operation_overheads_s = dict(self.operation_overheads_s)
         self.failures = dict(self.failures)
         for operation, delay in self.delays.items():
-            if operation not in OPERATION_ERRORS:
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unknown mock delay operation: {operation}")
-            if (
-                isinstance(delay, bool)
-                or not isinstance(delay, (int, float))
-                or not math.isfinite(delay)
-                or delay < 0
-            ):
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, f"invalid mock delay for {operation}")
+            self._validate_operation_name(operation, "delay")
+            self._validate_finite_number(delay, f"invalid mock delay for {operation}", minimum=0.0)
+        for operation, throughput in self.throughput_bytes_per_s.items():
+            self._validate_operation_name(operation, "throughput")
+            self._validate_finite_number(
+                throughput,
+                f"invalid mock throughput for {operation}",
+                minimum=0.0,
+                strictly_greater=True,
+            )
+        for operation, overhead in self.operation_overheads_s.items():
+            self._validate_operation_name(operation, "overhead")
+            self._validate_finite_number(
+                overhead,
+                f"invalid mock operation overhead for {operation}",
+                minimum=0.0,
+            )
         for operation, count in self.failures.items():
             if operation not in OPERATION_ERRORS:
                 raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unknown mock failure operation: {operation}")
             if isinstance(count, bool) or not isinstance(count, int) or count < 0:
                 raise PlasmaError(ErrorCode.CONFIG_INVALID, f"invalid mock failure count for {operation}")
         self.memory = bytearray([0xFF]) * self.flash_size
+
+    @staticmethod
+    def _validate_operation_name(operation: str, option_name: str) -> None:
+        if operation not in OPERATION_ERRORS:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                f"unknown mock {option_name} operation: {operation}",
+            )
+
+    @staticmethod
+    def _validate_finite_number(
+        value: Any,
+        message: str,
+        *,
+        minimum: float,
+        strictly_greater: bool = False,
+    ) -> None:
+        invalid = (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value < minimum
+            or (strictly_greater and value <= minimum)
+        )
+        if invalid:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, message)
 
     @classmethod
     def from_options(
@@ -94,6 +137,8 @@ class MockInterface(BaseInterface):
             "flash_size",
             "default_delay_s",
             "delays",
+            "throughput_bytes_per_s",
+            "operation_overheads_s",
             "failures",
             "failure_recoverable",
             "progress_steps",
@@ -107,6 +152,26 @@ class MockInterface(BaseInterface):
             )
         return cls(tracker=tracker, **options)
 
+    def estimated_delay_s(self, operation: str, total_bytes: int) -> float:
+        """Return the configured Mock execution time for one operation.
+
+        Explicit per-operation ``delays`` remain a compatibility override. If no
+        override is present and a throughput is configured, timing is modeled as
+        fixed operation overhead plus byte count divided by throughput. Without
+        a throughput profile the historical ``default_delay_s`` behavior remains.
+        """
+        if operation not in OPERATION_ERRORS:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unknown mock operation: {operation}")
+        if isinstance(total_bytes, bool) or not isinstance(total_bytes, int) or total_bytes < 0:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "mock timing byte count must be non-negative")
+        if operation in self.delays:
+            return max(0.0, float(self.delays[operation]))
+        throughput = self.throughput_bytes_per_s.get(operation)
+        if throughput is None:
+            return max(0.0, float(self.default_delay_s))
+        overhead = float(self.operation_overheads_s.get(operation, 0.0))
+        return max(0.0, overhead + total_bytes / float(throughput))
+
     async def _before(
         self,
         operation: str,
@@ -117,7 +182,7 @@ class MockInterface(BaseInterface):
         if self.tracker:
             self.tracker.enter()
         try:
-            delay_s = max(0.0, float(self.delays.get(operation, self.default_delay_s)))
+            delay_s = self.estimated_delay_s(operation, total_units)
             steps = max(1, int(self.progress_steps))
             if progress:
                 await progress(0, total_units)
@@ -152,7 +217,9 @@ class MockInterface(BaseInterface):
             )
 
     async def erase(self, progress: ProgressCallback | None = None) -> None:
-        await self._before("erase", progress, 100)
+        # Mock erase currently models a full-chip erase, so its size basis is the
+        # configured target flash size rather than the selected firmware length.
+        await self._before("erase", progress, self.flash_size)
         self.memory[:] = bytes([0xFF]) * self.flash_size
 
     async def program(
