@@ -63,6 +63,11 @@ type TargetSelection = { facilityId: string; ppuId: string };
 type ConnectionState = "connecting" | "online" | "offline";
 type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "failed";
 type BatchTerminalState = "success" | "cancelled" | "failed";
+type PendingRestore = {
+  target: TargetSelection;
+  siteIds: number[] | null;
+  targetRestored: boolean;
+};
 
 const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
 const MAX_LOG_ENTRIES = 1000;
@@ -138,6 +143,10 @@ function operationListLabel(operations: Operation[]): string {
   return operations.length ? operations.map(item => item.toUpperCase()).join(" → ") : "none";
 }
 
+function sameTarget(left: TargetSelection, right: TargetSelection): boolean {
+  return left.facilityId === right.facilityId && left.ppuId === right.ppuId;
+}
+
 export default function ProgrammingWorkspace() {
   const { t } = useI18n();
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
@@ -167,6 +176,7 @@ export default function ProgrammingWorkspace() {
   const engineeringSessionId = useRef<string | null>(null);
   const logSequence = useRef(0);
   const siteSelectionTarget = useRef<string | null>(null);
+  const pendingRestore = useRef<PendingRestore | null>(null);
 
   const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === selection.ppuId) ?? null;
@@ -235,6 +245,7 @@ export default function ProgrammingWorkspace() {
   }, []);
 
   const switchTarget = useCallback((next: TargetSelection) => {
+    pendingRestore.current = null;
     resetTargetRuntime();
     setSelection(next);
     if (next.facilityId && next.ppuId) appendLog(`[TARGET] ${next.facilityId} / ${next.ppuId}`);
@@ -286,7 +297,19 @@ export default function ProgrammingWorkspace() {
         setCatalog(next);
         setCatalogError(null);
         setConnection("online");
-        setSelection(current => validSelection(next, current));
+        const restore = pendingRestore.current;
+        if (restore) {
+          const resolved = validSelection(next, restore.target);
+          setSelection(resolved);
+          restore.targetRestored = sameTarget(resolved, restore.target);
+          if (restore.targetRestored) {
+            appendLog(`[TARGET] RESTORED · ${restore.target.facilityId} / ${restore.target.ppuId}`, false, "SYS");
+          } else {
+            pendingRestore.current = null;
+          }
+        } else {
+          setSelection(current => validSelection(next, current));
+        }
         appendLog(`[ENGINEERING] Provider ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
       } catch (error) {
         if (cancelled) return;
@@ -326,15 +349,28 @@ export default function ProgrammingWorkspace() {
         setSites(current => status.sites.map(snapshot => (
           siteFromStatus(snapshot, current.find(site => site.id === snapshot.site_id))
         )));
-        setSelectedSiteIdsState(current => {
-          const enabledIds = status.sites.filter(site => site.enabled).map(site => site.site_id);
-          if (siteSelectionTarget.current !== targetSelectionKey) {
-            siteSelectionTarget.current = targetSelectionKey;
-            return enabledIds;
+        const enabledIds = status.sites.filter(site => site.enabled).map(site => site.site_id);
+        const restore = pendingRestore.current;
+        if (restore?.targetRestored && sameTarget(restore.target, selection)) {
+          siteSelectionTarget.current = targetSelectionKey;
+          if (restore.siteIds === null) {
+            setSelectedSiteIdsState(enabledIds);
+          } else {
+            const restoredIds = restore.siteIds.filter(id => availableIds.has(id));
+            setSelectedSiteIdsState(restoredIds);
+            appendLog(`[SITE] RESTORED · ${siteListLabel(restoredIds)}`, false, "SYS");
           }
-          if (current === null) return enabledIds;
-          return current.filter(id => availableIds.has(id));
-        });
+          pendingRestore.current = null;
+        } else {
+          setSelectedSiteIdsState(current => {
+            if (siteSelectionTarget.current !== targetSelectionKey) {
+              siteSelectionTarget.current = targetSelectionKey;
+              return enabledIds;
+            }
+            if (current === null) return enabledIds;
+            return current.filter(id => availableIds.has(id));
+          });
+        }
 
         const jobIds = [...new Set(Object.values(trackedJobs.current))];
         const jobs = await Promise.all(jobIds.map(jobId => getJob(targetApiBase!, jobId)));
@@ -356,7 +392,7 @@ export default function ProgrammingWorkspace() {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [targetApiBase, targetSelectionKey, connectionGeneration, applyJob, appendLog]);
+  }, [targetApiBase, targetSelectionKey, connectionGeneration, selection, applyJob, appendLog]);
 
   function connect(event: FormEvent) {
     event.preventDefault();
@@ -367,6 +403,13 @@ export default function ProgrammingWorkspace() {
     }
     try {
       const normalized = normalizeApiBase(apiDraft);
+      pendingRestore.current = selection.facilityId && selection.ppuId
+        ? {
+          target: { ...selection },
+          siteIds: selectedSiteIdsState === null ? null : [...selectedSiteIdsState],
+          targetRestored: false,
+        }
+        : null;
       window.localStorage.setItem("plasma-api-base", normalized);
       resetTargetRuntime(true);
       setCatalog(null);
@@ -549,7 +592,7 @@ export default function ProgrammingWorkspace() {
     setBatchRunning(true);
     setBatchCancelling(false);
     setBatchSiteStates(Object.fromEntries(siteIds.map(id => [id, "running"])) as Record<number, BatchSiteState>);
-    appendLog(`[BATCH] START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteListLabel(siteIds)}`);
+    appendLog(`START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteListLabel(siteIds)}`, false, "BAT");
     try {
       await Promise.all(siteIds.map(async siteId => {
         for (const operation of operations) {
@@ -616,8 +659,9 @@ export default function ProgrammingWorkspace() {
             : "COMPLETE";
       const label = (ids: number[]) => ids.length ? siteListLabel(ids) : "—";
       appendLog(
-        `[BATCH] ${outcome} · success: ${label(successful)} · cancelled: ${label(cancelled)} · failed: ${label(failed)}`,
+        `${outcome} · success: ${label(successful)} · cancelled: ${label(cancelled)} · failed: ${label(failed)}`,
         failed.length > 0,
+        "BAT",
       );
     } finally {
       if (batchLifecycle.current === lifecycle) batchLifecycle.current = null;
