@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testIgnore: ["mock-cd-runtime.spec.ts", "engineering-programming-image-cache-runtime.spec.ts"],
+  testIgnore: ["mock-cd-runtime.spec.ts", "engineering-programming-asset-cache-runtime.spec.ts"],
   snapshotPathTemplate: "{testDir}/__snapshots__/{testFilePath}/{arg}{ext}",
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
