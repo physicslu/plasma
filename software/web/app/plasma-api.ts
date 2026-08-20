@@ -59,7 +59,24 @@ export type EngineeringTargetCatalog = {
   facility_count: number;
   ppu_count: number;
   site_count: number;
+  firmware_scope?: string;
   facilities: EngineeringFacilityTarget[];
+};
+
+export type EngineeringSession = {
+  session_id: string;
+  firmware_cache_scope: string;
+  previous_session_cleared: boolean;
+};
+
+type FirmwareFingerprint = {
+  firmware_name: string;
+  firmware_size: number;
+  firmware_sha256: string;
+};
+
+type FirmwareCacheStatus = FirmwareFingerprint & {
+  cache_hit: boolean;
 };
 
 // Transitional shapes accepted only from protocol/API v3.1 backends.
@@ -209,9 +226,10 @@ async function requestJson<T>(
   apiBase: string,
   path: string,
   init?: RequestInit,
+  timeoutMs = 10_000,
 ): Promise<T> {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 10_000);
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${apiBase}${path}`, {
       ...init,
@@ -248,6 +266,84 @@ export async function getEngineeringTargets(apiBase: string): Promise<Engineerin
   return await requestJson<EngineeringTargetCatalog>(apiBase, "/api/engineering/targets");
 }
 
+export async function beginEngineeringSession(
+  apiBase: string,
+  previousSessionId?: string,
+): Promise<EngineeringSession> {
+  const payload = await requestJson<{ ok: boolean; session: EngineeringSession }>(
+    apiBase,
+    "/api/engineering/session",
+    {
+      method: "POST",
+      body: JSON.stringify(previousSessionId ? { previous_session_id: previousSessionId } : {}),
+    },
+  );
+  return payload.session;
+}
+
+const fingerprintByFile = new WeakMap<File, Promise<FirmwareFingerprint>>();
+const firmwareEnsureInFlight = new Map<string, Promise<FirmwareFingerprint>>();
+
+async function fingerprintFile(file: File): Promise<FirmwareFingerprint> {
+  let pending = fingerprintByFile.get(file);
+  if (!pending) {
+    pending = file.arrayBuffer().then(async buffer => {
+      const digest = await window.crypto.subtle.digest("SHA-256", buffer);
+      const firmwareSha256 = Array.from(new Uint8Array(digest))
+        .map(value => value.toString(16).padStart(2, "0"))
+        .join("");
+      return {
+        firmware_name: file.name,
+        firmware_size: file.size,
+        firmware_sha256: firmwareSha256,
+      };
+    });
+    fingerprintByFile.set(file, pending);
+  }
+  return await pending;
+}
+
+async function ensureEngineeringFirmware(
+  apiBase: string,
+  sessionId: string,
+  firmware: File,
+): Promise<FirmwareFingerprint> {
+  const fingerprint = await fingerprintFile(firmware);
+  const key = `${sessionId}|${apiBase}|${fingerprint.firmware_sha256}`;
+  const existing = firmwareEnsureInFlight.get(key);
+  if (existing) return await existing;
+
+  const ensure = (async () => {
+    const checked = await requestJson<{ ok: boolean; firmware: FirmwareCacheStatus }>(
+      apiBase,
+      "/api/firmware/check",
+      {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId, ...fingerprint }),
+      },
+    );
+    if (!checked.firmware.cache_hit) {
+      await requestJson(
+        apiBase,
+        `/api/firmware?session_id=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(fingerprint.firmware_name)}&sha256=${encodeURIComponent(fingerprint.firmware_sha256)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: firmware,
+        },
+        120_000,
+      );
+    }
+    return fingerprint;
+  })();
+  firmwareEnsureInFlight.set(key, ensure);
+  try {
+    return await ensure;
+  } finally {
+    firmwareEnsureInFlight.delete(key);
+  }
+}
+
 export async function getPPUStatus(apiBase: string): Promise<PPUStatus> {
   const payload = await requestJson<StatusPayload>(apiBase, "/api/status");
   return {
@@ -277,34 +373,58 @@ export async function startJob(
     siteId: number;
     operation: Operation;
     firmware?: File | null;
+    engineeringSessionId?: string;
     offset?: number;
     length?: number;
     submissionGuard?: () => boolean;
   },
 ): Promise<JobSnapshot> {
-  const firmwareBase64 = options.firmware
-    ? await fileToBase64(options.firmware)
-    : "";
+  const usesFirmware = options.operation === "program" || options.operation === "verify";
+  const engineeringTarget = apiBase.includes("/api/engineering/targets/");
+  let fingerprint: FirmwareFingerprint | null = null;
+  let firmwareBase64 = "";
+
+  if (usesFirmware && options.firmware) {
+    if (engineeringTarget) {
+      if (!options.engineeringSessionId) {
+        throw new PlasmaApiError("Engineering connection session is not ready");
+      }
+      fingerprint = await ensureEngineeringFirmware(
+        apiBase,
+        options.engineeringSessionId,
+        options.firmware,
+      );
+    } else {
+      firmwareBase64 = await fileToBase64(options.firmware);
+    }
+  }
+
   if (options.submissionGuard && !options.submissionGuard()) {
     throw new PlasmaSubmissionBlockedError();
   }
+
+  const body: Record<string, unknown> = {
+    site_id: options.siteId,
+    operation: options.operation,
+  };
+  if (fingerprint && options.engineeringSessionId) {
+    body.session_id = options.engineeringSessionId;
+    body.firmware_name = fingerprint.firmware_name;
+    body.firmware_sha256 = fingerprint.firmware_sha256;
+  } else if (usesFirmware) {
+    body.firmware_name = options.firmware?.name;
+    body.firmware_base64 = firmwareBase64;
+    body.timeout_s = 30;
+  }
+  if (options.operation === "read") {
+    body.offset = options.offset ?? 0;
+    body.length = options.length ?? 256;
+  }
+
   const payload = await requestJson<{ ok: boolean; job: WireJobSnapshot }>(
     apiBase,
     "/api/jobs",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        site_id: options.siteId,
-        operation: options.operation,
-        firmware_name: options.firmware?.name,
-        firmware_base64: firmwareBase64,
-        ...(options.operation === "read" ? {
-          offset: options.offset ?? 0,
-          length: options.length ?? 256,
-        } : {}),
-        timeout_s: 30,
-      }),
-    },
+    { method: "POST", body: JSON.stringify(body) },
   );
   return normalizeJobSnapshot(payload.job);
 }

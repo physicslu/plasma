@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
 from plasma_core.enums import JobState, Operation
+from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
 from plasma_web.engineering_targets import MockEngineeringPPUProvider
 
@@ -14,7 +16,8 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.temporary = tempfile.TemporaryDirectory()
-        cls.provider = MockEngineeringPPUProvider(Path(cls.temporary.name))
+        cls.root = Path(cls.temporary.name)
+        cls.provider = MockEngineeringPPUProvider(cls.root)
         cls.provider.start()
 
     @classmethod
@@ -31,6 +34,19 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.01)
         self.fail(f"job did not become terminal: {job_id}")
 
+    def cache_firmware(self, facility_id: str, ppu_id: str, firmware: bytes, name: str = "test.bin") -> tuple[str, str]:
+        session_id = self.provider.begin_session()["session"]["session_id"]
+        sha256 = hashlib.sha256(firmware).hexdigest()
+        self.provider.cache_firmware(
+            session_id,
+            facility_id,
+            ppu_id,
+            name,
+            sha256,
+            firmware,
+        )
+        return session_id, sha256
+
     def test_catalog_is_three_facilities_four_ppus_each_and_sixty_sites(self) -> None:
         catalog = self.provider.catalog()
         self.assertTrue(catalog["ok"])
@@ -38,6 +54,7 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(catalog["facility_count"], 3)
         self.assertEqual(catalog["ppu_count"], 12)
         self.assertEqual(catalog["site_count"], 60)
+        self.assertEqual(catalog["firmware_scope"], "connection-session-and-ppu")
         self.assertEqual(len(catalog["facilities"]), 3)
         for facility in catalog["facilities"]:
             self.assertEqual(len(facility["ppus"]), 4)
@@ -47,6 +64,7 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
         profile = self.provider.catalog()["timing_profile"]
         self.assertEqual(profile["model"], "fixed-overhead-plus-bytes-over-throughput")
         self.assertEqual(profile["flash_size_bytes"], 4 * 1024 * 1024)
+        self.assertEqual(profile["operation_timeout_s"], 90.0)
 
         program_bytes_per_s = profile["throughput_bytes_per_s"]["program"]
         program_overhead_s = profile["operation_overheads_s"]["program"]
@@ -59,6 +77,72 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
             + profile["flash_size_bytes"] / profile["throughput_bytes_per_s"]["erase"]
         )
         self.assertAlmostEqual(erase_s, 3.0)
+
+    def test_session_cache_miss_upload_hit_change_and_reconnect_reset(self) -> None:
+        facility_id = "mock-facility-02"
+        ppu_id = "mock-facility-02-ppu-03"
+        other_ppu_id = "mock-facility-02-ppu-04"
+        firmware_a = b"A" * 4096
+        firmware_b = b"B" * 4096
+        sha_a = hashlib.sha256(firmware_a).hexdigest()
+        sha_b = hashlib.sha256(firmware_b).hexdigest()
+
+        first_session = self.provider.begin_session()["session"]["session_id"]
+        miss = self.provider.firmware_cache_status(
+            first_session, facility_id, ppu_id, "A.bin", len(firmware_a), sha_a
+        )
+        self.assertFalse(miss["firmware"]["cache_hit"])
+
+        uploaded = self.provider.cache_firmware(
+            first_session, facility_id, ppu_id, "A.bin", sha_a, firmware_a
+        )
+        self.assertTrue(uploaded["firmware"]["uploaded"])
+        hit = self.provider.firmware_cache_status(
+            first_session, facility_id, ppu_id, "A.bin", len(firmware_a), sha_a
+        )
+        self.assertTrue(hit["firmware"]["cache_hit"])
+
+        other_ppu_miss = self.provider.firmware_cache_status(
+            first_session, facility_id, other_ppu_id, "A.bin", len(firmware_a), sha_a
+        )
+        self.assertFalse(other_ppu_miss["firmware"]["cache_hit"])
+
+        changed_file_miss = self.provider.firmware_cache_status(
+            first_session, facility_id, ppu_id, "B.bin", len(firmware_b), sha_b
+        )
+        self.assertFalse(changed_file_miss["firmware"]["cache_hit"])
+        self.provider.cache_firmware(
+            first_session, facility_id, ppu_id, "B.bin", sha_b, firmware_b
+        )
+        old_file_is_replaced = self.provider.firmware_cache_status(
+            first_session, facility_id, ppu_id, "A.bin", len(firmware_a), sha_a
+        )
+        self.assertFalse(old_file_is_replaced["firmware"]["cache_hit"])
+
+        second_session_payload = self.provider.begin_session(first_session)["session"]
+        self.assertTrue(second_session_payload["previous_session_cleared"])
+        second_session = second_session_payload["session_id"]
+        reconnect_miss = self.provider.firmware_cache_status(
+            second_session, facility_id, ppu_id, "B.bin", len(firmware_b), sha_b
+        )
+        self.assertFalse(reconnect_miss["firmware"]["cache_hit"])
+        with self.assertRaises(PlasmaError):
+            self.provider.firmware_cache_status(
+                first_session, facility_id, ppu_id, "B.bin", len(firmware_b), sha_b
+            )
+
+        self.assertFalse(list(self.root.rglob("firmware")), "firmware cache must stay in memory")
+
+    def test_upload_rejects_fingerprint_mismatch(self) -> None:
+        facility_id = "mock-facility-01"
+        ppu_id = "mock-facility-01-ppu-01"
+        session_id = self.provider.begin_session()["session"]["session_id"]
+        firmware = b"payload"
+        wrong_sha = hashlib.sha256(b"other").hexdigest()
+        with self.assertRaises(PlasmaError):
+            self.provider.cache_firmware(
+                session_id, facility_id, ppu_id, "bad.bin", wrong_sha, firmware
+            )
 
     async def test_each_mock_ppu_reports_its_own_canonical_topology(self) -> None:
         catalog = self.provider.catalog()
@@ -74,15 +158,18 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
                         list(range(1, ppu["site_count"] + 1)),
                     )
 
-    async def test_job_is_executed_by_the_selected_mock_ppu(self) -> None:
+    async def test_job_is_executed_by_selected_ppu_using_session_cached_firmware(self) -> None:
         facility_id = "mock-facility-02"
         ppu_id = "mock-facility-02-ppu-03"  # six-Site PPU
         firmware = b"\x11\x22\x33\x44" * 64
+        session_id, sha256 = self.cache_firmware(facility_id, ppu_id, firmware)
 
         accepted = await self.provider.start_job(
             facility_id,
             ppu_id,
-            JobRequest(site_id=6, operation=Operation.PROGRAM, firmware=firmware),
+            JobRequest(site_id=6, operation=Operation.PROGRAM),
+            session_id=session_id,
+            firmware_sha256=sha256,
         )
         job = await self.wait_terminal(facility_id, ppu_id, accepted["job"]["job_id"])
         self.assertEqual(job["site_id"], 6)
@@ -95,14 +182,17 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
         other = await self.provider.status("mock-facility-02", "mock-facility-02-ppu-02")
         self.assertTrue(all(site["latest_job"] is None for site in other["sites"]))
 
-    async def test_size_aware_program_has_a_real_cancellation_window(self) -> None:
+    async def test_size_aware_program_has_a_real_cancellation_window_with_cached_firmware(self) -> None:
         facility_id = "mock-facility-01"
         ppu_id = "mock-facility-01-ppu-01"
         firmware = bytes((index % 251 for index in range(100 * 1024)))
+        session_id, sha256 = self.cache_firmware(facility_id, ppu_id, firmware, "100k.bin")
         accepted = await self.provider.start_job(
             facility_id,
             ppu_id,
-            JobRequest(site_id=1, operation=Operation.PROGRAM, firmware=firmware),
+            JobRequest(site_id=1, operation=Operation.PROGRAM),
+            session_id=session_id,
+            firmware_sha256=sha256,
         )
         job_id = accepted["job"]["job_id"]
 
@@ -112,6 +202,103 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
         job = await self.wait_terminal(facility_id, ppu_id, job_id)
         self.assertEqual(job["state"], "cancelled")
         self.assertTrue(job["cancel_requested"])
+
+    async def test_two_sites_can_reuse_one_ppu_session_firmware(self) -> None:
+        facility_id = "mock-facility-03"
+        ppu_id = "mock-facility-03-ppu-02"
+        firmware = b"shared" * 128
+        session_id, sha256 = self.cache_firmware(facility_id, ppu_id, firmware, "shared.bin")
+        accepted = await asyncio.gather(
+            self.provider.start_job(
+                facility_id,
+                ppu_id,
+                JobRequest(site_id=1, operation=Operation.PROGRAM),
+                session_id=session_id,
+                firmware_sha256=sha256,
+            ),
+            self.provider.start_job(
+                facility_id,
+                ppu_id,
+                JobRequest(site_id=2, operation=Operation.PROGRAM),
+                session_id=session_id,
+                firmware_sha256=sha256,
+            ),
+        )
+        jobs = await asyncio.gather(*(
+            self.wait_terminal(facility_id, ppu_id, item["job"]["job_id"])
+            for item in accepted
+        ))
+        self.assertEqual([job["state"] for job in jobs], ["success", "success"])
+
+    async def test_ppu_rejects_different_active_firmware_across_sessions(self) -> None:
+        facility_id = "mock-facility-03"
+        ppu_id = "mock-facility-03-ppu-04"
+        firmware_a = b"A" * 1024
+        firmware_b = b"B" * 1024
+        sha_a = hashlib.sha256(firmware_a).hexdigest()
+        sha_b = hashlib.sha256(firmware_b).hexdigest()
+
+        session_a = self.provider.begin_session()["session"]["session_id"]
+        self.provider.cache_firmware(session_a, facility_id, ppu_id, "A.bin", sha_a, firmware_a)
+        first = await self.provider.start_job(
+            facility_id,
+            ppu_id,
+            JobRequest(site_id=1, operation=Operation.PROGRAM),
+            session_id=session_a,
+            firmware_sha256=sha_a,
+        )
+
+        session_same = self.provider.begin_session()["session"]["session_id"]
+        self.provider.cache_firmware(
+            session_same, facility_id, ppu_id, "A-again.bin", sha_a, firmware_a
+        )
+        second = await self.provider.start_job(
+            facility_id,
+            ppu_id,
+            JobRequest(site_id=2, operation=Operation.PROGRAM),
+            session_id=session_same,
+            firmware_sha256=sha_a,
+        )
+
+        session_b = self.provider.begin_session()["session"]["session_id"]
+        self.provider.cache_firmware(session_b, facility_id, ppu_id, "B.bin", sha_b, firmware_b)
+        with self.assertRaises(PlasmaError) as blocked:
+            await self.provider.start_job(
+                facility_id,
+                ppu_id,
+                JobRequest(site_id=3, operation=Operation.PROGRAM),
+                session_id=session_b,
+                firmware_sha256=sha_b,
+            )
+        self.assertEqual(blocked.exception.code, ErrorCode.SITE_BUSY)
+        self.assertTrue(blocked.exception.recoverable)
+
+        for accepted in (first, second):
+            await self.provider.cancel_job(facility_id, ppu_id, accepted["job"]["job_id"])
+        await asyncio.gather(*(
+            self.wait_terminal(facility_id, ppu_id, accepted["job"]["job_id"])
+            for accepted in (first, second)
+        ))
+
+        third = None
+        for _ in range(100):
+            try:
+                third = await self.provider.start_job(
+                    facility_id,
+                    ppu_id,
+                    JobRequest(site_id=3, operation=Operation.PROGRAM),
+                    session_id=session_b,
+                    firmware_sha256=sha_b,
+                )
+                break
+            except PlasmaError as exc:
+                if exc.code is not ErrorCode.SITE_BUSY:
+                    raise
+                await asyncio.sleep(0.02)
+        self.assertIsNotNone(third, "PPU firmware lease was not released after terminal Jobs")
+        assert third is not None
+        await self.provider.cancel_job(facility_id, ppu_id, third["job"]["job_id"])
+        await self.wait_terminal(facility_id, ppu_id, third["job"]["job_id"])
 
     async def test_read_result_can_be_retrieved_from_selected_mock_ppu(self) -> None:
         facility_id = "mock-facility-03"

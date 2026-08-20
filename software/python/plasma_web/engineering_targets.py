@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import re
 import threading
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
 from plasma_client.client import PlasmaClient
 from plasma_core.config import PPUConfig, PlasmaConfig, ServerConfig, SiteConfig
+from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest, validate_job_id
 from plasma_server.server import PlasmaServer
@@ -17,6 +21,7 @@ from plasma_server.server import PlasmaServer
 MOCK_FACILITY_COUNT = 3
 MOCK_SITE_COUNTS = (2, 4, 6, 8)
 MOCK_FLASH_SIZE_BYTES = 4 * 1024 * 1024
+MOCK_MAX_CACHED_FIRMWARE_BYTES = 16 * 1024 * 1024
 MOCK_OPERATION_TIMEOUT_S = 90.0
 MOCK_THROUGHPUT_BYTES_PER_S = {
     "erase": 2 * 1024 * 1024,
@@ -31,16 +36,52 @@ MOCK_OPERATION_OVERHEADS_S = {
     "read": 1.0,
 }
 MOCK_PROGRESS_STEPS = 20
+SESSION_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+FIRMWARE_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+
+
+@dataclass(frozen=True, slots=True)
+class FirmwareCacheEntry:
+    firmware_name: str
+    firmware_size: int
+    firmware_sha256: str
+    firmware: bytes
+
+
+@dataclass(slots=True)
+class PPUFirmwareLease:
+    firmware_sha256: str
+    job_ids: set[str]
 
 
 class EngineeringPPUProvider(Protocol):
-    """Execution boundary consumed by the Engineering Web API.
-
-    A future real-PPU provider can replace the mock provider without changing
-    the browser Facility -> PPU -> Site control contract.
-    """
+    """Execution boundary consumed by the Engineering Web API."""
 
     def catalog(self) -> dict[str, Any]: ...
+
+    def begin_session(self, previous_session_id: str | None = None) -> dict[str, Any]: ...
+
+    def firmware_cache_status(
+        self,
+        session_id: str,
+        facility_id: str,
+        ppu_id: str,
+        firmware_name: str,
+        firmware_size: int,
+        firmware_sha256: str,
+    ) -> dict[str, Any]: ...
+
+    def cache_firmware(
+        self,
+        session_id: str,
+        facility_id: str,
+        ppu_id: str,
+        firmware_name: str,
+        firmware_sha256: str,
+        firmware: bytes,
+    ) -> dict[str, Any]: ...
+
+    def job_timeout_s(self, facility_id: str, ppu_id: str) -> float: ...
 
     async def status(
         self,
@@ -56,6 +97,9 @@ class EngineeringPPUProvider(Protocol):
         facility_id: str,
         ppu_id: str,
         request: JobRequest,
+        *,
+        session_id: str | None = None,
+        firmware_sha256: str | None = None,
     ) -> dict[str, Any]: ...
 
     async def cancel_job(self, facility_id: str, ppu_id: str, job_id: str) -> dict[str, Any]: ...
@@ -81,14 +125,18 @@ class MockPPUSpec:
 class MockEngineeringPPUProvider:
     """Twelve real in-process PlasmaServer runtimes backed by MockInterface.
 
-    The simulated topology is server-owned: three Facilities, four PPUs per
-    Facility, and 2/4/6/8 Sites per PPU. Jobs still traverse Plasma Protocol
-    v3.2, SiteManager/SiteWorker, and MockInterface.
+    Firmware cache semantics are explicit and intentionally short-lived:
+    - cache scope is one browser connection session and one selected PPU;
+    - a PPU keeps at most one cached firmware image per session;
+    - the first use after reconnect is a cache miss and requires one upload;
+    - repeated use of the same SHA-256 reuses in-memory bytes;
+    - changing firmware replaces that PPU's session cache entry;
+    - beginning a new connection session invalidates the previous session cache.
 
-    Mock operation timing is intentionally size-aware rather than instant. The
-    profile is an engineering simulation contract, not a claim about a specific
-    real IC. Program/verify/read scale with requested byte count; erase models a
-    full-chip erase and therefore scales with configured target flash size.
+    Independently of browser sessions, one physical PPU may have active
+    Program/Verify Jobs for only one firmware SHA-256 at a time. Different
+    sessions may join the same active firmware lease, but a different image is
+    rejected until all active Program/Verify Jobs using the lease are terminal.
     """
 
     def __init__(self, root: Path) -> None:
@@ -97,6 +145,9 @@ class MockEngineeringPPUProvider:
         self._servers: dict[tuple[str, str], PlasmaServer] = {}
         self._ports: dict[tuple[str, str], int] = {}
         self._output_roots: dict[tuple[str, str], Path] = {}
+        self._firmware_sessions: dict[str, dict[tuple[str, str], FirmwareCacheEntry]] = {}
+        self._ppu_firmware_leases: dict[tuple[str, str], PPUFirmwareLease] = {}
+        self._firmware_lock = threading.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._ready = threading.Event()
@@ -146,8 +197,13 @@ class MockEngineeringPPUProvider:
         thread = self._thread
         if loop is None or thread is None:
             return
+        with self._firmware_lock:
+            self._firmware_sessions.clear()
         if loop.is_running():
-            future = asyncio.run_coroutine_threadsafe(self._close_servers(), loop)
+            future = asyncio.run_coroutine_threadsafe(
+                self._shutdown_servers_and_watchers(),
+                loop,
+            )
             future.result(timeout=timeout_s)
             loop.call_soon_threadsafe(loop.stop)
         thread.join(timeout=timeout_s)
@@ -173,7 +229,7 @@ class MockEngineeringPPUProvider:
             loop.run_forever()
         finally:
             if self._servers:
-                loop.run_until_complete(self._close_servers())
+                loop.run_until_complete(self._shutdown_servers_and_watchers())
             loop.close()
 
     async def _start_servers(self) -> None:
@@ -193,6 +249,17 @@ class MockEngineeringPPUProvider:
         self._output_roots.clear()
         if servers:
             await asyncio.gather(*(server.close() for server in servers))
+
+    async def _shutdown_servers_and_watchers(self) -> None:
+        await self._close_servers()
+        for _ in range(100):
+            with self._firmware_lock:
+                if not self._ppu_firmware_leases:
+                    break
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0)
+        with self._firmware_lock:
+            self._ppu_firmware_leases.clear()
 
     def _config_for(self, spec: MockPPUSpec) -> PlasmaConfig:
         ppu_root = self.root / spec.ppu_id
@@ -241,9 +308,225 @@ class MockEngineeringPPUProvider:
             )
         return key
 
+    @staticmethod
+    def _validate_session_id(session_id: str) -> str:
+        if not isinstance(session_id, str) or SESSION_ID_PATTERN.fullmatch(session_id) is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid Engineering session_id")
+        return session_id
+
+    @staticmethod
+    def _validate_firmware_sha256(firmware_sha256: str) -> str:
+        if not isinstance(firmware_sha256, str) or FIRMWARE_SHA256_PATTERN.fullmatch(firmware_sha256) is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid firmware_sha256")
+        return firmware_sha256
+
     def _client(self, facility_id: str, ppu_id: str) -> PlasmaClient:
         key = self._key(facility_id, ppu_id)
         return PlasmaClient("127.0.0.1", self._ports[key])
+
+    def begin_session(self, previous_session_id: str | None = None) -> dict[str, Any]:
+        with self._firmware_lock:
+            if previous_session_id is not None:
+                self._validate_session_id(previous_session_id)
+                self._firmware_sessions.pop(previous_session_id, None)
+            session_id = uuid.uuid4().hex
+            self._firmware_sessions[session_id] = {}
+        return {
+            "ok": True,
+            "session": {
+                "session_id": session_id,
+                "firmware_cache_scope": "connection-session-and-ppu",
+                "previous_session_cleared": previous_session_id is not None,
+            },
+        }
+
+    def _session(self, session_id: str) -> dict[tuple[str, str], FirmwareCacheEntry]:
+        self._validate_session_id(session_id)
+        with self._firmware_lock:
+            session = self._firmware_sessions.get(session_id)
+        if session is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Engineering session is not active")
+        return session
+
+    def firmware_cache_status(
+        self,
+        session_id: str,
+        facility_id: str,
+        ppu_id: str,
+        firmware_name: str,
+        firmware_size: int,
+        firmware_sha256: str,
+    ) -> dict[str, Any]:
+        key = self._key(facility_id, ppu_id)
+        self._validate_firmware_sha256(firmware_sha256)
+        if isinstance(firmware_size, bool) or not isinstance(firmware_size, int) or firmware_size <= 0:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "firmware_size must be a positive integer")
+        session = self._session(session_id)
+        with self._firmware_lock:
+            entry = session.get(key)
+            hit = bool(
+                entry
+                and entry.firmware_sha256 == firmware_sha256
+                and entry.firmware_size == firmware_size
+            )
+        return {
+            "ok": True,
+            "firmware": {
+                "cache_hit": hit,
+                "firmware_name": str(firmware_name or "browser-upload.bin"),
+                "firmware_size": firmware_size,
+                "firmware_sha256": firmware_sha256,
+                "scope": {
+                    "session_id": session_id,
+                    "facility_id": facility_id,
+                    "ppu_id": ppu_id,
+                },
+            },
+        }
+
+    def cache_firmware(
+        self,
+        session_id: str,
+        facility_id: str,
+        ppu_id: str,
+        firmware_name: str,
+        firmware_sha256: str,
+        firmware: bytes,
+    ) -> dict[str, Any]:
+        key = self._key(facility_id, ppu_id)
+        self._validate_firmware_sha256(firmware_sha256)
+        if not isinstance(firmware, bytes) or not firmware:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Engineering firmware upload is empty")
+        if len(firmware) > MOCK_MAX_CACHED_FIRMWARE_BYTES:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "Engineering firmware upload exceeds the mock cache limit",
+                context={"size": len(firmware), "limit": MOCK_MAX_CACHED_FIRMWARE_BYTES},
+            )
+        actual_sha256 = hashlib.sha256(firmware).hexdigest()
+        if actual_sha256 != firmware_sha256:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "firmware_sha256 does not match uploaded bytes",
+                context={"expected": firmware_sha256, "actual": actual_sha256},
+            )
+        entry = FirmwareCacheEntry(
+            firmware_name=str(firmware_name or "browser-upload.bin"),
+            firmware_size=len(firmware),
+            firmware_sha256=firmware_sha256,
+            firmware=firmware,
+        )
+        session = self._session(session_id)
+        with self._firmware_lock:
+            session[key] = entry
+        return {
+            "ok": True,
+            "firmware": {
+                "cache_hit": True,
+                "uploaded": True,
+                "firmware_name": entry.firmware_name,
+                "firmware_size": entry.firmware_size,
+                "firmware_sha256": entry.firmware_sha256,
+                "scope": {
+                    "session_id": session_id,
+                    "facility_id": facility_id,
+                    "ppu_id": ppu_id,
+                },
+            },
+        }
+
+    def _cached_firmware(
+        self,
+        session_id: str,
+        facility_id: str,
+        ppu_id: str,
+        firmware_sha256: str,
+    ) -> FirmwareCacheEntry:
+        key = self._key(facility_id, ppu_id)
+        self._validate_firmware_sha256(firmware_sha256)
+        session = self._session(session_id)
+        with self._firmware_lock:
+            entry = session.get(key)
+        if entry is None or entry.firmware_sha256 != firmware_sha256:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "Engineering firmware cache miss",
+                context={
+                    "session_id": session_id,
+                    "facility_id": facility_id,
+                    "ppu_id": ppu_id,
+                    "firmware_sha256": firmware_sha256,
+                },
+            )
+        return entry
+
+    def _reserve_ppu_firmware(
+        self,
+        key: tuple[str, str],
+        firmware_sha256: str,
+        job_id: str,
+    ) -> None:
+        with self._firmware_lock:
+            lease = self._ppu_firmware_leases.get(key)
+            if lease is not None and lease.firmware_sha256 != firmware_sha256:
+                raise PlasmaError(
+                    ErrorCode.SITE_BUSY,
+                    "PPU is busy with a different firmware image",
+                    recoverable=True,
+                    context={
+                        "facility_id": key[0],
+                        "ppu_id": key[1],
+                        "active_firmware_sha256": lease.firmware_sha256,
+                        "requested_firmware_sha256": firmware_sha256,
+                    },
+                )
+            if lease is None:
+                lease = PPUFirmwareLease(firmware_sha256=firmware_sha256, job_ids=set())
+                self._ppu_firmware_leases[key] = lease
+            lease.job_ids.add(job_id)
+
+    def _release_ppu_firmware(self, key: tuple[str, str], job_id: str) -> None:
+        with self._firmware_lock:
+            lease = self._ppu_firmware_leases.get(key)
+            if lease is None:
+                return
+            lease.job_ids.discard(job_id)
+            if not lease.job_ids:
+                self._ppu_firmware_leases.pop(key, None)
+
+    async def _watch_firmware_job(self, key: tuple[str, str], job_id: str) -> None:
+        try:
+            while True:
+                server = self._servers.get(key)
+                if server is None:
+                    return
+                try:
+                    runtime = server.manager.registry.get(job_id)
+                except PlasmaError as exc:
+                    if exc.code is not ErrorCode.JOB_NOT_FOUND:
+                        return
+                    await asyncio.sleep(0.05)
+                    continue
+                if runtime.state.terminal:
+                    return
+                await asyncio.sleep(0.05)
+        finally:
+            self._release_ppu_firmware(key, job_id)
+
+    def _schedule_firmware_watch(self, key: tuple[str, str], job_id: str) -> None:
+        loop = self._loop
+        if loop is None or not loop.is_running():
+            self._release_ppu_firmware(key, job_id)
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self._watch_firmware_job(key, job_id), loop)
+        except RuntimeError:
+            self._release_ppu_firmware(key, job_id)
+            raise
+
+    def job_timeout_s(self, facility_id: str, ppu_id: str) -> float:
+        self._key(facility_id, ppu_id)
+        return MOCK_OPERATION_TIMEOUT_S
 
     def catalog(self) -> dict[str, Any]:
         facilities: list[dict[str, Any]] = []
@@ -272,11 +555,13 @@ class MockEngineeringPPUProvider:
             "facility_count": len(facilities),
             "ppu_count": len(self._specs),
             "site_count": sum(spec.site_count for spec in self._specs),
+            "firmware_scope": "connection-session-and-ppu",
             "timing_profile": {
                 "model": "fixed-overhead-plus-bytes-over-throughput",
                 "flash_size_bytes": MOCK_FLASH_SIZE_BYTES,
                 "throughput_bytes_per_s": dict(MOCK_THROUGHPUT_BYTES_PER_S),
                 "operation_overheads_s": dict(MOCK_OPERATION_OVERHEADS_S),
+                "operation_timeout_s": MOCK_OPERATION_TIMEOUT_S,
             },
             "facilities": facilities,
         }
@@ -296,8 +581,45 @@ class MockEngineeringPPUProvider:
         facility_id: str,
         ppu_id: str,
         request: JobRequest,
+        *,
+        session_id: str | None = None,
+        firmware_sha256: str | None = None,
     ) -> dict[str, Any]:
-        return await self._client(facility_id, ppu_id).start(request)
+        lease_key: tuple[str, str] | None = None
+        if request.operation in {Operation.PROGRAM, Operation.VERIFY}:
+            if request.firmware:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "Engineering program/verify must use the PPU session firmware cache",
+                )
+            if not session_id or not firmware_sha256:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "Engineering program/verify requires session_id and firmware_sha256",
+                )
+            entry = self._cached_firmware(session_id, facility_id, ppu_id, firmware_sha256)
+            lease_key = self._key(facility_id, ppu_id)
+            self._reserve_ppu_firmware(lease_key, firmware_sha256, request.job_id)
+            request = replace(
+                request,
+                firmware=entry.firmware,
+                metadata={**request.metadata, "firmware_name": entry.firmware_name},
+            )
+        elif session_id is not None or firmware_sha256 is not None:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "session firmware reference is only valid for program or verify",
+            )
+        request = replace(request, timeout_s=MOCK_OPERATION_TIMEOUT_S)
+        try:
+            accepted = await self._client(facility_id, ppu_id).start(request)
+        except Exception:
+            if lease_key is not None:
+                self._release_ppu_firmware(lease_key, request.job_id)
+            raise
+        if lease_key is not None:
+            self._schedule_firmware_watch(lease_key, request.job_id)
+        return accepted
 
     async def cancel_job(self, facility_id: str, ppu_id: str, job_id: str) -> dict[str, Any]:
         return await self._client(facility_id, ppu_id).cancel(job_id)
