@@ -137,7 +137,7 @@ test("Reconnect preserves the selected PPU and falls back to Default only when i
 
   providerOnline = false;
   await connect.click();
-  await expect(page.getByText("temporary provider outage")).toBeVisible();
+  await expect(page.getByText("temporary provider outage", { exact: true })).toBeVisible();
 
   providerOnline = true;
   await connect.click();
