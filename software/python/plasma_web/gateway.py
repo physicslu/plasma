@@ -11,15 +11,16 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 from plasma_client.client import PlasmaClient
+from plasma_core.assets import ProgrammingAsset
 from plasma_core.enums import Operation
 from plasma_core.errors import PlasmaError
-from plasma_core.models import JobRequest, site_id_from_legacy_channel, validate_job_id
+from plasma_core.models import JobRequest, validate_job_id
 
 from .engineering_targets import EngineeringPPUProvider, MockEngineeringPPUProvider
 
 
 FLEET_CONTRACT_VERSION = "1"
-WEB_REST_CONTRACT_VERSION = "2"
+WEB_REST_CONTRACT_VERSION = "3"
 GATEWAY_SERVICE_NAME = "plasma-web-rest-gateway"
 
 
@@ -41,81 +42,8 @@ def _parse_site_id(value: Any) -> int:
     return parsed
 
 
-def _parse_legacy_channel_id(value: Any) -> int:
-    if isinstance(value, bool):
-        raise ValueError("legacy channel_id must be a non-negative integer")
-    if isinstance(value, int):
-        parsed = value
-    elif isinstance(value, str) and value and value.isascii() and value.isdecimal():
-        parsed = int(value)
-    else:
-        raise ValueError("legacy channel_id must be a non-negative integer")
-    if parsed < 0:
-        raise ValueError("legacy channel_id must be a non-negative integer")
-    return site_id_from_legacy_channel(parsed)
-
-
-def _site_value(canonical: Any, legacy: Any) -> int | None:
-    if canonical is None and legacy is None:
-        return None
-    canonical_id = _parse_site_id(canonical) if canonical is not None else None
-    legacy_site_id = _parse_legacy_channel_id(legacy) if legacy is not None else None
-    if canonical_id is not None and legacy_site_id is not None and canonical_id != legacy_site_id:
-        raise ValueError("site_id and legacy channel_id refer to different Sites")
-    return canonical_id if canonical_id is not None else legacy_site_id
-
-
-def _compat_value(
-    body: dict[str, Any],
-    canonical_name: str,
-    legacy_name: str,
-    default: Any = None,
-) -> Any:
-    canonical_present = canonical_name in body
-    legacy_present = legacy_name in body
-    if canonical_present and legacy_present and body[canonical_name] != body[legacy_name]:
-        raise ValueError(f"{canonical_name} and legacy {legacy_name} disagree")
-    if canonical_present:
-        return body[canonical_name]
-    if legacy_present:
-        return body[legacy_name]
-    return default
-
-
-def _canonical_engineering_catalog(payload: dict[str, Any]) -> dict[str, Any]:
-    result = dict(payload)
-    if "programming_image_scope" not in result and "firmware_scope" in result:
-        result["programming_image_scope"] = result["firmware_scope"]
-    result["rest_contract_version"] = WEB_REST_CONTRACT_VERSION
-    return result
-
-
-def _canonical_engineering_session(payload: dict[str, Any]) -> dict[str, Any]:
-    result = dict(payload)
-    raw_session = result.get("session")
-    if isinstance(raw_session, dict):
-        session = dict(raw_session)
-        if "programming_image_cache_scope" not in session and "firmware_cache_scope" in session:
-            session["programming_image_cache_scope"] = session["firmware_cache_scope"]
-        result["session"] = session
-    result["rest_contract_version"] = WEB_REST_CONTRACT_VERSION
-    return result
-
-
-def _canonical_programming_image_response(payload: dict[str, Any]) -> dict[str, Any]:
-    result = dict(payload)
-    legacy = result.get("firmware")
-    if isinstance(legacy, dict):
-        image = dict(legacy)
-        if "firmware_name" in image:
-            image["image_name"] = image.pop("firmware_name")
-        if "firmware_size" in image:
-            image["image_size"] = image.pop("firmware_size")
-        if "firmware_sha256" in image:
-            image["image_sha256"] = image.pop("firmware_sha256")
-        result["programming_image"] = image
-    result["rest_contract_version"] = WEB_REST_CONTRACT_VERSION
-    return result
+def _with_rest_version(payload: dict[str, Any]) -> dict[str, Any]:
+    return {**payload, "rest_contract_version": WEB_REST_CONTRACT_VERSION}
 
 
 class PlasmaWebHandler(BaseHTTPRequestHandler):
@@ -177,7 +105,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
     def _error(self, exc: Exception) -> None:
         if isinstance(exc, PlasmaError):
             self._json(
-                HTTPStatus.BAD_GATEWAY,
+                HTTPStatus.BAD_REQUEST,
                 {"ok": False, "error": {"error_code": exc.code.value, "message": exc.message}},
             )
         else:
@@ -282,7 +210,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     return
                 self._json(
                     HTTPStatus.OK,
-                    _canonical_engineering_catalog(self.engineering_provider.catalog()),
+                    _with_rest_version(self.engineering_provider.catalog()),
                 )
                 return
 
@@ -296,8 +224,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 if tail == ["api", "status"]:
                     job = query.get("job", [None])[0]
                     site = query.get("site", [None])[0]
-                    legacy_channel = query.get("channel", [None])[0]
-                    site_id = _site_value(site, legacy_channel)
+                    site_id = _parse_site_id(site) if site is not None else None
                     self._json(
                         HTTPStatus.OK,
                         _run(
@@ -325,8 +252,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 query = parse_qs(parsed.query)
                 job = query.get("job", [None])[0]
                 site = query.get("site", [None])[0]
-                legacy_channel = query.get("channel", [None])[0]
-                site_id = _site_value(site, legacy_channel)
+                site_id = _parse_site_id(site) if site is not None else None
                 self._json(
                     HTTPStatus.OK,
                     _run(self.client_factory().status(job_id=job, site_id=site_id)),
@@ -359,38 +285,59 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             raise ValueError("output file does not belong to this job")
         self._binary(requested)
 
+    @staticmethod
+    def _inline_asset(body: dict[str, Any]) -> ProgrammingAsset:
+        encoded = body.get("asset_base64")
+        if not isinstance(encoded, str) or not encoded:
+            raise ValueError("program and verify require asset_base64")
+        try:
+            data = base64.b64decode(encoded, validate=True)
+        except ValueError as exc:
+            raise ValueError("asset_base64 is invalid") from exc
+        return ProgrammingAsset.from_upload(
+            name=str(body.get("asset_name", "browser-upload.bin")),
+            asset_type=str(body.get("asset_type", "image")),
+            asset_format=str(body.get("asset_format", "binary")),
+            data=data,
+            sha256=str(body.get("asset_sha256", "")),
+        )
+
     def _job_request(
         self,
         body: dict[str, Any],
         *,
         client_id: str,
         default_timeout_s: float = 30.0,
-        require_inline_firmware: bool = True,
+        allow_inline_asset: bool = True,
     ) -> JobRequest:
         operation = Operation(str(body["operation"]))
         if operation not in {Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ}:
             raise ValueError("web gateway supports erase, program, verify, and read")
-        encoded_image = _compat_value(body, "image_base64", "firmware_base64", "")
-        if not isinstance(encoded_image, str):
-            raise ValueError("image_base64 must be a string")
-        firmware = base64.b64decode(encoded_image, validate=True) if encoded_image else b""
-        if require_inline_firmware and operation in {Operation.PROGRAM, Operation.VERIFY} and not firmware:
-            raise ValueError("program and verify require image_base64")
-        image_name = _compat_value(body, "image_name", "firmware_name", "browser-upload.bin")
         map_data = body.get("map_data") or {}
         if operation is Operation.READ:
             map_data = self._read_map(body, map_data)
-        site_id = _site_value(body.get("site_id"), body.get("channel_id"))
-        if site_id is None:
-            raise ValueError("job requires site_id")
+        site_id = _parse_site_id(body.get("site_id"))
+        image = b""
+        metadata: dict[str, Any] = {}
+        if operation in {Operation.PROGRAM, Operation.VERIFY} and allow_inline_asset:
+            asset = self._inline_asset(body)
+            normalized = asset.normalize_image()
+            image = normalized.data
+            metadata = {
+                "image_name": normalized.name,
+                "source_asset_name": asset.name,
+                "source_asset_sha256": asset.sha256,
+                "source_asset_type": asset.asset_type.value,
+                "source_asset_format": asset.asset_format.value,
+            }
         return JobRequest(
             site_id=site_id,
             operation=operation,
-            firmware=firmware,
+            image=image,
             map_data=map_data,
             timeout_s=float(body.get("timeout_s", default_timeout_s)),
             client_id=client_id,
-            metadata={"firmware_name": str(image_name)},
+            metadata=metadata,
         )
 
     def do_POST(self) -> None:
@@ -406,9 +353,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     raise ValueError("previous_session_id must be a string")
                 self._json(
                     HTTPStatus.CREATED,
-                    _canonical_engineering_session(
-                        self.engineering_provider.begin_session(previous)
-                    ),
+                    _with_rest_version(self.engineering_provider.begin_session(previous)),
                 )
                 return
 
@@ -418,47 +363,42 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     self._engineering_unavailable()
                     return
                 facility_id, ppu_id, tail = engineering
-                if tail in (
-                    ["api", "programming-images", "check"],
-                    ["api", "firmware", "check"],
-                ):
+                if tail == ["api", "programming-assets", "check"]:
                     body = self._body()
-                    image_name = _compat_value(
-                        body, "image_name", "firmware_name", "browser-upload.bin"
-                    )
-                    image_size = _compat_value(body, "image_size", "firmware_size")
-                    image_sha256 = _compat_value(body, "image_sha256", "firmware_sha256", "")
                     self._json(
                         HTTPStatus.OK,
-                        _canonical_programming_image_response(
-                            self.engineering_provider.firmware_cache_status(
+                        _with_rest_version(
+                            self.engineering_provider.asset_cache_status(
                                 str(body.get("session_id", "")),
                                 facility_id,
                                 ppu_id,
-                                str(image_name),
-                                image_size,
-                                str(image_sha256),
+                                str(body.get("asset_name", "")),
+                                str(body.get("asset_type", "")),
+                                str(body.get("asset_format", "")),
+                                body.get("asset_size"),
+                                str(body.get("asset_sha256", "")),
                             )
                         ),
                     )
                     return
-                if tail in (
-                    ["api", "programming-images"],
-                    ["api", "firmware"],
-                ):
+                if tail == ["api", "programming-assets"]:
                     query = parse_qs(parsed.query)
                     session_id = query.get("session_id", [""])[0]
-                    image_name = query.get("name", ["browser-upload.bin"])[0]
-                    image_sha256 = query.get("sha256", [""])[0]
+                    asset_name = query.get("name", [""])[0]
+                    asset_type = query.get("type", [""])[0]
+                    asset_format = query.get("format", [""])[0]
+                    asset_sha256 = query.get("sha256", [""])[0]
                     self._json(
                         HTTPStatus.CREATED,
-                        _canonical_programming_image_response(
-                            self.engineering_provider.cache_firmware(
+                        _with_rest_version(
+                            self.engineering_provider.cache_asset(
                                 session_id,
                                 facility_id,
                                 ppu_id,
-                                image_name,
-                                image_sha256,
+                                asset_name,
+                                asset_type,
+                                asset_format,
+                                asset_sha256,
                                 self._raw_body(),
                             )
                         ),
@@ -476,19 +416,23 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                         body,
                         client_id="plasma-web-engineering",
                         default_timeout_s=self.engineering_provider.job_timeout_s(facility_id, ppu_id),
-                        require_inline_firmware=False,
+                        allow_inline_asset=False,
                     )
                     operation = request.operation
-                    session_id = body.get("session_id") if operation in {Operation.PROGRAM, Operation.VERIFY} else None
-                    image_sha256 = (
-                        _compat_value(body, "image_sha256", "firmware_sha256")
+                    session_id = (
+                        body.get("session_id")
+                        if operation in {Operation.PROGRAM, Operation.VERIFY}
+                        else None
+                    )
+                    asset_sha256 = (
+                        body.get("asset_sha256")
                         if operation in {Operation.PROGRAM, Operation.VERIFY}
                         else None
                     )
                     if session_id is not None and not isinstance(session_id, str):
                         raise ValueError("session_id must be a string")
-                    if image_sha256 is not None and not isinstance(image_sha256, str):
-                        raise ValueError("image_sha256 must be a string")
+                    if asset_sha256 is not None and not isinstance(asset_sha256, str):
+                        raise ValueError("asset_sha256 must be a string")
                     self._json(
                         HTTPStatus.ACCEPTED,
                         _run(
@@ -497,7 +441,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                                 ppu_id,
                                 request,
                                 session_id=session_id,
-                                firmware_sha256=image_sha256,
+                                asset_sha256=asset_sha256,
                             )
                         ),
                     )
