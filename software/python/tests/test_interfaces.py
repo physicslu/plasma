@@ -11,9 +11,10 @@ from plasma_interfaces.openocd import OpenOCDInterface
 class MockInterfaceTests(unittest.IsolatedAsyncioTestCase):
     async def test_program_verify_read_and_erase(self) -> None:
         interface = MockInterface(flash_size=32)
-        await interface.program(b"abcd", 4)
-        await interface.verify(b"abcd", 4)
-        self.assertEqual(await interface.read(4, 4), b"abcd")
+        image = b"abcd"
+        await interface.program(image, 4)
+        await interface.verify(image, 4)
+        self.assertEqual(await interface.read(4, 4), image)
         await interface.erase()
         self.assertEqual(await interface.read(4, 4), b"\xff" * 4)
 
@@ -50,7 +51,7 @@ class MockInterfaceTests(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(interface.estimated_delay_s("program", 100), 1.5)
         self.assertAlmostEqual(interface.estimated_delay_s("program", 400), 4.5)
 
-    def test_explicit_delay_overrides_size_aware_timing_for_compatibility(self) -> None:
+    def test_explicit_delay_overrides_size_aware_timing(self) -> None:
         interface = MockInterface(
             default_delay_s=9.0,
             delays={"program": 0.25},
@@ -92,24 +93,19 @@ class HardwareBoundaryTests(unittest.IsolatedAsyncioTestCase):
             await interface.erase()
         self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
 
-    async def test_fpga_placeholder_uses_one_based_site_identity(self) -> None:
+    async def test_fpga_placeholder_uses_one_based_site_identity_only(self) -> None:
         interface = FPGAInterface(site_id=1, register_base=0)
         self.assertEqual(interface.site_id, 1)
-        self.assertEqual(interface.channel_id, 0)
         with self.assertRaises(PlasmaError) as caught:
             await interface.read(0, 4)
         self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
         self.assertEqual(caught.exception.context["site_id"], 1)
-        self.assertNotIn("channel_id", caught.exception.context)
-
-    async def test_fpga_legacy_channel_keyword_maps_zero_to_site_one(self) -> None:
-        interface = FPGAInterface(channel_id=0, register_base=0)
-        self.assertEqual(interface.site_id, 1)
-        self.assertEqual(interface.channel_id, 0)
-        with self.assertRaises(TypeError):
-            FPGAInterface(site_id=1, channel_id=1, register_base=0)
 
     async def test_fpga_rejects_site_zero(self) -> None:
         with self.assertRaises(PlasmaError) as caught:
             FPGAInterface(site_id=0, register_base=0)
         self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
+
+
+if __name__ == "__main__":
+    unittest.main()
