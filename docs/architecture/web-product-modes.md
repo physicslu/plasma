@@ -19,7 +19,7 @@ Canonical terms:
 
 `Fleet`, `Single PPU`, `Manager`, and multi-PPU aggregation are **not ProductMode values**. They describe implementation topology, aggregation services, or engineering targets.
 
-The Web product model must therefore not expose Fleet as a peer mode beside Production Mode. Production Mode may observe one or many PPUs without changing its ProductMode value.
+The Web product model must therefore not expose Fleet as a peer mode beside Production Mode. Production Mode may operate one or many PPUs without changing its ProductMode value.
 
 The current implementation route for the multi-PPU Production Console remains `/fleet` for compatibility, while the canonical product state is `ProductMode = production`. Internal Manager/BFF names such as `fleet` may remain where they specifically describe multi-PPU aggregation contracts; they are infrastructure vocabulary, not user-facing product taxonomy.
 
@@ -27,19 +27,55 @@ Both product modes share the same Plasma backend/domain model. Plasma must not f
 
 ## 2. Production Mode principles
 
-Production Mode is intended for factory operators and line leaders. The primary screen must keep all relevant PPUs and Sites visible together instead of forcing the operator to drill into one PPU at a time.
+Production Mode is intended for factory operators and line leaders. The operator first defines the equipment scope for the current production activity and then operates only that committed scope.
 
-The Production Console groups dynamic Site topology by PPU and therefore does not assume eight Sites per PPU. Two-, four-, eight-, and future N-Site PPUs use the same presentation model.
+The canonical interaction is:
 
-Per-PPU selection provides:
+```text
+Facility selector
+    -> PPU multi-select within that Facility
+        -> SET
+            -> active Production Set
+                -> selected PPU / Site status
+                -> batch operations
+```
 
-- Select All / 全選: selects only enabled Sites on a currently reachable/current PPU;
-- Deselect All / 全部取消: clears selection for that PPU;
-- individual Site checkboxes remain available.
+A Production Set belongs to one Facility. The current prototype does not create a cross-Facility Production Set. This is an intentional control boundary, not a network limitation.
 
-The top selection count is global across all PPUs visible in Production Mode.
+After `SET`, the main execution area shows only PPUs committed to that Production Set. Each PPU retains its dynamic Site topology; Plasma therefore does not assume eight Sites per PPU. Two-, four-, six-, eight-, and future N-Site PPUs use the same presentation model.
 
-### 2.1 Status-light semantics
+All enabled Sites on a selected PPU are selected by default when the Production Set is created. Per-PPU Select All / Clear Sites and individual Site checkboxes remain available before execution.
+
+### 2.1 Multi-PPU execution semantics
+
+For the current Mock Production prototype, all selected Site sequences are launched concurrently across all selected PPUs. A Site executes its selected operations sequentially in canonical order:
+
+```text
+across PPUs / Sites: concurrent
+within one Site:      E -> P -> V -> R in selected canonical order
+```
+
+For example:
+
+```text
+Production Set
+├── PPU-01
+│   ├── SITE 1  E -> P -> V
+│   └── SITE 2  E -> P -> V
+├── PPU-02
+│   ├── SITE 1  E -> P -> V
+│   └── SITE 2  E -> P -> V
+└── PPU-03
+    └── ...
+```
+
+The PPU branches do not wait for each other. One PPU failure or cancellation must not serialize, stop, or implicitly cancel independent PPUs.
+
+Per-PPU cancellation affects that PPU only. Batch cancellation affects all currently active Jobs in the Production Set. Cancellation before a Job is submitted remains cancellation rather than a programming failure.
+
+The current implementation is a **Mock-only execution prototype**. It reuses the Python-owned Mock PPU Provider so selected targets still execute through real in-process `PlasmaServer`, `SiteManager` / `SiteWorker`, Plasma Protocol v3.3 / `PLASMA33`, and `MockInterface`. It is not a browser animation and it is not evidence of real PPU, Socket, or IC behavior.
+
+### 2.2 Status-light semantics
 
 Status colors are operational semantics, not decoration:
 
@@ -51,32 +87,22 @@ FAIL       red
 ERROR      red, but explicitly labeled ERROR rather than programming FAIL
 DISABLED   gray
 OFFLINE    dark gray
+CANCELLED  neutral gray
 ```
 
-Green is reserved for an actual successful programming job. A reachable/online PPU must not make an untested Site appear green.
+Green is reserved for an actual successful programming Job. A reachable/online PPU must not make an untested Site appear green.
 
-PPU connectivity state, Site operational error, and programming-job result are different domains. A PPU transport failure or Site runtime error must not be presented as an IC programming FAIL.
+PPU connectivity state, Site operational error, cancellation, and programming-job result are different domains. A PPU transport failure or Site runtime error must not be presented as an IC programming FAIL.
 
-### 2.2 Source of truth and latched result presentation
+### 2.3 Source of truth and result presentation
 
-Production operators must be able to see a completed PASS or FAIL after active execution has returned to idle. The Web UI therefore treats Site execution state and latest programming result separately.
+Production operators must be able to see a completed PASS or FAIL after active execution has returned to idle. The Web UI therefore treats Site execution state and programming result separately.
 
-The PPU v3.2 STATUS contract exposes a browser-safe `latest_job` summary for each Site. It carries only operational fields such as job ID, operation, state, stage, progress and timestamps; firmware bytes, metadata, output files and raw result payloads are not included.
+The PPU STATUS contract exposes browser-safe Job summaries containing operational fields such as job ID, operation, state, stage, progress and timestamps; Programming Asset bytes, metadata, output files and raw result payloads are not part of the fleet observation contract.
 
-Production presentation derives:
+Production presentation derives actual result/operation semantics from Job truth rather than guessing from strings.
 
-```text
-latest_job.state = queued/running         -> RUNNING
-latest_job.state = success                -> PASS
-latest_job.state = failed/timeout/aborted -> FAIL
-no latest job + idle Site                 -> READY
-```
-
-E/P/V/R comes from `latest_job.operation`; it must never be guessed by substring matching `site.state`.
-
-A terminal `latest_job` remains visible after the Site returns to idle, which supplies the initial latch semantics. The operator's **Clear Result** action only suppresses that exact terminal job result in the local browser view; it does not mutate the PPU or erase the job. A new job has a different signature and becomes visible normally.
-
-The current latest-job registry is runtime memory, not a durable factory production ledger. Server restart durability, audit retention and production traceability remain separate requirements.
+The current Production Mock prototype also maintains browser execution state while it drives the selected virtual PPUs. This prototype state is not a durable factory production ledger. Server restart durability, audit retention and production traceability remain separate requirements.
 
 ## 3. Canonical operation display codes
 
@@ -109,7 +135,7 @@ Tools
 Settings
 ```
 
-`Programming` is now the first implemented engineering work area. It provides a single-target programming workbench based on canonical:
+`Programming` is the first implemented engineering work area. It provides a single-target programming workbench based on canonical:
 
 ```text
 Facility -> PPU -> Site
@@ -125,11 +151,11 @@ Engineering UI
          -> RealPPUProvider             (future)
 ```
 
-The current server-side Mock provider creates three Mock Facilities with four PPUs per Facility. Their Site counts are 2 / 4 / 6 / 8, for 12 PPUs and 60 Sites total. These are Python-owned targets, not React fixtures. Each Mock PPU is backed by a real in-process `PlasmaServer`, `SiteManager` / `SiteWorker`, Protocol v3.2 path and `MockInterface`.
+The current server-side Mock provider creates three Mock Facilities with four PPUs per Facility. Their Site counts are 2 / 4 / 6 / 8, for 12 PPUs and 60 Sites total. These are Python-owned targets, not React fixtures. Each Mock PPU is backed by a real in-process `PlasmaServer`, `SiteManager` / `SiteWorker`, Protocol v3.3 path and `MockInterface`.
 
-Engineering Programming supports per-Site and batch E/P/V/R, firmware selection, Read ranges, Job progress/status, cancellation, Read download and engineering logs. Target switching is blocked while a selected PPU has an active/submitting Job so a running target cannot be silently orphaned by the UI.
+Engineering Programming supports per-Site and batch E/P/V/R, Programming Image selection, Read ranges, Job progress/status, cancellation, Read download and engineering logs. Target switching is blocked while a selected PPU has an active/submitting Job so a running target cannot be silently orphaned by the UI.
 
-The current Mock provider is an engineering/test execution provider and is not inserted into the Production Manager registry. Manager remains read-only; Engineering Mock writes do not create a Manager write proxy.
+The current Production Mock prototype deliberately reuses this same Python Mock execution provider as a simulation source. That reuse does not make `EngineeringPPUProvider` the final Production orchestration architecture; it is a temporary verification boundary for multi-PPU behavior. A future authenticated Production control provider/orchestrator must preserve standalone PPU autonomy and must not turn Manager into a mandatory PPU execution dependency.
 
 Future engineering capability can include IC/device configuration, programming algorithms, timing/voltage controls, memory maps, protocol traces, FPGA/PL diagnostics, register inspection, performance profiling, Read/Compare/Dump tools, and failure analysis.
 
@@ -146,7 +172,7 @@ zh-TW
 en-US
 ```
 
-UI components use translation keys instead of accumulating mixed hard-coded Chinese and English labels. Locale choice is a browser preference.
+UI components use localized copy instead of accumulating a second independent user-facing vocabulary. Locale choice is a browser preference.
 
 Language switching is required to update React UI state immediately. Browser storage is persistence only; the UI must not wait for storage-event propagation before changing language. Storage events are used only to synchronize the preference across tabs/windows.
 
@@ -154,13 +180,15 @@ Canonical engineering vocabulary remains stable where translation would reduce c
 
 ## 6. Factory Log contract and current boundary
 
-Factory logging is a first-class Production requirement. The Production Console keeps a persistent Factory Log Console visible and provides filters, auto-scroll, and a full-screen log view.
+Factory logging is a first-class Production requirement.
 
-The current read-only multi-PPU aggregation path can expose safe `latest_job` summaries, so the console can truthfully show observed job identity, operation, state, stage and progress transitions together with Manager/PPU observation transitions. It must not invent events that the PPU did not report.
+The Manager read-only aggregation path can expose safe latest-Job summaries, so a production console can truthfully show observed job identity, operation, state, stage and progress transitions together with Manager/PPU observation transitions. It must not invent events that the PPU did not report.
 
-This is still **not** the complete factory programming log. The authoritative detailed event source already exists locally on each PPU: `JobEventLogger` writes structured JSONL under the Plasma Server `log_root`, including job, Site, stage/progress, completion, failure, cancellation, timeout and related events.
+The Production Mock prototype additionally shows a bounded browser log for the Mock Jobs it actually submits and observes. This is execution diagnostics for the prototype, not the complete factory programming ledger.
 
-The intended next logging transport is:
+The authoritative detailed event source already exists locally on each PPU: `JobEventLogger` writes structured JSONL under the Plasma Server `log_root`, including job, Site, stage/progress, completion, failure, cancellation, timeout and related events.
+
+The intended production logging transport remains:
 
 ```text
 PPU JobEventLogger JSONL
@@ -173,7 +201,7 @@ PPU JobEventLogger JSONL
 Required properties:
 
 - no arbitrary filesystem path supplied by a browser;
-- no raw PPU endpoint exposed to the browser;
+- no raw PPU endpoint exposed to an untrusted browser contract;
 - stable event/cursor identity and bounded page size;
 - canonical `ppu_id`, `site_id`, `job_id`, operation, event, severity and timestamp fields;
 - localized display text derived from structured event data rather than parsing translated strings;
@@ -182,11 +210,11 @@ Required properties:
 
 Because factory logs are operational evidence, the dedicated log-transport/persistence work should precede treating Production Mode as a complete production traceability system.
 
-## 7. Current security boundary
+## 7. Current security and deployment boundary
 
-Production Mode may select Sites and operations in the UI, but cross-PPU write execution remains disabled until an authenticated/authorized management control path is separately designed and approved.
+### 7.1 Manager remains optional and read-only
 
-The current Manager remains read-only and outside the PPU-local execution path.
+Plasma Manager remains outside the PPU-local execution path. Its current contract is discovery-by-explicit-registry plus read-only observation.
 
 ```text
 Local execution:
@@ -196,12 +224,54 @@ Browser / local PPU Console
     -> Site
 
 Production observation:
-Production Mode UI
-    -> same-origin Management BFF
+Production Mode / management UI
+    -> Management BFF
     -> read-only Manager
     -> PPU Gateways
 ```
 
-The Engineering Mock provider is a separate opt-in local simulation execution path owned by the Web Gateway process. It does not grant remote write authority to Manager and does not relax Production Mode's write boundary.
+The Production Mock prototype is a separate simulation path:
+
+```text
+Production Mock UI
+    -> Plasma Web REST Gateway
+    -> Python Mock PPU Provider
+    -> selected virtual PlasmaServers
+    -> MockInterface
+```
+
+This path exists only to prove Facility/PPU selection, cross-PPU concurrency, Site sequencing, status aggregation, and cancellation semantics. It does not grant Manager write authority and it does not authorize remote write access to real PPUs.
+
+### 7.2 Initial factory-network assumption
+
+The first real multi-PPU deployment may assume a controlled factory LAN and an explicit PPU registry. Automatic subnet discovery is not required for this prototype.
+
+A Manager registry entry identifies the root of one autonomous PPU Gateway. The current development/runtime convention remains an operator-local config outside the Git worktree, such as:
+
+```text
+$XDG_CONFIG_HOME/plasma/manager.yaml
+```
+
+For the future productized system-service deployment, the target canonical locations are:
+
+```text
+/etc/plasma/manager.yaml                 # configuration
+/var/lib/plasma/manager/                 # runtime state
+/var/lib/plasma/manager/observations.sqlite3
+```
+
+The `/etc/plasma/manager.yaml` path is a product deployment decision for future service packaging; current code still accepts an explicit `--config` path and does not require this filesystem location yet.
+
+Example explicit registry:
+
+```yaml
+ppus:
+  - alias: ppu-01
+    endpoint: http://192.168.10.101:18080
+  - alias: ppu-02
+    endpoint: http://192.168.10.102:18080
+  - alias: ppu-03
+    endpoint: http://192.168.10.103:18080
+```
 
 Manager or management aggregation failure must never make a standalone PPU unable to continue local programming.
