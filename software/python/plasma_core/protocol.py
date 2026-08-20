@@ -10,15 +10,9 @@ from typing import Any
 
 from .errors import ErrorCode, PlasmaError
 
-PROTOCOL_VERSION = "3.2"
-LEGACY_PROTOCOL_VERSION = "3.1"
-SUPPORTED_PROTOCOL_VERSIONS = frozenset({LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION})
-MAGIC_BY_VERSION = {
-    LEGACY_PROTOCOL_VERSION: b"PLASMA31",
-    PROTOCOL_VERSION: b"PLASMA32",
-}
-VERSION_BY_MAGIC = {magic: version for version, magic in MAGIC_BY_VERSION.items()}
-MAGIC = MAGIC_BY_VERSION[PROTOCOL_VERSION]
+PROTOCOL_VERSION = "3.3"
+SUPPORTED_PROTOCOL_VERSIONS = frozenset({PROTOCOL_VERSION})
+MAGIC = b"PLASMA33"
 HEADER = struct.Struct("!8sIII")
 
 
@@ -47,18 +41,11 @@ def _json_bytes(value: dict[str, Any]) -> bytes:
         ) from exc
 
 
-def _magic_version(magic: bytes) -> str:
-    try:
-        return VERSION_BY_MAGIC[magic]
-    except KeyError as exc:
-        raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "invalid protocol magic") from exc
-
-
 def encode_frame(frame: Frame, limits: ProtocolLimits = ProtocolLimits()) -> bytes:
     metadata = dict(frame.metadata)
     metadata.setdefault("protocol_version", PROTOCOL_VERSION)
     version = metadata.get("protocol_version")
-    if version not in SUPPORTED_PROTOCOL_VERSIONS:
+    if version != PROTOCOL_VERSION:
         raise PlasmaError(
             ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
             f"unsupported protocol version: {version!r}",
@@ -67,7 +54,7 @@ def encode_frame(frame: Frame, limits: ProtocolLimits = ProtocolLimits()) -> byt
     map_bytes = _json_bytes(frame.map_data) if frame.map_data else b""
     lengths = (len(metadata_bytes), len(map_bytes), len(frame.binary))
     _validate_lengths(lengths, limits)
-    return HEADER.pack(MAGIC_BY_VERSION[str(version)], *lengths) + metadata_bytes + map_bytes + frame.binary
+    return HEADER.pack(MAGIC, *lengths) + metadata_bytes + map_bytes + frame.binary
 
 
 def _validate_lengths(lengths: tuple[int, int, int], limits: ProtocolLimits) -> None:
@@ -102,7 +89,8 @@ def decode_frame_bytes(data: bytes, limits: ProtocolLimits = ProtocolLimits()) -
     if len(data) < HEADER.size:
         raise PlasmaError(ErrorCode.PROTOCOL_INCOMPLETE, "incomplete protocol header")
     magic, metadata_len, map_len, binary_len = HEADER.unpack_from(data)
-    magic_version = _magic_version(magic)
+    if magic != MAGIC:
+        raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "invalid protocol magic")
     lengths = (metadata_len, map_len, binary_len)
     _validate_lengths(lengths, limits)
     expected = HEADER.size + sum(lengths)
@@ -121,7 +109,7 @@ def decode_frame_bytes(data: bytes, limits: ProtocolLimits = ProtocolLimits()) -
         map_data=_decode_json(map_raw, "map"),
         binary=data[cursor : cursor + binary_len],
     )
-    _validate_frame(frame, magic_version)
+    _validate_frame(frame)
     return frame
 
 
@@ -138,7 +126,8 @@ async def read_frame(
             original_exception=exc,
         ) from exc
     magic, metadata_len, map_len, binary_len = HEADER.unpack(header)
-    magic_version = _magic_version(magic)
+    if magic != MAGIC:
+        raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "invalid protocol magic")
     lengths = (metadata_len, map_len, binary_len)
     _validate_lengths(lengths, limits)
     try:
@@ -156,33 +145,28 @@ async def read_frame(
         map_data=_decode_json(map_raw, "map"),
         binary=binary,
     )
-    _validate_frame(frame, magic_version)
+    _validate_frame(frame)
     return frame
 
 
-def _validate_frame(frame: Frame, magic_version: str | None = None) -> None:
+def _validate_frame(frame: Frame) -> None:
     version = frame.metadata.get("protocol_version")
-    if version not in SUPPORTED_PROTOCOL_VERSIONS:
+    if version != PROTOCOL_VERSION:
         raise PlasmaError(
             ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
             f"unsupported protocol version: {version!r}",
         )
-    if magic_version is not None and version != magic_version:
-        raise PlasmaError(
-            ErrorCode.PROTOCOL_HEADER_INVALID,
-            f"protocol magic/version mismatch: magic={magic_version!r}, metadata={version!r}",
-        )
-    expected_size = frame.metadata.get("firmware_size")
+    expected_size = frame.metadata.get("image_size")
     if expected_size is not None:
         if isinstance(expected_size, bool) or not isinstance(expected_size, int) or expected_size < 0:
-            raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "firmware_size must be a non-negative integer")
+            raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "image_size must be a non-negative integer")
         if expected_size != len(frame.binary):
             raise PlasmaError(
                 ErrorCode.PROTOCOL_INCOMPLETE,
-                "firmware_size does not match BINLEN",
-                context={"firmware_size": expected_size, "binlen": len(frame.binary)},
+                "image_size does not match BINLEN",
+                context={"image_size": expected_size, "binlen": len(frame.binary)},
             )
-    expected_hash = frame.metadata.get("firmware_sha256")
+    expected_hash = frame.metadata.get("image_sha256")
     if expected_hash is not None:
         if (
             not isinstance(expected_hash, str)
@@ -191,12 +175,12 @@ def _validate_frame(frame: Frame, magic_version: str | None = None) -> None:
         ):
             raise PlasmaError(
                 ErrorCode.PROTOCOL_CHECKSUM_MISMATCH,
-                "firmware_sha256 must be a 64-digit hexadecimal SHA-256 value",
+                "image_sha256 must be a 64-digit hexadecimal SHA-256 value",
             )
         actual_hash = hashlib.sha256(frame.binary).hexdigest()
         if not hmac.compare_digest(expected_hash.lower(), actual_hash):
             raise PlasmaError(
                 ErrorCode.PROTOCOL_CHECKSUM_MISMATCH,
-                "binary SHA-256 does not match metadata",
+                "image SHA-256 does not match metadata",
                 context={"expected": expected_hash, "actual": actual_hash},
             )
