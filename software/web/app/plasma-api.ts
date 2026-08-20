@@ -59,19 +59,24 @@ export type EngineeringTargetCatalog = {
   facility_count: number;
   ppu_count: number;
   site_count: number;
-  firmware_scope?: "ppu" | string;
+  firmware_scope?: string;
   facilities: EngineeringFacilityTarget[];
 };
 
-export type EngineeringStagedFirmware = {
-  firmware_id: string;
+export type EngineeringSession = {
+  session_id: string;
+  firmware_cache_scope: string;
+  previous_session_cleared: boolean;
+};
+
+type FirmwareFingerprint = {
   firmware_name: string;
   firmware_size: number;
   firmware_sha256: string;
-  scope: {
-    facility_id: string;
-    ppu_id: string;
-  };
+};
+
+type FirmwareCacheStatus = FirmwareFingerprint & {
+  cache_hit: boolean;
 };
 
 // Transitional shapes accepted only from protocol/API v3.1 backends.
@@ -261,46 +266,82 @@ export async function getEngineeringTargets(apiBase: string): Promise<Engineerin
   return await requestJson<EngineeringTargetCatalog>(apiBase, "/api/engineering/targets");
 }
 
-export async function stageEngineeringFirmware(
+export async function beginEngineeringSession(
   apiBase: string,
-  firmware: File,
-): Promise<EngineeringStagedFirmware> {
-  const payload = await requestJson<{ ok: boolean; firmware: EngineeringStagedFirmware }>(
+  previousSessionId?: string,
+): Promise<EngineeringSession> {
+  const payload = await requestJson<{ ok: boolean; session: EngineeringSession }>(
     apiBase,
-    `/api/firmware?name=${encodeURIComponent(firmware.name)}`,
+    "/api/engineering/session",
     {
       method: "POST",
-      headers: { "Content-Type": "application/octet-stream" },
-      body: firmware,
+      body: JSON.stringify(previousSessionId ? { previous_session_id: previousSessionId } : {}),
     },
-    120_000,
   );
-  return payload.firmware;
+  return payload.session;
 }
 
-const stagedFirmwareByFile = new WeakMap<File, Map<string, Promise<EngineeringStagedFirmware>>>();
+const fingerprintByFile = new WeakMap<File, Promise<FirmwareFingerprint>>();
+const firmwareEnsureInFlight = new Map<string, Promise<FirmwareFingerprint>>();
 
-function isEngineeringTargetBase(apiBase: string): boolean {
-  return apiBase.includes("/api/engineering/targets/");
-}
-
-function stageEngineeringFirmwareOnce(
-  apiBase: string,
-  firmware: File,
-): Promise<EngineeringStagedFirmware> {
-  let byTarget = stagedFirmwareByFile.get(firmware);
-  if (!byTarget) {
-    byTarget = new Map<string, Promise<EngineeringStagedFirmware>>();
-    stagedFirmwareByFile.set(firmware, byTarget);
+async function fingerprintFile(file: File): Promise<FirmwareFingerprint> {
+  let pending = fingerprintByFile.get(file);
+  if (!pending) {
+    pending = file.arrayBuffer().then(async buffer => {
+      const digest = await window.crypto.subtle.digest("SHA-256", buffer);
+      const firmwareSha256 = Array.from(new Uint8Array(digest))
+        .map(value => value.toString(16).padStart(2, "0"))
+        .join("");
+      return {
+        firmware_name: file.name,
+        firmware_size: file.size,
+        firmware_sha256: firmwareSha256,
+      };
+    });
+    fingerprintByFile.set(file, pending);
   }
-  const existing = byTarget.get(apiBase);
-  if (existing) return existing;
-  const staged = stageEngineeringFirmware(apiBase, firmware).catch(error => {
-    byTarget?.delete(apiBase);
-    throw error;
-  });
-  byTarget.set(apiBase, staged);
-  return staged;
+  return await pending;
+}
+
+async function ensureEngineeringFirmware(
+  apiBase: string,
+  sessionId: string,
+  firmware: File,
+): Promise<FirmwareFingerprint> {
+  const fingerprint = await fingerprintFile(firmware);
+  const key = `${sessionId}|${apiBase}|${fingerprint.firmware_sha256}`;
+  const existing = firmwareEnsureInFlight.get(key);
+  if (existing) return await existing;
+
+  const ensure = (async () => {
+    const checked = await requestJson<{ ok: boolean; firmware: FirmwareCacheStatus }>(
+      apiBase,
+      "/api/firmware/check",
+      {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId, ...fingerprint }),
+      },
+    );
+    if (!checked.firmware.cache_hit) {
+      await requestJson(
+        apiBase,
+        `/api/firmware?session_id=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(fingerprint.firmware_name)}&sha256=${encodeURIComponent(fingerprint.firmware_sha256)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: firmware,
+        },
+        120_000,
+      );
+    }
+    return fingerprint;
+  })();
+  firmwareEnsureInFlight.set(key, ensure);
+  try {
+    return await ensure;
+  } finally {
+    firmwareEnsureInFlight.delete(key);
+  }
 }
 
 export async function getPPUStatus(apiBase: string): Promise<PPUStatus> {
@@ -332,45 +373,58 @@ export async function startJob(
     siteId: number;
     operation: Operation;
     firmware?: File | null;
-    firmwareId?: string;
-    firmwareName?: string;
+    engineeringSessionId?: string;
     offset?: number;
     length?: number;
     submissionGuard?: () => boolean;
   },
 ): Promise<JobSnapshot> {
-  let firmwareId = options.firmwareId;
-  let firmwareName = options.firmwareName ?? options.firmware?.name;
   const usesFirmware = options.operation === "program" || options.operation === "verify";
-  if (!firmwareId && options.firmware && usesFirmware && isEngineeringTargetBase(apiBase)) {
-    const staged = await stageEngineeringFirmwareOnce(apiBase, options.firmware);
-    firmwareId = staged.firmware_id;
-    firmwareName = staged.firmware_name;
+  const engineeringTarget = apiBase.includes("/api/engineering/targets/");
+  let fingerprint: FirmwareFingerprint | null = null;
+  let firmwareBase64 = "";
+
+  if (usesFirmware && options.firmware) {
+    if (engineeringTarget) {
+      if (!options.engineeringSessionId) {
+        throw new PlasmaApiError("Engineering connection session is not ready");
+      }
+      fingerprint = await ensureEngineeringFirmware(
+        apiBase,
+        options.engineeringSessionId,
+        options.firmware,
+      );
+    } else {
+      firmwareBase64 = await fileToBase64(options.firmware);
+    }
   }
-  const firmwareBase64 = options.firmware && !firmwareId
-    ? await fileToBase64(options.firmware)
-    : "";
+
   if (options.submissionGuard && !options.submissionGuard()) {
     throw new PlasmaSubmissionBlockedError();
   }
+
+  const body: Record<string, unknown> = {
+    site_id: options.siteId,
+    operation: options.operation,
+  };
+  if (fingerprint && options.engineeringSessionId) {
+    body.session_id = options.engineeringSessionId;
+    body.firmware_name = fingerprint.firmware_name;
+    body.firmware_sha256 = fingerprint.firmware_sha256;
+  } else if (usesFirmware) {
+    body.firmware_name = options.firmware?.name;
+    body.firmware_base64 = firmwareBase64;
+    body.timeout_s = 30;
+  }
+  if (options.operation === "read") {
+    body.offset = options.offset ?? 0;
+    body.length = options.length ?? 256;
+  }
+
   const payload = await requestJson<{ ok: boolean; job: WireJobSnapshot }>(
     apiBase,
     "/api/jobs",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        site_id: options.siteId,
-        operation: options.operation,
-        firmware_name: firmwareName,
-        ...(firmwareId
-          ? { firmware_id: firmwareId }
-          : { firmware_base64: firmwareBase64 }),
-        ...(options.operation === "read" ? {
-          offset: options.offset ?? 0,
-          length: options.length ?? 256,
-        } : {}),
-      }),
-    },
+    { method: "POST", body: JSON.stringify(body) },
   );
   return normalizeJobSnapshot(payload.job);
 }
