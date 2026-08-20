@@ -32,6 +32,12 @@ jobs:
 
           root = Path("software/web/e2e/tests")
           replacements = (
+              ("firmware_scope", "programming_asset_scope"),
+              ("firmware_cache_scope", "programming_asset_cache_scope"),
+              ("firmware_sha256", "asset_sha256"),
+              ("firmware_name", "asset_name"),
+              ("firmware_size", "asset_size"),
+              ("firmware_base64", "asset_base64"),
               ("programming_image_scope", "programming_asset_scope"),
               ("programming_image_cache_scope", "programming_asset_cache_scope"),
               ("api/programming-images", "api/programming-assets"),
@@ -40,7 +46,6 @@ jobs:
               ("image_name", "asset_name"),
               ("image_size", "asset_size"),
               ("image_base64", "asset_base64"),
-              ("firmware_sha256", "image_sha256"),
               ("Engineering Firmware file", "Engineering Programming Image Asset file"),
               ("選擇 Firmware 檔案", "選擇 Programming Image Asset 檔案"),
               ("previous firmware cache cleared", "previous Programming Asset cache cleared"),
