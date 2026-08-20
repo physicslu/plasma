@@ -107,8 +107,8 @@ function initialSelection(catalog: EngineeringTargetCatalog): TargetSelection {
 function validSelection(catalog: EngineeringTargetCatalog, selection: TargetSelection): TargetSelection {
   const facility = catalog.facilities.find(item => item.facility_id === selection.facilityId);
   if (!facility) return initialSelection(catalog);
-  if (facility.ppus.some(item => item.ppu_id === selection.ppuId)) return selection;
-  return { facilityId: facility.facility_id, ppuId: facility.ppus[0]?.ppu_id ?? "" };
+  if (!facility.ppus.some(item => item.ppu_id === selection.ppuId)) return initialSelection(catalog);
+  return selection;
 }
 
 function firmwareSizeLabel(bytes: number): string {
@@ -118,6 +118,11 @@ function firmwareSizeLabel(bytes: number): string {
 
 function shortSha256(sha256: string): string {
   return `${sha256.slice(0, 12)}…`;
+}
+
+function logDownloadTimestamp(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 
 export default function ProgrammingWorkspace() {
@@ -151,7 +156,7 @@ export default function ProgrammingWorkspace() {
 
   const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === selection.ppuId) ?? null;
-  const targetApiBase = selection.facilityId && selection.ppuId
+  const targetApiBase = catalog && selection.facilityId && selection.ppuId
     ? engineeringTargetApiBase(apiBase, selection.facilityId, selection.ppuId)
     : null;
   const selectedSites = sites.filter(site => selectedSiteIds.includes(site.id));
@@ -164,9 +169,9 @@ export default function ProgrammingWorkspace() {
   const appendLog = useCallback((message: string, error = false) => {
     const time = new Date().toLocaleTimeString("en-GB", { hour12: false });
     setLogs(current => [
-      ...current.slice(-79),
       { id: ++logSequence.current, text: `${time}  ${message}`, error },
-    ]);
+      ...current,
+    ].slice(0, 80));
   }, []);
 
   const logFirmwareEvent = useCallback((event: FirmwareTransferEvent) => {
@@ -258,7 +263,6 @@ export default function ProgrammingWorkspace() {
         resetTargetRuntime();
         setCatalog(null);
         setCatalogError(message);
-        setSelection({ facilityId: "", ppuId: "" });
         setConnection("offline");
         appendLog(`[ENGINEERING] Provider unavailable · ${message}`, true);
       }
@@ -338,6 +342,20 @@ export default function ProgrammingWorkspace() {
     } catch (error) {
       appendLog(`[NET] ${error instanceof Error ? error.message : "Invalid Gateway URL"}`, true);
     }
+  }
+
+  function downloadLog() {
+    if (!logs.length) return;
+    const content = `${logs.map(log => log.text).join("\n")}\n`;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `plasma-engineering-${logDownloadTimestamp(new Date())}.log`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
   }
 
   function selectFacility(facilityId: string) {
@@ -731,7 +749,13 @@ export default function ProgrammingWorkspace() {
       </section>
 
       <section className="logCard engineeringLogCard">
-        <div className="logHead"><div><span />{t("engineeringProgramming.jobLog")}</div><button type="button" onClick={() => setLogs([])}>{t("engineeringProgramming.clear")}</button></div>
+        <div className="logHead">
+          <div><span />{t("engineeringProgramming.jobLog")}</div>
+          <div>
+            <button type="button" onClick={downloadLog} disabled={!logs.length}>Download .log</button>
+            <button type="button" onClick={() => setLogs([])}>{t("engineeringProgramming.clear")}</button>
+          </div>
+        </div>
         <pre aria-label="Engineering job log">{logs.length ? logs.map(log => <span key={log.id} data-level={log.error ? "error" : "info"}>{log.text}</span>) : "Log cleared."}</pre>
       </section>
     </section>
