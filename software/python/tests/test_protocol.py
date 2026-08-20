@@ -8,7 +8,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.protocol import (
     HEADER,
     MAGIC,
-    MAGIC_BY_VERSION,
+    PROTOCOL_VERSION,
     Frame,
     ProtocolLimits,
     decode_frame_bytes,
@@ -18,59 +18,47 @@ from plasma_core.protocol import (
 
 
 class ProtocolTests(unittest.TestCase):
-    def test_v32_round_trip_with_map_and_binary(self) -> None:
-        binary = bytes(range(64))
+    def test_v33_round_trip_with_map_and_image(self) -> None:
+        image = bytes(range(64))
         frame = Frame(
             metadata={
-                "protocol_version": "3.2",
+                "protocol_version": PROTOCOL_VERSION,
                 "site_id": 1,
                 "operation": "program",
-                "firmware_sha256": hashlib.sha256(binary).hexdigest(),
+                "image_size": len(image),
+                "image_sha256": hashlib.sha256(image).hexdigest(),
             },
             map_data={"sections": [{"address": 0, "length": 64}]},
-            binary=binary,
+            binary=image,
         )
         encoded = encode_frame(frame)
-        self.assertEqual(encoded[:8], b"PLASMA32")
+        self.assertEqual(encoded[:8], b"PLASMA33")
         decoded = decode_frame_bytes(encoded)
-        self.assertEqual(decoded.binary, binary)
+        self.assertEqual(decoded.binary, image)
         self.assertEqual(decoded.map_data, frame.map_data)
         self.assertEqual(decoded.metadata["site_id"], 1)
 
-    def test_v31_frame_remains_decodable(self) -> None:
-        frame = Frame(
-            metadata={
-                "protocol_version": "3.1",
-                "channel_id": 0,
-                "operation": "status",
-            }
-        )
-        encoded = encode_frame(frame)
-        self.assertEqual(encoded[:8], b"PLASMA31")
-        decoded = decode_frame_bytes(encoded)
-        self.assertEqual(decoded.metadata["channel_id"], 0)
-
-    def test_default_version_is_v32(self) -> None:
+    def test_default_version_is_v33(self) -> None:
         encoded = encode_frame(Frame(metadata={"operation": "status"}))
-        self.assertEqual(encoded[:8], MAGIC_BY_VERSION["3.2"])
-        self.assertEqual(decode_frame_bytes(encoded).metadata["protocol_version"], "3.2")
+        self.assertEqual(encoded[:8], MAGIC)
+        self.assertEqual(decode_frame_bytes(encoded).metadata["protocol_version"], PROTOCOL_VERSION)
 
-    def test_magic_and_metadata_version_must_match(self) -> None:
+    def test_noncanonical_version_is_rejected(self) -> None:
         metadata = b'{"protocol_version":"3.2","operation":"status"}'
-        data = HEADER.pack(MAGIC_BY_VERSION["3.1"], len(metadata), 0, 0) + metadata
+        data = HEADER.pack(MAGIC, len(metadata), 0, 0) + metadata
         with self.assertRaises(PlasmaError) as caught:
             decode_frame_bytes(data)
-        self.assertEqual(caught.exception.code, ErrorCode.PROTOCOL_HEADER_INVALID)
+        self.assertEqual(caught.exception.code, ErrorCode.PROTOCOL_VERSION_UNSUPPORTED)
 
     def test_invalid_magic(self) -> None:
-        data = bytearray(encode_frame(Frame(metadata={"protocol_version": "3.2"})))
+        data = bytearray(encode_frame(Frame(metadata={"protocol_version": PROTOCOL_VERSION})))
         data[:8] = b"NOTMAGIC"
         with self.assertRaises(PlasmaError) as caught:
             decode_frame_bytes(bytes(data))
         self.assertEqual(caught.exception.code, ErrorCode.PROTOCOL_HEADER_INVALID)
 
     def test_incomplete_payload(self) -> None:
-        data = encode_frame(Frame(metadata={"protocol_version": "3.2"}, binary=b"abc"))
+        data = encode_frame(Frame(metadata={"protocol_version": PROTOCOL_VERSION}, binary=b"abc"))
         with self.assertRaises(PlasmaError) as caught:
             decode_frame_bytes(data[:-1])
         self.assertEqual(caught.exception.code, ErrorCode.PROTOCOL_INCOMPLETE)
@@ -78,7 +66,7 @@ class ProtocolTests(unittest.TestCase):
     def test_payload_limit(self) -> None:
         with self.assertRaises(PlasmaError) as caught:
             encode_frame(
-                Frame(metadata={"protocol_version": "3.2"}, binary=b"1234"),
+                Frame(metadata={"protocol_version": PROTOCOL_VERSION}, binary=b"1234"),
                 ProtocolLimits(binary=3),
             )
         self.assertEqual(caught.exception.code, ErrorCode.PROTOCOL_PAYLOAD_TOO_LARGE)
@@ -91,7 +79,7 @@ class ProtocolTests(unittest.TestCase):
     def test_checksum_mismatch(self) -> None:
         data = encode_frame(
             Frame(
-                metadata={"protocol_version": "3.2", "firmware_sha256": "0" * 64},
+                metadata={"protocol_version": PROTOCOL_VERSION, "image_sha256": "0" * 64},
                 binary=b"payload",
             )
         )
@@ -102,7 +90,7 @@ class ProtocolTests(unittest.TestCase):
     def test_malformed_checksum_is_rejected(self) -> None:
         data = encode_frame(
             Frame(
-                metadata={"protocol_version": "3.2", "firmware_sha256": "not-a-sha256"},
+                metadata={"protocol_version": PROTOCOL_VERSION, "image_sha256": "not-a-sha256"},
                 binary=b"payload",
             )
         )
@@ -110,10 +98,10 @@ class ProtocolTests(unittest.TestCase):
             decode_frame_bytes(data)
         self.assertEqual(caught.exception.code, ErrorCode.PROTOCOL_CHECKSUM_MISMATCH)
 
-    def test_firmware_size_must_match_binary_length(self) -> None:
+    def test_image_size_must_match_binary_length(self) -> None:
         data = encode_frame(
             Frame(
-                metadata={"protocol_version": "3.2", "firmware_size": 99},
+                metadata={"protocol_version": PROTOCOL_VERSION, "image_size": 99},
                 binary=b"payload",
             )
         )
@@ -132,7 +120,7 @@ class ProtocolTests(unittest.TestCase):
 class AsyncProtocolTests(unittest.IsolatedAsyncioTestCase):
     async def test_fragmented_async_read(self) -> None:
         encoded = encode_frame(
-            Frame(metadata={"protocol_version": "3.2", "operation": "status"})
+            Frame(metadata={"protocol_version": PROTOCOL_VERSION, "operation": "status"})
         )
         reader = asyncio.StreamReader()
 
