@@ -274,6 +274,7 @@ class ProgrammingAssetRestContractTests(unittest.TestCase):
                 "asset_name": "inline.bin",
                 "asset_type": "image",
                 "asset_format": "binary",
+                "asset_size": len(data),
                 "asset_sha256": sha256,
                 "asset_base64": encoded,
             },
@@ -296,11 +297,29 @@ class ProgrammingAssetRestContractTests(unittest.TestCase):
                     "asset_name": "serial.txt",
                     "asset_type": "serial_number",
                     "asset_format": "text",
+                    "asset_size": len(data),
                     "asset_sha256": sha256,
                     "asset_base64": encoded,
                 },
                 client_id="test-client",
             )
+
+    def test_unknown_rest_fields_fail_closed(self):
+        status, payload = self.request(
+            "POST",
+            f"{self.target}/api/programming-assets/check",
+            {
+                "session_id": "1" * 32,
+                "asset_name": "image.bin",
+                "asset_type": "image",
+                "asset_format": "binary",
+                "asset_size": 1,
+                "asset_sha256": "a" * 64,
+                "unexpected": True,
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertFalse(payload["ok"])
 
     def test_retired_rest_routes_are_not_available(self):
         for path in (
