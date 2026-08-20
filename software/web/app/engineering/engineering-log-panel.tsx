@@ -24,6 +24,7 @@ export const ENGINEERING_LOG_CATEGORIES: EngineeringLogCategory[] = [
 export function classifyEngineeringLog(message: string): EngineeringLogCategory {
   if (
     message.startsWith("[IMG]")
+    || message.startsWith("[FIRMWARE]")
     || message.startsWith("[KEY]")
     || message.startsWith("[OPT]")
   ) return "DAT";
@@ -40,6 +41,10 @@ export function classifyEngineeringLog(message: string): EngineeringLogCategory 
 
 export function engineeringLogCategoryLabel(category: EngineeringLogCategory): string {
   return category.padEnd(3, " ");
+}
+
+function engineeringLogText(entry: EngineeringLogEntry): string {
+  return entry.text.replace(" [FIRMWARE]", " [IMG]");
 }
 
 function logDownloadTimestamp(date: Date): string {
@@ -69,7 +74,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
 
   function downloadLog() {
     if (!logs.length) return;
-    const content = `${logs.map(log => log.text).join("\n")}\n`;
+    const content = `${logs.map(engineeringLogText).join("\n")}\n`;
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -119,7 +124,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
               data-level={log.error ? "error" : "info"}
               data-category={log.category}
             >
-              {log.text}
+              {engineeringLogText(log)}
             </span>
           ))
           : "No log entries for selected filters."}
