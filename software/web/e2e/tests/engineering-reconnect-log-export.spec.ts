@@ -10,7 +10,7 @@ function catalog(includeSelectedTarget = true) {
     facility_count: 3,
     ppu_count: includeSelectedTarget ? 12 : 11,
     site_count: includeSelectedTarget ? 60 : 54,
-    firmware_scope: "connection-session-and-ppu",
+    programming_asset_scope: "connection-session-and-ppu",
     facilities: Array.from({ length: 3 }, (_, facilityIndex) => {
       const facilityNumber = facilityIndex + 1;
       const facilityId = `mock-facility-${String(facilityNumber).padStart(2, "0")}`;
@@ -90,7 +90,7 @@ test("Reconnect preserves the selected PPU and falls back to Default only when i
           ok: true,
           session: {
             session_id: String(sessionNumber).padStart(32, "0"),
-            firmware_cache_scope: "connection-session-and-ppu",
+            programming_asset_cache_scope: "connection-session-and-ppu",
             previous_session_cleared: sessionNumber > 1,
           },
         }),
@@ -177,7 +177,7 @@ test("Engineering Job Log is newest-first and Download .log exports the same ord
           ok: true,
           session: {
             session_id: String(sessionNumber).padStart(32, "0"),
-            firmware_cache_scope: "connection-session-and-ppu",
+            programming_asset_cache_scope: "connection-session-and-ppu",
             previous_session_cleared: sessionNumber > 1,
           },
         }),
