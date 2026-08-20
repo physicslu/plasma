@@ -657,9 +657,12 @@ export default function ProgrammingWorkspace() {
           : cancelled.length > 0
             ? "PARTIAL"
             : "COMPLETE";
-      const label = (ids: number[]) => ids.length ? siteListLabel(ids) : "—";
+      const groups: string[] = [];
+      if (successful.length > 0) groups.push(`success: ${siteListLabel(successful)}`);
+      if (cancelled.length > 0) groups.push(`cancelled: ${siteListLabel(cancelled)}`);
+      if (failed.length > 0) groups.push(`failed: ${siteListLabel(failed)}`);
       appendLog(
-        `${outcome} · success: ${label(successful)} · cancelled: ${label(cancelled)} · failed: ${label(failed)}`,
+        `${outcome} · ${groups.join(" · ")}`,
         failed.length > 0,
         "BAT",
       );

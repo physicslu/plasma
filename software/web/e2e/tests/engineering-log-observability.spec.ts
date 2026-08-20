@@ -227,6 +227,9 @@ test("Engineering log distinguishes SHA-256 fingerprint-only Asset reuse from so
   expect(uploadCount).toBe(1);
   await expect(log).toContainText("[DAT] [IMG] CACHE HIT · SHA256");
   await expect(log).toContainText("reference only · no binary upload");
+  await expect(log).toContainText("[BAT] COMPLETE · success: SITE-01, SITE-02");
+  await expect(log).not.toContainText("cancelled: —");
+  await expect(log).not.toContainText("failed: —");
 
   await page.locator(".engineeringGateway button[type=submit]").click();
   await expect(log).toContainText("[SESSION] NEW · previous Programming Asset cache cleared");
@@ -291,6 +294,6 @@ test("independent Site cancellation produces a PARTIAL aggregate batch summary",
 
   const log = page.getByLabel("Engineering job log");
   await expect(log).toContainText("[PPU] [SITE-02] Cancel requested", { timeout: 15_000 });
-  await expect(log).toContainText("[BAT] PARTIAL · success: SITE-01 · cancelled: SITE-02 · failed: —", { timeout: 15_000 });
+  await expect(log).toContainText("[BAT] PARTIAL · success: SITE-01 · cancelled: SITE-02", { timeout: 15_000 });
   await expect(page.locator(".executeBatch")).toBeEnabled();
 });

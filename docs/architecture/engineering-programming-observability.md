@@ -187,10 +187,12 @@ Programming Recipe activity, once implemented, should be designed as control-pla
 
 ```text
 [BAT] START ERASE → PROGRAM → VERIFY · SITE-01, SITE-02
-[BAT] COMPLETE · success: SITE-01, SITE-02 · cancelled: — · failed: —
-[BAT] PARTIAL · success: SITE-01 · cancelled: SITE-02 · failed: —
-[BAT] CANCELLED · success: — · cancelled: SITE-01, SITE-02 · failed: —
-[BAT] FAILED · success: SITE-01 · cancelled: — · failed: SITE-02
+[BAT] COMPLETE · success: SITE-01, SITE-02
+[BAT] PARTIAL · success: SITE-01 · cancelled: SITE-02
+[BAT] CANCELLED · cancelled: SITE-01, SITE-02
+[BAT] FAILED · success: SITE-01 · failed: SITE-02
 ```
+
+Rendered operator logs omit empty outcome groups. Machine-readable Batch results keep their complete structured fields; consumers must not infer schema from rendered text.
 
 These logs are evidence, not behavioral authority. Provider/Server rules remain authoritative for Asset cache scope, SHA validation, Normalized Image lease enforcement, and Job state.
