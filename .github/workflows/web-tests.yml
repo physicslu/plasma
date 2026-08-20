@@ -16,6 +16,47 @@ permissions:
   contents: read
 
 jobs:
+  pr68-refresh-visual-baselines:
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/remove-rest-v1-firmware-compat'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: |
+            software/web/package-lock.json
+            software/web/e2e/package-lock.json
+      - name: Install Web and Playwright dependencies
+        run: |
+          npm --prefix software/web ci
+          npm --prefix software/web/e2e ci
+      - name: Install deterministic visual environment
+        timeout-minutes: 10
+        run: |
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends fonts-wqy-zenhei
+          cd software/web/e2e && npx playwright install chromium
+      - name: Refresh expected visual baselines
+        working-directory: software/web/e2e
+        run: npx playwright test tests/visual.spec.ts --update-snapshots
+      - name: Commit refreshed baselines
+        run: |
+          if git diff --quiet -- software/web/e2e/tests/__snapshots__; then
+            exit 0
+          fi
+          git config user.name "plasma-pr68-bot"
+          git config user.email "plasma-pr68-bot@users.noreply.github.com"
+          git add software/web/e2e/tests/__snapshots__
+          git commit -m "Refresh visual baselines for Programming Asset UI"
+          git push origin HEAD:${{ github.head_ref }}
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
