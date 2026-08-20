@@ -199,9 +199,11 @@ class MockEngineeringPPUProvider:
             return
         with self._firmware_lock:
             self._firmware_sessions.clear()
-            self._ppu_firmware_leases.clear()
         if loop.is_running():
-            future = asyncio.run_coroutine_threadsafe(self._close_servers(), loop)
+            future = asyncio.run_coroutine_threadsafe(
+                self._shutdown_servers_and_watchers(),
+                loop,
+            )
             future.result(timeout=timeout_s)
             loop.call_soon_threadsafe(loop.stop)
         thread.join(timeout=timeout_s)
@@ -227,7 +229,7 @@ class MockEngineeringPPUProvider:
             loop.run_forever()
         finally:
             if self._servers:
-                loop.run_until_complete(self._close_servers())
+                loop.run_until_complete(self._shutdown_servers_and_watchers())
             loop.close()
 
     async def _start_servers(self) -> None:
@@ -247,6 +249,17 @@ class MockEngineeringPPUProvider:
         self._output_roots.clear()
         if servers:
             await asyncio.gather(*(server.close() for server in servers))
+
+    async def _shutdown_servers_and_watchers(self) -> None:
+        await self._close_servers()
+        for _ in range(100):
+            with self._firmware_lock:
+                if not self._ppu_firmware_leases:
+                    break
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0)
+        with self._firmware_lock:
+            self._ppu_firmware_leases.clear()
 
     def _config_for(self, spec: MockPPUSpec) -> PlasmaConfig:
         ppu_root = self.root / spec.ppu_id
