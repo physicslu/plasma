@@ -16,9 +16,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 FORBIDDEN = re.compile(
-    r"\b(?:Programmer(?:Config|State|Manager|Worker)?|Channel(?:Config|State|Manager|Worker)?|"
+    r"(?:\b(?:Programmer(?:Config|State|Manager|Worker)?|Channel(?:Config|State|Manager|Worker)?|"
     r"programmer|programmer_id|channel_id|channel_count|enabled_channel_count|"
-    r"max_supported_channels|channels|firmware)\b",
+    r"max_supported_channels|channels)\b|\bfirmware(?:\b|_))",
     re.IGNORECASE,
 )
 
@@ -75,6 +75,7 @@ def self_test() -> None:
     assert FORBIDDEN.search("channels")
     assert FORBIDDEN.search("Firmware")
     assert FORBIDDEN.search("firmware_sha256")
+    assert FORBIDDEN.search("FIRMWARE_CACHE")
     assert not FORBIDDEN.search("site_id")
     assert not FORBIDDEN.search("SiteManager")
     assert not FORBIDDEN.search("ProgrammingAsset")
