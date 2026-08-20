@@ -171,9 +171,9 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   await expect.poll(() => jobNumber).toBe(1);
   await expect(page.locator(".executeBatch")).toBeEnabled();
   await expect(log).toContainText("[USR] [BATCH] EXECUTE · ERASE · SITE-01");
-  await expect(log).toContainText("[BAT] [BATCH] START ERASE · SITE-01");
+  await expect(log).toContainText("[BAT] START ERASE · SITE-01");
   await expect(log).toContainText("[PPU] [SITE-01] ERASE accepted · audit-job-1");
-  await expect(log).toContainText("[BAT] [BATCH] COMPLETE · success: SITE-01");
+  await expect(log).toContainText("[BAT] COMPLETE · success: SITE-01");
 
   await expect(page.getByText("DAT", { exact: true })).toBeVisible();
   const logHeight = await log.evaluate(element => Number.parseFloat(getComputedStyle(element).height));
@@ -204,5 +204,5 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   expect(fileText).toContain("[USR] [BATCH] EXECUTE · ERASE · SITE-01");
   expect(fileText).toContain("[NET] [SESSION] NEW · fresh connection");
   expect(fileText).toContain("[PPU] [SITE-01] ERASE accepted · audit-job-1");
-  expect(fileText).toContain("[BAT] [BATCH] COMPLETE · success: SITE-01");
+  expect(fileText).toContain("[BAT] COMPLETE · success: SITE-01");
 });

@@ -282,6 +282,6 @@ test("independent Site cancellation produces a PARTIAL aggregate batch summary",
 
   const log = page.getByLabel("Engineering job log");
   await expect(log).toContainText("[PPU] [SITE-02] Cancel requested", { timeout: 15_000 });
-  await expect(log).toContainText("[BAT] [BATCH] PARTIAL · success: SITE-01 · cancelled: SITE-02 · failed: —", { timeout: 15_000 });
+  await expect(log).toContainText("[BAT] PARTIAL · success: SITE-01 · cancelled: SITE-02 · failed: —", { timeout: 15_000 });
   await expect(page.locator(".executeBatch")).toBeEnabled();
 });

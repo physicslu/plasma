@@ -128,6 +128,9 @@ test("Reconnect preserves the selected PPU and falls back to Default only when i
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });
   const connect = page.locator(".engineeringGateway button[type=submit]");
+  const log = page.getByLabel("Engineering job log");
+  const targetRestores = log.locator('span[data-category="SYS"]').filter({ hasText: "[TARGET] RESTORED" });
+  const siteRestores = log.locator('span[data-category="SYS"]').filter({ hasText: "[SITE] RESTORED" });
 
   await facility.selectOption("mock-facility-02");
   await ppu.selectOption("mock-facility-02-ppu-03");
@@ -144,12 +147,18 @@ test("Reconnect preserves the selected PPU and falls back to Default only when i
   await expect(facility).toHaveValue("mock-facility-02");
   await expect(ppu).toHaveValue("mock-facility-02-ppu-03");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(6);
+  await expect(targetRestores).toHaveCount(1);
+  await expect(siteRestores).toHaveCount(1);
+  await expect(targetRestores.first()).toContainText("mock-facility-02 / mock-facility-02-ppu-03");
+  await expect(siteRestores.first()).toContainText("SITE-01, SITE-02, SITE-03, SITE-04, SITE-05, SITE-06");
 
   includeSelectedTarget = false;
   await connect.click();
   await expect(facility).toHaveValue("mock-facility-01");
   await expect(ppu).toHaveValue("mock-facility-01-ppu-01");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await expect(targetRestores).toHaveCount(1);
+  await expect(siteRestores).toHaveCount(1);
 });
 
 test("Engineering Job Log is newest-first and Download .log exports the same order", async ({ page }) => {
