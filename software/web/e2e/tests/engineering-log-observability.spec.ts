@@ -206,17 +206,17 @@ test("Engineering log distinguishes SHA-256 fingerprint-only reuse from binary u
   await expect.poll(() => jobNumber).toBe(2);
   await expect.poll(() => page.locator(".executeBatch").isEnabled()).toBe(true);
   expect(uploadCount).toBe(1);
-  await expect(log).toContainText("[FIRMWARE] CACHE CHECK · observable.bin · 1.00 MiB · SHA256");
+  await expect(log).toContainText("[DAT] [IMG] CACHE CHECK · observable.bin · 1.00 MiB · SHA256");
   await expect(log).toContainText("fingerprint only");
-  await expect(log).toContainText("[FIRMWARE] CACHE MISS · SHA256");
-  await expect(log).toContainText("[FIRMWARE] UPLOAD START · observable.bin · 1.00 MiB · SHA256");
-  await expect(log).toContainText("[FIRMWARE] UPLOAD COMPLETE · observable.bin · 1.00 MiB · SHA256");
+  await expect(log).toContainText("[DAT] [IMG] CACHE MISS · SHA256");
+  await expect(log).toContainText("[DAT] [IMG] UPLOAD START · observable.bin · 1.00 MiB · SHA256");
+  await expect(log).toContainText("[DAT] [IMG] UPLOAD COMPLETE · observable.bin · 1.00 MiB · SHA256");
 
   await page.locator(".executeBatch").click();
   await expect.poll(() => jobNumber).toBe(4);
   await expect.poll(() => page.locator(".executeBatch").isEnabled()).toBe(true);
   expect(uploadCount).toBe(1);
-  await expect(log).toContainText("[FIRMWARE] CACHE HIT · SHA256");
+  await expect(log).toContainText("[DAT] [IMG] CACHE HIT · SHA256");
   await expect(log).toContainText("reference only · no binary upload");
 
   await page.locator(".engineeringGateway button[type=submit]").click();
@@ -281,7 +281,7 @@ test("independent Site cancellation produces a PARTIAL aggregate batch summary",
   await page.getByLabel("Cancel SITE 2").click();
 
   const log = page.getByLabel("Engineering job log");
-  await expect(log).toContainText("[SITE 2] Cancel requested", { timeout: 15_000 });
-  await expect(log).toContainText("[BATCH] PARTIAL · success: SITE 1 · cancelled: SITE 2 · failed: —", { timeout: 15_000 });
+  await expect(log).toContainText("[PPU] [SITE-02] Cancel requested", { timeout: 15_000 });
+  await expect(log).toContainText("[BAT] [BATCH] PARTIAL · success: SITE-01 · cancelled: SITE-02 · failed: —", { timeout: 15_000 });
   await expect(page.locator(".executeBatch")).toBeEnabled();
 });

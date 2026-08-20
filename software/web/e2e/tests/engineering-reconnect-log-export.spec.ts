@@ -207,8 +207,9 @@ test("Engineering Job Log is newest-first and Download .log exports the same ord
   await ppu.selectOption("mock-facility-02-ppu-02");
 
   const entries = log.locator("span");
-  await expect(entries.nth(0)).toContainText("[TARGET] mock-facility-02 / mock-facility-02-ppu-02");
-  await expect(entries.nth(1)).toContainText("[TARGET] mock-facility-02 / mock-facility-02-ppu-01");
+  const systemTargets = log.locator('span[data-category="SYS"]').filter({ hasText: "[TARGET]" });
+  await expect(systemTargets.nth(0)).toContainText("[TARGET] mock-facility-02 / mock-facility-02-ppu-02");
+  await expect(systemTargets.nth(1)).toContainText("[TARGET] mock-facility-02 / mock-facility-02-ppu-01");
 
   const visibleLines = await entries.allTextContents();
   const downloadPromise = page.waitForEvent("download");

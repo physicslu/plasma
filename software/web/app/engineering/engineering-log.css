@@ -1,0 +1,88 @@
+.engineeringLogHead {
+  height: auto;
+  min-height: 38px;
+  padding-block: 8px;
+  gap: 12px;
+}
+
+.engineeringLogTitle,
+.engineeringLogActions {
+  flex: 0 0 auto;
+}
+
+.engineeringLogFilters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.engineeringLogFilters button,
+.engineeringLogFilters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 4px 8px;
+  font: 800 8px var(--font-mono);
+  letter-spacing: .06em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.engineeringLogFilters label span {
+  display: inline-block;
+  min-width: 3ch;
+  white-space: pre;
+}
+
+.engineeringLogFilters button.active,
+.engineeringLogFilters label.active {
+  border-color: color-mix(in srgb, var(--cyan) 60%, var(--line));
+  background: color-mix(in srgb, var(--cyan) 9%, var(--panel));
+  color: var(--cyan);
+}
+
+.engineeringLogFilters input {
+  margin: 0;
+  accent-color: var(--cyan);
+}
+
+.engineeringLogCard pre {
+  height: 270px;
+  min-height: 270px;
+}
+
+.engineeringLogCard pre span[data-category="USR"] {
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .engineeringLogHead {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .engineeringLogFilters {
+    align-items: stretch;
+  }
+
+  .engineeringLogFilters button,
+  .engineeringLogFilters label {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .engineeringLogCard pre {
+    height: 220px;
+    min-height: 220px;
+  }
+}

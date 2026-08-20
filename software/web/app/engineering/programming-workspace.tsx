@@ -26,6 +26,12 @@ import type {
   PPUSnapshot,
   SiteSnapshot,
 } from "../plasma-api";
+import EngineeringLogPanel, {
+  classifyEngineeringLog,
+  engineeringLogCategoryLabel,
+  type EngineeringLogCategory,
+  type EngineeringLogEntry,
+} from "./engineering-log-panel";
 
 type Stage =
   | "idle"
@@ -57,9 +63,9 @@ type TargetSelection = { facilityId: string; ppuId: string };
 type ConnectionState = "connecting" | "online" | "offline";
 type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "failed";
 type BatchTerminalState = "success" | "cancelled" | "failed";
-type LogEntry = { id: number; text: string; error: boolean };
 
 const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
+const MAX_LOG_ENTRIES = 1000;
 const POLL_INTERVAL_MS = 500;
 const POLL_ATTEMPTS = 600;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
@@ -120,9 +126,16 @@ function shortSha256(sha256: string): string {
   return `${sha256.slice(0, 12)}…`;
 }
 
-function logDownloadTimestamp(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+function siteLabel(siteId: number): string {
+  return `SITE-${String(siteId).padStart(2, "0")}`;
+}
+
+function siteListLabel(ids: number[]): string {
+  return ids.length ? ids.map(siteLabel).join(", ") : "none";
+}
+
+function operationListLabel(operations: Operation[]): string {
+  return operations.length ? operations.map(item => item.toUpperCase()).join(" → ") : "none";
 }
 
 export default function ProgrammingWorkspace() {
@@ -145,7 +158,7 @@ export default function ProgrammingWorkspace() {
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchCancelling, setBatchCancelling] = useState(false);
   const [batchSiteStates, setBatchSiteStates] = useState<Record<number, BatchSiteState>>({});
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);
 
   const trackedJobs = useRef<Record<number, string>>({});
   const submissionGenerations = useRef<Record<number, number>>({});
@@ -171,12 +184,22 @@ export default function ProgrammingWorkspace() {
     && Number(readLength) > 0;
   const targetLocked = batchRunning || submittingSiteIds.length > 0 || sites.some(isRunning);
 
-  const appendLog = useCallback((message: string, error = false) => {
+  const appendLog = useCallback((
+    message: string,
+    error = false,
+    category?: EngineeringLogCategory,
+  ) => {
+    const resolvedCategory = category ?? classifyEngineeringLog(message);
     const time = new Date().toLocaleTimeString("en-GB", { hour12: false });
     setLogs(current => [
-      { id: ++logSequence.current, text: `${time}  ${message}`, error },
+      {
+        id: ++logSequence.current,
+        text: `${time}  [${engineeringLogCategoryLabel(resolvedCategory)}] ${message}`,
+        error,
+        category: resolvedCategory,
+      },
       ...current,
-    ].slice(0, 80));
+    ].slice(0, MAX_LOG_ENTRIES));
   }, []);
 
   const logFirmwareEvent = useCallback((event: FirmwareTransferEvent) => {
@@ -322,7 +345,7 @@ export default function ProgrammingWorkspace() {
           if (terminalStates.has(job.state)) delete trackedJobs.current[job.site_id];
         });
       } catch (error) {
-        if (!stopped) appendLog(`[TARGET] Status failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
+        if (!stopped) appendLog(`[TARGET] Status failed · ${error instanceof Error ? error.message : "unknown error"}`, true, "PPU");
       } finally {
         if (!stopped) timer = window.setTimeout(poll, POLL_INTERVAL_MS);
       }
@@ -337,6 +360,7 @@ export default function ProgrammingWorkspace() {
 
   function connect(event: FormEvent) {
     event.preventDefault();
+    appendLog(`[CONNECTION] CONNECT · ${apiDraft}`, false, "USR");
     if (targetLocked) {
       appendLog("[NET] Gateway change blocked while a target Job is active", true);
       return;
@@ -356,50 +380,51 @@ export default function ProgrammingWorkspace() {
     }
   }
 
-  function downloadLog() {
-    if (!logs.length) return;
-    const content = `${logs.map(log => log.text).join("\n")}\n`;
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `plasma-engineering-${logDownloadTimestamp(new Date())}.log`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
-  }
-
   function selectFacility(facilityId: string) {
     if (targetLocked) return;
     const nextFacility = catalog?.facilities.find(item => item.facility_id === facilityId);
-    switchTarget({
+    const next = {
       facilityId,
       ppuId: nextFacility?.ppus[0]?.ppu_id ?? "",
-    });
+    };
+    appendLog(`[TARGET] SELECT · ${next.facilityId} / ${next.ppuId || "none"}`, false, "USR");
+    switchTarget(next);
   }
 
   function selectPPU(ppuId: string) {
     if (targetLocked) return;
+    appendLog(`[TARGET] SELECT · ${selection.facilityId} / ${ppuId}`, false, "USR");
     switchTarget({ facilityId: selection.facilityId, ppuId });
   }
 
   function toggleSite(siteId: number) {
     if (batchRunning) return;
     if (targetSelectionKey) siteSelectionTarget.current = targetSelectionKey;
-    setSelectedSiteIdsState(current => {
-      const selected = current ?? [];
-      return selected.includes(siteId)
-        ? selected.filter(id => id !== siteId)
-        : [...selected, siteId].sort((left, right) => left - right);
-    });
+    const next = selectedSiteIds.includes(siteId)
+      ? selectedSiteIds.filter(id => id !== siteId)
+      : [...selectedSiteIds, siteId].sort((left, right) => left - right);
+    setSelectedSiteIdsState(next);
+    appendLog(`[SITE] SELECTION · ${siteListLabel(next)}`, false, "USR");
   }
 
   function toggleOperation(operation: Operation) {
     if (batchRunning) return;
-    setSelectedOperations(current => current.includes(operation)
-      ? current.filter(item => item !== operation)
-      : operationOrder.filter(item => current.includes(item) || item === operation));
+    const next = selectedOperations.includes(operation)
+      ? selectedOperations.filter(item => item !== operation)
+      : operationOrder.filter(item => selectedOperations.includes(item) || item === operation);
+    setSelectedOperations(next);
+    appendLog(`[BATCH] OPERATIONS · ${operationListLabel(next)}`, false, "USR");
+  }
+
+  function selectFirmware(file: File | null) {
+    setFirmware(file);
+    appendLog(
+      file
+        ? `[FIRMWARE] SELECT · ${file.name} · ${firmwareSizeLabel(file.size)}`
+        : "[FIRMWARE] CLEAR",
+      false,
+      "USR",
+    );
   }
 
   function operationDisabled(site: Site, operation: Operation, forBatch = false): boolean {
@@ -462,12 +487,12 @@ export default function ProgrammingWorkspace() {
         outputFile: undefined,
         error: undefined,
       } : item));
-      appendLog(`[SITE ${siteId}] ${operation.toUpperCase()} accepted · ${job.job_id}`);
+      appendLog(`[${siteLabel(siteId)}] ${operation.toUpperCase()} accepted · ${job.job_id}`);
       return job;
     } catch (error) {
       if (error instanceof PlasmaSubmissionBlockedError) return;
       const message = error instanceof Error ? error.message : "unknown error";
-      appendLog(`[SITE ${siteId}] Submit failed · ${message}`, true);
+      appendLog(`[${siteLabel(siteId)}] Submit failed · ${message}`, true);
       setSites(current => current.map(item => item.id === siteId ? {
         ...item,
         stage: "failed",
@@ -477,6 +502,12 @@ export default function ProgrammingWorkspace() {
     } finally {
       setSubmittingSiteIds(current => current.filter(id => id !== siteId));
     }
+  }
+
+  function runSingleSite(siteId: number, operation: Operation) {
+    const readDetail = operation === "read" ? ` · offset ${readOffset} · length ${readLength}` : "";
+    appendLog(`[${siteLabel(siteId)}] EXECUTE ${operation.toUpperCase()}${readDetail}`, false, "USR");
+    void runSite(siteId, operation);
   }
 
   async function waitTerminal(job: JobSnapshot): Promise<JobSnapshot> {
@@ -495,10 +526,10 @@ export default function ProgrammingWorkspace() {
     cancelRequests.current.add(jobId);
     try {
       await cancelJob(targetApiBase, jobId);
-      appendLog(`[SITE ${siteId}] Cancel requested · ${jobId}`);
+      appendLog(`[${siteLabel(siteId)}] Cancel requested · ${jobId}`);
     } catch (error) {
       cancelRequests.current.delete(jobId);
-      appendLog(`[SITE ${siteId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
+      appendLog(`[${siteLabel(siteId)}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
     }
   }
 
@@ -506,13 +537,19 @@ export default function ProgrammingWorkspace() {
     if (batchRunning || selectedOperations.length === 0 || selectedOperations.some(batchDisabled)) return;
     const siteIds = [...selectedSiteIds];
     const operations = [...selectedOperations];
+    const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
+    appendLog(
+      `[BATCH] EXECUTE · ${operationListLabel(operations)} · ${siteListLabel(siteIds)}${readDetail}`,
+      false,
+      "USR",
+    );
     const lifecycle = new BatchLifecycle(siteIds);
     const results: Partial<Record<number, BatchTerminalState>> = {};
     batchLifecycle.current = lifecycle;
     setBatchRunning(true);
     setBatchCancelling(false);
     setBatchSiteStates(Object.fromEntries(siteIds.map(id => [id, "running"])) as Record<number, BatchSiteState>);
-    appendLog(`[BATCH] START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteIds.map(id => `SITE ${id}`).join(", ")}`);
+    appendLog(`[BATCH] START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteListLabel(siteIds)}`);
     try {
       await Promise.all(siteIds.map(async siteId => {
         for (const operation of operations) {
@@ -557,7 +594,7 @@ export default function ProgrammingWorkspace() {
             const state = lifecycle.isCancelRequested(siteId) ? "cancelled" : "failed";
             results[siteId] = state;
             setBatchSiteState(siteId, state);
-            appendLog(`[SITE ${siteId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
+            appendLog(`[${siteLabel(siteId)}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
             lifecycle.finish(siteId);
             return;
           }
@@ -577,7 +614,7 @@ export default function ProgrammingWorkspace() {
           : cancelled.length > 0
             ? "PARTIAL"
             : "COMPLETE";
-      const label = (ids: number[]) => ids.length ? ids.map(id => `SITE ${id}`).join(", ") : "—";
+      const label = (ids: number[]) => ids.length ? siteListLabel(ids) : "—";
       appendLog(
         `[BATCH] ${outcome} · success: ${label(successful)} · cancelled: ${label(cancelled)} · failed: ${label(failed)}`,
         failed.length > 0,
@@ -592,6 +629,7 @@ export default function ProgrammingWorkspace() {
   async function cancelBatch() {
     const lifecycle = batchLifecycle.current;
     if (!batchRunning || batchCancelling || !lifecycle) return;
+    appendLog("[BATCH] CANCEL", false, "USR");
     const { activeJobs } = lifecycle.cancel();
     setBatchCancelling(true);
     setBatchSiteStates(current => Object.fromEntries(
@@ -603,6 +641,7 @@ export default function ProgrammingWorkspace() {
   async function cancelSite(siteId: number) {
     const site = sites.find(item => item.id === siteId);
     if (!site?.jobId || !isRunning(site)) return;
+    appendLog(`[${siteLabel(siteId)}] CANCEL`, false, "USR");
     const lifecycle = batchLifecycle.current;
     if (batchRunning && lifecycle) {
       const jobId = lifecycle.cancelSite(siteId);
@@ -695,7 +734,7 @@ export default function ProgrammingWorkspace() {
                 disabled={batchRunning || !site.enabled || isRunning(site)}
                 onChange={() => toggleSite(site.id)}
               />
-              <span>SITE {site.id}</span>
+              <span>{siteLabel(site.id)}</span>
               <small>{site.enabled ? site.stage.toUpperCase() : "DISABLED"}</small>
             </label>
           ))}
@@ -705,7 +744,7 @@ export default function ProgrammingWorkspace() {
       <section className="operationConfig" aria-label="Engineering programming parameters">
         <div className="compactFile">
           <div><b>{firmware?.name ?? t("engineeringProgramming.firmware")}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB` : t("engineeringProgramming.firmwareHint")}</small></div>
-          <label>{t("engineeringProgramming.browse")}<input aria-label="Engineering Firmware file" type="file" accept=".bin,application/octet-stream" disabled={targetLocked} onChange={event => setFirmware(event.target.files?.[0] ?? null)} /></label>
+          <label>{t("engineeringProgramming.browse")}<input aria-label="Engineering Firmware file" type="file" accept=".bin,application/octet-stream" disabled={targetLocked} onChange={event => selectFirmware(event.target.files?.[0] ?? null)} /></label>
         </div>
         <div className="compactRead">
           <label>READ Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
@@ -715,7 +754,7 @@ export default function ProgrammingWorkspace() {
 
       <section className="batchPanel engineeringBatchPanel" aria-label="Engineering batch control">
         <div className="batchInfo">
-          <div><p className="eyebrow">E / P / V / R</p><h2>{t("engineeringProgramming.batchOperations")}</h2><small>{selectedSiteIds.map(id => `SITE ${id}`).join(", ") || t("engineeringProgramming.noSites")}</small></div>
+          <div><p className="eyebrow">E / P / V / R</p><h2>{t("engineeringProgramming.batchOperations")}</h2><small>{selectedSiteIds.map(siteLabel).join(", ") || t("engineeringProgramming.noSites")}</small></div>
           <div className="statusSummary">
             <span>{t("engineeringProgramming.idle")} <b>{statusCounts.idle}</b></span><span className="busy">{t("engineeringProgramming.running")} <b>{statusCounts.running}</b></span><span className="success">{t("engineeringProgramming.success")} <b>{statusCounts.success}</b></span><span className="failed">{t("engineeringProgramming.cancelled")} <b>{statusCounts.cancelled}</b></span><span className="failed">{t("engineeringProgramming.failed")} <b>{statusCounts.failed}</b></span>
           </div>
@@ -747,13 +786,13 @@ export default function ProgrammingWorkspace() {
             <tbody>
               {selectedSites.map(site => (
                 <tr key={site.id}>
-                  <td><b>SITE {site.id}</b></td>
+                  <td><b>{siteLabel(site.id)}</b></td>
                   <td><b>{site.target ?? "—"}</b><small>{site.interface ?? "—"}</small></td>
                   <td>{site.operation?.toUpperCase() ?? "—"}{site.error && <small className="errorText">{site.error}</small>}</td>
                   <td><span className={`state ${site.stage}`}>{site.stage.toUpperCase()}</span></td>
                   <td><div className="tableProgress"><div className="track"><i style={{ width: `${site.progress}%` }} /></div><b>{Math.round(site.progress)}%</b></div></td>
                   <td><div className="rowActions">
-                    {operationOrder.map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.id} ${t(`operation.${operation}`)}`} title={t(`operation.${operation}`)} disabled={operationDisabled(site, operation)} onClick={() => void runSite(site.id, operation)}>{operationCodes[operation]}</button>)}
+                    {operationOrder.map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.id} ${t(`operation.${operation}`)}`} title={t(`operation.${operation}`)} disabled={operationDisabled(site, operation)} onClick={() => runSingleSite(site.id, operation)}>{operationCodes[operation]}</button>)}
                     <button className="stop" aria-label={`Cancel SITE ${site.id}`} disabled={!isRunning(site)} onClick={() => void cancelSite(site.id)}>■</button>
                     {site.stage === "success" && site.jobId && site.outputFile && targetApiBase && <a className="rowDownload" aria-label={`Download SITE ${site.id} read file`} href={readDownloadUrl(targetApiBase, site.jobId, site.outputFile)}>↓</a>}
                   </div></td>
@@ -764,16 +803,7 @@ export default function ProgrammingWorkspace() {
         </div>
       </section>
 
-      <section className="logCard engineeringLogCard">
-        <div className="logHead">
-          <div><span />{t("engineeringProgramming.jobLog")}</div>
-          <div>
-            <button type="button" onClick={downloadLog} disabled={!logs.length}>Download .log</button>
-            <button type="button" onClick={() => setLogs([])}>{t("engineeringProgramming.clear")}</button>
-          </div>
-        </div>
-        <pre aria-label="Engineering job log">{logs.length ? logs.map(log => <span key={log.id} data-level={log.error ? "error" : "info"}>{log.text}</span>) : "Log cleared."}</pre>
-      </section>
+      <EngineeringLogPanel logs={logs} onClear={() => setLogs([])} />
     </section>
   );
 }

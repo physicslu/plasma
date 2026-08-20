@@ -130,8 +130,8 @@ test("Engineering Programming topology comes from the Python target catalog", as
   await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText("6 Sites");
   await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(6);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(6);
-  await expect(page.getByText("SITE 0", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("SITE 7", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("SITE-00", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("SITE-07", { exact: true })).toHaveCount(0);
 
   await facility.selectOption("mock-facility-03");
   await expect(ppu).toHaveValue("mock-facility-03-ppu-01");
@@ -274,7 +274,7 @@ test("Engineering EPVR job is posted to the selected Facility and PPU", async ({
   expect(submissions[0].url).toBe("/api/engineering/targets/mock-facility-02/mock-facility-02-ppu-03/api/jobs");
   expect(submissions[0].body.site_id).toBe(6);
   expect(submissions[0].body.operation).toBe("erase");
-  await expect(page.getByLabel("Engineering job log")).toContainText("SITE 6");
+  await expect(page.getByLabel("Engineering job log")).toContainText("SITE-06");
 });
 
 test("PPU firmware cache uploads once, probes on reuse, reloads on change and reconnect", async ({ page }) => {
