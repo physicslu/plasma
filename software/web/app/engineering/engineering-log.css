@@ -38,6 +38,12 @@
   user-select: none;
 }
 
+.engineeringLogFilters label span {
+  display: inline-block;
+  min-width: 3ch;
+  white-space: pre;
+}
+
 .engineeringLogFilters button.active,
 .engineeringLogFilters label.active {
   border-color: color-mix(in srgb, var(--cyan) 60%, var(--line));
@@ -55,7 +61,7 @@
   min-height: 270px;
 }
 
-.engineeringLogCard pre span[data-category="USER"] {
+.engineeringLogCard pre span[data-category="USR"] {
   font-weight: 700;
 }
 
