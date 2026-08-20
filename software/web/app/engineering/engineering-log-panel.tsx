@@ -24,9 +24,10 @@ export const ENGINEERING_LOG_CATEGORIES: EngineeringLogCategory[] = [
 export function classifyEngineeringLog(message: string): EngineeringLogCategory {
   if (
     message.startsWith("[IMG]")
-    || message.startsWith("[FIRMWARE]")
+    || message.startsWith("[ASSET]")
     || message.startsWith("[KEY]")
     || message.startsWith("[OPT]")
+    || message.startsWith("[SERIAL]")
   ) return "DAT";
   if (
     message.startsWith("[SESSION]")
@@ -44,7 +45,7 @@ export function engineeringLogCategoryLabel(category: EngineeringLogCategory): s
 }
 
 function engineeringLogText(entry: EngineeringLogEntry): string {
-  return entry.text.replace(" [FIRMWARE]", " [IMG]");
+  return entry.text;
 }
 
 function logDownloadTimestamp(date: Date): string {
