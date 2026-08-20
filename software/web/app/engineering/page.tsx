@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useI18n } from "../i18n";
 import ProgrammingWorkspace from "./programming-workspace";
 import "./engineering.css";
@@ -15,8 +15,13 @@ const sections = [
   ["settings", "engineering.settings"],
 ] as const;
 
+function subscribeHydration(): () => void {
+  return () => {};
+}
+
 export default function EngineeringPage() {
   const { t } = useI18n();
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [active, setActive] = useState<(typeof sections)[number][0]>("overview");
 
   return (
@@ -29,11 +34,12 @@ export default function EngineeringPage() {
         </header>
 
         <div className="engineeringWorkspace">
-          <nav aria-label={t("engineering.title")}>
+          <nav aria-label={t("engineering.title")} aria-busy={!hydrated}>
             {sections.map(([id, key]) => (
               <button
                 key={id}
                 type="button"
+                disabled={!hydrated}
                 className={active === id ? "active" : ""}
                 aria-pressed={active === id}
                 onClick={() => setActive(id)}
