@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useI18n } from "../i18n";
 
-export type EngineeringLogCategory = "USER" | "TRANSPORT" | "PPU" | "SYSTEM";
+export type EngineeringLogCategory = "USR" | "NET" | "PPU" | "FW" | "BAT" | "SYS";
 
 export type EngineeringLogEntry = {
   id: number;
@@ -13,21 +13,29 @@ export type EngineeringLogEntry = {
 };
 
 export const ENGINEERING_LOG_CATEGORIES: EngineeringLogCategory[] = [
-  "USER",
-  "TRANSPORT",
+  "USR",
+  "NET",
   "PPU",
-  "SYSTEM",
+  "FW",
+  "BAT",
+  "SYS",
 ];
 
 export function classifyEngineeringLog(message: string): EngineeringLogCategory {
+  if (message.startsWith("[FIRMWARE]")) return "FW";
   if (
     message.startsWith("[SESSION]")
     || message.startsWith("[ENGINEERING]")
-    || message.startsWith("[FIRMWARE]")
     || message.startsWith("[NET]")
-  ) return "TRANSPORT";
+    || message.startsWith("[CONNECTION]")
+  ) return "NET";
   if (message.startsWith("[SITE ")) return "PPU";
-  return "SYSTEM";
+  if (message.startsWith("[BATCH]")) return "BAT";
+  return "SYS";
+}
+
+export function engineeringLogCategoryLabel(category: EngineeringLogCategory): string {
+  return category.padEnd(3, " ");
 }
 
 function logDownloadTimestamp(date: Date): string {
@@ -95,7 +103,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
               checked={visibleCategories.includes(category)}
               onChange={() => toggleCategory(category)}
             />
-            <span>{category}</span>
+            <span>{engineeringLogCategoryLabel(category)}</span>
           </label>
         ))}
       </div>
