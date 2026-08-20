@@ -59,13 +59,16 @@ export type EngineeringTargetCatalog = {
   facility_count: number;
   ppu_count: number;
   site_count: number;
+  rest_contract_version?: string;
+  programming_image_scope?: string;
   firmware_scope?: string;
   facilities: EngineeringFacilityTarget[];
 };
 
 export type EngineeringSession = {
   session_id: string;
-  firmware_cache_scope: string;
+  programming_image_cache_scope?: string;
+  firmware_cache_scope?: string;
   previous_session_cleared: boolean;
 };
 
@@ -75,7 +78,10 @@ type FirmwareFingerprint = {
   firmware_sha256: string;
 };
 
-type FirmwareCacheStatus = FirmwareFingerprint & {
+type ProgrammingImageCacheStatus = {
+  image_name: string;
+  image_size: number;
+  image_sha256: string;
   cache_hit: boolean;
 };
 
@@ -328,15 +334,23 @@ async function ensureEngineeringFirmware(
 
   const ensure = (async () => {
     emitFirmwareEvent(onFirmwareEvent, "cache_check", fingerprint);
-    const checked = await requestJson<{ ok: boolean; firmware: FirmwareCacheStatus }>(
+    const checked = await requestJson<{
+      ok: boolean;
+      programming_image: ProgrammingImageCacheStatus;
+    }>(
       apiBase,
-      "/api/firmware/check",
+      "/api/programming-images/check",
       {
         method: "POST",
-        body: JSON.stringify({ session_id: sessionId, ...fingerprint }),
+        body: JSON.stringify({
+          session_id: sessionId,
+          image_name: fingerprint.firmware_name,
+          image_size: fingerprint.firmware_size,
+          image_sha256: fingerprint.firmware_sha256,
+        }),
       },
     );
-    if (checked.firmware.cache_hit) {
+    if (checked.programming_image.cache_hit) {
       emitFirmwareEvent(onFirmwareEvent, "cache_hit", fingerprint);
       return fingerprint;
     }
@@ -345,7 +359,7 @@ async function ensureEngineeringFirmware(
     emitFirmwareEvent(onFirmwareEvent, "upload_start", fingerprint);
     await requestJson(
       apiBase,
-      `/api/firmware?session_id=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(fingerprint.firmware_name)}&sha256=${encodeURIComponent(fingerprint.firmware_sha256)}`,
+      `/api/programming-images?session_id=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(fingerprint.firmware_name)}&sha256=${encodeURIComponent(fingerprint.firmware_sha256)}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream" },
@@ -431,11 +445,11 @@ export async function startJob(
   };
   if (fingerprint && options.engineeringSessionId) {
     body.session_id = options.engineeringSessionId;
-    body.firmware_name = fingerprint.firmware_name;
-    body.firmware_sha256 = fingerprint.firmware_sha256;
+    body.image_name = fingerprint.firmware_name;
+    body.image_sha256 = fingerprint.firmware_sha256;
   } else if (usesFirmware) {
-    body.firmware_name = options.firmware?.name;
-    body.firmware_base64 = firmwareBase64;
+    body.image_name = options.firmware?.name;
+    body.image_base64 = firmwareBase64;
     body.timeout_s = 30;
   }
   if (options.operation === "read") {

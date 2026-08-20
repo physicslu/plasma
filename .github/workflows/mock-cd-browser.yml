@@ -133,7 +133,7 @@ jobs:
                   "per_site_erase_program_verify_read_download": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "batch_membership_selected_sites_x_operations": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "engineering_server_catalog_and_selected_ppu_execution": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
-                  "engineering_1mib_firmware_cache_reuse_and_reconnect": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "engineering_1mib_programming_image_cache_reuse_and_reconnect": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
               },
           }
           path = Path("artifacts/mock-cd-browser/browser-acceptance.json")

@@ -35,7 +35,7 @@ The provider boundary owns:
 - Facility / PPU catalog;
 - selected PPU STATUS;
 - Engineering connection-session lifecycle;
-- PPU-scoped firmware cache validation;
+- PPU-scoped programming-image cache validation;
 - E/P/V/R job submission;
 - job status/progress;
 - cancellation;
@@ -133,13 +133,13 @@ The current Engineering Mock profile is intentionally conservative and configura
 | Operation | Size basis | Throughput | Fixed overhead | Approx. 100 KiB |
 |---|---|---:|---:|---:|
 | Erase | full 4 MiB mock flash | 2 MiB/s | 1.0 s | 3.0 s full-chip erase |
-| Program | firmware bytes | 96 KiB/s | 4.0 s | 5.04 s |
-| Verify | firmware bytes | 192 KiB/s | 1.0 s | 1.52 s |
+| Program | programming-image bytes | 96 KiB/s | 4.0 s | 5.04 s |
+| Verify | programming-image bytes | 192 KiB/s | 1.0 s | 1.52 s |
 | Read | requested read bytes | 192 KiB/s | 1.0 s | 1.52 s for 100 KiB |
 
-The Program profile intentionally keeps a 100 KiB job above five seconds so an operator has a practical manual cancellation window while the duration still increases with firmware size.
+The Program profile intentionally keeps a 100 KiB job above five seconds so an operator has a practical manual cancellation window while the duration still increases with image size.
 
-Erase is deliberately not modeled from firmware file size. The current interface is a full-chip erase, so its physical work basis is target flash size. Program, Verify and Read scale from the actual requested byte count.
+Erase is deliberately not modeled from image file size. The current interface is a full-chip erase, so its physical work basis is target flash size. Program, Verify and Read scale from the actual requested byte count.
 
 These values are a simulation profile, not a benchmark or specification for a real PPU or IC. When real target data is available, the profile can be calibrated without changing the Engineering UI, Job model or Provider boundary.
 
@@ -149,11 +149,11 @@ The Engineering catalog reports its `timing_profile` so diagnostics can identify
 
 Engineering Mock operation timeout is currently 90 seconds and is owned by the Provider/PPU profile. The browser does not impose its former 30-second Job timeout on Engineering targets. This is required for the current 4 MiB Program simulation, which is approximately 46.7 seconds.
 
-## Engineering connection session and firmware cache
+## Engineering connection session and programming-image cache
 
-A PPU programs one firmware image across its Sites. The browser must not upload the same image separately for every Site.
+A PPU programs one Programming Image across its Sites. The browser must not upload the same image separately for every Site.
 
-Engineering therefore uses a logical connection session. A Connect/Reconnect creates a new `session_id`. When reconnecting, the browser passes its previous session ID and the Provider invalidates that previous session's firmware cache.
+Engineering therefore uses a logical connection session. A Connect/Reconnect creates a new `session_id`. When reconnecting, the browser passes its previous session ID and the Provider invalidates that previous session's image cache.
 
 The cache scope is:
 
@@ -161,9 +161,9 @@ The cache scope is:
 (connection session, facility_id, ppu_id)
 ```
 
-The Mock provider keeps the cached firmware bytes in process memory only. It does not write cached firmware into the Engineering state directory.
+The Mock provider keeps the cached image bytes in process memory only. It does not write cached image data into the Engineering state directory.
 
-Within one session, one PPU holds at most one cached firmware image. The browser identifies a file using:
+Within one session, one PPU holds at most one cached Programming Image. The browser identifies a file using:
 
 ```text
 filename
@@ -171,7 +171,7 @@ size
 SHA-256
 ```
 
-Program/Verify firmware preparation is:
+Program/Verify image preparation is:
 
 ```text
 First use after Connect/Reconnect
@@ -220,11 +220,11 @@ Concurrent Sites share one in-flight fingerprint check/upload. A 2/4/6/8-Site Pr
 
 The server validates the SHA-256 of uploaded bytes before admitting them to the cache. A claimed fingerprint that does not match the binary is rejected.
 
-### PPU-wide active firmware invariant
+### PPU-wide active Programming Image invariant
 
-Session caches are not the final concurrency authority. Multiple browser sessions can exist, but one physical PPU must never execute Program/Verify Jobs for two different firmware images at the same time.
+Session caches are not the final concurrency authority. Multiple browser sessions can exist, but one physical PPU must never execute Program/Verify Jobs for two different Programming Images at the same time.
 
-The Provider therefore owns a PPU-wide active firmware lease:
+The Provider therefore owns a PPU-wide active image lease:
 
 ```text
 PPU idle
@@ -241,11 +241,15 @@ all SHA A Program/Verify Jobs terminal
   -> SHA B may start
 ```
 
-This is enforced server-side. The Web firmware selector is also locked while target Jobs are active, but UI locking is only an operator guard and is not the authority boundary.
+This is enforced server-side. The Web image selector is also locked while target Jobs are active, but UI locking is only an operator guard and is not the authority boundary.
 
-A reconnect may invalidate the old session cache while previously accepted Jobs are still finishing. Their active PPU firmware lease remains until those Jobs become terminal, so reconnecting cannot be used to switch the PPU to another firmware image mid-operation.
+A reconnect may invalidate the old session cache while previously accepted Jobs are still finishing. Their active PPU image lease remains until those Jobs become terminal, so reconnecting cannot be used to switch the PPU to another image mid-operation.
 
 ## REST shape
+
+The canonical browser REST contract is documented in [`web-rest-api-contract.md`](web-rest-api-contract.md).
+
+The current canonical Web REST contract is version `2`. This REST contract version is independent of Plasma Protocol v3.2.
 
 Catalog and connection session:
 
@@ -260,11 +264,11 @@ Selected PPU virtual API base:
 /api/engineering/targets/{facility_id}/{ppu_id}
 ```
 
-Firmware cache and normal PPU operations beneath that base:
+Programming Image cache and normal PPU operations beneath that base:
 
 ```text
-POST .../api/firmware/check
-POST .../api/firmware?session_id=...&name=...&sha256=...
+POST .../api/programming-images/check
+POST .../api/programming-images?session_id=...&name=...&sha256=...
 GET  .../api/status
 GET  .../api/status?job={job_id}
 POST .../api/jobs
@@ -272,7 +276,35 @@ POST .../api/jobs/{job_id}/cancel
 GET  .../api/jobs/{job_id}/files/{filename}
 ```
 
-`/api/firmware/check` contains the file fingerprint only. The binary upload endpoint accepts `application/octet-stream`. Engineering Program/Verify Job submission contains the session and firmware fingerprint reference rather than Base64 firmware bytes.
+`/api/programming-images/check` contains the file fingerprint only:
+
+```text
+session_id
+image_name
+image_size
+image_sha256
+```
+
+The binary upload endpoint accepts `application/octet-stream`. Engineering Program/Verify Job submission contains the session plus `image_name` / `image_sha256` reference rather than Base64 image bytes.
+
+Standalone/local inline Program/Verify uses `image_name` + `image_base64`.
+
+During the REST v2 compatibility window, the Gateway still accepts the retired REST aliases:
+
+```text
+/api/firmware/check
+/api/firmware
+firmware_name
+firmware_size
+firmware_sha256
+firmware_base64
+firmware_scope
+firmware_cache_scope
+```
+
+New Web code must not emit those aliases. If canonical and legacy names are supplied together with different values, the Gateway rejects the request instead of choosing one silently.
+
+The Provider and Plasma Protocol v3.2 may continue using internal `firmware` fields. That internal compatibility vocabulary is deliberately separated from the canonical browser REST surface.
 
 The Web UI can therefore keep one programming interaction model while the Python provider selects the target implementation.
 
@@ -311,8 +343,8 @@ The following must remain stable across that replacement:
 - one-based `site_id`;
 - E/P/V/R operation semantics;
 - `PROGRAM` means write only;
-- one active firmware image per PPU across concurrent Program/Verify Jobs;
-- connection-session firmware cache semantics;
+- one active Programming Image per PPU across concurrent Program/Verify Jobs;
+- connection-session Programming Image cache semantics;
 - Job state/progress/cancel semantics;
 - Read output semantics;
 - dynamic 2/4/6/8/N Site presentation.
@@ -329,15 +361,16 @@ Required validation includes:
 - Mock timing scales with Program / Verify / Read byte count and uses full target flash size for Erase;
 - a 100 KiB Program is at least five seconds and has a practical cancellation window; cancellation reaches the normal terminal `cancelled` Job state;
 - a same-URL Connect creates a new session and restarts catalog plus selected-PPU STATUS polling so Facility / PPU / Site controls recover;
-- first firmware use after Connect is a fingerprint miss followed by exactly one binary upload for all concurrent Sites;
+- first Programming Image use after Connect is a fingerprint miss followed by exactly one binary upload for all concurrent Sites;
 - a second same-file burn in the same session sends a fingerprint probe but no binary upload;
 - changing the file causes a cache miss and replacement upload;
 - reconnect invalidates the prior session cache so the first burn uploads again;
 - uploaded bytes must match the claimed SHA-256;
-- cached firmware remains memory-only;
-- concurrent Sites using the same firmware SHA are allowed on one PPU;
-- a different firmware SHA from the same or another session is rejected while the PPU firmware lease is active, and becomes admissible after all prior Program/Verify Jobs are terminal;
+- cached Programming Image data remains memory-only;
+- concurrent Sites using the same image SHA are allowed on one PPU;
+- a different image SHA from the same or another session is rejected while the PPU image lease is active, and becomes admissible after all prior Program/Verify Jobs are terminal;
 - the real Mock CD browser stack exercises a 1 MiB two-Site Program through Browser -> Gateway -> Provider -> PlasmaServer and verifies upload/reuse/reconnect request counts without API mocking;
+- the browser uses `/api/programming-images*` and canonical `image_*` fields rather than legacy firmware aliases;
 - Read output remains job- and PPU-scoped;
 - Engineering browser selection comes from the Python catalog rather than hard-coded React topology;
 - SITE 0 and Site N+1 are never exposed as canonical Sites;

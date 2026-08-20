@@ -69,6 +69,7 @@ Protocol v3.2 的 canonical wire identity 是 one-based `site_id = 1..N`。Proto
 
 - Domain / naming / identity：[`docs/architecture/domain-naming-migration.md`](docs/architecture/domain-naming-migration.md)
 - Facility / PPU / Site architecture：[`docs/architecture/ppu-facility-sites.md`](docs/architecture/ppu-facility-sites.md)
+- Plasma Web REST API contract：[`docs/architecture/web-rest-api-contract.md`](docs/architecture/web-rest-api-contract.md)
 - Engineering Programming observability / audit contract：[`docs/architecture/engineering-programming-observability.md`](docs/architecture/engineering-programming-observability.md)
 - Optional Manager invariant：[`docs/architecture/manager-optional-control-plane.md`](docs/architecture/manager-optional-control-plane.md)
 - Read-only Manager implementation：[`docs/architecture/manager-readonly-fleet-aggregation.md`](docs/architecture/manager-readonly-fleet-aggregation.md)
