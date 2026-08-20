@@ -59,7 +59,19 @@ export type EngineeringTargetCatalog = {
   facility_count: number;
   ppu_count: number;
   site_count: number;
+  firmware_scope?: "ppu" | string;
   facilities: EngineeringFacilityTarget[];
+};
+
+export type EngineeringStagedFirmware = {
+  firmware_id: string;
+  firmware_name: string;
+  firmware_size: number;
+  firmware_sha256: string;
+  scope: {
+    facility_id: string;
+    ppu_id: string;
+  };
 };
 
 // Transitional shapes accepted only from protocol/API v3.1 backends.
@@ -209,9 +221,10 @@ async function requestJson<T>(
   apiBase: string,
   path: string,
   init?: RequestInit,
+  timeoutMs = 10_000,
 ): Promise<T> {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 10_000);
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${apiBase}${path}`, {
       ...init,
@@ -248,6 +261,23 @@ export async function getEngineeringTargets(apiBase: string): Promise<Engineerin
   return await requestJson<EngineeringTargetCatalog>(apiBase, "/api/engineering/targets");
 }
 
+export async function stageEngineeringFirmware(
+  apiBase: string,
+  firmware: File,
+): Promise<EngineeringStagedFirmware> {
+  const payload = await requestJson<{ ok: boolean; firmware: EngineeringStagedFirmware }>(
+    apiBase,
+    `/api/firmware?name=${encodeURIComponent(firmware.name)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: firmware,
+    },
+    120_000,
+  );
+  return payload.firmware;
+}
+
 export async function getPPUStatus(apiBase: string): Promise<PPUStatus> {
   const payload = await requestJson<StatusPayload>(apiBase, "/api/status");
   return {
@@ -277,12 +307,14 @@ export async function startJob(
     siteId: number;
     operation: Operation;
     firmware?: File | null;
+    firmwareId?: string;
+    firmwareName?: string;
     offset?: number;
     length?: number;
     submissionGuard?: () => boolean;
   },
 ): Promise<JobSnapshot> {
-  const firmwareBase64 = options.firmware
+  const firmwareBase64 = options.firmware && !options.firmwareId
     ? await fileToBase64(options.firmware)
     : "";
   if (options.submissionGuard && !options.submissionGuard()) {
@@ -296,13 +328,14 @@ export async function startJob(
       body: JSON.stringify({
         site_id: options.siteId,
         operation: options.operation,
-        firmware_name: options.firmware?.name,
-        firmware_base64: firmwareBase64,
+        firmware_name: options.firmwareName ?? options.firmware?.name,
+        ...(options.firmwareId
+          ? { firmware_id: options.firmwareId }
+          : { firmware_base64: firmwareBase64 }),
         ...(options.operation === "read" ? {
           offset: options.offset ?? 0,
           length: options.length ?? 256,
         } : {}),
-        timeout_s: 30,
       }),
     },
   );
