@@ -51,8 +51,8 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
         program_bytes_per_s = profile["throughput_bytes_per_s"]["program"]
         program_overhead_s = profile["operation_overheads_s"]["program"]
         program_100k_s = program_overhead_s + (100 * 1024) / program_bytes_per_s
-        self.assertGreater(program_100k_s, 2.0)
-        self.assertLess(program_100k_s, 3.0)
+        self.assertGreaterEqual(program_100k_s, 5.0)
+        self.assertLess(program_100k_s, 5.2)
 
         erase_s = (
             profile["operation_overheads_s"]["erase"]
