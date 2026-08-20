@@ -1,0 +1,115 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+export type EngineeringLogCategory = "USER" | "TRANSPORT" | "PPU" | "SYSTEM";
+
+export type EngineeringLogEntry = {
+  id: number;
+  text: string;
+  error: boolean;
+  category: EngineeringLogCategory;
+};
+
+export const ENGINEERING_LOG_CATEGORIES: EngineeringLogCategory[] = [
+  "USER",
+  "TRANSPORT",
+  "PPU",
+  "SYSTEM",
+];
+
+export function classifyEngineeringLog(message: string): EngineeringLogCategory {
+  if (
+    message.startsWith("[SESSION]")
+    || message.startsWith("[ENGINEERING]")
+    || message.startsWith("[FIRMWARE]")
+    || message.startsWith("[NET]")
+  ) return "TRANSPORT";
+  if (message.startsWith("[SITE ")) return "PPU";
+  return "SYSTEM";
+}
+
+function logDownloadTimestamp(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
+type EngineeringLogPanelProps = {
+  logs: EngineeringLogEntry[];
+  onClear: () => void;
+};
+
+export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPanelProps) {
+  const [visibleCategories, setVisibleCategories] = useState<EngineeringLogCategory[]>(ENGINEERING_LOG_CATEGORIES);
+  const visibleLogs = useMemo(
+    () => logs.filter(log => visibleCategories.includes(log.category)),
+    [logs, visibleCategories],
+  );
+  const allVisible = visibleCategories.length === ENGINEERING_LOG_CATEGORIES.length;
+
+  function toggleCategory(category: EngineeringLogCategory) {
+    setVisibleCategories(current => current.includes(category)
+      ? current.filter(item => item !== category)
+      : ENGINEERING_LOG_CATEGORIES.filter(item => current.includes(item) || item === category));
+  }
+
+  function downloadLog() {
+    if (!logs.length) return;
+    const content = `${logs.map(log => log.text).join("\n")}\n`;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `plasma-engineering-${logDownloadTimestamp(new Date())}.log`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+  }
+
+  return (
+    <section className="logCard engineeringLogCard">
+      <div className="logHead engineeringLogHead">
+        <div className="engineeringLogTitle"><span />Engineering Job Log</div>
+        <div className="engineeringLogActions">
+          <button type="button" onClick={downloadLog} disabled={!logs.length}>Download .log</button>
+          <button type="button" onClick={onClear}>Clear</button>
+        </div>
+      </div>
+      <div className="engineeringLogFilters" role="group" aria-label="Engineering log filters">
+        <button
+          type="button"
+          className={allVisible ? "active" : ""}
+          aria-pressed={allVisible}
+          onClick={() => setVisibleCategories(ENGINEERING_LOG_CATEGORIES)}
+        >
+          ALL
+        </button>
+        {ENGINEERING_LOG_CATEGORIES.map(category => (
+          <label key={category} className={visibleCategories.includes(category) ? "active" : ""}>
+            <input
+              type="checkbox"
+              aria-label={`Engineering log filter ${category}`}
+              checked={visibleCategories.includes(category)}
+              onChange={() => toggleCategory(category)}
+            />
+            <span>{category}</span>
+          </label>
+        ))}
+      </div>
+      <pre aria-label="Engineering job log">
+        {visibleLogs.length
+          ? visibleLogs.map(log => (
+            <span
+              key={log.id}
+              data-level={log.error ? "error" : "info"}
+              data-category={log.category}
+            >
+              {log.text}
+            </span>
+          ))
+          : "No log entries for selected filters."}
+      </pre>
+    </section>
+  );
+}
