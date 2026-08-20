@@ -4,7 +4,7 @@ Engineering Programming exposes one operator-visible audit stream. The log must 
 
 ## Event category contract
 
-Every exported Engineering log entry carries exactly one fixed-width first-level category before its functional tag:
+Every exported Engineering log entry carries exactly one fixed-width first-level category:
 
 ```text
 [USR]  explicit operator intent or UI action
@@ -12,10 +12,26 @@ Every exported Engineering log entry carries exactly one fixed-width first-level
 [PPU]  PPU/Site command acceptance, cancellation, status/polling, and submission failures
 [DAT]  programming data validation/cache/transfer activity
 [BAT]  batch orchestration and aggregate batch outcomes
-[SYS]  other local system/target state and fallback activity
+[SYS]  other local system/target state, restoration, and fallback activity
 ```
 
 All first-level category fields are exactly three characters inside the brackets.
+
+A second bracket is used only when it adds information. It is not mandatory for every category:
+
+```text
+[USR] [TARGET] ...
+[USR] [SITE] ...
+[NET] [SESSION] ...
+[PPU] [SITE-01] ...
+[DAT] [IMG] ...
+[SYS] [TARGET] ...
+[SYS] [SITE] ...
+[BAT] START ...
+[BAT] COMPLETE ...
+```
+
+`BAT` is intentionally single-level. `[BAT] [BATCH]` is redundant and is not part of the Engineering log grammar. Batch event names such as `START`, `COMPLETE`, `PARTIAL`, `CANCELLED`, and `FAILED` follow the category directly.
 
 `DAT` is deliberately broader than firmware. Plasma programming jobs may consume multiple data assets over time, and those assets must not be forced into a firmware-only category.
 
@@ -51,18 +67,43 @@ Examples:
 [USR] [BATCH] EXECUTE · ERASE → PROGRAM → VERIFY · SITE-01, SITE-03, SITE-05
 
 [NET] [SESSION] NEW · previous firmware cache cleared · 6cc11d63…
+[SYS] [TARGET] RESTORED · mock-facility-02 / mock-facility-02-ppu-03
+[SYS] [SITE] RESTORED · SITE-01, SITE-03, SITE-05
+
 [DAT] [IMG] CACHE MISS · SHA256 fbbab289f7f9…
 [DAT] [IMG] UPLOAD COMPLETE · plasma.bin · 1.00 MiB · SHA256 fbbab289f7f9…
 
 [PPU] [SITE-01] PROGRAM accepted · job-...
 [PPU] [SITE-03] Cancel requested · job-...
 
-[BAT] [BATCH] PARTIAL · success: SITE-01 · cancelled: SITE-03, SITE-05 · failed: —
+[BAT] PARTIAL · success: SITE-01 · cancelled: SITE-03, SITE-05 · failed: —
 ```
 
-The first category is intended to be machine-filterable. The second tag retains the functional or data-subtype meaning used by operator diagnostics.
+The first category is intended to be machine-filterable. A second tag is retained only where it conveys a distinct functional target or data subtype.
 
 The UI may filter categories for readability, but filtering is **view-only**. `Download .log` exports the complete retained session log, not only the currently visible categories. Engineering Programming retains up to 1000 newest-first events so normal acceptance flows do not silently lose their beginning.
+
+## Reconnect restoration evidence
+
+A reconnect attempt snapshots the durable target identity and explicit Site selection before transport state is reset. After the new catalog arrives, Plasma emits restoration evidence only when the original durable target still exists:
+
+```text
+[SYS] [TARGET] RESTORED · <facility_id> / <ppu_id>
+```
+
+After the first successful status poll for that restored PPU, Plasma records the Site subset that remains valid in the current topology:
+
+```text
+[SYS] [SITE] RESTORED · SITE-02, SITE-04, SITE-06
+```
+
+An explicit zero-Site user selection is a real state and is recorded as:
+
+```text
+[SYS] [SITE] RESTORED · none
+```
+
+`RESTORED` is evidence, not an optimistic reconnect message. It must **not** be emitted for a fresh connection, a deliberate target switch, or when the original PPU disappeared and catalog validation falls back to the canonical Default target.
 
 ## Programming image transport semantics
 
@@ -115,13 +156,14 @@ The actual source may be a file, MES/API response, database record, generated va
 
 ## Batch outcome semantics
 
-Batch completion logs are aggregate batch outcomes rather than a generic `COMPLETE` marker:
+Batch orchestration and completion logs use the single-level `BAT` category:
 
 ```text
-[BAT] [BATCH] COMPLETE · success: SITE-01, SITE-02 · cancelled: — · failed: —
-[BAT] [BATCH] PARTIAL · success: SITE-01 · cancelled: SITE-02 · failed: —
-[BAT] [BATCH] CANCELLED · success: — · cancelled: SITE-01, SITE-02 · failed: —
-[BAT] [BATCH] FAILED · success: SITE-01 · cancelled: — · failed: SITE-02
+[BAT] START ERASE → PROGRAM → VERIFY · SITE-01, SITE-02
+[BAT] COMPLETE · success: SITE-01, SITE-02 · cancelled: — · failed: —
+[BAT] PARTIAL · success: SITE-01 · cancelled: SITE-02 · failed: —
+[BAT] CANCELLED · success: — · cancelled: SITE-01, SITE-02 · failed: —
+[BAT] FAILED · success: SITE-01 · cancelled: — · failed: SITE-02
 ```
 
 These logs are observability evidence, not the authority for behavior. Server-side Provider rules remain authoritative for image cache scope, SHA validation, PPU-wide active-image/firmware lease enforcement, and Job state.
