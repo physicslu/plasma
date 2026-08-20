@@ -4,41 +4,78 @@
 
 `Engineering Mode -> Programming` is the canonical single-PPU engineering programming workspace.
 
-It restores the existing PPU-local Erase / Program / Verify / Read console under Engineering Mode without creating a third ProductMode and without turning Plasma Manager into a write proxy.
-
-## Target sources
-
-The workspace separates target selection from execution authority.
-
-### Connected Local PPU
+The browser selects one target through:
 
 ```text
-Browser / Engineering Programming
-    -> PPU-local Plasma Web REST Gateway
-    -> Plasma Server
-    -> SiteManager / SiteWorker
-    -> Programming Site
+Facility -> PPU -> Site
 ```
 
-This path reuses the existing single-PPU Console and therefore retains its current firmware selection, Read range, per-Site E/P/V/R, batch operation, cancellation, progress, download and live-log behavior.
+and then uses the normal Erase / Program / Verify / Read job model. Production Mode and Engineering Mode continue to share the same canonical Facility / PPU / Site domain vocabulary.
 
-The PPU identity and Site topology come from canonical PPU STATUS. The Web UI must not hard-code an eight-Site PPU.
+## Provider boundary
 
-### Simulation Catalog
-
-The initial engineering topology fixture contains three Facilities. Each Facility contains four simulated PPUs with heterogeneous Site counts:
+Engineering target discovery and execution are server-owned. The browser does not create Facility, PPU, or Site topology.
 
 ```text
-Facility 01 / 02 / 03
-├── PPU 01 -> 2 Sites
-├── PPU 02 -> 4 Sites
-├── PPU 03 -> 6 Sites
-└── PPU 04 -> 8 Sites
+Engineering UI
+    |
+    v
+Engineering PPU Control API
+    |
+    v
+EngineeringPPUProvider
+    |\
+    | +--> MockEngineeringPPUProvider  (current)
+    |
+    +----> RealPPUProvider             (future)
 ```
 
-This produces 12 simulated PPUs and 60 simulated Sites in total.
+The provider boundary owns:
 
-Canonical identity remains one-based and local to a PPU:
+- Facility / PPU catalog;
+- selected PPU STATUS;
+- E/P/V/R job submission;
+- job status/progress;
+- cancellation;
+- Read output retrieval.
+
+The browser contract does not depend on whether the selected PPU is mock or real. A future real-PPU provider should therefore replace or coexist with the Mock provider without requiring a second Programming UI or a second Site/job state model.
+
+## Current server-side mock topology
+
+The current `MockEngineeringPPUProvider` creates three Facilities. Each Facility contains four PPUs with heterogeneous Site counts:
+
+```text
+Mock Facility 01
+├── Mock PPU 01 -> 2 Sites
+├── Mock PPU 02 -> 4 Sites
+├── Mock PPU 03 -> 6 Sites
+└── Mock PPU 04 -> 8 Sites
+
+Mock Facility 02
+├── Mock PPU 01 -> 2 Sites
+├── Mock PPU 02 -> 4 Sites
+├── Mock PPU 03 -> 6 Sites
+└── Mock PPU 04 -> 8 Sites
+
+Mock Facility 03
+├── Mock PPU 01 -> 2 Sites
+├── Mock PPU 02 -> 4 Sites
+├── Mock PPU 03 -> 6 Sites
+└── Mock PPU 04 -> 8 Sites
+```
+
+The total simulated topology is:
+
+```text
+3 Facilities
+12 PPUs
+60 Sites
+```
+
+This topology exists in Python, not in React.
+
+Canonical identity remains:
 
 ```text
 (facility_id, ppu_id, site_id)
@@ -47,24 +84,113 @@ SITE 1 .. SITE N
 
 There is no `SITE 0` and Sites are not flattened into a global integer namespace.
 
-The Simulation Catalog is UI/topology validation only. Its E/P/V/R controls are deliberately disabled and it must not dispatch jobs to the connected Local PPU.
+## Mock execution is a real Plasma software path
+
+A Mock PPU is not a static Web fixture. Each mock PPU is a real `PlasmaServer` instance with its own canonical PPU configuration, `SiteManager`, `SiteWorker`, job registry, output directory and MockInterface instances.
+
+Current execution path:
+
+```text
+Browser / Engineering Programming
+    |
+    | HTTP REST
+    v
+Plasma Web REST Gateway
+    |
+    | EngineeringPPUProvider selects (facility_id, ppu_id)
+    v
+MockEngineeringPPUProvider
+    |
+    | Plasma Protocol v3.2 / PLASMA32 over loopback TCP
+    v
+selected virtual PlasmaServer
+    |
+    v
+SiteManager / SiteWorker
+    |
+    v
+MockInterface
+```
+
+Therefore E/P/V/R, job state, progress, cancellation, Read output and per-Site independence exercise the normal Plasma software execution model. The only substituted layer is the PPU/hardware provider side.
+
+A successful Mock PPU operation still does not prove Z2, FPGA I/O, socket, voltage, timing, or real IC programming.
+
+## REST shape
+
+Catalog:
+
+```text
+GET /api/engineering/targets
+```
+
+Selected PPU virtual API base:
+
+```text
+/api/engineering/targets/{facility_id}/{ppu_id}
+```
+
+The normal PPU Console contract is then preserved beneath that base:
+
+```text
+GET  .../api/status
+GET  .../api/status?job={job_id}
+POST .../api/jobs
+POST .../api/jobs/{job_id}/cancel
+GET  .../api/jobs/{job_id}/files/{filename}
+```
+
+The Web UI can therefore keep one programming interaction model while the Python provider selects the target implementation.
+
+## Runtime enablement
+
+The server-side Engineering Mock provider is opt-in. `plasma_web.gateway` supports:
+
+```text
+--engineering-mock
+--engineering-mock-root <path>
+```
+
+A normal standalone PPU Gateway does not need to create 12 mock PPUs. Integration-host activation is a separate runtime/deployment setting.
 
 ## Manager boundary
 
-The current Plasma Manager remains read-only. Selecting a simulated Facility/PPU must never cause a job to be silently routed to the currently connected local Gateway.
+Plasma Manager remains read-only in this phase. Engineering Mock write execution does not pass through Manager and does not weaken the existing Manager security boundary.
 
-Future authenticated remote programming can replace the target adapter behind this workspace, but it requires a separately approved management write/control architecture. The Engineering UI target model must not be treated as proof that remote execution authority already exists.
+For real remote PPUs, the future `RealPPUProvider` must use an explicitly approved authenticated control path. The existence of the provider interface is not authorization to turn the current read-only Manager into a write proxy.
+
+## Replacement principle for real PPUs
+
+The intended transition is:
+
+```text
+Today:
+EngineeringPPUProvider -> MockEngineeringPPUProvider -> virtual PlasmaServer -> MockInterface
+
+Future:
+EngineeringPPUProvider -> RealPPUProvider -> real PPU control endpoint -> real PlasmaServer -> hardware interface
+```
+
+The following must remain stable across that replacement:
+
+- Facility / PPU / Site identity;
+- one-based `site_id`;
+- E/P/V/R operation semantics;
+- `PROGRAM` means write only;
+- Job state/progress/cancel semantics;
+- Read output semantics;
+- dynamic 2/4/6/8/N Site presentation.
 
 ## Validation expectations
 
-Browser tests cover at least:
+Required validation includes:
 
-- Engineering -> Programming navigation;
-- three Facility choices;
-- four PPU choices per Facility;
-- dynamic 2 / 4 / 6 / 8 Site rendering;
-- no SITE 0 or Site N+1;
-- simulated E/P/V/R controls cannot execute hardware jobs;
-- Connected Local PPU renders the existing single-PPU E/P/V/R console from canonical STATUS.
-
-Existing single-PPU Mock CD Browser Runtime Acceptance remains authoritative for actual browser -> Gateway -> Server -> MockInterface job execution behavior. Simulation Catalog tests do not replace that acceptance layer.
+- server catalog reports exactly 3 Facilities / 12 PPUs / 60 Sites for the current mock fixture;
+- every Facility reports four PPUs with 2 / 4 / 6 / 8 Sites;
+- every selected Mock PPU reports its own canonical STATUS through a real PlasmaServer runtime;
+- a job submitted to one `(facility_id, ppu_id, site_id)` does not appear on another PPU;
+- E/P/V/R submission routes to the selected target identity;
+- Read output remains job- and PPU-scoped;
+- Engineering browser selection comes from the Python catalog rather than hard-coded React topology;
+- SITE 0 and Site N+1 are never exposed as canonical Sites;
+- existing standalone PPU and Production Mode behavior remains unchanged when the Engineering provider is disabled.
