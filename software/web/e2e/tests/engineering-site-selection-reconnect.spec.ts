@@ -143,6 +143,7 @@ test("operator reconnect keeps explicit Site selection and polling never turns e
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });
   const connect = page.locator(".engineeringGateway button[type=submit]");
+  const log = page.getByLabel("Engineering job log");
 
   await facility.selectOption("mock-facility-01");
   await ppu.selectOption("mock-facility-01-ppu-03");
@@ -169,6 +170,8 @@ test("operator reconnect keeps explicit Site selection and polling never turns e
   await expect(ppu).toHaveValue("mock-facility-01-ppu-03");
   await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(6);
   await expectCheckedSites(page, [1, 5, 6]);
+  await expect(log).toContainText("[SYS] [TARGET] RESTORED · mock-facility-01 / mock-facility-01-ppu-03");
+  await expect(log).toContainText("[SYS] [SITE] RESTORED · SITE-01, SITE-05, SITE-06");
 
   // Explicitly select zero Sites. This is a real user state, not "uninitialized".
   await page.getByLabel("選取 SITE 1", { exact: true }).uncheck();
@@ -190,6 +193,7 @@ test("operator reconnect keeps explicit Site selection and polling never turns e
   await expect(ppu).toHaveValue("mock-facility-01-ppu-03");
   await expectCheckedSites(page, []);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(0);
+  await expect(log).toContainText("[SYS] [SITE] RESTORED · none");
 });
 
 test("operator gateway outage round-trip restores the original PPU and Site subset", async ({ page }) => {
@@ -213,6 +217,7 @@ test("operator gateway outage round-trip restores the original PPU and Site subs
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });
   const connect = page.locator(".engineeringGateway button[type=submit]");
+  const log = page.getByLabel("Engineering job log");
 
   await facility.selectOption("mock-facility-03");
   await ppu.selectOption("mock-facility-03-ppu-04");
@@ -236,4 +241,6 @@ test("operator gateway outage round-trip restores the original PPU and Site subs
   await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(8);
   await expectCheckedSites(page, [2, 4, 6, 7]);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(4);
+  await expect(log).toContainText("[SYS] [TARGET] RESTORED · mock-facility-03 / mock-facility-03-ppu-04");
+  await expect(log).toContainText("[SYS] [SITE] RESTORED · SITE-02, SITE-04, SITE-06, SITE-07");
 });
