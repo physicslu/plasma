@@ -167,13 +167,13 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
         accepted = await self.provider.start_job(
             facility_id,
             ppu_id,
-            JobRequest(site_id=6, operation=Operation.VERIFY),
+            JobRequest(site_id=6, operation=Operation.PROGRAM),
             session_id=session_id,
             firmware_sha256=sha256,
         )
         job = await self.wait_terminal(facility_id, ppu_id, accepted["job"]["job_id"])
         self.assertEqual(job["site_id"], 6)
-        self.assertEqual(job["operation"], "verify")
+        self.assertEqual(job["operation"], "program")
         self.assertEqual(job["state"], "success")
 
         selected = await self.provider.status(facility_id, ppu_id)
@@ -212,14 +212,14 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
             self.provider.start_job(
                 facility_id,
                 ppu_id,
-                JobRequest(site_id=1, operation=Operation.VERIFY),
+                JobRequest(site_id=1, operation=Operation.PROGRAM),
                 session_id=session_id,
                 firmware_sha256=sha256,
             ),
             self.provider.start_job(
                 facility_id,
                 ppu_id,
-                JobRequest(site_id=2, operation=Operation.VERIFY),
+                JobRequest(site_id=2, operation=Operation.PROGRAM),
                 session_id=session_id,
                 firmware_sha256=sha256,
             ),
