@@ -1,35 +1,26 @@
 #!/usr/bin/env python3
-"""Guard canonical Plasma production code against retired domain vocabulary.
+"""Guard canonical Plasma production code against retired vocabulary.
 
-The canonical product/domain hierarchy is Facility -> PPU -> Site. Protocol/API
-v3.1 compatibility remains an explicit adapter; removing that adapter is a
-separate migration decision.
+Canonical product/domain vocabulary is Facility -> PPU -> Site. Canonical
+programming-data vocabulary is Programming Asset at the REST/input boundary and
+Normalized Image at the execution/wire boundary. Plasma is still in development,
+so there is no legacy compatibility exception in canonical production code.
 """
 
 from __future__ import annotations
 
-import os
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LEGACY_MARKER = "PLASMA_LEGACY_COMPAT"
 
 FORBIDDEN = re.compile(
     r"\b(?:Programmer(?:Config|State|Manager|Worker)?|Channel(?:Config|State|Manager|Worker)?|"
     r"programmer|programmer_id|channel_id|channel_count|enabled_channel_count|"
-    r"max_supported_channels|channels)\b"
+    r"max_supported_channels|channels|firmware)\b",
+    re.IGNORECASE,
 )
-
-# Pure compatibility facades may continue using the retired vocabulary. Mixed
-# canonical/compatibility modules are still checked; intentional new v3.1 lines
-# there must carry the PLASMA_LEGACY_COMPAT marker.
-COMPATIBILITY_PATHS = {
-    "software/python/plasma_server/channel_manager.py",
-    "software/python/plasma_server/channel_worker.py",
-}
 
 EXCLUDED_PREFIXES = (
     "software/python/tests/",
@@ -44,35 +35,7 @@ PRODUCTION_PREFIXES = (
 CODE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx"}
 
 
-def git(*args: str) -> str:
-    return subprocess.check_output(["git", *args], cwd=ROOT, text=True).strip()
-
-
-def resolve_base() -> str:
-    explicit = os.environ.get("PLASMA_TERMINOLOGY_BASE", "").strip()
-    if explicit and set(explicit) != {"0"}:
-        return explicit
-
-    github_base = os.environ.get("GITHUB_BASE_REF", "").strip()
-    if github_base:
-        candidate = f"origin/{github_base}"
-        try:
-            git("rev-parse", "--verify", candidate)
-            return git("merge-base", candidate, "HEAD")
-        except subprocess.CalledProcessError:
-            pass
-
-    try:
-        return git("rev-parse", "HEAD^")
-    except subprocess.CalledProcessError as exc:
-        raise SystemExit(
-            "Unable to resolve terminology comparison base; set PLASMA_TERMINOLOGY_BASE"
-        ) from exc
-
-
 def checked_path(path: str) -> bool:
-    if path in COMPATIBILITY_PATHS:
-        return False
     if path.startswith(EXCLUDED_PREFIXES):
         return False
     if Path(path).suffix not in CODE_SUFFIXES:
@@ -80,32 +43,23 @@ def checked_path(path: str) -> bool:
     return path.startswith(PRODUCTION_PREFIXES)
 
 
-def added_lines(base: str) -> list[tuple[str, int, str]]:
-    diff = git("diff", "--unified=0", "--no-color", f"{base}...HEAD", "--", *PRODUCTION_PREFIXES)
+def current_tree_findings() -> list[tuple[str, int, str]]:
     findings: list[tuple[str, int, str]] = []
-    current_path: str | None = None
-    new_line = 0
-
-    for line in diff.splitlines():
-        if line.startswith("+++ b/"):
-            current_path = line[6:]
+    for prefix in PRODUCTION_PREFIXES:
+        root = ROOT / prefix
+        if not root.exists():
             continue
-        if line.startswith("@@"):
-            match = re.search(r"\+(\d+)(?:,(\d+))?", line)
-            if match:
-                new_line = int(match.group(1))
-            continue
-        if current_path is None:
-            continue
-        if line.startswith("+") and not line.startswith("+++"):
-            if checked_path(current_path):
-                text = line[1:]
-                if FORBIDDEN.search(text) and LEGACY_MARKER not in text:
-                    findings.append((current_path, new_line, text))
-            new_line += 1
-        elif not line.startswith("-"):
-            new_line += 1
-
+        for path in sorted(item for item in root.rglob("*") if item.is_file()):
+            relative = path.relative_to(ROOT).as_posix()
+            if not checked_path(relative):
+                continue
+            try:
+                lines = path.read_text(encoding="utf-8").splitlines()
+            except UnicodeDecodeError:
+                continue
+            for line_no, text in enumerate(lines, start=1):
+                if FORBIDDEN.search(text):
+                    findings.append((relative, line_no, text))
     return findings
 
 
@@ -113,15 +67,18 @@ def self_test() -> None:
     assert checked_path("software/web/app/engineering/new-feature.ts")
     assert checked_path("software/python/plasma_server/site_worker.py")
     assert not checked_path("software/web/package-lock.json")
-    assert not checked_path("software/python/tests/test_protocol_v31.py")
-    assert not checked_path("software/python/plasma_server/channel_manager.py")
+    assert not checked_path("software/python/tests/test_protocol.py")
+    assert not checked_path("software/web/e2e/tests/engineering-programming.spec.ts")
     assert FORBIDDEN.search("programmer")
     assert FORBIDDEN.search("channel_id")
     assert FORBIDDEN.search("ChannelManager")
     assert FORBIDDEN.search("channels")
+    assert FORBIDDEN.search("Firmware")
+    assert FORBIDDEN.search("firmware_sha256")
     assert not FORBIDDEN.search("site_id")
     assert not FORBIDDEN.search("SiteManager")
-    assert LEGACY_MARKER in "channel_id = old_id  # PLASMA_LEGACY_COMPAT"
+    assert not FORBIDDEN.search("ProgrammingAsset")
+    assert not FORBIDDEN.search("NormalizedImage")
     print("Canonical terminology guard self-test: PASS")
 
 
@@ -130,17 +87,15 @@ def main() -> int:
         self_test()
         return 0
 
-    base = resolve_base()
-    findings = added_lines(base)
+    findings = current_tree_findings()
     if not findings:
         print("Canonical terminology guard: PASS")
         return 0
 
     print("Canonical terminology guard: FAIL", file=sys.stderr)
     print(
-        "New production-code lines introduced retired Programmer/Channel vocabulary. "
-        "Use Facility/PPU/Site. For a deliberate v3.1 compatibility line in a mixed module, "
-        f"add an explicit {LEGACY_MARKER} marker.",
+        "Canonical production code contains retired vocabulary. "
+        "Use Facility/PPU/Site, Programming Asset, and Normalized Image terminology.",
         file=sys.stderr,
     )
     for path, line_no, text in findings:
