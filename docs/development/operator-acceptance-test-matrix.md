@@ -51,12 +51,13 @@ Scenario IDs are stable contracts. Tests may move between files, but the scenari
 | ID | Operator scenario | Required pass criteria | Current automation evidence | SWPC / human gate |
 |---|---|---|---|---|
 | `OAT-CONN-001` | Fresh Connect | New Engineering session is created; Provider catalog becomes available; Facility/PPU/Site topology is rendered. | `AUTO-MOCK`, `AUTO-STACK` | Confirm public Gateway and UI are reachable after deployment. |
-| `OAT-CONN-002` | Temporary Provider/Gateway outage -> reconnect | UI reports unavailable; reconnect creates a new session; catalog and target polling recover. | `AUTO-MOCK`, `AUTO-STACK` | Disconnect/reconnect once on deployed UI and verify recovery. |
+| `OAT-CONN-002` | Temporary Provider outage on the same Gateway -> reconnect | UI reports unavailable; reconnect creates a new session; catalog and target polling recover without losing the durable target selection. | `AUTO-MOCK`, `AUTO-STACK` | Disconnect/reconnect once on deployed UI and verify recovery. |
+| `OAT-CONN-003` | Original Gateway -> unreachable Gateway -> original Gateway | Browser reports the transport failure; returning to the original Gateway restores session/catalog polling and preserves the previously valid Facility/PPU/Site selection. | `AUTO-MOCK` using an actual aborted browser request | Reproduce once with a deliberately unreachable endpoint during Engineering acceptance. |
 | `OAT-TGT-001` | Select a non-default Facility/PPU | Selected `(facility_id, ppu_id)` is used for STATUS and Job routes; Site count matches selected PPU. | `AUTO-MOCK`, `AUTO-STACK` | Select at least one non-default PPU on SWPC. |
 | `OAT-TGT-002` | Reconnect while original PPU still exists | Same Facility/PPU is restored after reconnect. | `AUTO-MOCK` | Verify once after deployment. |
 | `OAT-TGT-003` | Reconnect when original PPU no longer exists | Selection falls back to canonical Default target: first Facility / first PPU. | `AUTO-MOCK` | Manual failure-injection only when catalog manipulation is available. |
 | `OAT-TGT-004` | Keep arbitrary Site subset, e.g. SITE 1 / 5 / 6 | Polling must not change the operator selection. | `AUTO-MOCK` | Verify with a non-contiguous subset on SWPC. |
-| `OAT-TGT-005` | Reconnect with SITE 1 / 5 / 6 selected | Same PPU and same valid Site subset are restored. | `AUTO-MOCK`; real-stack cache test also requires Site subset preservation. | Verify once after deployment. |
+| `OAT-TGT-005` | Reconnect with an explicit Site subset selected | Same PPU and same valid Site subset are restored for both same-Gateway reconnect and bad-Gateway -> original-Gateway recovery. | `AUTO-MOCK`; real-stack cache test also requires Site subset preservation. | Verify once after deployment. |
 | `OAT-TGT-006` | Explicitly unselect every Site | `0 / N` is a valid user state; repeated status polling must not turn it back into all selected. | `AUTO-MOCK` | Leave UI idle for several polling cycles and confirm `0 / N`. |
 | `OAT-TGT-007` | Reconnect while Site selection is explicitly empty | Explicit `0 / N` remains `0 / N`; empty does not mean uninitialized. | `AUTO-MOCK` | Verify once after deployment. |
 | `OAT-JOB-001` | Independent Erase | Only selected Site receives Erase; Erase does not imply Program. | `AUTO-MOCK`, `AUTO-STACK` | Verify individual Site action. |
@@ -97,21 +98,22 @@ This sequence is the preferred human acceptance flow because one continuous sess
 6. Select a subset and perform Batch Cancel.
 7. Select another non-contiguous subset; independently cancel one or more Sites.
 8. Confirm unaffected Sites continue and final aggregate is PARTIAL.
-9. Select SITE 1 / 5 / 6 and leave the page through multiple status polls.
-10. Disconnect/reconnect; confirm the same PPU and SITE 1 / 5 / 6 return.
-11. Confirm first firmware use after reconnect is CACHE MISS + binary upload again.
-12. Explicitly unselect every Site; wait through several polls; confirm 0 / N remains.
-13. Reconnect again; confirm explicit 0 / N remains.
-14. Download the newest-first `.log` and retain it as acceptance evidence.
+9. Select a non-contiguous Site subset and leave the page through multiple status polls.
+10. Change the Gateway URL to a deliberately unreachable endpoint; confirm the UI reports the transport failure.
+11. Restore the original Gateway URL; confirm the same PPU and same Site subset return.
+12. Confirm first firmware use after reconnect is CACHE MISS + binary upload again.
+13. Explicitly unselect every Site; wait through several polls; confirm 0 / N remains.
+14. Reconnect again; confirm explicit 0 / N remains.
+15. Download the newest-first `.log` and retain it as acceptance evidence.
 ```
 
 For an implementation that includes Read/data integrity, extend the same session with:
 
 ```text
-15. Program deterministic bytes.
-16. Verify.
-17. Read the same range.
-18. Compare byte length and content/hash.
+16. Program deterministic bytes.
+17. Verify.
+18. Read the same range.
+19. Compare byte length and content/hash.
 ```
 
 ## 6. Automation mapping
@@ -121,7 +123,7 @@ Current primary test owners:
 | Coverage | Primary file / workflow |
 |---|---|
 | Engineering target selection, E/P/V/R routing, browser behavior | `software/web/e2e/tests/engineering-programming.spec.ts` |
-| Operator Site selection / reconnect / explicit zero selection | `software/web/e2e/tests/engineering-site-selection-reconnect.spec.ts` |
+| Operator Site selection / same-Gateway reconnect / bad-Gateway round trip / explicit zero selection | `software/web/e2e/tests/engineering-site-selection-reconnect.spec.ts` |
 | Firmware cache behavior through real browser + real Gateway/Provider/Server | `software/web/e2e/tests/engineering-firmware-cache-runtime.spec.ts` |
 | Baseline real-stack PPU operator and batch acceptance | `software/web/e2e/tests/mock-cd-runtime.spec.ts` |
 | Browser regression CI | `.github/workflows/web-tests.yml` |
