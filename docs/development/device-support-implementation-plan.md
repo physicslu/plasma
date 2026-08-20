@@ -39,12 +39,14 @@ Model/revision records carry reusable compatibility. Instance records carry seri
 - [x] Bind physical evidence to a complete device/PPU/Socket/software configuration.
 - [ ] Audit the generated OpenOCD/CMSIS/ESP-IDF catalog for licensing and redistribution.
 - [ ] Quantify exact part numbers, CMSIS device names, ordering patterns, family aliases, duplicates, and unmapped identifiers separately.
-- [ ] Reproduce the 5,796-record research snapshot and record snapshot date, source versions, generator/importer version, mapping-rule version, source/license manifest references, and content hash before treating any count as a catalog baseline.
+- [ ] Reproduce the 5,760-record selectable research snapshot and record snapshot date, source versions, generator/importer version, mapping-rule version, source/license manifest references, and content hash before treating any count as a catalog baseline. Preserve the 24 STM32N6 and 12 TLE987x source identifiers as unmapped research records until a usable Flash bank/driver exists.
 - [ ] Implement deterministic identifier classification and target-mapping rules with confidence, rule version, provenance, and an exception queue.
 - [ ] Generate a machine-readable license/source manifest and quarantine sources outside an approved allowlist.
 - [ ] Default customer production details to private; require explicit consent for publication or aggregation.
 
 Exit criteria: catalog provenance and identifier kinds are understood; unresolved product/privacy decisions are recorded.
+
+The MCU-first sequencing for the 344 target CFG files not yet expanded is defined in [OpenOCD Part-Number Expansion Plan](openocd-part-number-expansion-plan.md).
 
 ### Phase 1 — Versioned catalog artifact
 

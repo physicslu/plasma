@@ -372,7 +372,7 @@ Catalog refresh must not overwrite engineering validations or customer reports. 
 
 ## 13. Initial catalog baseline
 
-A pre-import research snapshot counted 5,796 selectable OpenOCD candidate records across ten vendor groups and also contained broader authoritative identifiers that remain unmapped. This number is research evidence only, not a canonical product count or support guarantee. It must not be promoted to a shipped catalog baseline until the snapshot is reproducible and carries snapshot date, source versions, generator/importer version, mapping-rule version, source/license manifest references, and a content hash.
+A pre-import research snapshot counted 5,760 selectable OpenOCD candidate records across ten vendor groups and also contained broader authoritative identifiers that remain unmapped. The selectable count excludes 24 STM32N6 and 12 TLE987x identifiers because their current target CFG files do not configure an OpenOCD Flash bank/driver. This number is research evidence only, not a canonical product count or support guarantee. It must not be promoted to a shipped catalog baseline until the snapshot is reproducible and carries snapshot date, source versions, generator/importer version, mapping-rule version, source/license manifest references, and a content hash.
 
 Before import into Plasma:
 
