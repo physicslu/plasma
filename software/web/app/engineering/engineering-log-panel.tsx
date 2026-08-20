@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useI18n } from "../i18n";
 
 export type EngineeringLogCategory = "USER" | "TRANSPORT" | "PPU" | "SYSTEM";
 
@@ -40,6 +41,7 @@ type EngineeringLogPanelProps = {
 };
 
 export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPanelProps) {
+  const { t } = useI18n();
   const [visibleCategories, setVisibleCategories] = useState<EngineeringLogCategory[]>(ENGINEERING_LOG_CATEGORIES);
   const visibleLogs = useMemo(
     () => logs.filter(log => visibleCategories.includes(log.category)),
@@ -70,10 +72,10 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
   return (
     <section className="logCard engineeringLogCard">
       <div className="logHead engineeringLogHead">
-        <div className="engineeringLogTitle"><span />Engineering Job Log</div>
+        <div className="engineeringLogTitle"><span />{t("engineeringProgramming.jobLog")}</div>
         <div className="engineeringLogActions">
           <button type="button" onClick={downloadLog} disabled={!logs.length}>Download .log</button>
-          <button type="button" onClick={onClear}>Clear</button>
+          <button type="button" onClick={onClear}>{t("engineeringProgramming.clear")}</button>
         </div>
       </div>
       <div className="engineeringLogFilters" role="group" aria-label="Engineering log filters">
