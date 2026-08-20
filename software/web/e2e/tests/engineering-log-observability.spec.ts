@@ -10,7 +10,7 @@ function catalog() {
     facility_count: 1,
     ppu_count: 1,
     site_count: 2,
-    firmware_scope: "connection-session-and-ppu",
+    programming_image_scope: "connection-session-and-ppu",
     facilities: [{
       facility_id: facilityId,
       display_name: "Mock Facility 01",
@@ -100,7 +100,7 @@ async function baseRoute(
         ok: true,
         session: {
           session_id: String(session.number).padStart(32, "0"),
-          firmware_cache_scope: "connection-session-and-ppu",
+          programming_image_cache_scope: "connection-session-and-ppu",
           previous_session_cleared: session.number > 1,
         },
       }),
@@ -137,39 +137,39 @@ test("Engineering log distinguishes SHA-256 fingerprint-only reuse from binary u
     const parts = url.pathname.split("/").filter(Boolean);
     const tail = parts.slice(5).join("/");
 
-    if (request.method() === "POST" && tail === "api/firmware/check") {
+    if (request.method() === "POST" && tail === "api/programming-images/check") {
       const body = request.postDataJSON() as {
-        firmware_name: string;
-        firmware_size: number;
-        firmware_sha256: string;
+        image_name: string;
+        image_size: number;
+        image_sha256: string;
       };
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           ok: true,
-          firmware: {
-            cache_hit: cachedSha === body.firmware_sha256,
+          programming_image: {
+            cache_hit: cachedSha === body.image_sha256,
             ...body,
           },
         }),
       });
       return;
     }
-    if (request.method() === "POST" && tail === "api/firmware") {
+    if (request.method() === "POST" && tail === "api/programming-images") {
       uploadCount += 1;
       cachedSha = url.searchParams.get("sha256");
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify({ ok: true, firmware: { uploaded: true, cache_hit: true, firmware_sha256: cachedSha } }),
+        body: JSON.stringify({ ok: true, programming_image: { uploaded: true, cache_hit: true, image_sha256: cachedSha } }),
       });
       return;
     }
     if (request.method() === "POST" && tail === "api/jobs") {
       const body = request.postDataJSON() as { site_id: number; operation: string };
       jobNumber += 1;
-      const jobId = `firmware-log-job-${jobNumber}`;
+      const jobId = `programming-image-log-job-${jobNumber}`;
       jobs.set(jobId, { siteId: body.site_id, operation: body.operation });
       await route.fulfill({
         status: 202,
