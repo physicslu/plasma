@@ -77,15 +77,15 @@ test("Engineering Programming topology comes from the Python target catalog", as
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.getByText("SERVER SOURCE OF TRUTH")).toBeVisible();
 
-  const facility = page.getByLabel("Engineering Facility");
-  const ppu = page.getByLabel("Engineering PPU");
+  const facility = page.getByLabel("Engineering Facility", { exact: true });
+  const ppu = page.getByLabel("Engineering PPU", { exact: true });
   await expect(facility.locator("option")).toHaveCount(3);
   await expect(ppu.locator("option")).toHaveCount(4);
   await expect(facility.locator("option").first()).toHaveText("Server Facility 01");
 
   await ppu.selectOption("mock-facility-01-ppu-03");
-  await expect(page.getByLabel("Selected Engineering PPU")).toContainText("Server Facility 01 / Server PPU 03");
-  await expect(page.getByLabel("Selected Engineering PPU")).toContainText("6 Sites");
+  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText("Server Facility 01 / Server PPU 03");
+  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText("6 Sites");
   await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(6);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(6);
   await expect(page.getByText("SITE 0", { exact: true })).toHaveCount(0);
@@ -96,7 +96,7 @@ test("Engineering Programming topology comes from the Python target catalog", as
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
   await ppu.selectOption("mock-facility-03-ppu-04");
-  await expect(page.getByLabel("Selected Engineering PPU")).toContainText("Server Facility 03 / Server PPU 04");
+  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText("Server Facility 03 / Server PPU 04");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(8);
 });
 
@@ -175,8 +175,8 @@ test("Engineering EPVR job is posted to the selected Facility and PPU", async ({
 
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
-  await page.getByLabel("Engineering Facility").selectOption("mock-facility-02");
-  await page.getByLabel("Engineering PPU").selectOption("mock-facility-02-ppu-03");
+  await page.getByLabel("Engineering Facility", { exact: true }).selectOption("mock-facility-02");
+  await page.getByLabel("Engineering PPU", { exact: true }).selectOption("mock-facility-02-ppu-03");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(6);
 
   await page.getByLabel("SITE 6 擦除").click();
