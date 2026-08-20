@@ -116,6 +116,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
             "asset_name": name,
             "asset_type": "image",
             "asset_format": "binary",
+            "asset_size": len(image),
             "asset_sha256": hashlib.sha256(image).hexdigest(),
             "asset_base64": base64.b64encode(image).decode(),
         }
