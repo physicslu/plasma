@@ -2,6 +2,14 @@
 
 Engineering Programming exposes one operator-visible audit stream. The log must let an engineer reconstruct **operator intent -> network/session activity -> programming data activity -> PPU activity -> batch/system outcome** without guessing which layer produced an event.
 
+## Contract boundary
+
+This document defines the **Engineering Programming observability/audit contract**. It is intentionally separate from the Plasma Protocol v3.2 wire contract and the Plasma Web REST API contract.
+
+Changing rendered audit grammar such as `[BAT] START` does **not** by itself require a Protocol or REST contract version change. A Protocol/API version change is required only when the corresponding wire/API shape or semantics change.
+
+The exported text log is stable operator evidence and may be filtered by the documented first-level categories. It must not become the authoritative machine-to-machine application contract for Manager, MES, or external automation. A future structured audit-event API/schema must be versioned explicitly rather than requiring consumers to parse rendered text.
+
 ## Event category contract
 
 Every exported Engineering log entry carries exactly one fixed-width first-level category:
