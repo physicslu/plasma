@@ -2,7 +2,11 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testIgnore: ["mock-cd-runtime.spec.ts", "engineering-programming-asset-cache-runtime.spec.ts"],
+  testIgnore: [
+    "mock-cd-runtime.spec.ts",
+    "engineering-programming-asset-cache-runtime.spec.ts",
+    "production-multi-ppu-runtime.spec.ts",
+  ],
   snapshotPathTemplate: "{testDir}/__snapshots__/{testFilePath}/{arg}{ext}",
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
@@ -41,9 +45,9 @@ export default defineConfig({
     timeout: 120_000,
     stdout: "ignore",
     stderr: "pipe",
-    // Exercise the real Vite -> Cloudflare Worker binding path. No Manager is
-    // started in browser CI, so an enabled Fleet BFF must reach the Manager
-    // attempt and report 503 rather than falling back to fleet_ui_disabled.
+    // Standard browser CI does not start the Python Mock PPU Provider. Real
+    // Production multi-PPU execution is therefore isolated to the dedicated
+    // Mock CD Browser Runtime Acceptance configuration.
     env: {
       ...process.env,
       PLASMA_FLEET_UI_ENABLED: "1",
