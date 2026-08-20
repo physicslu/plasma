@@ -18,10 +18,6 @@ class ErrorCode(StrEnum):
     SITE_INVALID = "E4001"
     SITE_DISABLED = "E4002"
     SITE_BUSY = "E4003"
-    # Legacy symbolic aliases keep source compatibility; v3.2 serializes SITE_*.
-    CHANNEL_INVALID = "E4001"
-    CHANNEL_DISABLED = "E4002"
-    CHANNEL_BUSY = "E4003"
     JOB_NOT_FOUND = "E4004"
     OPERATION_UNSUPPORTED = "E4005"
     DUPLICATE_JOB = "E4006"
@@ -70,16 +66,10 @@ ERROR_NAMES: dict[ErrorCode, str] = {
     ErrorCode.JOB_ABORTED: "JOB_ABORTED",
 }
 
-LEGACY_V31_ERROR_NAMES: dict[ErrorCode, str] = {
-    ErrorCode.SITE_INVALID: "CHANNEL_INVALID",
-    ErrorCode.SITE_DISABLED: "CHANNEL_DISABLED",
-    ErrorCode.SITE_BUSY: "CHANNEL_BUSY",
-}
 
-
-def error_name(code: ErrorCode, protocol_version: str = "3.2") -> str:
-    if protocol_version == "3.1" and code in LEGACY_V31_ERROR_NAMES:
-        return LEGACY_V31_ERROR_NAMES[code]
+def error_name(code: ErrorCode, protocol_version: str = "3.3") -> str:
+    if protocol_version != "3.3":
+        raise ValueError(f"unsupported protocol version: {protocol_version!r}")
     return ERROR_NAMES[code]
 
 
