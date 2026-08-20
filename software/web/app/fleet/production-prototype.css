@@ -1,0 +1,572 @@
+.productionPrototypePage {
+  min-height: 100vh;
+  padding: 28px;
+  background: #081019;
+  color: #edf5fb;
+}
+
+.productionPrototypeShell {
+  width: min(1500px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.productionPrototypeHeading,
+.productionSetHead,
+.productionPrototypeLog > header,
+.productionPpuPrototype > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.productionPrototypeHeading p,
+.productionSetHead p,
+.productionPrototypeLog p {
+  margin: 0 0 4px;
+  color: #79c8f4;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+
+.productionPrototypeHeading h1,
+.productionSetHead h2,
+.productionPrototypeLog h2,
+.productionPpuPrototype h3 {
+  margin: 0;
+}
+
+.productionPrototypeHeading > div:first-child > span,
+.productionSetHead > div:first-child > span {
+  display: block;
+  margin-top: 6px;
+  color: #92a9b9;
+}
+
+.prototypeProvider,
+.batchState,
+.productionPpuStatus {
+  min-width: 150px;
+  padding: 10px 14px;
+  border: 1px solid #284254;
+  border-radius: 10px;
+  background: #0e1a24;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.prototypeProvider i,
+.productionPpuIdentity > i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #71808a;
+  box-shadow: 0 0 0 4px rgba(113,128,138,.12);
+}
+
+.prototypeProvider.online i,
+.productionPpuIdentity > i {
+  background: #32d296;
+  box-shadow: 0 0 0 4px rgba(50,210,150,.12);
+}
+
+.prototypeProvider.offline i {
+  background: #ff5b6e;
+  box-shadow: 0 0 0 4px rgba(255,91,110,.12);
+}
+
+.prototypeProvider small,
+.prototypeProvider b,
+.batchState small,
+.batchState b,
+.productionPpuStatus small,
+.productionPpuStatus b {
+  display: block;
+}
+
+.prototypeProvider small,
+.batchState small,
+.productionPpuStatus small {
+  color: #7f98a9;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.prototypeBoundary {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 3px solid #d59a32;
+  background: #171b1d;
+  color: #c9d3da;
+  font-size: 13px;
+}
+
+.prototypeNotice,
+.emptyProductionSet,
+.ppuLoading,
+.ppuError {
+  padding: 18px;
+  border: 1px solid #273b49;
+  border-radius: 12px;
+  background: #0d1821;
+  color: #9fb2c0;
+}
+
+.prototypeNotice {
+  display: grid;
+  gap: 6px;
+}
+
+.prototypeNotice b,
+.ppuError {
+  color: #ff7b88;
+}
+
+.prototypeTopologySummary,
+.productionSetSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.productionSetSummary {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.prototypeTopologySummary article,
+.productionSetSummary article {
+  padding: 12px 14px;
+  border: 1px solid #203747;
+  border-radius: 10px;
+  background: #0d1821;
+}
+
+.prototypeTopologySummary small,
+.productionSetSummary small {
+  display: block;
+  color: #7891a2;
+  font-size: 10px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.prototypeTopologySummary b,
+.productionSetSummary b {
+  display: block;
+  margin-top: 3px;
+  font-size: 22px;
+}
+
+.productionSelector,
+.productionSet,
+.productionPrototypeLog {
+  border: 1px solid #203747;
+  border-radius: 14px;
+  background: #0b151e;
+  overflow: hidden;
+}
+
+.productionSelector {
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.selectorFacility {
+  display: grid;
+  grid-template-columns: 140px minmax(260px, 480px);
+  align-items: center;
+  gap: 14px;
+}
+
+.selectorFacility label,
+.selectorTitle b,
+.batchOperations > span {
+  color: #dceaf3;
+  font-weight: 800;
+}
+
+.selectorFacility select {
+  min-height: 40px;
+  border: 1px solid #355064;
+  border-radius: 8px;
+  background: #08131b;
+  color: #edf5fb;
+  padding: 0 10px;
+}
+
+.selectorTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.selectorTitle span {
+  color: #7891a2;
+  font-size: 12px;
+}
+
+.ppuChoiceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ppuChoice {
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid #2b4354;
+  border-radius: 10px;
+  background: #0d1821;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.ppuChoice.selected {
+  border-color: #42b6e8;
+  box-shadow: inset 0 0 0 1px rgba(66,182,232,.35);
+  background: #102331;
+}
+
+.ppuChoice span b,
+.ppuChoice span small {
+  display: block;
+}
+
+.ppuChoice span small {
+  margin-top: 3px;
+  color: #7891a2;
+  font-size: 10px;
+}
+
+.ppuChoice em {
+  color: #87a6b9;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.selectorSetAction {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.selectorSetAction span {
+  color: #7f98a9;
+  font-size: 12px;
+}
+
+.setButton,
+.executeBatchButton,
+.cancelBatchButton,
+.cancelPpuButton,
+.productionPpuControls button,
+.productionPrototypeLog button {
+  min-height: 36px;
+  border: 1px solid #345064;
+  border-radius: 7px;
+  background: #122432;
+  color: #dfeef7;
+  padding: 0 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.setButton,
+.executeBatchButton {
+  border-color: #1f8ebc;
+  background: #0f668b;
+  color: white;
+}
+
+.cancelBatchButton,
+.cancelPpuButton {
+  border-color: #7e3440;
+  background: #3b1a21;
+  color: #ffb2bb;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.productionSetHead,
+.productionPrototypeLog > header {
+  padding: 16px;
+  border-bottom: 1px solid #203747;
+  background: #0e1a24;
+}
+
+.batchState {
+  justify-content: center;
+  text-align: center;
+}
+
+.batchState.batch-complete { border-color: #277d5a; }
+.batchState.batch-partial { border-color: #9b6b2f; }
+.batchState.batch-cancelled { border-color: #756f79; }
+.batchState.batch-running,
+.batchState.batch-cancelling { border-color: #b17a2b; }
+
+.productionSetSummary {
+  padding: 12px 16px 0;
+}
+
+.productionBatchToolbar {
+  margin: 12px 16px 16px;
+  padding: 14px;
+  border: 1px solid #294253;
+  border-radius: 10px;
+  background: #09131b;
+  display: grid;
+  grid-template-columns: minmax(420px, 1.2fr) minmax(320px, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.batchOperations {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.batchOperations label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #a9bdca;
+}
+
+.batchOperations label b {
+  color: #66c8f1;
+}
+
+.productionImagePicker {
+  display: grid;
+  gap: 5px;
+}
+
+.productionImagePicker span b,
+.productionImagePicker span small {
+  display: block;
+}
+
+.productionImagePicker span small,
+.productionImagePicker em {
+  color: #7891a2;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.productionImagePicker input {
+  max-width: 100%;
+  color: #a9bdca;
+}
+
+.productionBatchActions {
+  display: flex;
+  gap: 8px;
+}
+
+.productionPpuPrototypeStack {
+  padding: 0 16px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.productionPpuPrototype {
+  border: 1px solid #2a4354;
+  border-radius: 12px;
+  background: #0d1821;
+  overflow: hidden;
+}
+
+.productionPpuPrototype.ppu-running { border-color: #aa782b; }
+.productionPpuPrototype.ppu-success { border-color: #2b825f; }
+.productionPpuPrototype.ppu-failed { border-color: #a34351; }
+.productionPpuPrototype.ppu-cancelled,
+.productionPpuPrototype.ppu-partial { border-color: #75666f; }
+
+.productionPpuPrototype > header {
+  min-height: 70px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #203747;
+  background: #101e29;
+}
+
+.productionPpuIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.productionPpuIdentity small {
+  display: block;
+  color: #7891a2;
+  font-size: 10px;
+}
+
+.productionPpuStatus {
+  justify-content: center;
+  text-align: center;
+}
+
+.productionPpuControls {
+  display: flex;
+  gap: 7px;
+}
+
+.productionSitePrototypeGrid {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(115px, 1fr));
+  gap: 8px;
+}
+
+.productionSitePrototype {
+  min-height: 158px;
+  padding: 10px;
+  border: 1px solid #294253;
+  border-radius: 9px;
+  background: #09141d;
+  display: grid;
+  gap: 7px;
+  align-content: start;
+}
+
+.productionSitePrototype:not(.selected) {
+  opacity: .5;
+}
+
+.productionSitePrototype.site-running { border-color: #a9792b; }
+.productionSitePrototype.site-success { border-color: #2d8762; }
+.productionSitePrototype.site-failed { border-color: #b04656; }
+.productionSitePrototype.site-cancelled { border-color: #786d76; }
+
+.prototypeSiteTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.prototypeSiteTop label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.prototypeSiteTop span {
+  color: #66c8f1;
+  font-weight: 800;
+}
+
+.prototypeSiteLamp {
+  width: 34px;
+  height: 34px;
+  margin: 3px auto 0;
+  border-radius: 50%;
+  background: #173241;
+  display: grid;
+  place-items: center;
+}
+
+.prototypeSiteLamp i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #4fb5e1;
+}
+
+.prototypeSiteLamp.running i { background: #e9a63d; box-shadow: 0 0 14px rgba(233,166,61,.65); }
+.prototypeSiteLamp.success i { background: #43d593; box-shadow: 0 0 14px rgba(67,213,147,.55); }
+.prototypeSiteLamp.failed i { background: #ff6374; box-shadow: 0 0 14px rgba(255,99,116,.55); }
+.prototypeSiteLamp.cancelled i { background: #9a8f99; }
+
+.productionSitePrototype > strong {
+  text-align: center;
+  font-size: 12px;
+}
+
+.prototypeSiteProgress {
+  height: 4px;
+  border-radius: 999px;
+  background: #182a36;
+  overflow: hidden;
+}
+
+.prototypeSiteProgress i {
+  display: block;
+  height: 100%;
+  background: #53bfe9;
+  transition: width .2s ease;
+}
+
+.productionSitePrototype > small {
+  color: #718a9a;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.productionPrototypeLog > header button {
+  min-height: 32px;
+}
+
+.prototypeLogBody {
+  max-height: 300px;
+  overflow: auto;
+  background: #071016;
+}
+
+.prototypeLogRow {
+  min-height: 32px;
+  padding: 7px 12px;
+  border-bottom: 1px solid #162632;
+  display: grid;
+  grid-template-columns: 90px 65px 1fr;
+  gap: 10px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.prototypeLogRow > span { color: #6f8797; }
+.prototypeLogRow > b { color: #7fcdf0; }
+.prototypeLogRow.level-warn > b { color: #e7aa4a; }
+.prototypeLogRow.level-error > b { color: #ff6d7d; }
+.prototypeLogRow code { color: #b7c9d5; white-space: pre-wrap; }
+.prototypeEmptyLog { padding: 20px; color: #617786; }
+
+@media (max-width: 1100px) {
+  .ppuChoiceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .productionBatchToolbar { grid-template-columns: 1fr; }
+  .productionSetSummary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .productionSitePrototypeGrid { grid-template-columns: repeat(4, minmax(115px, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .productionPrototypePage { padding: 14px; }
+  .productionPrototypeHeading,
+  .productionSetHead,
+  .productionPpuPrototype > header { align-items: stretch; flex-direction: column; }
+  .prototypeTopologySummary,
+  .productionSetSummary,
+  .ppuChoiceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .selectorFacility { grid-template-columns: 1fr; }
+  .productionPpuControls,
+  .productionBatchActions { flex-wrap: wrap; }
+  .productionSitePrototypeGrid { grid-template-columns: repeat(2, minmax(110px, 1fr)); }
+  .prototypeLogRow { grid-template-columns: 70px 55px 1fr; }
+}
