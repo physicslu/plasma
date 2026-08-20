@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useI18n } from "../i18n";
 import SinglePPUConsole from "../page";
 
 type TargetSource = "local" | "simulation";
@@ -32,13 +33,14 @@ const simulatedFacilities: SimulatedFacility[] = Array.from({ length: 3 }, (_, f
 });
 
 const operations = [
-  ["E", "Erase"],
-  ["P", "Program"],
-  ["V", "Verify"],
-  ["R", "Read"],
+  ["E", "operation.erase"],
+  ["P", "operation.program"],
+  ["V", "operation.verify"],
+  ["R", "operation.read"],
 ] as const;
 
 export default function ProgrammingWorkspace() {
+  const { t } = useI18n();
   const [source, setSource] = useState<TargetSource>("local");
   const [facilityId, setFacilityId] = useState(simulatedFacilities[0].facilityId);
   const [ppuIndex, setPPUIndex] = useState(0);
@@ -51,21 +53,21 @@ export default function ProgrammingWorkspace() {
   const simulatedSites = Array.from({ length: ppu.siteCount }, (_, index) => index + 1);
 
   return (
-    <section className="engineeringProgramming" aria-label="Engineering programming workspace">
+    <section className="engineeringProgramming" aria-label={t("engineeringProgramming.workspace")}>
       <div className="engineeringProgrammingHeader">
         <div>
           <p>ENGINEERING / PROGRAMMING</p>
-          <h2>Single PPU Programming</h2>
-          <span>單台 PPU 的 Erase / Program / Verify / Read 工程驗證工作台。</span>
+          <h2>{t("engineeringProgramming.title")}</h2>
+          <span>{t("engineeringProgramming.subtitle")}</span>
         </div>
-        <div className="targetSourceSwitch" role="group" aria-label="Programming target source">
+        <div className="targetSourceSwitch" role="group" aria-label={t("engineeringProgramming.targetSource")}>
           <button
             type="button"
             className={source === "local" ? "active" : ""}
             aria-pressed={source === "local"}
             onClick={() => setSource("local")}
           >
-            Connected Local PPU
+            {t("engineeringProgramming.local")}
           </button>
           <button
             type="button"
@@ -73,7 +75,7 @@ export default function ProgrammingWorkspace() {
             aria-pressed={source === "simulation"}
             onClick={() => setSource("simulation")}
           >
-            Simulation Catalog
+            {t("engineeringProgramming.simulation")}
           </button>
         </div>
       </div>
@@ -81,8 +83,8 @@ export default function ProgrammingWorkspace() {
       {source === "local" ? (
         <div className="engineeringProgrammingLocal" data-target-source="local">
           <div className="engineeringBoundaryNote">
-            <b>LOCAL EXECUTION</b>
-            <span>此區直接重用既有單 PPU Console；工作只送往目前設定的 PPU-local Plasma Web REST Gateway。</span>
+            <b>{t("engineeringProgramming.localExecution")}</b>
+            <span>{t("engineeringProgramming.localExecutionNote")}</span>
           </div>
           <SinglePPUConsole />
         </div>
@@ -118,7 +120,7 @@ export default function ProgrammingWorkspace() {
                 ))}
               </select>
             </label>
-            <div className="engineeringTargetIdentity" aria-label="Selected simulated PPU">
+            <div className="engineeringTargetIdentity" aria-label={t("engineeringProgramming.selectedSimulatedPPU")}>
               <span className="simulationBadge">SIMULATED</span>
               <b>{facility.displayName} / {ppu.displayName}</b>
               <small>{ppu.ppuId} · {ppu.siteCount} Sites</small>
@@ -126,38 +128,41 @@ export default function ProgrammingWorkspace() {
           </div>
 
           <div className="engineeringBoundaryNote warning">
-            <b>NO HARDWARE EXECUTION</b>
-            <span>Simulation Catalog 只驗證 Facility / PPU / Site 拓樸與 Engineering UI。它不會把 E/P/V/R 送到 Local PPU，也不經由目前 read-only 的 Manager 執行遠端寫入。</span>
+            <b>{t("engineeringProgramming.noHardwareExecution")}</b>
+            <span>{t("engineeringProgramming.noHardwareExecutionNote")}</span>
           </div>
 
           <section className="simulatedSitePanel" aria-labelledby="simulated-site-title">
             <div className="simulatedSiteHeading">
               <div>
                 <p>SITE TOPOLOGY</p>
-                <h3 id="simulated-site-title">{ppu.displayName} Programming Sites</h3>
+                <h3 id="simulated-site-title">{ppu.displayName} {t("engineeringProgramming.programmingSites")}</h3>
               </div>
               <span>Sites <b>{ppu.siteCount}</b></span>
             </div>
-            <div className="simulatedSiteGrid" aria-label="Simulated site topology">
+            <div className="simulatedSiteGrid" aria-label={t("engineeringProgramming.simulatedSiteTopology")}>
               {simulatedSites.map(siteId => (
                 <article key={siteId} className="simulatedSiteCard">
                   <div>
                     <b>SITE {siteId}</b>
                     <span>IDLE · SIMULATED</span>
                   </div>
-                  <div className="simulatedOperations" aria-label={`SITE ${siteId} simulated operations`}>
-                    {operations.map(([code, label]) => (
-                      <button
-                        key={code}
-                        type="button"
-                        aria-label={`SITE ${siteId} ${label} simulated`}
-                        title={`${label} is disabled for simulated targets`}
-                        disabled
-                      >
-                        <b>{code}</b>
-                        <span>{label}</span>
-                      </button>
-                    ))}
+                  <div className="simulatedOperations" aria-label={`SITE ${siteId} ${t("engineeringProgramming.simulatedOperations")}`}>
+                    {operations.map(([code, key]) => {
+                      const label = t(key);
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          aria-label={`SITE ${siteId} ${label} simulated`}
+                          title={t("engineeringProgramming.simulatedDisabled")}
+                          disabled
+                        >
+                          <b>{code}</b>
+                          <span>{label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </article>
               ))}
