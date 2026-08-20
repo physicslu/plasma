@@ -522,24 +522,24 @@ export default function ProgrammingWorkspace() {
   }, { idle: 0, running: 0, success: 0, cancelled: 0, failed: 0 });
 
   return (
-    <section className="engineeringProgramming" aria-label="Engineering programming workspace">
+    <section className="engineeringProgramming" aria-label={t("engineeringProgramming.workspace")}>
       <div className="engineeringProgrammingHeader">
         <div>
           <p>ENGINEERING / PROGRAMMING</p>
-          <h2>Single PPU Programming</h2>
-          <span>Facility → PPU → Site；E/P/V/R 全部由 Python Engineering PPU Provider 執行。</span>
+          <h2>{t("engineeringProgramming.title")}</h2>
+          <span>{t("engineeringProgramming.subtitle")}</span>
         </div>
         <form className={`engineeringGateway ${connection}`} onSubmit={connect}>
           <span className="pulse" />
           <label>
-            <small>Plasma Web REST Gateway</small>
+            <small>{t("engineeringProgramming.gateway")}</small>
             <input aria-label="Engineering Gateway URL" value={apiDraft} disabled={targetLocked} onChange={event => setApiDraft(event.target.value)} />
           </label>
-          <button type="submit" disabled={targetLocked}>Connect</button>
+          <button type="submit" disabled={targetLocked}>{t("engineeringProgramming.connect")}</button>
         </form>
       </div>
 
-      {catalogError && <div className="engineeringBoundaryNote warning"><b>PROVIDER OFFLINE</b><span>{catalogError}</span></div>}
+      {catalogError && <div className="engineeringBoundaryNote warning"><b>{t("engineeringProgramming.providerOffline")}</b><span>{catalogError}</span></div>}
 
       <div className="engineeringTargetSelector">
         <label>
@@ -568,20 +568,20 @@ export default function ProgrammingWorkspace() {
         </label>
         <div className="engineeringTargetIdentity" aria-label="Selected Engineering PPU">
           <span className="simulationBadge">{selectedPPU?.provider?.toUpperCase() ?? "—"}</span>
-          <b>{facility?.display_name ?? "No Facility"} / {selectedPPU?.display_name ?? "No PPU"}</b>
+          <b>{facility?.display_name ?? t("engineeringProgramming.noFacility")} / {selectedPPU?.display_name ?? t("engineeringProgramming.noPpu")}</b>
           <small>{ppu?.ppu_id ?? selectedPPU?.ppu_id ?? "—"} · {ppu?.site_count ?? selectedPPU?.site_count ?? 0} Sites · {ppu?.model ?? selectedPPU?.model ?? "—"}</small>
         </div>
       </div>
 
       {catalog && <div className="engineeringBoundaryNote">
-        <b>SERVER SOURCE OF TRUTH</b>
-        <span>{catalog.facility_count} Facilities · {catalog.ppu_count} PPUs · {catalog.site_count} Sites。前端不建立 Mock topology；所有 target identity 由 Python Provider 回報。</span>
+        <b>{t("engineeringProgramming.serverSource")}</b>
+        <span>{catalog.facility_count} Facilities · {catalog.ppu_count} PPUs · {catalog.site_count} Sites。{t("engineeringProgramming.serverSourceNote")}</span>
       </div>}
 
       <section className="selectorPanel engineeringSelectorPanel" aria-label="Engineering Site selection">
         <div className="sectionHeading">
-          <div><p className="eyebrow">TARGET SITES</p><h2>Site Selection</h2></div>
-          <div className="statusSummary"><span>Selected <b>{selectedSiteIds.length} / {sites.length}</b></span></div>
+          <div><p className="eyebrow">TARGET SITES</p><h2>{t("engineeringProgramming.siteSelection")}</h2></div>
+          <div className="statusSummary"><span>{t("engineeringProgramming.selected")} <b>{selectedSiteIds.length} / {sites.length}</b></span></div>
         </div>
         <div className="channelChecks">
           {sites.map(site => (
@@ -602,8 +602,8 @@ export default function ProgrammingWorkspace() {
 
       <section className="operationConfig" aria-label="Engineering programming parameters">
         <div className="compactFile">
-          <div><b>{firmware?.name ?? "Firmware BIN"}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB` : "Program / Verify · Max 16 MiB"}</small></div>
-          <label>Browse<input aria-label="Engineering Firmware file" type="file" accept=".bin,application/octet-stream" disabled={batchRunning} onChange={event => setFirmware(event.target.files?.[0] ?? null)} /></label>
+          <div><b>{firmware?.name ?? t("engineeringProgramming.firmware")}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB` : t("engineeringProgramming.firmwareHint")}</small></div>
+          <label>{t("engineeringProgramming.browse")}<input aria-label="Engineering Firmware file" type="file" accept=".bin,application/octet-stream" disabled={batchRunning} onChange={event => setFirmware(event.target.files?.[0] ?? null)} /></label>
         </div>
         <div className="compactRead">
           <label>READ Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
@@ -613,9 +613,9 @@ export default function ProgrammingWorkspace() {
 
       <section className="batchPanel engineeringBatchPanel" aria-label="Engineering batch control">
         <div className="batchInfo">
-          <div><p className="eyebrow">E / P / V / R</p><h2>Batch Operations</h2><small>{selectedSiteIds.map(id => `SITE ${id}`).join(", ") || "No Sites selected"}</small></div>
+          <div><p className="eyebrow">E / P / V / R</p><h2>{t("engineeringProgramming.batchOperations")}</h2><small>{selectedSiteIds.map(id => `SITE ${id}`).join(", ") || t("engineeringProgramming.noSites")}</small></div>
           <div className="statusSummary">
-            <span>Idle <b>{statusCounts.idle}</b></span><span className="busy">Running <b>{statusCounts.running}</b></span><span className="success">Success <b>{statusCounts.success}</b></span><span className="failed">Cancelled <b>{statusCounts.cancelled}</b></span><span className="failed">Failed <b>{statusCounts.failed}</b></span>
+            <span>{t("engineeringProgramming.idle")} <b>{statusCounts.idle}</b></span><span className="busy">{t("engineeringProgramming.running")} <b>{statusCounts.running}</b></span><span className="success">{t("engineeringProgramming.success")} <b>{statusCounts.success}</b></span><span className="failed">{t("engineeringProgramming.cancelled")} <b>{statusCounts.cancelled}</b></span><span className="failed">{t("engineeringProgramming.failed")} <b>{statusCounts.failed}</b></span>
           </div>
         </div>
         <div className="batchActions">
@@ -629,19 +629,19 @@ export default function ProgrammingWorkspace() {
             })}
           </div>
           <div className="batchExecutionControls">
-            <button type="button" className="executeBatch" onClick={() => void runBatch()} disabled={batchRunning || selectedOperations.length === 0 || selectedOperations.some(batchDisabled)}>▶ Execute</button>
-            <button type="button" className="cancelBatch" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}>■ {batchCancelling ? "Cancelling" : "Cancel"}</button>
+            <button type="button" className="executeBatch" onClick={() => void runBatch()} disabled={batchRunning || selectedOperations.length === 0 || selectedOperations.some(batchDisabled)}>▶ {t("engineeringProgramming.execute")}</button>
+            <button type="button" className="cancelBatch" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}>■ {batchCancelling ? t("engineeringProgramming.cancelling") : t("engineeringProgramming.cancel")}</button>
           </div>
         </div>
       </section>
 
-      {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">Firmware exceeds 16 MiB.</div>}
+      {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">{t("engineeringProgramming.firmwareTooLarge")}</div>}
 
       <section className="overviewCard" aria-label="Engineering Site status">
-        <div className="overviewHead"><div><p className="eyebrow">LIVE PPU STATUS</p><h2>{ppu?.display_name ?? selectedPPU?.display_name ?? "Selected PPU"}</h2></div><small>REST polling 500 ms</small></div>
+        <div className="overviewHead"><div><p className="eyebrow">LIVE PPU STATUS</p><h2>{ppu?.display_name ?? selectedPPU?.display_name ?? t("engineeringProgramming.selectedPpu")}</h2></div><small>REST polling 500 ms</small></div>
         <div className="channelTableWrap">
           <table className="channelTable">
-            <thead><tr><th>Site</th><th>Target / Interface</th><th>Operation</th><th>State</th><th>Progress</th><th>Independent E/P/V/R</th></tr></thead>
+            <thead><tr><th>Site</th><th>{t("engineeringProgramming.targetInterface")}</th><th>{t("engineeringProgramming.operation")}</th><th>{t("engineeringProgramming.state")}</th><th>{t("engineeringProgramming.progress")}</th><th>{t("engineeringProgramming.independent")}</th></tr></thead>
             <tbody>
               {selectedSites.map(site => (
                 <tr key={site.id}>
@@ -663,7 +663,7 @@ export default function ProgrammingWorkspace() {
       </section>
 
       <section className="logCard engineeringLogCard">
-        <div className="logHead"><div><span />ENGINEERING JOB LOG</div><button type="button" onClick={() => setLogs([])}>Clear</button></div>
+        <div className="logHead"><div><span />{t("engineeringProgramming.jobLog")}</div><button type="button" onClick={() => setLogs([])}>{t("engineeringProgramming.clear")}</button></div>
         <pre aria-label="Engineering job log">{logs.length ? logs.map(log => <span key={log.id} data-level={log.error ? "error" : "info"}>{log.text}</span>) : "Log cleared."}</pre>
       </section>
     </section>
