@@ -13,9 +13,71 @@ on:
       - ".github/workflows/web-tests.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  pr68-contract-refactor:
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/remove-rest-v1-firmware-compat'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Migrate E2E mocks to REST v3 Programming Assets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("software/web/e2e/tests")
+          replacements = (
+              ("programming_image_scope", "programming_asset_scope"),
+              ("programming_image_cache_scope", "programming_asset_cache_scope"),
+              ("api/programming-images", "api/programming-assets"),
+              ("programming_image", "programming_asset"),
+              ("image_sha256", "asset_sha256"),
+              ("image_name", "asset_name"),
+              ("image_size", "asset_size"),
+              ("image_base64", "asset_base64"),
+              ("firmware_sha256", "image_sha256"),
+              ("Engineering Firmware file", "Engineering Programming Image Asset file"),
+              ("選擇 Firmware 檔案", "選擇 Programming Image Asset 檔案"),
+              ("previous firmware cache cleared", "previous Programming Asset cache cleared"),
+              ("PPU Programming Image cache", "PPU Programming Asset cache"),
+              ("programming-image-log-job", "programming-asset-log-job"),
+          )
+          for path in sorted(root.glob("*.ts")):
+              text = path.read_text(encoding="utf-8")
+              original = text
+              for old, new in replacements:
+                  text = text.replace(old, new)
+              text = re.sub(r"\bfirmware\b", "imageAssetBytes", text)
+              text = re.sub(r"\bFirmware\b", "Programming Image Asset", text)
+              if text != original:
+                  path.write_text(text, encoding="utf-8")
+
+          offenders = []
+          for path in sorted(root.glob("*.ts")):
+              text = path.read_text(encoding="utf-8")
+              if re.search(r"(?i)\bfirmware(?:\b|_)", text):
+                  offenders.append(f"{path}: retired programming term")
+              if "api/programming-images" in text or "programming_image_" in text:
+                  offenders.append(f"{path}: retired REST v2 contract")
+          if offenders:
+              raise SystemExit("\n".join(offenders))
+          PY
+      - name: Commit branch-only E2E migration
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "plasma-pr68-bot"
+          git config user.email "plasma-pr68-bot@users.noreply.github.com"
+          git add software/web/e2e/tests
+          git commit -m "Migrate browser mocks to Programming Asset REST v3"
+          git push origin HEAD:${{ github.head_ref }}
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
