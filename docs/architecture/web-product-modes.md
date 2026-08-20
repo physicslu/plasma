@@ -95,9 +95,9 @@ The backend/domain enum remains the full canonical name (`ERASE`, `PROGRAM`, `VE
 
 ## 4. Engineering Mode extension boundary
 
-Engineering Mode starts as an extensible information-architecture shell rather than a second copy of the Production Console.
+Engineering Mode remains an extensible engineering workspace rather than a second copy of the Production Console.
 
-Initial extension slots are:
+Extension areas are:
 
 ```text
 Overview
@@ -109,11 +109,33 @@ Tools
 Settings
 ```
 
+`Programming` is now the first implemented engineering work area. It provides a single-target programming workbench based on canonical:
+
+```text
+Facility -> PPU -> Site
+```
+
+The browser does not own the available Facility/PPU topology. It consumes the Python-side `EngineeringPPUProvider` contract, which owns target discovery/status and E/P/V/R execution. The current implementation supplies a server-side Mock provider; a future real-PPU provider is intended to preserve the same Facility/PPU/Site and Job contracts.
+
+```text
+Engineering UI
+    -> Engineering PPU Control API
+    -> EngineeringPPUProvider
+         -> MockEngineeringPPUProvider  (current)
+         -> RealPPUProvider             (future)
+```
+
+The current server-side Mock provider creates three Mock Facilities with four PPUs per Facility. Their Site counts are 2 / 4 / 6 / 8, for 12 PPUs and 60 Sites total. These are Python-owned targets, not React fixtures. Each Mock PPU is backed by a real in-process `PlasmaServer`, `SiteManager` / `SiteWorker`, Protocol v3.2 path and `MockInterface`.
+
+Engineering Programming supports per-Site and batch E/P/V/R, firmware selection, Read ranges, Job progress/status, cancellation, Read download and engineering logs. Target switching is blocked while a selected PPU has an active/submitting Job so a running target cannot be silently orphaned by the UI.
+
+The current Mock provider is an engineering/test execution provider and is not inserted into the Production Manager registry. Manager remains read-only; Engineering Mock writes do not create a Manager write proxy.
+
 Future engineering capability can include IC/device configuration, programming algorithms, timing/voltage controls, memory maps, protocol traces, FPGA/PL diagnostics, register inspection, performance profiling, Read/Compare/Dump tools, and failure analysis.
 
 Low-level engineering controls must not leak into Production Mode merely because they exist in the shared backend.
 
-A single-PPU console is an engineering/maintenance capability, not a third product mode.
+A single-PPU programming workbench is an engineering/maintenance capability, not a third product mode.
 
 ## 5. Internationalization
 
@@ -128,7 +150,7 @@ UI components use translation keys instead of accumulating mixed hard-coded Chin
 
 Language switching is required to update React UI state immediately. Browser storage is persistence only; the UI must not wait for storage-event propagation before changing language. Storage events are used only to synchronize the preference across tabs/windows.
 
-Canonical engineering vocabulary remains stable where translation would reduce cross-team clarity, including PPU, SITE, E/P/V/R, PASS, FAIL, READY, Job ID, SPI, I2C, SWD, and CRC.
+Canonical engineering vocabulary remains stable where translation would reduce cross-team clarity, including Facility, PPU, SITE, E/P/V/R, PASS, FAIL, READY, Job ID, SPI, I2C, SWD, and CRC.
 
 ## 6. Factory Log contract and current boundary
 
@@ -179,5 +201,7 @@ Production Mode UI
     -> read-only Manager
     -> PPU Gateways
 ```
+
+The Engineering Mock provider is a separate opt-in local simulation execution path owned by the Web Gateway process. It does not grant remote write authority to Manager and does not relax Production Mode's write boundary.
 
 Manager or management aggregation failure must never make a standalone PPU unable to continue local programming.
