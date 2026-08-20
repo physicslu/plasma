@@ -76,32 +76,32 @@ class STM32F103Handler(BaseHandler):
             return ExecutionOutput(details={"stages": ["erase"]})
 
         if operation is Operation.PROGRAM:
-            if not request.firmware:
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "program requires non-empty firmware")
+            if not request.image:
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "program requires a non-empty image")
             await self._stage(
                 "program",
                 stage_callback,
-                lambda progress: self.interface.program(request.firmware, 0, progress),
+                lambda progress: self.interface.program(request.image, 0, progress),
                 stage_index=0,
                 stage_count=1,
                 byte_progress=True,
             )
             return ExecutionOutput(
-                details={"stages": ["program"], "bytes_programmed": len(request.firmware)}
+                details={"stages": ["program"], "bytes_programmed": len(request.image)}
             )
 
         if operation is Operation.VERIFY:
-            if not request.firmware:
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "verify requires non-empty reference firmware")
+            if not request.image:
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "verify requires a non-empty reference image")
             await self._stage(
                 "verify",
                 stage_callback,
-                lambda progress: self.interface.verify(request.firmware, 0, progress),
+                lambda progress: self.interface.verify(request.image, 0, progress),
                 stage_index=0,
                 stage_count=1,
                 byte_progress=True,
             )
-            return ExecutionOutput(details={"stages": ["verify"], "bytes_verified": len(request.firmware)})
+            return ExecutionOutput(details={"stages": ["verify"], "bytes_verified": len(request.image)})
 
         if operation is Operation.READ:
             sections = self._read_sections(request.map_data)
