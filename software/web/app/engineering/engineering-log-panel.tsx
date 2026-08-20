@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useI18n } from "../i18n";
 
-export type EngineeringLogCategory = "USR" | "NET" | "PPU" | "FW" | "BAT" | "SYS";
+export type EngineeringLogCategory = "USR" | "NET" | "PPU" | "DAT" | "BAT" | "SYS";
 
 export type EngineeringLogEntry = {
   id: number;
@@ -16,20 +16,24 @@ export const ENGINEERING_LOG_CATEGORIES: EngineeringLogCategory[] = [
   "USR",
   "NET",
   "PPU",
-  "FW",
+  "DAT",
   "BAT",
   "SYS",
 ];
 
 export function classifyEngineeringLog(message: string): EngineeringLogCategory {
-  if (message.startsWith("[FIRMWARE]")) return "FW";
+  if (
+    message.startsWith("[IMG]")
+    || message.startsWith("[KEY]")
+    || message.startsWith("[OPT]")
+  ) return "DAT";
   if (
     message.startsWith("[SESSION]")
     || message.startsWith("[ENGINEERING]")
     || message.startsWith("[NET]")
     || message.startsWith("[CONNECTION]")
   ) return "NET";
-  if (message.startsWith("[SITE ")) return "PPU";
+  if (message.startsWith("[SITE-")) return "PPU";
   if (message.startsWith("[BATCH]")) return "BAT";
   return "SYS";
 }
