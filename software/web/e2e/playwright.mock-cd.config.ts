@@ -4,7 +4,11 @@ const artifactRoot = "../../../artifacts/mock-cd-browser";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["mock-cd-runtime.spec.ts", "engineering-programming-asset-cache-runtime.spec.ts"],
+  testMatch: [
+    "mock-cd-runtime.spec.ts",
+    "engineering-programming-asset-cache-runtime.spec.ts",
+    "production-multi-ppu-runtime.spec.ts",
+  ],
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,

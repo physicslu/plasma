@@ -41,12 +41,12 @@ test("demo entry exposes only canonical Product Modes in top-level navigation", 
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
   await expectProductNavigation(page, "量產模式");
 
-  // Browser CI intentionally does not start Plasma Manager. The multi-PPU
-  // observation flag is enabled on the Vite host process, so the Worker route
-  // must see that binding and advance to the Manager connection attempt.
-  await expect(page.getByText("量產模式資料暫時無法取得")).toBeVisible();
-  await expect(page.getByText("Fleet BFF HTTP 503")).toBeVisible();
-  await expect(page.getByText("Fleet UI is disabled on this host.")).toHaveCount(0);
+  // Standard browser CI intentionally does not start the Python Mock PPU
+  // Provider. The route must still render its explicit Mock-only execution
+  // boundary rather than falling back to the former Manager/Fleet write model.
+  await expect(page.getByText(/此頁使用 Python Mock PPU Provider 驗證多 PPU 執行/)).toBeVisible();
+  await expect(page.getByText(/Plasma Manager 仍維持唯讀/)).toBeVisible();
+  await expect(page.getByText("Fleet BFF HTTP 503")).toHaveCount(0);
 
   await page.getByRole("navigation", { name: "產品模式" }).getByRole("link", { name: "工程模式", exact: true }).click();
   await expect(page).toHaveURL(/\/engineering$/);

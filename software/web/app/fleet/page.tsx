@@ -1,350 +1,688 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n";
-import type { FleetJobSummary, FleetPPUView, FleetSiteView, FleetWebPayload } from "./fleet-contract";
+import {
+  beginEngineeringSession,
+  cancelJob,
+  DEFAULT_API_BASE,
+  engineeringTargetApiBase,
+  getEngineeringTargets,
+  getJob,
+  getPPUStatus,
+  startJob,
+} from "../plasma-api";
+import type {
+  EngineeringFacilityTarget,
+  EngineeringPPUTarget,
+  EngineeringTargetCatalog,
+  Operation,
+  SiteSnapshot,
+} from "../plasma-api";
 import "./fleet.css";
+import "./production-prototype.css";
 
-type LoadState = "loading" | "ready" | "disabled" | "error";
-type VisualStatus = "ready" | "running" | "pass" | "fail" | "error" | "disabled" | "offline";
-type LogSeverity = "INFO" | "WARN" | "ERROR";
-type LogFilter = "all" | "errors" | string;
-type FactoryLogEntry = {
+type SiteRunState = "ready" | "running" | "success" | "failed" | "cancelled";
+type BatchState = "idle" | "running" | "cancelling" | "complete" | "partial" | "cancelled";
+type SiteRuntime = {
   id: number;
-  timestamp: string;
-  ppu: string;
-  site: string | null;
-  severity: LogSeverity;
-  operation: string;
-  eventCode: "fleetConnected" | "ppuChanged" | "siteChanged" | "jobObserved" | "siteResultCleared";
-  detail: string;
+  enabled: boolean;
+  selected: boolean;
+  state: SiteRunState;
+  progress: number;
+  operation?: Operation;
+  jobId?: string;
+  error?: string;
+  target?: string | null;
+  interface?: string | null;
 };
+type PPURuntime = { target: EngineeringPPUTarget; sites: SiteRuntime[]; loading: boolean; error?: string };
+type ActiveJob = { ppuId: string; targetApiBase: string; siteId: number; jobId: string };
+type LogEntry = { id: number; time: string; level: "INFO" | "WARN" | "ERROR"; text: string };
 
-const operations = [
-  { code: "E", labelKey: "operation.erase" },
-  { code: "P", labelKey: "operation.program" },
-  { code: "V", labelKey: "operation.verify" },
-  { code: "R", labelKey: "operation.read" },
-] as const;
-
+const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
+const POLL_INTERVAL_MS = 300;
+const POLL_LIMIT = 600;
+const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
+const operationCodes: Record<Operation, string> = { erase: "E", program: "P", verify: "V", read: "R" };
 const terminalStates = new Set(["success", "failed", "cancelled", "timeout", "aborted"]);
-const failedStates = new Set(["failed", "timeout", "aborted"]);
 
-function ppuKey(ppu: FleetPPUView): string {
-  return ppu.identity.ppu_id ?? ppu.alias ?? "unknown-ppu";
+const copy = {
+  "zh-TW": {
+    eyebrow: "PRODUCTION MODE · MOCK PROTOTYPE",
+    title: "Factory Production Console",
+    subtitle: "Facility → PPU Production Set → 跨 PPU / 跨 Site 並行批次",
+    boundary: "此頁使用 Python Mock PPU Provider 驗證多 PPU 執行。Plasma Manager 仍維持唯讀；本 Prototype 不授權任何 real PPU 遠端寫入。",
+    provider: "Mock PPU Provider",
+    loading: "正在連接 Mock Provider…",
+    offline: "Mock Provider 無法使用。請確認 Plasma Web REST Gateway 已啟用 Engineering Mock Provider。",
+    facility: "Facility",
+    ppuSelection: "PPU 選擇",
+    set: "SET",
+    setHint: "SET 後，下方只顯示這次量產要操作的 PPU。",
+    noPpu: "請至少選擇一台 PPU。",
+    productionSet: "Production Set",
+    noSet: "尚未建立 Production Set。",
+    selectedPpus: "PPUs",
+    selectedSites: "Sites",
+    operations: "批次操作",
+    image: "Programming Image (.bin)",
+    imageHint: "Program / Verify 需要 Image Asset，最大 16 MiB。",
+    execute: "EXECUTE BATCH",
+    cancelAll: "CANCEL BATCH",
+    cancelPpu: "Cancel PPU",
+    ready: "READY",
+    running: "RUNNING",
+    success: "PASS",
+    failed: "FAIL",
+    cancelled: "CANCELLED",
+    partial: "PARTIAL",
+    complete: "COMPLETE",
+    batch: "Batch",
+    ppuState: "PPU State",
+    selectAllSites: "Select all Sites",
+    clearSites: "Clear Sites",
+    log: "Production Prototype Log",
+    clearLog: "清除 Log",
+    imageTooLarge: "Programming Image 超過 16 MiB。",
+    imageRequired: "Program / Verify 需要先選擇 Programming Image。",
+    chooseOperation: "請至少選擇一個操作。",
+    noSelectedSites: "Production Set 內沒有選取 Site。",
+  },
+  "en-US": {
+    eyebrow: "PRODUCTION MODE · MOCK PROTOTYPE",
+    title: "Factory Production Console",
+    subtitle: "Facility → PPU Production Set → concurrent execution across PPUs and Sites",
+    boundary: "This page uses the Python Mock PPU Provider to validate multi-PPU execution. Plasma Manager remains read-only; this prototype grants no remote write authority to real PPUs.",
+    provider: "Mock PPU Provider",
+    loading: "Connecting to Mock Provider…",
+    offline: "Mock Provider is unavailable. Enable the Engineering Mock Provider on the Plasma Web REST Gateway.",
+    facility: "Facility",
+    ppuSelection: "PPU Selection",
+    set: "SET",
+    setHint: "After SET, only PPUs in this Production Set are shown below.",
+    noPpu: "Select at least one PPU.",
+    productionSet: "Production Set",
+    noSet: "No Production Set has been created.",
+    selectedPpus: "PPUs",
+    selectedSites: "Sites",
+    operations: "Batch Operations",
+    image: "Programming Image (.bin)",
+    imageHint: "Program / Verify requires an Image Asset, max 16 MiB.",
+    execute: "EXECUTE BATCH",
+    cancelAll: "CANCEL BATCH",
+    cancelPpu: "Cancel PPU",
+    ready: "READY",
+    running: "RUNNING",
+    success: "PASS",
+    failed: "FAIL",
+    cancelled: "CANCELLED",
+    partial: "PARTIAL",
+    complete: "COMPLETE",
+    batch: "Batch",
+    ppuState: "PPU State",
+    selectAllSites: "Select all Sites",
+    clearSites: "Clear Sites",
+    log: "Production Prototype Log",
+    clearLog: "Clear Log",
+    imageTooLarge: "Programming Image exceeds 16 MiB.",
+    imageRequired: "Program / Verify requires a Programming Image.",
+    chooseOperation: "Select at least one operation.",
+    noSelectedSites: "No Site is selected in the Production Set.",
+  },
+} as const;
+
+function nowTime(): string {
+  return new Date().toLocaleTimeString("en-GB", { hour12: false });
 }
-
-function displayName(ppu: FleetPPUView): string {
-  return ppu.identity.display_name ?? ppu.identity.ppu_id ?? ppu.alias ?? "Unknown PPU";
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
 }
-
-function siteKey(ppu: FleetPPUView, site: FleetSiteView): string {
-  return `${ppuKey(ppu)}:${site.site_id}`;
+function siteLabel(siteId: number): string {
+  return `SITE-${String(siteId).padStart(2, "0")}`;
 }
-
-function ppuOperational(ppu: FleetPPUView): boolean {
-  return ppu.transport_state === "reachable" && ppu.observation.state === "current";
+function runtimeFromStatus(snapshot: SiteSnapshot): SiteRuntime {
+  return {
+    id: snapshot.site_id,
+    enabled: snapshot.enabled,
+    selected: snapshot.enabled,
+    state: "ready",
+    progress: 0,
+    target: snapshot.target,
+    interface: snapshot.interface,
+  };
 }
-
-function jobSignature(job: FleetJobSummary | null): string | null {
-  if (!job || !terminalStates.has(job.state)) return null;
-  return `${job.job_id}:${job.state}:${job.updated_at ?? ""}`;
+function orderedOperations(selected: Operation[]): Operation[] {
+  return operationOrder.filter(operation => selected.includes(operation));
 }
-
-function operationCode(site: FleetSiteView): string {
-  switch (site.latest_job?.operation) {
-    case "erase": return "E";
-    case "program": return "P";
-    case "verify": return "V";
-    case "read": return "R";
-    default: return "—";
-  }
-}
-
-function siteStatus(ppu: FleetPPUView, site: FleetSiteView, clearedSignature?: string): VisualStatus {
-  if (!site.enabled) return "disabled";
-  if (!ppuOperational(ppu)) return "offline";
-
-  const job = site.latest_job;
-  if (job) {
-    if (job.state === "queued" || job.state === "running") return "running";
-    const signature = jobSignature(job);
-    const cleared = signature !== null && signature === clearedSignature;
-    if (!cleared && job.state === "success") return "pass";
-    if (!cleared && failedStates.has(job.state)) return "fail";
-  }
-
-  if (site.state === "queued" || site.state === "running") return "running";
-  if (site.state === "error") return "error";
+function ppuStatus(runtime: PPURuntime): SiteRunState | "partial" {
+  const sites = runtime.sites.filter(site => site.selected);
+  if (sites.length === 0) return "ready";
+  if (sites.some(site => site.state === "running")) return "running";
+  if (sites.every(site => site.state === "success")) return "success";
+  if (sites.every(site => site.state === "cancelled")) return "cancelled";
+  if (sites.some(site => site.state === "failed")) return "failed";
+  if (sites.some(site => site.state === "success" || site.state === "cancelled")) return "partial";
   return "ready";
 }
 
-function resultLabel(site: FleetSiteView, clearedSignature?: string): string {
-  const job = site.latest_job;
-  const signature = jobSignature(job);
-  if (!job || !signature || signature === clearedSignature) return "NONE";
-  return job.state.toUpperCase();
-}
-
-function severityForJob(job: FleetJobSummary): LogSeverity {
-  if (failedStates.has(job.state)) return "ERROR";
-  if (job.state === "cancelled") return "WARN";
-  return "INFO";
-}
-
-function severityForSite(status: VisualStatus, ppu?: FleetPPUView): LogSeverity {
-  if (status === "fail" || status === "error" || status === "offline") return "ERROR";
-  if (ppu?.observation.state === "stale") return "WARN";
-  return "INFO";
-}
-
-function nowTime(): string {
-  return new Date().toLocaleTimeString([], { hour12: false });
-}
-
-function observedTime(job: FleetJobSummary | null): string {
-  const raw = job?.updated_at;
-  if (!raw) return nowTime();
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? nowTime() : parsed.toLocaleTimeString([], { hour12: false });
-}
-
 export default function FleetPage() {
-  const { t } = useI18n();
-  const [payload, setPayload] = useState<FleetWebPayload | null>(null);
-  const [state, setState] = useState<LoadState>("loading");
-  const [message, setMessage] = useState("Loading fleet snapshot…");
-  const [selectedSites, setSelectedSites] = useState<Set<string>>(new Set());
-  const [selectedOperations, setSelectedOperations] = useState<Set<string>>(new Set());
-  const [clearedResults, setClearedResults] = useState<Map<string, string>>(new Map());
-  const [selectedDetail, setSelectedDetail] = useState<{ ppu: string; siteId: number } | null>(null);
-  const [logs, setLogs] = useState<FactoryLogEntry[]>([]);
-  const [logFilter, setLogFilter] = useState<LogFilter>("all");
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [fullLog, setFullLog] = useState(false);
-  const previousSnapshot = useRef<Map<string, string>>(new Map());
+  const { locale, t } = useI18n();
+  const text = copy[locale];
+  const [catalog, setCatalog] = useState<EngineeringTargetCatalog | null>(null);
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const [facilityId, setFacilityId] = useState("");
+  const [draftPpuIds, setDraftPpuIds] = useState<string[]>([]);
+  const [activeFacilityId, setActiveFacilityId] = useState("");
+  const [activePpuIds, setActivePpuIds] = useState<string[]>([]);
+  const [runtimes, setRuntimes] = useState<Record<string, PPURuntime>>({});
+  const [selectedOperations, setSelectedOperations] = useState<Operation[]>([]);
+  const [imageAsset, setImageAsset] = useState<File | null>(null);
+  const [batchState, setBatchState] = useState<BatchState>("idle");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+
+  const currentJobs = useRef<Map<string, ActiveJob>>(new Map());
+  const cancelAllRequested = useRef(false);
+  const cancelledPpus = useRef<Set<string>>(new Set());
   const logSequence = useRef(0);
-  const logBodyRef = useRef<HTMLDivElement | null>(null);
+
+  const appendLog = useCallback((textValue: string, level: LogEntry["level"] = "INFO") => {
+    setLogs(current => [...current, {
+      id: ++logSequence.current,
+      time: nowTime(),
+      level,
+      text: textValue,
+    }].slice(-500));
+  }, []);
 
   useEffect(() => {
     let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    function processObservation(next: FleetWebPayload) {
-      const nextSnapshot = new Map<string, string>();
-      const entries: Omit<FactoryLogEntry, "id">[] = [];
-      const firstObservation = previousSnapshot.current.size === 0;
-
-      if (firstObservation) {
-        entries.push({
-          timestamp: nowTime(), ppu: "FLEET", site: null, severity: "INFO", operation: "—",
-          eventCode: "fleetConnected", detail: `${next.summary.configured_ppus} PPU / ${next.summary.reported_sites} Sites`,
-        });
-      }
-
-      for (const ppu of next.ppus) {
-        const id = ppuKey(ppu);
-        const ppuValue = `${ppu.transport_state}/${ppu.execution_state}/${ppu.observation.state}`;
-        nextSnapshot.set(`ppu:${id}`, ppuValue);
-        const previousPpu = previousSnapshot.current.get(`ppu:${id}`);
-        if (previousPpu && previousPpu !== ppuValue) {
-          entries.push({ timestamp: nowTime(), ppu: id, site: null, severity: ppuOperational(ppu) ? "INFO" : ppu.observation.state === "stale" ? "WARN" : "ERROR", operation: "—", eventCode: "ppuChanged", detail: `${previousPpu} → ${ppuValue}` });
-        }
-
-        for (const site of ppu.topology.sites) {
-          const key = siteKey(ppu, site);
-          const siteValue = `${site.state}/${site.current_job_id ?? "none"}`;
-          nextSnapshot.set(`site:${key}`, siteValue);
-          const previousSite = previousSnapshot.current.get(`site:${key}`);
-          if (previousSite && previousSite !== siteValue) {
-            entries.push({ timestamp: nowTime(), ppu: id, site: `SITE ${site.site_id}`, severity: severityForSite(siteStatus(ppu, site), ppu), operation: operationCode(site), eventCode: "siteChanged", detail: `${previousSite} → ${siteValue}` });
-          }
-
-          const job = site.latest_job;
-          if (job) {
-            const jobValue = [job.job_id, job.operation, job.state, job.stage ?? "", job.stage_state ?? "", Math.round(job.progress_percent), job.updated_at ?? ""].join("/");
-            nextSnapshot.set(`job:${key}`, jobValue);
-            const previousJob = previousSnapshot.current.get(`job:${key}`);
-            if ((firstObservation || previousJob) && previousJob !== jobValue) {
-              const stage = job.stage ? ` stage=${job.stage}` : "";
-              entries.push({ timestamp: observedTime(job), ppu: id, site: `SITE ${site.site_id}`, severity: severityForJob(job), operation: operationCode(site), eventCode: "jobObserved", detail: `${job.job_id} ${job.state.toUpperCase()} ${Math.round(job.progress_percent)}%${stage}` });
-            }
-          }
-        }
-      }
-
-      previousSnapshot.current = nextSnapshot;
-      if (entries.length > 0) setLogs(current => [...current, ...entries.map(entry => ({ ...entry, id: ++logSequence.current }))].slice(-500));
-
-      const allowed = new Set<string>();
-      for (const ppu of next.ppus) {
-        if (!ppuOperational(ppu)) continue;
-        for (const site of ppu.topology.sites) if (site.enabled) allowed.add(siteKey(ppu, site));
-      }
-      setSelectedSites(current => {
-        const filtered = new Set([...current].filter(key => allowed.has(key)));
-        return filtered.size === current.size ? current : filtered;
-      });
-    }
-
-    async function poll() {
+    void (async () => {
       try {
-        const response = await fetch("/api/fleet", { cache: "no-store" });
+        const session = await beginEngineeringSession(DEFAULT_API_BASE);
+        const next = await getEngineeringTargets(DEFAULT_API_BASE);
         if (stopped) return;
-        if (response.status === 404) {
-          setState("disabled");
-          setMessage("Fleet UI is disabled on this host.");
-          setPayload(null);
-          return;
-        }
-        if (!response.ok) throw new Error(`Fleet BFF HTTP ${response.status}`);
-        const next = await response.json() as FleetWebPayload;
-        if (stopped) return;
-        processObservation(next);
-        setPayload(next);
-        setState("ready");
-        setMessage("");
+        setSessionId(session.session_id);
+        setCatalog(next);
+        setProviderError(null);
+        setFacilityId(next.facilities[0]?.facility_id ?? "");
+        setDraftPpuIds([]);
+        appendLog(`[PROVIDER] ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
       } catch (error) {
         if (stopped) return;
-        setState("error");
-        setMessage(error instanceof Error ? error.message : "Fleet data unavailable");
-      } finally {
-        if (!stopped) timer = window.setTimeout(poll, 2_000);
+        const detail = error instanceof Error ? error.message : "Mock Provider unavailable";
+        setProviderError(detail);
+        setCatalog(null);
+        appendLog(`[PROVIDER] unavailable · ${detail}`, "ERROR");
       }
-    }
+    })();
+    return () => { stopped = true; };
+  }, [appendLog]);
 
-    void poll();
-    return () => {
-      stopped = true;
-      if (timer) window.clearTimeout(timer);
+  const facility: EngineeringFacilityTarget | null = useMemo(
+    () => catalog?.facilities.find(item => item.facility_id === facilityId) ?? null,
+    [catalog, facilityId],
+  );
+  const activeFacility: EngineeringFacilityTarget | null = useMemo(
+    () => catalog?.facilities.find(item => item.facility_id === activeFacilityId) ?? null,
+    [catalog, activeFacilityId],
+  );
+  const activeTargets = useMemo(
+    () => activeFacility?.ppus.filter(ppu => activePpuIds.includes(ppu.ppu_id)) ?? [],
+    [activeFacility, activePpuIds],
+  );
+  const batchRunning = batchState === "running" || batchState === "cancelling";
+  const summary = useMemo(() => {
+    const sites = Object.values(runtimes).flatMap(runtime => runtime.sites.filter(site => site.selected));
+    return {
+      ppus: activeTargets.length,
+      sites: sites.length,
+      running: sites.filter(site => site.state === "running").length,
+      success: sites.filter(site => site.state === "success").length,
+      failed: sites.filter(site => site.state === "failed").length,
+      cancelled: sites.filter(site => site.state === "cancelled").length,
     };
+  }, [runtimes, activeTargets.length]);
+
+  const updateSite = useCallback((ppuId: string, siteId: number, patch: Partial<SiteRuntime>) => {
+    setRuntimes(current => {
+      const runtime = current[ppuId];
+      if (!runtime) return current;
+      return {
+        ...current,
+        [ppuId]: {
+          ...runtime,
+          sites: runtime.sites.map(site => site.id === siteId ? { ...site, ...patch } : site),
+        },
+      };
+    });
   }, []);
 
-  const facilities = useMemo(() => {
-    const groups = new Map<string, FleetPPUView[]>();
-    for (const ppu of payload?.ppus ?? []) {
-      const key = ppu.identity.facility_id ?? "Unidentified Facility";
-      const group = groups.get(key) ?? [];
-      group.push(ppu);
-      groups.set(key, group);
-    }
-    return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right));
-  }, [payload]);
+  function toggleDraftPpu(ppuId: string) {
+    if (batchRunning) return;
+    setDraftPpuIds(current => current.includes(ppuId)
+      ? current.filter(item => item !== ppuId)
+      : [...current, ppuId]);
+  }
 
-  const siteViews = useMemo(() => {
-    const views: { ppu: FleetPPUView; site: FleetSiteView; status: VisualStatus; key: string }[] = [];
-    for (const ppu of payload?.ppus ?? []) {
-      for (const site of ppu.topology.sites) {
-        const key = siteKey(ppu, site);
-        views.push({ ppu, site, key, status: siteStatus(ppu, site, clearedResults.get(key)) });
+  async function applyProductionSet() {
+    if (!facility || draftPpuIds.length === 0 || batchRunning) return;
+    const targets = facility.ppus.filter(ppu => draftPpuIds.includes(ppu.ppu_id));
+    setActiveFacilityId(facility.facility_id);
+    setActivePpuIds(targets.map(ppu => ppu.ppu_id));
+    setBatchState("idle");
+    cancelAllRequested.current = false;
+    cancelledPpus.current.clear();
+    currentJobs.current.clear();
+    setRuntimes(Object.fromEntries(targets.map(target => [target.ppu_id, { target, sites: [], loading: true } as PPURuntime])));
+    appendLog(`[SET] ${facility.facility_id} · ${targets.map(target => target.ppu_id).join(", ")}`);
+
+    const results = await Promise.allSettled(targets.map(async target => {
+      const targetBase = engineeringTargetApiBase(DEFAULT_API_BASE, facility.facility_id, target.ppu_id);
+      return { target, status: await getPPUStatus(targetBase) };
+    }));
+
+    setRuntimes(current => {
+      const next = { ...current };
+      results.forEach((result, index) => {
+        const target = targets[index];
+        next[target.ppu_id] = result.status === "fulfilled"
+          ? { target, loading: false, sites: result.value.status.sites.map(runtimeFromStatus) }
+          : {
+            target,
+            loading: false,
+            sites: [],
+            error: result.reason instanceof Error ? result.reason.message : "PPU status unavailable",
+          };
+      });
+      return next;
+    });
+  }
+
+  function toggleSite(ppuId: string, siteId: number) {
+    if (batchRunning) return;
+    setRuntimes(current => {
+      const runtime = current[ppuId];
+      if (!runtime) return current;
+      return {
+        ...current,
+        [ppuId]: {
+          ...runtime,
+          sites: runtime.sites.map(site => site.id === siteId && site.enabled
+            ? { ...site, selected: !site.selected }
+            : site),
+        },
+      };
+    });
+  }
+
+  function selectSites(ppuId: string, selected: boolean) {
+    if (batchRunning) return;
+    setRuntimes(current => {
+      const runtime = current[ppuId];
+      if (!runtime) return current;
+      return {
+        ...current,
+        [ppuId]: {
+          ...runtime,
+          sites: runtime.sites.map(site => ({ ...site, selected: site.enabled ? selected : false })),
+        },
+      };
+    });
+  }
+
+  function toggleOperation(operation: Operation) {
+    if (batchRunning) return;
+    setSelectedOperations(current => current.includes(operation)
+      ? current.filter(item => item !== operation)
+      : [...current, operation]);
+  }
+
+  async function waitForTerminal(ppuId: string, siteId: number, targetBase: string, jobId: string): Promise<SiteRunState> {
+    for (let attempt = 0; attempt < POLL_LIMIT; attempt += 1) {
+      const job = await getJob(targetBase, jobId);
+      const progress = Math.round(Number(job.progress_percent ?? 0));
+      if (!terminalStates.has(job.state)) {
+        updateSite(ppuId, siteId, {
+          state: "running",
+          progress,
+          operation: job.operation,
+          jobId: job.job_id,
+        });
       }
+      if (terminalStates.has(job.state)) {
+        if (job.state === "success") return "success";
+        if (job.state === "cancelled") return "cancelled";
+        return "failed";
+      }
+      await delay(POLL_INTERVAL_MS);
     }
-    return views;
-  }, [payload, clearedResults]);
-
-  const summary = useMemo(() => ({
-    ppuOnline: (payload?.ppus ?? []).filter(ppuOperational).length,
-    ppuTotal: payload?.ppus.length ?? 0,
-    sites: siteViews.length,
-    running: siteViews.filter(item => item.status === "running").length,
-    pass: siteViews.filter(item => item.status === "pass").length,
-    fail: siteViews.filter(item => item.status === "fail").length,
-    offline: siteViews.filter(item => item.status === "offline").length,
-  }), [payload, siteViews]);
-
-  const ppuIds = useMemo(() => (payload?.ppus ?? []).map(ppuKey), [payload]);
-  const filteredLogs = useMemo(() => logs.filter(entry => logFilter === "errors" ? entry.severity === "ERROR" : logFilter === "all" || entry.ppu === logFilter), [logs, logFilter]);
-
-  useEffect(() => {
-    if (!autoScroll || !logBodyRef.current) return;
-    logBodyRef.current.scrollTop = logBodyRef.current.scrollHeight;
-  }, [filteredLogs, autoScroll]);
-
-  const detail = useMemo(() => {
-    if (!selectedDetail || !payload) return null;
-    const ppu = payload.ppus.find(item => ppuKey(item) === selectedDetail.ppu);
-    const site = ppu?.topology.sites.find(item => item.site_id === selectedDetail.siteId);
-    if (!ppu || !site) return null;
-    const key = siteKey(ppu, site);
-    return { ppu, site, key, status: siteStatus(ppu, site, clearedResults.get(key)), result: resultLabel(site, clearedResults.get(key)), terminalSignature: jobSignature(site.latest_job) };
-  }, [selectedDetail, payload, clearedResults]);
-
-  function selectAllForPpu(ppu: FleetPPUView) {
-    if (!ppuOperational(ppu)) return;
-    setSelectedSites(current => {
-      const next = new Set(current);
-      for (const site of ppu.topology.sites) if (site.enabled) next.add(siteKey(ppu, site));
-      return next;
-    });
+    throw new Error(`Job ${jobId} polling timed out`);
   }
 
-  function deselectAllForPpu(ppu: FleetPPUView) {
-    setSelectedSites(current => {
-      const next = new Set(current);
-      for (const site of ppu.topology.sites) next.delete(siteKey(ppu, site));
-      return next;
-    });
+  async function runSiteSequence(
+    facilityValue: string,
+    ppu: EngineeringPPUTarget,
+    siteId: number,
+    operations: Operation[],
+  ): Promise<SiteRunState> {
+    const targetBase = engineeringTargetApiBase(DEFAULT_API_BASE, facilityValue, ppu.ppu_id);
+    const cancellationRequested = () => cancelAllRequested.current || cancelledPpus.current.has(ppu.ppu_id);
+    try {
+      updateSite(ppu.ppu_id, siteId, { state: "running", progress: 0, error: undefined });
+      for (const operation of operations) {
+        if (cancellationRequested()) {
+          updateSite(ppu.ppu_id, siteId, { state: "cancelled", progress: 0 });
+          return "cancelled";
+        }
+        appendLog(`[JOB] START · ${ppu.ppu_id} · ${siteLabel(siteId)} · ${operation.toUpperCase()}`);
+        const job = await startJob(targetBase, {
+          siteId,
+          operation,
+          assetFile: imageAsset,
+          engineeringSessionId: sessionId ?? undefined,
+          offset: 0,
+          length: 256,
+          submissionGuard: () => !cancellationRequested(),
+        });
+        const jobKey = `${ppu.ppu_id}:${siteId}`;
+        currentJobs.current.set(jobKey, { ppuId: ppu.ppu_id, targetApiBase: targetBase, siteId, jobId: job.job_id });
+        updateSite(ppu.ppu_id, siteId, {
+          state: "running",
+          progress: Math.round(Number(job.progress_percent ?? 0)),
+          operation,
+          jobId: job.job_id,
+        });
+        if (cancellationRequested()) await cancelJob(targetBase, job.job_id).catch(() => undefined);
+        const terminal = await waitForTerminal(ppu.ppu_id, siteId, targetBase, job.job_id);
+        currentJobs.current.delete(jobKey);
+        if (terminal !== "success") {
+          updateSite(ppu.ppu_id, siteId, { state: terminal, progress: terminal === "cancelled" ? 100 : 0 });
+          appendLog(
+            `[JOB] ${terminal.toUpperCase()} · ${ppu.ppu_id} · ${siteLabel(siteId)} · ${operation.toUpperCase()}`,
+            terminal === "failed" ? "ERROR" : "WARN",
+          );
+          return terminal;
+        }
+        appendLog(`[JOB] PASS · ${ppu.ppu_id} · ${siteLabel(siteId)} · ${operation.toUpperCase()}`);
+      }
+      updateSite(ppu.ppu_id, siteId, { state: "success", progress: 100 });
+      return "success";
+    } catch (error) {
+      if (cancellationRequested()) {
+        updateSite(ppu.ppu_id, siteId, { state: "cancelled", progress: 0 });
+        appendLog(`[JOB] CANCELLED · ${ppu.ppu_id} · ${siteLabel(siteId)}`, "WARN");
+        return "cancelled";
+      }
+      const detail = error instanceof Error ? error.message : "Job failed";
+      updateSite(ppu.ppu_id, siteId, { state: "failed", progress: 0, error: detail });
+      appendLog(`[JOB] FAIL · ${ppu.ppu_id} · ${siteLabel(siteId)} · ${detail}`, "ERROR");
+      return "failed";
+    }
   }
 
-  function toggleSite(ppu: FleetPPUView, site: FleetSiteView) {
-    if (!site.enabled || !ppuOperational(ppu)) return;
-    const key = siteKey(ppu, site);
-    setSelectedSites(current => {
-      const next = new Set(current);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
+  async function executeBatch() {
+    if (batchRunning || !activeFacilityId || activeTargets.length === 0) return;
+    const operations = orderedOperations(selectedOperations);
+    if (operations.length === 0) {
+      appendLog(`[BAT] BLOCKED · ${text.chooseOperation}`, "WARN");
+      return;
+    }
+    if (operations.some(operation => operation === "program" || operation === "verify") && !imageAsset) {
+      appendLog(`[BAT] BLOCKED · ${text.imageRequired}`, "WARN");
+      return;
+    }
+    const selected = activeTargets.flatMap(ppu => {
+      const runtime = runtimes[ppu.ppu_id];
+      return (runtime?.sites ?? []).filter(site => site.selected && site.enabled).map(site => ({ ppu, siteId: site.id }));
     });
+    if (selected.length === 0) {
+      appendLog(`[BAT] BLOCKED · ${text.noSelectedSites}`, "WARN");
+      return;
+    }
+
+    cancelAllRequested.current = false;
+    cancelledPpus.current.clear();
+    currentJobs.current.clear();
+    setBatchState("running");
+    setRuntimes(current => Object.fromEntries(Object.entries(current).map(([ppuId, runtime]) => [ppuId, {
+      ...runtime,
+      sites: runtime.sites.map(site => site.selected
+        ? { ...site, state: "ready" as const, progress: 0, jobId: undefined, error: undefined }
+        : site),
+    }])) as Record<string, PPURuntime>);
+    appendLog(`[BAT] START · ${activeTargets.length} PPUs · ${selected.length} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")}`);
+
+    const results = await Promise.allSettled(
+      selected.map(item => runSiteSequence(activeFacilityId, item.ppu, item.siteId, operations)),
+    );
+    const values = results.map(result => result.status === "fulfilled" ? result.value : "failed");
+    if (values.every(value => value === "success")) {
+      setBatchState("complete");
+      appendLog(`[BAT] COMPLETE · ${selected.length}/${selected.length} Sites PASS`);
+    } else if (values.every(value => value === "cancelled")) {
+      setBatchState("cancelled");
+      appendLog(`[BAT] CANCELLED · ${selected.length} Sites`, "WARN");
+    } else {
+      setBatchState("partial");
+      const pass = values.filter(value => value === "success").length;
+      const failed = values.filter(value => value === "failed").length;
+      const cancelled = values.filter(value => value === "cancelled").length;
+      const groups = [`success: ${pass}`];
+      if (cancelled) groups.push(`cancelled: ${cancelled}`);
+      if (failed) groups.push(`failed: ${failed}`);
+      appendLog(`[BAT] PARTIAL · ${groups.join(" · ")}`, failed ? "ERROR" : "WARN");
+    }
   }
 
-  function toggleOperation(code: string) {
-    setSelectedOperations(current => {
-      const next = new Set(current);
-      if (next.has(code)) next.delete(code); else next.add(code);
-      return next;
-    });
+  async function cancelActiveJobs(filterPpuId?: string) {
+    const jobs = [...currentJobs.current.values()].filter(job => !filterPpuId || job.ppuId === filterPpuId);
+    await Promise.allSettled(jobs.map(job => cancelJob(job.targetApiBase, job.jobId)));
   }
 
-  function clearDisplayedResult() {
-    if (!detail?.terminalSignature || detail.result === "NONE") return;
-    setClearedResults(current => {
-      const next = new Map(current);
-      next.set(detail.key, detail.terminalSignature as string);
-      return next;
-    });
-    const entry: FactoryLogEntry = { id: ++logSequence.current, timestamp: nowTime(), ppu: ppuKey(detail.ppu), site: `SITE ${detail.site.site_id}`, severity: "INFO", operation: operationCode(detail.site), eventCode: "siteResultCleared", detail: detail.result };
-    setLogs(current => [...current, entry].slice(-500));
+  async function cancelBatch() {
+    if (!batchRunning) return;
+    cancelAllRequested.current = true;
+    setBatchState("cancelling");
+    appendLog("[BAT] CANCEL REQUESTED", "WARN");
+    await cancelActiveJobs();
   }
+
+  async function cancelPPU(ppuId: string) {
+    if (!batchRunning) return;
+    cancelledPpus.current.add(ppuId);
+    appendLog(`[PPU] CANCEL REQUESTED · ${ppuId}`, "WARN");
+    await cancelActiveJobs(ppuId);
+  }
+
+  const batchLabel = batchState === "complete"
+    ? text.complete
+    : batchState === "partial"
+      ? text.partial
+      : batchState === "cancelled"
+        ? text.cancelled
+        : batchState === "running" || batchState === "cancelling"
+          ? text.running
+          : text.ready;
 
   return (
-    <main className="fleetPage">
-      <section className="fleetShell">
-        <header className="productionHeading"><div><p>PRODUCTION MODE</p><h1>{t("production.title")}</h1><span>{t("production.subtitle")}</span></div><div className={`fleetHealth ${state}`}><i /><div><small>Fleet BFF</small><b>{state === "ready" ? t("fleet.online") : state === "loading" ? t("fleet.connecting") : state === "disabled" ? t("fleet.disabled") : t("fleet.unavailable")}</b></div></div></header>
+    <main className="productionPrototypePage">
+      <section className="productionPrototypeShell">
+        <header className="productionPrototypeHeading">
+          <div><p>{text.eyebrow}</p><h1>{text.title}</h1><span>{text.subtitle}</span></div>
+          <div className={`prototypeProvider ${providerError ? "offline" : catalog ? "online" : "loading"}`}>
+            <i /><div><small>{text.provider}</small><b>{providerError ? "OFFLINE" : catalog ? "ONLINE" : "CONNECTING"}</b></div>
+          </div>
+        </header>
 
-        <section className="productionSummary" aria-label="Production summary"><article><small>{t("summary.ppuOnline")}</small><b>{summary.ppuOnline}/{summary.ppuTotal}</b></article><article><small>{t("summary.sites")}</small><b>{summary.sites}</b></article><article className="summaryRunning"><small>{t("summary.running")}</small><b>{summary.running}</b></article><article className="summaryPass"><small>{t("summary.pass")}</small><b>{summary.pass}</b></article><article className="summaryFail"><small>{t("summary.fail")}</small><b>{summary.fail}</b></article><article><small>{t("summary.offline")}</small><b>{summary.offline}</b></article></section>
+        <p className="prototypeBoundary">{text.boundary}</p>
 
-        <section className="batchToolbar" aria-label="Production batch selection"><div className="selectionCount"><b>{t("selection.selectedSites")}: {selectedSites.size}</b><button type="button" onClick={() => setSelectedSites(new Set())}>{t("selection.clear")}</button></div><div className="operationChecks"><span>{t("selection.operations")}</span>{operations.map(operation => <label key={operation.code}><input type="checkbox" checked={selectedOperations.has(operation.code)} onChange={() => toggleOperation(operation.code)} /><b>{operation.code}</b> {t(operation.labelKey)}</label>)}</div><div className="batchActions" title={t("selection.writeLocked")}><button type="button" className="primary" disabled>{t("selection.execute")}</button><button type="button" disabled>{t("selection.cancel")}</button></div></section>
+        {!catalog && (
+          <section className="prototypeNotice" role="status">
+            <b>{providerError ? text.offline : text.loading}</b>
+            {providerError && <span>{providerError}</span>}
+          </section>
+        )}
 
-        <p className="productionBoundary">{t("production.readOnly")}</p>
-        {state !== "ready" && <section className="fleetNotice" role="status"><b>{state === "disabled" ? t("fleet.disabledTitle") : t("fleet.unavailableTitle")}</b><p>{message}</p><p>{t("fleet.managerIndependent")}</p></section>}
+        {catalog && (
+          <>
+            <section className="prototypeTopologySummary" aria-label="Mock topology summary">
+              <article><small>Facilities</small><b>{catalog.facility_count}</b></article>
+              <article><small>PPUs</small><b>{catalog.ppu_count}</b></article>
+              <article><small>Sites</small><b>{catalog.site_count}</b></article>
+              <article><small>Provider</small><b>{catalog.provider.toUpperCase()}</b></article>
+            </section>
 
-        {facilities.map(([facilityId, ppus]) => <section className="facilityBlock" key={facilityId}><div className="facilityHead"><div><p>FACILITY</p><h2>{facilityId}</h2></div><span>{ppus.length} PPU{ppus.length === 1 ? "" : "s"}</span></div><div className="productionPpuStack">{ppus.map(ppu => {
-          const id = ppuKey(ppu);
-          const online = ppuOperational(ppu);
-          return <article className="productionPpu" key={id} data-ppu={id}><header className="productionPpuHead"><div className="ppuIdentity"><i className={online ? "online" : "offline"} /><div><small>{ppu.alias ?? "PPU"}</small><h3>{displayName(ppu)}</h3></div></div><div className="ppuTelemetry"><span>{t("ppu.transport")}: <b>{ppu.transport_state.toUpperCase()}</b></span><span>{t("ppu.gateway")}: <b>{ppu.observation.state.toUpperCase()}</b></span></div><div className="ppuSelection"><button type="button" onClick={() => selectAllForPpu(ppu)} disabled={!online}>{t("selection.selectAll")}</button><button type="button" onClick={() => deselectAllForPpu(ppu)}>{t("selection.deselectAll")}</button><span>{t("ppu.sites")}: {ppu.topology.sites.length}</span></div></header><div className="siteProductionGrid">{ppu.topology.sites.map(site => {
-            const key = siteKey(ppu, site);
-            const status = siteStatus(ppu, site, clearedResults.get(key));
-            const result = resultLabel(site, clearedResults.get(key));
-            const selectable = site.enabled && online;
-            const selected = selectedSites.has(key);
-            const job = site.latest_job;
-            return <article key={site.site_id} className={`productionSite status-${status} ${selected ? "selected" : ""}`} data-site-id={site.site_id} data-status={status} onClick={() => setSelectedDetail({ ppu: id, siteId: site.site_id })}><div className="siteCardTop"><label onClick={event => event.stopPropagation()}><input type="checkbox" aria-label={`${id} SITE ${site.site_id}`} checked={selected} disabled={!selectable} onChange={() => toggleSite(ppu, site)} /></label><b>SITE {site.site_id}</b>{result !== "NONE" && <span className="latchedBadge">LATCHED</span>}</div><div className={`statusLamp ${status}`} aria-hidden="true"><i /></div><strong>{t(`status.${status}`)}</strong><div className="siteCardMeta"><span>{t("site.execution")}: <b>{job?.state.toUpperCase() ?? site.state.toUpperCase()}</b></span><span>{t("site.operation")}: <b>{operationCode(site)}</b></span>{status === "running" && job && <span>{t("site.progress")}: <b>{Math.round(job.progress_percent)}%</b></span>}</div></article>;
-          })}</div></article>;
-        })}</div></section>)}
+            <section className="productionSelector" aria-label="Production Set selector">
+              <div className="selectorFacility">
+                <label htmlFor="production-facility">{text.facility}</label>
+                <select
+                  id="production-facility"
+                  value={facilityId}
+                  disabled={batchRunning}
+                  onChange={event => { setFacilityId(event.target.value); setDraftPpuIds([]); }}
+                >
+                  {catalog.facilities.map(item => <option value={item.facility_id} key={item.facility_id}>{item.display_name}</option>)}
+                </select>
+              </div>
 
-        <section className={`factoryLogPanel ${fullLog ? "full" : ""}`} aria-label={t("log.title")}><header className="factoryLogHead"><div><p>FACTORY OBSERVABILITY</p><h2>{t("log.title")}</h2></div><div className="logControls"><label><input type="checkbox" checked={autoScroll} onChange={event => setAutoScroll(event.target.checked)} /> {t("log.autoScroll")}</label><button type="button" onClick={() => setLogs([])}>{t("log.clear")}</button><button type="button" onClick={() => setFullLog(value => !value)}>{fullLog ? t("log.closeFull") : t("log.full")}</button></div></header><div className="logTabs"><button type="button" className={logFilter === "all" ? "active" : ""} onClick={() => setLogFilter("all")}>{t("log.all")}</button><button type="button" className={logFilter === "errors" ? "active" : ""} onClick={() => setLogFilter("errors")}>{t("log.errors")}</button>{ppuIds.map(id => <button key={id} type="button" className={logFilter === id ? "active" : ""} onClick={() => setLogFilter(id)}>{id}</button>)}</div><p className="logContractNote">{t("log.observationNote")}</p><div className="logTableHead"><span>{t("log.time")}</span><span>{t("log.ppu")}</span><span>{t("log.site")}</span><span>{t("log.level")}</span><span>{t("log.operation")}</span><span>{t("log.message")}</span></div><div className="logBody" ref={logBodyRef}>{filteredLogs.length === 0 && <div className="emptyLog">{t("log.empty")}</div>}{filteredLogs.map(entry => <div className={`logRow severity-${entry.severity.toLowerCase()}`} key={entry.id}><span>{entry.timestamp}</span><span>{entry.ppu}</span><span>{entry.site ?? "—"}</span><span><b>{entry.severity}</b></span><span>{entry.operation}</span><span>{t(`log.event.${entry.eventCode}`)} · {entry.detail}</span></div>)}</div></section>
+              <div className="selectorPpus">
+                <div className="selectorTitle"><b>{text.ppuSelection}</b><span>{facility?.ppus.length ?? 0} PPU</span></div>
+                <div className="ppuChoiceGrid">
+                  {(facility?.ppus ?? []).map(ppu => (
+                    <label className={`ppuChoice ${draftPpuIds.includes(ppu.ppu_id) ? "selected" : ""}`} key={ppu.ppu_id}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${ppu.ppu_id}`}
+                        checked={draftPpuIds.includes(ppu.ppu_id)}
+                        disabled={batchRunning}
+                        onChange={() => toggleDraftPpu(ppu.ppu_id)}
+                      />
+                      <span><b>{ppu.display_name}</b><small>{ppu.ppu_id}</small></span>
+                      <em>{ppu.site_count} Sites</em>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="selectorSetAction">
+                <button type="button" className="setButton" onClick={() => void applyProductionSet()} disabled={draftPpuIds.length === 0 || batchRunning}>{text.set}</button>
+                <span>{draftPpuIds.length === 0 ? text.noPpu : text.setHint}</span>
+              </div>
+            </section>
+
+            <section className="productionSet" aria-label={text.productionSet}>
+              <header className="productionSetHead">
+                <div><p>ACTIVE PRODUCTION SET</p><h2>{text.productionSet}</h2><span>{activeFacilityId || text.noSet}</span></div>
+                <div className={`batchState batch-${batchState}`}><small>{text.batch}</small><b>{batchLabel}</b></div>
+              </header>
+
+              {activeTargets.length === 0 ? (
+                <div className="emptyProductionSet">{text.noSet}</div>
+              ) : (
+                <>
+                  <section className="productionSetSummary">
+                    <article><small>{text.selectedPpus}</small><b>{summary.ppus}</b></article>
+                    <article><small>{text.selectedSites}</small><b>{summary.sites}</b></article>
+                    <article><small>RUNNING</small><b>{summary.running}</b></article>
+                    <article><small>PASS</small><b>{summary.success}</b></article>
+                    <article><small>FAIL</small><b>{summary.failed}</b></article>
+                    <article><small>CANCELLED</small><b>{summary.cancelled}</b></article>
+                  </section>
+
+                  <section className="productionBatchToolbar">
+                    <div className="batchOperations">
+                      <span>{text.operations}</span>
+                      {operationOrder.map(operation => (
+                        <label key={operation}>
+                          <input type="checkbox" checked={selectedOperations.includes(operation)} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
+                          <b>{operationCodes[operation]}</b> {t(`operation.${operation}`)}
+                        </label>
+                      ))}
+                    </div>
+                    <label className="productionImagePicker">
+                      <span><b>{text.image}</b><small>{text.imageHint}</small></span>
+                      <input
+                        type="file"
+                        accept=".bin,application/octet-stream"
+                        disabled={batchRunning}
+                        onChange={event => {
+                          const file = event.target.files?.[0] ?? null;
+                          if (file && file.size > MAX_IMAGE_BYTES) {
+                            appendLog(`[IMG] BLOCKED · ${text.imageTooLarge}`, "WARN");
+                            event.currentTarget.value = "";
+                            setImageAsset(null);
+                          } else {
+                            setImageAsset(file);
+                            if (file) appendLog(`[IMG] SELECTED · ${file.name} · ${file.size} bytes`);
+                          }
+                        }}
+                      />
+                      <em>{imageAsset?.name ?? "—"}</em>
+                    </label>
+                    <div className="productionBatchActions">
+                      <button type="button" className="executeBatchButton" onClick={() => void executeBatch()} disabled={batchRunning}>{text.execute}</button>
+                      <button type="button" className="cancelBatchButton" onClick={() => void cancelBatch()} disabled={!batchRunning}>{text.cancelAll}</button>
+                    </div>
+                  </section>
+
+                  <div className="productionPpuPrototypeStack">
+                    {activeTargets.map(ppu => {
+                      const runtime = runtimes[ppu.ppu_id];
+                      const status = runtime ? ppuStatus(runtime) : "ready";
+                      const statusText = status === "partial" ? text.partial : text[status];
+                      return (
+                        <article className={`productionPpuPrototype ppu-${status}`} data-production-ppu={ppu.ppu_id} key={ppu.ppu_id}>
+                          <header>
+                            <div className="productionPpuIdentity"><i /><div><small>{ppu.ppu_id}</small><h3>{ppu.display_name}</h3></div></div>
+                            <div className="productionPpuStatus"><small>{text.ppuState}</small><b>{statusText}</b></div>
+                            <div className="productionPpuControls">
+                              <button type="button" onClick={() => selectSites(ppu.ppu_id, true)} disabled={batchRunning || !runtime}>{text.selectAllSites}</button>
+                              <button type="button" onClick={() => selectSites(ppu.ppu_id, false)} disabled={batchRunning || !runtime}>{text.clearSites}</button>
+                              <button type="button" className="cancelPpuButton" onClick={() => void cancelPPU(ppu.ppu_id)} disabled={!batchRunning}>{text.cancelPpu}</button>
+                            </div>
+                          </header>
+
+                          {runtime?.loading && <div className="ppuLoading">Loading {ppu.ppu_id}…</div>}
+                          {runtime?.error && <div className="ppuError">{runtime.error}</div>}
+                          {runtime && !runtime.loading && !runtime.error && (
+                            <div className="productionSitePrototypeGrid">
+                              {runtime.sites.map(site => (
+                                <article className={`productionSitePrototype site-${site.state} ${site.selected ? "selected" : ""}`} data-production-site={site.id} data-site-state={site.state} key={site.id}>
+                                  <div className="prototypeSiteTop">
+                                    <label>
+                                      <input type="checkbox" aria-label={`${ppu.ppu_id} ${siteLabel(site.id)}`} checked={site.selected} disabled={batchRunning || !site.enabled} onChange={() => toggleSite(ppu.ppu_id, site.id)} />
+                                      <b>{siteLabel(site.id)}</b>
+                                    </label>
+                                    <span>{site.operation ? operationCodes[site.operation] : "—"}</span>
+                                  </div>
+                                  <div className={`prototypeSiteLamp ${site.state}`}><i /></div>
+                                  <strong>{site.state === "success" ? text.success : site.state === "failed" ? text.failed : site.state === "cancelled" ? text.cancelled : site.state === "running" ? text.running : text.ready}</strong>
+                                  <div className="prototypeSiteProgress"><i style={{ width: `${Math.max(0, Math.min(100, site.progress))}%` }} /></div>
+                                  <small>{site.state === "running" ? `${site.progress}%` : site.error ?? `${site.target ?? "—"} / ${site.interface ?? "—"}`}</small>
+                                </article>
+                              ))}
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </section>
+
+            <section className="productionPrototypeLog" aria-label={text.log}>
+              <header><div><p>MOCK EXECUTION OBSERVABILITY</p><h2>{text.log}</h2></div><button type="button" onClick={() => setLogs([])}>{text.clearLog}</button></header>
+              <div className="prototypeLogBody">
+                {logs.length === 0 && <div className="prototypeEmptyLog">—</div>}
+                {logs.map(entry => <div className={`prototypeLogRow level-${entry.level.toLowerCase()}`} key={entry.id}><span>{entry.time}</span><b>{entry.level}</b><code>{entry.text}</code></div>)}
+              </div>
+            </section>
+          </>
+        )}
       </section>
-
-      {detail && <aside className="siteDetailDrawer" aria-label={t("site.detail")}><header><div><small>{ppuKey(detail.ppu)}</small><h2>SITE {detail.site.site_id}</h2></div><button type="button" aria-label="Close" onClick={() => setSelectedDetail(null)}>×</button></header><div className={`detailResult status-${detail.status}`}><i /><b>{t(`status.${detail.status}`)}</b>{detail.result !== "NONE" && <span>LATCHED</span>}</div><dl><div><dt>PPU</dt><dd>{displayName(detail.ppu)}</dd></div><div><dt>SITE</dt><dd>SITE {detail.site.site_id}</dd></div><div><dt>{t("site.execution")}</dt><dd>{detail.site.latest_job?.state.toUpperCase() ?? detail.site.state.toUpperCase()}</dd></div><div><dt>{t("site.lastResult")}</dt><dd>{detail.result}</dd></div><div><dt>{t("site.operation")}</dt><dd>{operationCode(detail.site)}</dd></div><div><dt>Job ID</dt><dd>{detail.site.latest_job?.job_id ?? "—"}</dd></div><div><dt>{t("site.progress")}</dt><dd>{detail.site.latest_job ? `${Math.round(detail.site.latest_job.progress_percent)}%` : "—"}</dd></div><div><dt>Stage</dt><dd>{detail.site.latest_job?.stage ?? "—"}</dd></div><div><dt>{t("site.interface")}</dt><dd>{detail.site.interface ?? "—"}</dd></div><div><dt>{t("site.target")}</dt><dd>{detail.site.target ?? "—"}</dd></div><div><dt>{t("ppu.transport")}</dt><dd>{detail.ppu.transport_state}</dd></div></dl><button type="button" className="clearResultButton" onClick={clearDisplayedResult} disabled={!detail.terminalSignature || detail.result === "NONE"}>{t("site.clearResult")}</button></aside>}
     </main>
   );
 }
