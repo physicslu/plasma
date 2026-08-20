@@ -136,7 +136,7 @@ export default function ProgrammingWorkspace() {
   const [selection, setSelection] = useState<TargetSelection>({ facilityId: "", ppuId: "" });
   const [ppu, setPPU] = useState<PPUSnapshot | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteIds, setSelectedSiteIds] = useState<number[]>([]);
+  const [selectedSiteIdsState, setSelectedSiteIdsState] = useState<number[] | null>(null);
   const [selectedOperations, setSelectedOperations] = useState<Operation[]>([]);
   const [firmware, setFirmware] = useState<File | null>(null);
   const [readOffset, setReadOffset] = useState("0");
@@ -153,12 +153,17 @@ export default function ProgrammingWorkspace() {
   const cancelRequests = useRef<Set<string>>(new Set());
   const engineeringSessionId = useRef<string | null>(null);
   const logSequence = useRef(0);
+  const siteSelectionTarget = useRef<string | null>(null);
 
   const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === selection.ppuId) ?? null;
+  const targetSelectionKey = selection.facilityId && selection.ppuId
+    ? `${selection.facilityId}/${selection.ppuId}`
+    : null;
   const targetApiBase = catalog && selection.facilityId && selection.ppuId
     ? engineeringTargetApiBase(apiBase, selection.facilityId, selection.ppuId)
     : null;
+  const selectedSiteIds = selectedSiteIdsState ?? [];
   const selectedSites = sites.filter(site => selectedSiteIds.includes(site.id));
   const readRangeValid = Number.isInteger(Number(readOffset))
     && Number(readOffset) >= 0
@@ -189,14 +194,17 @@ export default function ProgrammingWorkspace() {
     }
   }, [appendLog]);
 
-  const resetTargetRuntime = useCallback(() => {
+  const resetTargetRuntime = useCallback((preserveSiteSelection = false) => {
     trackedJobs.current = {};
     submissionGenerations.current = {};
     cancelRequests.current.clear();
     batchLifecycle.current = null;
     setPPU(null);
     setSites([]);
-    setSelectedSiteIds([]);
+    if (!preserveSiteSelection) {
+      siteSelectionTarget.current = null;
+      setSelectedSiteIdsState(null);
+    }
     setBatchSiteStates({});
     setSubmittingSiteIds([]);
     setBatchRunning(false);
@@ -260,7 +268,7 @@ export default function ProgrammingWorkspace() {
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : "Engineering target provider unavailable";
-        resetTargetRuntime();
+        resetTargetRuntime(true);
         setCatalog(null);
         setCatalogError(message);
         setConnection("offline");
@@ -273,7 +281,7 @@ export default function ProgrammingWorkspace() {
   }, [apiBase, connectionGeneration, appendLog, resetTargetRuntime]);
 
   useEffect(() => {
-    if (!targetApiBase) return;
+    if (!targetApiBase || !targetSelectionKey) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -295,10 +303,14 @@ export default function ProgrammingWorkspace() {
         setSites(current => status.sites.map(snapshot => (
           siteFromStatus(snapshot, current.find(site => site.id === snapshot.site_id))
         )));
-        setSelectedSiteIds(current => {
-          const retained = current.filter(id => availableIds.has(id));
-          if (retained.length) return retained;
-          return status.sites.filter(site => site.enabled).map(site => site.site_id);
+        setSelectedSiteIdsState(current => {
+          const enabledIds = status.sites.filter(site => site.enabled).map(site => site.site_id);
+          if (siteSelectionTarget.current !== targetSelectionKey) {
+            siteSelectionTarget.current = targetSelectionKey;
+            return enabledIds;
+          }
+          if (current === null) return enabledIds;
+          return current.filter(id => availableIds.has(id));
         });
 
         const jobIds = [...new Set(Object.values(trackedJobs.current))];
@@ -321,7 +333,7 @@ export default function ProgrammingWorkspace() {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [targetApiBase, connectionGeneration, applyJob, appendLog]);
+  }, [targetApiBase, targetSelectionKey, connectionGeneration, applyJob, appendLog]);
 
   function connect(event: FormEvent) {
     event.preventDefault();
@@ -331,8 +343,10 @@ export default function ProgrammingWorkspace() {
     }
     try {
       const normalized = normalizeApiBase(apiDraft);
+      const sameGateway = normalized === apiBase;
       window.localStorage.setItem("plasma-api-base", normalized);
-      resetTargetRuntime();
+      resetTargetRuntime(sameGateway);
+      if (!sameGateway) setSelection({ facilityId: "", ppuId: "" });
       setCatalog(null);
       setCatalogError(null);
       setConnection("connecting");
@@ -374,9 +388,13 @@ export default function ProgrammingWorkspace() {
 
   function toggleSite(siteId: number) {
     if (batchRunning) return;
-    setSelectedSiteIds(current => current.includes(siteId)
-      ? current.filter(id => id !== siteId)
-      : [...current, siteId].sort((left, right) => left - right));
+    if (targetSelectionKey) siteSelectionTarget.current = targetSelectionKey;
+    setSelectedSiteIdsState(current => {
+      const selected = current ?? [];
+      return selected.includes(siteId)
+        ? selected.filter(id => id !== siteId)
+        : [...selected, siteId].sort((left, right) => left - right);
+    });
   }
 
   function toggleOperation(operation: Operation) {
