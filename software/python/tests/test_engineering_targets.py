@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from plasma_core.enums import JobState, Operation
-from plasma_core.errors import PlasmaError
+from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
 from plasma_web.engineering_targets import MockEngineeringPPUProvider
 
@@ -229,6 +229,76 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
             for item in accepted
         ))
         self.assertEqual([job["state"] for job in jobs], ["success", "success"])
+
+    async def test_ppu_rejects_different_active_firmware_across_sessions(self) -> None:
+        facility_id = "mock-facility-03"
+        ppu_id = "mock-facility-03-ppu-04"
+        firmware_a = b"A" * 1024
+        firmware_b = b"B" * 1024
+        sha_a = hashlib.sha256(firmware_a).hexdigest()
+        sha_b = hashlib.sha256(firmware_b).hexdigest()
+
+        session_a = self.provider.begin_session()["session"]["session_id"]
+        self.provider.cache_firmware(session_a, facility_id, ppu_id, "A.bin", sha_a, firmware_a)
+        first = await self.provider.start_job(
+            facility_id,
+            ppu_id,
+            JobRequest(site_id=1, operation=Operation.PROGRAM),
+            session_id=session_a,
+            firmware_sha256=sha_a,
+        )
+
+        session_same = self.provider.begin_session()["session"]["session_id"]
+        self.provider.cache_firmware(
+            session_same, facility_id, ppu_id, "A-again.bin", sha_a, firmware_a
+        )
+        second = await self.provider.start_job(
+            facility_id,
+            ppu_id,
+            JobRequest(site_id=2, operation=Operation.PROGRAM),
+            session_id=session_same,
+            firmware_sha256=sha_a,
+        )
+
+        session_b = self.provider.begin_session()["session"]["session_id"]
+        self.provider.cache_firmware(session_b, facility_id, ppu_id, "B.bin", sha_b, firmware_b)
+        with self.assertRaises(PlasmaError) as blocked:
+            await self.provider.start_job(
+                facility_id,
+                ppu_id,
+                JobRequest(site_id=3, operation=Operation.PROGRAM),
+                session_id=session_b,
+                firmware_sha256=sha_b,
+            )
+        self.assertEqual(blocked.exception.code, ErrorCode.SITE_BUSY)
+        self.assertTrue(blocked.exception.recoverable)
+
+        for accepted in (first, second):
+            await self.provider.cancel_job(facility_id, ppu_id, accepted["job"]["job_id"])
+        await asyncio.gather(*(
+            self.wait_terminal(facility_id, ppu_id, accepted["job"]["job_id"])
+            for accepted in (first, second)
+        ))
+
+        third = None
+        for _ in range(100):
+            try:
+                third = await self.provider.start_job(
+                    facility_id,
+                    ppu_id,
+                    JobRequest(site_id=3, operation=Operation.PROGRAM),
+                    session_id=session_b,
+                    firmware_sha256=sha_b,
+                )
+                break
+            except PlasmaError as exc:
+                if exc.code is not ErrorCode.SITE_BUSY:
+                    raise
+                await asyncio.sleep(0.02)
+        self.assertIsNotNone(third, "PPU firmware lease was not released after terminal Jobs")
+        assert third is not None
+        await self.provider.cancel_job(facility_id, ppu_id, third["job"]["job_id"])
+        await self.wait_terminal(facility_id, ppu_id, third["job"]["job_id"])
 
     async def test_read_result_can_be_retrieved_from_selected_mock_ppu(self) -> None:
         facility_id = "mock-facility-03"
