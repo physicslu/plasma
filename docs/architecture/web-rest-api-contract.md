@@ -4,45 +4,75 @@
 
 This document defines the browser-facing **Plasma Web REST API contract**. It is separate from:
 
-- Plasma Protocol v3.2 / `PLASMA32`, which is the PPU wire protocol;
+- Plasma Protocol v3.3 / `PLASMA33`, the canonical PPU wire protocol;
 - the Facility -> PPU -> Site domain contract;
-- Engineering operator-log rendering and audit grammar.
+- Engineering operator-log rendering and audit grammar;
+- future Programming Recipe / Package semantics.
 
-A REST shape or semantic change may therefore require a REST contract migration without changing Plasma Protocol v3.2.
+REST and wire contracts are versioned independently even when one architectural change intentionally updates both.
 
 ## Current contract version
 
 The canonical Web REST contract is:
 
 ```text
-rest_contract_version = "2"
+rest_contract_version = "3"
 ```
 
-`GET /api/node` publishes `rest_contract_version` independently from the existing fleet `contract_version`.
+`GET /api/node` publishes `rest_contract_version` independently from the fleet `contract_version`.
 
-Engineering catalog and session responses also publish the REST contract version so browser diagnostics can establish the active HTTP contract without inferring it from route behavior.
+## Programming data model
 
-## Programming Image terminology
-
-REST v2 uses **Programming Image** for binary data consumed by Program/Verify operations.
-
-This is intentionally narrower than the observability category `[DAT]`, because future programming data may also include keys, options or configuration records. Those data types are not represented as binary programming images merely for naming convenience.
-
-Canonical REST v2 terminology:
+Plasma separates source inputs from execution data.
 
 ```text
-Programming Image
-image_name
-image_size
-image_sha256
-image_base64
-programming_image_scope
-programming_image_cache_scope
+Programming Asset                    What data is supplied to the workflow?
+    |
+    +-- Image Asset
+    +-- Key Asset
+    +-- Option Asset
+    +-- Serial Number Asset
+    +-- Calibration Asset
+    |
+    v
+Parser / normalizer
+    |
+    v
+Normalized Image                    What bytes/sections are actually programmed to
+                                    or verified against target IC memory?
+
+Programming Recipe                  What should the PPU do?
+                                    Separate control-plane concept; not an Asset.
 ```
 
-The current Provider and Plasma Protocol v3.2 may still use internal `firmware` names. That internal compatibility vocabulary is not the canonical Web REST surface.
+A source file format is not the same thing as Asset semantics. For example, an Image Asset may eventually arrive as BIN, Intel HEX, S-Record or ELF. A Serial Number may arrive from a file today and from MES or an API later.
 
-## Engineering Programming Image routes
+Current Asset types:
+
+```text
+image
+key
+option
+serial_number
+calibration
+```
+
+Declared Asset formats:
+
+```text
+binary
+intel_hex
+srec
+elf
+csv
+text
+json
+pem
+```
+
+Only `asset_type=image` + `asset_format=binary` has an implemented normalizer today. Unsupported type/format combinations fail closed rather than pretending to be programmable Images.
+
+## Engineering Programming Asset routes
 
 For a selected Engineering target base:
 
@@ -50,125 +80,134 @@ For a selected Engineering target base:
 /api/engineering/targets/{facility_id}/{ppu_id}
 ```
 
-REST v2 defines:
+REST v3 defines:
 
 ```text
-POST .../api/programming-images/check
-POST .../api/programming-images?session_id=...&name=...&sha256=...
+POST .../api/programming-assets/check
+POST .../api/programming-assets?session_id=...&name=...&type=...&format=...&sha256=...
 ```
 
-The check request contains only the fingerprint:
+The check request contains metadata/fingerprint only:
 
 ```json
 {
   "session_id": "...",
-  "image_name": "target.bin",
-  "image_size": 102400,
-  "image_sha256": "...64 lowercase hex characters..."
+  "asset_name": "target.bin",
+  "asset_type": "image",
+  "asset_format": "binary",
+  "asset_size": 102400,
+  "asset_sha256": "...64 lowercase hex characters..."
 }
 ```
 
-The canonical response contains `programming_image`:
+Canonical response:
 
 ```json
 {
   "ok": true,
-  "rest_contract_version": "2",
-  "programming_image": {
+  "rest_contract_version": "3",
+  "programming_asset": {
     "cache_hit": true,
-    "image_name": "target.bin",
-    "image_size": 102400,
-    "image_sha256": "..."
+    "asset_name": "target.bin",
+    "asset_type": "image",
+    "asset_format": "binary",
+    "asset_size": 102400,
+    "asset_sha256": "..."
   }
 }
 ```
 
-The binary upload uses `application/octet-stream`. Query parameters `name` and `sha256` remain generic because the route already establishes Programming Image semantics.
+Binary/materialized Asset upload uses `application/octet-stream`. The endpoint's `type` and `format` query parameters describe semantics and serialization explicitly.
 
 ## Job submission
 
-Canonical REST v2 job bodies use Programming Image field names.
-
-Engineering Program/Verify references a session-cached image:
+Engineering Program/Verify references a session-cached Asset:
 
 ```json
 {
   "site_id": 1,
   "operation": "program",
   "session_id": "...",
-  "image_name": "target.bin",
-  "image_sha256": "..."
+  "asset_sha256": "..."
 }
 ```
 
-Standalone/local inline Program/Verify uses:
+The Provider resolves that Asset, normalizes it into an execution Image, and sends the normalized Image over Plasma Protocol v3.3. Engineering Job submission does not resend cached Asset bytes.
+
+Standalone/local inline Program/Verify may submit one materialized Asset directly:
 
 ```json
 {
   "site_id": 1,
   "operation": "program",
-  "image_name": "target.bin",
-  "image_base64": "..."
+  "asset_name": "target.bin",
+  "asset_type": "image",
+  "asset_format": "binary",
+  "asset_sha256": "...",
+  "asset_base64": "..."
 }
 ```
 
-Engineering job submissions must not resend cached image bytes.
+The Gateway validates the Asset and normalizes it before creating the wire-level `JobRequest.image`.
 
 ## Session and catalog fields
 
-Canonical REST v2 fields are:
+Canonical REST v3 fields include:
 
 ```text
 GET /api/engineering/targets
-  programming_image_scope
+  programming_asset_scope
+  supported_asset_types
+  supported_asset_formats
+  implemented_normalizers
 
 POST /api/engineering/session
-  session.programming_image_cache_scope
+  session.programming_asset_cache_scope
 ```
 
-The current scope remains:
+Current cache scope is:
 
 ```text
 (connection session, facility_id, ppu_id)
 ```
 
-## Compatibility aliases
+A session/PPU may cache multiple Assets simultaneously. This is required for future workflows that combine an Image, Option data, credentials, Serial Number and calibration inputs.
 
-REST v2 is a compatibility migration rather than a flag-day break.
+## Concurrency authority
 
-The Gateway temporarily accepts and returns the prior firmware vocabulary:
+Source Asset SHA is the cache identity. It is not necessarily the final PPU execution-resource identity.
+
+Program/Verify concurrency is controlled by the **Normalized Image SHA**:
 
 ```text
-/api/firmware/check
-/api/firmware
-firmware_name
-firmware_size
-firmware_sha256
-firmware_base64
-firmware_scope
-firmware_cache_scope
+Asset -> normalize -> Image SHA -> PPU-wide active Image lease
 ```
 
-These names are **legacy REST aliases**, not canonical fields for new code.
+This prevents two Sites on one physical PPU from concurrently programming different target Images while allowing multiple Sites to share the same normalized Image.
 
-Rules:
+## Serial Number
 
-1. The Plasma Web client must emit only REST v2 Programming Image routes and fields.
-2. Legacy clients may continue using firmware aliases during the compatibility window.
-3. If one request supplies both canonical and legacy names with different values, the Gateway rejects the request rather than guessing which value wins.
-4. REST v2 responses may include the legacy aliases during migration, but machine consumers must prefer the canonical Programming Image fields.
-5. Removal of legacy aliases is a future explicit compatibility decision and must not happen silently.
+`serial_number` is a first-class Programming Asset type for per-device identity. It is distinct from security keys.
+
+A Serial Number may eventually originate from MES, a database, API, generated allocation or operator input. It is normally per-device/per-Site and must not inherit PPU-wide Image-cache sharing semantics merely because both are Programming Assets.
+
+Current Program/Verify does not consume Serial Number Assets directly; attempting to normalize a Serial Number as an Image is rejected.
+
+## No legacy compatibility surface
+
+Plasma is still in development and there is no external REST compatibility requirement. REST v3 therefore has one canonical vocabulary and does not preserve retired REST aliases.
+
+New code must use Programming Asset fields/routes. The Gateway does not provide a second firmware-oriented REST contract or a Programming-Image REST alias layer.
 
 ## Contract boundaries
 
-This REST migration does **not** change:
+REST v3 does not change these domain invariants:
 
-- Plasma Protocol v3.2;
-- `JobRequest.firmware` or other protocol/internal compatibility fields;
 - Facility / PPU / Site identity;
 - one-based `site_id`;
 - Program = write-only semantics;
-- PPU-wide same-image concurrency rules;
-- Provider selection or hardware behavior.
+- selected Sites execute independently except for real shared-resource constraints;
+- per-Site cancellation does not cancel unrelated Sites;
+- Provider selection and hardware validation remain separate concerns.
 
-The purpose of REST v2 is to stop exposing a firmware-specific browser contract while preserving the stable PPU execution protocol beneath it.
+Plasma Protocol v3.3 carries the **Normalized Image** execution representation using `image_size` and `image_sha256`; REST v3 carries the broader **Programming Asset** source/input representation.
