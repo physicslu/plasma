@@ -42,6 +42,43 @@ class MockInterfaceTests(unittest.IsolatedAsyncioTestCase):
             await interface.program(b"data")
         self.assertEqual(options["failures"]["program"], 1)
 
+    def test_size_aware_timing_is_overhead_plus_bytes_over_throughput(self) -> None:
+        interface = MockInterface(
+            throughput_bytes_per_s={"program": 100.0},
+            operation_overheads_s={"program": 0.5},
+        )
+        self.assertAlmostEqual(interface.estimated_delay_s("program", 100), 1.5)
+        self.assertAlmostEqual(interface.estimated_delay_s("program", 400), 4.5)
+
+    def test_explicit_delay_overrides_size_aware_timing_for_compatibility(self) -> None:
+        interface = MockInterface(
+            default_delay_s=9.0,
+            delays={"program": 0.25},
+            throughput_bytes_per_s={"program": 1.0},
+            operation_overheads_s={"program": 1.0},
+        )
+        self.assertAlmostEqual(interface.estimated_delay_s("program", 4096), 0.25)
+
+    def test_erase_size_basis_can_use_full_mock_flash_size(self) -> None:
+        interface = MockInterface(
+            flash_size=4096,
+            throughput_bytes_per_s={"erase": 2048.0},
+            operation_overheads_s={"erase": 0.5},
+        )
+        self.assertAlmostEqual(interface.estimated_delay_s("erase", interface.flash_size), 2.5)
+
+    def test_invalid_size_aware_timing_options_are_rejected(self) -> None:
+        invalid_options = (
+            {"throughput_bytes_per_s": {"program": 0}},
+            {"throughput_bytes_per_s": {"unknown": 1}},
+            {"operation_overheads_s": {"verify": -1}},
+        )
+        for options in invalid_options:
+            with self.subTest(options=options):
+                with self.assertRaises(PlasmaError) as caught:
+                    MockInterface.from_options(options)
+                self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
+
     async def test_unknown_mock_option_is_rejected(self) -> None:
         with self.assertRaises(PlasmaError) as caught:
             MockInterface.from_options({"delaiys": {"erase": 1.0}})
