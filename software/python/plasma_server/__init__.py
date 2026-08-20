@@ -4,27 +4,21 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .server import PlasmaServer
-    from .site_manager import ChannelManager, SiteManager
-    from .site_worker import ChannelWorker, SiteWorker
+    from .site_manager import SiteManager
+    from .site_worker import SiteWorker
 
-__all__ = [
-    "ChannelManager",
-    "ChannelWorker",
-    "PlasmaServer",
-    "SiteManager",
-    "SiteWorker",
-]
+__all__ = ["PlasmaServer", "SiteManager", "SiteWorker"]
 
 
 def __getattr__(name: str) -> Any:
-    if name in {"ChannelManager", "SiteManager"}:
-        from .site_manager import ChannelManager, SiteManager
+    if name == "SiteManager":
+        from .site_manager import SiteManager
 
-        return SiteManager if name == "SiteManager" else ChannelManager
-    if name in {"ChannelWorker", "SiteWorker"}:
-        from .site_worker import ChannelWorker, SiteWorker
+        return SiteManager
+    if name == "SiteWorker":
+        from .site_worker import SiteWorker
 
-        return SiteWorker if name == "SiteWorker" else ChannelWorker
+        return SiteWorker
     if name == "PlasmaServer":
         from .server import PlasmaServer
 
