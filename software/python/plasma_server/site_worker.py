@@ -188,9 +188,9 @@ class SiteWorker:
             finished_at=iso_now(),
             elapsed_ms=0,
             attempts=0,
-            firmware_name=request.metadata.get("firmware_name"),
-            firmware_size=len(request.firmware),
-            firmware_sha256=request.firmware_sha256 if request.firmware else None,
+            image_name=request.metadata.get("image_name"),
+            image_size=len(request.image),
+            image_sha256=request.image_sha256 if request.image else None,
             error=detail,
         )
         runtime.state = JobState.FAILED
@@ -213,8 +213,8 @@ class SiteWorker:
             "updated_at": runtime.updated_at,
             "client_id": request.client_id,
             "target": request.target,
-            "firmware_size": len(request.firmware),
-            "firmware_sha256": request.firmware_sha256 if request.firmware else None,
+            "image_size": len(request.image),
+            "image_sha256": request.image_sha256 if request.image else None,
             "stage": runtime.stage,
             "stage_state": runtime.stage_state,
             "stage_progress_percent": runtime.stage_progress_percent,
@@ -250,8 +250,8 @@ class SiteWorker:
                 operation=request.operation.value,
                 target=request.target,
                 client_id=request.client_id,
-                firmware_size=len(request.firmware),
-                firmware_sha256=request.firmware_sha256 if request.firmware else None,
+                image_size=len(request.image),
+                image_sha256=request.image_sha256 if request.image else None,
             )
             started_monotonic = time.monotonic()
             attempts = 0
@@ -412,9 +412,9 @@ class SiteWorker:
                 finished_at=iso_now(),
                 elapsed_ms=elapsed_ms,
                 attempts=attempts,
-                firmware_name=request.metadata.get("firmware_name"),
-                firmware_size=len(request.firmware),
-                firmware_sha256=request.firmware_sha256 if request.firmware else None,
+                image_name=request.metadata.get("image_name"),
+                image_size=len(request.image),
+                image_sha256=request.image_sha256 if request.image else None,
                 error=error_detail,
                 details=output.details,
             )
@@ -490,7 +490,3 @@ class SiteWorker:
         logger.event("job_cancelled", level="WARNING", state=result.state.value)
         if not runtime.future.done():
             runtime.future.set_result(result)
-
-
-# Compatibility alias for code importing the pre-domain-rename worker type.
-ChannelWorker = SiteWorker
