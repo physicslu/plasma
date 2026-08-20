@@ -288,10 +288,11 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
   await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(engineeringPpuId);
   await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(`${engineeringPpuSites} Sites`);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
-  await expect(page.getByText("SITE 0", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("SITE-00", { exact: true })).toHaveCount(0);
 
   const siteId = engineeringPpuSites;
-  const row = page.locator(".channelTable tbody tr").filter({ hasText: `SITE ${siteId}` }).first();
+  const engineeringSiteLabel = `SITE-${String(siteId).padStart(2, "0")}`;
+  const row = page.locator(".channelTable tbody tr").filter({ hasText: engineeringSiteLabel }).first();
   await page.getByLabel("Engineering Firmware file").setInputFiles({
     name: "engineering-provider-runtime.bin",
     mimeType: "application/octet-stream",
@@ -301,7 +302,7 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
   await page.getByLabel("Engineering READ length").fill(String(firmware.length));
 
   for (const operation of operationOrder) {
-    await test.step(`Engineering ${engineeringFacilityId}/${engineeringPpuId}/SITE ${siteId}: ${operation}`, async () => {
+    await test.step(`Engineering ${engineeringFacilityId}/${engineeringPpuId}/${engineeringSiteLabel}: ${operation}`, async () => {
       const before = engineeringStarts.length;
       await page.getByLabel(`SITE ${siteId} ${operationLabels[operation]}`).click();
       await expect.poll(() => engineeringStarts.length, { timeout: 15_000 }).toBe(before + 1);
