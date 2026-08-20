@@ -60,65 +60,44 @@ export type EngineeringTargetCatalog = {
   ppu_count: number;
   site_count: number;
   rest_contract_version?: string;
-  programming_image_scope?: string;
-  firmware_scope?: string;
+  programming_asset_scope?: string;
+  supported_asset_types?: string[];
+  supported_asset_formats?: string[];
+  implemented_normalizers?: Array<{
+    asset_type: string;
+    asset_format: string;
+    output: string;
+  }>;
   facilities: EngineeringFacilityTarget[];
 };
 
 export type EngineeringSession = {
   session_id: string;
-  programming_image_cache_scope?: string;
-  firmware_cache_scope?: string;
+  programming_asset_cache_scope?: string;
   previous_session_cleared: boolean;
 };
 
-type FirmwareFingerprint = {
-  firmware_name: string;
-  firmware_size: number;
-  firmware_sha256: string;
+export type ProgrammingAssetFingerprint = {
+  asset_name: string;
+  asset_type: "image";
+  asset_format: "binary";
+  asset_size: number;
+  asset_sha256: string;
 };
 
-type ProgrammingImageCacheStatus = {
-  image_name: string;
-  image_size: number;
-  image_sha256: string;
+type ProgrammingAssetCacheStatus = ProgrammingAssetFingerprint & {
   cache_hit: boolean;
+  uploaded?: boolean;
 };
 
-export type FirmwareTransferEvent = FirmwareFingerprint & {
+export type AssetTransferEvent = ProgrammingAssetFingerprint & {
   kind: "cache_check" | "cache_hit" | "cache_miss" | "upload_start" | "upload_complete";
-};
-
-// Transitional shapes accepted only from protocol/API v3.1 backends.
-type LegacyChannelSnapshot = {
-  channel_id: number;
-  enabled: boolean;
-  state: string;
-  current_job_id: string | null;
-  queued_jobs: number;
-  interface: string | null;
-  target: string | null;
-};
-
-type LegacyProgrammerSnapshot = {
-  programmer_id: string;
-  site_id: string;
-  model: string;
-  display_name: string;
-  channel_count: number;
-  enabled_channel_count: number;
-  capabilities: {
-    max_supported_channels: number;
-    operations: Operation[];
-  };
 };
 
 type StatusPayload = {
   ok: boolean;
   ppu?: PPUSnapshot;
   sites?: SiteSnapshot[];
-  programmer?: LegacyProgrammerSnapshot;
-  channels?: LegacyChannelSnapshot[];
 };
 
 export type JobSnapshot = {
@@ -138,11 +117,6 @@ export type JobSnapshot = {
     output_files?: string[];
     error?: { message?: string } | null;
   };
-};
-
-type WireJobSnapshot = Omit<JobSnapshot, "site_id"> & {
-  site_id?: number;
-  channel_id?: number;
 };
 
 type ApiErrorPayload = {
@@ -185,50 +159,17 @@ export function engineeringTargetApiBase(
   return `${apiBase}/api/engineering/targets/${encodeURIComponent(facilityId)}/${encodeURIComponent(ppuId)}`;
 }
 
-function normalizeJobSnapshot(job: WireJobSnapshot): JobSnapshot {
-  const siteId = job.site_id ?? (job.channel_id === undefined ? undefined : job.channel_id + 1);
-  if (siteId === undefined) {
-    throw new PlasmaApiError("Job snapshot is missing site_id");
+function normalizeJobSnapshot(job: JobSnapshot): JobSnapshot {
+  if (!Number.isInteger(job.site_id) || job.site_id < 1) {
+    throw new PlasmaApiError("Job snapshot is missing a valid site_id");
   }
-  const normalized = {
-    ...job,
-    site_id: siteId,
-  } as JobSnapshot & { channel_id?: number };
-  delete normalized.channel_id;
-  if (normalized.state !== "cancelled" || !normalized.result?.error) return normalized;
+  if (job.state !== "cancelled" || !job.result?.error) return job;
   return {
-    ...normalized,
+    ...job,
     result: {
-      ...normalized.result,
+      ...job.result,
       error: null,
     },
-  };
-}
-
-function legacyPPU(programmer: LegacyProgrammerSnapshot): PPUSnapshot {
-  return {
-    ppu_id: programmer.programmer_id,
-    facility_id: programmer.site_id,
-    model: programmer.model,
-    display_name: programmer.display_name,
-    site_count: programmer.channel_count,
-    enabled_site_count: programmer.enabled_channel_count,
-    capabilities: {
-      max_supported_sites: programmer.capabilities.max_supported_channels,
-      operations: programmer.capabilities.operations,
-    },
-  };
-}
-
-function legacySite(channel: LegacyChannelSnapshot): SiteSnapshot {
-  return {
-    site_id: channel.channel_id + 1,
-    enabled: channel.enabled,
-    state: channel.state,
-    current_job_id: channel.current_job_id,
-    queued_jobs: channel.queued_jobs,
-    interface: channel.interface,
-    target: channel.target,
   };
 }
 
@@ -291,21 +232,23 @@ export async function beginEngineeringSession(
   return payload.session;
 }
 
-const fingerprintByFile = new WeakMap<File, Promise<FirmwareFingerprint>>();
-const firmwareEnsureInFlight = new Map<string, Promise<FirmwareFingerprint>>();
+const fingerprintByFile = new WeakMap<File, Promise<ProgrammingAssetFingerprint>>();
+const assetEnsureInFlight = new Map<string, Promise<ProgrammingAssetFingerprint>>();
 
-async function fingerprintFile(file: File): Promise<FirmwareFingerprint> {
+async function fingerprintFile(file: File): Promise<ProgrammingAssetFingerprint> {
   let pending = fingerprintByFile.get(file);
   if (!pending) {
     pending = file.arrayBuffer().then(async buffer => {
       const digest = await window.crypto.subtle.digest("SHA-256", buffer);
-      const firmwareSha256 = Array.from(new Uint8Array(digest))
+      const assetSha256 = Array.from(new Uint8Array(digest))
         .map(value => value.toString(16).padStart(2, "0"))
         .join("");
       return {
-        firmware_name: file.name,
-        firmware_size: file.size,
-        firmware_sha256: firmwareSha256,
+        asset_name: file.name,
+        asset_type: "image" as const,
+        asset_format: "binary" as const,
+        asset_size: file.size,
+        asset_sha256: assetSha256,
       };
     });
     fingerprintByFile.set(file, pending);
@@ -313,76 +256,74 @@ async function fingerprintFile(file: File): Promise<FirmwareFingerprint> {
   return await pending;
 }
 
-function emitFirmwareEvent(
-  callback: ((event: FirmwareTransferEvent) => void) | undefined,
-  kind: FirmwareTransferEvent["kind"],
-  fingerprint: FirmwareFingerprint,
+function emitAssetEvent(
+  callback: ((event: AssetTransferEvent) => void) | undefined,
+  kind: AssetTransferEvent["kind"],
+  fingerprint: ProgrammingAssetFingerprint,
 ): void {
   callback?.({ kind, ...fingerprint });
 }
 
-async function ensureEngineeringFirmware(
+async function ensureEngineeringAsset(
   apiBase: string,
   sessionId: string,
-  firmware: File,
-  onFirmwareEvent?: (event: FirmwareTransferEvent) => void,
-): Promise<FirmwareFingerprint> {
-  const fingerprint = await fingerprintFile(firmware);
-  const key = `${sessionId}|${apiBase}|${fingerprint.firmware_sha256}`;
-  const existing = firmwareEnsureInFlight.get(key);
+  file: File,
+  onAssetEvent?: (event: AssetTransferEvent) => void,
+): Promise<ProgrammingAssetFingerprint> {
+  const fingerprint = await fingerprintFile(file);
+  const key = `${sessionId}|${apiBase}|${fingerprint.asset_sha256}`;
+  const existing = assetEnsureInFlight.get(key);
   if (existing) return await existing;
 
   const ensure = (async () => {
-    emitFirmwareEvent(onFirmwareEvent, "cache_check", fingerprint);
+    emitAssetEvent(onAssetEvent, "cache_check", fingerprint);
     const checked = await requestJson<{
       ok: boolean;
-      programming_image: ProgrammingImageCacheStatus;
+      programming_asset: ProgrammingAssetCacheStatus;
     }>(
       apiBase,
-      "/api/programming-images/check",
+      "/api/programming-assets/check",
       {
         method: "POST",
         body: JSON.stringify({
           session_id: sessionId,
-          image_name: fingerprint.firmware_name,
-          image_size: fingerprint.firmware_size,
-          image_sha256: fingerprint.firmware_sha256,
+          ...fingerprint,
         }),
       },
     );
-    if (checked.programming_image.cache_hit) {
-      emitFirmwareEvent(onFirmwareEvent, "cache_hit", fingerprint);
+    if (checked.programming_asset.cache_hit) {
+      emitAssetEvent(onAssetEvent, "cache_hit", fingerprint);
       return fingerprint;
     }
 
-    emitFirmwareEvent(onFirmwareEvent, "cache_miss", fingerprint);
-    emitFirmwareEvent(onFirmwareEvent, "upload_start", fingerprint);
+    emitAssetEvent(onAssetEvent, "cache_miss", fingerprint);
+    emitAssetEvent(onAssetEvent, "upload_start", fingerprint);
     await requestJson(
       apiBase,
-      `/api/programming-images?session_id=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(fingerprint.firmware_name)}&sha256=${encodeURIComponent(fingerprint.firmware_sha256)}`,
+      `/api/programming-assets?session_id=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(fingerprint.asset_name)}&type=${encodeURIComponent(fingerprint.asset_type)}&format=${encodeURIComponent(fingerprint.asset_format)}&sha256=${encodeURIComponent(fingerprint.asset_sha256)}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream" },
-        body: firmware,
+        body: file,
       },
       120_000,
     );
-    emitFirmwareEvent(onFirmwareEvent, "upload_complete", fingerprint);
+    emitAssetEvent(onAssetEvent, "upload_complete", fingerprint);
     return fingerprint;
   })();
-  firmwareEnsureInFlight.set(key, ensure);
+  assetEnsureInFlight.set(key, ensure);
   try {
     return await ensure;
   } finally {
-    firmwareEnsureInFlight.delete(key);
+    assetEnsureInFlight.delete(key);
   }
 }
 
 export async function getPPUStatus(apiBase: string): Promise<PPUStatus> {
   const payload = await requestJson<StatusPayload>(apiBase, "/api/status");
   return {
-    ppu: payload.ppu ?? (payload.programmer ? legacyPPU(payload.programmer) : undefined),
-    sites: payload.sites ?? (payload.channels ?? []).map(legacySite),
+    ppu: payload.ppu,
+    sites: payload.sites ?? [],
   };
 }
 
@@ -394,7 +335,7 @@ export async function getJob(
   apiBase: string,
   jobId: string,
 ): Promise<JobSnapshot> {
-  const payload = await requestJson<{ ok: boolean; job: WireJobSnapshot }>(
+  const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
     apiBase,
     `/api/status?job=${encodeURIComponent(jobId)}`,
   );
@@ -406,32 +347,36 @@ export async function startJob(
   options: {
     siteId: number;
     operation: Operation;
-    firmware?: File | null;
+    assetFile?: File | null;
     engineeringSessionId?: string;
     offset?: number;
     length?: number;
     submissionGuard?: () => boolean;
-    onFirmwareEvent?: (event: FirmwareTransferEvent) => void;
+    onAssetEvent?: (event: AssetTransferEvent) => void;
   },
 ): Promise<JobSnapshot> {
-  const usesFirmware = options.operation === "program" || options.operation === "verify";
+  const usesAsset = options.operation === "program" || options.operation === "verify";
   const engineeringTarget = apiBase.includes("/api/engineering/targets/");
-  let fingerprint: FirmwareFingerprint | null = null;
-  let firmwareBase64 = "";
+  let fingerprint: ProgrammingAssetFingerprint | null = null;
+  let assetBase64 = "";
 
-  if (usesFirmware && options.firmware) {
+  if (usesAsset) {
+    if (!options.assetFile) {
+      throw new PlasmaApiError("Program and Verify require an Image Asset");
+    }
+    fingerprint = await fingerprintFile(options.assetFile);
     if (engineeringTarget) {
       if (!options.engineeringSessionId) {
         throw new PlasmaApiError("Engineering connection session is not ready");
       }
-      fingerprint = await ensureEngineeringFirmware(
+      fingerprint = await ensureEngineeringAsset(
         apiBase,
         options.engineeringSessionId,
-        options.firmware,
-        options.onFirmwareEvent,
+        options.assetFile,
+        options.onAssetEvent,
       );
     } else {
-      firmwareBase64 = await fileToBase64(options.firmware);
+      assetBase64 = await fileToBase64(options.assetFile);
     }
   }
 
@@ -443,21 +388,21 @@ export async function startJob(
     site_id: options.siteId,
     operation: options.operation,
   };
-  if (fingerprint && options.engineeringSessionId) {
+  if (fingerprint && engineeringTarget && options.engineeringSessionId) {
     body.session_id = options.engineeringSessionId;
-    body.image_name = fingerprint.firmware_name;
-    body.image_sha256 = fingerprint.firmware_sha256;
-  } else if (usesFirmware) {
-    body.image_name = options.firmware?.name;
-    body.image_base64 = firmwareBase64;
-    body.timeout_s = 30;
+    body.asset_sha256 = fingerprint.asset_sha256;
+  } else if (fingerprint && usesAsset) {
+    Object.assign(body, fingerprint, {
+      asset_base64: assetBase64,
+      timeout_s: 30,
+    });
   }
   if (options.operation === "read") {
     body.offset = options.offset ?? 0;
     body.length = options.length ?? 256;
   }
 
-  const payload = await requestJson<{ ok: boolean; job: WireJobSnapshot }>(
+  const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
     apiBase,
     "/api/jobs",
     { method: "POST", body: JSON.stringify(body) },
