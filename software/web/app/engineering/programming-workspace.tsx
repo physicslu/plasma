@@ -28,6 +28,7 @@ import type {
 } from "../plasma-api";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
+  engineeringLogCategoryLabel,
   type EngineeringLogCategory,
   type EngineeringLogEntry,
 } from "./engineering-log-panel";
@@ -125,8 +126,12 @@ function shortSha256(sha256: string): string {
   return `${sha256.slice(0, 12)}…`;
 }
 
+function siteLabel(siteId: number): string {
+  return `SITE ${String(siteId).padStart(2, "0")}`;
+}
+
 function siteListLabel(ids: number[]): string {
-  return ids.length ? ids.map(id => `SITE ${id}`).join(", ") : "none";
+  return ids.length ? ids.map(siteLabel).join(", ") : "none";
 }
 
 function operationListLabel(operations: Operation[]): string {
@@ -189,7 +194,7 @@ export default function ProgrammingWorkspace() {
     setLogs(current => [
       {
         id: ++logSequence.current,
-        text: `${time}  [${resolvedCategory}] ${message}`,
+        text: `${time}  [${engineeringLogCategoryLabel(resolvedCategory)}] ${message}`,
         error,
         category: resolvedCategory,
       },
@@ -355,7 +360,7 @@ export default function ProgrammingWorkspace() {
 
   function connect(event: FormEvent) {
     event.preventDefault();
-    appendLog(`[CONNECTION] CONNECT · ${apiDraft}`, false, "USER");
+    appendLog(`[CONNECTION] CONNECT · ${apiDraft}`, false, "USR");
     if (targetLocked) {
       appendLog("[NET] Gateway change blocked while a target Job is active", true);
       return;
@@ -382,13 +387,13 @@ export default function ProgrammingWorkspace() {
       facilityId,
       ppuId: nextFacility?.ppus[0]?.ppu_id ?? "",
     };
-    appendLog(`[TARGET] SELECT · ${next.facilityId} / ${next.ppuId || "none"}`, false, "USER");
+    appendLog(`[TARGET] SELECT · ${next.facilityId} / ${next.ppuId || "none"}`, false, "USR");
     switchTarget(next);
   }
 
   function selectPPU(ppuId: string) {
     if (targetLocked) return;
-    appendLog(`[TARGET] SELECT · ${selection.facilityId} / ${ppuId}`, false, "USER");
+    appendLog(`[TARGET] SELECT · ${selection.facilityId} / ${ppuId}`, false, "USR");
     switchTarget({ facilityId: selection.facilityId, ppuId });
   }
 
@@ -399,7 +404,7 @@ export default function ProgrammingWorkspace() {
       ? selectedSiteIds.filter(id => id !== siteId)
       : [...selectedSiteIds, siteId].sort((left, right) => left - right);
     setSelectedSiteIdsState(next);
-    appendLog(`[SITE] SELECTION · ${siteListLabel(next)}`, false, "USER");
+    appendLog(`[SITE] SELECTION · ${siteListLabel(next)}`, false, "USR");
   }
 
   function toggleOperation(operation: Operation) {
@@ -408,7 +413,7 @@ export default function ProgrammingWorkspace() {
       ? selectedOperations.filter(item => item !== operation)
       : operationOrder.filter(item => selectedOperations.includes(item) || item === operation);
     setSelectedOperations(next);
-    appendLog(`[BATCH] OPERATIONS · ${operationListLabel(next)}`, false, "USER");
+    appendLog(`[BATCH] OPERATIONS · ${operationListLabel(next)}`, false, "USR");
   }
 
   function selectFirmware(file: File | null) {
@@ -418,7 +423,7 @@ export default function ProgrammingWorkspace() {
         ? `[FIRMWARE] SELECT · ${file.name} · ${firmwareSizeLabel(file.size)}`
         : "[FIRMWARE] CLEAR",
       false,
-      "USER",
+      "USR",
     );
   }
 
@@ -482,12 +487,12 @@ export default function ProgrammingWorkspace() {
         outputFile: undefined,
         error: undefined,
       } : item));
-      appendLog(`[SITE ${siteId}] ${operation.toUpperCase()} accepted · ${job.job_id}`);
+      appendLog(`[${siteLabel(siteId)}] ${operation.toUpperCase()} accepted · ${job.job_id}`);
       return job;
     } catch (error) {
       if (error instanceof PlasmaSubmissionBlockedError) return;
       const message = error instanceof Error ? error.message : "unknown error";
-      appendLog(`[SITE ${siteId}] Submit failed · ${message}`, true);
+      appendLog(`[${siteLabel(siteId)}] Submit failed · ${message}`, true);
       setSites(current => current.map(item => item.id === siteId ? {
         ...item,
         stage: "failed",
@@ -501,7 +506,7 @@ export default function ProgrammingWorkspace() {
 
   function runSingleSite(siteId: number, operation: Operation) {
     const readDetail = operation === "read" ? ` · offset ${readOffset} · length ${readLength}` : "";
-    appendLog(`[SITE ${siteId}] EXECUTE ${operation.toUpperCase()}${readDetail}`, false, "USER");
+    appendLog(`[${siteLabel(siteId)}] EXECUTE ${operation.toUpperCase()}${readDetail}`, false, "USR");
     void runSite(siteId, operation);
   }
 
@@ -521,10 +526,10 @@ export default function ProgrammingWorkspace() {
     cancelRequests.current.add(jobId);
     try {
       await cancelJob(targetApiBase, jobId);
-      appendLog(`[SITE ${siteId}] Cancel requested · ${jobId}`);
+      appendLog(`[${siteLabel(siteId)}] Cancel requested · ${jobId}`);
     } catch (error) {
       cancelRequests.current.delete(jobId);
-      appendLog(`[SITE ${siteId}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
+      appendLog(`[${siteLabel(siteId)}] Cancel failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
     }
   }
 
@@ -536,7 +541,7 @@ export default function ProgrammingWorkspace() {
     appendLog(
       `[BATCH] EXECUTE · ${operationListLabel(operations)} · ${siteListLabel(siteIds)}${readDetail}`,
       false,
-      "USER",
+      "USR",
     );
     const lifecycle = new BatchLifecycle(siteIds);
     const results: Partial<Record<number, BatchTerminalState>> = {};
@@ -544,7 +549,7 @@ export default function ProgrammingWorkspace() {
     setBatchRunning(true);
     setBatchCancelling(false);
     setBatchSiteStates(Object.fromEntries(siteIds.map(id => [id, "running"])) as Record<number, BatchSiteState>);
-    appendLog(`[BATCH] START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteIds.map(id => `SITE ${id}`).join(", ")}`);
+    appendLog(`[BATCH] START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteListLabel(siteIds)}`);
     try {
       await Promise.all(siteIds.map(async siteId => {
         for (const operation of operations) {
@@ -589,7 +594,7 @@ export default function ProgrammingWorkspace() {
             const state = lifecycle.isCancelRequested(siteId) ? "cancelled" : "failed";
             results[siteId] = state;
             setBatchSiteState(siteId, state);
-            appendLog(`[SITE ${siteId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
+            appendLog(`[${siteLabel(siteId)}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
             lifecycle.finish(siteId);
             return;
           }
@@ -609,7 +614,7 @@ export default function ProgrammingWorkspace() {
           : cancelled.length > 0
             ? "PARTIAL"
             : "COMPLETE";
-      const label = (ids: number[]) => ids.length ? ids.map(id => `SITE ${id}`).join(", ") : "—";
+      const label = (ids: number[]) => ids.length ? siteListLabel(ids) : "—";
       appendLog(
         `[BATCH] ${outcome} · success: ${label(successful)} · cancelled: ${label(cancelled)} · failed: ${label(failed)}`,
         failed.length > 0,
@@ -624,7 +629,7 @@ export default function ProgrammingWorkspace() {
   async function cancelBatch() {
     const lifecycle = batchLifecycle.current;
     if (!batchRunning || batchCancelling || !lifecycle) return;
-    appendLog("[BATCH] CANCEL", false, "USER");
+    appendLog("[BATCH] CANCEL", false, "USR");
     const { activeJobs } = lifecycle.cancel();
     setBatchCancelling(true);
     setBatchSiteStates(current => Object.fromEntries(
@@ -636,7 +641,7 @@ export default function ProgrammingWorkspace() {
   async function cancelSite(siteId: number) {
     const site = sites.find(item => item.id === siteId);
     if (!site?.jobId || !isRunning(site)) return;
-    appendLog(`[SITE ${siteId}] CANCEL`, false, "USER");
+    appendLog(`[${siteLabel(siteId)}] CANCEL`, false, "USR");
     const lifecycle = batchLifecycle.current;
     if (batchRunning && lifecycle) {
       const jobId = lifecycle.cancelSite(siteId);
@@ -729,7 +734,7 @@ export default function ProgrammingWorkspace() {
                 disabled={batchRunning || !site.enabled || isRunning(site)}
                 onChange={() => toggleSite(site.id)}
               />
-              <span>SITE {site.id}</span>
+              <span>{siteLabel(site.id)}</span>
               <small>{site.enabled ? site.stage.toUpperCase() : "DISABLED"}</small>
             </label>
           ))}
@@ -749,7 +754,7 @@ export default function ProgrammingWorkspace() {
 
       <section className="batchPanel engineeringBatchPanel" aria-label="Engineering batch control">
         <div className="batchInfo">
-          <div><p className="eyebrow">E / P / V / R</p><h2>{t("engineeringProgramming.batchOperations")}</h2><small>{selectedSiteIds.map(id => `SITE ${id}`).join(", ") || t("engineeringProgramming.noSites")}</small></div>
+          <div><p className="eyebrow">E / P / V / R</p><h2>{t("engineeringProgramming.batchOperations")}</h2><small>{selectedSiteIds.map(siteLabel).join(", ") || t("engineeringProgramming.noSites")}</small></div>
           <div className="statusSummary">
             <span>{t("engineeringProgramming.idle")} <b>{statusCounts.idle}</b></span><span className="busy">{t("engineeringProgramming.running")} <b>{statusCounts.running}</b></span><span className="success">{t("engineeringProgramming.success")} <b>{statusCounts.success}</b></span><span className="failed">{t("engineeringProgramming.cancelled")} <b>{statusCounts.cancelled}</b></span><span className="failed">{t("engineeringProgramming.failed")} <b>{statusCounts.failed}</b></span>
           </div>
@@ -781,7 +786,7 @@ export default function ProgrammingWorkspace() {
             <tbody>
               {selectedSites.map(site => (
                 <tr key={site.id}>
-                  <td><b>SITE {site.id}</b></td>
+                  <td><b>{siteLabel(site.id)}</b></td>
                   <td><b>{site.target ?? "—"}</b><small>{site.interface ?? "—"}</small></td>
                   <td>{site.operation?.toUpperCase() ?? "—"}{site.error && <small className="errorText">{site.error}</small>}</td>
                   <td><span className={`state ${site.stage}`}>{site.stage.toUpperCase()}</span></td>
