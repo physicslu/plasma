@@ -343,10 +343,8 @@ export default function ProgrammingWorkspace() {
     }
     try {
       const normalized = normalizeApiBase(apiDraft);
-      const sameGateway = normalized === apiBase;
       window.localStorage.setItem("plasma-api-base", normalized);
-      resetTargetRuntime(sameGateway);
-      if (!sameGateway) setSelection({ facilityId: "", ppuId: "" });
+      resetTargetRuntime(true);
       setCatalog(null);
       setCatalogError(null);
       setConnection("connecting");
