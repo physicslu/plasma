@@ -88,24 +88,24 @@ class OpenOCDInterface(BaseInterface):
 
     async def program(
         self,
-        firmware: bytes,
+        image: bytes,
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
         raise PlasmaError(
             ErrorCode.INTERFACE_NOT_CONFIGURED,
-            "binary staging for OpenOCD requires hardware-specific configuration",
+            "image staging for OpenOCD requires hardware-specific configuration",
         )
 
     async def verify(
         self,
-        firmware: bytes,
+        image: bytes,
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
         raise PlasmaError(
             ErrorCode.INTERFACE_NOT_CONFIGURED,
-            "binary staging for OpenOCD requires hardware-specific configuration",
+            "image staging for OpenOCD requires hardware-specific configuration",
         )
 
     async def read(
