@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BatchLifecycle } from "../batch-lifecycle";
 import { useI18n } from "../i18n";
@@ -51,6 +51,7 @@ type Site = {
   outputFile?: string;
 };
 
+type TargetSelection = { facilityId: string; ppuId: string };
 type ConnectionState = "connecting" | "online" | "offline";
 type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "failed";
 type LogEntry = { id: number; text: string; error: boolean };
@@ -92,6 +93,21 @@ function siteFromStatus(snapshot: SiteSnapshot, existing?: Site): Site {
   };
 }
 
+function initialSelection(catalog: EngineeringTargetCatalog): TargetSelection {
+  const facility = catalog.facilities[0];
+  return {
+    facilityId: facility?.facility_id ?? "",
+    ppuId: facility?.ppus[0]?.ppu_id ?? "",
+  };
+}
+
+function validSelection(catalog: EngineeringTargetCatalog, selection: TargetSelection): TargetSelection {
+  const facility = catalog.facilities.find(item => item.facility_id === selection.facilityId);
+  if (!facility) return initialSelection(catalog);
+  if (facility.ppus.some(item => item.ppu_id === selection.ppuId)) return selection;
+  return { facilityId: facility.facility_id, ppuId: facility.ppus[0]?.ppu_id ?? "" };
+}
+
 export default function ProgrammingWorkspace() {
   const { t } = useI18n();
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
@@ -99,8 +115,7 @@ export default function ProgrammingWorkspace() {
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [catalog, setCatalog] = useState<EngineeringTargetCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [facilityId, setFacilityId] = useState("");
-  const [ppuId, setPPUId] = useState("");
+  const [selection, setSelection] = useState<TargetSelection>({ facilityId: "", ppuId: "" });
   const [ppu, setPPU] = useState<PPUSnapshot | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteIds, setSelectedSiteIds] = useState<number[]>([]);
@@ -120,10 +135,10 @@ export default function ProgrammingWorkspace() {
   const cancelRequests = useRef<Set<string>>(new Set());
   const logSequence = useRef(0);
 
-  const facility = catalog?.facilities.find(item => item.facility_id === facilityId) ?? null;
-  const selectedPPU = facility?.ppus.find(item => item.ppu_id === ppuId) ?? null;
-  const targetApiBase = facilityId && ppuId
-    ? engineeringTargetApiBase(apiBase, facilityId, ppuId)
+  const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
+  const selectedPPU = facility?.ppus.find(item => item.ppu_id === selection.ppuId) ?? null;
+  const targetApiBase = selection.facilityId && selection.ppuId
+    ? engineeringTargetApiBase(apiBase, selection.facilityId, selection.ppuId)
     : null;
   const selectedSites = sites.filter(site => selectedSiteIds.includes(site.id));
   const readRangeValid = Number.isInteger(Number(readOffset))
@@ -138,6 +153,26 @@ export default function ProgrammingWorkspace() {
       { id: ++logSequence.current, text: `${time}  ${message}`, error },
     ]);
   }, []);
+
+  const resetTargetRuntime = useCallback(() => {
+    trackedJobs.current = {};
+    submissionGenerations.current = {};
+    cancelRequests.current.clear();
+    batchLifecycle.current = null;
+    setPPU(null);
+    setSites([]);
+    setSelectedSiteIds([]);
+    setBatchSiteStates({});
+    setSubmittingSiteIds([]);
+    setBatchRunning(false);
+    setBatchCancelling(false);
+  }, []);
+
+  const switchTarget = useCallback((next: TargetSelection) => {
+    resetTargetRuntime();
+    setSelection(next);
+    if (next.facilityId && next.ppuId) appendLog(`[TARGET] ${next.facilityId} / ${next.ppuId}`);
+  }, [appendLog, resetTargetRuntime]);
 
   const applyJob = useCallback((job: JobSnapshot) => {
     const stage = uiStage(job);
@@ -155,65 +190,43 @@ export default function ProgrammingWorkspace() {
   }, []);
 
   useEffect(() => {
-    const savedApi = window.localStorage.getItem("plasma-api-base");
-    if (!savedApi) return;
-    try {
-      const normalized = normalizeApiBase(savedApi);
-      setApiBase(normalized);
-      setApiDraft(normalized);
-    } catch {
-      window.localStorage.removeItem("plasma-api-base");
-    }
+    const restore = window.requestAnimationFrame(() => {
+      const savedApi = window.localStorage.getItem("plasma-api-base");
+      if (!savedApi) return;
+      try {
+        const normalized = normalizeApiBase(savedApi);
+        setApiBase(normalized);
+        setApiDraft(normalized);
+      } catch {
+        window.localStorage.removeItem("plasma-api-base");
+      }
+    });
+    return () => window.cancelAnimationFrame(restore);
   }, []);
 
-  const loadCatalog = useCallback(async (base: string) => {
-    setConnection("connecting");
-    try {
-      const next = await getEngineeringTargets(base);
+  useEffect(() => {
+    let cancelled = false;
+    void getEngineeringTargets(apiBase).then(next => {
+      if (cancelled) return;
       setCatalog(next);
       setCatalogError(null);
       setConnection("online");
-      setFacilityId(current => {
-        if (next.facilities.some(item => item.facility_id === current)) return current;
-        return next.facilities[0]?.facility_id ?? "";
-      });
+      setSelection(current => validSelection(next, current));
       appendLog(`[ENGINEERING] Provider ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
-    } catch (error) {
+    }).catch(error => {
+      if (cancelled) return;
       const message = error instanceof Error ? error.message : "Engineering target provider unavailable";
+      resetTargetRuntime();
       setCatalog(null);
       setCatalogError(message);
+      setSelection({ facilityId: "", ppuId: "" });
       setConnection("offline");
       appendLog(`[ENGINEERING] Provider unavailable · ${message}`, true);
-    }
-  }, [appendLog]);
-
-  useEffect(() => {
-    void loadCatalog(apiBase);
-  }, [apiBase, loadCatalog]);
-
-  useEffect(() => {
-    if (!facility) {
-      setPPUId("");
-      return;
-    }
-    setPPUId(current => facility.ppus.some(item => item.ppu_id === current)
-      ? current
-      : facility.ppus[0]?.ppu_id ?? "");
-  }, [facility]);
-
-  useEffect(() => {
-    trackedJobs.current = {};
-    submissionGenerations.current = {};
-    cancelRequests.current.clear();
-    batchLifecycle.current = null;
-    setSites([]);
-    setSelectedSiteIds([]);
-    setBatchSiteStates({});
-    setBatchRunning(false);
-    setBatchCancelling(false);
-    setPPU(null);
-    if (facilityId && ppuId) appendLog(`[TARGET] ${facilityId} / ${ppuId}`);
-  }, [facilityId, ppuId, appendLog]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, appendLog, resetTargetRuntime]);
 
   useEffect(() => {
     if (!targetApiBase) return;
@@ -271,11 +284,27 @@ export default function ProgrammingWorkspace() {
     try {
       const normalized = normalizeApiBase(apiDraft);
       window.localStorage.setItem("plasma-api-base", normalized);
+      resetTargetRuntime();
+      setCatalog(null);
+      setCatalogError(null);
+      setConnection("connecting");
       setApiDraft(normalized);
       setApiBase(normalized);
     } catch (error) {
       appendLog(`[NET] ${error instanceof Error ? error.message : "Invalid Gateway URL"}`, true);
     }
+  }
+
+  function selectFacility(facilityId: string) {
+    const nextFacility = catalog?.facilities.find(item => item.facility_id === facilityId);
+    switchTarget({
+      facilityId,
+      ppuId: nextFacility?.ppus[0]?.ppu_id ?? "",
+    });
+  }
+
+  function selectPPU(ppuId: string) {
+    switchTarget({ facilityId: selection.facilityId, ppuId });
   }
 
   function toggleSite(siteId: number) {
@@ -465,7 +494,7 @@ export default function ProgrammingWorkspace() {
     await requestCancel(siteId, site.jobId);
   }
 
-  const statusCounts = useMemo(() => selectedSites.reduce((counts, site) => {
+  const statusCounts = selectedSites.reduce((counts, site) => {
     const batch = batchSiteStates[site.id];
     if (batch === "running" || batch === "cancelling" || isRunning(site)) counts.running += 1;
     else if (batch === "success" || site.stage === "success") counts.success += 1;
@@ -473,7 +502,7 @@ export default function ProgrammingWorkspace() {
     else if (batch === "failed" || ["failed", "timeout", "aborted"].includes(site.stage)) counts.failed += 1;
     else counts.idle += 1;
     return counts;
-  }, { idle: 0, running: 0, success: 0, cancelled: 0, failed: 0 }), [selectedSites, batchSiteStates]);
+  }, { idle: 0, running: 0, success: 0, cancelled: 0, failed: 0 });
 
   return (
     <section className="engineeringProgramming" aria-label="Engineering programming workspace">
@@ -500,9 +529,9 @@ export default function ProgrammingWorkspace() {
           <span>Facility</span>
           <select
             aria-label="Engineering Facility"
-            value={facilityId}
+            value={selection.facilityId}
             disabled={!catalog || batchRunning}
-            onChange={event => setFacilityId(event.target.value)}
+            onChange={event => selectFacility(event.target.value)}
           >
             {(catalog?.facilities ?? []).map(item => <option key={item.facility_id} value={item.facility_id}>{item.display_name}</option>)}
           </select>
@@ -511,9 +540,9 @@ export default function ProgrammingWorkspace() {
           <span>PPU</span>
           <select
             aria-label="Engineering PPU"
-            value={ppuId}
+            value={selection.ppuId}
             disabled={!facility || batchRunning}
-            onChange={event => setPPUId(event.target.value)}
+            onChange={event => selectPPU(event.target.value)}
           >
             {(facility?.ppus ?? []).map(item => (
               <option key={item.ppu_id} value={item.ppu_id}>{item.display_name} — {item.site_count} Sites</option>
