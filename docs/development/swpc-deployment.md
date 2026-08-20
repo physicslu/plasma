@@ -53,11 +53,11 @@ The current service contract is:
 | systemd unit | Default port | Operator name / role |
 |---|---:|---|
 | `plasma-server.service` | 9900 | **Plasma PPU Programming Server** — Protocol v3.2 TCP Server |
-| `plasma-web.service` | 18080 | **Plasma Web REST Gateway** — HTTP REST boundary |
+| `plasma-web.service` | 18080 | **Plasma Web REST Gateway** — HTTP REST boundary; also hosts the optional Engineering Mock PPU Provider |
 | `plasma-vite.service` | 5173 | Plasma PPU Console development/demo Web runtime |
 | `plasma-manager.service` | 18180 | **Plasma Manager** — optional read-only fleet control plane |
 
-The first three services are the PPU/integration baseline. `plasma-manager.service` is opt-in and is not required for standalone PPU execution.
+The first three services are the PPU/integration baseline. `plasma-manager.service` is opt-in and is not required for standalone PPU execution. The Engineering Mock PPU Provider is also opt-in, but it is hosted inside `plasma-web.service`; it is not a separate systemd service.
 
 The Plasma Server canonical protocol is v3.2 (`PLASMA32`, one-based `site_id = 1..N`). Protocol v3.1 remains only as an explicit compatibility adapter.
 
@@ -84,7 +84,9 @@ The deployment contract is:
 - regenerate systemd units before start/restart;
 - perform health checks after restart;
 - start/restart Manager only when `PLASMA_MANAGER_ENABLED=1`;
-- validate the Manager YAML before activating an enabled Manager service.
+- validate the Manager YAML before activating an enabled Manager service;
+- add Engineering Mock Provider Gateway arguments only when `PLASMA_ENGINEERING_MOCK_ENABLED=1`;
+- probe `/api/engineering/targets` after restart when the Engineering Mock Provider is enabled.
 
 A failed validation must not replace a healthy running service with an unvalidated revision.
 
@@ -118,10 +120,10 @@ The persistent deployment file is:
 $HOME/.config/plasma/plasmactl.env
 ```
 
-The current schema is v3. Generic example:
+The current schema is v4. Generic example:
 
 ```bash
-PLASMA_CONFIG_VERSION=3
+PLASMA_CONFIG_VERSION=4
 PLASMA_REPO=/path/to/plasma
 PLASMA_BRANCH=main
 PLASMA_NPM=/path/to/npm
@@ -134,11 +136,17 @@ PLASMA_VITE_PORT=5173
 PLASMA_PUBLIC_API_URL=https://example.invalid
 PLASMA_MANAGER_ENABLED=0
 PLASMA_MANAGER_CONFIG=/absolute/operator/local/path/manager.yaml
+PLASMA_ENGINEERING_MOCK_ENABLED=0
+PLASMA_ENGINEERING_MOCK_ROOT=/absolute/operator/local/state/engineering-mock
 ```
 
 The Web Console appends API paths to the configured API Base; do not append `/api` to the base value itself.
 
 `PLASMA_MANAGER_ENABLED=0` is the default so upgrading an existing standalone PPU/integration host cannot accidentally create a new fleet-control dependency. Setting it to `1` is an explicit operational choice.
+
+`PLASMA_ENGINEERING_MOCK_ENABLED=0` is also the default. Enabling simulation must be explicit because the same Engineering UI and REST contract will later be used by real PPU providers.
+
+If `PLASMA_ENGINEERING_MOCK_ROOT` is not explicitly configured, `plasmactl` resolves it under `$XDG_STATE_HOME/plasma/engineering-mock`, or `$HOME/.local/state/plasma/engineering-mock` when `XDG_STATE_HOME` is unset. Runtime output/log state is intentionally kept outside the Git worktree; `plasmactl` rejects an Engineering Mock root located inside the repository because that would contaminate `git status` and break clean-tree deployment gates.
 
 The Manager registry belongs outside the Git worktree. A minimal local-only integration configuration is:
 
@@ -164,11 +172,13 @@ Policy:
 - known obsolete historical defaults may migrate to the current default only at the schema version where that migration is defined;
 - unknown/custom values are preserved as explicit operator overrides;
 - schema v2 -> v3 adds Manager settings with Manager disabled by default and does not reinterpret an already-versioned API Base;
-- a `PLASMA_CONFIG_VERSION=3` marker does not suppress completeness checks: if either Manager deployment field is missing, `plasmactl` appends only the missing assignment using the already-resolved value and preserves every explicit operator value already present;
-- completeness reconciliation is idempotent and must not create duplicate Manager assignments on repeated `restart` / `deploy` runs;
+- schema v3 -> v4 adds Engineering Mock Provider deployment settings with simulation disabled by default and a state root outside the Git worktree;
+- a current schema marker does not suppress completeness checks: if a deployment field is missing, `plasmactl` appends only the missing assignment using the already-resolved value and preserves every explicit operator value already present;
+- completeness reconciliation is idempotent and must not create duplicate assignments on repeated `restart` / `deploy` runs;
 - a configuration schema newer than the running `plasmactl` supports is rejected rather than mutated by an older deployment tool;
 - generated systemd units are derived state and are regenerated from validated configuration;
-- disabling Manager removes it from the managed start/restart service set and stops any stale Manager process during runtime reconciliation.
+- disabling Manager removes it from the managed start/restart service set and stops any stale Manager process during runtime reconciliation;
+- disabling Engineering Mock removes the `--engineering-mock` arguments from the regenerated `plasma-web.service` unit on the next reconciliation/restart.
 
 This distinction matters operationally: a version number is metadata, not proof that every field introduced by that schema is physically present. Runtime defaults may keep a service safe, but persistent configuration still needs deterministic reconciliation so the next operator sees the same state that the runtime is using.
 
@@ -195,15 +205,59 @@ PLASMA_MANAGER_ENABLED=0
 
 and reconcile/restart. Local PPU programming remains independent of Manager in either mode.
 
-## 10. Public routing boundary
+## 10. Engineering Mock Provider opt-in activation
+
+The Engineering Mock Provider is a server-side simulation provider used by `Engineering Mode -> Programming`. It reports the mock Facility/PPU/Site catalog from Python and executes E/P/V/R jobs through real in-process `PlasmaServer` runtimes backed by `MockInterface`.
+
+To enable it on an integration/development host, edit `plasmactl.env`:
+
+```bash
+PLASMA_ENGINEERING_MOCK_ENABLED=1
+PLASMA_ENGINEERING_MOCK_ROOT=/absolute/operator/local/state/engineering-mock
+```
+
+The root must be absolute and must not live inside the Plasma Git worktree. Omitting an explicit root is valid; the safe XDG state default will be persisted during configuration migration.
+
+Then reconcile and restart:
+
+```bash
+plasmactl restart
+```
+
+The regenerated `plasma-web.service` adds:
+
+```text
+--engineering-mock --engineering-mock-root <configured-root>
+```
+
+After restart, `plasmactl` verifies:
+
+```text
+GET http://127.0.0.1:<gateway-port>/api/engineering/targets
+```
+
+The Engineering UI should then receive the Python-owned Mock catalog rather than showing `Engineering PPU provider is not enabled`.
+
+To disable simulation again:
+
+```bash
+PLASMA_ENGINEERING_MOCK_ENABLED=0
+plasmactl restart
+```
+
+This provider is an Engineering execution facility. It does not grant Plasma Manager write authority, does not enter the Production Manager registry, and does not claim Z2/FPGA/electrical/real-IC validation.
+
+## 11. Public routing boundary
 
 A reverse proxy may route the Web Console to the local Vite service, with `/api/*` forwarded to the Plasma Web REST Gateway. The Gateway should not be exposed directly to the public Internet without an explicit security design.
+
+When Engineering Mock is enabled, its `/api/engineering/targets/*` execution routes are exposed through the same Gateway boundary. Treat that as an explicit development/integration-host capability rather than harmless static demo data.
 
 The current Manager is also not intended for direct public-Internet exposure. Before remote command routing or broader access is added, authentication/authorization and transport security require an explicit architecture decision.
 
 A transient browser polling timeout does not by itself prove that the Gateway process crashed. Diagnose browser/network/proxy, local Gateway request handling, and Plasma Server dependencies separately.
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ```bash
 plasmactl status
@@ -214,6 +268,8 @@ plasmactl logs vite
 plasmactl logs manager
 systemctl --user status plasma-server plasma-web plasma-vite plasma-manager --no-pager
 ```
+
+`plasmactl status` reports both Manager and Engineering Mock opt-in state. When Engineering Mock is enabled, the status line also shows its persistent state root.
 
 To validate operator-visible service naming:
 

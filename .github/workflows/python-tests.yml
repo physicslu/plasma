@@ -54,6 +54,8 @@ jobs:
         run: bash scripts/tests/test-public-doc-sanitization.sh
       - name: Test deployment config migration
         run: bash scripts/tests/test-plasmactl-config.sh
+      - name: Test Engineering Mock deployment wiring
+        run: bash scripts/tests/test-plasmactl-engineering-mock.sh
       - name: Install package
         run: python -m pip install -e "./software/python[dev]"
       - name: Run pytest
