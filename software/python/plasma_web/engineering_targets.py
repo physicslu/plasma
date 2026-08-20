@@ -26,7 +26,7 @@ MOCK_THROUGHPUT_BYTES_PER_S = {
 }
 MOCK_OPERATION_OVERHEADS_S = {
     "erase": 1.0,
-    "program": 1.5,
+    "program": 4.0,
     "verify": 1.0,
     "read": 1.0,
 }
