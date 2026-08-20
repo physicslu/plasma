@@ -10,9 +10,8 @@ from typing import Any
 
 from plasma_core.enums import JobState, Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import JobRequest, legacy_channel_id_from_site
+from plasma_core.models import JobRequest
 from plasma_core.protocol import (
-    LEGACY_PROTOCOL_VERSION,
     PROTOCOL_VERSION,
     SUPPORTED_PROTOCOL_VERSIONS,
     Frame,
@@ -97,7 +96,7 @@ class PlasmaClient:
             Frame(
                 metadata=request.protocol_metadata(self.protocol_version),
                 map_data=request.map_data,
-                binary=request.firmware,
+                binary=request.image,
             ),
             response_timeout_s=timeout,
         )
@@ -110,7 +109,7 @@ class PlasmaClient:
             Frame(
                 metadata=metadata,
                 map_data=request.map_data,
-                binary=request.firmware,
+                binary=request.image,
             )
         )
 
@@ -149,9 +148,9 @@ class PlasmaClient:
     async def program(
         self,
         site_id: int,
-        firmware: bytes,
+        image: bytes,
         *,
-        firmware_name: str | None = None,
+        image_name: str | None = None,
         map_data: dict[str, Any] | None = None,
         timeout_s: float = 30.0,
         max_retries: int = 0,
@@ -161,21 +160,21 @@ class PlasmaClient:
             JobRequest(
                 site_id=site_id,
                 operation=Operation.PROGRAM,
-                firmware=firmware,
+                image=image,
                 map_data=map_data or {},
                 timeout_s=timeout_s,
                 max_retries=max_retries,
                 client_id=client_id,
-                metadata={"firmware_name": firmware_name} if firmware_name else {},
+                metadata={"image_name": image_name} if image_name else {},
             )
         )
 
     async def erase(self, site_id: int, **options: Any) -> dict[str, Any]:
         return await self.submit(JobRequest(site_id=site_id, operation=Operation.ERASE, **options))
 
-    async def verify(self, site_id: int, firmware: bytes, **options: Any) -> dict[str, Any]:
+    async def verify(self, site_id: int, image: bytes, **options: Any) -> dict[str, Any]:
         return await self.submit(
-            JobRequest(site_id=site_id, operation=Operation.VERIFY, firmware=firmware, **options)
+            JobRequest(site_id=site_id, operation=Operation.VERIFY, image=image, **options)
         )
 
     async def read(
@@ -200,10 +199,7 @@ class PlasmaClient:
             "operation": Operation.STATUS.value,
         }
         if site_id is not None:
-            if self.protocol_version == LEGACY_PROTOCOL_VERSION:
-                metadata["channel_id"] = legacy_channel_id_from_site(site_id)
-            else:
-                metadata["site_id"] = site_id
+            metadata["site_id"] = site_id
         if job_id is not None:
             metadata["target_job_id"] = job_id
         return await self.send(Frame(metadata=metadata))
