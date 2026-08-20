@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useI18n } from "../i18n";
+import ProgrammingWorkspace from "./programming-workspace";
 import "./engineering.css";
 
 const sections = [
@@ -42,17 +43,21 @@ export default function EngineeringPage() {
             ))}
           </nav>
 
-          <section className="engineeringCanvas">
-            <div className="engineeringPlaceholder">
-              <small>EXTENSION SLOT</small>
-              <h2>{t(sections.find(([id]) => id === active)?.[1] ?? "engineering.overview")}</h2>
-              <p>{t("engineering.placeholder")}</p>
-              <div className="engineeringSlotGrid" aria-hidden="true">
-                <span />
-                <span />
-                <span />
+          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : ""}`}>
+            {active === "programming" ? (
+              <ProgrammingWorkspace />
+            ) : (
+              <div className="engineeringPlaceholder">
+                <small>EXTENSION SLOT</small>
+                <h2>{t(sections.find(([id]) => id === active)?.[1] ?? "engineering.overview")}</h2>
+                <p>{t("engineering.placeholder")}</p>
+                <div className="engineeringSlotGrid" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
               </div>
-            </div>
+            )}
           </section>
         </div>
       </section>
