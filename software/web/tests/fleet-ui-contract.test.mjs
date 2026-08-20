@@ -52,16 +52,23 @@ test("Web source defines ProductMode rather than Fleet as a product-mode value",
   assert.doesNotMatch(nav, /nav\.singlePpu/);
 });
 
-test("fleet implementation route exposes the Production Console while cross-PPU writes remain locked", async () => {
+test("fleet implementation route exposes the Production multi-PPU Mock prototype while Manager stays read-only", async () => {
   const worker = await workerFor("fleet-page");
   const page = await worker.fetch(new Request("http://localhost/fleet", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, />Factory Production Console</);
-  assert.match(html, />PRODUCTION MODE</);
-  assert.match(html, /跨 PPU 寫入需另行啟用受認證控制路徑/);
-  assert.match(html, /<button[^>]*disabled[^>]*>執行批次<\/button>/);
-  assert.match(html, />Factory Log Console</);
+  assert.match(html, /PRODUCTION MODE · MOCK PROTOTYPE/);
+  assert.match(html, /Plasma Manager 仍維持唯讀/);
+
+  const source = await fs.readFile(new URL("../app/fleet/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /getEngineeringTargets\(DEFAULT_API_BASE\)/);
+  assert.match(source, /engineeringTargetApiBase/);
+  assert.match(source, /activePpuIds/);
+  assert.match(source, /Promise\.allSettled/);
+  assert.match(source, /runSiteSequence/);
+  assert.match(source, /cancelPPU/);
+  assert.match(source, /Production Set selector/);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
   assert.equal(api.status, 404);
