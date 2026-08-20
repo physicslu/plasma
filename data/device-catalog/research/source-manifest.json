@@ -1,0 +1,225 @@
+{
+  "schema_version": "1.0",
+  "index": {
+    "url": "https://www.keil.com/pack/index.pidx",
+    "content_sha256": "17d774568937579fa54a5f9289d7466c9b60606b3701b0f186ea2553ab0955e1"
+  },
+  "sources": [
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "NXP",
+      "pack_name": "LPC8N04_DFP",
+      "pack_version": "12.2.0",
+      "source_url": "https://mcuxpresso.nxp.com/cmsis_pack/repo/NXP.LPC8N04_DFP.pdsc",
+      "content_sha256": "0c899111f237df24b7ee3cecabd788d41710b82190d2f1e481c2199d82b8ce2a"
+    },
+    {
+      "silicon_vendor": "Microchip",
+      "pack_vendor": "Keil",
+      "pack_name": "SAM3_DFP",
+      "pack_version": "1.2.3",
+      "source_url": "https://www.keil.com/pack/Keil.SAM3_DFP.pdsc",
+      "content_sha256": "baf4523cbf1f7c35bcd48e50a169c994a01d590bca9e7a259b5bf2a53072f17d"
+    },
+    {
+      "silicon_vendor": "Microchip",
+      "pack_vendor": "Keil",
+      "pack_name": "SAM4_DFP",
+      "pack_version": "1.6.2",
+      "source_url": "https://www.keil.com/pack/Keil.SAM4_DFP.pdsc",
+      "content_sha256": "dc0f3c0e38784835287dc5710dfb89af9e2a1f7688faeb5bd473fcd8fa79d4c3"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "LPC1100_DFP",
+      "pack_version": "1.4.1",
+      "source_url": "https://www.keil.com/pack/Keil.LPC1100_DFP.pdsc",
+      "content_sha256": "e3b235f0fcd5b6b789812c59f33023af7ce2db0f5a15222108ef616ad118c2ff"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "LPC1200_DFP",
+      "pack_version": "1.0.2",
+      "source_url": "https://www.keil.com/pack/Keil.LPC1200_DFP.pdsc",
+      "content_sha256": "21ee09801c117bd382193b210fde0eac95467c39d19e724d823a8bbdbe7398b2"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "LPC1300_DFP",
+      "pack_version": "1.1.1",
+      "source_url": "https://www.keil.com/pack/Keil.LPC1300_DFP.pdsc",
+      "content_sha256": "ceaee6def74c22ff2b027b49e921ffe8977759daadd9cae47decfbf512f598ca"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "LPC1700_DFP",
+      "pack_version": "2.7.2",
+      "source_url": "https://www.keil.com/pack/Keil.LPC1700_DFP.pdsc",
+      "content_sha256": "095145b4ef101b00253bc7635953fff7c41f707e164a00f2151255280da61091"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "LPC4000_DFP",
+      "pack_version": "2.2.2",
+      "source_url": "https://www.keil.com/pack/Keil.LPC4000_DFP.pdsc",
+      "content_sha256": "0cc10bc8a1e3a98d3bbb3511f7d60934840f54216da4267227b2e0c9fc30ec6e"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "LPC4300_DFP",
+      "pack_version": "2.10.2",
+      "source_url": "https://www.keil.com/pack/Keil.LPC4300_DFP.pdsc",
+      "content_sha256": "e9535d3c28a81da2c7c3b59c355fc234fd45bd58aa6ac301f8aebdd7e8fc5e03"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "LPC800_DFP",
+      "pack_version": "1.10.2",
+      "source_url": "https://www.keil.com/pack/Keil.LPC800_DFP.pdsc",
+      "content_sha256": "b5c8a113d1bd88387e21643c05de18ac7413a88be2a9859ac258a9cec02e53d1"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "Kinetis_K40_DFP",
+      "pack_version": "1.1.1",
+      "source_url": "https://www.keil.com/pack/Keil.Kinetis_K40_DFP.pdsc",
+      "content_sha256": "c19b289c04eda93407a57dac73e33c841bf4c45a2f79decd157242262eae5f93"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "Kinetis_K60_DFP",
+      "pack_version": "1.5.1",
+      "source_url": "https://www.keil.com/pack/Keil.Kinetis_K60_DFP.pdsc",
+      "content_sha256": "7981a155caff036fde73f4cd4ffb3f74c0008a06eaeb60f184b2d27e64cd81b6"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "Kinetis_KLxx_DFP",
+      "pack_version": "1.15.1",
+      "source_url": "https://www.keil.com/pack/Keil.Kinetis_KLxx_DFP.pdsc",
+      "content_sha256": "e81d3358e24f2d230987aafe8dd30602041186f9d8a6f43c85ead4d7842bd0ab"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "S32K116_SDK_DFP",
+      "pack_version": "1.2.1",
+      "source_url": "https://www.keil.com/pack/Keil.S32K116_SDK_DFP.pdsc",
+      "content_sha256": "11c5a159c2254aa83f2d9cd5afde8156165d934061011ead76aa946ad1309a3b"
+    },
+    {
+      "silicon_vendor": "NXP",
+      "pack_vendor": "Keil",
+      "pack_name": "S32K118_SDK_DFP",
+      "pack_version": "1.2.1",
+      "source_url": "https://www.keil.com/pack/Keil.S32K118_SDK_DFP.pdsc",
+      "content_sha256": "11c891080bf261925ab001bc785bf16c202f8edee3b7388598b7083ca81daa2f"
+    },
+    {
+      "silicon_vendor": "STMicroelectronics",
+      "pack_vendor": "Keil",
+      "pack_name": "STBlueNRG_DFP",
+      "pack_version": "1.1.2",
+      "source_url": "https://www.keil.com/pack/Keil.STBlueNRG_DFP.pdsc",
+      "content_sha256": "b18d60b4d5d43ab25de6f461663f006676eecabc69926a8d224e3a56d05c0f27"
+    },
+    {
+      "silicon_vendor": "STMicroelectronics",
+      "pack_vendor": "Keil",
+      "pack_name": "STBlueNRG-1_DFP",
+      "pack_version": "1.2.1",
+      "source_url": "https://www.keil.com/pack/Keil.STBlueNRG-1_DFP.pdsc",
+      "content_sha256": "04f786b40ec3855d22aba12957117f0626fa3469442f90edefe2dbe820dc0c70"
+    },
+    {
+      "silicon_vendor": "STMicroelectronics",
+      "pack_vendor": "Keil",
+      "pack_name": "STBlueNRG-2_DFP",
+      "pack_version": "1.0.2",
+      "source_url": "https://www.keil.com/pack/Keil.STBlueNRG-2_DFP.pdsc",
+      "content_sha256": "a17bc2be49bab3bfdeec97dac87386da489f1762ebcbd354bcc71969bc5be656"
+    },
+    {
+      "silicon_vendor": "STMicroelectronics",
+      "pack_vendor": "Keil",
+      "pack_name": "STBlueNRG-LP_DFP",
+      "pack_version": "3.0.0",
+      "source_url": "https://www.keil.com/pack/Keil.STBlueNRG-LP_DFP.pdsc",
+      "content_sha256": "0e0c4a3b4310ab9f9513d60c32807dbcf3bf8871fd180fa9184a6aaf3cbe1e05"
+    },
+    {
+      "silicon_vendor": "STMicroelectronics",
+      "pack_vendor": "Keil",
+      "pack_name": "STM32H7RSxx_DFP",
+      "pack_version": "1.1.0",
+      "source_url": "https://www.keil.com/pack/Keil.STM32H7RSxx_DFP.pdsc",
+      "content_sha256": "6ba2d30ddc5f1c89d7dd38d23117cd46d711ccf886d0776133a4a3074efaa56e"
+    },
+    {
+      "silicon_vendor": "STMicroelectronics",
+      "pack_vendor": "Keil",
+      "pack_name": "STM32WBAxx_DFP",
+      "pack_version": "2.2.0",
+      "source_url": "https://www.keil.com/pack/Keil.STM32WBAxx_DFP.pdsc",
+      "content_sha256": "944bdaacae5161bcfd15069c57ea48d86717e3169d71aa6835c4be3ee4779b78"
+    },
+    {
+      "silicon_vendor": "STMicroelectronics",
+      "pack_vendor": "Keil",
+      "pack_name": "STM32WBxx_DFP",
+      "pack_version": "2.0.1",
+      "source_url": "https://www.keil.com/pack/Keil.STM32WBxx_DFP.pdsc",
+      "content_sha256": "8df5e6670fb4c62403accb7d5f49ea3fb25c402dd628f21069fccaa18312b472"
+    },
+    {
+      "silicon_vendor": "STMicroelectronics",
+      "pack_vendor": "Keil",
+      "pack_name": "STM32WLxx_DFP",
+      "pack_version": "2.1.0",
+      "source_url": "https://www.keil.com/pack/Keil.STM32WLxx_DFP.pdsc",
+      "content_sha256": "38d48e160498fe8d46fcf759ea26f71dd57f149ed32d916849321f2131a8ed0e"
+    },
+    {
+      "silicon_vendor": "Texas Instruments",
+      "pack_vendor": "Keil",
+      "pack_name": "LM3S_DFP",
+      "pack_version": "1.1.1",
+      "source_url": "https://www.keil.com/pack/Keil.LM3S_DFP.pdsc",
+      "content_sha256": "14232360062733bd4c753a0ad8989e423ab6a7637239df1b6167a70ac153c391"
+    },
+    {
+      "silicon_vendor": "Texas Instruments",
+      "pack_vendor": "Keil",
+      "pack_name": "LM4F_DFP",
+      "pack_version": "1.0.0",
+      "source_url": "https://www.keil.com/pack/Keil.LM4F_DFP.pdsc",
+      "content_sha256": "11a91a1d7f86d8f14d9b5851a7e14d5aba6281e7444cd05eae78e6b72b0b378a"
+    },
+    {
+      "silicon_vendor": "Texas Instruments",
+      "pack_vendor": "Keil",
+      "pack_name": "TM4C_DFP",
+      "pack_version": "1.1.0",
+      "source_url": "https://www.keil.com/pack/Keil.TM4C_DFP.pdsc",
+      "content_sha256": "d0b91760767042b63012f86c28e83df234425ab80974ec958bf83939a307bb44"
+    },
+    {
+      "silicon_vendor": "Nuvoton",
+      "pack_vendor": "Nuvoton",
+      "pack_name": "NuMicroM4_DFP",
+      "pack_version": "1.0.3",
+      "source_url": "https://github.com/OpenNuvoton/cmsis-packs/raw/master/Nuvoton_DFP/Nuvoton.NuMicroM4_DFP.pdsc",
+      "content_sha256": "3e7943a350a2e66c7022ec44b8ef3c5339dbfe47cf03576b9f56eabc3bfc428e"
+    }
+  ]
+}

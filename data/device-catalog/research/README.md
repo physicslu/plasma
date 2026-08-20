@@ -1,6 +1,6 @@
 # Plasma OpenOCD Target Catalog — Seed v1
 
-This research catalog recursively converts OpenOCD `tcl/target/**/*.cfg` entries into a simple user-facing seed taxonomy, then enriches ten MCU vendors from official device sources. It is not a production-support claim or the canonical Phase 1 catalog artifact.
+This research catalog recursively converts OpenOCD `tcl/target/**/*.cfg` entries into a simple user-facing seed taxonomy, then enriches MCU vendors from official device sources. It is not a production-support claim or the canonical Phase 1 catalog artifact.
 
 ## Scope
 
@@ -20,6 +20,12 @@ This research catalog recursively converts OpenOCD `tcl/target/**/*.cfg` entries
 - Selectable mapped identifiers: 5,760
 - Selectable target configurations: 53
 - Excluded for missing configured Flash bank/driver: 36 identifiers across 2 target configurations
+- MCU/Wireless MCU expansion candidates evaluated: 114
+- First automated expansion: 1,023 identifiers across 36 additional target configurations
+- First automated expansion identifier kinds: 893 CMSIS device names and 130 ordering patterns
+- First automated expansion sources: 27 pinned PDSC files
+- Expansion targets awaiting a source adapter/rule: 69
+- Helper/alias or external-Flash-only expansion targets deferred: 9
 
 ## User-facing selection
 
@@ -71,5 +77,12 @@ The target seed establishes **Vendor → Series → OpenOCD target**. The first 
 - `plasma_openocd_parts_top5_mapped.csv`: simplified five-vendor candidate table for review/UI prototyping.
 - `plasma_openocd_parts_next5_mapped.csv`: simplified Infineon, Espressif, Silicon Labs, Nuvoton, and Renesas candidate table.
 - `enrich_cmsis_parts.py`: reproducible CMSIS DFP enrichment tool.
+- `expand_openocd_parts.py`: fail-closed generator for the 114-target MCU-first expansion backlog.
+- `openocd-target-capabilities.csv` / `.json`: resolved include graph and Flash capability for all 114 candidates.
+- `openocd-parts-expanded.csv` / `.json`: deterministic PDSC-to-Target mappings from the current execution batch.
+- `openocd-expansion-outcomes.csv`: one terminal current-run outcome for each of the 114 candidates.
+- `source-manifest.json`: Pack Index and PDSC versions, URLs, and SHA-256 provenance.
+- `mapping-rules.json`: exported deterministic rule set used by the generator.
+- `expansion-report.md`: current execution totals and status interpretation.
 
 The generator can also produce JSON and full research exports containing unmapped identifiers. Those larger or duplicate source-audit artifacts are intentionally not checked in here; the selectable mapped CSV tables are the checked-in part-number research documents.

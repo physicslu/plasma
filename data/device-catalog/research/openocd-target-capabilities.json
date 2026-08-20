@@ -1,0 +1,3479 @@
+{
+  "metadata": {
+    "schema_version": "1.0",
+    "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+    "researched_target_count": 55,
+    "backlog_target_count": 344,
+    "flash_declaring_backlog_count": 124,
+    "mcu_candidate_count": 114,
+    "mcu_count": 110,
+    "wireless_mcu_count": 4
+  },
+  "targets": [
+    {
+      "vendor": "Analog Devices",
+      "series": "ADUC702X",
+      "target_config": "tcl/target/aduc702x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "aduc702x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/aduc702x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "aduc702x",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/aduc702x.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "ADUCM360",
+      "target_config": "tcl/target/aducm360.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "aducm360"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/aducm360.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "aducm360",
+          "base": "0x00"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/aducm360.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32620",
+      "target_config": "tcl/target/max32620.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32620.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32625",
+      "target_config": "tcl/target/max32625.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32625.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX3263",
+      "target_config": "tcl/target/max3263x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max3263x.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32650",
+      "target_config": "tcl/target/max32650.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32650.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32655",
+      "target_config": "tcl/target/max32655.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32655.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32660",
+      "target_config": "tcl/target/max32660.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32660.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32662",
+      "target_config": "tcl/target/max32662.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32662.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32670",
+      "target_config": "tcl/target/max32670.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32670.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32672",
+      "target_config": "tcl/target/max32672.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32672.cfg",
+          "bank": "$_CHIPNAME.flash1",
+          "driver": "max32xxx",
+          "base": "$FLASH_BASE"
+        },
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32672.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32675",
+      "target_config": "tcl/target/max32675.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32675.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32680",
+      "target_config": "tcl/target/max32680.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32680.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32690",
+      "target_config": "tcl/target/max32690.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32690.cfg",
+          "bank": "$_CHIPNAME.flash1",
+          "driver": "max32xxx",
+          "base": "$FLASH_BASE"
+        },
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32690.cfg",
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32XXX",
+      "target_config": "tcl/target/max32xxx_common.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
+      "flash_drivers": [
+        "max32xxx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/max32xxx_common.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "max32xxx",
+          "base": "$_FLASH_BASE"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/max32xxx_common.cfg",
+        "tcl/mem_helper.tcl",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Artery",
+      "series": "AT32F4X",
+      "target_config": "tcl/target/artery/at32f4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "artery"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/artery/at32f4x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "artery",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/artery/at32f4x.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL602",
+      "target_config": "tcl/target/bl602.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "bl602"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/bl602_common.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "bl602",
+          "base": "0x23000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/bl602.cfg",
+        "tcl/target/bl602_common.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL602",
+      "target_config": "tcl/target/bl602_common.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Internal/helper",
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
+      "flash_drivers": [
+        "bl602"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/bl602_common.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "bl602",
+          "base": "0x23000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/bl602_common.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL702",
+      "target_config": "tcl/target/bl702.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "bl602"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/bl602_common.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "bl602",
+          "base": "0x23000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/bl702.cfg",
+        "tcl/target/bl602_common.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL702",
+      "target_config": "tcl/target/bl702l.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "bl602"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/bl602_common.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "bl602",
+          "base": "0x23000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/bl702l.cfg",
+        "tcl/target/bl602_common.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Cypress/Fujitsu",
+      "series": "FM3",
+      "target_config": "tcl/target/fm3.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "fm3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/fm3.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "fm3",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/fm3.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Cypress/Fujitsu",
+      "series": "FM4 MB9BF",
+      "target_config": "tcl/target/fm4_mb9bf.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "fm4"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/fm4_mb9bf.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "fm4",
+          "base": "0x00000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/fm4_mb9bf.cfg",
+        "tcl/target/fm4.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Cypress/Fujitsu",
+      "series": "FM4 S6E2CC",
+      "target_config": "tcl/target/fm4_s6e2cc.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "fm4"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/fm4_s6e2cc.cfg",
+          "bank": "${_FLASHNAME}0",
+          "driver": "fm4",
+          "base": "0x00000000"
+        },
+        {
+          "declaration_file": "tcl/target/fm4_s6e2cc.cfg",
+          "bank": "${_FLASHNAME}1",
+          "driver": "fm4",
+          "base": "0x00100000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/fm4_s6e2cc.cfg",
+        "tcl/target/fm4.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Geehy",
+      "series": "APM32F0X",
+      "target_config": "tcl/target/geehy/apm32f0x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32f1x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/geehy/apm32f0x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32f1x",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/geehy/apm32f0x.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Geehy",
+      "series": "APM32F1X",
+      "target_config": "tcl/target/geehy/apm32f1x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32f1x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/geehy/apm32f1x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32f1x",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/geehy/apm32f1x.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Geehy",
+      "series": "APM32F4X",
+      "target_config": "tcl/target/geehy/apm32f4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32f2x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/geehy/apm32f4x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32f2x",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/geehy/apm32f4x.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "GigaDevice",
+      "series": "GD32E23X",
+      "target_config": "tcl/target/gigadevice/gd32e23x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32f1x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/gigadevice/gd32e23x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32f1x",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/gigadevice/gd32e23x.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "GigaDevice",
+      "series": "GD32VF103",
+      "target_config": "tcl/target/gigadevice/gd32vf103.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32f1x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/gigadevice/gd32vf103.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32f1x",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/gigadevice/gd32vf103.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Holtek",
+      "series": "HT32F4X",
+      "target_config": "tcl/target/holtek/ht32f4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "artery"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/holtek/ht32f4x.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "artery",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/holtek/ht32f4x.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Infineon",
+      "series": "PSOC5",
+      "target_config": "tcl/target/psoc5lp.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "psoc5lp",
+        "psoc5lp_eeprom",
+        "psoc5lp_nvl"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/psoc5lp.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "psoc5lp",
+          "base": "0x00000000"
+        },
+        {
+          "declaration_file": "tcl/target/psoc5lp.cfg",
+          "bank": "$_CHIPNAME.eeprom",
+          "driver": "psoc5lp_eeprom",
+          "base": "0x40008000"
+        },
+        {
+          "declaration_file": "tcl/target/psoc5lp.cfg",
+          "bank": "$_CHIPNAME.nvl",
+          "driver": "psoc5lp_nvl",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/psoc5lp.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3AX",
+      "target_config": "tcl/target/at91sam3ax_4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3ax_4x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000080000"
+        },
+        {
+          "declaration_file": "tcl/target/at91sam3ax_4x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x0000A0000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3ax_4x.cfg",
+        "tcl/target/at91sam3ax_xx.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3AX",
+      "target_config": "tcl/target/at91sam3ax_8x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3ax_8x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000080000"
+        },
+        {
+          "declaration_file": "tcl/target/at91sam3ax_8x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x0000C0000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3ax_8x.cfg",
+        "tcl/target/at91sam3ax_xx.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3NX",
+      "target_config": "tcl/target/at91sam3nXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3nXX.cfg",
+          "bank": "flash0",
+          "driver": "at91sam3",
+          "base": "0x00400000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3nXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3SX",
+      "target_config": "tcl/target/at91sam3sXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3sXX.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x00400000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3sXX.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U1C",
+      "target_config": "tcl/target/at91sam3u1c.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3u1c.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000080000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3u1c.cfg",
+        "tcl/target/at91sam3uxx.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U1E",
+      "target_config": "tcl/target/at91sam3u1e.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3u1e.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000080000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3u1e.cfg",
+        "tcl/target/at91sam3uxx.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U2C",
+      "target_config": "tcl/target/at91sam3u2c.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3u2c.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000080000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3u2c.cfg",
+        "tcl/target/at91sam3uxx.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U2E",
+      "target_config": "tcl/target/at91sam3u2e.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3u2e.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000080000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3u2e.cfg",
+        "tcl/target/at91sam3uxx.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U4C",
+      "target_config": "tcl/target/at91sam3u4c.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3u4c.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000080000"
+        },
+        {
+          "declaration_file": "tcl/target/at91sam3u4c.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000100000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3u4c.cfg",
+        "tcl/target/at91sam3uxx.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U4E",
+      "target_config": "tcl/target/at91sam3u4e.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam3"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam3u4e.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000080000"
+        },
+        {
+          "declaration_file": "tcl/target/at91sam3u4e.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam3",
+          "base": "0x000100000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam3u4e.cfg",
+        "tcl/target/at91sam3uxx.cfg",
+        "tcl/target/at91sam3XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4C32X",
+      "target_config": "tcl/target/at91sam4c32x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam4"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam4c32x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam4",
+          "base": "0x01000000"
+        },
+        {
+          "declaration_file": "tcl/target/at91sam4c32x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam4",
+          "base": "0x01100000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam4c32x.cfg",
+        "tcl/target/at91sam4XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4CX",
+      "target_config": "tcl/target/at91sam4cXXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam4"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam4cXXX.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam4",
+          "base": "0x01000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam4cXXX.cfg",
+        "tcl/target/at91sam4XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4LX",
+      "target_config": "tcl/target/at91sam4lXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam4l"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam4lXX.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam4l",
+          "base": "0x00000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam4lXX.cfg",
+        "tcl/target/at91sam4XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4SX",
+      "target_config": "tcl/target/at91sam4sXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam4"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam4sXX.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam4",
+          "base": "0x00400000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam4sXX.cfg",
+        "tcl/target/at91sam4XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4SD32X",
+      "target_config": "tcl/target/at91sam4sd32x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam4"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam4sd32x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam4",
+          "base": "0x00400000"
+        },
+        {
+          "declaration_file": "tcl/target/at91sam4sd32x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam4",
+          "base": "0x00500000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam4sd32x.cfg",
+        "tcl/target/at91sam4XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7SE512",
+      "target_config": "tcl/target/at91sam7se512.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam7"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam7se512.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam7",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam7se512.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7SX",
+      "target_config": "tcl/target/at91sam7sx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam7"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam7sx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam7",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam7sx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7X256",
+      "target_config": "tcl/target/at91sam7x256.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam7"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam7x256.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam7",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam7x256.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7X512",
+      "target_config": "tcl/target/at91sam7x512.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam7"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam7x512.cfg",
+          "bank": "$_FLASHNAME.0",
+          "driver": "at91sam7",
+          "base": "0"
+        },
+        {
+          "declaration_file": "tcl/target/at91sam7x512.cfg",
+          "bank": "$_FLASHNAME.1",
+          "driver": "at91sam7",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam7x512.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9260",
+      "target_config": "tcl/target/at91sam9260_ext_RAM_ext_flash.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "external_flash_only",
+      "capability_reason": "Only an external/general-purpose Flash bank was resolved",
+      "flash_drivers": [
+        "cfi"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91sam9260_ext_RAM_ext_flash.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "cfi",
+          "base": "0x10000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91sam9260_ext_RAM_ext_flash.cfg",
+        "tcl/target/at91sam9261.cfg",
+        "tcl/target/at91sam9.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAMG5X",
+      "target_config": "tcl/target/at91samg5x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "at91sam4"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/at91samg5x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "at91sam4",
+          "base": "0x00400000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/at91samg5x.cfg",
+        "tcl/target/at91sam4XXX.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATMEGA128",
+      "target_config": "tcl/target/atmega128.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "avr"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/atmega128.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "avr",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/atmega128.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATMEGA128",
+      "target_config": "tcl/target/atmega128rfa1.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "avr"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/atmega128rfa1.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "avr",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/atmega128rfa1.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATMEGA32",
+      "target_config": "tcl/target/atmega32u4.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "avr"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/atmega32u4.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "avr",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/atmega32u4.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Microchip",
+      "series": "PIC32MX",
+      "target_config": "tcl/target/pic32mx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "pic32mx",
+        "virtual"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/pic32mx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "pic32mx",
+          "base": "0x1fc00000"
+        },
+        {
+          "declaration_file": "tcl/target/pic32mx.cfg",
+          "bank": "vbank0",
+          "driver": "virtual",
+          "base": "0xbfc00000"
+        },
+        {
+          "declaration_file": "tcl/target/pic32mx.cfg",
+          "bank": "vbank1",
+          "driver": "virtual",
+          "base": "0x9fc00000"
+        },
+        {
+          "declaration_file": "tcl/target/pic32mx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "pic32mx",
+          "base": "0x1d000000"
+        },
+        {
+          "declaration_file": "tcl/target/pic32mx.cfg",
+          "bank": "vbank2",
+          "driver": "virtual",
+          "base": "0xbd000000"
+        },
+        {
+          "declaration_file": "tcl/target/pic32mx.cfg",
+          "bank": "vbank3",
+          "driver": "virtual",
+          "base": "0x9d000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/pic32mx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "K1921VK01T",
+      "target_config": "tcl/target/k1921vk01t.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "niietcm4"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/k1921vk01t.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "niietcm4",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/k1921vk01t.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "K40",
+      "target_config": "tcl/target/k40.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "kinetis"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/kx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "kinetis",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/k40.cfg",
+        "tcl/target/kx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "K60",
+      "target_config": "tcl/target/k60.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "kinetis"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/kx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "kinetis",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/k60.cfg",
+        "tcl/target/kx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "KL25",
+      "target_config": "tcl/target/kl25.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "kinetis"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/klx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "kinetis",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/kl25.cfg",
+        "tcl/target/klx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC11",
+      "target_config": "tcl/target/lpc11xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc1xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc11xx.cfg",
+        "tcl/target/lpc1xxx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC12",
+      "target_config": "tcl/target/lpc12xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc1xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc12xx.cfg",
+        "tcl/target/lpc1xxx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC13",
+      "target_config": "tcl/target/lpc13xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc1xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc13xx.cfg",
+        "tcl/target/lpc1xxx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC17",
+      "target_config": "tcl/target/lpc17xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc1xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc17xx.cfg",
+        "tcl/target/lpc1xxx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC1XXX",
+      "target_config": "tcl/target/lpc1xxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc1xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc1xxx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC21",
+      "target_config": "tcl/target/lpc2103.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2103.cfg",
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC21",
+      "target_config": "tcl/target/lpc2124.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2124.cfg",
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC21",
+      "target_config": "tcl/target/lpc2129.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2129.cfg",
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC21",
+      "target_config": "tcl/target/lpc2148.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2148.cfg",
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC22",
+      "target_config": "tcl/target/lpc2294.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2294.cfg",
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC23",
+      "target_config": "tcl/target/lpc2378.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2378.cfg",
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC24",
+      "target_config": "tcl/target/lpc2460.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2460.cfg",
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC24",
+      "target_config": "tcl/target/lpc2478.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2478.cfg",
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC29",
+      "target_config": "tcl/target/lpc2900.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2900"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2900.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2900",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2900.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC2XXX",
+      "target_config": "tcl/target/lpc2xxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc2xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc2xxx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC40",
+      "target_config": "tcl/target/lpc40xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc1xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc40xx.cfg",
+        "tcl/target/lpc1xxx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC43",
+      "target_config": "tcl/target/lpc4357.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc4357.cfg",
+          "bank": "$_CHIPNAME.flasha",
+          "driver": "lpc2000",
+          "base": "0x1A000000"
+        },
+        {
+          "declaration_file": "tcl/target/lpc4357.cfg",
+          "bank": "$_CHIPNAME.flashb",
+          "driver": "lpc2000",
+          "base": "0x1B000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc4357.cfg",
+        "tcl/target/lpc4350.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC8NXX",
+      "target_config": "tcl/target/lpc8nxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc8nxx.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc8nxx.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC8XX",
+      "target_config": "tcl/target/lpc8xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc1xxx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/lpc8xx.cfg",
+        "tcl/target/lpc1xxx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "NHS31XX",
+      "target_config": "tcl/target/nhs31xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "lpc2000"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/lpc8nxx.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "lpc2000",
+          "base": "0x0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/nhs31xx.cfg",
+        "tcl/target/lpc8nxx.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "NXP",
+      "series": "S32K",
+      "target_config": "tcl/target/s32k.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "kinetis"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/s32k.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "kinetis",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/s32k.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Nuvoton",
+      "series": "NPCX",
+      "target_config": "tcl/target/npcx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "npcx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/npcx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "npcx",
+          "base": "0x64000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/npcx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Nuvoton",
+      "series": "NUMICRO",
+      "target_config": "tcl/target/numicro_m4.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "numicro"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/numicro_m4.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "numicro",
+          "base": "0x00000000"
+        },
+        {
+          "declaration_file": "tcl/target/numicro_m4.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "numicro",
+          "base": "0x0001F000"
+        },
+        {
+          "declaration_file": "tcl/target/numicro_m4.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "numicro",
+          "base": "0x00100000"
+        },
+        {
+          "declaration_file": "tcl/target/numicro_m4.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "numicro",
+          "base": "0x00300000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/numicro_m4.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Raspberry Pi",
+      "series": "RP2040",
+      "target_config": "tcl/target/rp2040.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "rp2xxx",
+        "virtual"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/rp2040.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "rp2xxx",
+          "base": "0x10000000"
+        },
+        {
+          "declaration_file": "tcl/target/rp2040.cfg",
+          "bank": "$_CHIPNAME.alias",
+          "driver": "virtual",
+          "base": "0x10000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/rp2040.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Raspberry Pi",
+      "series": "RP2350",
+      "target_config": "tcl/target/rp2350.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "rp2xxx",
+        "virtual"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/rp2350.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "rp2xxx",
+          "base": "0x10000000"
+        },
+        {
+          "declaration_file": "tcl/target/rp2350.cfg",
+          "bank": "$_CHIPNAME.alias",
+          "driver": "virtual",
+          "base": "0x10000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/rp2350.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "BLUENRG-X",
+      "target_config": "tcl/target/bluenrg-x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "bluenrg-x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/bluenrg-x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "bluenrg-x",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/bluenrg-x.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32H7",
+      "target_config": "tcl/target/stm32h7rsx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32h7x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32h7rsx.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "stm32h7x",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32h7rsx.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32H7",
+      "target_config": "tcl/target/stm32h7x_dual_bank.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
+      "flash_drivers": [
+        "stm32h7x",
+        "stmqspi"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32h7x.cfg",
+          "bank": "$_CHIPNAME.bank1.cpu0",
+          "driver": "stm32h7x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32h7x.cfg",
+          "bank": "$_CHIPNAME.bank2.cpu0",
+          "driver": "stm32h7x",
+          "base": "0x08100000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32h7x.cfg",
+          "bank": "$_CHIPNAME.bank1.cpu1",
+          "driver": "stm32h7x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32h7x.cfg",
+          "bank": "$_CHIPNAME.bank2.cpu1",
+          "driver": "stm32h7x",
+          "base": "0x08100000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32h7x.cfg",
+          "bank": "$_QSPINAME",
+          "driver": "stmqspi",
+          "base": "0x90000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32h7x.cfg",
+          "bank": "$_OCTOSPINAME1",
+          "driver": "stmqspi",
+          "base": "0x90000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32h7x.cfg",
+          "bank": "$_OCTOSPINAME2",
+          "driver": "stmqspi",
+          "base": "0x70000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32h7x_dual_bank.cfg",
+        "tcl/target/stm32h7x.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32L0",
+      "target_config": "tcl/target/stm32l0_dual_bank.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
+      "flash_drivers": [
+        "stm32lx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32l0_dual_bank.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32lx",
+          "base": "0"
+        },
+        {
+          "declaration_file": "tcl/target/stm32l0.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32lx",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32l0_dual_bank.cfg",
+        "tcl/target/stm32l0.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32L1",
+      "target_config": "tcl/target/stm32l1x_dual_bank.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
+      "flash_drivers": [
+        "stm32lx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32l1x_dual_bank.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32lx",
+          "base": "0"
+        },
+        {
+          "declaration_file": "tcl/target/stm32l1.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32lx",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32l1x_dual_bank.cfg",
+        "tcl/target/stm32l1.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32W108",
+      "target_config": "tcl/target/stm32w108xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "em357"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32w108xx.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "em357",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32w108xx.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WBA2X",
+      "target_config": "tcl/target/stm32wba2x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32l4x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32wba2x.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "stm32l4x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32wba2x.cfg",
+          "bank": "$_CHIPNAME.otp",
+          "driver": "stm32l4x",
+          "base": "0x0bf8d000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32wba2x.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WBA5X",
+      "target_config": "tcl/target/stm32wba5x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32l4x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32wba5x.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "stm32l4x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32wba5x.cfg",
+          "bank": "$_CHIPNAME.otp",
+          "driver": "stm32l4x",
+          "base": "0x0bf90000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32wba5x.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WBA6X",
+      "target_config": "tcl/target/stm32wba6x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32l4x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32wba6x.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "stm32l4x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32wba6x.cfg",
+          "bank": "$_CHIPNAME.otp",
+          "driver": "stm32l4x",
+          "base": "0x0bfa0000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32wba6x.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WBX",
+      "target_config": "tcl/target/stm32wbx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32l4x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32wbx.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "stm32l4x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32wbx.cfg",
+          "bank": "$_CHIPNAME.otp",
+          "driver": "stm32l4x",
+          "base": "0x1fff7000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32wbx.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WLX",
+      "target_config": "tcl/target/stm32wlx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32l4x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32wlx.cfg",
+          "bank": "$_CHIPNAME.flash.cpu0",
+          "driver": "stm32l4x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32wlx.cfg",
+          "bank": "$_CHIPNAME.otp.cpu0",
+          "driver": "stm32l4x",
+          "base": "0x1fff7000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32wlx.cfg",
+          "bank": "$_CHIPNAME.flash.cpu1",
+          "driver": "stm32l4x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32wlx.cfg",
+          "bank": "$_CHIPNAME.otp.cpu1",
+          "driver": "stm32l4x",
+          "base": "0x1fff7000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32wlx.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32X5",
+      "target_config": "tcl/target/stm32x5x_common.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
+      "flash_drivers": [
+        "stm32l4x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32x5x_common.cfg",
+          "bank": "$_CHIPNAME.flash_ns",
+          "driver": "stm32l4x",
+          "base": "0x08000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32x5x_common.cfg",
+          "bank": "$_CHIPNAME.flash_alias_s",
+          "driver": "stm32l4x",
+          "base": "0x0C000000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32x5x_common.cfg",
+          "bank": "$_CHIPNAME.otp",
+          "driver": "stm32l4x",
+          "base": "0x0BFA0000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32x5x_common.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32XL",
+      "target_config": "tcl/target/stm32xl.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stm32f1x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/stm32xl.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32f1x",
+          "base": "0x08080000"
+        },
+        {
+          "declaration_file": "tcl/target/stm32f1x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stm32f1x",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/stm32xl.cfg",
+        "tcl/target/stm32f1x.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STR710",
+      "target_config": "tcl/target/str710.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "str7x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/str710.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "str7x",
+          "base": "0x40000000"
+        },
+        {
+          "declaration_file": "tcl/target/str710.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "str7x",
+          "base": "0x400C0000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/str710.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STR730",
+      "target_config": "tcl/target/str730.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "str7x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/str730.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "str7x",
+          "base": "0x80000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/str730.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STR750",
+      "target_config": "tcl/target/str750.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stmsmi",
+        "str7x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/str750.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "str7x",
+          "base": "0x20000000"
+        },
+        {
+          "declaration_file": "tcl/target/str750.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "str7x",
+          "base": "0x200C0000"
+        },
+        {
+          "declaration_file": "tcl/target/str750.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "stmsmi",
+          "base": "0x80000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/str750.cfg",
+        "tcl/mem_helper.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STR912",
+      "target_config": "tcl/target/str912.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "str9x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/str912.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "str9x",
+          "base": "0x00000000"
+        },
+        {
+          "declaration_file": "tcl/target/str912.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "str9x",
+          "base": "0x00080000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/str912.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "EM357",
+      "target_config": "tcl/target/em357.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "em357"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/em357.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "em357",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/em357.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "EM358",
+      "target_config": "tcl/target/em358.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "em357"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/em357.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "em357",
+          "base": "0x08000000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/em358.cfg",
+        "tcl/target/em357.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "SERIES0",
+      "target_config": "tcl/target/silabs/series0.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "efm32"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/silabs/series0.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "efm32",
+          "base": "0"
+        },
+        {
+          "declaration_file": "tcl/target/silabs/series0.cfg",
+          "bank": "userdata.flash",
+          "driver": "efm32",
+          "base": "0x0FE00000"
+        },
+        {
+          "declaration_file": "tcl/target/silabs/series0.cfg",
+          "bank": "lockbits.flash",
+          "driver": "efm32",
+          "base": "0x0FE04000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/silabs/series0.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "SERIES2",
+      "target_config": "tcl/target/silabs/series2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "efm32"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/silabs/series2.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "efm32",
+          "base": "$_FLASHBASE"
+        },
+        {
+          "declaration_file": "tcl/target/silabs/series2.cfg",
+          "bank": "userdata.flash",
+          "driver": "efm32",
+          "base": "0x0FE00000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/silabs/series2.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "SIM3X",
+      "target_config": "tcl/target/sim3x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "sim3x"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/sim3x.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "sim3x",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/sim3x.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC13",
+      "target_config": "tcl/target/ti/cc13x0.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "cc26xx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/ti/cc26x0.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "cc26xx",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/ti/cc13x0.cfg",
+        "tcl/target/ti/cc26x0.cfg",
+        "tcl/target/ti/icepick.cfg",
+        "tcl/target/ti/cjtag.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC13",
+      "target_config": "tcl/target/ti/cc13x2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "cc26xx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/ti/cc26x0.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "cc26xx",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/ti/cc13x2.cfg",
+        "tcl/target/ti/cc26x0.cfg",
+        "tcl/target/ti/icepick.cfg",
+        "tcl/target/ti/cjtag.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC26",
+      "target_config": "tcl/target/ti/cc26x0.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "cc26xx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/ti/cc26x0.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "cc26xx",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/ti/cc26x0.cfg",
+        "tcl/target/ti/icepick.cfg",
+        "tcl/target/ti/cjtag.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC26",
+      "target_config": "tcl/target/ti/cc26x2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "cc26xx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/ti/cc26x0.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "cc26xx",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/ti/cc26x2.cfg",
+        "tcl/target/ti/cc26x0.cfg",
+        "tcl/target/ti/icepick.cfg",
+        "tcl/target/ti/cjtag.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC26",
+      "target_config": "tcl/target/ti/cc26x2x7.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "cc26xx"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/ti/cc26x0.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "cc26xx",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/ti/cc26x2x7.cfg",
+        "tcl/target/ti/cc26x0.cfg",
+        "tcl/target/ti/icepick.cfg",
+        "tcl/target/ti/cjtag.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC3220",
+      "target_config": "tcl/target/ti/cc3220sf.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "cc3220sf"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/ti/cc3220sf.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "cc3220sf",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/ti/cc3220sf.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/target/ti/icepick.cfg",
+        "tcl/target/ti/cc32xx.cfg"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "STELLARIS",
+      "target_config": "tcl/target/ti/stellaris.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "stellaris"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/ti/stellaris.cfg",
+          "bank": "$_CHIPNAME.flash",
+          "driver": "stellaris",
+          "base": "0"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/ti/stellaris.cfg",
+        "tcl/target/swj-dp.tcl",
+        "tcl/mem_helper.tcl",
+        "tcl/chip/ti/lm3s/lm3s.tcl",
+        "tcl/chip/ti/lm3s/lm3s_regs.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    },
+    {
+      "vendor": "XMOS",
+      "series": "XMOS XS1-XAU8A-10",
+      "target_config": "tcl/target/xmos_xs1-xau8a-10_arm.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "capability_status": "flash_driver_declared",
+      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "flash_drivers": [
+        "efm32"
+      ],
+      "flash_banks": [
+        {
+          "declaration_file": "tcl/target/silabs/series0.cfg",
+          "bank": "$_FLASHNAME",
+          "driver": "efm32",
+          "base": "0"
+        },
+        {
+          "declaration_file": "tcl/target/silabs/series0.cfg",
+          "bank": "userdata.flash",
+          "driver": "efm32",
+          "base": "0x0FE00000"
+        },
+        {
+          "declaration_file": "tcl/target/silabs/series0.cfg",
+          "bank": "lockbits.flash",
+          "driver": "efm32",
+          "base": "0x0FE04000"
+        }
+      ],
+      "include_graph": [
+        "tcl/target/xmos_xs1-xau8a-10_arm.cfg",
+        "tcl/target/efm32.cfg",
+        "tcl/target/silabs/series0.cfg",
+        "tcl/target/swj-dp.tcl"
+      ],
+      "openocd_distribution": "upstream-openocd",
+      "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "validation_status": "not_verified"
+    }
+  ]
+}

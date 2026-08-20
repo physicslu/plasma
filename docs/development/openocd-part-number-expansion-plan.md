@@ -1,6 +1,6 @@
 # OpenOCD Part-Number Expansion Plan
 
-Status: planned expansion after the initial ten-vendor research catalog
+Status: executing; first automated PDSC batch generated
 
 ## 1. Goal and boundary
 
@@ -32,9 +32,24 @@ The OpenOCD snapshot at commit `56b8d93fbe61a78dc903d770820d6d896b6d8134` produc
 
 The first expansion program therefore starts with 114 CFG candidates: 110 MCU and 4 Wireless MCU target files. These are candidates for deeper inspection, not 114 confirmed independently selectable families. Common/base CFG files, aliases, virtual banks, external-only Flash, and overlapping family files must be normalized before identifier export.
 
+Current execution checkpoint:
+
+| Result | Count |
+|---|---:|
+| MCU/Wireless MCU CFG candidates evaluated | 114 |
+| CFG files with deterministic PDSC mappings | 36 |
+| Unique device identifiers mapped | 1,023 |
+| CMSIS device names | 893 |
+| Ordering patterns | 130 |
+| Pinned PDSC sources parsed | 27 |
+| Helper/alias or external-Flash-only targets deferred | 9 |
+| Flash-capable targets awaiting an adapter/rule | 69 |
+
+The 1,023 identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint.
+
 ## 3. Priority waves
 
-### Wave 0 — Capability inventory and fail-closed gate
+### Wave 0 — Capability inventory and fail-closed gate (complete for the 114 candidates)
 
 Before adding identifiers:
 
@@ -59,7 +74,7 @@ needs_review
 
 Only `flash_driver_declared` proceeds automatically to MCU identifier expansion.
 
-### Wave 1 — Reuse existing vendor-source pipelines
+### Wave 1 — Reuse existing vendor-source pipelines (in progress)
 
 Start with the 82 Flash-declaring MCU CFG candidates belonging to vendor groups already handled by the current DFP/PDSC enrichment pipeline.
 
@@ -75,6 +90,8 @@ Start with the 82 Flash-declaring MCU CFG candidates belonging to vendor groups 
 | **Total** | **82** |
 
 Process these in batches of 10–20 CFG files. Prefer modern MCU families with current structured vendor packs, then handle legacy families whose identifiers may require archived packs or product tables.
+
+The first PDSC batch maps 36 CFG files across Microchip, NXP, STMicroelectronics, Texas Instruments, and Nuvoton. Wave 1 remains open because 46 of its original 82 candidates still require another structured source, a deterministic rule, or alias normalization. The outcome table, rather than the plan estimate, is authoritative for per-target progress.
 
 Each vendor batch must add deterministic mapping fixtures. A filename or family-name substring alone is not sufficient when multiple CFG files overlap.
 

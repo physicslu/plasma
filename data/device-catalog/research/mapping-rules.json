@@ -1,0 +1,227 @@
+{
+  "schema_version": "1.0",
+  "rules": [
+    {
+      "rule_id": "microchip-sam3a4x4",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3[AX]4",
+      "target_config": "tcl/target/at91sam3ax_4x.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3a8x8",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3[AX]8",
+      "target_config": "tcl/target/at91sam3ax_8x.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3n",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3N",
+      "target_config": "tcl/target/at91sam3nXX.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3sd",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3SD",
+      "target_config": "tcl/target/at91sam3sXX.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3s",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3S(?!D)",
+      "target_config": "tcl/target/at91sam3sXX.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3u1c",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3U1C$",
+      "target_config": "tcl/target/at91sam3u1c.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3u1e",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3U1E$",
+      "target_config": "tcl/target/at91sam3u1e.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3u2c",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3U2C$",
+      "target_config": "tcl/target/at91sam3u2c.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3u2e",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3U2E$",
+      "target_config": "tcl/target/at91sam3u2e.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3u4c",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3U4C$",
+      "target_config": "tcl/target/at91sam3u4c.cfg"
+    },
+    {
+      "rule_id": "microchip-sam3u4e",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM3U4E$",
+      "target_config": "tcl/target/at91sam3u4e.cfg"
+    },
+    {
+      "rule_id": "microchip-sam4c32",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM4C(?:MP|MS|P)?32",
+      "target_config": "tcl/target/at91sam4c32x.cfg"
+    },
+    {
+      "rule_id": "microchip-sam4c",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM4C",
+      "target_config": "tcl/target/at91sam4cXXX.cfg"
+    },
+    {
+      "rule_id": "microchip-sam4l",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM4L[CS]",
+      "target_config": "tcl/target/at91sam4lXX.cfg"
+    },
+    {
+      "rule_id": "microchip-sam4sd32",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM4SD32",
+      "target_config": "tcl/target/at91sam4sd32x.cfg"
+    },
+    {
+      "rule_id": "microchip-sam4s",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAM4S(?!D32)",
+      "target_config": "tcl/target/at91sam4sXX.cfg"
+    },
+    {
+      "rule_id": "nxp-k40",
+      "vendor": "NXP",
+      "part_pattern": "^MK40",
+      "target_config": "tcl/target/k40.cfg"
+    },
+    {
+      "rule_id": "nxp-k60",
+      "vendor": "NXP",
+      "part_pattern": "^MK60",
+      "target_config": "tcl/target/k60.cfg"
+    },
+    {
+      "rule_id": "nxp-kl25",
+      "vendor": "NXP",
+      "part_pattern": "^MKL25",
+      "target_config": "tcl/target/kl25.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc11",
+      "vendor": "NXP",
+      "part_pattern": "^LPC11",
+      "target_config": "tcl/target/lpc11xx.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc12",
+      "vendor": "NXP",
+      "part_pattern": "^LPC12",
+      "target_config": "tcl/target/lpc12xx.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc13",
+      "vendor": "NXP",
+      "part_pattern": "^LPC13",
+      "target_config": "tcl/target/lpc13xx.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc17",
+      "vendor": "NXP",
+      "part_pattern": "^LPC17",
+      "target_config": "tcl/target/lpc17xx.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc40",
+      "vendor": "NXP",
+      "part_pattern": "^LPC40",
+      "target_config": "tcl/target/lpc40xx.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc4357",
+      "vendor": "NXP",
+      "part_pattern": "^LPC4357$",
+      "target_config": "tcl/target/lpc4357.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc8n",
+      "vendor": "NXP",
+      "part_pattern": "^LPC8N",
+      "target_config": "tcl/target/lpc8nxx.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc8",
+      "vendor": "NXP",
+      "part_pattern": "^LPC8[0-3]",
+      "target_config": "tcl/target/lpc8xx.cfg"
+    },
+    {
+      "rule_id": "nxp-s32k11",
+      "vendor": "NXP",
+      "part_pattern": "^S32K11",
+      "target_config": "tcl/target/s32k.cfg"
+    },
+    {
+      "rule_id": "st-bluenrg",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^BlueNRG",
+      "target_config": "tcl/target/bluenrg-x.cfg"
+    },
+    {
+      "rule_id": "st-stm32h7rs",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STM32H7[RS]",
+      "target_config": "tcl/target/stm32h7rsx.cfg"
+    },
+    {
+      "rule_id": "st-stm32wba2",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STM32WBA2",
+      "target_config": "tcl/target/stm32wba2x.cfg"
+    },
+    {
+      "rule_id": "st-stm32wba5",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STM32WBA5",
+      "target_config": "tcl/target/stm32wba5x.cfg"
+    },
+    {
+      "rule_id": "st-stm32wba6",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STM32WBA6",
+      "target_config": "tcl/target/stm32wba6x.cfg"
+    },
+    {
+      "rule_id": "st-stm32wb",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STM32WB",
+      "target_config": "tcl/target/stm32wbx.cfg"
+    },
+    {
+      "rule_id": "st-stm32wl",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STM32WL",
+      "target_config": "tcl/target/stm32wlx.cfg"
+    },
+    {
+      "rule_id": "ti-stellaris",
+      "vendor": "Texas Instruments",
+      "part_pattern": "^(?:LM3S|LM4F|TM4C)",
+      "target_config": "tcl/target/ti/stellaris.cfg"
+    },
+    {
+      "rule_id": "nuvoton-numicro-m4",
+      "vendor": "Nuvoton",
+      "part_pattern": ".+",
+      "target_config": "tcl/target/numicro_m4.cfg"
+    }
+  ]
+}
