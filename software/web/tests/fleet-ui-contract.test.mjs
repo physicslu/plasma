@@ -30,11 +30,11 @@ test("demo landing page exposes Production and Engineering as the only product m
   const response = await worker.fetch(new Request("http://localhost/demo", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, />Choose Product Mode</);
+  assert.match(html, />選擇產品模式</);
   assert.match(html, /href="\/fleet"/);
-  assert.match(html, />Production Mode</);
+  assert.match(html, />量產模式</);
   assert.match(html, /href="\/engineering"/);
-  assert.match(html, />Engineering Mode</);
+  assert.match(html, />工程模式</);
   assert.doesNotMatch(html, />Single PPU Demo</);
   assert.doesNotMatch(html, />Manager \/ Fleet Demo</);
 });
