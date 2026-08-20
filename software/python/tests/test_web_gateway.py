@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import tempfile
 import threading
@@ -77,62 +78,34 @@ class WebGatewayTests(unittest.TestCase):
         self.assertIn("ppu", payload)
         self.assertIn("sites", payload)
 
-    def test_status_accepts_canonical_site_query(self):
+    def test_status_accepts_one_based_site_query(self):
         status, payload, _ = self.request("GET", "/api/status?site=1")
         self.assertEqual(status, 200)
         self.assertTrue(payload["ok"])
         self.assertEqual(FakeClient.last_status_kwargs["site_id"], 1)
 
-    def test_status_retains_legacy_channel_zero_query(self):
-        status, payload, _ = self.request("GET", "/api/status?channel=0")
-        self.assertEqual(status, 200)
-        self.assertTrue(payload["ok"])
-        self.assertEqual(FakeClient.last_status_kwargs["site_id"], 1)
-
-    def test_status_rejects_conflicting_site_and_channel(self):
-        status, payload, _ = self.request("GET", "/api/status?site=1&channel=1")
-        self.assertEqual(status, 400)
-        self.assertFalse(payload["ok"])
-
-    def test_start_program_upload_uses_one_based_site_id(self):
-        firmware = b"\x01\x02\x03"
+    def test_start_program_materializes_image_asset(self):
+        image = b"\x01\x02\x03"
+        sha256 = hashlib.sha256(image).hexdigest()
         status, payload, _ = self.request(
             "POST",
             "/api/jobs",
             {
                 "site_id": 1,
                 "operation": "program",
-                "firmware_name": "fw.bin",
-                "firmware_base64": base64.b64encode(firmware).decode(),
+                "asset_name": "app.bin",
+                "asset_type": "image",
+                "asset_format": "binary",
+                "asset_sha256": sha256,
+                "asset_base64": base64.b64encode(image).decode(),
             },
         )
         self.assertEqual(status, 202)
         self.assertEqual(payload["job"]["job_id"], "web-job-1")
-        self.assertEqual(FakeClient.last_request.firmware, firmware)
+        self.assertEqual(FakeClient.last_request.image, image)
         self.assertEqual(FakeClient.last_request.site_id, 1)
-        self.assertEqual(FakeClient.last_request.channel_id, 0)
-
-    def test_start_job_translates_legacy_channel_zero_to_site_one(self):
-        status, payload, _ = self.request(
-            "POST", "/api/jobs", {"channel_id": 0, "operation": "erase"}
-        )
-        self.assertEqual(status, 202)
-        self.assertEqual(payload["job"]["job_id"], "web-job-1")
-        self.assertEqual(FakeClient.last_request.site_id, 1)
-
-    def test_start_job_accepts_matching_site_and_legacy_channel(self):
-        status, payload, _ = self.request(
-            "POST", "/api/jobs", {"site_id": 1, "channel_id": 0, "operation": "erase"}
-        )
-        self.assertEqual(status, 202)
-        self.assertEqual(payload["job"]["site_id"], 1)
-
-    def test_start_job_rejects_conflicting_site_and_channel(self):
-        status, payload, _ = self.request(
-            "POST", "/api/jobs", {"site_id": 1, "channel_id": 1, "operation": "erase"}
-        )
-        self.assertEqual(status, 400)
-        self.assertFalse(payload["ok"])
+        self.assertEqual(FakeClient.last_request.metadata["image_name"], "app.bin")
+        self.assertEqual(FakeClient.last_request.metadata["source_asset_sha256"], sha256)
 
     def test_start_job_rejects_non_integer_or_zero_site_id(self):
         for site_id in (True, 1.5, 0, -1, "1.5"):
@@ -143,19 +116,19 @@ class WebGatewayTests(unittest.TestCase):
                 self.assertEqual(status, 400)
                 self.assertFalse(payload["ok"])
 
-    def test_verify_requires_firmware(self):
+    def test_verify_requires_programming_asset(self):
         status, payload, _ = self.request(
             "POST", "/api/jobs", {"site_id": 1, "operation": "verify"}
         )
         self.assertEqual(status, 400)
         self.assertFalse(payload["ok"])
 
-    def test_read_without_firmware_uses_logical_range(self):
+    def test_read_without_asset_uses_logical_range(self):
         status, _, _ = self.request(
             "POST", "/api/jobs", {"site_id": 1, "operation": "read", "offset": 12, "length": 4}
         )
         self.assertEqual(status, 202)
-        self.assertEqual(FakeClient.last_request.firmware, b"")
+        self.assertEqual(FakeClient.last_request.image, b"")
         self.assertEqual(
             FakeClient.last_request.map_data["sections"],
             [{"name": "flash", "address": 12, "length": 4}],
