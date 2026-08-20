@@ -46,6 +46,34 @@ def _with_rest_version(payload: dict[str, Any]) -> dict[str, Any]:
     return {**payload, "rest_contract_version": WEB_REST_CONTRACT_VERSION}
 
 
+def _require_declared_keys(
+    values: dict[str, Any],
+    *,
+    allowed: set[str],
+    required: set[str] | None = None,
+    label: str = "request",
+) -> None:
+    unknown = sorted(set(values) - allowed)
+    if unknown:
+        raise ValueError(f"{label} contains unexpected fields: {', '.join(unknown)}")
+    missing = sorted((required or set()) - set(values))
+    if missing:
+        raise ValueError(f"{label} is missing required fields: {', '.join(missing)}")
+
+
+def _query_value(query: dict[str, list[str]], name: str, *, required: bool = False) -> str | None:
+    values = query.get(name)
+    if not values:
+        if required:
+            raise ValueError(f"query parameter {name} is required")
+        return None
+    if len(values) != 1:
+        raise ValueError(f"query parameter {name} must appear exactly once")
+    if required and values[0] == "":
+        raise ValueError(f"query parameter {name} is required")
+    return values[0]
+
+
 class PlasmaWebHandler(BaseHTTPRequestHandler):
     client_factory: Callable[[], PlasmaClient] = PlasmaClient
     engineering_provider: EngineeringPPUProvider | None = None
@@ -220,10 +248,11 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     self._engineering_unavailable()
                     return
                 facility_id, ppu_id, tail = engineering
-                query = parse_qs(parsed.query)
+                query = parse_qs(parsed.query, keep_blank_values=True)
                 if tail == ["api", "status"]:
-                    job = query.get("job", [None])[0]
-                    site = query.get("site", [None])[0]
+                    _require_declared_keys(query, allowed={"job", "site"}, label="status query")
+                    job = _query_value(query, "job")
+                    site = _query_value(query, "site")
                     site_id = _parse_site_id(site) if site is not None else None
                     self._json(
                         HTTPStatus.OK,
@@ -249,9 +278,10 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 return
 
             if parsed.path == "/api/status":
-                query = parse_qs(parsed.query)
-                job = query.get("job", [None])[0]
-                site = query.get("site", [None])[0]
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                _require_declared_keys(query, allowed={"job", "site"}, label="status query")
+                job = _query_value(query, "job")
+                site = _query_value(query, "site")
                 site_id = _parse_site_id(site) if site is not None else None
                 self._json(
                     HTTPStatus.OK,
@@ -294,13 +324,17 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             data = base64.b64decode(encoded, validate=True)
         except ValueError as exc:
             raise ValueError("asset_base64 is invalid") from exc
-        return ProgrammingAsset.from_upload(
-            name=str(body.get("asset_name", "browser-upload.bin")),
-            asset_type=str(body.get("asset_type", "image")),
-            asset_format=str(body.get("asset_format", "binary")),
+        asset = ProgrammingAsset.from_upload(
+            name=str(body["asset_name"]),
+            asset_type=str(body["asset_type"]),
+            asset_format=str(body["asset_format"]),
             data=data,
-            sha256=str(body.get("asset_sha256", "")),
+            sha256=str(body["asset_sha256"]),
         )
+        declared_size = body["asset_size"]
+        if isinstance(declared_size, bool) or not isinstance(declared_size, int) or declared_size != asset.size:
+            raise ValueError("asset_size does not match decoded Asset length")
+        return asset
 
     def _job_request(
         self,
@@ -310,13 +344,77 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         default_timeout_s: float = 30.0,
         allow_inline_asset: bool = True,
     ) -> JobRequest:
+        _require_declared_keys(
+            body,
+            allowed={
+                "site_id",
+                "operation",
+                "timeout_s",
+                "map_data",
+                "offset",
+                "length",
+                "asset_name",
+                "asset_type",
+                "asset_format",
+                "asset_size",
+                "asset_sha256",
+                "asset_base64",
+                "session_id",
+            },
+            required={"site_id", "operation"},
+            label="job request",
+        )
         operation = Operation(str(body["operation"]))
         if operation not in {Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ}:
             raise ValueError("web gateway supports erase, program, verify, and read")
+
+        common_fields = {"site_id", "operation", "timeout_s", "map_data"}
+        if operation is Operation.READ:
+            allowed_fields = common_fields | {"offset", "length"}
+        elif operation in {Operation.PROGRAM, Operation.VERIFY}:
+            if allow_inline_asset:
+                allowed_fields = common_fields | {
+                    "asset_name",
+                    "asset_type",
+                    "asset_format",
+                    "asset_size",
+                    "asset_sha256",
+                    "asset_base64",
+                }
+                required_fields = {
+                    "site_id",
+                    "operation",
+                    "asset_name",
+                    "asset_type",
+                    "asset_format",
+                    "asset_size",
+                    "asset_sha256",
+                    "asset_base64",
+                }
+            else:
+                allowed_fields = common_fields | {"session_id", "asset_sha256"}
+                required_fields = {"site_id", "operation", "session_id", "asset_sha256"}
+            _require_declared_keys(
+                body,
+                allowed=allowed_fields,
+                required=required_fields,
+                label="job request",
+            )
+        else:
+            allowed_fields = common_fields
+
+        if operation not in {Operation.PROGRAM, Operation.VERIFY}:
+            _require_declared_keys(
+                body,
+                allowed=allowed_fields,
+                required={"site_id", "operation"},
+                label="job request",
+            )
+
         map_data = body.get("map_data") or {}
         if operation is Operation.READ:
             map_data = self._read_map(body, map_data)
-        site_id = _parse_site_id(body.get("site_id"))
+        site_id = _parse_site_id(body["site_id"])
         image = b""
         metadata: dict[str, Any] = {}
         if operation in {Operation.PROGRAM, Operation.VERIFY} and allow_inline_asset:
@@ -348,6 +446,11 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     self._engineering_unavailable()
                     return
                 body = self._body()
+                _require_declared_keys(
+                    body,
+                    allowed={"previous_session_id"},
+                    label="Engineering session request",
+                )
                 previous = body.get("previous_session_id")
                 if previous is not None and not isinstance(previous, str):
                     raise ValueError("previous_session_id must be a string")
@@ -365,29 +468,51 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 facility_id, ppu_id, tail = engineering
                 if tail == ["api", "programming-assets", "check"]:
                     body = self._body()
+                    required = {
+                        "session_id",
+                        "asset_name",
+                        "asset_type",
+                        "asset_format",
+                        "asset_size",
+                        "asset_sha256",
+                    }
+                    _require_declared_keys(
+                        body,
+                        allowed=required,
+                        required=required,
+                        label="Programming Asset check",
+                    )
                     self._json(
                         HTTPStatus.OK,
                         _with_rest_version(
                             self.engineering_provider.asset_cache_status(
-                                str(body.get("session_id", "")),
+                                str(body["session_id"]),
                                 facility_id,
                                 ppu_id,
-                                str(body.get("asset_name", "")),
-                                str(body.get("asset_type", "")),
-                                str(body.get("asset_format", "")),
-                                body.get("asset_size"),
-                                str(body.get("asset_sha256", "")),
+                                str(body["asset_name"]),
+                                str(body["asset_type"]),
+                                str(body["asset_format"]),
+                                body["asset_size"],
+                                str(body["asset_sha256"]),
                             )
                         ),
                     )
                     return
                 if tail == ["api", "programming-assets"]:
-                    query = parse_qs(parsed.query)
-                    session_id = query.get("session_id", [""])[0]
-                    asset_name = query.get("name", [""])[0]
-                    asset_type = query.get("type", [""])[0]
-                    asset_format = query.get("format", [""])[0]
-                    asset_sha256 = query.get("sha256", [""])[0]
+                    query = parse_qs(parsed.query, keep_blank_values=True)
+                    allowed_query = {"session_id", "name", "type", "format", "sha256"}
+                    _require_declared_keys(
+                        query,
+                        allowed=allowed_query,
+                        required=allowed_query,
+                        label="Programming Asset upload query",
+                    )
+                    session_id = _query_value(query, "session_id", required=True)
+                    asset_name = _query_value(query, "name", required=True)
+                    asset_type = _query_value(query, "type", required=True)
+                    asset_format = _query_value(query, "format", required=True)
+                    asset_sha256 = _query_value(query, "sha256", required=True)
+                    assert None not in (session_id, asset_name, asset_type, asset_format, asset_sha256)
                     self._json(
                         HTTPStatus.CREATED,
                         _with_rest_version(
@@ -420,12 +545,12 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     )
                     operation = request.operation
                     session_id = (
-                        body.get("session_id")
+                        body["session_id"]
                         if operation in {Operation.PROGRAM, Operation.VERIFY}
                         else None
                     )
                     asset_sha256 = (
-                        body.get("asset_sha256")
+                        body["asset_sha256"]
                         if operation in {Operation.PROGRAM, Operation.VERIFY}
                         else None
                     )
@@ -451,6 +576,8 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
 
             if parsed.path.startswith("/api/jobs/") and parsed.path.endswith("/cancel"):
                 job_id = parsed.path.split("/")[3]
+                body = self._body()
+                _require_declared_keys(body, allowed=set(), label="cancel request")
                 self._json(HTTPStatus.OK, _run(self.client_factory().cancel(job_id)))
                 return
             if parsed.path != "/api/jobs":
