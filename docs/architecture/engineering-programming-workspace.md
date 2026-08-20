@@ -131,9 +131,11 @@ The current Engineering Mock profile is intentionally conservative and configura
 | Operation | Size basis | Throughput | Fixed overhead | Approx. 100 KiB |
 |---|---|---:|---:|---:|
 | Erase | full 4 MiB mock flash | 2 MiB/s | 1.0 s | 3.0 s full-chip erase |
-| Program | firmware bytes | 96 KiB/s | 1.5 s | 2.54 s |
+| Program | firmware bytes | 96 KiB/s | 4.0 s | 5.04 s |
 | Verify | firmware bytes | 192 KiB/s | 1.0 s | 1.52 s |
 | Read | requested read bytes | 192 KiB/s | 1.0 s | 1.52 s for 100 KiB |
+
+The Program profile intentionally keeps a 100 KiB job above five seconds so an operator has a practical manual cancellation window while the duration still increases with firmware size.
 
 Erase is deliberately not modeled from firmware file size. The current interface is a full-chip erase, so its physical work basis is target flash size. Program, Verify and Read scale from the actual requested byte count.
 
@@ -218,7 +220,7 @@ Required validation includes:
 - a job submitted to one `(facility_id, ppu_id, site_id)` does not appear on another PPU;
 - E/P/V/R submission routes to the selected target identity;
 - Mock timing scales with Program / Verify / Read byte count and uses full target flash size for Erase;
-- a 100 KiB Program has a practical cancellation window and cancellation reaches the normal terminal `cancelled` Job state;
+- a 100 KiB Program is at least five seconds and has a practical cancellation window; cancellation reaches the normal terminal `cancelled` Job state;
 - Read output remains job- and PPU-scoped;
 - Engineering browser selection comes from the Python catalog rather than hard-coded React topology;
 - SITE 0 and Site N+1 are never exposed as canonical Sites;
