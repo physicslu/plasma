@@ -374,6 +374,8 @@ Catalog refresh must not overwrite engineering validations or customer reports. 
 
 A pre-import research snapshot counted 5,796 selectable OpenOCD candidate records across ten vendor groups and also contained broader authoritative identifiers that remain unmapped. This number is research evidence only, not a canonical product count or support guarantee. It must not be promoted to a shipped catalog baseline until the snapshot is reproducible and carries snapshot date, source versions, generator/importer version, mapping-rule version, source/license manifest references, and a content hash.
 
+The detailed CFG, identifier-kind, vendor, and CPU-architecture counts are recorded in [Device Support Catalog Baseline Statistics](device-support-catalog-baseline.md).
+
 Before import into Plasma:
 
 - deduplicate identifiers using vendor-aware normalization;

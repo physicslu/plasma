@@ -37,9 +37,11 @@ Model/revision records carry reusable compatibility. Instance records carry seri
 - [x] Define support dimensions and validation responsibility.
 - [x] Define `engineering_verified`, `pilot_reported`, and `production_reported` boundaries.
 - [x] Bind physical evidence to a complete device/PPU/Socket/software configuration.
+- [x] Record the OpenOCD CFG, mapped-identifier, vendor, and CPU-architecture baseline for the current source snapshot.
 - [ ] Audit the generated OpenOCD/CMSIS/ESP-IDF catalog for licensing and redistribution.
-- [ ] Quantify exact part numbers, CMSIS device names, ordering patterns, family aliases, duplicates, and unmapped identifiers separately.
-- [ ] Reproduce the 5,796-record research snapshot and record snapshot date, source versions, generator/importer version, mapping-rule version, source/license manifest references, and content hash before treating any count as a catalog baseline.
+- [x] Quantify current CMSIS device names, ordering patterns, unique candidate mappings, referenced CFGs, and mapped CPU architectures.
+- [ ] Reclassify and quantify exact part numbers, family aliases, duplicates, and unmapped identifiers separately.
+- [ ] Promote the research statistics to a canonical shipped baseline only after recording generator/importer version, mapping-rule version, source/license manifest references, and content hash.
 - [ ] Implement deterministic identifier classification and target-mapping rules with confidence, rule version, provenance, and an exception queue.
 - [ ] Generate a machine-readable license/source manifest and quarantine sources outside an approved allowlist.
 - [ ] Default customer production details to private; require explicit consent for publication or aggregation.
