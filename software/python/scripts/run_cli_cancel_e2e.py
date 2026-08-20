@@ -30,8 +30,8 @@ def run_cli(*arguments: str, timeout: float = 10.0) -> subprocess.CompletedProce
 
 def main() -> int:
     with tempfile.TemporaryDirectory() as temporary:
-        firmware = Path(temporary) / "cancel-demo.bin"
-        firmware.write_bytes(bytes(range(256)) * 4)
+        image_asset = Path(temporary) / "cancel-demo.bin"
+        image_asset.write_bytes(bytes(range(256)) * 4)
         server = subprocess.Popen(
             [
                 PYTHON,
@@ -60,10 +60,10 @@ def main() -> int:
                     "-m",
                     "plasma_client.cli",
                     "program",
-                    "--channel",
-                    "0",
+                    "--site",
+                    "1",
                     "--bin",
-                    os.fspath(firmware),
+                    os.fspath(image_asset),
                     "--timeout",
                     "15",
                     "--poll-interval",
@@ -90,8 +90,8 @@ def main() -> int:
 
             follow_up = run_cli(
                 "erase",
-                "--channel",
-                "0",
+                "--site",
+                "1",
                 "--timeout",
                 "5",
                 "--no-progress",
@@ -100,7 +100,7 @@ def main() -> int:
             if follow_up.returncode != 0:
                 raise AssertionError(follow_up.stderr)
             assert json.loads(follow_up.stdout)["result"]["state"] == "success"
-            print("CLI Ctrl+C E2E: remote cancel and channel recovery passed")
+            print("CLI Ctrl+C E2E: remote cancel and Site recovery passed")
             return 0
         finally:
             server.terminate()
