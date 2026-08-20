@@ -16,6 +16,21 @@ from plasma_server.server import PlasmaServer
 
 MOCK_FACILITY_COUNT = 3
 MOCK_SITE_COUNTS = (2, 4, 6, 8)
+MOCK_FLASH_SIZE_BYTES = 4 * 1024 * 1024
+MOCK_OPERATION_TIMEOUT_S = 90.0
+MOCK_THROUGHPUT_BYTES_PER_S = {
+    "erase": 2 * 1024 * 1024,
+    "program": 96 * 1024,
+    "verify": 192 * 1024,
+    "read": 192 * 1024,
+}
+MOCK_OPERATION_OVERHEADS_S = {
+    "erase": 1.0,
+    "program": 1.5,
+    "verify": 1.0,
+    "read": 1.0,
+}
+MOCK_PROGRESS_STEPS = 20
 
 
 class EngineeringPPUProvider(Protocol):
@@ -69,6 +84,11 @@ class MockEngineeringPPUProvider:
     The simulated topology is server-owned: three Facilities, four PPUs per
     Facility, and 2/4/6/8 Sites per PPU. Jobs still traverse Plasma Protocol
     v3.2, SiteManager/SiteWorker, and MockInterface.
+
+    Mock operation timing is intentionally size-aware rather than instant. The
+    profile is an engineering simulation contract, not a claim about a specific
+    real IC. Program/verify/read scale with requested byte count; erase models a
+    full-chip erase and therefore scales with configured target flash size.
     """
 
     def __init__(self, root: Path) -> None:
@@ -198,13 +218,14 @@ class MockEngineeringPPUProvider:
                     enabled=True,
                     interface="mock",
                     target="MOCK-IC",
-                    operation_timeout_s=5.0,
+                    operation_timeout_s=MOCK_OPERATION_TIMEOUT_S,
                     max_retries=0,
                     retry_backoff_s=0.01,
                     mock={
-                        "flash_size": 4 * 1024 * 1024,
-                        "default_delay_s": 0.01,
-                        "progress_steps": 4,
+                        "flash_size": MOCK_FLASH_SIZE_BYTES,
+                        "throughput_bytes_per_s": dict(MOCK_THROUGHPUT_BYTES_PER_S),
+                        "operation_overheads_s": dict(MOCK_OPERATION_OVERHEADS_S),
+                        "progress_steps": MOCK_PROGRESS_STEPS,
                     },
                 )
                 for site_id in range(1, spec.site_count + 1)
@@ -251,6 +272,12 @@ class MockEngineeringPPUProvider:
             "facility_count": len(facilities),
             "ppu_count": len(self._specs),
             "site_count": sum(spec.site_count for spec in self._specs),
+            "timing_profile": {
+                "model": "fixed-overhead-plus-bytes-over-throughput",
+                "flash_size_bytes": MOCK_FLASH_SIZE_BYTES,
+                "throughput_bytes_per_s": dict(MOCK_THROUGHPUT_BYTES_PER_S),
+                "operation_overheads_s": dict(MOCK_OPERATION_OVERHEADS_S),
+            },
             "facilities": facilities,
         }
 
