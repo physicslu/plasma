@@ -329,7 +329,14 @@ test("PPU Programming Asset cache uploads once, probes on reuse, reloads on chan
     }
     if (request.method() === "POST" && tail === "api/programming-assets/check") {
       checkCount += 1;
-      const body = request.postDataJSON() as { session_id: string; asset_sha256: string; asset_name: string; asset_size: number };
+      const body = request.postDataJSON() as {
+        session_id: string;
+        asset_name: string;
+        asset_type: string;
+        asset_format: string;
+        asset_size: number;
+        asset_sha256: string;
+      };
       const cacheKey = `${body.session_id}|${targetKey}`;
       await route.fulfill({
         status: 200,
@@ -339,6 +346,8 @@ test("PPU Programming Asset cache uploads once, probes on reuse, reloads on chan
           programming_asset: {
             cache_hit: cache.get(cacheKey) === body.asset_sha256,
             asset_name: body.asset_name,
+            asset_type: body.asset_type,
+            asset_format: body.asset_format,
             asset_size: body.asset_size,
             asset_sha256: body.asset_sha256,
           },
@@ -404,7 +413,7 @@ test("PPU Programming Asset cache uploads once, probes on reuse, reloads on chan
   expect(uploadCount).toBe(1);
   expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "asset_base64"))).toBe(true);
   expect(jobBodies.slice(0, 2).every(body => typeof body.asset_sha256 === "string")).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "asset_sha256"))).toBe(true);
+  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "image_sha256"))).toBe(true);
   await expect.poll(() => page.locator(".executeBatch").isEnabled()).toBe(true);
 
   await page.locator(".executeBatch").click();
