@@ -16,7 +16,6 @@ import type {
   EngineeringFacilityTarget,
   EngineeringPPUTarget,
   EngineeringTargetCatalog,
-  JobSnapshot,
   Operation,
   SiteSnapshot,
 } from "../plasma-api";
@@ -25,7 +24,6 @@ import "./production-prototype.css";
 
 type SiteRunState = "ready" | "running" | "success" | "failed" | "cancelled";
 type BatchState = "idle" | "running" | "cancelling" | "complete" | "partial" | "cancelled";
-
 type SiteRuntime = {
   id: number;
   enabled: boolean;
@@ -38,27 +36,9 @@ type SiteRuntime = {
   target?: string | null;
   interface?: string | null;
 };
-
-type PPURuntime = {
-  target: EngineeringPPUTarget;
-  sites: SiteRuntime[];
-  loading: boolean;
-  error?: string;
-};
-
-type ActiveJob = {
-  ppuId: string;
-  targetApiBase: string;
-  siteId: number;
-  jobId: string;
-};
-
-type LogEntry = {
-  id: number;
-  time: string;
-  level: "INFO" | "WARN" | "ERROR";
-  text: string;
-};
+type PPURuntime = { target: EngineeringPPUTarget; sites: SiteRuntime[]; loading: boolean; error?: string };
+type ActiveJob = { ppuId: string; targetApiBase: string; siteId: number; jobId: string };
+type LogEntry = { id: number; time: string; level: "INFO" | "WARN" | "ERROR"; text: string };
 
 const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 const POLL_INTERVAL_MS = 300;
@@ -155,15 +135,12 @@ const copy = {
 function nowTime(): string {
   return new Date().toLocaleTimeString("en-GB", { hour12: false });
 }
-
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, ms));
 }
-
 function siteLabel(siteId: number): string {
   return `SITE-${String(siteId).padStart(2, "0")}`;
 }
-
 function runtimeFromStatus(snapshot: SiteSnapshot): SiteRuntime {
   return {
     id: snapshot.site_id,
@@ -175,11 +152,9 @@ function runtimeFromStatus(snapshot: SiteSnapshot): SiteRuntime {
     interface: snapshot.interface,
   };
 }
-
 function orderedOperations(selected: Operation[]): Operation[] {
   return operationOrder.filter(operation => selected.includes(operation));
 }
-
 function ppuStatus(runtime: PPURuntime): SiteRunState | "partial" {
   const sites = runtime.sites.filter(site => site.selected);
   if (sites.length === 0) return "ready";
@@ -213,8 +188,12 @@ export default function FleetPage() {
   const logSequence = useRef(0);
 
   const appendLog = useCallback((textValue: string, level: LogEntry["level"] = "INFO") => {
-    const entry: LogEntry = { id: ++logSequence.current, time: nowTime(), level, text: textValue };
-    setLogs(current => [...current, entry].slice(-500));
+    setLogs(current => [...current, {
+      id: ++logSequence.current,
+      time: nowTime(),
+      level,
+      text: textValue,
+    }].slice(-500));
   }, []);
 
   useEffect(() => {
@@ -227,38 +206,33 @@ export default function FleetPage() {
         setSessionId(session.session_id);
         setCatalog(next);
         setProviderError(null);
-        const firstFacility = next.facilities[0]?.facility_id ?? "";
-        setFacilityId(firstFacility);
+        setFacilityId(next.facilities[0]?.facility_id ?? "");
         setDraftPpuIds([]);
         appendLog(`[PROVIDER] ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
       } catch (error) {
         if (stopped) return;
-        const detail = error instanceof Error ? error.message : text.offline;
+        const detail = error instanceof Error ? error.message : "Mock Provider unavailable";
         setProviderError(detail);
         setCatalog(null);
         appendLog(`[PROVIDER] unavailable · ${detail}`, "ERROR");
       }
     })();
     return () => { stopped = true; };
-  }, [appendLog, text.offline]);
+  }, [appendLog]);
 
   const facility: EngineeringFacilityTarget | null = useMemo(
     () => catalog?.facilities.find(item => item.facility_id === facilityId) ?? null,
     [catalog, facilityId],
   );
-
   const activeFacility: EngineeringFacilityTarget | null = useMemo(
     () => catalog?.facilities.find(item => item.facility_id === activeFacilityId) ?? null,
     [catalog, activeFacilityId],
   );
-
   const activeTargets = useMemo(
     () => activeFacility?.ppus.filter(ppu => activePpuIds.includes(ppu.ppu_id)) ?? [],
     [activeFacility, activePpuIds],
   );
-
   const batchRunning = batchState === "running" || batchState === "cancelling";
-
   const summary = useMemo(() => {
     const sites = Object.values(runtimes).flatMap(runtime => runtime.sites.filter(site => site.selected));
     return {
@@ -301,33 +275,26 @@ export default function FleetPage() {
     cancelAllRequested.current = false;
     cancelledPpus.current.clear();
     currentJobs.current.clear();
-    setRuntimes(Object.fromEntries(targets.map(target => [target.ppu_id, { target, sites: [], loading: true }])));
+    setRuntimes(Object.fromEntries(targets.map(target => [target.ppu_id, { target, sites: [], loading: true } as PPURuntime])));
     appendLog(`[SET] ${facility.facility_id} · ${targets.map(target => target.ppu_id).join(", ")}`);
 
     const results = await Promise.allSettled(targets.map(async target => {
       const targetBase = engineeringTargetApiBase(DEFAULT_API_BASE, facility.facility_id, target.ppu_id);
-      const status = await getPPUStatus(targetBase);
-      return { target, status };
+      return { target, status: await getPPUStatus(targetBase) };
     }));
 
     setRuntimes(current => {
       const next = { ...current };
       results.forEach((result, index) => {
         const target = targets[index];
-        if (result.status === "fulfilled") {
-          next[target.ppu_id] = {
-            target,
-            loading: false,
-            sites: result.value.status.sites.map(runtimeFromStatus),
-          };
-        } else {
-          next[target.ppu_id] = {
+        next[target.ppu_id] = result.status === "fulfilled"
+          ? { target, loading: false, sites: result.value.status.sites.map(runtimeFromStatus) }
+          : {
             target,
             loading: false,
             sites: [],
             error: result.reason instanceof Error ? result.reason.message : "PPU status unavailable",
           };
-        }
       });
       return next;
     });
@@ -372,21 +339,18 @@ export default function FleetPage() {
       : [...current, operation]);
   }
 
-  async function waitForTerminal(
-    ppuId: string,
-    siteId: number,
-    targetBase: string,
-    jobId: string,
-  ): Promise<SiteRunState> {
+  async function waitForTerminal(ppuId: string, siteId: number, targetBase: string, jobId: string): Promise<SiteRunState> {
     for (let attempt = 0; attempt < POLL_LIMIT; attempt += 1) {
       const job = await getJob(targetBase, jobId);
       const progress = Math.round(Number(job.progress_percent ?? 0));
-      updateSite(ppuId, siteId, {
-        state: terminalStates.has(job.state) ? undefined : "running",
-        progress,
-        operation: job.operation,
-        jobId: job.job_id,
-      });
+      if (!terminalStates.has(job.state)) {
+        updateSite(ppuId, siteId, {
+          state: "running",
+          progress,
+          operation: job.operation,
+          jobId: job.job_id,
+        });
+      }
       if (terminalStates.has(job.state)) {
         if (job.state === "success") return "success";
         if (job.state === "cancelled") return "cancelled";
@@ -404,10 +368,11 @@ export default function FleetPage() {
     operations: Operation[],
   ): Promise<SiteRunState> {
     const targetBase = engineeringTargetApiBase(DEFAULT_API_BASE, facilityValue, ppu.ppu_id);
+    const cancellationRequested = () => cancelAllRequested.current || cancelledPpus.current.has(ppu.ppu_id);
     try {
       updateSite(ppu.ppu_id, siteId, { state: "running", progress: 0, error: undefined });
       for (const operation of operations) {
-        if (cancelAllRequested.current || cancelledPpus.current.has(ppu.ppu_id)) {
+        if (cancellationRequested()) {
           updateSite(ppu.ppu_id, siteId, { state: "cancelled", progress: 0 });
           return "cancelled";
         }
@@ -419,29 +384,25 @@ export default function FleetPage() {
           engineeringSessionId: sessionId ?? undefined,
           offset: 0,
           length: 256,
-          submissionGuard: () => !cancelAllRequested.current && !cancelledPpus.current.has(ppu.ppu_id),
+          submissionGuard: () => !cancellationRequested(),
         });
         const jobKey = `${ppu.ppu_id}:${siteId}`;
-        currentJobs.current.set(jobKey, {
-          ppuId: ppu.ppu_id,
-          targetApiBase: targetBase,
-          siteId,
-          jobId: job.job_id,
-        });
+        currentJobs.current.set(jobKey, { ppuId: ppu.ppu_id, targetApiBase: targetBase, siteId, jobId: job.job_id });
         updateSite(ppu.ppu_id, siteId, {
           state: "running",
           progress: Math.round(Number(job.progress_percent ?? 0)),
           operation,
           jobId: job.job_id,
         });
-        if (cancelAllRequested.current || cancelledPpus.current.has(ppu.ppu_id)) {
-          await cancelJob(targetBase, job.job_id).catch(() => undefined);
-        }
+        if (cancellationRequested()) await cancelJob(targetBase, job.job_id).catch(() => undefined);
         const terminal = await waitForTerminal(ppu.ppu_id, siteId, targetBase, job.job_id);
         currentJobs.current.delete(jobKey);
         if (terminal !== "success") {
-          updateSite(ppu.ppu_id, siteId, { state: terminal, progress: terminal === "failed" ? 0 : 100 });
-          appendLog(`[JOB] ${terminal.toUpperCase()} · ${ppu.ppu_id} · ${siteLabel(siteId)} · ${operation.toUpperCase()}`, terminal === "failed" ? "ERROR" : "WARN");
+          updateSite(ppu.ppu_id, siteId, { state: terminal, progress: terminal === "cancelled" ? 100 : 0 });
+          appendLog(
+            `[JOB] ${terminal.toUpperCase()} · ${ppu.ppu_id} · ${siteLabel(siteId)} · ${operation.toUpperCase()}`,
+            terminal === "failed" ? "ERROR" : "WARN",
+          );
           return terminal;
         }
         appendLog(`[JOB] PASS · ${ppu.ppu_id} · ${siteLabel(siteId)} · ${operation.toUpperCase()}`);
@@ -449,6 +410,11 @@ export default function FleetPage() {
       updateSite(ppu.ppu_id, siteId, { state: "success", progress: 100 });
       return "success";
     } catch (error) {
+      if (cancellationRequested()) {
+        updateSite(ppu.ppu_id, siteId, { state: "cancelled", progress: 0 });
+        appendLog(`[JOB] CANCELLED · ${ppu.ppu_id} · ${siteLabel(siteId)}`, "WARN");
+        return "cancelled";
+      }
       const detail = error instanceof Error ? error.message : "Job failed";
       updateSite(ppu.ppu_id, siteId, { state: "failed", progress: 0, error: detail });
       appendLog(`[JOB] FAIL · ${ppu.ppu_id} · ${siteLabel(siteId)} · ${detail}`, "ERROR");
@@ -485,7 +451,7 @@ export default function FleetPage() {
       sites: runtime.sites.map(site => site.selected
         ? { ...site, state: "ready" as const, progress: 0, jobId: undefined, error: undefined }
         : site),
-    }])));
+    }])) as Record<string, PPURuntime>);
     appendLog(`[BAT] START · ${activeTargets.length} PPUs · ${selected.length} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")}`);
 
     const results = await Promise.allSettled(
@@ -544,14 +510,9 @@ export default function FleetPage() {
     <main className="productionPrototypePage">
       <section className="productionPrototypeShell">
         <header className="productionPrototypeHeading">
-          <div>
-            <p>{text.eyebrow}</p>
-            <h1>{text.title}</h1>
-            <span>{text.subtitle}</span>
-          </div>
+          <div><p>{text.eyebrow}</p><h1>{text.title}</h1><span>{text.subtitle}</span></div>
           <div className={`prototypeProvider ${providerError ? "offline" : catalog ? "online" : "loading"}`}>
-            <i />
-            <div><small>{text.provider}</small><b>{providerError ? "OFFLINE" : catalog ? "ONLINE" : "CONNECTING"}</b></div>
+            <i /><div><small>{text.provider}</small><b>{providerError ? "OFFLINE" : catalog ? "ONLINE" : "CONNECTING"}</b></div>
           </div>
         </header>
 
@@ -580,10 +541,7 @@ export default function FleetPage() {
                   id="production-facility"
                   value={facilityId}
                   disabled={batchRunning}
-                  onChange={event => {
-                    setFacilityId(event.target.value);
-                    setDraftPpuIds([]);
-                  }}
+                  onChange={event => { setFacilityId(event.target.value); setDraftPpuIds([]); }}
                 >
                   {catalog.facilities.map(item => <option value={item.facility_id} key={item.facility_id}>{item.display_name}</option>)}
                 </select>
