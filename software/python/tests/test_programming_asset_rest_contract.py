@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import threading
 import unittest
@@ -10,7 +11,7 @@ from http.server import ThreadingHTTPServer
 from plasma_web.gateway import PlasmaWebHandler, WEB_REST_CONTRACT_VERSION
 
 
-class FakeProgrammingImageProvider:
+class FakeProgrammingAssetProvider:
     last_begin_session = None
     last_cache_check = None
     last_cache_upload = None
@@ -23,7 +24,12 @@ class FakeProgrammingImageProvider:
             "facility_count": 1,
             "ppu_count": 1,
             "site_count": 2,
-            "firmware_scope": "connection-session-and-ppu",
+            "programming_asset_scope": "connection-session-and-ppu",
+            "supported_asset_types": ["image", "key", "option", "serial_number", "calibration"],
+            "supported_asset_formats": ["binary", "intel_hex", "csv", "text"],
+            "implemented_normalizers": [
+                {"asset_type": "image", "asset_format": "binary", "output": "normalized_image"}
+            ],
             "facilities": [],
         }
 
@@ -33,63 +39,75 @@ class FakeProgrammingImageProvider:
             "ok": True,
             "session": {
                 "session_id": "1" * 32,
-                "firmware_cache_scope": "connection-session-and-ppu",
+                "programming_asset_cache_scope": "connection-session-and-ppu",
                 "previous_session_cleared": previous_session_id is not None,
             },
         }
 
-    def firmware_cache_status(
+    def asset_cache_status(
         self,
         session_id,
         facility_id,
         ppu_id,
-        firmware_name,
-        firmware_size,
-        firmware_sha256,
+        asset_name,
+        asset_type,
+        asset_format,
+        asset_size,
+        asset_sha256,
     ):
         self.last_cache_check = (
             session_id,
             facility_id,
             ppu_id,
-            firmware_name,
-            firmware_size,
-            firmware_sha256,
+            asset_name,
+            asset_type,
+            asset_format,
+            asset_size,
+            asset_sha256,
         )
         return {
             "ok": True,
-            "firmware": {
+            "programming_asset": {
                 "cache_hit": False,
-                "firmware_name": firmware_name,
-                "firmware_size": firmware_size,
-                "firmware_sha256": firmware_sha256,
+                "asset_name": asset_name,
+                "asset_type": asset_type,
+                "asset_format": asset_format,
+                "asset_size": asset_size,
+                "asset_sha256": asset_sha256,
             },
         }
 
-    def cache_firmware(
+    def cache_asset(
         self,
         session_id,
         facility_id,
         ppu_id,
-        firmware_name,
-        firmware_sha256,
-        firmware,
+        asset_name,
+        asset_type,
+        asset_format,
+        asset_sha256,
+        data,
     ):
         self.last_cache_upload = (
             session_id,
             facility_id,
             ppu_id,
-            firmware_name,
-            firmware_sha256,
-            firmware,
+            asset_name,
+            asset_type,
+            asset_format,
+            asset_sha256,
+            data,
         )
         return {
             "ok": True,
-            "firmware": {
+            "programming_asset": {
                 "cache_hit": True,
                 "uploaded": True,
-                "firmware_name": firmware_name,
-                "firmware_size": len(firmware),
-                "firmware_sha256": firmware_sha256,
+                "asset_name": asset_name,
+                "asset_type": asset_type,
+                "asset_format": asset_format,
+                "asset_size": len(data),
+                "asset_sha256": asset_sha256,
             },
         }
 
@@ -121,19 +139,13 @@ class FakeProgrammingImageProvider:
         request,
         *,
         session_id=None,
-        firmware_sha256=None,
+        asset_sha256=None,
     ):
-        self.last_start = (
-            facility_id,
-            ppu_id,
-            request,
-            session_id,
-            firmware_sha256,
-        )
+        self.last_start = (facility_id, ppu_id, request, session_id, asset_sha256)
         return {
             "ok": True,
             "job": {
-                "job_id": "programming-image-job-1",
+                "job_id": "programming-asset-job-1",
                 "site_id": request.site_id,
                 "operation": request.operation.value,
                 "state": "queued",
@@ -147,11 +159,11 @@ class FakeProgrammingImageProvider:
         return b""
 
 
-class ProgrammingImageRestContractTests(unittest.TestCase):
+class ProgrammingAssetRestContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.previous_provider = PlasmaWebHandler.engineering_provider
-        cls.provider = FakeProgrammingImageProvider()
+        cls.provider = FakeProgrammingAssetProvider()
         PlasmaWebHandler.engineering_provider = cls.provider
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -177,63 +189,60 @@ class ProgrammingImageRestContractTests(unittest.TestCase):
         payload = json.loads(data) if data and response_content_type.startswith("application/json") else data
         return response.status, payload
 
-    def test_catalog_and_session_publish_rest_v2_programming_image_names(self):
+    def test_catalog_and_session_publish_rest_v3_asset_contract(self):
         status, payload = self.request("GET", "/api/engineering/targets")
         self.assertEqual(status, 200)
         self.assertEqual(payload["rest_contract_version"], WEB_REST_CONTRACT_VERSION)
-        self.assertEqual(payload["programming_image_scope"], "connection-session-and-ppu")
-        self.assertEqual(payload["firmware_scope"], "connection-session-and-ppu")
+        self.assertEqual(WEB_REST_CONTRACT_VERSION, "3")
+        self.assertEqual(payload["programming_asset_scope"], "connection-session-and-ppu")
+        self.assertIn("serial_number", payload["supported_asset_types"])
 
         status, payload = self.request("POST", "/api/engineering/session", {})
         self.assertEqual(status, 201)
-        self.assertEqual(payload["rest_contract_version"], WEB_REST_CONTRACT_VERSION)
+        self.assertEqual(payload["rest_contract_version"], "3")
         self.assertEqual(
-            payload["session"]["programming_image_cache_scope"],
-            "connection-session-and-ppu",
-        )
-        self.assertEqual(
-            payload["session"]["firmware_cache_scope"],
+            payload["session"]["programming_asset_cache_scope"],
             "connection-session-and-ppu",
         )
 
-    def test_canonical_programming_image_check_and_upload_routes(self):
+    def test_programming_asset_check_and_upload_routes(self):
         session_id = "1" * 32
-        sha256 = "a" * 64
+        data = b"image-bytes"
+        sha256 = hashlib.sha256(data).hexdigest()
         status, payload = self.request(
             "POST",
-            f"{self.target}/api/programming-images/check",
+            f"{self.target}/api/programming-assets/check",
             {
                 "session_id": session_id,
-                "image_name": "image.bin",
-                "image_size": 4096,
-                "image_sha256": sha256,
+                "asset_name": "image.bin",
+                "asset_type": "image",
+                "asset_format": "binary",
+                "asset_size": len(data),
+                "asset_sha256": sha256,
             },
         )
         self.assertEqual(status, 200)
-        self.assertFalse(payload["programming_image"]["cache_hit"])
-        self.assertEqual(payload["programming_image"]["image_name"], "image.bin")
-        self.assertEqual(payload["programming_image"]["image_size"], 4096)
-        self.assertEqual(payload["programming_image"]["image_sha256"], sha256)
-        self.assertIn("firmware", payload)
+        self.assertFalse(payload["programming_asset"]["cache_hit"])
+        self.assertEqual(payload["programming_asset"]["asset_name"], "image.bin")
         self.assertEqual(
             self.provider.last_cache_check,
-            (session_id, "facility-01", "ppu-01", "image.bin", 4096, sha256),
+            (session_id, "facility-01", "ppu-01", "image.bin", "image", "binary", len(data), sha256),
         )
 
         status, payload = self.request(
             "POST",
-            f"{self.target}/api/programming-images?session_id={session_id}&name=image.bin&sha256={sha256}",
-            raw_body=b"image-bytes",
+            f"{self.target}/api/programming-assets?session_id={session_id}&name=image.bin&type=image&format=binary&sha256={sha256}",
+            raw_body=data,
             content_type="application/octet-stream",
         )
         self.assertEqual(status, 201)
-        self.assertTrue(payload["programming_image"]["uploaded"])
+        self.assertTrue(payload["programming_asset"]["uploaded"])
         self.assertEqual(
             self.provider.last_cache_upload,
-            (session_id, "facility-01", "ppu-01", "image.bin", sha256, b"image-bytes"),
+            (session_id, "facility-01", "ppu-01", "image.bin", "image", "binary", sha256, data),
         )
 
-    def test_canonical_job_reference_routes_to_legacy_provider_boundary(self):
+    def test_engineering_job_references_cached_asset_only(self):
         session_id = "2" * 32
         sha256 = "b" * 64
         status, payload = self.request(
@@ -243,65 +252,83 @@ class ProgrammingImageRestContractTests(unittest.TestCase):
                 "site_id": 2,
                 "operation": "program",
                 "session_id": session_id,
-                "image_name": "cached.bin",
-                "image_sha256": sha256,
+                "asset_sha256": sha256,
             },
         )
         self.assertEqual(status, 202)
         self.assertEqual(payload["job"]["operation"], "program")
         _, _, request, routed_session, routed_sha = self.provider.last_start
-        self.assertEqual(request.metadata["firmware_name"], "cached.bin")
+        self.assertEqual(request.image, b"")
         self.assertEqual(routed_session, session_id)
         self.assertEqual(routed_sha, sha256)
 
-    def test_legacy_firmware_alias_remains_accepted(self):
-        session_id = "3" * 32
-        sha256 = "c" * 64
-        status, payload = self.request(
-            "POST",
-            f"{self.target}/api/firmware/check",
-            {
-                "session_id": session_id,
-                "firmware_name": "legacy.bin",
-                "firmware_size": 64,
-                "firmware_sha256": sha256,
-            },
-        )
-        self.assertEqual(status, 200)
-        self.assertEqual(payload["programming_image"]["image_name"], "legacy.bin")
-        self.assertEqual(payload["firmware"]["firmware_name"], "legacy.bin")
-
-    def test_conflicting_canonical_and_legacy_fields_are_rejected(self):
-        status, payload = self.request(
-            "POST",
-            f"{self.target}/api/programming-images/check",
-            {
-                "session_id": "4" * 32,
-                "image_name": "canonical.bin",
-                "firmware_name": "legacy.bin",
-                "image_size": 64,
-                "firmware_size": 64,
-                "image_sha256": "d" * 64,
-                "firmware_sha256": "d" * 64,
-            },
-        )
-        self.assertEqual(status, 400)
-        self.assertIn("disagree", payload["error"]["message"])
-
-    def test_local_job_accepts_canonical_inline_image_fields(self):
+    def test_local_job_materializes_asset_then_normalizes_image(self):
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
-        encoded = base64.b64encode(b"inline-image").decode()
+        data = b"inline-image"
+        encoded = base64.b64encode(data).decode()
+        sha256 = hashlib.sha256(data).hexdigest()
         request = handler._job_request(
             {
                 "site_id": 1,
                 "operation": "program",
-                "image_name": "inline.bin",
-                "image_base64": encoded,
+                "asset_name": "inline.bin",
+                "asset_type": "image",
+                "asset_format": "binary",
+                "asset_size": len(data),
+                "asset_sha256": sha256,
+                "asset_base64": encoded,
             },
             client_id="test-client",
         )
-        self.assertEqual(request.firmware, b"inline-image")
-        self.assertEqual(request.metadata["firmware_name"], "inline.bin")
+        self.assertEqual(request.image, data)
+        self.assertEqual(request.metadata["image_name"], "inline.bin")
+        self.assertEqual(request.metadata["source_asset_sha256"], sha256)
+
+    def test_non_image_asset_cannot_be_used_as_inline_program_image(self):
+        handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
+        data = b"SN-000003"
+        encoded = base64.b64encode(data).decode()
+        sha256 = hashlib.sha256(data).hexdigest()
+        with self.assertRaises(Exception):
+            handler._job_request(
+                {
+                    "site_id": 1,
+                    "operation": "program",
+                    "asset_name": "serial.txt",
+                    "asset_type": "serial_number",
+                    "asset_format": "text",
+                    "asset_size": len(data),
+                    "asset_sha256": sha256,
+                    "asset_base64": encoded,
+                },
+                client_id="test-client",
+            )
+
+    def test_unknown_rest_fields_fail_closed(self):
+        status, payload = self.request(
+            "POST",
+            f"{self.target}/api/programming-assets/check",
+            {
+                "session_id": "1" * 32,
+                "asset_name": "image.bin",
+                "asset_type": "image",
+                "asset_format": "binary",
+                "asset_size": 1,
+                "asset_sha256": "a" * 64,
+                "unexpected": True,
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertFalse(payload["ok"])
+
+    def test_retired_rest_routes_are_not_available(self):
+        for path in (
+            f"{self.target}/api/programming-images/check",
+            f"{self.target}/api/firmware/check",
+        ):
+            with self.subTest(path=path):
+                status, _payload = self.request("POST", path, {})
+                self.assertEqual(status, 404)
 
 
 if __name__ == "__main__":

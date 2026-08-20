@@ -4,15 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from plasma_core.config import (
-    ChannelConfig,
-    PPUConfig,
-    PlasmaConfig,
-    ProgrammerConfig,
-    ServerConfig,
-    SiteConfig,
-    load_config,
-)
+from plasma_core.config import PPUConfig, PlasmaConfig, ServerConfig, SiteConfig, load_config
 from plasma_core.errors import ErrorCode, PlasmaError
 
 
@@ -29,7 +21,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual([item.id for item in config.sites], list(range(1, 9)))
         self.assertTrue(config.server.output_root.is_absolute())
 
-    def test_new_domain_identity_is_one_based(self) -> None:
+    def test_domain_identity_is_one_based(self) -> None:
         config = PlasmaConfig(
             server=ServerConfig(max_supported_sites=4, max_concurrent_jobs=1),
             sites=[SiteConfig(id=1, enabled=True), SiteConfig(id=2)],
@@ -40,7 +32,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.site_count, 2)
         self.assertEqual(config.enabled_site_count, 1)
 
-    def test_canonical_site_zero_is_rejected(self) -> None:
+    def test_site_zero_is_rejected(self) -> None:
         config = PlasmaConfig(
             server=ServerConfig(max_supported_sites=2, max_concurrent_jobs=1),
             sites=[SiteConfig(id=0, enabled=True)],
@@ -49,7 +41,7 @@ class ConfigTests(unittest.TestCase):
             config.validate()
         self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
 
-    def test_canonical_site_id_requires_integer_without_coercion(self) -> None:
+    def test_site_id_requires_integer_without_coercion(self) -> None:
         for value in (True, 1.0, 1.5, "1"):
             with self.subTest(site_id=value):
                 config = PlasmaConfig(
@@ -60,52 +52,18 @@ class ConfigTests(unittest.TestCase):
                     config.validate()
                 self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
 
-    def test_legacy_config_and_python_aliases_translate_channel_zero_to_site_one(self) -> None:
+    def test_retired_configuration_vocabulary_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "plasma.yaml"
             path.write_text(
-                "programmer:\n  id: legacy-pgm\n  site_id: legacy-lab\n"
+                "programmer:\n  id: old-node\n"
                 "server:\n  max_supported_channels: 4\n  max_concurrent_jobs: 1\n"
                 "channels:\n  - {id: 0, enabled: true, interface: mock}\n",
                 encoding="utf-8",
             )
-            config = load_config(path)
-            self.assertEqual(config.ppu.id, "legacy-pgm")
-            self.assertEqual(config.ppu.facility_id, "legacy-lab")
-            self.assertEqual(config.sites[0].id, 1)
-            self.assertIs(config.programmer, config.ppu)
-            self.assertIs(config.channels, config.sites)
-
-        legacy = PlasmaConfig(
-            server=ServerConfig(max_supported_channels=2, max_concurrent_jobs=1),
-            channels=[ChannelConfig(id=0)],
-            programmer=ProgrammerConfig(id="legacy-pgm", site_id="legacy-lab"),
-        )
-        self.assertEqual(legacy.sites[0].id, 1)
-        self.assertEqual(legacy.ppu.facility_id, "legacy-lab")
-        self.assertIsInstance(legacy.ppu, PPUConfig)
-
-    def test_legacy_channel_id_requires_integer_without_coercion(self) -> None:
-        for value in (True, 0.0, 0.5, "0"):
-            with self.subTest(channel_id=value):
-                with self.assertRaises(PlasmaError) as caught:
-                    PlasmaConfig(
-                        server=ServerConfig(max_supported_channels=2, max_concurrent_jobs=1),
-                        channels=[ChannelConfig(id=value)],  # type: ignore[arg-type]
-                    )
-                self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
-
-        for literal in ("true", "0.0", "'0'"):
-            with self.subTest(yaml_channel_id=literal), tempfile.TemporaryDirectory() as temporary:
-                path = Path(temporary) / "plasma.yaml"
-                path.write_text(
-                    "server:\n  max_supported_channels: 2\n  max_concurrent_jobs: 1\n"
-                    f"channels:\n  - {{id: {literal}, enabled: true, interface: mock}}\n",
-                    encoding="utf-8",
-                )
-                with self.assertRaises(PlasmaError) as caught:
-                    load_config(path)
-                self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
+            with self.assertRaises(PlasmaError) as caught:
+                load_config(path)
+            self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
 
     def test_invalid_ppu_identity_rejected(self) -> None:
         config = PlasmaConfig(

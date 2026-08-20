@@ -8,13 +8,8 @@ from plasma_core.config import PlasmaConfig, SiteConfig
 from plasma_core.enums import Operation, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.job_logging import OutputManager, ServerEventLogger
-from plasma_core.models import (
-    JobRequest,
-    JobResult,
-    iso_now,
-    legacy_channel_id_from_site,
-    site_id_from_legacy_channel,
-)
+from plasma_core.models import JobRequest, JobResult, iso_now
+from plasma_core.protocol import PROTOCOL_VERSION
 from plasma_handlers.stm32 import STM32F103Handler
 from plasma_interfaces.base import BaseInterface
 from plasma_interfaces.fpga import FPGAInterface
@@ -121,10 +116,6 @@ class SiteManager:
             raise PlasmaError(ErrorCode.SITE_DISABLED, f"site is disabled: SITE{site_id}")
         return self.workers[site_id]
 
-    def _resolve_channel(self, channel_id: int) -> SiteWorker:
-        """Legacy v3.1 adapter from 0-based channel to one-based Site."""
-        return self._resolve_site(site_id_from_legacy_channel(channel_id))
-
     def enqueue(self, request: JobRequest) -> asyncio.Future[JobResult]:
         if not self._started:
             raise PlasmaError(ErrorCode.INTERNAL_ERROR, "site manager is not started")
@@ -201,22 +192,6 @@ class SiteManager:
             },
         }
 
-    def programmer_snapshot(self) -> dict[str, Any]:
-        """Legacy STATUS shape retained for v3.1 compatibility."""
-        ppu = self.ppu_snapshot()
-        return {
-            "programmer_id": ppu["ppu_id"],
-            "site_id": ppu["facility_id"],
-            "model": ppu["model"],
-            "display_name": ppu["display_name"],
-            "channel_count": ppu["site_count"],
-            "enabled_channel_count": ppu["enabled_site_count"],
-            "capabilities": {
-                "max_supported_channels": ppu["capabilities"]["max_supported_sites"],
-                "operations": list(ppu["capabilities"]["operations"]),
-            },
-        }
-
     def _latest_job_summary(self, site_id: int) -> dict[str, Any] | None:
         """Return a browser-safe latest-job summary without result files or raw metadata."""
         for runtime in reversed(self.registry.all()):
@@ -240,19 +215,17 @@ class SiteManager:
         self,
         *,
         site_id: int | None = None,
-        channel_id: int | None = None,
         job_id: str | None = None,
-        protocol_version: str = "3.2",
+        protocol_version: str = PROTOCOL_VERSION,
     ) -> dict[str, Any]:
+        if protocol_version != PROTOCOL_VERSION:
+            raise PlasmaError(
+                ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
+                f"unsupported protocol version: {protocol_version!r}",
+            )
         if job_id:
             return {"job": self.registry.get(job_id).snapshot(protocol_version)}
-        legacy_site_id = (
-            site_id_from_legacy_channel(channel_id) if channel_id is not None else None
-        )
-        if site_id is not None and legacy_site_id is not None and site_id != legacy_site_id:
-            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id and legacy channel_id disagree")
-        selected_site_id = site_id if site_id is not None else legacy_site_id
-        site_ids = [selected_site_id] if selected_site_id is not None else sorted(self._site_configs)
+        site_ids = [site_id] if site_id is not None else sorted(self._site_configs)
         sites: list[dict[str, Any]] = []
         for current_id in site_ids:
             config = self._site_configs.get(current_id)
@@ -273,22 +246,7 @@ class SiteManager:
                     "target": config.target if config.enabled else None,
                 }
             )
-        if protocol_version == "3.1":
-            return {
-                "programmer": self.programmer_snapshot(),
-                "channels": [
-                    {
-                        "channel_id": legacy_channel_id_from_site(item["site_id"]),
-                        **{key: value for key, value in item.items() if key != "site_id"},
-                    }
-                    for item in sites
-                ],
-            }
         return {
             "ppu": self.ppu_snapshot(),
             "sites": sites,
         }
-
-
-# Compatibility alias. New domain code should import SiteManager.
-ChannelManager = SiteManager

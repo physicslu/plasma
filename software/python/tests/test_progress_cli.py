@@ -46,13 +46,11 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         return PlasmaClient(*server.address, response_timeout_s=2.0), server
 
     async def test_detached_program_reports_program_only_and_monotonic_progress(self) -> None:
-        client, server = await self.start_server(
-            {"erase": 0.12, "program": 0.18, "verify": 0.12}
-        )
+        client, server = await self.start_server({"erase": 0.12, "program": 0.18, "verify": 0.12})
         request = JobRequest(
             site_id=1,
             operation=Operation.PROGRAM,
-            firmware=bytes(range(64)),
+            image=bytes(range(64)),
             job_id="progress-stages",
             timeout_s=10.0,
         )
@@ -68,7 +66,6 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
             timeout_s=12.0,
             on_update=lambda job: updates.append(dict(job)),
         )
-
         observed_stages = {str(item["stage"]) for item in updates if item.get("stage")}
         percentages = [float(item["progress_percent"]) for item in updates]
         self.assertEqual(result["result"]["state"], "success")
@@ -84,9 +81,7 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(interface.calls["verify"], 0)
 
     async def test_cli_progress_renderer_shows_site_and_program_only(self) -> None:
-        client, _server = await self.start_server(
-            {"erase": 0.09, "program": 0.12, "verify": 0.09}
-        )
+        client, _server = await self.start_server({"erase": 0.09, "program": 0.12, "verify": 0.09})
         stream = io.StringIO()
         renderer = ProgressRenderer(stream=stream, width=12)
         result = await _run_work(
@@ -94,7 +89,7 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
             JobRequest(
                 site_id=1,
                 operation=Operation.PROGRAM,
-                firmware=b"progress-bar-firmware",
+                image=b"progress-bar-image",
                 job_id="cli-progress",
                 timeout_s=2.0,
             ),
@@ -104,7 +99,6 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         rendered = stream.getvalue()
         self.assertEqual(result["result"]["state"], "success")
         self.assertIn("SITE1", rendered)
-        self.assertNotIn("CH0", rendered)
         self.assertIn("PROGRAM", rendered)
         self.assertNotIn("ERASE", rendered)
         self.assertNotIn("VERIFY", rendered)
@@ -126,21 +120,21 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
 
         async def gated_program(
             interface: MockInterface,
-            firmware: bytes,
+            image: bytes,
             address: int = 0,
             progress=None,
         ) -> None:
-            interface._validate_range(address, len(firmware))
+            interface._validate_range(address, len(image))
             interface.calls["program"] += 1
             if progress:
-                await progress(1, len(firmware))
+                await progress(1, len(image))
             program_entered.set()
             await keep_programming.wait()
 
         request = JobRequest(
             site_id=1,
             operation=Operation.PROGRAM,
-            firmware=b"cancel-me" * 32,
+            image=b"cancel-me" * 32,
             job_id="cli-cancel",
             timeout_s=10.0,
         )
@@ -158,7 +152,6 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
             runtime = server.manager.registry.get(request.job_id)
             self.assertEqual(runtime.stage, "program")
             self.assertGreater(runtime.stage_progress_percent, 0)
-
             task.cancel()
             await asyncio.wait_for(runtime.cancel_event.wait(), timeout=5.0)
             self.assertIn("Cancellation requested", stream.getvalue())
@@ -172,7 +165,6 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(snapshot["cancel_requested"])
         self.assertEqual(snapshot["stage_state"], "cancelled")
         self.assertGreaterEqual(interface.shutdown_count, 1)
-
         follow_up = await client.erase(1, timeout_s=1.0)
         self.assertEqual(follow_up["result"]["state"], "success")
 
@@ -199,7 +191,6 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(erase_entered.wait(), timeout=5.0)
             status = await client.status(job_id=request.job_id)
             self.assertEqual(status["job"]["state"], "running")
-
             cancel = await client.cancel(request.job_id)
             result = await client.wait_for_job(
                 request.job_id,

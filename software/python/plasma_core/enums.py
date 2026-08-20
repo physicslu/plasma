@@ -39,8 +39,3 @@ class SiteState(StrEnum):
     RUNNING = "running"
     ERROR = "error"
     STOPPED = "stopped"
-
-
-# Plasma protocol v3.1 and older internal imports use ChannelState. Keep the
-# alias while Site is the canonical domain term.
-ChannelState = SiteState

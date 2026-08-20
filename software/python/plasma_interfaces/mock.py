@@ -153,13 +153,7 @@ class MockInterface(BaseInterface):
         return cls(tracker=tracker, **options)
 
     def estimated_delay_s(self, operation: str, total_bytes: int) -> float:
-        """Return the configured Mock execution time for one operation.
-
-        Explicit per-operation ``delays`` remain a compatibility override. If no
-        override is present and a throughput is configured, timing is modeled as
-        fixed operation overhead plus byte count divided by throughput. Without
-        a throughput profile the historical ``default_delay_s`` behavior remains.
-        """
+        """Return the configured Mock execution time for one operation."""
         if operation not in OPERATION_ERRORS:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unknown mock operation: {operation}")
         if isinstance(total_bytes, bool) or not isinstance(total_bytes, int) or total_bytes < 0:
@@ -217,33 +211,31 @@ class MockInterface(BaseInterface):
             )
 
     async def erase(self, progress: ProgressCallback | None = None) -> None:
-        # Mock erase currently models a full-chip erase, so its size basis is the
-        # configured target flash size rather than the selected firmware length.
         await self._before("erase", progress, self.flash_size)
         self.memory[:] = bytes([0xFF]) * self.flash_size
 
     async def program(
         self,
-        firmware: bytes,
+        image: bytes,
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
-        self._validate_range(address, len(firmware))
-        await self._before("program", progress, len(firmware))
-        self.memory[address : address + len(firmware)] = firmware
+        self._validate_range(address, len(image))
+        await self._before("program", progress, len(image))
+        self.memory[address : address + len(image)] = image
 
     async def verify(
         self,
-        firmware: bytes,
+        image: bytes,
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
-        self._validate_range(address, len(firmware))
-        await self._before("verify", progress, len(firmware))
-        actual = bytes(self.memory[address : address + len(firmware)])
-        if actual != firmware:
+        self._validate_range(address, len(image))
+        await self._before("verify", progress, len(image))
+        actual = bytes(self.memory[address : address + len(image)])
+        if actual != image:
             mismatch = next(
-                (index for index, pair in enumerate(zip(actual, firmware, strict=True)) if pair[0] != pair[1]),
+                (index for index, pair in enumerate(zip(actual, image, strict=True)) if pair[0] != pair[1]),
                 None,
             )
             raise PlasmaError(

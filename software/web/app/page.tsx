@@ -53,7 +53,7 @@ type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "fail
 type LogLevel = "info" | "error";
 type LogEntry = { id: number; text: string; level: LogLevel };
 
-const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
+const MAX_IMAGE_ASSET_BYTES = 16 * 1024 * 1024;
 const BATCH_JOB_POLL_INTERVAL_MS = 500;
 const BATCH_JOB_POLL_ATTEMPTS = 120;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
@@ -142,7 +142,7 @@ export default function Home() {
   const [sites, setSites] = useState<Site[]>([]);
   const [visibleSiteIds, setVisibleSiteIds] = useState<number[]>([]);
   const [ppu, setPPU] = useState<PPUSnapshot | null>(null);
-  const [firmware, setFirmware] = useState<File | null>(null);
+  const [imageAsset, setImageAsset] = useState<File | null>(null);
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
   const [selectedBatchOperations, setSelectedBatchOperations] = useState<Operation[]>([]);
@@ -376,8 +376,8 @@ export default function Home() {
   function operationDisabled(site: Site, operation: Operation, forBatch = false): boolean {
     if ((!forBatch && batchRunning) || connection !== "online" || !site.enabled || isRunning(site)) return true;
     if (submittingSiteIds.includes(site.id)) return true;
-    if ((operation === "program" || operation === "verify") && !firmware) return true;
-    if ((operation === "program" || operation === "verify") && firmware.size > MAX_FIRMWARE_BYTES) return true;
+    if ((operation === "program" || operation === "verify") && !imageAsset) return true;
+    if ((operation === "program" || operation === "verify") && imageAsset.size > MAX_IMAGE_ASSET_BYTES) return true;
     if (operation === "read" && !readRangeValid) return true;
     return false;
   }
@@ -404,8 +404,8 @@ export default function Home() {
   ): Promise<JobSnapshot | undefined> {
     const site = sites.find(item => item.id === siteId);
     if (!site || operationDisabled(site, operation, forBatch)) return;
-    if (firmware && firmware.size > MAX_FIRMWARE_BYTES) {
-      appendLog(`[SITE ${siteId}] Firmware exceeds the 16 MiB limit`, "error");
+    if (imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES) {
+      appendLog(`[SITE ${siteId}] Programming Image Asset exceeds the 16 MiB limit`, "error");
       return;
     }
 
@@ -416,7 +416,7 @@ export default function Home() {
       const job = await startJob(apiBase, {
         siteId,
         operation,
-        firmware: operation === "erase" || operation === "read" ? null : firmware,
+        assetFile: operation === "erase" || operation === "read" ? null : imageAsset,
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
         submissionGuard,
@@ -429,7 +429,7 @@ export default function Home() {
         progress: 0,
         stageProgress: 0,
         jobId: job.job_id,
-        file: firmware?.name,
+        file: imageAsset?.name,
         error: undefined,
         outputFile: undefined,
       } : item));
@@ -653,8 +653,8 @@ export default function Home() {
 
         <section className="operationConfig" aria-label="工作參數">
           <div className="compactFile">
-            <div><b>{firmware?.name ?? "選擇 Firmware BIN 檔案"}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB · BIN` : "Program / Verify 共用 · Max 16 MiB"}</small></div>
-            <label>瀏覽檔案<input aria-label="選擇 Firmware 檔案" type="file" accept=".bin,application/octet-stream" disabled={batchRunning} onChange={event => setFirmware(event.target.files?.[0] ?? null)}/></label>
+            <div><b>{imageAsset?.name ?? "選擇 Programming Image Asset BIN 檔案"}</b><small>{imageAsset ? `${(imageAsset.size / 1024).toFixed(1)} KB · BIN` : "Program / Verify 共用 · Max 16 MiB"}</small></div>
+            <label>瀏覽檔案<input aria-label="選擇 Programming Image Asset 檔案" type="file" accept=".bin,application/octet-stream" disabled={batchRunning} onChange={event => setImageAsset(event.target.files?.[0] ?? null)}/></label>
           </div>
           <div className="compactRead">
             <label>READ Offset<input aria-label="READ logical flash offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)}/></label>
@@ -685,7 +685,7 @@ export default function Home() {
             </div>
           </div>
           {visibleSites.some(site => !site.enabled) && <div className="warning">選取項目包含未啟用 Site；取消勾選後才能執行批次工作。</div>}
-          {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">Firmware 超過 16 MiB 限制。</div>}
+          {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">Programming Image Asset 超過 16 MiB 限制。</div>}
         </section>
 
         <section className="overviewCard" aria-labelledby="overview-title">
@@ -722,7 +722,7 @@ export default function Home() {
 
       {detailsSite && <div className="modalBackdrop" onClick={() => setDetailsSiteId(null)}><section className="details" onClick={event => event.stopPropagation()}>
         <div className="detailsHead"><div><p className="eyebrow">JOB INSPECTOR</p><h2>Site {detailsSite.id} 詳細資料</h2></div><button aria-label="關閉詳細資料" onClick={() => setDetailsSiteId(null)}>×</button></div>
-        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Facility</dt><dd>{ppu?.facility_id ?? "—"}</dd></div><div><dt>PPU</dt><dd>{ppu?.ppu_id ?? "—"}</dd></div><div><dt>Job ID</dt><dd>{detailsSite.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsSite.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsSite.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Firmware</dt><dd>{detailsSite.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsSite.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.2 TCP</dd></div><div><dt>Target</dt><dd>{detailsSite.target ?? "STM32F103C8T6"} ({detailsSite.interface ?? "Mock"})</dd></div></dl>
+        <dl><div><dt>Plasma Web REST Gateway</dt><dd>{apiBase}</dd></div><div><dt>Facility</dt><dd>{ppu?.facility_id ?? "—"}</dd></div><div><dt>PPU</dt><dd>{ppu?.ppu_id ?? "—"}</dd></div><div><dt>Job ID</dt><dd>{detailsSite.jobId ?? "—"}</dd></div><div><dt>Operation</dt><dd>{detailsSite.operation?.toUpperCase() ?? "—"}</dd></div><div><dt>Job State</dt><dd>{detailsSite.stage.toUpperCase()}</dd></div><div><dt>Batch State</dt><dd>{detailsBatchState ? batchStateLabels[detailsBatchState] : "—"}</dd></div><div><dt>Programming Image Asset</dt><dd>{detailsSite.file ?? "—"}</dd></div><div><dt>Progress</dt><dd>{detailsSite.progress.toFixed(1)}%</dd></div><div><dt>Protocol</dt><dd>REST → Plasma v3.3 TCP</dd></div><div><dt>Target</dt><dd>{detailsSite.target ?? "STM32F103C8T6"} ({detailsSite.interface ?? "Mock"})</dd></div></dl>
         <p>Job State 保留 Python Job Manager 回傳的真實結果；Batch State 描述該 Site 在本次批次流程的結果。Mock 測試不代表 Z2、FPGA I/O 或實體 IC 已完成驗證。</p>
       </section></div>}
     </main>

@@ -15,7 +15,7 @@ const expectedPpuId = process.env.MOCK_CD_EXPECTED_PPU_ID ?? "mock-ppu-a";
 const engineeringFacilityId = process.env.MOCK_CD_ENGINEERING_FACILITY_ID ?? "mock-facility-02";
 const engineeringPpuId = process.env.MOCK_CD_ENGINEERING_PPU_ID ?? "mock-facility-02-ppu-03";
 const engineeringPpuSites = Number(process.env.MOCK_CD_ENGINEERING_PPU_SITES ?? "6");
-const firmware = Buffer.from(Array.from({ length: 256 }, (_, index) => (index * 17 + 3) & 0xff));
+const imageAssetBytes = Buffer.from(Array.from({ length: 256 }, (_, index) => (index * 17 + 3) & 0xff));
 const operationLabels: Record<Operation, string> = {
   erase: "擦除",
   program: "燒錄",
@@ -186,13 +186,13 @@ test("every enabled Site runs Erase Program Verify Read and downloads exact byte
 
   await openRuntimeConsole(page);
 
-  await page.getByLabel("選擇 Firmware 檔案").setInputFiles({
+  await page.getByLabel("選擇 Programming Image Asset 檔案").setInputFiles({
     name: "mock-cd-runtime.bin",
     mimeType: "application/octet-stream",
-    buffer: firmware,
+    buffer: imageAssetBytes,
   });
   await page.getByLabel("READ logical flash offset").fill("0");
-  await page.getByLabel("READ byte length").fill(String(firmware.length));
+  await page.getByLabel("READ byte length").fill(String(imageAssetBytes.length));
 
   for (let siteId = 1; siteId <= expectedSites; siteId += 1) {
     await test.step(`SITE ${siteId}: Erase -> Program -> Verify -> Read -> download`, async () => {
@@ -213,8 +213,8 @@ test("every enabled Site runs Erase Program Verify Read and downloads exact byte
       const path = await download.path();
       if (!path) throw new Error(`SITE ${siteId} Read download did not produce a local file`);
       const bytes = await readFile(path);
-      expect(bytes.length).toBe(firmware.length);
-      expect(bytes.equals(firmware)).toBe(true);
+      expect(bytes.length).toBe(imageAssetBytes.length);
+      expect(bytes.equals(imageAssetBytes)).toBe(true);
     });
   }
 });
@@ -293,13 +293,13 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
   const siteId = engineeringPpuSites;
   const engineeringSiteLabel = `SITE-${String(siteId).padStart(2, "0")}`;
   const row = page.locator(".channelTable tbody tr").filter({ hasText: engineeringSiteLabel }).first();
-  await page.getByLabel("Engineering Firmware file").setInputFiles({
+  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "engineering-provider-runtime.bin",
     mimeType: "application/octet-stream",
-    buffer: firmware,
+    buffer: imageAssetBytes,
   });
   await page.getByLabel("Engineering READ offset").fill("0");
-  await page.getByLabel("Engineering READ length").fill(String(firmware.length));
+  await page.getByLabel("Engineering READ length").fill(String(imageAssetBytes.length));
 
   for (const operation of operationOrder) {
     await test.step(`Engineering ${engineeringFacilityId}/${engineeringPpuId}/${engineeringSiteLabel}: ${operation}`, async () => {
@@ -321,6 +321,6 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
   const path = await download.path();
   if (!path) throw new Error("Engineering Mock PPU Read did not produce a local file");
   const bytes = await readFile(path);
-  expect(bytes.length).toBe(firmware.length);
-  expect(bytes.equals(firmware)).toBe(true);
+  expect(bytes.length).toBe(imageAssetBytes.length);
+  expect(bytes.equals(imageAssetBytes)).toBe(true);
 });

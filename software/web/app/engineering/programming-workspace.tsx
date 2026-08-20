@@ -19,7 +19,7 @@ import {
 } from "../plasma-api";
 import type {
   EngineeringTargetCatalog,
-  FirmwareTransferEvent,
+  AssetTransferEvent,
   JobSnapshot,
   JobState,
   Operation,
@@ -69,7 +69,7 @@ type PendingRestore = {
   targetRestored: boolean;
 };
 
-const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
+const MAX_IMAGE_ASSET_BYTES = 16 * 1024 * 1024;
 const MAX_LOG_ENTRIES = 1000;
 const POLL_INTERVAL_MS = 500;
 const POLL_ATTEMPTS = 600;
@@ -122,7 +122,7 @@ function validSelection(catalog: EngineeringTargetCatalog, selection: TargetSele
   return selection;
 }
 
-function firmwareSizeLabel(bytes: number): string {
+function imageAssetSizeLabel(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
   return `${(bytes / 1024).toFixed(1)} KiB`;
 }
@@ -160,7 +160,7 @@ export default function ProgrammingWorkspace() {
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteIdsState, setSelectedSiteIdsState] = useState<number[] | null>(null);
   const [selectedOperations, setSelectedOperations] = useState<Operation[]>([]);
-  const [firmware, setFirmware] = useState<File | null>(null);
+  const [imageAsset, setImageAsset] = useState<File | null>(null);
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
   const [submittingSiteIds, setSubmittingSiteIds] = useState<number[]>([]);
@@ -212,18 +212,18 @@ export default function ProgrammingWorkspace() {
     ].slice(0, MAX_LOG_ENTRIES));
   }, []);
 
-  const logFirmwareEvent = useCallback((event: FirmwareTransferEvent) => {
-    const digest = `SHA256 ${shortSha256(event.firmware_sha256)}`;
+  const logAssetEvent = useCallback((event: AssetTransferEvent) => {
+    const digest = `SHA256 ${shortSha256(event.asset_sha256)}`;
     if (event.kind === "cache_check") {
-      appendLog(`[FIRMWARE] CACHE CHECK · ${event.firmware_name} · ${firmwareSizeLabel(event.firmware_size)} · ${digest} · fingerprint only`);
+      appendLog(`[IMG] CACHE CHECK · ${event.asset_name} · ${imageAssetSizeLabel(event.asset_size)} · ${digest} · fingerprint only`);
     } else if (event.kind === "cache_hit") {
-      appendLog(`[FIRMWARE] CACHE HIT · ${digest} · reference only · no binary upload`);
+      appendLog(`[IMG] CACHE HIT · ${digest} · reference only · no binary upload`);
     } else if (event.kind === "cache_miss") {
-      appendLog(`[FIRMWARE] CACHE MISS · ${digest}`);
+      appendLog(`[IMG] CACHE MISS · ${digest}`);
     } else if (event.kind === "upload_start") {
-      appendLog(`[FIRMWARE] UPLOAD START · ${event.firmware_name} · ${firmwareSizeLabel(event.firmware_size)} · ${digest}`);
+      appendLog(`[IMG] UPLOAD START · ${event.asset_name} · ${imageAssetSizeLabel(event.asset_size)} · ${digest}`);
     } else {
-      appendLog(`[FIRMWARE] UPLOAD COMPLETE · ${event.firmware_name} · ${firmwareSizeLabel(event.firmware_size)} · ${digest}`);
+      appendLog(`[IMG] UPLOAD COMPLETE · ${event.asset_name} · ${imageAssetSizeLabel(event.asset_size)} · ${digest}`);
     }
   }, [appendLog]);
 
@@ -291,7 +291,7 @@ export default function ProgrammingWorkspace() {
         );
         engineeringSessionId.current = session.session_id;
         if (cancelled) return;
-        appendLog(`[SESSION] NEW · ${session.previous_session_cleared ? "previous firmware cache cleared" : "fresh connection"} · ${session.session_id.slice(0, 8)}…`);
+        appendLog(`[SESSION] NEW · ${session.previous_session_cleared ? "previous Programming Asset cache cleared" : "fresh connection"} · ${session.session_id.slice(0, 8)}…`);
         const next = await getEngineeringTargets(apiBase);
         if (cancelled) return;
         setCatalog(next);
@@ -459,12 +459,12 @@ export default function ProgrammingWorkspace() {
     appendLog(`[BATCH] OPERATIONS · ${operationListLabel(next)}`, false, "USR");
   }
 
-  function selectFirmware(file: File | null) {
-    setFirmware(file);
+  function selectImageAsset(file: File | null) {
+    setImageAsset(file);
     appendLog(
       file
-        ? `[FIRMWARE] SELECT · ${file.name} · ${firmwareSizeLabel(file.size)}`
-        : "[FIRMWARE] CLEAR",
+        ? `[IMG] SELECT · ${file.name} · ${imageAssetSizeLabel(file.size)}`
+        : "[IMG] CLEAR",
       false,
       "USR",
     );
@@ -474,8 +474,8 @@ export default function ProgrammingWorkspace() {
     if (!targetApiBase || connection !== "online" || !site.enabled || isRunning(site)) return true;
     if (!forBatch && batchRunning) return true;
     if (submittingSiteIds.includes(site.id)) return true;
-    if ((operation === "program" || operation === "verify") && !firmware) return true;
-    if ((operation === "program" || operation === "verify") && Boolean(firmware && firmware.size > MAX_FIRMWARE_BYTES)) return true;
+    if ((operation === "program" || operation === "verify") && !imageAsset) return true;
+    if ((operation === "program" || operation === "verify") && Boolean(imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES)) return true;
     if (operation === "read" && !readRangeValid) return true;
     return false;
   }
@@ -513,12 +513,12 @@ export default function ProgrammingWorkspace() {
       const job = await startJob(targetApiBase, {
         siteId,
         operation,
-        firmware: operation === "erase" || operation === "read" ? null : firmware,
+        assetFile: operation === "erase" || operation === "read" ? null : imageAsset,
         engineeringSessionId: engineeringSessionId.current ?? undefined,
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
         submissionGuard,
-        onFirmwareEvent: logFirmwareEvent,
+        onAssetEvent: logAssetEvent,
       });
       trackedJobs.current[siteId] = job.job_id;
       setSites(current => current.map(item => item.id === siteId ? {
@@ -787,8 +787,8 @@ export default function ProgrammingWorkspace() {
 
       <section className="operationConfig" aria-label="Engineering programming parameters">
         <div className="compactFile">
-          <div><b>{firmware?.name ?? t("engineeringProgramming.firmware")}</b><small>{firmware ? `${(firmware.size / 1024).toFixed(1)} KB` : t("engineeringProgramming.firmwareHint")}</small></div>
-          <label>{t("engineeringProgramming.browse")}<input aria-label="Engineering Firmware file" type="file" accept=".bin,application/octet-stream" disabled={targetLocked} onChange={event => selectFirmware(event.target.files?.[0] ?? null)} /></label>
+          <div><b>{imageAsset?.name ?? t("engineeringProgramming.imageAsset")}</b><small>{imageAsset ? `${(imageAsset.size / 1024).toFixed(1)} KB` : t("engineeringProgramming.imageAssetHint")}</small></div>
+          <label>{t("engineeringProgramming.browse")}<input aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} /></label>
         </div>
         <div className="compactRead">
           <label>READ Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
@@ -820,7 +820,7 @@ export default function ProgrammingWorkspace() {
         </div>
       </section>
 
-      {firmware && firmware.size > MAX_FIRMWARE_BYTES && <div className="warning">{t("engineeringProgramming.firmwareTooLarge")}</div>}
+      {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
 
       <section className="overviewCard" aria-label="Engineering Site status">
         <div className="overviewHead"><div><p className="eyebrow">LIVE PPU STATUS</p><h2>{ppu?.display_name ?? selectedPPU?.display_name ?? t("engineeringProgramming.selectedPpu")}</h2></div><small>REST polling 500 ms</small></div>

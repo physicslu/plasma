@@ -10,9 +10,8 @@ from typing import Any
 from plasma_core.config import PlasmaConfig, load_config
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import ErrorDetail, JobRequest, new_job_id, site_id_from_legacy_channel
+from plasma_core.models import ErrorDetail, JobRequest, new_job_id
 from plasma_core.protocol import (
-    LEGACY_PROTOCOL_VERSION,
     PROTOCOL_VERSION,
     Frame,
     ProtocolLimits,
@@ -75,39 +74,19 @@ class PlasmaServer:
     @staticmethod
     def _site_id_from_wire(metadata: dict[str, Any], *, required: bool) -> int | None:
         version = metadata.get("protocol_version")
-        if version == PROTOCOL_VERSION:
-            if "channel_id" in metadata:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT,
-                    "protocol v3.2 uses site_id; channel_id is a v3.1 field",
-                )
-            raw = metadata.get("site_id")
-            if raw is None and not required:
-                return None
-            if isinstance(raw, bool) or not isinstance(raw, int):
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must be a JSON integer")
-            if raw < 1:
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must start at 1")
-            return raw
-        if version == LEGACY_PROTOCOL_VERSION:
-            if "site_id" in metadata:
-                raise PlasmaError(
-                    ErrorCode.INVALID_ARGUMENT,
-                    "protocol v3.1 uses channel_id; site_id requires v3.2",
-                )
-            raw = metadata.get("channel_id")
-            if raw is None and not required:
-                return None
-            if isinstance(raw, bool) or not isinstance(raw, int):
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "channel_id must be a JSON integer")
-            try:
-                return site_id_from_legacy_channel(raw)
-            except PlasmaError as exc:
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid channel_id") from exc
-        raise PlasmaError(
-            ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
-            f"unsupported protocol version: {version!r}",
-        )
+        if version != PROTOCOL_VERSION:
+            raise PlasmaError(
+                ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
+                f"unsupported protocol version: {version!r}",
+            )
+        raw = metadata.get("site_id")
+        if raw is None and not required:
+            return None
+        if isinstance(raw, bool) or not isinstance(raw, int):
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must be a JSON integer")
+        if raw < 1:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "site_id must start at 1")
+        return raw
 
     async def _handle_connection(
         self,
@@ -118,10 +97,8 @@ class PlasmaServer:
         job_id: str | None = None
         site_id: int | None = None
         operation: str | None = None
-        response_version = PROTOCOL_VERSION
         try:
             frame = await read_frame(reader, self.limits)
-            response_version = str(frame.metadata.get("protocol_version", PROTOCOL_VERSION))
             job_id = frame.metadata.get("job_id")
             site_id = self._site_id_from_wire(frame.metadata, required=False)
             operation = frame.metadata.get("operation")
@@ -135,10 +112,10 @@ class PlasmaServer:
             )
             response = Frame(
                 metadata={
-                    "protocol_version": response_version,
+                    "protocol_version": PROTOCOL_VERSION,
                     "message_type": "response",
                     "ok": False,
-                    "error": detail.to_dict(response_version),
+                    "error": detail.to_dict(),
                 }
             )
             self.manager.server_log.event(
@@ -151,7 +128,7 @@ class PlasmaServer:
                 error_code=exc.code.value,
                 message=exc.message,
             )
-        except Exception as exc:  # final network/plugin safety boundary
+        except Exception as exc:
             error = PlasmaError(
                 ErrorCode.INTERNAL_ERROR,
                 "unexpected server error",
@@ -159,10 +136,10 @@ class PlasmaServer:
             )
             response = Frame(
                 metadata={
-                    "protocol_version": response_version,
+                    "protocol_version": PROTOCOL_VERSION,
                     "message_type": "response",
                     "ok": False,
-                    "error": ErrorDetail.from_exception(error).to_dict(response_version),
+                    "error": ErrorDetail.from_exception(error).to_dict(),
                 }
             )
             self.manager.server_log.event("ERROR", "server_exception", peer=peer, error=str(exc))
@@ -180,6 +157,11 @@ class PlasmaServer:
     async def _dispatch(self, frame: Frame, peer: Any) -> Frame:
         metadata = frame.metadata
         protocol_version = str(metadata["protocol_version"])
+        if protocol_version != PROTOCOL_VERSION:
+            raise PlasmaError(
+                ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
+                f"unsupported protocol version: {protocol_version!r}",
+            )
         try:
             operation = Operation(str(metadata["operation"]))
         except (KeyError, ValueError) as exc:
@@ -196,13 +178,13 @@ class PlasmaServer:
                 job_id=metadata.get("target_job_id"),
                 protocol_version=protocol_version,
             )
-            return self._success(result, protocol_version)
+            return self._success(result)
 
         if operation is Operation.CANCEL:
             target_job_id = metadata.get("target_job_id")
             if not target_job_id:
                 raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "cancel requires target_job_id")
-            return self._success(self.manager.cancel(str(target_job_id)), protocol_version)
+            return self._success(self.manager.cancel(str(target_job_id)))
 
         site_id = self._site_id_from_wire(metadata, required=True)
         assert site_id is not None
@@ -238,23 +220,24 @@ class PlasmaServer:
             or retry_backoff_s < 0
         ):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid timeout or retry settings")
-        expected_size = metadata.get("firmware_size")
+
+        expected_size = metadata.get("image_size")
         if expected_size is not None:
             if isinstance(expected_size, bool):
-                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "firmware_size must be an integer")
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "image_size must be an integer")
             try:
                 parsed_size = int(expected_size)
             except (TypeError, ValueError, OverflowError) as exc:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
-                    "firmware_size must be an integer",
+                    "image_size must be an integer",
                     original_exception=exc,
                 ) from exc
             if parsed_size != len(frame.binary):
                 raise PlasmaError(
                     ErrorCode.PROTOCOL_INCOMPLETE,
-                    "firmware_size does not match BINLEN",
-                    context={"firmware_size": expected_size, "binlen": len(frame.binary)},
+                    "image_size does not match BINLEN",
+                    context={"image_size": expected_size, "binlen": len(frame.binary)},
                 )
 
         known = {
@@ -262,15 +245,14 @@ class PlasmaServer:
             "message_type",
             "job_id",
             "site_id",
-            "channel_id",
             "operation",
             "timeout_s",
             "max_retries",
             "retry_backoff_s",
             "client_id",
             "target",
-            "firmware_size",
-            "firmware_sha256",
+            "image_size",
+            "image_sha256",
             "wait_for_completion",
         }
         job_id_raw = metadata.get("job_id")
@@ -282,7 +264,7 @@ class PlasmaServer:
         request = JobRequest(
             site_id=site_id,
             operation=operation,
-            firmware=frame.binary,
+            image=frame.binary,
             map_data=frame.map_data,
             job_id=job_id_raw or new_job_id(),
             timeout_s=timeout_s,
@@ -295,18 +277,15 @@ class PlasmaServer:
         future = self.manager.enqueue(request)
         if not wait_for_completion:
             runtime = self.manager.registry.get(request.job_id)
-            return self._success(
-                {"accepted": True, "job": runtime.snapshot(protocol_version)},
-                protocol_version,
-            )
+            return self._success({"accepted": True, "job": runtime.snapshot(protocol_version)})
         result = await future
-        return self._success({"result": result.to_dict(protocol_version)}, protocol_version)
+        return self._success({"result": result.to_dict(protocol_version)})
 
     @staticmethod
-    def _success(payload: dict[str, Any], protocol_version: str = PROTOCOL_VERSION) -> Frame:
+    def _success(payload: dict[str, Any]) -> Frame:
         return Frame(
             metadata={
-                "protocol_version": protocol_version,
+                "protocol_version": PROTOCOL_VERSION,
                 "message_type": "response",
                 "ok": True,
                 **payload,

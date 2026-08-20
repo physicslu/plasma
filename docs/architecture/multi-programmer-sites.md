@@ -1,6 +1,6 @@
-# Legacy Multi-Programmer / Multi-Site Naming
+# Historical Multi-Programmer / Multi-Site Naming
 
-This document records the retired naming model. Current architecture is defined by [`ppu-facility-sites.md`](./ppu-facility-sites.md) and [`domain-naming-migration.md`](./domain-naming-migration.md).
+This document records a **retired historical naming model**. It is not a current runtime contract. Current architecture is defined by [`ppu-facility-sites.md`](./ppu-facility-sites.md) and [`domain-naming-migration.md`](./domain-naming-migration.md).
 
 The previous hierarchy was:
 
@@ -8,7 +8,7 @@ The previous hierarchy was:
 Site -> Programmer -> Channel
 ```
 
-It is deprecated because `Site` was overloaded to mean a deployment location while the IC-programming domain also needs **Programming Site** for an independently controlled programming position.
+It was retired because `Site` was overloaded to mean a deployment location while the IC-programming domain also needs **Programming Site** for an independently controlled programming position.
 
 The canonical hierarchy is now:
 
@@ -32,14 +32,8 @@ SITE 2 -> site_id = 2
 SITE N -> site_id = N
 ```
 
-Protocol v3.2 is the canonical wire contract and uses `PLASMA32` plus one-based `site_id`.
+Current canonical wire contract is **Plasma Protocol v3.3 / `PLASMA33`** with one-based `site_id`.
 
-Protocol v3.1 remains only as an explicit compatibility adapter:
+Historically, older protocol revisions used zero-based Channel identity. Those mappings are useful only to understand old commits and artifacts; they are not accepted by the current development runtime and must not be reintroduced as a compatibility layer without a new explicit requirement and versioned migration plan.
 
-```text
-v3.1 channel_id 0 -> canonical / v3.2 site_id 1
-v3.1 channel_id 1 -> canonical / v3.2 site_id 2
-...
-```
-
-Do not interpret legacy `channel_id` as numerically identical to `site_id`, and do not introduce new product/domain code using the retired Programmer/Channel vocabulary.
+Do not introduce new product/domain code using the retired Programmer/Channel vocabulary.

@@ -12,7 +12,7 @@ from plasma_server.site_manager import SiteManager
 
 
 class PPUStatusTests(unittest.TestCase):
-    def test_v32_status_exposes_ppu_identity_and_one_based_sites(self) -> None:
+    def test_status_exposes_ppu_identity_and_one_based_sites(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             config = PlasmaConfig(
@@ -30,9 +30,7 @@ class PPUStatusTests(unittest.TestCase):
                     display_name="Line A PPU",
                 ),
             )
-
             status = SiteManager(config).status()
-
             self.assertEqual(
                 status["ppu"],
                 {
@@ -50,10 +48,8 @@ class PPUStatusTests(unittest.TestCase):
             )
             self.assertEqual([item["site_id"] for item in status["sites"]], [1, 2, 3])
             self.assertTrue(all(item["latest_job"] is None for item in status["sites"]))
-            self.assertNotIn("programmer", status)
-            self.assertNotIn("channels", status)
 
-    def test_v32_status_exposes_safe_latest_job_summary_without_result_payload(self) -> None:
+    def test_status_exposes_safe_latest_job_summary_without_image_or_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             manager = SiteManager(
@@ -75,7 +71,7 @@ class PPUStatusTests(unittest.TestCase):
                         site_id=1,
                         operation=Operation.VERIFY,
                         job_id="verify-job-1",
-                        firmware=b"secret-firmware-bytes",
+                        image=b"secret-image-bytes",
                         metadata={"private": "do-not-expose"},
                     )
                 )
@@ -85,34 +81,16 @@ class PPUStatusTests(unittest.TestCase):
             runtime.stage = "verify"
             runtime.stage_state = "complete"
             runtime.progress_percent = 100.0
-
             latest = manager.status()["sites"][0]["latest_job"]
-
             self.assertEqual(latest["job_id"], "verify-job-1")
             self.assertEqual(latest["operation"], "verify")
             self.assertEqual(latest["state"], "success")
             self.assertEqual(latest["stage"], "verify")
             self.assertEqual(latest["progress_percent"], 100.0)
             self.assertNotIn("result", latest)
-            self.assertNotIn("firmware", latest)
+            self.assertNotIn("image", latest)
             self.assertNotIn("metadata", latest)
             self.assertNotIn("output_files", latest)
-
-    def test_v31_status_retains_zero_based_channel_shape(self) -> None:
-        config = PlasmaConfig(
-            server=ServerConfig(max_supported_sites=2, max_concurrent_jobs=1),
-            sites=[SiteConfig(id=1), SiteConfig(id=2)],
-            ppu=PPUConfig(id="ppu-legacy", facility_id="facility-1"),
-        )
-
-        status = SiteManager(config).status(channel_id=0, protocol_version="3.1")
-
-        self.assertEqual(status["programmer"]["programmer_id"], "ppu-legacy")
-        self.assertEqual(status["programmer"]["site_id"], "facility-1")
-        self.assertEqual(status["channels"][0]["channel_id"], 0)
-        self.assertIn("latest_job", status["channels"][0])
-        self.assertNotIn("ppu", status)
-        self.assertNotIn("sites", status)
 
 
 if __name__ == "__main__":

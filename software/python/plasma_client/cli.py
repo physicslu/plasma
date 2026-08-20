@@ -36,8 +36,6 @@ class ProgressRenderer:
             byte_text = f"  {int(job.get('bytes_done') or 0):,}/{int(job['bytes_total']):,} B"
         cancel_text = "  CANCEL REQUESTED" if job.get("cancel_requested") else ""
         site_id = job.get("site_id")
-        if site_id is None and job.get("channel_id") is not None:
-            site_id = int(job["channel_id"]) + 1
         line = (
             f"SITE{site_id} {stage:<9} [{bar}] {percent:5.1f}%"
             f"  stage {stage_percent:5.1f}%{byte_text}{cancel_text}"
@@ -75,7 +73,7 @@ def _load_map(path: Path | None) -> dict[str, Any]:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="plasma",
-        description="Plasma PPU programming client (protocol v3.2)",
+        description="Plasma PPU programming client (protocol v3.3)",
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=9900)
@@ -97,13 +95,13 @@ def _parser() -> argparse.ArgumentParser:
         return command
 
     program = site_command("program")
-    program.add_argument("--bin", type=Path, required=True)
+    program.add_argument("--bin", type=Path, required=True, help="raw binary Image Asset")
     program.add_argument("--map", type=Path)
 
     site_command("erase")
 
     verify = site_command("verify")
-    verify.add_argument("--bin", type=Path, required=True)
+    verify.add_argument("--bin", type=Path, required=True, help="raw binary Image Asset")
 
     read = site_command("read")
     read.add_argument("--map", type=Path, required=True)
@@ -122,12 +120,12 @@ def _build_request(args: argparse.Namespace) -> JobRequest:
         return JobRequest(
             site_id=args.site,
             operation=Operation.PROGRAM,
-            firmware=args.bin.read_bytes(),
+            image=args.bin.read_bytes(),
             map_data=_load_map(args.map),
             timeout_s=args.timeout,
             max_retries=args.retries,
             client_id="plasma-cli",
-            metadata={"firmware_name": args.bin.name},
+            metadata={"image_name": args.bin.name},
         )
     if args.command == "erase":
         return JobRequest(
@@ -141,7 +139,7 @@ def _build_request(args: argparse.Namespace) -> JobRequest:
         return JobRequest(
             site_id=args.site,
             operation=Operation.VERIFY,
-            firmware=args.bin.read_bytes(),
+            image=args.bin.read_bytes(),
             timeout_s=args.timeout,
             max_retries=args.retries,
             client_id="plasma-cli",

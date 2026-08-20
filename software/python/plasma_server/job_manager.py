@@ -7,6 +7,7 @@ from typing import Any
 from plasma_core.enums import JobState
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest, JobResult, iso_now
+from plasma_core.protocol import PROTOCOL_VERSION
 
 
 @dataclass(slots=True)
@@ -35,15 +36,15 @@ class JobRuntime:
         if not self.updated_at:
             self.updated_at = self.created_at
 
-    def snapshot(self, protocol_version: str = "3.2") -> dict[str, Any]:
-        identity = (
-            {"site_id": self.request.site_id}
-            if protocol_version == "3.2"
-            else {"channel_id": self.request.channel_id}
-        )
+    def snapshot(self, protocol_version: str = PROTOCOL_VERSION) -> dict[str, Any]:
+        if protocol_version != PROTOCOL_VERSION:
+            raise PlasmaError(
+                ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
+                f"unsupported protocol version: {protocol_version!r}",
+            )
         data: dict[str, Any] = {
             "job_id": self.request.job_id,
-            **identity,
+            "site_id": self.request.site_id,
             "operation": self.request.operation.value,
             "state": self.state.value,
             "created_at": self.created_at,

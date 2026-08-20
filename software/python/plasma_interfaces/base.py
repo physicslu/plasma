@@ -8,7 +8,7 @@ ProgressCallback = Callable[[int, int], Awaitable[None]]
 
 
 class BaseInterface(ABC):
-    """Hardware boundary. One instance belongs to exactly one channel."""
+    """Hardware boundary. One instance belongs to exactly one Programming Site."""
 
     @abstractmethod
     async def erase(self, progress: ProgressCallback | None = None) -> None:
@@ -17,7 +17,7 @@ class BaseInterface(ABC):
     @abstractmethod
     async def program(
         self,
-        firmware: bytes,
+        image: bytes,
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
@@ -26,7 +26,7 @@ class BaseInterface(ABC):
     @abstractmethod
     async def verify(
         self,
-        firmware: bytes,
+        image: bytes,
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
@@ -43,5 +43,5 @@ class BaseInterface(ABC):
 
     @abstractmethod
     async def safe_shutdown(self) -> None:
-        """Leave only this channel in a defined safe state."""
+        """Leave only this Site in a defined safe state."""
         raise NotImplementedError

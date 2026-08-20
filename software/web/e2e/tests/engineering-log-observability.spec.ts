@@ -10,7 +10,7 @@ function catalog() {
     facility_count: 1,
     ppu_count: 1,
     site_count: 2,
-    programming_image_scope: "connection-session-and-ppu",
+    programming_asset_scope: "connection-session-and-ppu",
     facilities: [{
       facility_id: facilityId,
       display_name: "Mock Facility 01",
@@ -100,7 +100,7 @@ async function baseRoute(
         ok: true,
         session: {
           session_id: String(session.number).padStart(32, "0"),
-          programming_image_cache_scope: "connection-session-and-ppu",
+          programming_asset_cache_scope: "connection-session-and-ppu",
           previous_session_cleared: session.number > 1,
         },
       }),
@@ -120,7 +120,7 @@ async function baseRoute(
   return false;
 }
 
-test("Engineering log distinguishes SHA-256 fingerprint-only reuse from binary upload", async ({ page }) => {
+test("Engineering log distinguishes SHA-256 fingerprint-only Asset reuse from source upload", async ({ page }) => {
   const session = { number: 0 };
   let cachedSha: string | null = null;
   let uploadCount = 0;
@@ -137,39 +137,48 @@ test("Engineering log distinguishes SHA-256 fingerprint-only reuse from binary u
     const parts = url.pathname.split("/").filter(Boolean);
     const tail = parts.slice(5).join("/");
 
-    if (request.method() === "POST" && tail === "api/programming-images/check") {
+    if (request.method() === "POST" && tail === "api/programming-assets/check") {
       const body = request.postDataJSON() as {
-        image_name: string;
-        image_size: number;
-        image_sha256: string;
+        asset_name: string;
+        asset_type: string;
+        asset_format: string;
+        asset_size: number;
+        asset_sha256: string;
       };
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           ok: true,
-          programming_image: {
-            cache_hit: cachedSha === body.image_sha256,
+          programming_asset: {
+            cache_hit: cachedSha === body.asset_sha256,
             ...body,
           },
         }),
       });
       return;
     }
-    if (request.method() === "POST" && tail === "api/programming-images") {
+    if (request.method() === "POST" && tail === "api/programming-assets") {
       uploadCount += 1;
       cachedSha = url.searchParams.get("sha256");
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify({ ok: true, programming_image: { uploaded: true, cache_hit: true, image_sha256: cachedSha } }),
+        body: JSON.stringify({
+          ok: true,
+          programming_asset: {
+            uploaded: true,
+            cache_hit: true,
+            asset_sha256: cachedSha,
+          },
+        }),
       });
       return;
     }
     if (request.method() === "POST" && tail === "api/jobs") {
       const body = request.postDataJSON() as { site_id: number; operation: string };
       jobNumber += 1;
-      const jobId = `programming-image-log-job-${jobNumber}`;
+      const jobId = `programming-asset-log-job-${jobNumber}`;
       jobs.set(jobId, { siteId: body.site_id, operation: body.operation });
       await route.fulfill({
         status: 202,
@@ -195,7 +204,7 @@ test("Engineering log distinguishes SHA-256 fingerprint-only reuse from binary u
   const log = page.getByLabel("Engineering job log");
   await expect(log).toContainText("[SESSION] NEW · fresh connection");
 
-  await page.getByLabel("Engineering Firmware file").setInputFiles({
+  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "observable.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(1024 * 1024, 0x5a),
@@ -220,7 +229,7 @@ test("Engineering log distinguishes SHA-256 fingerprint-only reuse from binary u
   await expect(log).toContainText("reference only · no binary upload");
 
   await page.locator(".engineeringGateway button[type=submit]").click();
-  await expect(log).toContainText("[SESSION] NEW · previous firmware cache cleared");
+  await expect(log).toContainText("[SESSION] NEW · previous Programming Asset cache cleared");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 });
 

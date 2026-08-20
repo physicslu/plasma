@@ -19,7 +19,7 @@ Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。目前 prototype 預�
 ## 目前目錄
 
 - `pl/`：Zynq Programmable Logic 的 RTL、constraints、模擬、verification 與 Vivado 建置資產。
-- `software/python/`：Plasma PPU control plane、Protocol v3.2 TCP Server、CLI、Plasma Web REST Gateway、optional read-only Plasma Manager 與測試。
+- `software/python/`：Plasma PPU control plane、Protocol v3.3 TCP Server、CLI、Plasma Web REST Gateway、optional read-only Plasma Manager 與測試。
 - `software/web/`：React + TypeScript Plasma PPU Console。
 - `scripts/plasmactl`：integration host 的更新、測試、systemd reconciliation、重啟與服務管理入口。
 - `docs/`：architecture、development 與 deployment 文件。
@@ -29,11 +29,12 @@ Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。目前 prototype 預�
 ```text
 Browser / Plasma PPU Console
         |
-        | HTTP REST polling
+        | Web REST API Contract v3
         v
 Plasma Web REST Gateway
         |
-        | Plasma Protocol v3.2 / PLASMA32
+        | Programming Asset -> normalize -> Image
+        | Plasma Protocol v3.3 / PLASMA33
         v
 Plasma Server
         |
@@ -59,11 +60,21 @@ Plasma Manager (read-only registry / aggregation)
     +--> ...
 ```
 
-第一版 Plasma Manager 只使用手動設定的 PPU Gateway endpoints 彙整 health、identity 與 Site topology，不提供 job routing、central scheduling、discovery、Fleet Web UI 或 production deployment integration。
+Plasma Manager 使用手動設定的 PPU Gateway endpoints 彙整 health、identity 與 Site topology；Manager 不參與 PPU 本地 deterministic programming execution。
 
 目前 Plasma Web REST Gateway 使用 Python standard-library `ThreadingHTTPServer` 與 REST polling；**不是 FastAPI，也沒有使用 WebSocket**。
 
-Protocol v3.2 的 canonical wire identity 是 one-based `site_id = 1..N`。Protocol v3.1 的 zero-based `channel_id` 只保留在明確的 compatibility boundary，不是新程式的 domain contract。
+Protocol v3.3 的 canonical wire identity 是 one-based `site_id = 1..N`。Plasma 仍在開發期，current runtime 不維護退休的 zero-based Programmer/Channel compatibility model。
+
+Programming data 分層：
+
+```text
+Web REST v3 input   -> Programming Asset
+Parser/Normalizer   -> Normalized Image
+Protocol v3.3       -> Image execution data
+```
+
+Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration；目前只有 `image + binary` normalizer 已實作，其餘未實作組合 fail closed。
 
 ## 文件入口
 
@@ -73,7 +84,7 @@ Protocol v3.2 的 canonical wire identity 是 one-based `site_id = 1..N`。Proto
 - Engineering Programming observability / audit contract：[`docs/architecture/engineering-programming-observability.md`](docs/architecture/engineering-programming-observability.md)
 - Optional Manager invariant：[`docs/architecture/manager-optional-control-plane.md`](docs/architecture/manager-optional-control-plane.md)
 - Read-only Manager implementation：[`docs/architecture/manager-readonly-fleet-aggregation.md`](docs/architecture/manager-readonly-fleet-aggregation.md)
-- Protocol v3.2：[`software/python/docs/protocol.md`](software/python/docs/protocol.md)
+- Protocol v3.3：[`software/python/docs/protocol.md`](software/python/docs/protocol.md)
 - Python software：[`software/python/README.md`](software/python/README.md)
 - Web Console：[`software/web/README.md`](software/web/README.md)
 - FPGA / PL：[`pl/README.md`](pl/README.md)

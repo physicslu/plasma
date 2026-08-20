@@ -29,7 +29,7 @@ async function runTwoSiteProgram(
   await expect(execute).toBeEnabled({ timeout: 30_000 });
 }
 
-test("1 MiB Engineering programming image uploads once per PPU session and reloads after reconnect", async ({ page }) => {
+test("1 MiB Engineering Image Asset uploads once per PPU session and reloads after reconnect", async ({ page }) => {
   const counters = { sessions: 0, checks: 0, uploads: 0, jobs: 0 };
   const sessionBodies: Array<Record<string, unknown>> = [];
   const jobBodies: Array<Record<string, unknown>> = [];
@@ -42,11 +42,11 @@ test("1 MiB Engineering programming image uploads once per PPU session and reloa
       sessionBodies.push(request.postDataJSON() as Record<string, unknown>);
       return;
     }
-    if (url.pathname === `${targetBase}/api/programming-images/check`) {
+    if (url.pathname === `${targetBase}/api/programming-assets/check`) {
       counters.checks += 1;
       return;
     }
-    if (url.pathname === `${targetBase}/api/programming-images`) {
+    if (url.pathname === `${targetBase}/api/programming-assets`) {
       counters.uploads += 1;
       return;
     }
@@ -67,7 +67,7 @@ test("1 MiB Engineering programming image uploads once per PPU session and reloa
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
 
   await selectSitesOneAndTwo(page);
-  await page.getByLabel("Engineering Firmware file").setInputFiles({
+  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "engineering-cache-1MiB.bin",
     mimeType: "application/octet-stream",
     buffer: oneMiB,
@@ -79,9 +79,9 @@ test("1 MiB Engineering programming image uploads once per PPU session and reloa
   expect(counters.sessions).toBe(sessionsAtFirstRun);
   expect(counters.checks).toBe(1);
   expect(counters.uploads).toBe(1);
-  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "image_base64"))).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => typeof body.image_sha256 === "string")).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "firmware_sha256"))).toBe(true);
+  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "asset_base64"))).toBe(true);
+  expect(jobBodies.slice(0, 2).every(body => typeof body.asset_sha256 === "string")).toBe(true);
+  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "image_sha256"))).toBe(true);
   expect(jobBodies.slice(0, 2).every(body => typeof body.session_id === "string")).toBe(true);
 
   await runTwoSiteProgram(page, 4, counters);

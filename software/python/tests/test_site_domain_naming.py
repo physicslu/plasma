@@ -11,59 +11,37 @@ from plasma_core.errors import ErrorCode, PlasmaError, error_name
 from plasma_core.job_logging import JobEventLogger, OutputManager
 from plasma_core.models import JobRequest
 from plasma_server import SiteManager, SiteWorker
-from plasma_server.channel_manager import ChannelManager
-from plasma_server.channel_worker import ChannelWorker
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager as ModuleSiteManager
 from plasma_server.site_worker import SiteWorker as ModuleSiteWorker
 
 
 class SiteDomainNamingTests(unittest.TestCase):
-    def test_server_config_uses_site_fields_canonically(self) -> None:
+    def test_server_config_uses_site_fields_only(self) -> None:
         config = ServerConfig(max_supported_sites=4, max_queue_depth_per_site=7)
         self.assertEqual(config.max_supported_sites, 4)
         self.assertEqual(config.max_queue_depth_per_site, 7)
-        self.assertEqual(config.max_supported_channels, 4)
-        self.assertEqual(config.max_queue_depth_per_channel, 7)
-
-    def test_legacy_server_config_keywords_remain_compatible(self) -> None:
-        config = ServerConfig(max_supported_channels=4, max_queue_depth_per_channel=7)
-        self.assertEqual(config.max_supported_sites, 4)
-        self.assertEqual(config.max_queue_depth_per_site, 7)
-        with self.assertRaises(TypeError):
-            ServerConfig(max_supported_sites=4, max_supported_channels=4)
-        with self.assertRaises(TypeError):
-            ServerConfig(max_queue_depth_per_site=7, max_queue_depth_per_channel=7)
+        self.assertFalse(hasattr(config, "max_supported_channels"))
+        self.assertFalse(hasattr(config, "max_queue_depth_per_channel"))
 
     def test_site_manager_and_worker_are_canonical_exports(self) -> None:
         self.assertIs(SiteManager, ModuleSiteManager)
-        self.assertIsNot(ChannelManager, SiteManager)
         self.assertIs(SiteWorker, ModuleSiteWorker)
-        self.assertIs(ChannelWorker, SiteWorker)
 
-    def test_site_error_symbols_are_v32_canonical_and_v31_serializable(self) -> None:
-        self.assertIs(ErrorCode.SITE_INVALID, ErrorCode.CHANNEL_INVALID)
-        self.assertIs(ErrorCode.SITE_DISABLED, ErrorCode.CHANNEL_DISABLED)
-        self.assertIs(ErrorCode.SITE_BUSY, ErrorCode.CHANNEL_BUSY)
+    def test_site_error_symbols_are_v33_canonical(self) -> None:
         error = PlasmaError(ErrorCode.SITE_INVALID, "missing site")
         self.assertEqual(error.code.value, "E4001")
         self.assertEqual(error.error_type, "SITE_INVALID")
-        self.assertEqual(error_name(ErrorCode.SITE_INVALID, "3.1"), "CHANNEL_INVALID")
+        self.assertEqual(error_name(ErrorCode.SITE_INVALID), "SITE_INVALID")
 
-    def test_job_request_serializes_v32_site_id_and_can_adapt_v31_channel_id(self) -> None:
-        request = JobRequest(site_id=4, operation=Operation.ERASE)
+    def test_job_request_serializes_v33_site_and_image_contract(self) -> None:
+        request = JobRequest(site_id=4, operation=Operation.PROGRAM, image=b"abc")
         metadata = request.protocol_metadata()
         self.assertEqual(request.site_id, 4)
+        self.assertEqual(metadata["protocol_version"], "3.3")
         self.assertEqual(metadata["site_id"], 4)
-        self.assertNotIn("channel_id", metadata)
-
-        legacy_metadata = request.protocol_metadata("3.1")
-        self.assertEqual(legacy_metadata["channel_id"], 3)
-        self.assertNotIn("site_id", legacy_metadata)
-
-        legacy_request = JobRequest(channel_id=3, operation=Operation.ERASE)
-        self.assertEqual(legacy_request.site_id, 4)
-        self.assertEqual(legacy_request.channel_id, 3)
+        self.assertEqual(metadata["image_size"], 3)
+        self.assertEqual(metadata["image_sha256"], request.image_sha256)
 
     def test_site_audit_paths_and_readback_names_are_canonical(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -74,12 +52,6 @@ class SiteDomainNamingTests(unittest.TestCase):
             self.assertEqual(logger.text_path.parent.name, "SITE2")
             record = json.loads(logger.jsonl_path.read_text(encoding="utf-8").strip())
             self.assertEqual(record["site_id"], 2)
-            self.assertNotIn("channel_id", record)
-
-            legacy_record = json.loads(logger.legacy_jsonl_path.read_text(encoding="utf-8").strip())
-            self.assertEqual(logger.legacy_jsonl_path.parent.name, "CH1")
-            self.assertEqual(legacy_record["channel_id"], 1)
-            self.assertNotIn("site_id", legacy_record)
 
             output = OutputManager(root / "output")
             paths = output.write_read_sections("site-readback", 2, {"flash": b"abc"})

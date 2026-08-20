@@ -50,10 +50,11 @@ test("uses the Plasma Web REST Gateway instead of browser-side job simulation", 
   assert.match(page, /getJob/);
   assert.match(page, /startJob/);
   assert.match(page, /cancelJob/);
-  assert.match(page, /REST → Plasma v3\.2 TCP/);
-  assert.doesNotMatch(page, /REST → Plasma v3\.1 TCP/);
+  assert.match(page, /REST → Plasma v3\.3 TCP/);
+  assert.doesNotMatch(page, /REST → Plasma v3\.[12] TCP/);
   assert.match(api, /\/api\/status/);
   assert.match(api, /\/api\/jobs/);
+  assert.match(api, /\/api\/programming-assets/);
   assert.match(api, /await fetch/);
   assert.match(api, /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?/);
   assert.doesNotMatch(api, /127\.0\.0\.1:8080/);
@@ -68,8 +69,8 @@ test("derives PPU identity and Site topology from canonical status instead of fi
   assert.match(api, /export async function getPPUStatus/);
   assert.match(api, /payload\.ppu/);
   assert.match(api, /payload\.sites/);
-  assert.match(api, /payload\.programmer/);
-  assert.match(api, /payload\.channels/);
+  assert.doesNotMatch(api, /payload\.programmer/);
+  assert.doesNotMatch(api, /payload\.channels/);
   assert.match(page, /useState<Site\[]>\(\[\]\)/);
   assert.match(page, /useState<PPUSnapshot \| null>\(null\)/);
   assert.match(page, /const status = await getPPUStatus\(apiBase\)/);
@@ -87,18 +88,15 @@ test("derives PPU identity and Site topology from canonical status instead of fi
   assert.doesNotMatch(page, /visibleSiteIds\.length\} \/ 8/);
 });
 
-test("uses canonical Site requests while keeping v3.1 compatibility read-only", async () => {
+test("uses canonical Site requests only", async () => {
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
   assert.match(api, /siteId: number/);
   assert.match(api, /site_id: options\.siteId/);
-  assert.doesNotMatch(api, /channel_id:\s*options\.siteId/);
-  assert.match(
-    api,
-    /job\.site_id \?\? \(job\.channel_id === undefined \? undefined : job\.channel_id \+ 1\)/,
-  );
-  assert.match(api, /site_id: channel\.channel_id \+ 1/);
-  assert.match(api, /Job snapshot is missing site_id/);
+  assert.doesNotMatch(api, /channel_id/);
+  assert.doesNotMatch(api, /LegacyChannel/);
+  assert.doesNotMatch(api, /LegacyProgrammer/);
+  assert.match(api, /Job snapshot is missing a valid site_id/);
 });
 
 test("keeps live log messages English and marks error severity explicitly", async () => {
@@ -112,12 +110,11 @@ test("keeps live log messages English and marks error severity explicitly", asyn
   assert.match(page, /Plasma Web REST Gateway offline/);
   assert.match(page, /offline · \$\{apiBase\} ·/);
   assert.match(page, /Plasma Web REST Gateway rejected · \$\{apiDraft\.trim\(\)/);
-  assert.match(page, /Firmware exceeds the 16 MiB limit/);
+  assert.match(page, /Programming Image Asset exceeds the 16 MiB limit/);
   assert.match(page, /timed out waiting for completion/);
   assert.match(page, /At least one site must remain visible/);
   assert.doesNotMatch(page, /At least one channel must remain visible/);
   assert.doesNotMatch(page, /主畫面至少必須保留一個通道/);
-  assert.doesNotMatch(page, /Firmware 超過 16 MiB 限制`/);
   assert.doesNotMatch(page, /等待完成逾時/);
   assert.doesNotMatch(page, /API URL 無效/);
 });
@@ -250,13 +247,13 @@ test("uses an explicit batch lifecycle and a cancel barrier at dispatch", async 
   assert.doesNotMatch(page, /batchActiveJobs/);
   assert.doesNotMatch(page, /batchCancelRequested/);
 
-  const encode = api.indexOf("await fileToBase64(options.firmware)");
+  const encode = api.indexOf("assetBase64 = await fileToBase64(options.assetFile)");
   const guard = api.indexOf("if (options.submissionGuard && !options.submissionGuard())");
   const dispatch = api.indexOf('"/api/jobs"', guard);
-  assert.notEqual(encode, -1, "firmware preparation is missing");
+  assert.notEqual(encode, -1, "Programming Asset preparation is missing");
   assert.notEqual(guard, -1, "submission guard is missing");
   assert.notEqual(dispatch, -1, "job dispatch is missing");
-  assert.ok(encode < guard, "cancel barrier must be checked after firmware preparation");
+  assert.ok(encode < guard, "cancel barrier must be checked after Programming Asset preparation");
   assert.ok(guard < dispatch, "cancel barrier must be checked before POST /api/jobs");
 });
 

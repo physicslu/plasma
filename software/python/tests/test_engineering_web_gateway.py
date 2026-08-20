@@ -24,7 +24,12 @@ class FakeEngineeringProvider:
             "facility_count": 3,
             "ppu_count": 12,
             "site_count": 60,
-            "firmware_scope": "connection-session-and-ppu",
+            "programming_asset_scope": "connection-session-and-ppu",
+            "supported_asset_types": ["image", "key", "option", "serial_number", "calibration"],
+            "supported_asset_formats": ["binary", "intel_hex", "csv", "text"],
+            "implemented_normalizers": [
+                {"asset_type": "image", "asset_format": "binary", "output": "normalized_image"}
+            ],
             "facilities": [],
         }
 
@@ -34,63 +39,75 @@ class FakeEngineeringProvider:
             "ok": True,
             "session": {
                 "session_id": "1" * 32,
-                "firmware_cache_scope": "connection-session-and-ppu",
+                "programming_asset_cache_scope": "connection-session-and-ppu",
                 "previous_session_cleared": previous_session_id is not None,
             },
         }
 
-    def firmware_cache_status(
+    def asset_cache_status(
         self,
         session_id,
         facility_id,
         ppu_id,
-        firmware_name,
-        firmware_size,
-        firmware_sha256,
+        asset_name,
+        asset_type,
+        asset_format,
+        asset_size,
+        asset_sha256,
     ):
         FakeEngineeringProvider.last_cache_check = (
             session_id,
             facility_id,
             ppu_id,
-            firmware_name,
-            firmware_size,
-            firmware_sha256,
+            asset_name,
+            asset_type,
+            asset_format,
+            asset_size,
+            asset_sha256,
         )
         return {
             "ok": True,
-            "firmware": {
+            "programming_asset": {
                 "cache_hit": False,
-                "firmware_name": firmware_name,
-                "firmware_size": firmware_size,
-                "firmware_sha256": firmware_sha256,
+                "asset_name": asset_name,
+                "asset_type": asset_type,
+                "asset_format": asset_format,
+                "asset_size": asset_size,
+                "asset_sha256": asset_sha256,
             },
         }
 
-    def cache_firmware(
+    def cache_asset(
         self,
         session_id,
         facility_id,
         ppu_id,
-        firmware_name,
-        firmware_sha256,
-        firmware,
+        asset_name,
+        asset_type,
+        asset_format,
+        asset_sha256,
+        data,
     ):
         FakeEngineeringProvider.last_cache_upload = (
             session_id,
             facility_id,
             ppu_id,
-            firmware_name,
-            firmware_sha256,
-            firmware,
+            asset_name,
+            asset_type,
+            asset_format,
+            asset_sha256,
+            data,
         )
         return {
             "ok": True,
-            "firmware": {
+            "programming_asset": {
                 "cache_hit": True,
                 "uploaded": True,
-                "firmware_name": firmware_name,
-                "firmware_size": len(firmware),
-                "firmware_sha256": firmware_sha256,
+                "asset_name": asset_name,
+                "asset_type": asset_type,
+                "asset_format": asset_format,
+                "asset_size": len(data),
+                "asset_sha256": asset_sha256,
             },
         }
 
@@ -130,14 +147,14 @@ class FakeEngineeringProvider:
         request,
         *,
         session_id=None,
-        firmware_sha256=None,
+        asset_sha256=None,
     ):
         FakeEngineeringProvider.last_start = (
             facility_id,
             ppu_id,
             request,
             session_id,
-            firmware_sha256,
+            asset_sha256,
         )
         return {
             "ok": True,
@@ -192,7 +209,8 @@ class EngineeringWebGatewayTests(unittest.TestCase):
         self.assertEqual(payload["facility_count"], 3)
         self.assertEqual(payload["ppu_count"], 12)
         self.assertEqual(payload["site_count"], 60)
-        self.assertEqual(payload["firmware_scope"], "connection-session-and-ppu")
+        self.assertEqual(payload["programming_asset_scope"], "connection-session-and-ppu")
+        self.assertIn("serial_number", payload["supported_asset_types"])
 
     def test_reconnect_starts_new_session_and_passes_previous_session_for_clear(self):
         previous = "a" * 32
@@ -205,50 +223,46 @@ class EngineeringWebGatewayTests(unittest.TestCase):
         self.assertEqual(FakeEngineeringProvider.last_begin_session, previous)
         self.assertTrue(payload["session"]["previous_session_cleared"])
         self.assertEqual(payload["session"]["session_id"], "1" * 32)
+        self.assertEqual(
+            payload["session"]["programming_asset_cache_scope"],
+            "connection-session-and-ppu",
+        )
 
-    def test_firmware_fingerprint_probe_and_binary_upload_route_to_selected_ppu(self):
+    def test_asset_probe_and_upload_route_to_selected_ppu(self):
         session_id = "1" * 32
         sha256 = "b" * 64
-        check_path = "/api/engineering/targets/mock-facility-02/mock-facility-02-ppu-03/api/firmware/check"
+        base = "/api/engineering/targets/mock-facility-02/mock-facility-02-ppu-03"
         status, payload = self.request(
             "POST",
-            check_path,
+            f"{base}/api/programming-assets/check",
             {
                 "session_id": session_id,
-                "firmware_name": "one.bin",
-                "firmware_size": 1024,
-                "firmware_sha256": sha256,
+                "asset_name": "one.bin",
+                "asset_type": "image",
+                "asset_format": "binary",
+                "asset_size": 1024,
+                "asset_sha256": sha256,
             },
         )
         self.assertEqual(status, 200)
-        self.assertFalse(payload["firmware"]["cache_hit"])
+        self.assertFalse(payload["programming_asset"]["cache_hit"])
         self.assertEqual(
             FakeEngineeringProvider.last_cache_check,
-            (session_id, "mock-facility-02", "mock-facility-02-ppu-03", "one.bin", 1024, sha256),
+            (session_id, "mock-facility-02", "mock-facility-02-ppu-03", "one.bin", "image", "binary", 1024, sha256),
         )
 
-        upload_path = (
-            "/api/engineering/targets/mock-facility-02/mock-facility-02-ppu-03/api/firmware"
-            f"?session_id={session_id}&name=one.bin&sha256={sha256}"
-        )
+        data = b"image-bytes"
         status, payload = self.request(
             "POST",
-            upload_path,
-            raw_body=b"firmware-bytes",
+            f"{base}/api/programming-assets?session_id={session_id}&name=one.bin&type=image&format=binary&sha256={sha256}",
+            raw_body=data,
             content_type="application/octet-stream",
         )
         self.assertEqual(status, 201)
-        self.assertTrue(payload["firmware"]["uploaded"])
+        self.assertTrue(payload["programming_asset"]["uploaded"])
         self.assertEqual(
             FakeEngineeringProvider.last_cache_upload,
-            (
-                session_id,
-                "mock-facility-02",
-                "mock-facility-02-ppu-03",
-                "one.bin",
-                sha256,
-                b"firmware-bytes",
-            ),
+            (session_id, "mock-facility-02", "mock-facility-02-ppu-03", "one.bin", "image", "binary", sha256, data),
         )
 
     def test_selected_facility_ppu_and_site_reach_provider(self):
@@ -271,16 +285,16 @@ class EngineeringWebGatewayTests(unittest.TestCase):
         )
         self.assertEqual(status, 202)
         self.assertEqual(payload["job"]["site_id"], 8)
-        facility_id, ppu_id, request, session_id, firmware_sha256 = FakeEngineeringProvider.last_start
+        facility_id, ppu_id, request, session_id, asset_sha256 = FakeEngineeringProvider.last_start
         self.assertEqual(facility_id, "mock-facility-03")
         self.assertEqual(ppu_id, "mock-facility-03-ppu-04")
         self.assertEqual(request.site_id, 8)
         self.assertEqual(request.client_id, "plasma-web-engineering")
         self.assertEqual(request.timeout_s, 90.0)
         self.assertIsNone(session_id)
-        self.assertIsNone(firmware_sha256)
+        self.assertIsNone(asset_sha256)
 
-    def test_program_submission_sends_only_session_fingerprint_reference(self):
+    def test_program_submission_sends_only_session_asset_reference(self):
         session_id = "2" * 32
         sha256 = "c" * 64
         status, payload = self.request(
@@ -289,16 +303,15 @@ class EngineeringWebGatewayTests(unittest.TestCase):
             {
                 "site_id": 2,
                 "operation": "program",
-                "firmware_name": "cached.bin",
                 "session_id": session_id,
-                "firmware_sha256": sha256,
+                "asset_sha256": sha256,
             },
         )
         self.assertEqual(status, 202)
         self.assertEqual(payload["job"]["operation"], "program")
         facility_id, ppu_id, request, routed_session, routed_sha = FakeEngineeringProvider.last_start
         self.assertEqual((facility_id, ppu_id), ("mock-facility-01", "mock-facility-01-ppu-02"))
-        self.assertEqual(request.firmware, b"")
+        self.assertEqual(request.image, b"")
         self.assertEqual(request.timeout_s, 90.0)
         self.assertEqual(routed_session, session_id)
         self.assertEqual(routed_sha, sha256)
@@ -315,7 +328,6 @@ class EngineeringWebGatewayTests(unittest.TestCase):
             FakeEngineeringProvider.last_cancel,
             ("mock-facility-01", "mock-facility-01-ppu-01", "engineering-job-1"),
         )
-
         status, payload = self.request(
             "GET",
             "/api/engineering/targets/mock-facility-01/mock-facility-01-ppu-01/api/jobs/engineering-job-1/files/read.bin",

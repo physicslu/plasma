@@ -2,17 +2,31 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 const apiBase = "https://plasma.open4th.com";
 
-function channelPayload() {
-  // Keep one legacy status fixture to exercise the Web v3.1 compatibility adapter.
-  return Array.from({ length: 8 }, (_, channelId) => ({
-    channel_id: channelId,
-    enabled: channelId < 2,
-    state: "idle",
-    current_job_id: null,
-    queued_jobs: 0,
-    interface: channelId < 2 ? "Mock" : null,
-    target: channelId < 2 ? "STM32F103C8T6" : null,
-  }));
+function canonicalStatus() {
+  return {
+    ok: true,
+    ppu: {
+      ppu_id: "observability-ppu-01",
+      facility_id: "observability-facility-01",
+      model: "MOCK-PPU",
+      display_name: "Observability PPU 01",
+      site_count: 8,
+      enabled_site_count: 2,
+      capabilities: {
+        max_supported_sites: 8,
+        operations: ["erase", "program", "verify", "read"],
+      },
+    },
+    sites: Array.from({ length: 8 }, (_, index) => ({
+      site_id: index + 1,
+      enabled: index < 2,
+      state: "idle",
+      current_job_id: null,
+      queued_jobs: 0,
+      interface: index < 2 ? "Mock" : null,
+      target: index < 2 ? "STM32F103C8T6" : null,
+    })),
+  };
 }
 
 async function fulfillJson(route: Route, body: unknown) {
@@ -28,7 +42,7 @@ async function installStatusMock(page: Page) {
     const request = route.request();
     const url = new URL(request.url());
     if (request.method() === "GET" && url.pathname === "/api/status" && !url.searchParams.has("job")) {
-      await fulfillJson(route, { ok: true, channels: channelPayload() });
+      await fulfillJson(route, canonicalStatus());
       return;
     }
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "unhandled mock route" } }) });
@@ -48,8 +62,6 @@ test("restored default Gateway URL does not emit a second connected event", asyn
   const liveLog = page.getByLabel("Live job log");
   await expect(liveLog).toContainText(`Plasma Web REST Gateway connected · ${apiBase}`);
 
-  // Keep observing across multiple 500 ms polling cycles. The old test passed as
-  // soon as it saw the first event and therefore missed the later duplicate.
   await page.waitForTimeout(1_750);
 
   const connectedLines = liveLog.locator("span").filter({ hasText: "Plasma Web REST Gateway connected" });
@@ -66,7 +78,7 @@ test("operator-requested cancellation stays INFO even when backend includes an e
     const url = new URL(request.url());
 
     if (request.method() === "GET" && url.pathname === "/api/status" && !url.searchParams.has("job")) {
-      await fulfillJson(route, { ok: true, channels: channelPayload() });
+      await fulfillJson(route, canonicalStatus());
       return;
     }
 
@@ -126,6 +138,7 @@ test("operator-requested cancellation stays INFO even when backend includes an e
 
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
   await page.getByLabel("SITE 1 擦除").click();
   await expect(page.getByLabel("取消 SITE 1 工作")).toBeEnabled();

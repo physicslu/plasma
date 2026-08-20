@@ -1,8 +1,6 @@
 # Plasma PPU control plane v0.3.2
 
-Plasma 是一個可配置 **1～8 個 Programming Sites** 的 IC 燒錄平台 Prototype。Python control plane 將一台實體燒錄設備建模為 **Plasma Programming Unit (PPU)**，每個 PPU 內含多個可獨立排程與執行工作的 **Site**。
-
-Canonical domain hierarchy：
+Plasma 是可配置 **1～8 個 Programming Sites** 的 IC programming platform prototype。Python control plane 將一台實體設備建模為 **Plasma Programming Unit (PPU)**，每個 PPU 內含多個可獨立排程與執行工作的 **Site**。
 
 ```text
 Facility
@@ -12,62 +10,105 @@ Facility
     └── ... SITE N
 ```
 
-> Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。本版本已完成純軟體自動測試，但尚未完成 OpenOCD、STM32F103C8T6 與 Z2／FPGA 的完整實機燒錄驗證。`OpenOCDInterface` 與 `FPGAInterface` 是整合邊界，不代表硬體功能已完成。
+Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。
 
-## Domain naming 與 Protocol v3.2
+目前純軟體/Mock path 有自動測試；OpenOCD、STM32F103C8T6 與 Z2/FPGA 的完整實機 programming validation 仍是獨立階段。
 
-Python / REST / CLI / Web / TCP wire 的 canonical vocabulary 已統一為 `PPU`、`Facility`、`Site`：
+## Canonical contracts
 
-- `PPUConfig`
-- `SiteConfig`
-- `SiteManager`
-- `SiteWorker`
-- `SiteState`
-- `site_id = 1..N`
-- `max_supported_sites`
-- `max_queue_depth_per_site`
-- CLI `--site`
-
-Plasma TCP protocol canonical version 是 **v3.2**：
+### Domain
 
 ```text
-Magic:            PLASMA32
-protocol_version: 3.2
+PPUConfig
+SiteConfig
+SiteManager
+SiteWorker
+SiteState
+site_id = 1..N
+max_supported_sites
+max_queue_depth_per_site
+```
+
+### Plasma Protocol v3.3
+
+```text
+Magic:            PLASMA33
+protocol_version: 3.3
 identity:         site_id = 1..N
+execution data:   image_size / image_sha256 / normalized Image bytes
 ```
 
-Server 暫時保留 v3.1 compatibility adapter：
+Protocol v3.3 是目前唯一 canonical runtime wire contract。
+
+### Web REST v3
+
+REST source/input model 使用 **Programming Asset**：
 
 ```text
-v3.1 channel_id 0 -> canonical SITE 1
-v3.1 channel_id 1 -> canonical SITE 2
-...
+Programming Asset
+├── Image
+├── Key
+├── Option
+├── Serial Number
+└── Calibration
 ```
 
-v3.1 使用 `PLASMA31`、zero-based `channel_id` 與 legacy `programmer/channels` response shape；v3.2 不再混入這些欄位。Python distribution name `plasma-multichannel` 暫時保留，避免安裝 identity 在這次 protocol migration 中無意改變。
+Declared formats：
+
+```text
+binary
+intel_hex
+srec
+elf
+csv
+text
+json
+pem
+```
+
+只有 `Image + binary` normalizer 已實作。其他 Asset type/format 目前只是 extension point，執行時會 fail closed。
+
+REST 的 Programming Asset 與 wire 的 Normalized Image 是不同 abstraction：
+
+```text
+Programming Asset
+    |
+    | parse / normalize
+    v
+Normalized Image
+    |
+    | Protocol v3.3
+    v
+PPU execution
+```
+
+Programming Recipe 是「PPU 要做什麼」的 control-plane concept，不屬於 Programming Asset。
+
+`serial_number` 是 per-device identity Asset，不是 security key，也不應直接沿用 PPU-wide Image sharing semantics。
 
 ## 已完成的功能
 
 - Python 3.11+。
-- YAML 動態設定 1～8 個 one-based Sites，任一 Site 可個別停用。
+- YAML 動態設定 1～8 個 one-based Sites，任一 Site 可停用。
 - 每個 Site 有獨立 queue、worker、state、interface instance 與 audit log。
-- 全域 `max_concurrent_jobs` 限制，避免硬體資源過載。
-- 操作：`erase`、`program`、`verify`、`read`、`status`、`cancel`。
-- `program` 只負責寫入 Firmware；完整流程由 Client／Web UI 決定是否依序送出 `erase → program → verify`。
-- Plasma v3.2 framed protocol：明確 metadata、map、binary 長度與 `PLASMA32` magic。
-- v3.1 `PLASMA31/channel_id` compatibility decoding。
-- Binary SHA-256 驗證、封包大小上限與不完整資料偵測。
-- 統一錯誤碼、recoverable 分類與原始例外保留。
-- v3.2 Site errors：`SITE_INVALID`、`SITE_DISABLED`、`SITE_BUSY`；E4001/E4002/E4003 數值不變。
-- 每個 Job 支援 timeout、retry、backoff、cancel。
-- CLI 單行動態進度顯示與安全取消。
-- 單一 Site 失敗不會停止其他 Site。
+- 全域 `max_concurrent_jobs` 控制執行並行度。
+- 操作：Erase / Program / Verify / Read / Status / Cancel。
+- Program 只負責寫入 Image；完整流程由 Client/Web 明確組合，例如 `erase -> program -> verify`。
+- Plasma v3.3 framed protocol：metadata/map/binary length + `PLASMA33` magic。
+- Image SHA-256、payload size 與 incomplete-frame validation。
+- 統一錯誤碼與 recoverable classification。
+- Site errors：`SITE_INVALID` / `SITE_DISABLED` / `SITE_BUSY`。
+- Job timeout / retry / backoff / cancel。
+- CLI 單行 progress display 與安全取消。
+- 單一 Site 失敗不會停止無關 Site。
 - Server log、Job text log、JSONL audit log。
-- `job_state.json`、`result.json` 與 read-back binary。
-- 原子寫檔；Server 啟動時會把先前未完成的工作標記為 `ABORTED`。
-- Plasma Web REST Gateway 提供狀態、工作提交、取消與 read-back 下載。
-- Optional `plasma_manager` 提供手動 PPU registry 與 read-only fleet aggregation；Manager 不參與 PPU 本地工作執行。
-- `scripts/plasmactl` 支援 opt-in `plasma-manager.service` deployment；預設仍是 Manager disabled。
+- `job_state.json` / `result.json` / read-back binary。
+- Server startup recovery 將不完整 Job 標記為 `ABORTED`。
+- Plasma Web REST Gateway 提供 status、Job、cancel、read-back download 與 Engineering Programming Asset routes。
+- Engineering Mock Provider 支援 3 Facilities × 4 PPUs，Site 數 2/4/6/8。
+- Engineering session/PPU 可 cache 多個 Programming Assets。
+- Program/Verify 以 **Normalized Image SHA** 建立 PPU-wide active Image lease。
+- Optional `plasma_manager` 提供手動 PPU registry 與 read-only fleet aggregation；Manager 不參與 PPU 本地 Job execution。
 - `pytest` 是統一 Python test runner。
 
 ## Python 結構
@@ -75,18 +116,17 @@ v3.1 使用 `PLASMA31`、zero-based `channel_id` 與 legacy `programmer/channels
 ```text
 software/python/
 ├── config/
-│   ├── plasma.yaml
-│   └── manager.example.yaml
 ├── plasma_client/
 ├── plasma_core/
+│   ├── assets.py             # Programming Asset + Normalized Image model
+│   ├── models.py             # JobRequest / JobResult
+│   └── protocol.py           # Protocol v3.3 / PLASMA33
 ├── plasma_handlers/
 ├── plasma_interfaces/
-├── plasma_manager/          # optional read-only fleet control plane
+├── plasma_manager/           # optional read-only fleet control plane
 ├── plasma_server/
-│   ├── site_manager.py      # canonical one-based domain
-│   ├── site_worker.py       # canonical one-based execution
-│   ├── channel_manager.py   # v3.1 compatibility facade
-│   ├── channel_worker.py    # legacy import compatibility
+│   ├── site_manager.py
+│   ├── site_worker.py
 │   └── server.py
 ├── plasma_web/
 ├── tests/
@@ -116,30 +156,42 @@ plasma-server --config config/plasma.yaml
 python3 -m plasma_server.server --config config/plasma.yaml
 ```
 
-預設監聽 `127.0.0.1:9900`。若允許遠端 Client，必須另外規劃 authentication、TLS 與 firewall；目前 Prototype 尚未提供完整網路安全層，不應把 raw TCP Server 直接暴露到 Internet。
+預設 code-level listener 為 `127.0.0.1:9900`。若允許遠端 Client，必須另外規劃 authentication、TLS 與 firewall；目前 prototype 不應把 raw TCP Server 直接暴露到 Internet。
 
 ## 啟動 Plasma Web REST Gateway
-
-先啟動 Plasma Server，再啟動 Gateway：
 
 ```bash
 plasma-web --host 127.0.0.1 --port 8080 \
   --plasma-host 127.0.0.1 --plasma-port 9900
 ```
 
-Gateway 提供 `GET /api/status`、`POST /api/jobs`、`POST /api/jobs/{job_id}/cancel` 與 read-back file download。Canonical REST request 使用 one-based `site_id`，Gateway 以 v3.2 與 Server 溝通。舊 `channel/channel_id` 只在 REST compatibility boundary 被視為 zero-based legacy identity 並轉成 Site。
+Core local routes 包含：
 
-> 實際部署參數由 repository `scripts/plasmactl` 與本機 deployment config 決定；不要把上述 code-level default 當成部署端口的 source of truth。
+```text
+GET  /api/status
+POST /api/jobs
+POST /api/jobs/{job_id}/cancel
+GET  /api/jobs/{job_id}/files/{filename}
+```
 
-## 啟動 Plasma Manager（read-only）
+Engineering Programming 使用 REST v3 Programming Asset routes，詳見：
 
-第一版 Manager 是 optional control plane，只讀取多台 PPU 的 fleet-facing REST contract，不會成為本地燒錄的必要條件：
+```text
+docs/architecture/web-rest-api-contract.md
+docs/architecture/engineering-programming-workspace.md
+```
+
+實際 deployment parameters 由 `scripts/plasmactl` 與 operator-local config 決定；不要把 code-level default 當成 deployment source of truth。
+
+## Plasma Manager
+
+Manager 是 optional read-only fleet control plane：
 
 ```bash
 plasma-manager --config config/manager.example.yaml
 ```
 
-Manager 目前提供：
+目前提供：
 
 ```text
 GET /api/health/live
@@ -147,55 +199,36 @@ GET /api/registry
 GET /api/fleet
 ```
 
-每台 PPU 由設定檔提供 Plasma Web REST Gateway root URL。Manager 會讀取 PPU 的 `/api/health/live`、`/api/health/ready`、`/api/node`、`/api/status`，並彙整 Facility / PPU / Site 狀態。不同 PPU 可有不同 Site 數量，例如 2、4、8 Sites；單一 PPU offline 不會讓其他 PPU 的 fleet status 無法回傳。
-
-Integration-host deployment 已支援 opt-in `plasma-manager.service`。真正的 Manager registry/config 應放在 Git worktree 之外，並由 operator-local deployment config 指定：
-
-```text
-PLASMA_MANAGER_ENABLED=1
-PLASMA_MANAGER_CONFIG=/absolute/operator/local/path/manager.yaml
-```
-
-`PLASMA_MANAGER_ENABLED=0` 是預設值，因此既有 PPU/Integration host 升級不會自動增加 Manager runtime dependency。啟用時 `plasmactl` 會先驗證 Manager YAML，再產生/enable service 並檢查 `/api/health/live`。Manager unit 只依賴 network-online，不依賴同一台主機上的 `plasma-web.service`。
-
-目前 Manager **不提供** job command routing、central scheduling、mDNS discovery、authentication policy 或 Fleet Web UI。這些功能必須在保持 PPU standalone-first invariant 的前提下分階段加入。
+Manager 不提供 Job command routing、central scheduling、automatic discovery、authentication policy 或 Fleet Web UI。
 
 ## CLI
 
-查詢 PPU / 所有 Sites：
+查詢 PPU / Sites：
 
 ```bash
 plasma --host 127.0.0.1 --port 9900 status
 ```
 
-只寫入 Firmware 至 SITE 1：
+Program raw binary Image 至 SITE 1：
 
 ```bash
 plasma --host 127.0.0.1 --port 9900 program \
   --site 1 \
-  --bin firmware.bin \
+  --bin application.bin \
   --timeout 30 \
   --retries 1
-```
-
-CLI 進度使用 one-based Site vocabulary：
-
-```text
-Job job-... queued. Press Ctrl+C to cancel.
-SITE1 PROGRAM   [████████████████────────────]  58.9%  stage 58.9%  38,600/65,536 B
-SITE1 PROGRAM   [████████████████████████████] 100.0%  stage 100.0% 65,536/65,536 B
 ```
 
 其他操作：
 
 ```bash
 plasma erase --site 1
-plasma verify --site 1 --bin firmware.bin
+plasma verify --site 1 --bin application.bin
 plasma read --site 1 --map config/map.example.json
 plasma status --site 1
 ```
 
-新版 CLI 不再把 `--channel` 當作 public interface；若必須驗證 v3.1 wire compatibility，使用明確設定為 protocol 3.1 的 Client adapter，不要在新操作流程中混用兩套 ID。
+CLI 的 `--bin` 表示目前 CLI 的 source input 是 raw binary Image；未來 HEX/ELF 等 parser 必須在明確實作後才可宣稱支援。
 
 ## Canonical YAML
 
@@ -219,20 +252,17 @@ sites:
   - {id: 3, enabled: false, interface: mock}
 ```
 
-`max_supported_sites` 定義 Site ID 空間 `1..N`；`max_concurrent_jobs` 定義同時真正執行的 Job 數。兩者不是同一件事。
-
-舊 YAML 的 `programmer`、`channels`、`max_supported_channels` 等名稱仍可讀取。若使用 legacy `channels:`，其 ID 被視為 v3.1 zero-based Channel ID，在 config loader 邊界轉成 one-based Site ID；進入 canonical domain 後不再存在 Site 0。
+Configuration 使用 canonical `ppu/sites` vocabulary only。
 
 ## Output 與 audit log
 
-每個 Job 使用獨立 output 目錄：
+每個 Job：
 
 ```text
 output/<job-id>/
 ├── job_state.json
 ├── result.json
-├── read_SITE1_section0.bin
-└── read_SITE1_section1.bin
+└── read_SITE1_<section>.bin
 ```
 
 Canonical log path：
@@ -245,33 +275,16 @@ logs/YYYY-MM-DD/
     └── <job-id>.jsonl
 ```
 
-Canonical `SITE1/*.jsonl` 只寫 `site_id: 1`。Migration 期間另有小型 legacy mirror `CH0/`，其 JSONL 只寫 `channel_id: 0`；兩套 schema 不在同一 log record 中混用。Read-back binary 不重複建立 legacy `read_CH*` 副本。
-
-所有時間採帶時區的 UTC ISO 8601；UI 若要顯示當地時間，應在 presentation layer 轉換，不應改寫 audit timestamp。
-
-## Mock 故障注入
-
-測試用 Site 可在 YAML 注入延遲與失敗：
-
-```yaml
-mock:
-  default_delay_s: 0.01
-  delays:
-    program: 0.2
-  failures:
-    program: 1
-  failure_recoverable: true
-```
-
-這是 test facility，不應帶入 production configuration。
+所有 audit timestamps 採帶時區 UTC ISO 8601；presentation layer 可轉成當地時間。
 
 ## 已知限制
 
 - 尚無完整 authentication、TLS、authorization 或 anti-replay 機制。
-- Job persistence 目前仍以檔案為主；高工作量需重新評估資料層。
-- TCP 仍採一個 request 對一個 connection，沒有長連線多工或 server-push event stream。
-- v3.1 compatibility adapter 暫時保留；移除時必須另做 deprecation/removal decision。
-- Server 重啟可辨識未完成工作，但不會自動重做燒錄。
-- Plasma Manager 目前只做手動 registry、read-only aggregation 與 opt-in deployment，尚無 command routing、auth 或 Fleet UI。
-- OpenOCD binary staging、adapter isolation、port 配置與實體 target 尚未完成完整驗證。
-- FPGA register map、AXI/FIFO、SWD engine、power-good 與安全關電仍屬後續硬體整合工作。
+- Job persistence 仍以檔案為主；高工作量需重新評估資料層。
+- TCP 目前一個 request 對一個 connection，沒有長連線 multiplexing/server-push。
+- 只有 raw binary Image Asset normalization 已實作。
+- Programming Recipe/Package 尚未成為 executable contract。
+- Server restart 可辨識未完成 Job，但不會自動重做 programming。
+- Manager 目前只做 read-only aggregation 與 opt-in deployment。
+- OpenOCD binary staging、adapter isolation 與實體 target 尚未完整驗證。
+- FPGA register map、AXI/FIFO、SWD engine、power-good 與安全關電仍屬後續硬體整合。
