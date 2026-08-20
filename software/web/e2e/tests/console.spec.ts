@@ -184,7 +184,7 @@ test("starts with SITE 1/SITE 2 visible and no batch operation selected", async 
 test("selects batch operations and completes them through the browser", async ({ page }) => {
   const mock = await openConsole(page);
 
-  await page.getByLabel("選擇 Firmware 檔案").setInputFiles({
+  await page.getByLabel("選擇 Programming Image Asset 檔案").setInputFiles({
     name: "e2e.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.from([0x50, 0x4c, 0x41, 0x53, 0x4d, 0x41]),

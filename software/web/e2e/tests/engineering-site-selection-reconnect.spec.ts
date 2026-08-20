@@ -9,7 +9,7 @@ function catalog() {
     facility_count: 3,
     ppu_count: 12,
     site_count: 60,
-    firmware_scope: "connection-session-and-ppu",
+    programming_asset_scope: "connection-session-and-ppu",
     facilities: Array.from({ length: 3 }, (_, facilityIndex) => {
       const facilityNumber = facilityIndex + 1;
       const facilityId = `mock-facility-${String(facilityNumber).padStart(2, "0")}`;
@@ -87,7 +87,7 @@ async function fulfillEngineeringRoute(
         ok: true,
         session: {
           session_id: String(counters?.sessions ?? 1).padStart(32, "0"),
-          firmware_cache_scope: "connection-session-and-ppu",
+          programming_asset_cache_scope: "connection-session-and-ppu",
           previous_session_cleared: Boolean(body.previous_session_id),
         },
       }),

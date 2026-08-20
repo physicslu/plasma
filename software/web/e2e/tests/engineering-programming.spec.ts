@@ -9,7 +9,7 @@ function catalog() {
     facility_count: 3,
     ppu_count: 12,
     site_count: 60,
-    programming_image_scope: "connection-session-and-ppu",
+    programming_asset_scope: "connection-session-and-ppu",
     facilities: Array.from({ length: 3 }, (_, facilityIndex) => {
       const facilityNumber = facilityIndex + 1;
       const facilityId = `mock-facility-${String(facilityNumber).padStart(2, "0")}`;
@@ -94,7 +94,7 @@ test("Engineering Programming topology comes from the Python target catalog", as
           ok: true,
           session: {
             session_id: String(sessionNumber).padStart(32, "0"),
-            programming_image_cache_scope: "connection-session-and-ppu",
+            programming_asset_cache_scope: "connection-session-and-ppu",
             previous_session_cleared: sessionNumber > 1,
           },
         }),
@@ -162,7 +162,7 @@ test("same-URL Connect creates a new session and restores Facility PPU Site topo
           ok: true,
           session: {
             session_id: String(sessionRequests).padStart(32, "0"),
-            programming_image_cache_scope: "connection-session-and-ppu",
+            programming_asset_cache_scope: "connection-session-and-ppu",
             previous_session_cleared: Boolean(body.previous_session_id),
           },
         }),
@@ -213,7 +213,7 @@ test("Engineering EPVR job is posted to the selected Facility and PPU", async ({
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify({ ok: true, session: { session_id: String(sessionNumber).padStart(32, "0"), programming_image_cache_scope: "connection-session-and-ppu", previous_session_cleared: false } }),
+        body: JSON.stringify({ ok: true, session: { session_id: String(sessionNumber).padStart(32, "0"), programming_asset_cache_scope: "connection-session-and-ppu", previous_session_cleared: false } }),
       });
       return;
     }
@@ -277,7 +277,7 @@ test("Engineering EPVR job is posted to the selected Facility and PPU", async ({
   await expect(page.getByLabel("Engineering job log")).toContainText("SITE-06");
 });
 
-test("PPU Programming Image cache uploads once, probes on reuse, reloads on change and reconnect", async ({ page }) => {
+test("PPU Programming Asset cache uploads once, probes on reuse, reloads on change and reconnect", async ({ page }) => {
   let sessionNumber = 0;
   let checkCount = 0;
   let uploadCount = 0;
@@ -299,7 +299,7 @@ test("PPU Programming Image cache uploads once, probes on reuse, reloads on chan
           ok: true,
           session: {
             session_id: String(sessionNumber).padStart(32, "0"),
-            programming_image_cache_scope: "connection-session-and-ppu",
+            programming_asset_cache_scope: "connection-session-and-ppu",
             previous_session_cleared: sessionNumber > 1,
           },
         }),
@@ -327,26 +327,26 @@ test("PPU Programming Image cache uploads once, probes on reuse, reloads on chan
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(terminalJob(jobId, job.siteId, job.operation)) });
       return;
     }
-    if (request.method() === "POST" && tail === "api/programming-images/check") {
+    if (request.method() === "POST" && tail === "api/programming-assets/check") {
       checkCount += 1;
-      const body = request.postDataJSON() as { session_id: string; image_sha256: string; image_name: string; image_size: number };
+      const body = request.postDataJSON() as { session_id: string; asset_sha256: string; asset_name: string; asset_size: number };
       const cacheKey = `${body.session_id}|${targetKey}`;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           ok: true,
-          programming_image: {
-            cache_hit: cache.get(cacheKey) === body.image_sha256,
-            image_name: body.image_name,
-            image_size: body.image_size,
-            image_sha256: body.image_sha256,
+          programming_asset: {
+            cache_hit: cache.get(cacheKey) === body.asset_sha256,
+            asset_name: body.asset_name,
+            asset_size: body.asset_size,
+            asset_sha256: body.asset_sha256,
           },
         }),
       });
       return;
     }
-    if (request.method() === "POST" && tail === "api/programming-images") {
+    if (request.method() === "POST" && tail === "api/programming-assets") {
       uploadCount += 1;
       const sessionId = url.searchParams.get("session_id")!;
       const sha256 = url.searchParams.get("sha256")!;
@@ -354,7 +354,7 @@ test("PPU Programming Image cache uploads once, probes on reuse, reloads on chan
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify({ ok: true, programming_image: { cache_hit: true, uploaded: true, image_sha256: sha256 } }),
+        body: JSON.stringify({ ok: true, programming_asset: { cache_hit: true, uploaded: true, asset_sha256: sha256 } }),
       });
       return;
     }
@@ -391,7 +391,7 @@ test("PPU Programming Image cache uploads once, probes on reuse, reloads on chan
 
   await openProgramming(page);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
-  await page.getByLabel("Engineering Firmware file").setInputFiles({
+  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "A.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(1024 * 1024, 0x5a),
@@ -402,9 +402,9 @@ test("PPU Programming Image cache uploads once, probes on reuse, reloads on chan
   await expect.poll(() => jobCount).toBe(2);
   await expect.poll(() => checkCount).toBe(1);
   expect(uploadCount).toBe(1);
-  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "image_base64"))).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => typeof body.image_sha256 === "string")).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "firmware_sha256"))).toBe(true);
+  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "asset_base64"))).toBe(true);
+  expect(jobBodies.slice(0, 2).every(body => typeof body.asset_sha256 === "string")).toBe(true);
+  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "asset_sha256"))).toBe(true);
   await expect.poll(() => page.locator(".executeBatch").isEnabled()).toBe(true);
 
   await page.locator(".executeBatch").click();
@@ -412,7 +412,7 @@ test("PPU Programming Image cache uploads once, probes on reuse, reloads on chan
   await expect.poll(() => checkCount).toBe(2);
   expect(uploadCount).toBe(1);
 
-  await page.getByLabel("Engineering Firmware file").setInputFiles({
+  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "B.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(1024 * 1024, 0xa5),

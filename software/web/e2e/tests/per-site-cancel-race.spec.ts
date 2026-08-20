@@ -124,7 +124,7 @@ test("per-Site cancel blocks the next operation when the current job races to SU
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
 
-  await page.getByLabel("選擇 Firmware 檔案").setInputFiles({
+  await page.getByLabel("選擇 Programming Image Asset 檔案").setInputFiles({
     name: "site-race.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.from([0x50, 0x4c, 0x41, 0x53, 0x4d, 0x41]),
