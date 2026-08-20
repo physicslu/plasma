@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import threading
+import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
@@ -20,7 +21,7 @@ from plasma_server.server import PlasmaServer
 MOCK_FACILITY_COUNT = 3
 MOCK_SITE_COUNTS = (2, 4, 6, 8)
 MOCK_FLASH_SIZE_BYTES = 4 * 1024 * 1024
-MOCK_MAX_STAGED_FIRMWARE_BYTES = 16 * 1024 * 1024
+MOCK_MAX_CACHED_FIRMWARE_BYTES = 16 * 1024 * 1024
 MOCK_OPERATION_TIMEOUT_S = 90.0
 MOCK_THROUGHPUT_BYTES_PER_S = {
     "erase": 2 * 1024 * 1024,
@@ -35,23 +36,42 @@ MOCK_OPERATION_OVERHEADS_S = {
     "read": 1.0,
 }
 MOCK_PROGRESS_STEPS = 20
-FIRMWARE_ID_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+SESSION_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+FIRMWARE_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+
+
+@dataclass(frozen=True, slots=True)
+class FirmwareCacheEntry:
+    firmware_name: str
+    firmware_size: int
+    firmware_sha256: str
+    firmware: bytes
 
 
 class EngineeringPPUProvider(Protocol):
-    """Execution boundary consumed by the Engineering Web API.
-
-    A future real-PPU provider can replace the mock provider without changing
-    the browser Facility -> PPU -> Site control contract.
-    """
+    """Execution boundary consumed by the Engineering Web API."""
 
     def catalog(self) -> dict[str, Any]: ...
 
-    def stage_firmware(
+    def begin_session(self, previous_session_id: str | None = None) -> dict[str, Any]: ...
+
+    def firmware_cache_status(
         self,
+        session_id: str,
         facility_id: str,
         ppu_id: str,
         firmware_name: str,
+        firmware_size: int,
+        firmware_sha256: str,
+    ) -> dict[str, Any]: ...
+
+    def cache_firmware(
+        self,
+        session_id: str,
+        facility_id: str,
+        ppu_id: str,
+        firmware_name: str,
+        firmware_sha256: str,
         firmware: bytes,
     ) -> dict[str, Any]: ...
 
@@ -72,7 +92,8 @@ class EngineeringPPUProvider(Protocol):
         ppu_id: str,
         request: JobRequest,
         *,
-        firmware_id: str | None = None,
+        session_id: str | None = None,
+        firmware_sha256: str | None = None,
     ) -> dict[str, Any]: ...
 
     async def cancel_job(self, facility_id: str, ppu_id: str, job_id: str) -> dict[str, Any]: ...
@@ -98,13 +119,13 @@ class MockPPUSpec:
 class MockEngineeringPPUProvider:
     """Twelve real in-process PlasmaServer runtimes backed by MockInterface.
 
-    The simulated topology is server-owned: three Facilities, four PPUs per
-    Facility, and 2/4/6/8 Sites per PPU. Jobs still traverse Plasma Protocol
-    v3.2, SiteManager/SiteWorker, and MockInterface.
-
-    Firmware is staged once per selected PPU and addressed by an immutable
-    SHA-256 firmware_id. Program/Verify jobs reuse the same staged bytes across
-    Sites instead of making the browser upload the same file once per Site.
+    Firmware cache semantics are explicit and intentionally short-lived:
+    - cache scope is one browser connection session and one selected PPU;
+    - a PPU keeps at most one active firmware image per session;
+    - the first use after reconnect is a cache miss and requires one upload;
+    - repeated use of the same SHA-256 reuses in-memory bytes;
+    - changing firmware replaces that PPU's session cache entry;
+    - beginning a new connection session invalidates the previous session cache.
     """
 
     def __init__(self, root: Path) -> None:
@@ -113,6 +134,8 @@ class MockEngineeringPPUProvider:
         self._servers: dict[tuple[str, str], PlasmaServer] = {}
         self._ports: dict[tuple[str, str], int] = {}
         self._output_roots: dict[tuple[str, str], Path] = {}
+        self._firmware_sessions: dict[str, dict[tuple[str, str], FirmwareCacheEntry]] = {}
+        self._firmware_lock = threading.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._ready = threading.Event()
@@ -162,6 +185,8 @@ class MockEngineeringPPUProvider:
         thread = self._thread
         if loop is None or thread is None:
             return
+        with self._firmware_lock:
+            self._firmware_sessions.clear()
         if loop.is_running():
             future = asyncio.run_coroutine_threadsafe(self._close_servers(), loop)
             future.result(timeout=timeout_s)
@@ -257,52 +282,157 @@ class MockEngineeringPPUProvider:
             )
         return key
 
+    @staticmethod
+    def _validate_session_id(session_id: str) -> str:
+        if not isinstance(session_id, str) or SESSION_ID_PATTERN.fullmatch(session_id) is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid Engineering session_id")
+        return session_id
+
+    @staticmethod
+    def _validate_firmware_sha256(firmware_sha256: str) -> str:
+        if not isinstance(firmware_sha256, str) or FIRMWARE_SHA256_PATTERN.fullmatch(firmware_sha256) is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid firmware_sha256")
+        return firmware_sha256
+
     def _client(self, facility_id: str, ppu_id: str) -> PlasmaClient:
         key = self._key(facility_id, ppu_id)
         return PlasmaClient("127.0.0.1", self._ports[key])
 
-    def _firmware_directory(self, facility_id: str, ppu_id: str) -> Path:
-        self._key(facility_id, ppu_id)
-        directory = self.root / ppu_id / "firmware"
-        directory.mkdir(parents=True, exist_ok=True)
-        return directory.resolve()
+    def begin_session(self, previous_session_id: str | None = None) -> dict[str, Any]:
+        with self._firmware_lock:
+            if previous_session_id is not None:
+                self._validate_session_id(previous_session_id)
+                self._firmware_sessions.pop(previous_session_id, None)
+            session_id = uuid.uuid4().hex
+            self._firmware_sessions[session_id] = {}
+        return {
+            "ok": True,
+            "session": {
+                "session_id": session_id,
+                "firmware_cache_scope": "connection-session-and-ppu",
+                "previous_session_cleared": previous_session_id is not None,
+            },
+        }
 
-    def _firmware_path(self, facility_id: str, ppu_id: str, firmware_id: str) -> Path:
-        if not isinstance(firmware_id, str) or FIRMWARE_ID_PATTERN.fullmatch(firmware_id) is None:
-            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid Engineering firmware_id")
-        return self._firmware_directory(facility_id, ppu_id) / f"{firmware_id}.bin"
+    def _session(self, session_id: str) -> dict[tuple[str, str], FirmwareCacheEntry]:
+        self._validate_session_id(session_id)
+        with self._firmware_lock:
+            session = self._firmware_sessions.get(session_id)
+        if session is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Engineering session is not active")
+        return session
 
-    def stage_firmware(
+    def firmware_cache_status(
         self,
+        session_id: str,
         facility_id: str,
         ppu_id: str,
         firmware_name: str,
-        firmware: bytes,
+        firmware_size: int,
+        firmware_sha256: str,
     ) -> dict[str, Any]:
-        if not isinstance(firmware, bytes) or not firmware:
-            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Engineering firmware upload is empty")
-        if len(firmware) > MOCK_MAX_STAGED_FIRMWARE_BYTES:
-            raise PlasmaError(
-                ErrorCode.INVALID_ARGUMENT,
-                "Engineering firmware upload exceeds the mock staging limit",
-                context={"size": len(firmware), "limit": MOCK_MAX_STAGED_FIRMWARE_BYTES},
+        key = self._key(facility_id, ppu_id)
+        self._validate_firmware_sha256(firmware_sha256)
+        if isinstance(firmware_size, bool) or not isinstance(firmware_size, int) or firmware_size <= 0:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "firmware_size must be a positive integer")
+        session = self._session(session_id)
+        with self._firmware_lock:
+            entry = session.get(key)
+            hit = bool(
+                entry
+                and entry.firmware_sha256 == firmware_sha256
+                and entry.firmware_size == firmware_size
             )
-        firmware_id = hashlib.sha256(firmware).hexdigest()
-        path = self._firmware_path(facility_id, ppu_id, firmware_id)
-        if not path.is_file():
-            temporary = path.with_name(f".{firmware_id}.{threading.get_ident()}.tmp")
-            temporary.write_bytes(firmware)
-            temporary.replace(path)
         return {
             "ok": True,
             "firmware": {
-                "firmware_id": firmware_id,
+                "cache_hit": hit,
                 "firmware_name": str(firmware_name or "browser-upload.bin"),
-                "firmware_size": len(firmware),
-                "firmware_sha256": firmware_id,
-                "scope": {"facility_id": facility_id, "ppu_id": ppu_id},
+                "firmware_size": firmware_size,
+                "firmware_sha256": firmware_sha256,
+                "scope": {
+                    "session_id": session_id,
+                    "facility_id": facility_id,
+                    "ppu_id": ppu_id,
+                },
             },
         }
+
+    def cache_firmware(
+        self,
+        session_id: str,
+        facility_id: str,
+        ppu_id: str,
+        firmware_name: str,
+        firmware_sha256: str,
+        firmware: bytes,
+    ) -> dict[str, Any]:
+        key = self._key(facility_id, ppu_id)
+        self._validate_firmware_sha256(firmware_sha256)
+        if not isinstance(firmware, bytes) or not firmware:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Engineering firmware upload is empty")
+        if len(firmware) > MOCK_MAX_CACHED_FIRMWARE_BYTES:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "Engineering firmware upload exceeds the mock cache limit",
+                context={"size": len(firmware), "limit": MOCK_MAX_CACHED_FIRMWARE_BYTES},
+            )
+        actual_sha256 = hashlib.sha256(firmware).hexdigest()
+        if actual_sha256 != firmware_sha256:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "firmware_sha256 does not match uploaded bytes",
+                context={"expected": firmware_sha256, "actual": actual_sha256},
+            )
+        entry = FirmwareCacheEntry(
+            firmware_name=str(firmware_name or "browser-upload.bin"),
+            firmware_size=len(firmware),
+            firmware_sha256=firmware_sha256,
+            firmware=firmware,
+        )
+        session = self._session(session_id)
+        with self._firmware_lock:
+            session[key] = entry
+        return {
+            "ok": True,
+            "firmware": {
+                "cache_hit": True,
+                "uploaded": True,
+                "firmware_name": entry.firmware_name,
+                "firmware_size": entry.firmware_size,
+                "firmware_sha256": entry.firmware_sha256,
+                "scope": {
+                    "session_id": session_id,
+                    "facility_id": facility_id,
+                    "ppu_id": ppu_id,
+                },
+            },
+        }
+
+    def _cached_firmware(
+        self,
+        session_id: str,
+        facility_id: str,
+        ppu_id: str,
+        firmware_sha256: str,
+    ) -> FirmwareCacheEntry:
+        key = self._key(facility_id, ppu_id)
+        self._validate_firmware_sha256(firmware_sha256)
+        session = self._session(session_id)
+        with self._firmware_lock:
+            entry = session.get(key)
+        if entry is None or entry.firmware_sha256 != firmware_sha256:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "Engineering firmware cache miss",
+                context={
+                    "session_id": session_id,
+                    "facility_id": facility_id,
+                    "ppu_id": ppu_id,
+                    "firmware_sha256": firmware_sha256,
+                },
+            )
+        return entry
 
     def job_timeout_s(self, facility_id: str, ppu_id: str) -> float:
         self._key(facility_id, ppu_id)
@@ -335,7 +465,7 @@ class MockEngineeringPPUProvider:
             "facility_count": len(facilities),
             "ppu_count": len(self._specs),
             "site_count": sum(spec.site_count for spec in self._specs),
-            "firmware_scope": "ppu",
+            "firmware_scope": "connection-session-and-ppu",
             "timing_profile": {
                 "model": "fixed-overhead-plus-bytes-over-throughput",
                 "flash_size_bytes": MOCK_FLASH_SIZE_BYTES,
@@ -362,32 +492,30 @@ class MockEngineeringPPUProvider:
         ppu_id: str,
         request: JobRequest,
         *,
-        firmware_id: str | None = None,
+        session_id: str | None = None,
+        firmware_sha256: str | None = None,
     ) -> dict[str, Any]:
         if request.operation in {Operation.PROGRAM, Operation.VERIFY}:
-            if firmware_id is not None and request.firmware:
+            if request.firmware:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
-                    "use staged firmware_id or inline firmware, not both",
+                    "Engineering program/verify must use the PPU session firmware cache",
                 )
-            if firmware_id is not None:
-                path = self._firmware_path(facility_id, ppu_id, firmware_id)
-                if not path.is_file():
-                    raise PlasmaError(
-                        ErrorCode.INVALID_ARGUMENT,
-                        "staged Engineering firmware is not available on this PPU",
-                        context={"firmware_id": firmware_id, "ppu_id": ppu_id},
-                    )
-                request = replace(request, firmware=path.read_bytes())
-            elif not request.firmware:
+            if not session_id or not firmware_sha256:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
-                    "program and verify require staged firmware_id or inline firmware",
+                    "Engineering program/verify requires session_id and firmware_sha256",
                 )
-        elif firmware_id is not None:
+            entry = self._cached_firmware(session_id, facility_id, ppu_id, firmware_sha256)
+            request = replace(
+                request,
+                firmware=entry.firmware,
+                metadata={**request.metadata, "firmware_name": entry.firmware_name},
+            )
+        elif session_id is not None or firmware_sha256 is not None:
             raise PlasmaError(
                 ErrorCode.INVALID_ARGUMENT,
-                "firmware_id is only valid for program or verify",
+                "session firmware reference is only valid for program or verify",
             )
         request = replace(request, timeout_s=MOCK_OPERATION_TIMEOUT_S)
         return await self._client(facility_id, ppu_id).start(request)
