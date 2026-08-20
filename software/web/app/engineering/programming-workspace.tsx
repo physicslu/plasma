@@ -145,6 +145,7 @@ export default function ProgrammingWorkspace() {
     && Number(readOffset) >= 0
     && Number.isInteger(Number(readLength))
     && Number(readLength) > 0;
+  const targetLocked = batchRunning || submittingSiteIds.length > 0 || sites.some(isRunning);
 
   const appendLog = useCallback((message: string, error = false) => {
     const time = new Date().toLocaleTimeString("en-GB", { hour12: false });
@@ -281,6 +282,10 @@ export default function ProgrammingWorkspace() {
 
   function connect(event: FormEvent) {
     event.preventDefault();
+    if (targetLocked) {
+      appendLog("[NET] Gateway change blocked while a target Job is active", true);
+      return;
+    }
     try {
       const normalized = normalizeApiBase(apiDraft);
       window.localStorage.setItem("plasma-api-base", normalized);
@@ -296,6 +301,7 @@ export default function ProgrammingWorkspace() {
   }
 
   function selectFacility(facilityId: string) {
+    if (targetLocked) return;
     const nextFacility = catalog?.facilities.find(item => item.facility_id === facilityId);
     switchTarget({
       facilityId,
@@ -304,6 +310,7 @@ export default function ProgrammingWorkspace() {
   }
 
   function selectPPU(ppuId: string) {
+    if (targetLocked) return;
     switchTarget({ facilityId: selection.facilityId, ppuId });
   }
 
@@ -339,6 +346,15 @@ export default function ProgrammingWorkspace() {
     setBatchSiteStates(current => ({ ...current, [siteId]: state }));
   }
 
+  function clearBatchSiteState(siteId: number) {
+    setBatchSiteStates(current => {
+      if (!(siteId in current)) return current;
+      const next = { ...current };
+      delete next[siteId];
+      return next;
+    });
+  }
+
   async function runSite(
     siteId: number,
     operation: Operation,
@@ -348,6 +364,7 @@ export default function ProgrammingWorkspace() {
     if (!targetApiBase) return;
     const site = sites.find(item => item.id === siteId);
     if (!site || operationDisabled(site, operation, forBatch)) return;
+    if (!forBatch) clearBatchSiteState(siteId);
     submissionGenerations.current[siteId] = (submissionGenerations.current[siteId] ?? 0) + 1;
     setSubmittingSiteIds(current => current.includes(siteId) ? current : [...current, siteId]);
     try {
@@ -516,9 +533,9 @@ export default function ProgrammingWorkspace() {
           <span className="pulse" />
           <label>
             <small>Plasma Web REST Gateway</small>
-            <input aria-label="Engineering Gateway URL" value={apiDraft} onChange={event => setApiDraft(event.target.value)} />
+            <input aria-label="Engineering Gateway URL" value={apiDraft} disabled={targetLocked} onChange={event => setApiDraft(event.target.value)} />
           </label>
-          <button type="submit">Connect</button>
+          <button type="submit" disabled={targetLocked}>Connect</button>
         </form>
       </div>
 
@@ -530,7 +547,7 @@ export default function ProgrammingWorkspace() {
           <select
             aria-label="Engineering Facility"
             value={selection.facilityId}
-            disabled={!catalog || batchRunning}
+            disabled={!catalog || targetLocked}
             onChange={event => selectFacility(event.target.value)}
           >
             {(catalog?.facilities ?? []).map(item => <option key={item.facility_id} value={item.facility_id}>{item.display_name}</option>)}
@@ -541,7 +558,7 @@ export default function ProgrammingWorkspace() {
           <select
             aria-label="Engineering PPU"
             value={selection.ppuId}
-            disabled={!facility || batchRunning}
+            disabled={!facility || targetLocked}
             onChange={event => selectPPU(event.target.value)}
           >
             {(facility?.ppus ?? []).map(item => (
