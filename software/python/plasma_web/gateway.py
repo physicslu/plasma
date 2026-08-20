@@ -178,11 +178,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/health/live":
                 self._json(
                     HTTPStatus.OK,
-                    {
-                        "ok": True,
-                        "service": GATEWAY_SERVICE_NAME,
-                        "gateway": "alive",
-                    },
+                    {"ok": True, "service": GATEWAY_SERVICE_NAME, "gateway": "alive"},
                 )
                 return
             if parsed.path == "/api/health/ready":
@@ -311,7 +307,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         *,
         client_id: str,
         default_timeout_s: float = 30.0,
-        allow_firmware_reference: bool = False,
+        require_inline_firmware: bool = True,
     ) -> JobRequest:
         operation = Operation(str(body["operation"]))
         if operation not in {Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ}:
@@ -320,12 +316,8 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         if not isinstance(encoded_firmware, str):
             raise ValueError("firmware_base64 must be a string")
         firmware = base64.b64decode(encoded_firmware, validate=True) if encoded_firmware else b""
-        firmware_id = body.get("firmware_id")
-        if firmware_id is not None and not isinstance(firmware_id, str):
-            raise ValueError("firmware_id must be a string")
-        if operation in {Operation.PROGRAM, Operation.VERIFY} and not firmware:
-            if not allow_firmware_reference or not firmware_id:
-                raise ValueError("program and verify require firmware_base64 or staged firmware_id")
+        if require_inline_firmware and operation in {Operation.PROGRAM, Operation.VERIFY} and not firmware:
+            raise ValueError("program and verify require firmware_base64")
         map_data = body.get("map_data") or {}
         if operation is Operation.READ:
             map_data = self._read_map(body, map_data)
@@ -345,21 +337,53 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             parsed = urlparse(self.path)
+            if parsed.path == "/api/engineering/session":
+                if self.engineering_provider is None:
+                    self._engineering_unavailable()
+                    return
+                body = self._body()
+                previous = body.get("previous_session_id")
+                if previous is not None and not isinstance(previous, str):
+                    raise ValueError("previous_session_id must be a string")
+                self._json(
+                    HTTPStatus.CREATED,
+                    self.engineering_provider.begin_session(previous),
+                )
+                return
+
             engineering = self._engineering_target(parsed.path)
             if engineering is not None:
                 if self.engineering_provider is None:
                     self._engineering_unavailable()
                     return
                 facility_id, ppu_id, tail = engineering
+                if tail == ["api", "firmware", "check"]:
+                    body = self._body()
+                    self._json(
+                        HTTPStatus.OK,
+                        self.engineering_provider.firmware_cache_status(
+                            str(body.get("session_id", "")),
+                            facility_id,
+                            ppu_id,
+                            str(body.get("firmware_name", "browser-upload.bin")),
+                            body.get("firmware_size"),
+                            str(body.get("firmware_sha256", "")),
+                        ),
+                    )
+                    return
                 if tail == ["api", "firmware"]:
                     query = parse_qs(parsed.query)
+                    session_id = query.get("session_id", [""])[0]
                     firmware_name = query.get("name", ["browser-upload.bin"])[0]
+                    firmware_sha256 = query.get("sha256", [""])[0]
                     self._json(
                         HTTPStatus.CREATED,
-                        self.engineering_provider.stage_firmware(
+                        self.engineering_provider.cache_firmware(
+                            session_id,
                             facility_id,
                             ppu_id,
                             firmware_name,
+                            firmware_sha256,
                             self._raw_body(),
                         ),
                     )
@@ -372,13 +396,19 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     return
                 if tail == ["api", "jobs"]:
                     body = self._body()
-                    firmware_id = body.get("firmware_id")
                     request = self._job_request(
                         body,
                         client_id="plasma-web-engineering",
                         default_timeout_s=self.engineering_provider.job_timeout_s(facility_id, ppu_id),
-                        allow_firmware_reference=True,
+                        require_inline_firmware=False,
                     )
+                    operation = request.operation
+                    session_id = body.get("session_id") if operation in {Operation.PROGRAM, Operation.VERIFY} else None
+                    firmware_sha256 = body.get("firmware_sha256") if operation in {Operation.PROGRAM, Operation.VERIFY} else None
+                    if session_id is not None and not isinstance(session_id, str):
+                        raise ValueError("session_id must be a string")
+                    if firmware_sha256 is not None and not isinstance(firmware_sha256, str):
+                        raise ValueError("firmware_sha256 must be a string")
                     self._json(
                         HTTPStatus.ACCEPTED,
                         _run(
@@ -386,7 +416,8 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                                 facility_id,
                                 ppu_id,
                                 request,
-                                firmware_id=firmware_id if isinstance(firmware_id, str) else None,
+                                session_id=session_id,
+                                firmware_sha256=firmware_sha256,
                             )
                         ),
                     )
