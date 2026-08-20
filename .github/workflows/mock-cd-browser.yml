@@ -79,6 +79,7 @@ jobs:
               if runtime.is_file():
                   payload = json.loads(runtime.read_text(encoding="utf-8"))
                   if payload.get("state") == "ready":
+                      engineering = payload.get("engineering") or {}
                       print(json.dumps(payload, indent=2, sort_keys=True))
                       with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as stream:
                           stream.write(f"MOCK_CD_WEB_URL={payload['web_url']}\n")
@@ -86,6 +87,9 @@ jobs:
                           stream.write(f"MOCK_CD_UNREACHABLE_GATEWAY_URL={payload['unreachable_gateway_url']}\n")
                           stream.write(f"MOCK_CD_EXPECTED_SITES={payload['enabled_sites']}\n")
                           stream.write(f"MOCK_CD_EXPECTED_PPU_ID={payload['ppu_id']}\n")
+                          stream.write(f"MOCK_CD_ENGINEERING_FACILITY_ID={engineering['test_facility_id']}\n")
+                          stream.write(f"MOCK_CD_ENGINEERING_PPU_ID={engineering['test_ppu_id']}\n")
+                          stream.write(f"MOCK_CD_ENGINEERING_PPU_SITES={engineering['test_ppu_sites']}\n")
                       break
               time.sleep(0.25)
           else:
@@ -114,7 +118,7 @@ jobs:
           runtime_path = Path("artifacts/mock-cd-browser/stack/runtime.json")
           runtime = json.loads(runtime_path.read_text(encoding="utf-8")) if runtime_path.is_file() else {}
           payload = {
-              "schema_version": 1,
+              "schema_version": 2,
               "commit": os.environ.get("MOCK_CD_COMMIT", "unknown"),
               "result": "PASS" if passed else "FAIL",
               "stack": {
@@ -122,11 +126,13 @@ jobs:
                   "enabled_sites": runtime.get("enabled_sites"),
                   "gateway": "real",
                   "api_mocking": False,
+                  "engineering": runtime.get("engineering"),
               },
               "scenarios": {
                   "gateway_offline_recovery": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "per_site_erase_program_verify_read_download": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
                   "batch_membership_selected_sites_x_operations": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
+                  "engineering_server_catalog_and_selected_ppu_execution": "PASS" if passed else "SEE_PLAYWRIGHT_RESULTS",
               },
           }
           path = Path("artifacts/mock-cd-browser/browser-acceptance.json")
