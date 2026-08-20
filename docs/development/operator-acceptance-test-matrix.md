@@ -85,6 +85,20 @@ Scenario IDs are stable contracts. Tests may move between files, but the scenari
 | `OAT-DATA-001` | Program -> Verify -> Read deterministic bytes | Read result length and bytes match programmed deterministic input for tested range. | `AUTO-STACK` | Repeat on SWPC Mock before real hardware validation. |
 | `OAT-DATA-002` | Read file naming/download | Successful Read provides the expected output filename and download action. | `AUTO-STACK` | Browser download must succeed. |
 
+### Permanent reconnect coverage rule
+
+`OAT-CONN-002` and `OAT-CONN-003` are complementary permanent regressions. They must both remain in the suite.
+
+```text
+same-URL reconnect
+  -> exercises Provider/session recovery while transport identity is unchanged
+
+bad-Gateway -> original-Gateway round trip
+  -> exercises transport-endpoint changes without losing durable target identity
+```
+
+A PASS in one scenario must never be used as justification to remove, weaken, or replace the other scenario. The same rule applies to the explicit-zero Site-selection reconnect case and the missing-PPU -> Default fallback case because each exercises a distinct state transition.
+
 ## 5. Canonical operator-driven smoke sequence
 
 This sequence is the preferred human acceptance flow because one continuous session exercises state transitions that isolated happy-path tests can miss.
@@ -99,21 +113,22 @@ This sequence is the preferred human acceptance flow because one continuous sess
 7. Select another non-contiguous subset; independently cancel one or more Sites.
 8. Confirm unaffected Sites continue and final aggregate is PARTIAL.
 9. Select a non-contiguous Site subset and leave the page through multiple status polls.
-10. Change the Gateway URL to a deliberately unreachable endpoint; confirm the UI reports the transport failure.
-11. Restore the original Gateway URL; confirm the same PPU and same Site subset return.
-12. Confirm first firmware use after reconnect is CACHE MISS + binary upload again.
-13. Explicitly unselect every Site; wait through several polls; confirm 0 / N remains.
-14. Reconnect again; confirm explicit 0 / N remains.
-15. Download the newest-first `.log` and retain it as acceptance evidence.
+10. Perform a same-Gateway Provider outage/reconnect and confirm the same PPU and Site subset return.
+11. Change the Gateway URL to a deliberately unreachable endpoint; confirm the UI reports the transport failure.
+12. Restore the original Gateway URL; confirm the same PPU and same Site subset return.
+13. Confirm first firmware use after reconnect is CACHE MISS + binary upload again.
+14. Explicitly unselect every Site; wait through several polls; confirm 0 / N remains.
+15. Reconnect again; confirm explicit 0 / N remains.
+16. Download the newest-first `.log` and retain it as acceptance evidence.
 ```
 
 For an implementation that includes Read/data integrity, extend the same session with:
 
 ```text
-16. Program deterministic bytes.
-17. Verify.
-18. Read the same range.
-19. Compare byte length and content/hash.
+17. Program deterministic bytes.
+18. Verify.
+19. Read the same range.
+20. Compare byte length and content/hash.
 ```
 
 ## 6. Automation mapping
@@ -188,9 +203,34 @@ These rows are intentionally not satisfied by current Mock automation.
 When an operator discovers a defect through a realistic workflow:
 
 1. Reproduce and identify the violated OAT scenario or create a new stable Scenario ID.
-2. Fix the product behavior at the correct architectural boundary.
-3. Convert the operator workflow into the highest-value automated regression layer possible.
-4. Keep the regression focused on the observable contract, not incidental implementation details.
-5. If automation cannot prove the behavior (for example electrical timing or real IC behavior), retain it as an explicit `SWPC`, `HUMAN`, or `HW` release gate.
+2. Convert the operator workflow into the highest-value automated regression layer possible before or alongside the product fix.
+3. When technically practical, run that regression against the known-bad pre-fix code and retain evidence that it fails for the intended reason (`RED`).
+4. Fix the product behavior at the correct architectural boundary.
+5. Run the same regression against the fixed code and require it to pass (`GREEN`).
+6. Keep the regression focused on the observable contract, not incidental implementation details.
+7. If automation or a pre-fix negative control cannot prove the behavior (for example electrical timing, destructive hardware state, unavailable historical environment, or real IC behavior), record why and retain it as an explicit `SWPC`, `HUMAN`, or `HW` release gate.
 
 This is the core rule: **operator discoveries become institutional regression knowledge instead of one-time manual knowledge.**
+
+## 11. Regression validity: Red-before-Green
+
+For an operator-discovered software defect, a newly added regression is strongest when it demonstrates both sides of the behavioral boundary:
+
+```text
+known-bad product code + new regression
+  -> FAIL for the expected observable defect (RED)
+
+fixed product code + the same regression contract
+  -> PASS (GREEN)
+```
+
+The negative control must isolate the product behavior as far as practical. Prefer a temporary branch/PR where the known-bad product commit is unchanged and only the new regression is added. Do not merge negative-control branches or intentionally failing PRs.
+
+A useful negative-control result should show:
+
+- the intended new regression fails;
+- existing unrelated tests remain predominantly green;
+- the failure message points to the violated OAT contract rather than a test harness/setup failure;
+- the fixed branch passes the corresponding regression and normal CI gates.
+
+Red-before-Green is the default validation method for reproducible software regressions, not an absolute requirement for every defect. Hardware-only, timing-sensitive, destructive, or historically unreproducible failures may require other evidence, but the exception must be explicit.
