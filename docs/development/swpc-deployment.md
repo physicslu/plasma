@@ -50,7 +50,7 @@ The installer creates or uses the Python environment, installs dependencies, run
 
 The first three services are the PPU/integration baseline. `plasma-manager.service` is opt-in and is not required for standalone PPU execution. The Engineering Mock Provider is also opt-in but hosted inside `plasma-web.service`; it is not a separate systemd service.
 
-The Plasma Server canonical wire protocol is v3.3 (`PLASMA33`, one-based `site_id = 1..N`). Current development runtime does not maintain retired v3.1/v3.2 Programmer/Channel compatibility adapters.
+The Plasma Server canonical wire protocol is v3.3 (`PLASMA33`, one-based `site_id = 1..N`). Current development runtime does not maintain retired pre-v3.3 Programmer/Channel compatibility adapters.
 
 The Plasma Web REST Gateway uses Python standard-library `ThreadingHTTPServer` and REST polling. It is not FastAPI and does not use WebSocket.
 
