@@ -47,6 +47,18 @@ Vinext/Vite Web :15173
 
 Expected Fleet topology is 2 current PPUs and 12 current/enabled Sites.
 
+For Browser Runtime Acceptance, PPU A's REST Gateway additionally enables the server-side Engineering Mock PPU provider. That provider owns a separate Engineering-only simulation topology:
+
+```text
+3 Mock Facilities
+  x 4 Mock PPUs per Facility
+    -> 2 / 4 / 6 / 8 Sites
+
+Total: 12 Mock PPUs / 60 Sites
+```
+
+Each Engineering Mock PPU is a real in-process `PlasmaServer` runtime backed by `MockInterface`. It is not added to the Production Manager registry and does not change the baseline Production/Fleet capacity counts.
+
 ## Mock CD baseline checks
 
 `scripts/mock-cd.py` validates:
@@ -77,7 +89,7 @@ The GitHub workflow uploads the whole `artifacts/mock-cd/` directory as `mock-cd
 
 `.github/workflows/mock-cd-browser.yml` drives the actual PPU Web console through Playwright while the persistent harness `scripts/mock-cd-browser-stack.py` keeps the same Mock CD stack alive.
 
-The browser test does **not** use `page.route()` to replace Plasma APIs. Its required path is:
+The browser test does **not** use `page.route()` to replace Plasma APIs. Its required local-PPU path is:
 
 ```text
 Playwright browser action
@@ -89,7 +101,21 @@ Playwright browser action
   -> browser assertion
 ```
 
-The persistent stack publishes `runtime.json`. The workflow derives the Web URL, Gateway URL, deliberately unreachable Gateway endpoint, PPU identity, and enabled Site count from that runtime contract instead of duplicating topology constants in the Playwright step.
+The Engineering path is also real and unmocked:
+
+```text
+Playwright browser action
+  -> Engineering -> Programming
+  -> real Plasma Web REST Gateway
+  -> EngineeringPPUProvider
+  -> selected virtual PlasmaServer
+  -> SiteManager / SiteWorker
+  -> MockInterface
+  -> runtime result / Read download
+  -> browser assertion
+```
+
+The persistent stack publishes `runtime.json`. The workflow derives the Web URL, Gateway URL, deliberately unreachable Gateway endpoint, local PPU identity/site count, and representative Engineering Facility/PPU identity from that runtime contract instead of duplicating those runtime values in the Playwright step.
 
 The acceptance scenarios are:
 
@@ -118,6 +144,18 @@ The acceptance scenarios are:
    - combine Site membership with one or multiple operation checkboxes and inspect the browser's real outbound `POST /api/jobs` requests without mocking or fulfilling them;
    - require the resulting dispatch multiset to equal `selected Sites × selected operations` exactly, which also proves unselected Sites and unselected operations receive no jobs.
 
+4. **Engineering server catalog and selected-PUU execution**
+   - require the Gateway's real `/api/engineering/targets` catalog to report 3 Facilities / 12 PPUs / 60 Sites;
+   - enter `Engineering -> Programming` through the actual Web UI;
+   - select the runtime-provided representative Facility and 6-Site PPU;
+   - require the rendered Site topology to come from that selected PPU STATUS and contain no `SITE 0`;
+   - load deterministic firmware and execute `Erase -> Program -> Verify -> Read` on the last Site of that selected PPU;
+   - observe real outbound requests scoped to `/api/engineering/targets/{facility_id}/{ppu_id}/api/jobs`;
+   - require every operation to reach `SUCCESS` through the Python Provider and selected virtual `PlasmaServer`;
+   - download the Read result and require exact byte length and byte-for-byte firmware match.
+
+This fourth scenario specifically proves that Engineering Facility/PPU selection is not a React-only mock and that changing the target identity changes the Python execution target.
+
 For `N` enabled Sites there are `2^N - 1` possible non-empty subsets. CI intentionally uses representative boundary and non-contiguous subsets rather than exhaustively executing all combinations; exhaustive 8-Site coverage would require 255 membership combinations before considering operation combinations.
 
 The Playwright configuration preserves trace, screenshot, video, HTML report, and JSON report on failure. The workflow emits:
@@ -142,4 +180,4 @@ They must never silently evolve into real SWPC or Z2 deployment mechanisms. Real
 
 ## Planned extensions
 
-Separate scenarios may later add deterministic PPU outage -> stale, Manager restart -> SQLite restore, recovery -> current, and additional failure injection. These should extend the artifact schemas rather than changing the meaning of existing PASS results.
+Separate scenarios may later add deterministic PPU outage -> stale, Manager restart -> SQLite restore, recovery -> current, a real authenticated `RealPPUProvider`, and additional failure injection. These should extend the artifact schemas rather than changing the meaning of existing PASS results.
