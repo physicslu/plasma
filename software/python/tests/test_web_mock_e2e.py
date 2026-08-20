@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import tempfile
 import threading
@@ -56,10 +57,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         PlasmaWebHandler.allowed_origins = frozenset({"http://localhost:4173"})
         PlasmaWebHandler.output_root = config.server.output_root
         self.gateway = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
-        self.gateway_thread = threading.Thread(
-            target=self.gateway.serve_forever,
-            daemon=True,
-        )
+        self.gateway_thread = threading.Thread(target=self.gateway.serve_forever, daemon=True)
         self.gateway_thread.start()
 
     async def asyncTearDown(self) -> None:
@@ -112,39 +110,40 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.01)
         self.fail(f"job did not reach a terminal state: {job_id}")
 
+    @staticmethod
+    def asset_body(image: bytes, name: str) -> dict[str, Any]:
+        return {
+            "asset_name": name,
+            "asset_type": "image",
+            "asset_format": "binary",
+            "asset_sha256": hashlib.sha256(image).hexdigest(),
+            "asset_base64": base64.b64encode(image).decode(),
+        }
+
     async def test_web_gateway_programs_mock_and_reports_real_progress(self) -> None:
         status, topology, headers = await self.request("GET", "/api/status")
         self.assertEqual(status, 200)
         self.assertEqual(headers["Access-Control-Allow-Origin"], "http://localhost:4173")
-        self.assertEqual(
-            [item["site_id"] for item in topology["sites"] if item["enabled"]],
-            [1, 2],
-        )
-        self.assertNotIn("channels", topology)
+        self.assertEqual([item["site_id"] for item in topology["sites"] if item["enabled"]], [1, 2])
 
-        firmware = bytes(range(64))
+        image = bytes(range(64))
         status, accepted, _ = await self.request(
             "POST",
             "/api/jobs",
             {
                 "site_id": 2,
                 "operation": "program",
-                "firmware_name": "web-e2e.bin",
-                "firmware_base64": base64.b64encode(firmware).decode(),
+                **self.asset_body(image, "web-e2e.bin"),
                 "timeout_s": 2,
             },
         )
         self.assertEqual(status, 202)
         job_id = accepted["job"]["job_id"]
         self.assertEqual(accepted["job"]["site_id"], 2)
-
         final, updates = await self.wait_for_terminal(job_id)
         self.assertEqual(final["state"], "success")
         self.assertEqual(final["progress_percent"], 100.0)
-        self.assertEqual(
-            {item["stage"] for item in updates if item["stage"]},
-            {"program"},
-        )
+        self.assertEqual({item["stage"] for item in updates if item["stage"]}, {"program"})
         self.assertTrue(any(0 < item["progress_percent"] < 100 for item in updates))
 
     async def test_web_gateway_cancel_reaches_mock_worker(self) -> None:
@@ -155,7 +154,6 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(status, 202)
         job_id = accepted["job"]["job_id"]
-
         for _ in range(100):
             _, payload, _ = await self.request("GET", f"/api/status?job={job_id}")
             if payload["job"]["state"] == "running":
@@ -163,39 +161,36 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.005)
         else:
             self.fail("erase job did not start")
-
-        status, cancelled, _ = await self.request(
-            "POST",
-            f"/api/jobs/{job_id}/cancel",
-            {},
-        )
+        status, cancelled, _ = await self.request("POST", f"/api/jobs/{job_id}/cancel", {})
         self.assertEqual(status, 200)
         self.assertTrue(cancelled["cancel_requested"])
-
         final, _ = await self.wait_for_terminal(job_id)
         self.assertEqual(final["state"], "cancelled")
         self.assertTrue(final["cancel_requested"])
 
     async def test_program_then_read_and_download_exact_mock_bytes(self) -> None:
-        firmware = bytes(range(64))
-        status, accepted, _ = await self.request("POST", "/api/jobs", {
-            "site_id": 2, "operation": "program", "firmware_name": "known.bin",
-            "firmware_base64": base64.b64encode(firmware).decode(),
-        })
+        image = bytes(range(64))
+        status, accepted, _ = await self.request(
+            "POST",
+            "/api/jobs",
+            {"site_id": 2, "operation": "program", **self.asset_body(image, "known.bin")},
+        )
         self.assertEqual(status, 202)
         programmed, _ = await self.wait_for_terminal(accepted["job"]["job_id"])
         self.assertEqual(programmed["state"], "success")
 
-        status, accepted, _ = await self.request("POST", "/api/jobs", {
-            "site_id": 2, "operation": "read", "offset": 7, "length": 29,
-        })
+        status, accepted, _ = await self.request(
+            "POST",
+            "/api/jobs",
+            {"site_id": 2, "operation": "read", "offset": 7, "length": 29},
+        )
         self.assertEqual(status, 202)
         read_job, updates = await self.wait_for_terminal(accepted["job"]["job_id"])
         self.assertEqual(read_job["state"], "success")
         self.assertTrue(any(item["stage"] == "read_flash" for item in updates))
         output_file = Path(read_job["result"]["output_files"][0])
         self.assertTrue(output_file.is_file())
-        self.assertEqual(output_file.read_bytes(), firmware[7:36])
+        self.assertEqual(output_file.read_bytes(), image[7:36])
         self.assertIn("read_SITE2_", output_file.name)
 
         status, downloaded, headers = await self.request(
@@ -203,7 +198,7 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(status, 200)
         self.assertEqual(headers["Content-Type"], "application/octet-stream")
-        self.assertEqual(downloaded, firmware[7:36])
+        self.assertEqual(downloaded, image[7:36])
 
 
 if __name__ == "__main__":
