@@ -91,7 +91,10 @@ test("1 MiB Engineering firmware uploads once per PPU session and reloads after 
   await page.locator(".engineeringGateway button[type=submit]").click();
   await expect.poll(() => counters.sessions).toBeGreaterThan(sessionsBeforeReconnect);
   await expect(facility.locator("option")).toHaveCount(3, { timeout: 15_000 });
-  await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
+  await expect(facility).toHaveValue(engineeringFacilityId);
+  await expect(ppu).toHaveValue(engineeringPpuId);
+  await expect(page.getByLabel("Engineering Site selection")).toContainText(`2 / ${engineeringPpuSites}`);
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2, { timeout: 15_000 });
   expect(sessionBodies.at(-1)?.previous_session_id).toBeTruthy();
 
   await selectSitesOneAndTwo(page);
