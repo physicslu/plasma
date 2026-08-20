@@ -16,6 +16,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: agent/remove-rest-v1-firmware-compat
+          fetch-depth: 0
+      - name: Fast-forward to latest PR branch
+        run: git pull --ff-only origin agent/remove-rest-v1-firmware-compat
       - name: Apply canonical Programming Asset naming
         run: |
           python - <<'PY'
