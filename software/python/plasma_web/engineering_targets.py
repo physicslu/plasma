@@ -143,6 +143,8 @@ class MockEngineeringPPUProvider:
             loop.run_until_complete(self._start_servers())
         except BaseException as exc:
             self._startup_error = exc
+            if self._servers:
+                loop.run_until_complete(self._close_servers())
             self._ready.set()
             loop.close()
             return
