@@ -278,6 +278,31 @@ export async function stageEngineeringFirmware(
   return payload.firmware;
 }
 
+const stagedFirmwareByFile = new WeakMap<File, Map<string, Promise<EngineeringStagedFirmware>>>();
+
+function isEngineeringTargetBase(apiBase: string): boolean {
+  return apiBase.includes("/api/engineering/targets/");
+}
+
+function stageEngineeringFirmwareOnce(
+  apiBase: string,
+  firmware: File,
+): Promise<EngineeringStagedFirmware> {
+  let byTarget = stagedFirmwareByFile.get(firmware);
+  if (!byTarget) {
+    byTarget = new Map<string, Promise<EngineeringStagedFirmware>>();
+    stagedFirmwareByFile.set(firmware, byTarget);
+  }
+  const existing = byTarget.get(apiBase);
+  if (existing) return existing;
+  const staged = stageEngineeringFirmware(apiBase, firmware).catch(error => {
+    byTarget?.delete(apiBase);
+    throw error;
+  });
+  byTarget.set(apiBase, staged);
+  return staged;
+}
+
 export async function getPPUStatus(apiBase: string): Promise<PPUStatus> {
   const payload = await requestJson<StatusPayload>(apiBase, "/api/status");
   return {
@@ -314,7 +339,15 @@ export async function startJob(
     submissionGuard?: () => boolean;
   },
 ): Promise<JobSnapshot> {
-  const firmwareBase64 = options.firmware && !options.firmwareId
+  let firmwareId = options.firmwareId;
+  let firmwareName = options.firmwareName ?? options.firmware?.name;
+  const usesFirmware = options.operation === "program" || options.operation === "verify";
+  if (!firmwareId && options.firmware && usesFirmware && isEngineeringTargetBase(apiBase)) {
+    const staged = await stageEngineeringFirmwareOnce(apiBase, options.firmware);
+    firmwareId = staged.firmware_id;
+    firmwareName = staged.firmware_name;
+  }
+  const firmwareBase64 = options.firmware && !firmwareId
     ? await fileToBase64(options.firmware)
     : "";
   if (options.submissionGuard && !options.submissionGuard()) {
@@ -328,9 +361,9 @@ export async function startJob(
       body: JSON.stringify({
         site_id: options.siteId,
         operation: options.operation,
-        firmware_name: options.firmwareName ?? options.firmware?.name,
-        ...(options.firmwareId
-          ? { firmware_id: options.firmwareId }
+        firmware_name: firmwareName,
+        ...(firmwareId
+          ? { firmware_id: firmwareId }
           : { firmware_base64: firmwareBase64 }),
         ...(options.operation === "read" ? {
           offset: options.offset ?? 0,
