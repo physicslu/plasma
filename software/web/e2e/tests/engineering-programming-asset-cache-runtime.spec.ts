@@ -81,7 +81,7 @@ test("1 MiB Engineering Image Asset uploads once per PPU session and reloads aft
   expect(counters.uploads).toBe(1);
   expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "asset_base64"))).toBe(true);
   expect(jobBodies.slice(0, 2).every(body => typeof body.asset_sha256 === "string")).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "asset_sha256"))).toBe(true);
+  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "image_sha256"))).toBe(true);
   expect(jobBodies.slice(0, 2).every(body => typeof body.session_id === "string")).toBe(true);
 
   await runTwoSiteProgram(page, 4, counters);
