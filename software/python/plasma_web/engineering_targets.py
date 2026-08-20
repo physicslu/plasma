@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import re
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
 from plasma_client.client import PlasmaClient
 from plasma_core.config import PPUConfig, PlasmaConfig, ServerConfig, SiteConfig
+from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest, validate_job_id
 from plasma_server.server import PlasmaServer
@@ -17,6 +20,7 @@ from plasma_server.server import PlasmaServer
 MOCK_FACILITY_COUNT = 3
 MOCK_SITE_COUNTS = (2, 4, 6, 8)
 MOCK_FLASH_SIZE_BYTES = 4 * 1024 * 1024
+MOCK_MAX_STAGED_FIRMWARE_BYTES = 16 * 1024 * 1024
 MOCK_OPERATION_TIMEOUT_S = 90.0
 MOCK_THROUGHPUT_BYTES_PER_S = {
     "erase": 2 * 1024 * 1024,
@@ -31,6 +35,7 @@ MOCK_OPERATION_OVERHEADS_S = {
     "read": 1.0,
 }
 MOCK_PROGRESS_STEPS = 20
+FIRMWARE_ID_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 class EngineeringPPUProvider(Protocol):
@@ -41,6 +46,16 @@ class EngineeringPPUProvider(Protocol):
     """
 
     def catalog(self) -> dict[str, Any]: ...
+
+    def stage_firmware(
+        self,
+        facility_id: str,
+        ppu_id: str,
+        firmware_name: str,
+        firmware: bytes,
+    ) -> dict[str, Any]: ...
+
+    def job_timeout_s(self, facility_id: str, ppu_id: str) -> float: ...
 
     async def status(
         self,
@@ -56,6 +71,8 @@ class EngineeringPPUProvider(Protocol):
         facility_id: str,
         ppu_id: str,
         request: JobRequest,
+        *,
+        firmware_id: str | None = None,
     ) -> dict[str, Any]: ...
 
     async def cancel_job(self, facility_id: str, ppu_id: str, job_id: str) -> dict[str, Any]: ...
@@ -85,10 +102,9 @@ class MockEngineeringPPUProvider:
     Facility, and 2/4/6/8 Sites per PPU. Jobs still traverse Plasma Protocol
     v3.2, SiteManager/SiteWorker, and MockInterface.
 
-    Mock operation timing is intentionally size-aware rather than instant. The
-    profile is an engineering simulation contract, not a claim about a specific
-    real IC. Program/verify/read scale with requested byte count; erase models a
-    full-chip erase and therefore scales with configured target flash size.
+    Firmware is staged once per selected PPU and addressed by an immutable
+    SHA-256 firmware_id. Program/Verify jobs reuse the same staged bytes across
+    Sites instead of making the browser upload the same file once per Site.
     """
 
     def __init__(self, root: Path) -> None:
@@ -245,6 +261,53 @@ class MockEngineeringPPUProvider:
         key = self._key(facility_id, ppu_id)
         return PlasmaClient("127.0.0.1", self._ports[key])
 
+    def _firmware_directory(self, facility_id: str, ppu_id: str) -> Path:
+        self._key(facility_id, ppu_id)
+        directory = self.root / ppu_id / "firmware"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory.resolve()
+
+    def _firmware_path(self, facility_id: str, ppu_id: str, firmware_id: str) -> Path:
+        if not isinstance(firmware_id, str) or FIRMWARE_ID_PATTERN.fullmatch(firmware_id) is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid Engineering firmware_id")
+        return self._firmware_directory(facility_id, ppu_id) / f"{firmware_id}.bin"
+
+    def stage_firmware(
+        self,
+        facility_id: str,
+        ppu_id: str,
+        firmware_name: str,
+        firmware: bytes,
+    ) -> dict[str, Any]:
+        if not isinstance(firmware, bytes) or not firmware:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Engineering firmware upload is empty")
+        if len(firmware) > MOCK_MAX_STAGED_FIRMWARE_BYTES:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "Engineering firmware upload exceeds the mock staging limit",
+                context={"size": len(firmware), "limit": MOCK_MAX_STAGED_FIRMWARE_BYTES},
+            )
+        firmware_id = hashlib.sha256(firmware).hexdigest()
+        path = self._firmware_path(facility_id, ppu_id, firmware_id)
+        if not path.is_file():
+            temporary = path.with_name(f".{firmware_id}.{threading.get_ident()}.tmp")
+            temporary.write_bytes(firmware)
+            temporary.replace(path)
+        return {
+            "ok": True,
+            "firmware": {
+                "firmware_id": firmware_id,
+                "firmware_name": str(firmware_name or "browser-upload.bin"),
+                "firmware_size": len(firmware),
+                "firmware_sha256": firmware_id,
+                "scope": {"facility_id": facility_id, "ppu_id": ppu_id},
+            },
+        }
+
+    def job_timeout_s(self, facility_id: str, ppu_id: str) -> float:
+        self._key(facility_id, ppu_id)
+        return MOCK_OPERATION_TIMEOUT_S
+
     def catalog(self) -> dict[str, Any]:
         facilities: list[dict[str, Any]] = []
         for facility_number in range(1, MOCK_FACILITY_COUNT + 1):
@@ -272,11 +335,13 @@ class MockEngineeringPPUProvider:
             "facility_count": len(facilities),
             "ppu_count": len(self._specs),
             "site_count": sum(spec.site_count for spec in self._specs),
+            "firmware_scope": "ppu",
             "timing_profile": {
                 "model": "fixed-overhead-plus-bytes-over-throughput",
                 "flash_size_bytes": MOCK_FLASH_SIZE_BYTES,
                 "throughput_bytes_per_s": dict(MOCK_THROUGHPUT_BYTES_PER_S),
                 "operation_overheads_s": dict(MOCK_OPERATION_OVERHEADS_S),
+                "operation_timeout_s": MOCK_OPERATION_TIMEOUT_S,
             },
             "facilities": facilities,
         }
@@ -296,7 +361,35 @@ class MockEngineeringPPUProvider:
         facility_id: str,
         ppu_id: str,
         request: JobRequest,
+        *,
+        firmware_id: str | None = None,
     ) -> dict[str, Any]:
+        if request.operation in {Operation.PROGRAM, Operation.VERIFY}:
+            if firmware_id is not None and request.firmware:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "use staged firmware_id or inline firmware, not both",
+                )
+            if firmware_id is not None:
+                path = self._firmware_path(facility_id, ppu_id, firmware_id)
+                if not path.is_file():
+                    raise PlasmaError(
+                        ErrorCode.INVALID_ARGUMENT,
+                        "staged Engineering firmware is not available on this PPU",
+                        context={"firmware_id": firmware_id, "ppu_id": ppu_id},
+                    )
+                request = replace(request, firmware=path.read_bytes())
+            elif not request.firmware:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "program and verify require staged firmware_id or inline firmware",
+                )
+        elif firmware_id is not None:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "firmware_id is only valid for program or verify",
+            )
+        request = replace(request, timeout_s=MOCK_OPERATION_TIMEOUT_S)
         return await self._client(facility_id, ppu_id).start(request)
 
     async def cancel_job(self, facility_id: str, ppu_id: str, job_id: str) -> dict[str, Any]:
