@@ -277,15 +277,16 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
-  const facility = page.getByLabel("Engineering Facility");
-  const ppu = page.getByLabel("Engineering PPU");
+  const facility = page.getByLabel("Engineering Facility", { exact: true });
+  const ppu = page.getByLabel("Engineering PPU", { exact: true });
   await expect(facility.locator("option")).toHaveCount(3, { timeout: 15_000 });
-  await expect(page.getByText("SERVER SOURCE OF TRUTH")).toContainText("3 Facilities · 12 PPUs · 60 Sites");
+  const sourceOfTruth = page.locator(".engineeringBoundaryNote").filter({ hasText: "SERVER SOURCE OF TRUTH" });
+  await expect(sourceOfTruth).toContainText("3 Facilities · 12 PPUs · 60 Sites");
 
   await facility.selectOption(engineeringFacilityId);
   await ppu.selectOption(engineeringPpuId);
-  await expect(page.getByLabel("Selected Engineering PPU")).toContainText(engineeringPpuId);
-  await expect(page.getByLabel("Selected Engineering PPU")).toContainText(`${engineeringPpuSites} Sites`);
+  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(engineeringPpuId);
+  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(`${engineeringPpuSites} Sites`);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
   await expect(page.getByText("SITE 0", { exact: true })).toHaveCount(0);
 
