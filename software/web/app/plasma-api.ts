@@ -79,6 +79,10 @@ type FirmwareCacheStatus = FirmwareFingerprint & {
   cache_hit: boolean;
 };
 
+export type FirmwareTransferEvent = FirmwareFingerprint & {
+  kind: "cache_check" | "cache_hit" | "cache_miss" | "upload_start" | "upload_complete";
+};
+
 // Transitional shapes accepted only from protocol/API v3.1 backends.
 type LegacyChannelSnapshot = {
   channel_id: number;
@@ -303,10 +307,19 @@ async function fingerprintFile(file: File): Promise<FirmwareFingerprint> {
   return await pending;
 }
 
+function emitFirmwareEvent(
+  callback: ((event: FirmwareTransferEvent) => void) | undefined,
+  kind: FirmwareTransferEvent["kind"],
+  fingerprint: FirmwareFingerprint,
+): void {
+  callback?.({ kind, ...fingerprint });
+}
+
 async function ensureEngineeringFirmware(
   apiBase: string,
   sessionId: string,
   firmware: File,
+  onFirmwareEvent?: (event: FirmwareTransferEvent) => void,
 ): Promise<FirmwareFingerprint> {
   const fingerprint = await fingerprintFile(firmware);
   const key = `${sessionId}|${apiBase}|${fingerprint.firmware_sha256}`;
@@ -314,6 +327,7 @@ async function ensureEngineeringFirmware(
   if (existing) return await existing;
 
   const ensure = (async () => {
+    emitFirmwareEvent(onFirmwareEvent, "cache_check", fingerprint);
     const checked = await requestJson<{ ok: boolean; firmware: FirmwareCacheStatus }>(
       apiBase,
       "/api/firmware/check",
@@ -322,18 +336,24 @@ async function ensureEngineeringFirmware(
         body: JSON.stringify({ session_id: sessionId, ...fingerprint }),
       },
     );
-    if (!checked.firmware.cache_hit) {
-      await requestJson(
-        apiBase,
-        `/api/firmware?session_id=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(fingerprint.firmware_name)}&sha256=${encodeURIComponent(fingerprint.firmware_sha256)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/octet-stream" },
-          body: firmware,
-        },
-        120_000,
-      );
+    if (checked.firmware.cache_hit) {
+      emitFirmwareEvent(onFirmwareEvent, "cache_hit", fingerprint);
+      return fingerprint;
     }
+
+    emitFirmwareEvent(onFirmwareEvent, "cache_miss", fingerprint);
+    emitFirmwareEvent(onFirmwareEvent, "upload_start", fingerprint);
+    await requestJson(
+      apiBase,
+      `/api/firmware?session_id=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(fingerprint.firmware_name)}&sha256=${encodeURIComponent(fingerprint.firmware_sha256)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: firmware,
+      },
+      120_000,
+    );
+    emitFirmwareEvent(onFirmwareEvent, "upload_complete", fingerprint);
     return fingerprint;
   })();
   firmwareEnsureInFlight.set(key, ensure);
@@ -377,6 +397,7 @@ export async function startJob(
     offset?: number;
     length?: number;
     submissionGuard?: () => boolean;
+    onFirmwareEvent?: (event: FirmwareTransferEvent) => void;
   },
 ): Promise<JobSnapshot> {
   const usesFirmware = options.operation === "program" || options.operation === "verify";
@@ -393,6 +414,7 @@ export async function startJob(
         apiBase,
         options.engineeringSessionId,
         options.firmware,
+        options.onFirmwareEvent,
       );
     } else {
       firmwareBase64 = await fileToBase64(options.firmware);

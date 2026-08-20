@@ -19,6 +19,7 @@ import {
 } from "../plasma-api";
 import type {
   EngineeringTargetCatalog,
+  FirmwareTransferEvent,
   JobSnapshot,
   JobState,
   Operation,
@@ -55,6 +56,7 @@ type Site = {
 type TargetSelection = { facilityId: string; ppuId: string };
 type ConnectionState = "connecting" | "online" | "offline";
 type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "failed";
+type BatchTerminalState = "success" | "cancelled" | "failed";
 type LogEntry = { id: number; text: string; error: boolean };
 
 const MAX_FIRMWARE_BYTES = 16 * 1024 * 1024;
@@ -109,6 +111,15 @@ function validSelection(catalog: EngineeringTargetCatalog, selection: TargetSele
   return { facilityId: facility.facility_id, ppuId: facility.ppus[0]?.ppu_id ?? "" };
 }
 
+function firmwareSizeLabel(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
+  return `${(bytes / 1024).toFixed(1)} KiB`;
+}
+
+function shortSha256(sha256: string): string {
+  return `${sha256.slice(0, 12)}…`;
+}
+
 export default function ProgrammingWorkspace() {
   const { t } = useI18n();
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
@@ -157,6 +168,21 @@ export default function ProgrammingWorkspace() {
       { id: ++logSequence.current, text: `${time}  ${message}`, error },
     ]);
   }, []);
+
+  const logFirmwareEvent = useCallback((event: FirmwareTransferEvent) => {
+    const digest = `SHA256 ${shortSha256(event.firmware_sha256)}`;
+    if (event.kind === "cache_check") {
+      appendLog(`[FIRMWARE] CACHE CHECK · ${event.firmware_name} · ${firmwareSizeLabel(event.firmware_size)} · ${digest} · fingerprint only`);
+    } else if (event.kind === "cache_hit") {
+      appendLog(`[FIRMWARE] CACHE HIT · ${digest} · reference only · no binary upload`);
+    } else if (event.kind === "cache_miss") {
+      appendLog(`[FIRMWARE] CACHE MISS · ${digest}`);
+    } else if (event.kind === "upload_start") {
+      appendLog(`[FIRMWARE] UPLOAD START · ${event.firmware_name} · ${firmwareSizeLabel(event.firmware_size)} · ${digest}`);
+    } else {
+      appendLog(`[FIRMWARE] UPLOAD COMPLETE · ${event.firmware_name} · ${firmwareSizeLabel(event.firmware_size)} · ${digest}`);
+    }
+  }, [appendLog]);
 
   const resetTargetRuntime = useCallback(() => {
     trackedJobs.current = {};
@@ -218,6 +244,7 @@ export default function ProgrammingWorkspace() {
         );
         engineeringSessionId.current = session.session_id;
         if (cancelled) return;
+        appendLog(`[SESSION] NEW · ${session.previous_session_cleared ? "previous firmware cache cleared" : "fresh connection"} · ${session.session_id.slice(0, 8)}…`);
         const next = await getEngineeringTargets(apiBase);
         if (cancelled) return;
         setCatalog(next);
@@ -389,6 +416,7 @@ export default function ProgrammingWorkspace() {
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
         submissionGuard,
+        onFirmwareEvent: logFirmwareEvent,
       });
       trackedJobs.current[siteId] = job.job_id;
       setSites(current => current.map(item => item.id === siteId ? {
@@ -445,6 +473,7 @@ export default function ProgrammingWorkspace() {
     const siteIds = [...selectedSiteIds];
     const operations = [...selectedOperations];
     const lifecycle = new BatchLifecycle(siteIds);
+    const results: Partial<Record<number, BatchTerminalState>> = {};
     batchLifecycle.current = lifecycle;
     setBatchRunning(true);
     setBatchCancelling(false);
@@ -454,19 +483,23 @@ export default function ProgrammingWorkspace() {
       await Promise.all(siteIds.map(async siteId => {
         for (const operation of operations) {
           if (!lifecycle.prepare(siteId, operation)) {
+            results[siteId] = "cancelled";
             setBatchSiteState(siteId, "cancelled");
             lifecycle.finish(siteId);
             return;
           }
           await new Promise(resolve => window.setTimeout(resolve, 0));
           if (!lifecycle.beginSubmit(siteId)) {
+            results[siteId] = "cancelled";
             setBatchSiteState(siteId, "cancelled");
             lifecycle.finish(siteId);
             return;
           }
           const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
           if (!job) {
-            setBatchSiteState(siteId, lifecycle.isCancelRequested(siteId) ? "cancelled" : "failed");
+            const state = lifecycle.isCancelRequested(siteId) ? "cancelled" : "failed";
+            results[siteId] = state;
+            setBatchSiteState(siteId, state);
             lifecycle.finish(siteId);
             return;
           }
@@ -474,26 +507,47 @@ export default function ProgrammingWorkspace() {
           try {
             const finalJob = await waitTerminal(job);
             if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
+              results[siteId] = "cancelled";
               setBatchSiteState(siteId, "cancelled");
               lifecycle.finish(siteId);
               return;
             }
             if (finalJob.state !== "success") {
-              setBatchSiteState(siteId, finalJob.state === "cancelled" ? "cancelled" : "failed");
+              const state = finalJob.state === "cancelled" ? "cancelled" : "failed";
+              results[siteId] = state;
+              setBatchSiteState(siteId, state);
               lifecycle.finish(siteId);
               return;
             }
           } catch (error) {
-            setBatchSiteState(siteId, lifecycle.isCancelRequested(siteId) ? "cancelled" : "failed");
+            const state = lifecycle.isCancelRequested(siteId) ? "cancelled" : "failed";
+            results[siteId] = state;
+            setBatchSiteState(siteId, state);
             appendLog(`[SITE ${siteId}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
             lifecycle.finish(siteId);
             return;
           }
         }
+        results[siteId] = "success";
         setBatchSiteState(siteId, "success");
         lifecycle.finish(siteId);
       }));
-      appendLog(`[BATCH] ${lifecycle.cancelRequested ? "CANCELLED" : "COMPLETE"}`);
+
+      const successful = siteIds.filter(siteId => results[siteId] === "success");
+      const cancelled = siteIds.filter(siteId => results[siteId] === "cancelled");
+      const failed = siteIds.filter(siteId => results[siteId] === "failed");
+      const outcome = failed.length > 0
+        ? "FAILED"
+        : cancelled.length === siteIds.length
+          ? "CANCELLED"
+          : cancelled.length > 0
+            ? "PARTIAL"
+            : "COMPLETE";
+      const label = (ids: number[]) => ids.length ? ids.map(id => `SITE ${id}`).join(", ") : "—";
+      appendLog(
+        `[BATCH] ${outcome} · success: ${label(successful)} · cancelled: ${label(cancelled)} · failed: ${label(failed)}`,
+        failed.length > 0,
+      );
     } finally {
       if (batchLifecycle.current === lifecycle) batchLifecycle.current = null;
       setBatchRunning(false);
