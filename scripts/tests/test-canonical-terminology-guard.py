@@ -2,8 +2,8 @@
 """Guard canonical Plasma production code against retired domain vocabulary.
 
 The canonical product/domain hierarchy is Facility -> PPU -> Site. Protocol/API
-v3.1 compatibility remains an explicit adapter and is intentionally excluded from
-this guard; removing that adapter is a separate migration decision.
+v3.1 compatibility remains an explicit adapter; removing that adapter is a
+separate migration decision.
 """
 
 from __future__ import annotations
@@ -15,17 +15,18 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+LEGACY_MARKER = "PLASMA_LEGACY_COMPAT"
 
 FORBIDDEN = re.compile(
     r"\b(?:Programmer(?:Config|State|Manager|Worker)?|Channel(?:Config|State|Manager|Worker)?|"
-    r"programmer_id|channel_id|channel_count|enabled_channel_count|max_supported_channels|channels)\b"
+    r"programmer|programmer_id|channel_id|channel_count|enabled_channel_count|"
+    r"max_supported_channels|channels)\b"
 )
 
-# Explicit compatibility boundaries. These files may translate legacy v3.1
-# Programmer/Channel identities into the canonical PPU/Site model.
+# Pure compatibility facades may continue using the retired vocabulary. Mixed
+# canonical/compatibility modules are still checked; intentional new v3.1 lines
+# there must carry the PLASMA_LEGACY_COMPAT marker.
 COMPATIBILITY_PATHS = {
-    "software/web/app/plasma-api.ts",
-    "software/python/plasma_core/config.py",
     "software/python/plasma_server/channel_manager.py",
     "software/python/plasma_server/channel_worker.py",
 }
@@ -39,6 +40,8 @@ PRODUCTION_PREFIXES = (
     "software/python/",
     "software/web/",
 )
+
+CODE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx"}
 
 
 def git(*args: str) -> str:
@@ -72,6 +75,8 @@ def checked_path(path: str) -> bool:
         return False
     if path.startswith(EXCLUDED_PREFIXES):
         return False
+    if Path(path).suffix not in CODE_SUFFIXES:
+        return False
     return path.startswith(PRODUCTION_PREFIXES)
 
 
@@ -95,7 +100,7 @@ def added_lines(base: str) -> list[tuple[str, int, str]]:
         if line.startswith("+") and not line.startswith("+++"):
             if checked_path(current_path):
                 text = line[1:]
-                if FORBIDDEN.search(text):
+                if FORBIDDEN.search(text) and LEGACY_MARKER not in text:
                     findings.append((current_path, new_line, text))
             new_line += 1
         elif not line.startswith("-"):
@@ -107,13 +112,16 @@ def added_lines(base: str) -> list[tuple[str, int, str]]:
 def self_test() -> None:
     assert checked_path("software/web/app/engineering/new-feature.ts")
     assert checked_path("software/python/plasma_server/site_worker.py")
-    assert not checked_path("software/web/app/plasma-api.ts")
+    assert not checked_path("software/web/package-lock.json")
     assert not checked_path("software/python/tests/test_protocol_v31.py")
+    assert not checked_path("software/python/plasma_server/channel_manager.py")
+    assert FORBIDDEN.search("programmer")
     assert FORBIDDEN.search("channel_id")
     assert FORBIDDEN.search("ChannelManager")
     assert FORBIDDEN.search("channels")
     assert not FORBIDDEN.search("site_id")
     assert not FORBIDDEN.search("SiteManager")
+    assert LEGACY_MARKER in "channel_id = old_id  # PLASMA_LEGACY_COMPAT"
     print("Canonical terminology guard self-test: PASS")
 
 
@@ -131,7 +139,8 @@ def main() -> int:
     print("Canonical terminology guard: FAIL", file=sys.stderr)
     print(
         "New production-code lines introduced retired Programmer/Channel vocabulary. "
-        "Use Facility/PPU/Site, or place intentional v3.1 translation inside an explicit compatibility boundary.",
+        "Use Facility/PPU/Site. For a deliberate v3.1 compatibility line in a mixed module, "
+        f"add an explicit {LEGACY_MARKER} marker.",
         file=sys.stderr,
     )
     for path, line_no, text in findings:
