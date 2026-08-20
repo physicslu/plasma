@@ -152,7 +152,7 @@ async function openConsole(page: Page, options: { mode?: MockMode; waitForStarts
 }
 
 function batchSummary(page: Page) {
-  return page.getByLabel("Site 配置摘要").locator("..").locator("..");
+  return page.getByLabel("選取 Site 狀態摘要");
 }
 
 function liveLog(page: Page) {
