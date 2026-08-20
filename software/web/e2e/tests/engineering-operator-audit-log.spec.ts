@@ -12,7 +12,7 @@ function catalog() {
     facility_count: 1,
     ppu_count: 2,
     site_count: 4,
-    firmware_scope: "connection-session-and-ppu",
+    programming_asset_scope: "connection-session-and-ppu",
     facilities: [{
       facility_id: facilityId,
       display_name: "Mock Facility 01",
@@ -103,7 +103,7 @@ test("Engineering audit log reconstructs operator actions and filters without tr
         ok: true,
         session: {
           session_id: String(sessionNumber).padStart(32, "0"),
-          firmware_cache_scope: "connection-session-and-ppu",
+          programming_asset_cache_scope: "connection-session-and-ppu",
           previous_session_cleared: sessionNumber > 1,
         },
       });
@@ -157,7 +157,7 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   await page.getByLabel("選取 SITE 2").uncheck();
   await expect(log).toContainText("[USR] [SITE] SELECTION · SITE-01");
 
-  await page.getByLabel("Engineering Firmware file").setInputFiles({
+  await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "operator-audit.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(1024, 0x5a),
