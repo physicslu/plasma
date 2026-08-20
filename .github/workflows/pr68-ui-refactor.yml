@@ -1,0 +1,115 @@
+name: PR68 canonical UI refactor
+
+on:
+  push:
+    branches:
+      - agent/remove-rest-v1-firmware-compat
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/remove-rest-v1-firmware-compat
+      - name: Apply canonical Programming Asset naming
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def rewrite(path, replacements=(), regexes=()):
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              original = text
+              for old, new in replacements:
+                  if old not in text:
+                      raise SystemExit(f"expected token missing in {path}: {old!r}")
+                  text = text.replace(old, new)
+              for pattern, replacement in regexes:
+                  text = re.sub(pattern, replacement, text)
+              if text == original:
+                  raise SystemExit(f"no refactor changes produced for {path}")
+              file.write_text(text, encoding="utf-8")
+
+          rewrite(
+              "software/web/app/page.tsx",
+              replacements=(
+                  ("MAX_FIRMWARE_BYTES", "MAX_IMAGE_ASSET_BYTES"),
+                  ("setFirmware", "setImageAsset"),
+                  ("REST → Plasma v3.2 TCP", "REST → Plasma v3.3 TCP"),
+              ),
+              regexes=((r"\bfirmware\b", "imageAsset"), (r"\bFirmware\b", "Programming Image Asset")),
+          )
+          page = Path("software/web/app/page.tsx")
+          text = page.read_text(encoding="utf-8")
+          text = text.replace("imageAsset: operation ===", "assetFile: operation ===")
+          page.write_text(text, encoding="utf-8")
+
+          rewrite(
+              "software/web/app/engineering/programming-workspace.tsx",
+              replacements=(
+                  ("FirmwareTransferEvent", "AssetTransferEvent"),
+                  ("MAX_FIRMWARE_BYTES", "MAX_IMAGE_ASSET_BYTES"),
+                  ("firmwareSizeLabel", "imageAssetSizeLabel"),
+                  ("logFirmwareEvent", "logAssetEvent"),
+                  ("setFirmware", "setImageAsset"),
+                  ("selectFirmware", "selectImageAsset"),
+                  ("onFirmwareEvent", "onAssetEvent"),
+                  ("event.firmware_sha256", "event.asset_sha256"),
+                  ("event.firmware_name", "event.asset_name"),
+                  ("event.firmware_size", "event.asset_size"),
+                  ("[FIRMWARE]", "[IMG]"),
+                  ("previous firmware cache cleared", "previous Programming Asset cache cleared"),
+                  ("engineeringProgramming.firmwareTooLarge", "engineeringProgramming.imageAssetTooLarge"),
+                  ("engineeringProgramming.firmwareHint", "engineeringProgramming.imageAssetHint"),
+                  ("engineeringProgramming.firmware", "engineeringProgramming.imageAsset"),
+              ),
+              regexes=((r"\bfirmware\b", "imageAsset"), (r"\bFirmware\b", "Programming Image Asset")),
+          )
+          workspace = Path("software/web/app/engineering/programming-workspace.tsx")
+          text = workspace.read_text(encoding="utf-8")
+          text = text.replace("imageAsset: operation ===", "assetFile: operation ===")
+          workspace.write_text(text, encoding="utf-8")
+
+          rewrite(
+              "software/web/app/i18n.tsx",
+              replacements=(
+                  ("engineeringProgramming.firmwareTooLarge", "engineeringProgramming.imageAssetTooLarge"),
+                  ("engineeringProgramming.firmwareHint", "engineeringProgramming.imageAssetHint"),
+                  ("engineeringProgramming.firmware", "engineeringProgramming.imageAsset"),
+                  ("Firmware BIN", "Programming Image (.bin)"),
+                  ("Firmware 超過 16 MiB 限制。", "Programming Image Asset 超過 16 MiB 限制。"),
+                  ("Firmware exceeds the 16 MiB limit.", "Programming Image Asset exceeds the 16 MiB limit."),
+              ),
+          )
+
+          for path in (
+              "software/web/app/page.tsx",
+              "software/web/app/engineering/programming-workspace.tsx",
+              "software/web/app/i18n.tsx",
+          ):
+              text = Path(path).read_text(encoding="utf-8")
+              if re.search(r"(?i)firmware", text):
+                  raise SystemExit(f"retired firmware vocabulary remains in {path}")
+          PY
+      - name: Validate Web source after refactor
+        run: |
+          cd software/web
+          npm ci
+          npm run lint
+          npm test
+      - name: Commit branch-only refactor
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "plasma-pr68-bot"
+          git config user.email "plasma-pr68-bot@users.noreply.github.com"
+          git add software/web/app/page.tsx software/web/app/engineering/programming-workspace.tsx software/web/app/i18n.tsx
+          git commit -m "Finish Programming Asset UI rename"
+          git push origin HEAD:agent/remove-rest-v1-firmware-compat
