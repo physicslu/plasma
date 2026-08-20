@@ -96,6 +96,7 @@ class WebGatewayTests(unittest.TestCase):
                 "asset_name": "app.bin",
                 "asset_type": "image",
                 "asset_format": "binary",
+                "asset_size": len(image),
                 "asset_sha256": sha256,
                 "asset_base64": base64.b64encode(image).decode(),
             },
