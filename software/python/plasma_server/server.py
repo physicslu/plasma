@@ -79,11 +79,6 @@ class PlasmaServer:
                 ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
                 f"unsupported protocol version: {version!r}",
             )
-        if "channel_id" in metadata:
-            raise PlasmaError(
-                ErrorCode.INVALID_ARGUMENT,
-                "Protocol v3.3 uses site_id; channel_id is not part of the canonical contract",
-            )
         raw = metadata.get("site_id")
         if raw is None and not required:
             return None
