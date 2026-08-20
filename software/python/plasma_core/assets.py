@@ -14,6 +14,8 @@ class ProgrammingAssetType(StrEnum):
     IMAGE = "image"
     KEY = "key"
     OPTION = "option"
+    SERIAL_NUMBER = "serial_number"
+    CALIBRATION = "calibration"
 
 
 class ProgrammingAssetFormat(StrEnum):
@@ -29,6 +31,8 @@ class ProgrammingAssetFormat(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class NormalizedImage:
+    """Canonical bytes that will be programmed to or verified against target IC memory."""
+
     name: str
     data: bytes
     sha256: str
@@ -40,6 +44,14 @@ class NormalizedImage:
 
 @dataclass(frozen=True, slots=True)
 class ProgrammingAsset:
+    """Materialized source data consumed by a programming workflow.
+
+    An Asset describes source data, not PPU execution instructions. Recipe or
+    manifest semantics belong to separate control-plane objects. The current
+    implementation materializes uploaded assets as bytes; future providers may
+    obtain equivalent assets from MES, databases, APIs or secure stores.
+    """
+
     name: str
     asset_type: ProgrammingAssetType
     asset_format: ProgrammingAssetFormat
@@ -96,20 +108,21 @@ class ProgrammingAsset:
         )
 
     def normalize_image(self) -> NormalizedImage:
-        """Convert a source Programming Asset into the canonical execution image.
+        """Convert an Image Asset into the canonical execution image.
 
-        Only raw binary image assets are implemented today. Other declared
-        formats/types intentionally fail closed until a parser/consumer exists.
+        Only raw binary Image Assets are implemented today. HEX/SREC/ELF/CSV/
+        text inputs and non-Image Asset types fail closed until a real parser or
+        consumer is implemented and validated.
         """
         if self.asset_type is not ProgrammingAssetType.IMAGE:
             raise PlasmaError(
                 ErrorCode.OPERATION_UNSUPPORTED,
-                f"asset_type {self.asset_type.value!r} cannot be used as a programming image yet",
+                f"asset_type {self.asset_type.value!r} cannot be normalized as an Image",
             )
         if self.asset_format is not ProgrammingAssetFormat.BINARY:
             raise PlasmaError(
                 ErrorCode.OPERATION_UNSUPPORTED,
-                f"asset_format {self.asset_format.value!r} has no parser yet",
+                f"asset_format {self.asset_format.value!r} has no Image parser yet",
             )
         return NormalizedImage(
             name=self.name,
