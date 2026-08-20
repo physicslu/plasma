@@ -108,11 +108,14 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Max-Age", "600")
 
-    def _body(self) -> dict[str, Any]:
+    def _raw_body(self) -> bytes:
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0 or length > self.max_body_bytes:
             raise ValueError("invalid request body size")
-        value = json.loads(self.rfile.read(length))
+        return self.rfile.read(length)
+
+    def _body(self) -> dict[str, Any]:
+        value = json.loads(self._raw_body())
         if not isinstance(value, dict):
             raise ValueError("JSON body must be an object")
         return value
@@ -302,7 +305,14 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             raise ValueError("output file does not belong to this job")
         self._binary(requested)
 
-    def _job_request(self, body: dict[str, Any], *, client_id: str) -> JobRequest:
+    def _job_request(
+        self,
+        body: dict[str, Any],
+        *,
+        client_id: str,
+        default_timeout_s: float = 30.0,
+        allow_firmware_reference: bool = False,
+    ) -> JobRequest:
         operation = Operation(str(body["operation"]))
         if operation not in {Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ}:
             raise ValueError("web gateway supports erase, program, verify, and read")
@@ -310,8 +320,12 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         if not isinstance(encoded_firmware, str):
             raise ValueError("firmware_base64 must be a string")
         firmware = base64.b64decode(encoded_firmware, validate=True) if encoded_firmware else b""
+        firmware_id = body.get("firmware_id")
+        if firmware_id is not None and not isinstance(firmware_id, str):
+            raise ValueError("firmware_id must be a string")
         if operation in {Operation.PROGRAM, Operation.VERIFY} and not firmware:
-            raise ValueError("program and verify require firmware_base64")
+            if not allow_firmware_reference or not firmware_id:
+                raise ValueError("program and verify require firmware_base64 or staged firmware_id")
         map_data = body.get("map_data") or {}
         if operation is Operation.READ:
             map_data = self._read_map(body, map_data)
@@ -323,7 +337,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             operation=operation,
             firmware=firmware,
             map_data=map_data,
-            timeout_s=float(body.get("timeout_s", 30)),
+            timeout_s=float(body.get("timeout_s", default_timeout_s)),
             client_id=client_id,
             metadata={"firmware_name": str(body.get("firmware_name", "browser-upload.bin"))},
         )
@@ -337,6 +351,19 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     self._engineering_unavailable()
                     return
                 facility_id, ppu_id, tail = engineering
+                if tail == ["api", "firmware"]:
+                    query = parse_qs(parsed.query)
+                    firmware_name = query.get("name", ["browser-upload.bin"])[0]
+                    self._json(
+                        HTTPStatus.CREATED,
+                        self.engineering_provider.stage_firmware(
+                            facility_id,
+                            ppu_id,
+                            firmware_name,
+                            self._raw_body(),
+                        ),
+                    )
+                    return
                 if len(tail) == 4 and tail[:2] == ["api", "jobs"] and tail[3] == "cancel":
                     self._json(
                         HTTPStatus.OK,
@@ -344,10 +371,24 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     )
                     return
                 if tail == ["api", "jobs"]:
-                    request = self._job_request(self._body(), client_id="plasma-web-engineering")
+                    body = self._body()
+                    firmware_id = body.get("firmware_id")
+                    request = self._job_request(
+                        body,
+                        client_id="plasma-web-engineering",
+                        default_timeout_s=self.engineering_provider.job_timeout_s(facility_id, ppu_id),
+                        allow_firmware_reference=True,
+                    )
                     self._json(
                         HTTPStatus.ACCEPTED,
-                        _run(self.engineering_provider.start_job(facility_id, ppu_id, request)),
+                        _run(
+                            self.engineering_provider.start_job(
+                                facility_id,
+                                ppu_id,
+                                request,
+                                firmware_id=firmware_id if isinstance(firmware_id, str) else None,
+                            )
+                        ),
                     )
                     return
                 self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
