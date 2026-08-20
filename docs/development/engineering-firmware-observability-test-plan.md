@@ -1,5 +1,7 @@
 # Engineering Firmware Observability Test Plan
 
+This focused plan is part of the cross-layer operator contract defined in [`operator-acceptance-test-matrix.md`](operator-acceptance-test-matrix.md), primarily `OAT-FW-*`, `OAT-BATCH-*`, and `OAT-LOG-*`.
+
 Required browser regression coverage:
 
 1. First Program with a firmware image emits SHA-256 fingerprint-only cache check, cache miss, binary upload start, and binary upload complete logs.
