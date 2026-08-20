@@ -15,6 +15,8 @@ from plasma_core.enums import Operation
 from plasma_core.errors import PlasmaError
 from plasma_core.models import JobRequest, site_id_from_legacy_channel, validate_job_id
 
+from .engineering_targets import EngineeringPPUProvider, MockEngineeringPPUProvider
+
 
 FLEET_CONTRACT_VERSION = "1"
 GATEWAY_SERVICE_NAME = "plasma-web-rest-gateway"
@@ -64,6 +66,7 @@ def _site_value(canonical: Any, legacy: Any) -> int | None:
 
 class PlasmaWebHandler(BaseHTTPRequestHandler):
     client_factory: Callable[[], PlasmaClient] = PlasmaClient
+    engineering_provider: EngineeringPPUProvider | None = None
     max_body_bytes = 24 * 1024 * 1024
     allowed_origins = frozenset({"*"})
     output_root = Path("output")
@@ -81,16 +84,18 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def _binary(self, path: Path) -> None:
-        data = path.read_bytes()
+    def _binary_data(self, data: bytes, filename: str) -> None:
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Content-Disposition", f'attachment; filename="{path.name}"')
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self._cors_headers()
         self.end_headers()
         self.wfile.write(data)
+
+    def _binary(self, path: Path) -> None:
+        self._binary_data(path.read_bytes(), path.name)
 
     def _cors_headers(self) -> None:
         origin = self.headers.get("Origin")
@@ -140,6 +145,23 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                 "error": {"message": "local Plasma Server is unavailable"},
             },
         )
+
+    def _engineering_unavailable(self) -> None:
+        self._json(
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {
+                "ok": False,
+                "provider": "unavailable",
+                "error": {"message": "Engineering PPU provider is not enabled"},
+            },
+        )
+
+    @staticmethod
+    def _engineering_target(path: str) -> tuple[str, str, list[str]] | None:
+        parts = path.strip("/").split("/")
+        if len(parts) < 5 or parts[:3] != ["api", "engineering", "targets"]:
+            return None
+        return unquote(parts[3]), unquote(parts[4]), [unquote(part) for part in parts[5:]]
 
     def do_OPTIONS(self) -> None:
         self.send_response(HTTPStatus.NO_CONTENT)
@@ -200,6 +222,48 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     },
                 )
                 return
+            if parsed.path == "/api/engineering/targets":
+                if self.engineering_provider is None:
+                    self._engineering_unavailable()
+                    return
+                self._json(HTTPStatus.OK, self.engineering_provider.catalog())
+                return
+
+            engineering = self._engineering_target(parsed.path)
+            if engineering is not None:
+                if self.engineering_provider is None:
+                    self._engineering_unavailable()
+                    return
+                facility_id, ppu_id, tail = engineering
+                query = parse_qs(parsed.query)
+                if tail == ["api", "status"]:
+                    job = query.get("job", [None])[0]
+                    site = query.get("site", [None])[0]
+                    legacy_channel = query.get("channel", [None])[0]
+                    site_id = _site_value(site, legacy_channel)
+                    self._json(
+                        HTTPStatus.OK,
+                        _run(
+                            self.engineering_provider.status(
+                                facility_id,
+                                ppu_id,
+                                site_id=site_id,
+                                job_id=job,
+                            )
+                        ),
+                    )
+                    return
+                if len(tail) == 5 and tail[:2] == ["api", "jobs"] and tail[3] == "files":
+                    job_id = tail[2]
+                    filename = tail[4]
+                    data = self.engineering_provider.read_output_file(
+                        facility_id, ppu_id, job_id, filename
+                    )
+                    self._binary_data(data, filename)
+                    return
+                self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
+                return
+
             if parsed.path == "/api/status":
                 query = parse_qs(parsed.query)
                 job = query.get("job", [None])[0]
@@ -238,9 +302,57 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             raise ValueError("output file does not belong to this job")
         self._binary(requested)
 
+    def _job_request(self, body: dict[str, Any], *, client_id: str) -> JobRequest:
+        operation = Operation(str(body["operation"]))
+        if operation not in {Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ}:
+            raise ValueError("web gateway supports erase, program, verify, and read")
+        encoded_firmware = body.get("firmware_base64", "")
+        if not isinstance(encoded_firmware, str):
+            raise ValueError("firmware_base64 must be a string")
+        firmware = base64.b64decode(encoded_firmware, validate=True) if encoded_firmware else b""
+        if operation in {Operation.PROGRAM, Operation.VERIFY} and not firmware:
+            raise ValueError("program and verify require firmware_base64")
+        map_data = body.get("map_data") or {}
+        if operation is Operation.READ:
+            map_data = self._read_map(body, map_data)
+        site_id = _site_value(body.get("site_id"), body.get("channel_id"))
+        if site_id is None:
+            raise ValueError("job requires site_id")
+        return JobRequest(
+            site_id=site_id,
+            operation=operation,
+            firmware=firmware,
+            map_data=map_data,
+            timeout_s=float(body.get("timeout_s", 30)),
+            client_id=client_id,
+            metadata={"firmware_name": str(body.get("firmware_name", "browser-upload.bin"))},
+        )
+
     def do_POST(self) -> None:
         try:
             parsed = urlparse(self.path)
+            engineering = self._engineering_target(parsed.path)
+            if engineering is not None:
+                if self.engineering_provider is None:
+                    self._engineering_unavailable()
+                    return
+                facility_id, ppu_id, tail = engineering
+                if len(tail) == 4 and tail[:2] == ["api", "jobs"] and tail[3] == "cancel":
+                    self._json(
+                        HTTPStatus.OK,
+                        _run(self.engineering_provider.cancel_job(facility_id, ppu_id, tail[2])),
+                    )
+                    return
+                if tail == ["api", "jobs"]:
+                    request = self._job_request(self._body(), client_id="plasma-web-engineering")
+                    self._json(
+                        HTTPStatus.ACCEPTED,
+                        _run(self.engineering_provider.start_job(facility_id, ppu_id, request)),
+                    )
+                    return
+                self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
+                return
+
             if parsed.path.startswith("/api/jobs/") and parsed.path.endswith("/cancel"):
                 job_id = parsed.path.split("/")[3]
                 self._json(HTTPStatus.OK, _run(self.client_factory().cancel(job_id)))
@@ -251,31 +363,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     {"ok": False, "error": {"message": "not found"}},
                 )
                 return
-            body = self._body()
-            operation = Operation(str(body["operation"]))
-            if operation not in {Operation.ERASE, Operation.PROGRAM, Operation.VERIFY, Operation.READ}:
-                raise ValueError("web gateway supports erase, program, verify, and read")
-            encoded_firmware = body.get("firmware_base64", "")
-            if not isinstance(encoded_firmware, str):
-                raise ValueError("firmware_base64 must be a string")
-            firmware = base64.b64decode(encoded_firmware, validate=True) if encoded_firmware else b""
-            if operation in {Operation.PROGRAM, Operation.VERIFY} and not firmware:
-                raise ValueError("program and verify require firmware_base64")
-            map_data = body.get("map_data") or {}
-            if operation is Operation.READ:
-                map_data = self._read_map(body, map_data)
-            site_id = _site_value(body.get("site_id"), body.get("channel_id"))
-            if site_id is None:
-                raise ValueError("job requires site_id")
-            request = JobRequest(
-                site_id=site_id,
-                operation=operation,
-                firmware=firmware,
-                map_data=map_data,
-                timeout_s=float(body.get("timeout_s", 30)),
-                client_id="plasma-web",
-                metadata={"firmware_name": str(body.get("firmware_name", "browser-upload.bin"))},
-            )
+            request = self._job_request(self._body(), client_id="plasma-web")
             self._json(HTTPStatus.ACCEPTED, _run(self.client_factory().start(request)))
         except Exception as exc:
             self._error(exc)
@@ -322,8 +410,10 @@ def serve(
     plasma_port: int,
     cors_origins: tuple[str, ...] = ("*",),
     output_root: Path = Path("output"),
+    engineering_provider: EngineeringPPUProvider | None = None,
 ) -> None:
     PlasmaWebHandler.client_factory = staticmethod(lambda: PlasmaClient(plasma_host, plasma_port))
+    PlasmaWebHandler.engineering_provider = engineering_provider
     PlasmaWebHandler.allowed_origins = frozenset(cors_origins)
     PlasmaWebHandler.output_root = output_root.resolve()
     server = ThreadingHTTPServer((host, port), PlasmaWebHandler)
@@ -349,15 +439,42 @@ def main() -> None:
         dest="cors_origins",
         help="Allowed Web origin; repeat for multiple origins (prototype default: *)",
     )
-    args = parser.parse_args()
-    serve(
-        args.host,
-        args.port,
-        args.plasma_host,
-        args.plasma_port,
-        tuple(args.cors_origins or ["*"]),
-        args.output_root,
+    parser.add_argument(
+        "--engineering-mock",
+        action="store_true",
+        help="Enable the server-side Engineering mock Facility/PPU provider",
     )
+    parser.add_argument(
+        "--engineering-mock-root",
+        type=Path,
+        default=Path("engineering-mock"),
+        help="Output/log root for Engineering mock PPU runtimes",
+    )
+    args = parser.parse_args()
+
+    provider: MockEngineeringPPUProvider | None = None
+    try:
+        if args.engineering_mock:
+            provider = MockEngineeringPPUProvider(args.engineering_mock_root)
+            provider.start()
+            catalog = provider.catalog()
+            print(
+                "Engineering mock PPU provider ready: "
+                f"{catalog['facility_count']} facilities / {catalog['ppu_count']} PPUs / "
+                f"{catalog['site_count']} Sites"
+            )
+        serve(
+            args.host,
+            args.port,
+            args.plasma_host,
+            args.plasma_port,
+            tuple(args.cors_origins or ["*"]),
+            args.output_root,
+            provider,
+        )
+    finally:
+        if provider is not None:
+            provider.close()
 
 
 if __name__ == "__main__":

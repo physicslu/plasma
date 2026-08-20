@@ -64,23 +64,35 @@ def main() -> None:
             # Read downloads are served by the REST Gateway from the same job
             # output directory written by the Plasma Server.
             output_root = work / f"{item['ppu_id']}-output"
+            gateway_command = [
+                sys.executable,
+                "-m",
+                "plasma_web.gateway",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(item["gateway_port"]),
+                "--plasma-host",
+                "127.0.0.1",
+                "--plasma-port",
+                str(item["server_port"]),
+                "--output-root",
+                str(output_root),
+            ]
+            # Only the browser-facing PPU-A Gateway owns the Engineering mock
+            # provider in this acceptance stack. Its provider creates twelve
+            # virtual PlasmaServer runtimes behind the same Gateway contract.
+            if item is cd.PPUS[0]:
+                gateway_command.extend(
+                    [
+                        "--engineering-mock",
+                        "--engineering-mock-root",
+                        str(work / "engineering-mock"),
+                    ]
+                )
             gateway = cd.start_process(
                 f"{item['name']}-gateway",
-                [
-                    sys.executable,
-                    "-m",
-                    "plasma_web.gateway",
-                    "--host",
-                    "127.0.0.1",
-                    "--port",
-                    str(item["gateway_port"]),
-                    "--plasma-host",
-                    "127.0.0.1",
-                    "--plasma-port",
-                    str(item["server_port"]),
-                    "--output-root",
-                    str(output_root),
-                ],
+                gateway_command,
                 cwd=cd.PYTHON_DIR,
             )
             processes.append((f"{item['name']}-gateway", gateway))
@@ -91,6 +103,18 @@ def main() -> None:
                 lambda value: value.get("ok") is True and value.get("execution") == "ready",
                 label=f"{item['name']} gateway ready",
             )
+
+        engineering_catalog = cd.wait_json(
+            f"http://127.0.0.1:{cd.PPUS[0]['gateway_port']}/api/engineering/targets",
+            lambda value: (
+                value.get("ok") is True
+                and value.get("facility_count") == 3
+                and value.get("ppu_count") == 12
+                and value.get("site_count") == 60
+            ),
+            timeout_s=20.0,
+            label="Engineering server-side mock PPU catalog",
+        )
 
         manager = cd.start_process(
             "manager",
@@ -134,7 +158,7 @@ def main() -> None:
         cd.assert_processes_alive(processes)
 
         runtime = {
-            "schema_version": 1,
+            "schema_version": 2,
             "state": "ready",
             "web_url": f"http://127.0.0.1:{cd.WEB_PORT}",
             "gateway_url": f"http://127.0.0.1:{cd.PPUS[0]['gateway_port']}",
@@ -142,6 +166,15 @@ def main() -> None:
             "ppu_id": str(cd.PPUS[0]["ppu_id"]),
             "enabled_sites": int(cd.PPUS[0]["sites"]),
             "fleet": {"ppus": 2, "sites": 12},
+            "engineering": {
+                "provider": engineering_catalog.get("provider"),
+                "facilities": engineering_catalog["facility_count"],
+                "ppus": engineering_catalog["ppu_count"],
+                "sites": engineering_catalog["site_count"],
+                "test_facility_id": "mock-facility-02",
+                "test_ppu_id": "mock-facility-02-ppu-03",
+                "test_ppu_sites": 6,
+            },
         }
         (artifact_dir / "runtime.json").write_text(
             json.dumps(runtime, indent=2, sort_keys=True) + "\n",

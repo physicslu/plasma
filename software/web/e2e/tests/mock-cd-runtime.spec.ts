@@ -12,6 +12,9 @@ const gatewayUrl = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
 const unreachableGatewayUrl = process.env.MOCK_CD_UNREACHABLE_GATEWAY_URL ?? "http://127.0.0.1:19899";
 const expectedSites = Number(process.env.MOCK_CD_EXPECTED_SITES ?? "8");
 const expectedPpuId = process.env.MOCK_CD_EXPECTED_PPU_ID ?? "mock-ppu-a";
+const engineeringFacilityId = process.env.MOCK_CD_ENGINEERING_FACILITY_ID ?? "mock-facility-02";
+const engineeringPpuId = process.env.MOCK_CD_ENGINEERING_PPU_ID ?? "mock-facility-02-ppu-03";
+const engineeringPpuSites = Number(process.env.MOCK_CD_ENGINEERING_PPU_SITES ?? "6");
 const firmware = Buffer.from(Array.from({ length: 256 }, (_, index) => (index * 17 + 3) & 0xff));
 const operationLabels: Record<Operation, string> = {
   erase: "擦除",
@@ -257,4 +260,66 @@ test("batch membership supports representative arbitrary Site subsets and select
     expect(selections).toContainEqual([1, Math.max(2, Math.min(expectedSites - 1, Math.floor(expectedSites / 2) + 1)), expectedSites]);
   }
   expect(selections.at(-1)).toEqual(allSiteIds());
+});
+
+test("Engineering selects a server-reported Mock PPU and executes E/P/V/R through Python", async ({ page }) => {
+  const engineeringStarts: StartRequest[] = [];
+  page.on("request", request => {
+    const url = new URL(request.url());
+    const expectedPath = `/api/engineering/targets/${engineeringFacilityId}/${engineeringPpuId}/api/jobs`;
+    if (request.method() !== "POST" || url.pathname !== expectedPath) return;
+    const body = request.postDataJSON() as { site_id?: number; operation?: Operation };
+    if (typeof body.site_id === "number" && body.operation) {
+      engineeringStarts.push({ siteId: body.site_id, operation: body.operation });
+    }
+  });
+
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+
+  const facility = page.getByLabel("Engineering Facility", { exact: true });
+  const ppu = page.getByLabel("Engineering PPU", { exact: true });
+  await expect(facility.locator("option")).toHaveCount(3, { timeout: 15_000 });
+  const sourceOfTruth = page.locator(".engineeringBoundaryNote").filter({ hasText: "SERVER SOURCE OF TRUTH" });
+  await expect(sourceOfTruth).toContainText("3 Facilities · 12 PPUs · 60 Sites");
+
+  await facility.selectOption(engineeringFacilityId);
+  await ppu.selectOption(engineeringPpuId);
+  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(engineeringPpuId);
+  await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(`${engineeringPpuSites} Sites`);
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
+  await expect(page.getByText("SITE 0", { exact: true })).toHaveCount(0);
+
+  const siteId = engineeringPpuSites;
+  const row = page.locator(".channelTable tbody tr").filter({ hasText: `SITE ${siteId}` }).first();
+  await page.getByLabel("Engineering Firmware file").setInputFiles({
+    name: "engineering-provider-runtime.bin",
+    mimeType: "application/octet-stream",
+    buffer: firmware,
+  });
+  await page.getByLabel("Engineering READ offset").fill("0");
+  await page.getByLabel("Engineering READ length").fill(String(firmware.length));
+
+  for (const operation of operationOrder) {
+    await test.step(`Engineering ${engineeringFacilityId}/${engineeringPpuId}/SITE ${siteId}: ${operation}`, async () => {
+      const before = engineeringStarts.length;
+      await page.getByLabel(`SITE ${siteId} ${operationLabels[operation]}`).click();
+      await expect.poll(() => engineeringStarts.length, { timeout: 15_000 }).toBe(before + 1);
+      expect(engineeringStarts[before]).toEqual({ siteId, operation });
+      await expect(row.locator(".state")).toHaveText("SUCCESS", { timeout: 15_000 });
+    });
+  }
+
+  const downloadLink = page.getByLabel(`Download SITE ${siteId} read file`);
+  await expect(downloadLink).toBeVisible();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    downloadLink.click(),
+  ]);
+  expect(download.suggestedFilename()).toBe(`read_SITE${siteId}_flash.bin`);
+  const path = await download.path();
+  if (!path) throw new Error("Engineering Mock PPU Read did not produce a local file");
+  const bytes = await readFile(path);
+  expect(bytes.length).toBe(firmware.length);
+  expect(bytes.equals(firmware)).toBe(true);
 });

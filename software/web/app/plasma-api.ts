@@ -39,6 +39,29 @@ export type PPUStatus = {
   sites: SiteSnapshot[];
 };
 
+export type EngineeringPPUTarget = {
+  ppu_id: string;
+  display_name: string;
+  model: string;
+  site_count: number;
+  provider: string;
+};
+
+export type EngineeringFacilityTarget = {
+  facility_id: string;
+  display_name: string;
+  ppus: EngineeringPPUTarget[];
+};
+
+export type EngineeringTargetCatalog = {
+  ok: boolean;
+  provider: string;
+  facility_count: number;
+  ppu_count: number;
+  site_count: number;
+  facilities: EngineeringFacilityTarget[];
+};
+
 // Transitional shapes accepted only from protocol/API v3.1 backends.
 type LegacyChannelSnapshot = {
   channel_id: number;
@@ -127,6 +150,14 @@ export function normalizeApiBase(value: string): string {
   return url.toString().replace(/\/$/, "");
 }
 
+export function engineeringTargetApiBase(
+  apiBase: string,
+  facilityId: string,
+  ppuId: string,
+): string {
+  return `${apiBase}/api/engineering/targets/${encodeURIComponent(facilityId)}/${encodeURIComponent(ppuId)}`;
+}
+
 function normalizeJobSnapshot(job: WireJobSnapshot): JobSnapshot {
   const siteId = job.site_id ?? (job.channel_id === undefined ? undefined : job.channel_id + 1);
   if (siteId === undefined) {
@@ -211,6 +242,10 @@ async function requestJson<T>(
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+export async function getEngineeringTargets(apiBase: string): Promise<EngineeringTargetCatalog> {
+  return await requestJson<EngineeringTargetCatalog>(apiBase, "/api/engineering/targets");
 }
 
 export async function getPPUStatus(apiBase: string): Promise<PPUStatus> {
