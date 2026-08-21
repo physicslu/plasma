@@ -94,7 +94,7 @@ async function installEngineeringApi(page: Page) {
       await route.fulfill({
         status: 500,
         contentType: "application/json",
-        body: JSON.stringify({ error: { message: "empty-EPVR guard failed: unexpected job submission" } }),
+        body: JSON.stringify({ error: { message: "readiness guard failed: unexpected job submission" } }),
       });
       return;
     }
@@ -116,7 +116,24 @@ async function chooseFileFromButton(page: Page, buttonName: string, expectedFile
   });
 }
 
-test("Pmod programming file picker is explicit and empty EPVR submits no jobs", async ({ page }) => {
+async function expectSharedToolbarGeometry(page: Page) {
+  const toolbar = page.locator(".programmingBatchToolbar");
+  const file = toolbar.locator(".programmingBatchFile");
+  const operations = toolbar.locator(".programmingBatchOperations");
+  const actions = toolbar.locator(".programmingBatchActions");
+  const fileBox = await file.boundingBox();
+  const operationBox = await operations.boundingBox();
+  const actionBox = await actions.boundingBox();
+  expect(fileBox).not.toBeNull();
+  expect(operationBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  expect(fileBox!.x).toBeLessThan(operationBox!.x);
+  expect(actionBox!.x - (operationBox!.x + operationBox!.width)).toBeGreaterThanOrEqual(0);
+  expect(actionBox!.x - (operationBox!.x + operationBox!.width)).toBeLessThanOrEqual(16);
+  await expect(toolbar.locator(".programmingFileName")).toHaveCSS("font-size", "13px");
+}
+
+test("Pmod readiness gates Execute and keeps EPVR adjacent to batch actions", async ({ page }) => {
   const api = await installEngineeringApi(page);
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
@@ -125,41 +142,59 @@ test("Pmod programming file picker is explicit and empty EPVR submits no jobs", 
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
   await expect(page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`)).toBeVisible();
 
-  const picker = page.locator(".productionImagePicker");
-  const browse = page.getByRole("button", { name: "選擇燒錄檔", exact: true });
-  await expect(browse).toBeVisible();
-  await expect(picker).not.toContainText("Programming Image (.bin)");
-  await expect(picker.locator("em")).toHaveText("—");
-  await chooseFileFromButton(page, "選擇燒錄檔", "pmod-test.bin");
-  await expect(picker.locator("em")).toHaveText("pmod-test.bin");
+  const toolbar = page.locator(".programmingBatchToolbar");
+  const readiness = toolbar.getByRole("status", { name: "Batch readiness" });
+  const execute = toolbar.locator(".executeBatchButton");
+  await expect(readiness).toContainText("NO OP");
+  await expect(execute).toBeDisabled();
+  expect(api.jobRequests).toBe(0);
 
-  await page.locator(".executeBatchButton").click();
-  await expect(page.getByRole("alert")).toContainText(
-    "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。",
-  );
+  const program = toolbar.locator(".programmingBatchOperations input").nth(1);
+  await program.check();
+  await expect(readiness).toContainText("IMAGE REQUIRED");
+  await expect(execute).toBeDisabled();
+
+  await chooseFileFromButton(page, "選擇燒錄檔", "pmod-test.bin");
+  await expect(toolbar.locator(".programmingFileName")).toHaveText("pmod-test.bin");
+  await expect(readiness).toContainText("BATCH READY");
+  await expect(execute).toBeEnabled();
+  await expectSharedToolbarGeometry(page);
   expect(api.jobRequests).toBe(0);
 });
 
-test("Emode programming file picker matches Pmod and empty EPVR submits no jobs", async ({ page }) => {
+test("Emode uses the same toolbar and readiness contract including READ validation", async ({ page }) => {
   const api = await installEngineeringApi(page);
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
-  const picker = page.locator(".compactFile");
-  const browse = page.getByRole("button", { name: "選擇燒錄檔", exact: true });
-  await expect(browse).toBeVisible();
-  await expect(picker).not.toContainText("Programming Image (.bin)");
-  await expect(picker.locator("b")).toHaveText("—");
-  await chooseFileFromButton(page, "選擇燒錄檔", "emode-test.bin");
-  await expect(picker.locator("b")).toHaveText("emode-test.bin");
+  const toolbar = page.locator(".programmingBatchToolbar");
+  const readiness = toolbar.getByRole("status", { name: "Batch readiness" });
+  const execute = toolbar.locator(".executeBatch");
+  await expect(readiness).toContainText("NO OP");
+  await expect(execute).toBeDisabled();
 
-  const execute = page.locator(".executeBatch");
+  const operations = toolbar.locator(".programmingBatchOperations input");
+  await operations.nth(3).check();
+  await expect(readiness).toContainText("BATCH READY");
   await expect(execute).toBeEnabled();
-  await execute.click();
-  await expect(page.getByRole("alert")).toContainText(
-    "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。",
-  );
+  await expect(page.getByRole("region", { name: "Engineering READ parameters" })).toBeVisible();
+
+  await page.getByLabel("Engineering READ length").fill("0");
+  await expect(readiness).toContainText("INVALID READ");
+  await expect(execute).toBeDisabled();
+  await page.getByLabel("Engineering READ length").fill("256");
+  await expect(readiness).toContainText("BATCH READY");
+
+  await operations.nth(3).uncheck();
+  await operations.nth(1).check();
+  await expect(readiness).toContainText("IMAGE REQUIRED");
+  await expect(execute).toBeDisabled();
+  await chooseFileFromButton(page, "選擇燒錄檔", "emode-test.bin");
+  await expect(toolbar.locator(".programmingFileName")).toHaveText("emode-test.bin");
+  await expect(readiness).toContainText("BATCH READY");
+  await expect(execute).toBeEnabled();
+  await expectSharedToolbarGeometry(page);
   expect(api.jobRequests).toBe(0);
 });

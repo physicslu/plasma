@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { evaluateBatchReadiness } from "../batch-readiness";
 import { useI18n } from "../i18n";
 import {
   beginEngineeringSession,
@@ -19,6 +20,7 @@ import type {
   Operation,
   SiteSnapshot,
 } from "../plasma-api";
+import "../programming-batch-toolbar.css";
 import "./fleet.css";
 import "./production-prototype.css";
 import "./operator-feedback.css";
@@ -85,7 +87,6 @@ const copy = {
     selectedSites: "Sites",
     noSelection: "尚未選擇 FPS。",
     operations: "批次操作",
-    image: "Programming Image (.bin)",
     imageHint: "Program / Verify 需要 Image Asset，最大 16 MiB。",
     browse: "選擇燒錄檔",
     execute: "執行批次",
@@ -96,8 +97,6 @@ const copy = {
     failed: "FAIL",
     cancelled: "CANCELLED",
     partial: "PARTIAL",
-    complete: "COMPLETE",
-    batch: "Batch",
     liveStatus: "Active FPS : 即時執行狀態",
     hierarchyHint: "依 Facility / PPU / Site 定位",
     log: "Production Prototype Log",
@@ -129,7 +128,6 @@ const copy = {
     selectedSites: "Sites",
     noSelection: "No FPS selected.",
     operations: "Batch Operations",
-    image: "Programming Image (.bin)",
     imageHint: "Program / Verify requires an Image Asset, max 16 MiB.",
     browse: "Select Programming File",
     execute: "Execute Batch",
@@ -140,8 +138,6 @@ const copy = {
     failed: "FAIL",
     cancelled: "CANCELLED",
     partial: "PARTIAL",
-    complete: "COMPLETE",
-    batch: "Batch",
     liveStatus: "Active FPS : Live Execution Status",
     hierarchyHint: "Locate by Facility / PPU / Site",
     log: "Production Prototype Log",
@@ -326,6 +322,31 @@ export default function FleetPage() {
   }, [activeCounts, runtimes]);
 
   const siteDensity = densityFor(summary.sites);
+  const requiresImage = selectedOperations.some(operation => operation === "program" || operation === "verify");
+  const allSitesExecutable = activeTargets.length > 0 && activeTargets.every(active => {
+    const runtime = runtimes[active.key];
+    return Boolean(
+      runtime
+      && !runtime.loading
+      && !runtime.error
+      && runtime.sites.length === active.siteIds.length
+      && runtime.sites.every(site => site.enabled && site.state !== "running"),
+    );
+  });
+  const batchReadiness = evaluateBatchReadiness({
+    providerOnline: Boolean(catalog && !providerError),
+    targetValid: activeTargets.length > 0,
+    selectedSiteCount: activeCounts.sites,
+    selectedOperationCount: selectedOperations.length,
+    requiresImage,
+    imagePresent: Boolean(imageAsset),
+    imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_BYTES,
+    readSelected: selectedOperations.includes("read"),
+    readParamsValid: true,
+    allSitesExecutable,
+    batchRunning: batchState === "running",
+    batchCancelling: batchState === "cancelling",
+  });
 
   const updateSite = useCallback((key: string, siteId: number, patch: Partial<SiteRuntime>) => {
     setRuntimes(current => {
@@ -517,17 +538,13 @@ export default function FleetPage() {
 
   async function executeBatch() {
     if (batchRunning || activeTargets.length === 0) return;
+    if (!batchReadiness.ready) {
+      if (batchReadiness.code === "no-op") setOperatorWarning(text.chooseOperation);
+      appendLog(`[BAT] BLOCKED · ${batchReadiness.label}`, "WARN");
+      return;
+    }
     const operations = orderedOperations(selectedOperations);
-    if (operations.length === 0) {
-      setOperatorWarning(text.chooseOperation);
-      appendLog(`[BAT] BLOCKED · ${text.chooseOperation}`, "WARN");
-      return;
-    }
     setOperatorWarning(null);
-    if (operations.some(operation => operation === "program" || operation === "verify") && !imageAsset) {
-      appendLog(`[BAT] BLOCKED · ${text.imageRequired}`, "WARN");
-      return;
-    }
     const selected = activeTargets.flatMap(active => {
       const runtime = runtimes[active.key];
       return (runtime?.sites ?? []).filter(site => site.enabled).map(site => ({ active, siteId: site.id }));
@@ -570,7 +587,7 @@ export default function FleetPage() {
   }
 
   async function cancelBatch() {
-    if (!batchRunning) return;
+    if (!batchRunning || batchState === "cancelling") return;
     cancelAllRequested.current = true;
     setBatchState("cancelling");
     appendLog("[BAT] CANCEL REQUESTED", "WARN");
@@ -583,16 +600,6 @@ export default function FleetPage() {
     appendLog(`[PPU] CANCEL REQUESTED · ${key}`, "WARN");
     await cancelActiveJobs(key);
   }
-
-  const batchLabel = batchState === "complete"
-    ? text.complete
-    : batchState === "partial"
-      ? text.partial
-      : batchState === "cancelled"
-        ? text.cancelled
-        : batchState === "running" || batchState === "cancelling"
-          ? text.running
-          : text.ready;
 
   return (
     <main className="productionPrototypePage">
@@ -705,8 +712,8 @@ export default function FleetPage() {
                 <article className="runtimeSummary"><small>PASS</small><b>{summary.success}</b><span>FAIL {summary.failed} · RUN {summary.running} · CAN {summary.cancelled}</span></article>
               </section>
 
-              <section className="productionBatchToolbar" aria-label="Batch operation toolbar">
-                <div className="productionImagePicker">
+              <section className="productionBatchToolbar programmingBatchToolbar" aria-label="Batch operation toolbar">
+                <div className="productionImagePicker programmingBatchFile">
                   <button type="button" className="productionBrowseButton" disabled={batchRunning} onClick={() => imageInputRef.current?.click()}>{text.browse}</button>
                   <input
                     ref={imageInputRef}
@@ -727,10 +734,10 @@ export default function FleetPage() {
                       }
                     }}
                   />
-                  <em title={imageAsset?.name}>{imageAsset?.name ?? "—"}</em>
-                  <small>{text.imageHint}</small>
+                  <em className="programmingFileName" title={imageAsset?.name}>{imageAsset?.name ?? "—"}</em>
+                  <small className="programmingFileHint">{text.imageHint}</small>
                 </div>
-                <div className="batchOperations">
+                <div className="batchOperations programmingBatchOperations">
                   <span>{text.operations}</span>
                   {operationOrder.map(operation => (
                     <label key={operation}>
@@ -739,10 +746,12 @@ export default function FleetPage() {
                     </label>
                   ))}
                 </div>
-                <div className="productionBatchActions">
-                  <div className={`batchState batch-${batchState}`}><small>{text.batch}</small><b>{batchLabel}</b></div>
-                  <button type="button" className="executeBatchButton" onClick={() => void executeBatch()} disabled={batchRunning || activeCounts.sites === 0}>{text.execute}</button>
-                  <button type="button" className="cancelBatchButton" onClick={() => void cancelBatch()} disabled={!batchRunning}>{text.cancelAll}</button>
+                <div className="productionBatchActions programmingBatchActions">
+                  <div className={`batchState batchReadiness readiness-${batchReadiness.code}`} role="status" aria-label="Batch readiness">
+                    <small>BATCH</small><b>{batchReadiness.label}</b>
+                  </div>
+                  <button type="button" className="executeBatchButton" onClick={() => void executeBatch()} disabled={!batchReadiness.ready}>{text.execute}</button>
+                  <button type="button" className="cancelBatchButton" onClick={() => void cancelBatch()} disabled={!batchRunning || batchState === "cancelling"}>{text.cancelAll}</button>
                 </div>
               </section>
 

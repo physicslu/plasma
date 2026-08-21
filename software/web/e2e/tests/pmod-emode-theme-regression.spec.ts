@@ -117,13 +117,21 @@ test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR
   const toolbarOrder = await page.locator(".productionBatchToolbar").evaluate(element => (
     Array.from(element.children).map(child => child.className)
   ));
-  expect(toolbarOrder.slice(0, 2)).toEqual(["productionImagePicker", "batchOperations"]);
+  expect(toolbarOrder.slice(0, 3)).toEqual([
+    "productionImagePicker programmingBatchFile",
+    "batchOperations programmingBatchOperations",
+    "productionBatchActions programmingBatchActions",
+  ]);
 
-  const imageBox = await page.locator(".productionImagePicker").boundingBox();
-  const operationsBox = await page.locator(".batchOperations").boundingBox();
+  const imageBox = await page.locator(".programmingBatchFile").boundingBox();
+  const operationsBox = await page.locator(".programmingBatchOperations").boundingBox();
+  const actionsBox = await page.locator(".programmingBatchActions").boundingBox();
   expect(imageBox).not.toBeNull();
   expect(operationsBox).not.toBeNull();
+  expect(actionsBox).not.toBeNull();
   expect(imageBox!.x).toBeLessThan(operationsBox!.x);
+  expect(actionsBox!.x - (operationsBox!.x + operationsBox!.width)).toBeGreaterThanOrEqual(0);
+  expect(actionsBox!.x - (operationsBox!.x + operationsBox!.width)).toBeLessThanOrEqual(16);
 
   const theme = page.getByRole("group", { name: "Theme" });
   await theme.getByRole("button", { name: "Dark", exact: true }).click();
@@ -183,23 +191,23 @@ test("Emode stays dense and shares the Pmod file picker and dark operator palett
   expect(emodeButtonStyle).toEqual(pmodButtonStyle);
 
   const browse = await page.locator(".engineeringBrowseButton").boundingBox();
-  const imageText = await page.locator(".engineeringProgramming .compactFile > div > b").boundingBox();
+  const imageText = await page.locator(".engineeringProgramming .programmingFileName").boundingBox();
   expect(browse).not.toBeNull();
   expect(imageText).not.toBeNull();
   expect(browse!.x).toBeLessThan(imageText!.x);
   expect(imageText!.x - (browse!.x + browse!.width)).toBeGreaterThanOrEqual(0);
   expect(imageText!.x - (browse!.x + browse!.width)).toBeLessThanOrEqual(16);
 
+  const toolbar = await page.locator(".engineeringExecutionToolbar").boundingBox();
   const header = await page.locator(".engineeringProgrammingHeader").boundingBox();
   const targetSelector = await page.locator(".engineeringTargetSelector").boundingBox();
   const sourceNote = await page.locator(".engineeringBoundaryNote").last().boundingBox();
   const sitePanel = await page.locator(".engineeringSelectorPanel").boundingBox();
-  const operationConfig = await page.locator(".engineeringProgramming .operationConfig").boundingBox();
-  for (const box of [header, targetSelector, sourceNote, sitePanel, operationConfig]) expect(box).not.toBeNull();
+  for (const box of [toolbar, header, targetSelector, sourceNote, sitePanel]) expect(box).not.toBeNull();
   expect(header!.height).toBeLessThanOrEqual(80);
+  expect(toolbar!.height).toBeLessThanOrEqual(70);
   expect(targetSelector!.height).toBeLessThanOrEqual(72);
   expect(sourceNote!.height).toBeLessThanOrEqual(42);
   expect(sitePanel!.height).toBeLessThanOrEqual(118);
-  expect(operationConfig!.height).toBeLessThanOrEqual(78);
-  expect(operationConfig!.y + operationConfig!.height - header!.y).toBeLessThanOrEqual(370);
+  expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(360);
 });

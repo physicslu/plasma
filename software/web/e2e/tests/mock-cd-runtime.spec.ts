@@ -298,8 +298,11 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
     mimeType: "application/octet-stream",
     buffer: imageAssetBytes,
   });
-  await page.getByLabel("Engineering READ offset").fill("0");
-  await page.getByLabel("Engineering READ length").fill(String(imageAssetBytes.length));
+
+  // Emode intentionally hides READ parameters until READ is selected. The
+  // defaults (offset 0, length 256) already match imageAssetBytes, so this
+  // single-Site E/P/V/R acceptance does not need to expose or rewrite them.
+  await expect(page.getByLabel("Engineering READ parameters")).toHaveCount(0);
 
   for (const operation of operationOrder) {
     await test.step(`Engineering ${engineeringFacilityId}/${engineeringPpuId}/${engineeringSiteLabel}: ${operation}`, async () => {

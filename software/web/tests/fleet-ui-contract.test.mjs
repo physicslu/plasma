@@ -62,6 +62,7 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   const source = await fs.readFile(new URL("../app/fleet/page.tsx", import.meta.url), "utf8");
   const css = await fs.readFile(new URL("../app/fleet/production-prototype.css", import.meta.url), "utf8");
   const operatorFeedback = await fs.readFile(new URL("../app/fleet/operator-feedback.css", import.meta.url), "utf8");
+  const batchToolbar = await fs.readFile(new URL("../app/programming-batch-toolbar.css", import.meta.url), "utf8");
   assert.match(source, /type SelectionMap/);
   assert.match(source, /draftSelection/);
   assert.match(source, /activeSelection/);
@@ -79,7 +80,9 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(source, /runSiteSequence/);
   assert.match(source, /cancelPPU/);
   assert.match(source, /site\.state === "running" \? ` · \$\{site\.progress\}%`/);
-  assert.match(source, /<div className="productionImagePicker">[\s\S]*<\/div>\s*<div className="batchOperations">/);
+  assert.match(source, /<div className="productionImagePicker programmingBatchFile">[\s\S]*<\/div>\s*<div className="batchOperations programmingBatchOperations">/);
+  assert.match(source, /productionBatchActions programmingBatchActions/);
+  assert.match(source, /disabled=\{!batchReadiness\.ready\}/);
   assert.doesNotMatch(source, /<b>\{text\.image\}<\/b>/);
   assert.match(css, /background:\s*#f5f8fc/);
   assert.match(css, /--site-tile-w/);
@@ -93,10 +96,9 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(operatorFeedback, /\.fpsSelectionSummary\s*\{\s*display:\s*none;/s);
   assert.match(operatorFeedback, /content:\s*"Cancel All"/);
   assert.match(operatorFeedback, /content:\s*"Confirm"/);
-  assert.match(operatorFeedback, /\.productionBatchToolbar\s*\{[^}]*grid-template-areas:\s*"image operations actions";/s);
-  assert.match(operatorFeedback, /@media\s*\(max-width:\s*920px\)[\s\S]*grid-template-areas:\s*"image"\s*"operations"\s*"actions";/s);
-  assert.match(operatorFeedback, /\.productionImagePicker\s*\{[^}]*grid-template-columns:\s*max-content\s+minmax\(0,\s*1fr\)/s);
-  assert.match(operatorFeedback, /\.productionImagePicker\s*>\s*\.productionBrowseButton\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*1;/s);
+  assert.match(batchToolbar, /grid-template-areas:\s*"file operations actions"/);
+  assert.match(batchToolbar, /\.programmingBatchOperations\s*\{[\s\S]*justify-self:\s*end/);
+  assert.match(batchToolbar, /\.programmingFileName\s*\{[\s\S]*font-size:\s*13px/);
   assert.match(operatorFeedback, /\.facilityRuntimeIdentity h3\s*\{[^}]*font-weight:\s*800;/s);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
