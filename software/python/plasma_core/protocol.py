@@ -149,6 +149,53 @@ async def read_frame(
     return frame
 
 
+def _validated_sha256(value: Any, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(char not in "0123456789abcdefABCDEF" for char in value)
+    ):
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_CHECKSUM_MISMATCH,
+            f"{field} must be a 64-digit hexadecimal SHA-256 value",
+        )
+    return value.lower()
+
+
+def _execution_image_reference(metadata: dict[str, Any]) -> tuple[int, str] | None:
+    raw = metadata.get("execution_image_ref")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_HEADER_INVALID,
+            "execution_image_ref must be an object",
+        )
+    required = {"scheme", "sha256", "size_bytes"}
+    unknown = sorted(set(raw) - required)
+    missing = sorted(required - set(raw))
+    if unknown or missing:
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_HEADER_INVALID,
+            "execution_image_ref has invalid fields",
+            context={"unknown_fields": unknown, "missing_fields": missing},
+        )
+    scheme = raw.get("scheme")
+    if not isinstance(scheme, str) or not scheme:
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_HEADER_INVALID,
+            "execution_image_ref scheme must be a non-empty string",
+        )
+    size = raw.get("size_bytes")
+    if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_HEADER_INVALID,
+            "execution_image_ref size_bytes must be a positive integer",
+        )
+    digest = _validated_sha256(raw.get("sha256"), "execution_image_ref.sha256")
+    return size, digest
+
+
 def _validate_frame(frame: Frame) -> None:
     version = frame.metadata.get("protocol_version")
     if version != PROTOCOL_VERSION:
@@ -156,31 +203,33 @@ def _validate_frame(frame: Frame) -> None:
             ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
             f"unsupported protocol version: {version!r}",
         )
+
+    reference = _execution_image_reference(frame.metadata)
+    if reference is not None and frame.binary:
+        raise PlasmaError(
+            ErrorCode.PROTOCOL_HEADER_INVALID,
+            "execution_image_ref cannot be combined with binary payload",
+        )
+
     expected_size = frame.metadata.get("image_size")
     if expected_size is not None:
         if isinstance(expected_size, bool) or not isinstance(expected_size, int) or expected_size < 0:
             raise PlasmaError(ErrorCode.PROTOCOL_HEADER_INVALID, "image_size must be a non-negative integer")
-        if expected_size != len(frame.binary):
+        actual_size = reference[0] if reference is not None else len(frame.binary)
+        if expected_size != actual_size:
             raise PlasmaError(
                 ErrorCode.PROTOCOL_INCOMPLETE,
-                "image_size does not match BINLEN",
-                context={"image_size": expected_size, "binlen": len(frame.binary)},
+                "image_size does not match execution image payload",
+                context={"image_size": expected_size, "actual_size": actual_size},
             )
+
     expected_hash = frame.metadata.get("image_sha256")
     if expected_hash is not None:
-        if (
-            not isinstance(expected_hash, str)
-            or len(expected_hash) != 64
-            or any(char not in "0123456789abcdefABCDEF" for char in expected_hash)
-        ):
+        expected_digest = _validated_sha256(expected_hash, "image_sha256")
+        actual_hash = reference[1] if reference is not None else hashlib.sha256(frame.binary).hexdigest()
+        if not hmac.compare_digest(expected_digest, actual_hash):
             raise PlasmaError(
                 ErrorCode.PROTOCOL_CHECKSUM_MISMATCH,
-                "image_sha256 must be a 64-digit hexadecimal SHA-256 value",
-            )
-        actual_hash = hashlib.sha256(frame.binary).hexdigest()
-        if not hmac.compare_digest(expected_hash.lower(), actual_hash):
-            raise PlasmaError(
-                ErrorCode.PROTOCOL_CHECKSUM_MISMATCH,
-                "image SHA-256 does not match metadata",
-                context={"expected": expected_hash, "actual": actual_hash},
+                "image SHA-256 does not match execution image payload",
+                context={"expected": expected_digest, "actual": actual_hash},
             )
