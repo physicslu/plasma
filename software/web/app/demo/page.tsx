@@ -20,7 +20,6 @@ export default function DemoLandingPage() {
             <div className="demoCardHead"><span>01</span><b>{t("mode.production")}</b></div>
             <h2>{t("demo.production.title")}</h2>
             <p>{t("demo.production.description")}</p>
-            <dl><div><dt>{t("mode.label")}</dt><dd>production</dd></div><div><dt>Manager</dt><dd>{t("demo.production.manager")}</dd></div></dl>
             <strong>{t("demo.production.open")}</strong>
           </Link>
 
@@ -28,7 +27,6 @@ export default function DemoLandingPage() {
             <div className="demoCardHead"><span>02</span><b>{t("mode.engineering")}</b></div>
             <h2>{t("demo.engineering.title")}</h2>
             <p>{t("demo.engineering.description")}</p>
-            <dl><div><dt>{t("mode.label")}</dt><dd>engineering</dd></div><div><dt>PPU Console</dt><dd>{t("demo.engineering.ppuConsole")}</dd></div></dl>
             <strong>{t("demo.engineering.open")}</strong>
           </Link>
         </div>
