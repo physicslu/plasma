@@ -46,6 +46,26 @@ html[lang="en-US"] .fpsSelectorActions .confirmFpsButton::after {
   content: "Confirm";
 }
 
+/* Pmod operator flow starts with the image asset, then the EPVR operation set,
+ * then the execution controls. Use explicit grid areas so the visual order is
+ * stable without changing any execution behavior. */
+.productionBatchToolbar {
+  grid-template-columns: minmax(290px, .95fr) minmax(360px, 1.05fr) auto;
+  grid-template-areas: "image operations actions";
+}
+
+.productionImagePicker {
+  grid-area: image;
+}
+
+.batchOperations {
+  grid-area: operations;
+}
+
+.productionBatchActions {
+  grid-area: actions;
+}
+
 /* Keep the Programming Image label and Browse action as one visual unit.
  * The selected file name stays in the same row, while the requirement hint
  * sits directly below them. */
@@ -196,6 +216,16 @@ html[lang="en-US"] .fpsSelectorActions .confirmFpsButton::after {
   .prototypeSiteLamp.running i {
     animation: none;
     outline: 3px solid rgba(37, 99, 235, .22);
+  }
+}
+
+@media (max-width: 920px) {
+  .productionBatchToolbar {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "image"
+      "operations"
+      "actions";
   }
 }
 
