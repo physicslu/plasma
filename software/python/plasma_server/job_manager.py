@@ -6,7 +6,7 @@ from typing import Any
 
 from plasma_core.enums import JobState
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import JobRequest, JobResult, iso_now
+from plasma_core.models import JobAttemptResult, JobRequest, JobResult, iso_now
 from plasma_core.protocol import PROTOCOL_VERSION
 
 
@@ -28,6 +28,8 @@ class JobRuntime:
     bytes_done: int | None = None
     bytes_total: int | None = None
     attempt: int = 0
+    attempt_history: list[JobAttemptResult] = field(default_factory=list)
+    retry_exhausted: bool = False
     updated_at: str = ""
 
     def __post_init__(self) -> None:
@@ -57,6 +59,8 @@ class JobRuntime:
             "bytes_done": self.bytes_done,
             "bytes_total": self.bytes_total,
             "attempt": self.attempt,
+            "attempt_history": [item.to_dict(protocol_version) for item in self.attempt_history],
+            "retry_exhausted": self.retry_exhausted,
             "updated_at": self.updated_at,
         }
         if self.result:

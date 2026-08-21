@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
+
+from plasma_core.errors import ErrorCode, PlasmaError
+
+if TYPE_CHECKING:
+    from plasma_core.models import ExecutionImageRef
 
 
 ProgressCallback = Callable[[int, int], Awaitable[None]]
@@ -23,6 +29,19 @@ class BaseInterface(ABC):
     ) -> None:
         raise NotImplementedError
 
+    async def program_image_ref(
+        self,
+        image_ref: "ExecutionImageRef",
+        address: int = 0,
+        progress: ProgressCallback | None = None,
+    ) -> None:
+        """Program an immutable execution image reference when the interface supports it."""
+        raise PlasmaError(
+            ErrorCode.OPERATION_UNSUPPORTED,
+            "interface does not support execution image references",
+            context={"scheme": image_ref.scheme},
+        )
+
     @abstractmethod
     async def verify(
         self,
@@ -31,6 +50,19 @@ class BaseInterface(ABC):
         progress: ProgressCallback | None = None,
     ) -> None:
         raise NotImplementedError
+
+    async def verify_image_ref(
+        self,
+        image_ref: "ExecutionImageRef",
+        address: int = 0,
+        progress: ProgressCallback | None = None,
+    ) -> None:
+        """Verify against an immutable execution image reference when supported."""
+        raise PlasmaError(
+            ErrorCode.OPERATION_UNSUPPORTED,
+            "interface does not support execution image references",
+            context={"scheme": image_ref.scheme},
+        )
 
     @abstractmethod
     async def read(

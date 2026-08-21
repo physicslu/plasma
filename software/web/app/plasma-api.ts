@@ -3,6 +3,7 @@ export type JobState =
   | "running"
   | "success"
   | "failed"
+  | "error"
   | "cancelled"
   | "timeout"
   | "aborted";
@@ -100,6 +101,23 @@ type StatusPayload = {
   sites?: SiteSnapshot[];
 };
 
+export type JobError = {
+  message?: string;
+  error_code?: string;
+  failure_source?: string | null;
+  retry_count?: number;
+};
+
+export type JobAttempt = {
+  attempt: number;
+  state: JobState;
+  started_at: string;
+  finished_at: string;
+  elapsed_ms: number;
+  retry_scheduled: boolean;
+  error?: JobError | null;
+};
+
 export type JobSnapshot = {
   job_id: string;
   site_id: number;
@@ -112,10 +130,16 @@ export type JobSnapshot = {
   progress_percent: number;
   bytes_done: number | null;
   bytes_total: number | null;
+  attempt?: number;
+  attempt_history?: JobAttempt[];
+  retry_exhausted?: boolean;
   result?: {
     state: JobState;
+    attempts?: number;
+    attempt_history?: JobAttempt[];
+    retry_exhausted?: boolean;
     output_files?: string[];
-    error?: { message?: string } | null;
+    error?: JobError | null;
   };
 };
 
@@ -143,7 +167,14 @@ export class PlasmaSubmissionBlockedError extends Error {
   }
 }
 
-const terminalJobStates = new Set<JobState>(["success", "failed", "cancelled", "timeout", "aborted"]);
+const terminalJobStates = new Set<JobState>([
+  "success",
+  "failed",
+  "error",
+  "cancelled",
+  "timeout",
+  "aborted",
+]);
 const ppuExecutionListeners = new Set<() => void>();
 const activeExecutionJobs = new Set<string>();
 let pendingJobSubmissions = 0;

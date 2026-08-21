@@ -10,7 +10,7 @@ from unittest import mock
 from plasma_client.cli import ProgressRenderer, _run_work
 from plasma_client.client import PlasmaClient
 from plasma_core.enums import JobState, Operation
-from plasma_core.models import JobRequest
+from plasma_core.models import ExecutionImageRef, JobRequest
 from plasma_interfaces.mock import MockInterface
 from plasma_server.server import PlasmaServer
 from plasma_server.site_manager import SiteManager
@@ -118,16 +118,16 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
                 if job.get("stage") == "program":
                     cli_observed_program.set()
 
-        async def gated_program(
+        async def gated_program_ref(
             interface: MockInterface,
-            image: bytes,
+            image_ref: ExecutionImageRef,
             address: int = 0,
             progress=None,
         ) -> None:
-            interface._validate_range(address, len(image))
+            interface._validate_range(address, image_ref.size_bytes)
             interface.calls["program"] += 1
             if progress:
-                await progress(1, len(image))
+                await progress(1, image_ref.size_bytes)
             program_entered.set()
             await keep_programming.wait()
 
@@ -138,7 +138,7 @@ class ProgressAndCliTests(unittest.IsolatedAsyncioTestCase):
             job_id="cli-cancel",
             timeout_s=10.0,
         )
-        with mock.patch.object(MockInterface, "program", gated_program):
+        with mock.patch.object(MockInterface, "program_image_ref", gated_program_ref):
             task = asyncio.create_task(
                 _run_work(
                     client,

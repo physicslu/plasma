@@ -154,6 +154,37 @@ class MockFlashState:
                 return address + index
         return None
 
+    def verify_shared(
+        self,
+        store: SharedImageStore,
+        *,
+        expected_sha256: str,
+        expected_size_bytes: int,
+        address: int = 0,
+        chunk_size: int = 64 * 1024,
+    ) -> int | None:
+        """Verify one shared image using bounded working memory.
+
+        The expected Blob stays mmap-backed. Actual target state is read in
+        chunks, so a 4 MiB Verify does not materialize another 4 MiB expected
+        image for every concurrently executing Site.
+        """
+        self._validate_range(address, expected_size_bytes)
+        if isinstance(chunk_size, bool) or not isinstance(chunk_size, int) or chunk_size <= 0:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "verify chunk_size must be positive")
+        store.resolve(expected_sha256, expected_size=expected_size_bytes)
+        with store.open_mmap(expected_sha256, expected_size=expected_size_bytes) as expected:
+            for offset in range(0, expected_size_bytes, chunk_size):
+                length = min(chunk_size, expected_size_bytes - offset)
+                actual = self.read(store, address + offset, length)
+                wanted = expected[offset : offset + length]
+                if actual == wanted:
+                    continue
+                for index, (observed, expected_byte) in enumerate(zip(actual, wanted, strict=True)):
+                    if observed != expected_byte:
+                        return address + offset + index
+        return None
+
     def _validate_range(self, address: int, length: int) -> None:
         if (
             isinstance(address, bool)
