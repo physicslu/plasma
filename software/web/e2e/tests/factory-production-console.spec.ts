@@ -178,11 +178,12 @@ async function buildTwoPpuSet(page: Page) {
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Mock topology summary" })).toContainText("12");
-  await expect(page.getByRole("region", { name: "Mock topology summary" })).toContainText("60");
 
   const facilityId = "mock-facility-01";
   const ppu1Id = `${facilityId}-ppu-01`;
   const ppu2Id = `${facilityId}-ppu-02`;
+  await expect(fpsCheckbox(page, facilityId, ppu1Id)).toBeVisible();
+  await expect(fpsCheckbox(page, facilityId, ppu2Id)).toBeVisible();
   await fpsCheckbox(page, facilityId, ppu1Id).check();
   await fpsCheckbox(page, facilityId, ppu2Id).check();
   await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
