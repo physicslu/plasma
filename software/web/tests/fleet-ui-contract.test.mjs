@@ -67,6 +67,7 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(source, /activeSelection/);
   assert.match(source, /clearAll:\s*"全部取消"/);
   assert.match(source, /apply:\s*"確定選取"/);
+  assert.match(source, /browse:\s*"選擇燒錄檔"/);
   assert.match(source, /liveStatus:\s*"Active FPS : 即時執行狀態"/);
   assert.match(source, /fpsSelectorCommandGroup/);
   assert.match(source, /applyFpsSelection/);
@@ -78,6 +79,8 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(source, /runSiteSequence/);
   assert.match(source, /cancelPPU/);
   assert.match(source, /site\.state === "running" \? ` · \$\{site\.progress\}%`/);
+  assert.match(source, /<div className="productionImagePicker">[\s\S]*<\/div>\s*<div className="batchOperations">/);
+  assert.doesNotMatch(source, /<b>\{text\.image\}<\/b>/);
   assert.match(css, /background:\s*#f5f8fc/);
   assert.match(css, /--site-tile-w/);
   assert.match(css, /density-dense/);
@@ -92,8 +95,8 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(operatorFeedback, /content:\s*"Confirm"/);
   assert.match(operatorFeedback, /\.productionBatchToolbar\s*\{[^}]*grid-template-areas:\s*"image operations actions";/s);
   assert.match(operatorFeedback, /@media\s*\(max-width:\s*920px\)[\s\S]*grid-template-areas:\s*"image"\s*"operations"\s*"actions";/s);
-  assert.match(operatorFeedback, /\.productionImagePicker\s*\{[^}]*grid-template-columns:\s*max-content\s+max-content\s+minmax\(0,\s*1fr\)/s);
-  assert.match(operatorFeedback, /\.productionImagePicker\s*>\s*\.productionBrowseButton\s*\{[^}]*grid-column:\s*2;[^}]*grid-row:\s*1;/s);
+  assert.match(operatorFeedback, /\.productionImagePicker\s*\{[^}]*grid-template-columns:\s*max-content\s+minmax\(0,\s*1fr\)/s);
+  assert.match(operatorFeedback, /\.productionImagePicker\s*>\s*\.productionBrowseButton\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*1;/s);
   assert.match(operatorFeedback, /\.facilityRuntimeIdentity h3\s*\{[^}]*font-weight:\s*800;/s);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
