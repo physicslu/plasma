@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BatchLifecycle } from "../batch-lifecycle";
+import { evaluateBatchReadiness } from "../batch-readiness";
 import { useI18n } from "../i18n";
 import {
   beginEngineeringSession,
@@ -26,6 +27,7 @@ import type {
   PPUSnapshot,
   SiteSnapshot,
 } from "../plasma-api";
+import "../programming-batch-toolbar.css";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
   engineeringLogCategoryLabel,
@@ -195,6 +197,24 @@ export default function ProgrammingWorkspace() {
     && Number.isInteger(Number(readLength))
     && Number(readLength) > 0;
   const targetLocked = batchRunning || submittingSiteIds.length > 0 || sites.some(isRunning);
+  const requiresImage = selectedOperations.some(operation => operation === "program" || operation === "verify");
+  const allSitesExecutable = selectedSites.length === selectedSiteIds.length
+    && selectedSites.length > 0
+    && selectedSites.every(site => site.enabled && !isRunning(site) && !submittingSiteIds.includes(site.id));
+  const batchReadiness = evaluateBatchReadiness({
+    providerOnline: connection === "online" && Boolean(catalog),
+    targetValid: Boolean(targetApiBase && selectedPPU),
+    selectedSiteCount: selectedSiteIds.length,
+    selectedOperationCount: selectedOperations.length,
+    requiresImage,
+    imagePresent: Boolean(imageAsset),
+    imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_ASSET_BYTES,
+    readSelected: selectedOperations.includes("read"),
+    readParamsValid: readRangeValid,
+    allSitesExecutable,
+    batchRunning: batchRunning && !batchCancelling,
+    batchCancelling,
+  });
   const noOperationWarning = locale === "zh-TW"
     ? "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。"
     : "No operation selected. Select at least one of Erase, Program, Verify, or Read.";
@@ -487,10 +507,6 @@ export default function ProgrammingWorkspace() {
     return false;
   }
 
-  function batchDisabled(operation: Operation): boolean {
-    return selectedSites.length === 0 || selectedSites.some(site => operationDisabled(site, operation, true));
-  }
-
   function setBatchSiteState(siteId: number, state: BatchSiteState) {
     setBatchSiteStates(current => ({ ...current, [siteId]: state }));
   }
@@ -585,13 +601,12 @@ export default function ProgrammingWorkspace() {
 
   async function runBatch() {
     if (batchRunning) return;
-    if (selectedOperations.length === 0) {
-      setOperatorWarning(noOperationWarning);
-      appendLog(`[BATCH] BLOCKED · ${noOperationWarning}`, false, "USR");
+    if (!batchReadiness.ready) {
+      if (batchReadiness.code === "no-op") setOperatorWarning(noOperationWarning);
+      appendLog(`[BATCH] BLOCKED · ${batchReadiness.label}`, false, "USR");
       return;
     }
     setOperatorWarning(null);
-    if (selectedOperations.some(batchDisabled)) return;
     const siteIds = [...selectedSiteIds];
     const operations = [...selectedOperations];
     const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
@@ -713,16 +728,6 @@ export default function ProgrammingWorkspace() {
     await requestCancel(siteId, site.jobId);
   }
 
-  const statusCounts = selectedSites.reduce((counts, site) => {
-    const batch = batchSiteStates[site.id];
-    if (batch === "running" || batch === "cancelling" || isRunning(site)) counts.running += 1;
-    else if (batch === "success" || site.stage === "success") counts.success += 1;
-    else if (batch === "cancelled" || site.stage === "cancelled") counts.cancelled += 1;
-    else if (batch === "failed" || ["failed", "timeout", "aborted"].includes(site.stage)) counts.failed += 1;
-    else counts.idle += 1;
-    return counts;
-  }, { idle: 0, running: 0, success: 0, cancelled: 0, failed: 0 });
-
   return (
     <section className="engineeringProgramming" aria-label={t("engineeringProgramming.workspace")}>
       <div className="engineeringProgrammingHeader">
@@ -741,6 +746,48 @@ export default function ProgrammingWorkspace() {
         </form>
       </div>
 
+      <section className="engineeringExecutionToolbar programmingBatchToolbar" aria-label="Engineering batch control">
+        <div className="programmingBatchFile">
+          <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>{t("engineeringProgramming.browse")}</button>
+          <input ref={imageInputRef} aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" hidden disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} />
+          <em className="programmingFileName" title={imageAsset?.name}>{imageAsset?.name ?? "—"}</em>
+          <small className="programmingFileHint">{t("engineeringProgramming.imageAssetHint")}</small>
+        </div>
+        <div className="programmingBatchOperations" role="group" aria-label="Engineering batch operations">
+          <span>{t("engineeringProgramming.batchOperations")}</span>
+          {operationOrder.map(operation => {
+            const selected = selectedOperations.includes(operation);
+            return <label key={operation} className={selected ? "selected" : ""}>
+              <input type="checkbox" aria-label={`Engineering batch ${operation}`} checked={selected} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
+              <b>{operationCodes[operation]}</b>{t(`operation.${operation}`)}
+            </label>;
+          })}
+        </div>
+        <div className="programmingBatchActions">
+          <div className={`batchReadiness readiness-${batchReadiness.code}`} role="status" aria-label="Batch readiness">
+            <small>BATCH</small><b>{batchReadiness.label}</b>
+          </div>
+          <button type="button" className="executeBatch" onClick={() => void runBatch()} disabled={!batchReadiness.ready}>{t("selection.execute")}</button>
+          <button type="button" className="cancelBatch" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}>{t("selection.cancel")}</button>
+        </div>
+      </section>
+
+      {selectedOperations.includes("read") && (
+        <section className="engineeringReadParameters" aria-label="Engineering READ parameters">
+          <span>READ PARAMETERS</span>
+          <label>Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
+          <label>Length<input aria-label="Engineering READ length" type="number" min="1" step="1" value={readLength} disabled={batchRunning} onChange={event => setReadLength(event.target.value)} /></label>
+        </section>
+      )}
+
+      {operatorWarning && (
+        <div className="warning engineeringOperationWarning" role="alert">
+          <span>{operatorWarning}</span>
+          <button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button>
+        </div>
+      )}
+
+      {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
       {catalogError && <div className="engineeringBoundaryNote warning"><b>{t("engineeringProgramming.providerOffline")}</b><span>{catalogError}</span></div>}
 
       <div className="engineeringTargetSelector">
@@ -801,50 +848,6 @@ export default function ProgrammingWorkspace() {
           ))}
         </div>
       </section>
-
-      <section className="operationConfig" aria-label="Engineering programming parameters">
-        <div className="compactFile">
-          <div><b>{imageAsset?.name ?? t("engineeringProgramming.imageAsset")}</b><small>{imageAsset ? `${(imageAsset.size / 1024).toFixed(1)} KB` : t("engineeringProgramming.imageAssetHint")}</small></div>
-          <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>{t("engineeringProgramming.browse")}</button>
-          <input ref={imageInputRef} aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" hidden disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} />
-        </div>
-        <div className="compactRead">
-          <label>READ Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
-          <label>READ Length<input aria-label="Engineering READ length" type="number" min="1" step="1" value={readLength} disabled={batchRunning} onChange={event => setReadLength(event.target.value)} /></label>
-        </div>
-      </section>
-
-      <section className="batchPanel engineeringBatchPanel" aria-label="Engineering batch control">
-        <div className="batchInfo">
-          <div><p className="eyebrow">E / P / V / R</p><h2>{t("engineeringProgramming.batchOperations")}</h2><small>{selectedSiteIds.map(siteLabel).join(", ") || t("engineeringProgramming.noSites")}</small></div>
-          <div className="statusSummary">
-            <span>{t("engineeringProgramming.idle")} <b>{statusCounts.idle}</b></span><span className="busy">{t("engineeringProgramming.running")} <b>{statusCounts.running}</b></span><span className="success">{t("engineeringProgramming.success")} <b>{statusCounts.success}</b></span><span className="failed">{t("engineeringProgramming.cancelled")} <b>{statusCounts.cancelled}</b></span><span className="failed">{t("engineeringProgramming.failed")} <b>{statusCounts.failed}</b></span>
-          </div>
-        </div>
-        <div className="batchActions">
-          <div className="batchOperationChoices" role="group" aria-label="Engineering batch operations">
-            {operationOrder.map(operation => {
-              const selected = selectedOperations.includes(operation);
-              return <label key={operation} className={selected ? "selected" : ""}>
-                <input type="checkbox" aria-label={`Engineering batch ${operation}`} checked={selected} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
-                <span>{operationCodes[operation]}</span><b>{t(`operation.${operation}`)}</b>
-              </label>;
-            })}
-          </div>
-          <div className="batchExecutionControls">
-            <button type="button" className="executeBatch" onClick={() => void runBatch()} disabled={batchRunning || (selectedOperations.length > 0 && selectedOperations.some(batchDisabled))}>▶ {t("engineeringProgramming.execute")}</button>
-            <button type="button" className="cancelBatch" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}>■ {batchCancelling ? t("engineeringProgramming.cancelling") : t("engineeringProgramming.cancel")}</button>
-          </div>
-        </div>
-        {operatorWarning && (
-          <div className="warning engineeringOperationWarning" role="alert">
-            <span>{operatorWarning}</span>
-            <button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button>
-          </div>
-        )}
-      </section>
-
-      {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
 
       <section className="overviewCard" aria-label="Engineering Site status">
         <div className="overviewHead"><div><p className="eyebrow">LIVE PPU STATUS</p><h2>{ppu?.display_name ?? selectedPPU?.display_name ?? t("engineeringProgramming.selectedPpu")}</h2></div><small>REST polling 500 ms</small></div>
