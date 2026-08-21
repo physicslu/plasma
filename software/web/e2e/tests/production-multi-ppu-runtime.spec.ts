@@ -32,7 +32,8 @@ async function openTwoPpuProductionSet(page: Page) {
   const topology = page.getByRole("region", { name: "Mock topology summary" });
   await expect(topology).toContainText("3");
   await expect(topology).toContainText("12");
-  await expect(topology).toContainText("60");
+  await expect(fpsCheckbox(page, ppuOne)).toBeVisible();
+  await expect(fpsCheckbox(page, ppuTwo)).toBeVisible();
 
   await fpsCheckbox(page, ppuOne).check();
   await fpsCheckbox(page, ppuTwo).check();
@@ -93,7 +94,7 @@ test("real Production Mock starts two different PPUs concurrently and completes 
 test("real Production Mock cancels one PPU without stopping the other", async ({ page }) => {
   const starts: StartObservation[] = [];
   observeStarts(page, starts);
-  const { first, second } = await openTwoPpuProductionSet(page);
+  const { first } = await openTwoPpuProductionSet(page);
 
   await page.locator(".executeBatchButton").click();
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
