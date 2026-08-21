@@ -9,6 +9,7 @@ from typing import Any
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.mock_flash import MockFlashState
 from plasma_core.mock_image_store import SharedImageStore, default_mock_image_store
+from plasma_core.models import ExecutionImageRef
 
 from .base import BaseInterface, ProgressCallback
 
@@ -246,6 +247,22 @@ class MockInterface(BaseInterface):
             address=address,
         )
 
+    async def program_image_ref(
+        self,
+        image_ref: ExecutionImageRef,
+        address: int = 0,
+        progress: ProgressCallback | None = None,
+    ) -> None:
+        self._validate_range(address, image_ref.size_bytes)
+        await self._before("program", progress, image_ref.size_bytes)
+        assert self.image_store is not None
+        self.image_store.resolve(image_ref.sha256, expected_size=image_ref.size_bytes)
+        self.flash_state.program_shared(
+            image_sha256=image_ref.sha256,
+            image_size_bytes=image_ref.size_bytes,
+            address=address,
+        )
+
     async def verify(
         self,
         image: bytes,
@@ -262,7 +279,31 @@ class MockInterface(BaseInterface):
             ErrorCode.VERIFY_FAILED,
             "flash verification mismatch",
             recoverable=True,
-            context={"address": mismatch, "failure_source": "data_mismatch"},
+            context={"address": mismatch, "failure_source": "mismatch"},
+        )
+
+    async def verify_image_ref(
+        self,
+        image_ref: ExecutionImageRef,
+        address: int = 0,
+        progress: ProgressCallback | None = None,
+    ) -> None:
+        self._validate_range(address, image_ref.size_bytes)
+        await self._before("verify", progress, image_ref.size_bytes)
+        assert self.image_store is not None
+        mismatch = self.flash_state.verify_shared(
+            self.image_store,
+            expected_sha256=image_ref.sha256,
+            expected_size_bytes=image_ref.size_bytes,
+            address=address,
+        )
+        if mismatch is None:
+            return
+        raise PlasmaError(
+            ErrorCode.VERIFY_FAILED,
+            "flash verification mismatch",
+            recoverable=True,
+            context={"address": mismatch, "failure_source": "mismatch"},
         )
 
     async def read(
