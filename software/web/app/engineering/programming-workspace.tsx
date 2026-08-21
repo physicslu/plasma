@@ -309,7 +309,8 @@ export default function ProgrammingWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (workspaceHydrated) setApiDraft(apiBase);
+    if (!workspaceHydrated) return;
+    queueMicrotask(() => setApiDraft(apiBase));
   }, [apiBase, workspaceHydrated]);
 
   useEffect(() => {
