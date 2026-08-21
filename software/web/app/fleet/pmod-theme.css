@@ -268,3 +268,25 @@ html .productionPrototypePage .prototypeLogRow.level-warn > b {
 html .productionPrototypePage .prototypeLogRow.level-error > b {
   color: var(--pmod-danger);
 }
+
+/* The production operator sequence is image asset first, then EPVR. Keep this
+ * ordering in the authoritative stylesheet rather than relying on the legacy
+ * operator-feedback chunk that was missed by the deployed build. */
+html .productionPrototypePage .productionBatchToolbar {
+  grid-template-columns: minmax(290px, .95fr) minmax(360px, 1.05fr) auto;
+  grid-template-areas: "image operations actions";
+}
+
+html .productionPrototypePage .productionImagePicker { grid-area: image; }
+html .productionPrototypePage .batchOperations { grid-area: operations; }
+html .productionPrototypePage .productionBatchActions { grid-area: actions; }
+
+@media (max-width: 920px) {
+  html .productionPrototypePage .productionBatchToolbar {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "image"
+      "operations"
+      "actions";
+  }
+}
