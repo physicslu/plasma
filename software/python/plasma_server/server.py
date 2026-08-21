@@ -232,6 +232,11 @@ class PlasmaServer:
         image_ref_raw = metadata.get("execution_image_ref")
         image_ref = ExecutionImageRef.from_dict(image_ref_raw) if image_ref_raw is not None else None
         if image_ref is not None:
+            if operation not in {Operation.PROGRAM, Operation.VERIFY}:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "execution image reference is only valid for program or verify",
+                )
             if frame.binary:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
@@ -280,7 +285,13 @@ class PlasmaServer:
                 )
 
         inline_image = frame.binary
-        if image_ref is None and frame.binary and site_config is not None and site_config.interface == "mock":
+        if (
+            image_ref is None
+            and frame.binary
+            and operation in {Operation.PROGRAM, Operation.VERIFY}
+            and site_config is not None
+            and site_config.interface == "mock"
+        ):
             shared = default_mock_image_store().put(frame.binary)
             image_ref = ExecutionImageRef(
                 scheme=LOCAL_MOCK_BLOB_SCHEME,
