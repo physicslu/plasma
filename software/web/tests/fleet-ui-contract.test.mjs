@@ -87,6 +87,9 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(operatorFeedback, /--ppu-card-w/);
   assert.match(operatorFeedback, /production-site-running-pulse/);
   assert.match(operatorFeedback, /\.prototypeSiteLamp\.running i/);
+  assert.match(operatorFeedback, /\.fpsSelectionSummary\s*\{\s*display:\s*none;/s);
+  assert.match(operatorFeedback, /content:\s*"Cancel All"/);
+  assert.match(operatorFeedback, /content:\s*"Confirm"/);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
   assert.equal(api.status, 404);
