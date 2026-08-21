@@ -71,7 +71,7 @@
   cursor: wait;
 }
 
-.globalAppNav nav a:hover,
+.globalAppNav nav a:not([aria-disabled="true"]):hover,
 .globalAppNav nav a[aria-current="page"],
 .globalLocale button:not(:disabled):hover,
 .globalLocale button:not(:disabled)[aria-pressed="true"] {
@@ -82,6 +82,26 @@
 
 .globalProductNav a[aria-current="page"] {
   box-shadow: inset 0 -2px 0 var(--cyan);
+}
+
+.globalAppNav a[aria-disabled="true"] {
+  opacity: .38;
+  cursor: not-allowed;
+  filter: saturate(.45);
+}
+
+.globalExecutionGuard {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 38%, var(--line));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cyan) 7%, var(--panel));
+  color: var(--text-soft);
+  font: 750 9px var(--font-sans);
+  letter-spacing: .08em;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
@@ -104,4 +124,5 @@
   .globalNavControls { gap: 4px; }
   .globalAppNav nav a,
   .globalLocale button { padding: 7px 8px; }
+  .globalExecutionGuard { padding-inline: 7px; }
 }
