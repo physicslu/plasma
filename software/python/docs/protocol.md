@@ -21,7 +21,7 @@ SITE N -> site_id = N
 
 ## Programming data boundary
 
-Web REST v3 接收 **Programming Asset**；Protocol v3.3 不傳送來源 Asset model，而傳送已經解析/正規化後的 **Image** execution data。
+Web REST v3 接收 **Programming Asset**；Protocol v3.3 不傳送來源 Asset model，而傳送或引用已經解析/正規化後的 **Image execution data**。
 
 ```text
 Programming Asset
@@ -31,11 +31,18 @@ Programming Asset
 Normalized Image
     |
     | Protocol v3.3
-    v
-PPU execution
+    +--------------------------+
+    |                          |
+    v                          v
+inline Binary              execution_image_ref
+(real/default path)        (local Mock optimization)
+    |                          |
+    +------------+-------------+
+                 v
+             PPU execution
 ```
 
-因此 wire metadata 使用：
+Canonical execution identity仍使用：
 
 ```text
 image_size
@@ -43,6 +50,8 @@ image_sha256
 ```
 
 而不是來源檔案的 Asset 欄位。
+
+`execution_image_ref` 是 additive execution transport contract，不是 Programming Asset identity。Phase 1 只支援同一個 Mock runtime 已存在的 content-addressed Blob；真實 PPU 與不支援 reference 的介面仍使用 inline binary。
 
 ## Frame format
 
@@ -56,7 +65,7 @@ image_sha256
 | Binary length | 4 bytes | unsigned big-endian |
 | Metadata | variable | UTF-8 JSON object |
 | Map | variable | UTF-8 JSON object；可為空 |
-| Binary | variable | normalized Image bytes；可為空 |
+| Binary | variable | inline normalized Image bytes；使用 reference 時必須為空 |
 
 Header Python definition：
 
@@ -76,7 +85,7 @@ PLASMA33 <-> protocol_version: "3.3"
 
 ## Request metadata
 
-Program request 範例：
+### Inline Program request
 
 ```json
 {
@@ -97,21 +106,65 @@ Program request 範例：
 }
 ```
 
+Inline request 的 normalized Image bytes 放在 frame Binary payload。
+
+### Local Mock execution-image reference
+
+當 normalized Image 已存在同一個 local Mock runtime 的 Shared Image Store 時，Program/Verify 可選擇不再攜帶 Binary payload，而改送：
+
+```json
+{
+  "protocol_version": "3.3",
+  "message_type": "request",
+  "job_id": "job-20260821-123456-abcdef12",
+  "site_id": 1,
+  "operation": "program",
+  "image_size": 4194304,
+  "image_sha256": "<64-hex-sha256>",
+  "execution_image_ref": {
+    "scheme": "local_mock_blob",
+    "sha256": "<64-hex-sha256>",
+    "size_bytes": 4194304
+  }
+}
+```
+
+Reference contract 的限制：
+
+- reference 與 Binary payload 互斥。
+- reference 只描述 content identity；不得攜帶 filesystem path。
+- `image_size` 必須等於 reference `size_bytes`。
+- `image_sha256` 必須等於 reference `sha256`。
+- Phase 1 `local_mock_blob` 只供 local Mock execution 使用，不是跨主機 Blob protocol。
+- Real PPU 不需要實作此 scheme；既有 inline binary path 保持 canonical supported path。
+
 Server checks：
 
 - `protocol_version` 必須為 `3.3`。
 - `site_id` 必須是 JSON integer 且 `>= 1`。
-- `image_size` 必須等於 header BINLEN。
-- `image_sha256` 必須等於實際 normalized Image SHA-256。
+- Inline mode：`image_size` 必須等於 header BINLEN，`image_sha256` 必須等於 Binary payload SHA-256。
+- Reference mode：BINLEN 必須為 0，`image_size/image_sha256` 必須和 `execution_image_ref` 一致。
 - metadata/map 必須是 JSON object。
 - payload 不得超過設定上限。
 - `job_id` 必須符合 canonical ID 規則。
 - `wait_for_completion` 必須是 JSON boolean。
 - 自訂 metadata 不得覆寫保留 protocol fields。
 
+Local Mock Server 收到既有 inline Program/Verify request 後，可在 ingress 將 Image content-address 化並把 JobRuntime 轉成 `execution_image_ref`，因此 queue/retry/JobRegistry 不必長期保留每個 Job 的完整 Image bytes。這個最佳化不改變 client 原本的 inline request contract。
+
 ## Response
 
-通訊成功與 Job 成功是不同概念。Request/protocol/routing 成立時 `ok=true`；Job 本身仍可能以 `failed/cancelled/timeout` 結束。
+通訊成功與 Job 成功是不同概念。Request/protocol/routing 成立時 `ok=true`；Job 本身仍可能以 `failed/error/cancelled/timeout/aborted` 結束。
+
+其中：
+
+```text
+failed     target/operation outcome failed
+error      execution infrastructure failed
+cancelled  operator/client cancellation won terminal state
+```
+
+`timeout` 與 `aborted` 目前保留為既有 Protocol v3.3 terminal states。
 
 成功：
 
@@ -153,18 +206,45 @@ Server checks：
 |---|---|
 | `site_id` | one-based local Programming Site ID |
 | `stage` | erase/program/verify/read section |
-| `stage_state` | started/progress/completed/failed/cancelled |
+| `stage_state` | started/progress/completed/failed/error/cancelled |
 | `stage_progress_percent` | 目前 stage 0–100% |
 | `progress_percent` | Job 0–100% |
 | `bytes_done` / `bytes_total` | byte-oriented stage progress |
+| `attempt` | 目前/最後執行 attempt，從 1 開始 |
+| `attempt_history` | 每次 attempt 的結果、時間、error 與是否排定 retry |
+| `retry_exhausted` | recoverable failure 是否已耗盡 `max_retries` |
 | `cancel_requested` | Server 是否收到取消要求 |
 | `updated_at` | 最後狀態更新時間 |
+
+`max_retries = N` 的 canonical 語意是：
+
+```text
+1 initial attempt + at most N retry attempts
+```
+
+因此 `max_retries = 2` 最多執行 3 次。這個 attempt provenance 是後續 Batch `Site FAULTED` / retry-exhaustion policy 的底層 contract。
 
 每個 operation 是獨立 Job。`program` 只寫入 Image，不會隱含 `erase` 或 `verify`。完整流程由 Client 明確組合：
 
 ```text
 erase -> program -> verify
 ```
+
+## Failure-source taxonomy
+
+`ErrorDetail.failure_source` 用來區分「Job 為什麼失敗」，避免所有問題都被統計成 IC/operation fail。
+
+目前 canonical values：
+
+| failure_source | 意義 |
+|---|---|
+| `injected` | Mock fault injection |
+| `mismatch` | Verify data mismatch |
+| `infrastructure` | transport/interface/internal/output 等執行基礎設施問題 |
+| `cancelled` | cancellation |
+| `operation` | 一般 operation failure，producer 沒有更精確分類 |
+
+Infrastructure failure 對應 Job `error`，不得假裝成 Programming yield `failed`。
 
 ## Site errors
 
