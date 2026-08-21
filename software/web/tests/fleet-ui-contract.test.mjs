@@ -51,7 +51,7 @@ test("Web source defines ProductMode rather than Fleet as a product-mode value",
   assert.doesNotMatch(nav, /nav\.singlePpu/);
 });
 
-test("fleet implementation uses a retained multi-Facility FPS selection and adaptive Site density", async () => {
+test("fleet implementation uses retained FPS selection, four-column PPU layout and running LED feedback", async () => {
   const worker = await workerFor("fleet-page");
   const page = await worker.fetch(new Request("http://localhost/fleet", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(page.status, 200);
@@ -61,9 +61,13 @@ test("fleet implementation uses a retained multi-Facility FPS selection and adap
 
   const source = await fs.readFile(new URL("../app/fleet/page.tsx", import.meta.url), "utf8");
   const css = await fs.readFile(new URL("../app/fleet/production-prototype.css", import.meta.url), "utf8");
+  const operatorFeedback = await fs.readFile(new URL("../app/fleet/operator-feedback.css", import.meta.url), "utf8");
   assert.match(source, /type SelectionMap/);
   assert.match(source, /draftSelection/);
   assert.match(source, /activeSelection/);
+  assert.match(source, /clearAll:\s*"全部取消"/);
+  assert.match(source, /apply:\s*"確定選取"/);
+  assert.match(source, /fpsSelectorCommandGroup/);
   assert.match(source, /applyFpsSelection/);
   assert.match(source, /groupedActiveTargets/);
   assert.match(source, /data-production-facility/);
@@ -72,11 +76,16 @@ test("fleet implementation uses a retained multi-Facility FPS selection and adap
   assert.match(source, /Promise\.allSettled/);
   assert.match(source, /runSiteSequence/);
   assert.match(source, /cancelPPU/);
+  assert.match(source, /site\.state === "running" \? ` · \$\{site\.progress\}%`/);
   assert.match(css, /background:\s*#f5f8fc/);
   assert.match(css, /--site-tile-w/);
   assert.match(css, /density-dense/);
   assert.match(css, /width:\s*var\(--site-tile-w\)/);
   assert.match(css, /height:\s*var\(--site-tile-h\)/);
+  assert.match(operatorFeedback, /grid-template-columns:\s*repeat\(4,\s*var\(--site-tile-w\)\)/);
+  assert.match(operatorFeedback, /--ppu-card-w/);
+  assert.match(operatorFeedback, /production-site-running-pulse/);
+  assert.match(operatorFeedback, /\.prototypeSiteLamp\.running i/);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
   assert.equal(api.status, 404);
