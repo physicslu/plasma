@@ -6,6 +6,7 @@ export default defineConfig({
     "mock-cd-runtime.spec.ts",
     "engineering-programming-asset-cache-runtime.spec.ts",
     "production-multi-ppu-runtime.spec.ts",
+    "mock-runtime-settings-runtime.spec.ts",
   ],
   snapshotPathTemplate: "{testDir}/__snapshots__/{testFilePath}/{arg}{ext}",
   fullyParallel: false,
@@ -46,8 +47,8 @@ export default defineConfig({
     stdout: "ignore",
     stderr: "pipe",
     // Standard browser CI does not start the Python Mock PPU Provider. Real
-    // Production multi-PPU execution is therefore isolated to the dedicated
-    // Mock CD Browser Runtime Acceptance configuration.
+    // Production multi-PPU execution and server-owned Mock settings are
+    // isolated to the dedicated Mock CD Browser Runtime Acceptance config.
     env: {
       ...process.env,
       PLASMA_FLEET_UI_ENABLED: "1",
