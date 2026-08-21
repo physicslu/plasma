@@ -102,14 +102,15 @@ class SharedImageStoreTests(unittest.TestCase):
 
 
 class MockFlashStateTests(unittest.TestCase):
-    def test_shared_program_does_not_materialize_flash_bytearray(self) -> None:
+    def test_sixty_sites_reference_one_4_mib_blob_without_flash_arrays(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SharedImageStore(directory)
-            image = bytes(index % 256 for index in range(256 * 1024))
+            image = bytes(range(256)) * (4 * 1024 * 1024 // 256)
             ref = store.put(image)
             sites = [MockFlashState(4 * 1024 * 1024) for _ in range(60)]
             for site in sites:
                 site.program_shared(image_sha256=ref.sha256, image_size_bytes=ref.size_bytes)
+            self.assertEqual(ref.size_bytes, 4 * 1024 * 1024)
             self.assertEqual(len(list(Path(directory).glob("*.bin"))), 1)
             self.assertTrue(all(site.backing_regions[0].image_sha256 == ref.sha256 for site in sites))
             self.assertTrue(all(not hasattr(site, "memory") for site in sites))
@@ -139,6 +140,18 @@ class MockFlashStateTests(unittest.TestCase):
             first.erase()
             self.assertEqual(first.read(store, 0, 16), b"\xff" * 16)
             self.assertEqual(second.read(store, 0, 16), b"\x55" * 16)
+
+    def test_partial_erase_and_reprogram_preserve_unrelated_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SharedImageStore(directory)
+            base = store.put(b"abcdefgh")
+            replacement = store.put(b"XY")
+            state = MockFlashState(64)
+            state.program_shared(image_sha256=base.sha256, image_size_bytes=base.size_bytes)
+            state.erase(address=2, length=2)
+            self.assertEqual(state.read(store, 0, 8), b"ab\xff\xffefgh")
+            state.program_shared(image_sha256=replacement.sha256, image_size_bytes=2, address=2)
+            self.assertEqual(state.read(store, 0, 8), b"abXYefgh")
 
     def test_verify_reports_first_absolute_mismatch_address(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
