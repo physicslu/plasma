@@ -309,7 +309,7 @@ test("selected PPUs dispatch concurrently and selector remains expanded when exe
   await expect.poll(() => runtime.seenStartPpus.size).toBe(2);
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
-  await expect(page.locator(".batchState")).toContainText("COMPLETE");
+  await expect(page.getByRole("status", { name: "Batch readiness" })).toContainText("BATCH READY");
   await expect(page.locator(".productionPrototypeLog")).toContainText("[BAT] COMPLETE");
 });
 
@@ -324,7 +324,8 @@ test("Cancel PPU affects only that PPU while another PPU continues to PASS", asy
   await ppu1.getByRole("button", { name: "Cancel PPU", exact: true }).click();
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "cancelled");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
-  await expect(page.locator(".batchState")).toContainText("PARTIAL");
+  await expect(page.getByRole("status", { name: "Batch readiness" })).toContainText("BATCH READY");
+  await expect(page.locator(".productionPrototypeLog")).toContainText("[BAT] PARTIAL");
   expect(runtime.cancelledPpus).toContain(ppu1Id);
   expect(runtime.cancelledPpus).not.toContain(ppu2Id);
 });
