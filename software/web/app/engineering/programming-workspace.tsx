@@ -6,14 +6,11 @@ import { BatchLifecycle } from "../batch-lifecycle";
 import { evaluateBatchReadiness } from "../batch-readiness";
 import { useI18n } from "../i18n";
 import {
-  beginEngineeringSession,
   cancelJob,
-  DEFAULT_API_BASE,
   engineeringTargetApiBase,
   getEngineeringTargets,
   getJob,
   getPPUStatus,
-  normalizeApiBase,
   PlasmaSubmissionBlockedError,
   readDownloadUrl,
   startJob,
@@ -27,6 +24,7 @@ import type {
   PPUSnapshot,
   SiteSnapshot,
 } from "../plasma-api";
+import { useWorkspaceSession, type TargetSelection } from "../workspace-session";
 import "../programming-batch-toolbar.css";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
@@ -61,7 +59,6 @@ type Site = {
   outputFile?: string;
 };
 
-type TargetSelection = { facilityId: string; ppuId: string };
 type ConnectionState = "connecting" | "online" | "offline";
 type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "failed";
 type BatchTerminalState = "success" | "cancelled" | "failed";
@@ -95,10 +92,13 @@ function uiStage(job: JobSnapshot): Stage {
 }
 
 function siteFromStatus(snapshot: SiteSnapshot, existing?: Site): Site {
+  const runtimeStage: Stage = snapshot.current_job_id || snapshot.state === "running" || snapshot.state === "queued"
+    ? "queued"
+    : "idle";
   return {
     id: snapshot.site_id,
     enabled: snapshot.enabled,
-    stage: existing?.stage ?? "idle",
+    stage: existing?.stage ?? runtimeStage,
     progress: existing?.progress ?? 0,
     operation: existing?.operation,
     jobId: snapshot.current_job_id ?? existing?.jobId,
@@ -151,21 +151,34 @@ function sameTarget(left: TargetSelection, right: TargetSelection): boolean {
 
 export default function ProgrammingWorkspace() {
   const { locale, t } = useI18n();
-  const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
-  const [apiDraft, setApiDraft] = useState(DEFAULT_API_BASE);
+  const {
+    hydrated: workspaceHydrated,
+    apiBase,
+    setApiBase,
+    engineeringSessionId,
+    ensureEngineeringSession,
+    restartEngineeringSession,
+    programmingImage: imageAsset,
+    setProgrammingImage: setImageAsset,
+    emodeSelection: selection,
+    setEmodeSelection: setSelection,
+    emodeSiteIds: selectedSiteIdsState,
+    setEmodeSiteIds: setSelectedSiteIdsState,
+    emodeOperations: selectedOperations,
+    setEmodeOperations: setSelectedOperations,
+    emodeReadOffset: readOffset,
+    setEmodeReadOffset: setReadOffset,
+    emodeReadLength: readLength,
+    setEmodeReadLength: setReadLength,
+  } = useWorkspaceSession();
+  const [apiDraft, setApiDraft] = useState(apiBase);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [connectionGeneration, setConnectionGeneration] = useState(0);
   const [catalog, setCatalog] = useState<EngineeringTargetCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [selection, setSelection] = useState<TargetSelection>({ facilityId: "", ppuId: "" });
   const [ppu, setPPU] = useState<PPUSnapshot | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteIdsState, setSelectedSiteIdsState] = useState<number[] | null>(null);
-  const [selectedOperations, setSelectedOperations] = useState<Operation[]>([]);
-  const [imageAsset, setImageAsset] = useState<File | null>(null);
   const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
-  const [readOffset, setReadOffset] = useState("0");
-  const [readLength, setReadLength] = useState("256");
   const [submittingSiteIds, setSubmittingSiteIds] = useState<number[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchCancelling, setBatchCancelling] = useState(false);
@@ -176,11 +189,14 @@ export default function ProgrammingWorkspace() {
   const submissionGenerations = useRef<Record<number, number>>({});
   const batchLifecycle = useRef<BatchLifecycle | null>(null);
   const cancelRequests = useRef<Set<string>>(new Set());
-  const engineeringSessionId = useRef<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
-  const siteSelectionTarget = useRef<string | null>(null);
+  const initialSelectionKey = selection.facilityId && selection.ppuId
+    ? `${selection.facilityId}/${selection.ppuId}`
+    : null;
+  const siteSelectionTarget = useRef<string | null>(selectedSiteIdsState !== null ? initialSelectionKey : null);
   const pendingRestore = useRef<PendingRestore | null>(null);
+  const restartSessionRequested = useRef(false);
 
   const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === selection.ppuId) ?? null;
@@ -268,14 +284,14 @@ export default function ProgrammingWorkspace() {
     setSubmittingSiteIds([]);
     setBatchRunning(false);
     setBatchCancelling(false);
-  }, []);
+  }, [setSelectedSiteIdsState]);
 
   const switchTarget = useCallback((next: TargetSelection) => {
     pendingRestore.current = null;
     resetTargetRuntime();
     setSelection(next);
     if (next.facilityId && next.ppuId) appendLog(`[TARGET] ${next.facilityId} / ${next.ppuId}`);
-  }, [appendLog, resetTargetRuntime]);
+  }, [appendLog, resetTargetRuntime, setSelection]);
 
   const applyJob = useCallback((job: JobSnapshot) => {
     const stage = uiStage(job);
@@ -293,31 +309,21 @@ export default function ProgrammingWorkspace() {
   }, []);
 
   useEffect(() => {
-    const restore = window.requestAnimationFrame(() => {
-      const savedApi = window.localStorage.getItem("plasma-api-base");
-      if (!savedApi) return;
-      try {
-        const normalized = normalizeApiBase(savedApi);
-        setApiBase(normalized);
-        setApiDraft(normalized);
-      } catch {
-        window.localStorage.removeItem("plasma-api-base");
-      }
-    });
-    return () => window.cancelAnimationFrame(restore);
-  }, []);
+    if (!workspaceHydrated) return;
+    queueMicrotask(() => setApiDraft(apiBase));
+  }, [apiBase, workspaceHydrated]);
 
   useEffect(() => {
+    if (!workspaceHydrated) return;
     let cancelled = false;
     void (async () => {
       try {
-        const session = await beginEngineeringSession(
-          apiBase,
-          engineeringSessionId.current ?? undefined,
-        );
-        engineeringSessionId.current = session.session_id;
+        const sessionId = restartSessionRequested.current
+          ? await restartEngineeringSession(apiBase)
+          : await ensureEngineeringSession(apiBase);
+        restartSessionRequested.current = false;
         if (cancelled) return;
-        appendLog(`[SESSION] NEW · ${session.previous_session_cleared ? "previous Programming Asset cache cleared" : "fresh connection"} · ${session.session_id.slice(0, 8)}…`);
+        appendLog(`[SESSION] ACTIVE · ${sessionId.slice(0, 8)}…`);
         const next = await getEngineeringTargets(apiBase);
         if (cancelled) return;
         setCatalog(next);
@@ -338,6 +344,7 @@ export default function ProgrammingWorkspace() {
         }
         appendLog(`[ENGINEERING] Provider ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
       } catch (error) {
+        restartSessionRequested.current = false;
         if (cancelled) return;
         const message = error instanceof Error ? error.message : "Engineering target provider unavailable";
         resetTargetRuntime(true);
@@ -350,7 +357,7 @@ export default function ProgrammingWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, [apiBase, connectionGeneration, appendLog, resetTargetRuntime]);
+  }, [apiBase, connectionGeneration, appendLog, ensureEngineeringSession, resetTargetRuntime, restartEngineeringSession, setSelection, workspaceHydrated]);
 
   useEffect(() => {
     if (!targetApiBase || !targetSelectionKey) return;
@@ -418,7 +425,7 @@ export default function ProgrammingWorkspace() {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [targetApiBase, targetSelectionKey, connectionGeneration, selection, applyJob, appendLog]);
+  }, [targetApiBase, targetSelectionKey, connectionGeneration, selection, applyJob, appendLog, setSelectedSiteIdsState]);
 
   function connect(event: FormEvent) {
     event.preventDefault();
@@ -428,7 +435,6 @@ export default function ProgrammingWorkspace() {
       return;
     }
     try {
-      const normalized = normalizeApiBase(apiDraft);
       pendingRestore.current = selection.facilityId && selection.ppuId
         ? {
           target: { ...selection },
@@ -436,13 +442,13 @@ export default function ProgrammingWorkspace() {
           targetRestored: false,
         }
         : null;
-      window.localStorage.setItem("plasma-api-base", normalized);
       resetTargetRuntime(true);
       setCatalog(null);
       setCatalogError(null);
       setConnection("connecting");
+      restartSessionRequested.current = true;
+      const normalized = setApiBase(apiDraft);
       setApiDraft(normalized);
-      setApiBase(normalized);
       setConnectionGeneration(current => current + 1);
     } catch (error) {
       appendLog(`[NET] ${error instanceof Error ? error.message : "Invalid Gateway URL"}`, true);
@@ -537,7 +543,7 @@ export default function ProgrammingWorkspace() {
         siteId,
         operation,
         assetFile: operation === "erase" || operation === "read" ? null : imageAsset,
-        engineeringSessionId: engineeringSessionId.current ?? undefined,
+        engineeringSessionId: engineeringSessionId ?? undefined,
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
         submissionGuard,

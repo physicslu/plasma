@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { useI18n } from "../i18n";
+import { useWorkspaceSession } from "../workspace-session";
 import ProgrammingWorkspace from "./programming-workspace";
 import "./engineering.css";
 import "./engineering-density.css";
@@ -23,8 +24,8 @@ function subscribeHydration(): () => void {
 
 export default function EngineeringPage() {
   const { t } = useI18n();
+  const { emodeSection: active, setEmodeSection: setActive } = useWorkspaceSession();
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
-  const [active, setActive] = useState<(typeof sections)[number][0]>("overview");
 
   return (
     <main className="engineeringPage">

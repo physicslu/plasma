@@ -4,9 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { evaluateBatchReadiness } from "../batch-readiness";
 import { useI18n } from "../i18n";
 import {
-  beginEngineeringSession,
   cancelJob,
-  DEFAULT_API_BASE,
   engineeringTargetApiBase,
   getEngineeringTargets,
   getJob,
@@ -20,6 +18,7 @@ import type {
   Operation,
   SiteSnapshot,
 } from "../plasma-api";
+import { useWorkspaceSession, type SelectionMap } from "../workspace-session";
 import "../programming-batch-toolbar.css";
 import "./fleet.css";
 import "./production-prototype.css";
@@ -27,7 +26,6 @@ import "./operator-feedback.css";
 
 type SiteRunState = "ready" | "running" | "success" | "failed" | "cancelled";
 type BatchState = "idle" | "running" | "cancelling" | "complete" | "partial" | "cancelled";
-type SelectionMap = Record<string, Record<string, number[]>>;
 type SiteRuntime = {
   id: number;
   enabled: boolean;
@@ -194,11 +192,13 @@ function normalizeSelection(selection: SelectionMap): SelectionMap {
 }
 
 function runtimeFromStatus(snapshot: SiteSnapshot): SiteRuntime {
+  const running = Boolean(snapshot.current_job_id) || snapshot.state === "queued" || snapshot.state === "running";
   return {
     id: snapshot.site_id,
     enabled: snapshot.enabled,
-    state: "ready",
+    state: running ? "running" : "ready",
     progress: 0,
+    jobId: snapshot.current_job_id ?? undefined,
     target: snapshot.target,
     interface: snapshot.interface,
   };
@@ -236,24 +236,35 @@ function densityFor(siteCount: number): "spacious" | "comfortable" | "compact" |
 export default function FleetPage() {
   const { locale, t } = useI18n();
   const text = copy[locale];
+  const {
+    hydrated: workspaceHydrated,
+    apiBase,
+    engineeringSessionId: sessionId,
+    ensureEngineeringSession,
+    programmingImage: imageAsset,
+    setProgrammingImage: setImageAsset,
+    pmodDraftSelection: draftSelection,
+    setPmodDraftSelection: setDraftSelection,
+    pmodActiveSelection: activeSelection,
+    setPmodActiveSelection: setActiveSelection,
+    pmodOperations: selectedOperations,
+    setPmodOperations: setSelectedOperations,
+    pmodSelectorCollapsed: selectorCollapsed,
+    setPmodSelectorCollapsed: setSelectorCollapsed,
+  } = useWorkspaceSession();
   const [catalog, setCatalog] = useState<EngineeringTargetCatalog | null>(null);
   const [providerError, setProviderError] = useState<string | null>(null);
-  const [draftSelection, setDraftSelection] = useState<SelectionMap>({});
-  const [activeSelection, setActiveSelection] = useState<SelectionMap>({});
   const [runtimes, setRuntimes] = useState<Record<string, PPURuntime>>({});
-  const [selectedOperations, setSelectedOperations] = useState<Operation[]>([]);
-  const [imageAsset, setImageAsset] = useState<File | null>(null);
   const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
   const [batchState, setBatchState] = useState<BatchState>("idle");
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [selectorCollapsed, setSelectorCollapsed] = useState(false);
 
   const currentJobs = useRef<Map<string, ActiveJob>>(new Map());
   const cancelAllRequested = useRef(false);
   const cancelledTargets = useRef<Set<string>>(new Set());
   const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
+  const initialActiveSelection = useRef(activeSelection);
 
   const appendLog = useCallback((textValue: string, level: LogEntry["level"] = "INFO") => {
     setLogs(current => [...current, {
@@ -265,17 +276,61 @@ export default function FleetPage() {
   }, []);
 
   useEffect(() => {
+    if (!workspaceHydrated) return;
     let stopped = false;
     void (async () => {
       try {
-        const session = await beginEngineeringSession(DEFAULT_API_BASE);
-        const next = await getEngineeringTargets(DEFAULT_API_BASE);
+        await ensureEngineeringSession(apiBase);
+        const next = await getEngineeringTargets(apiBase);
         if (stopped) return;
-        setSessionId(session.session_id);
         setCatalog(next);
         setProviderError(null);
-        setDraftSelection({});
         appendLog(`[PROVIDER] ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
+
+        const restoredSelection = normalizeSelection(cloneSelection(initialActiveSelection.current));
+        const restoredTargets = next.facilities.flatMap(facility => facility.ppus.flatMap(target => {
+          const siteIds = restoredSelection[facility.facility_id]?.[target.ppu_id] ?? [];
+          if (siteIds.length === 0) return [];
+          return [{ facility, target, siteIds, key: targetKey(facility.facility_id, target.ppu_id) }];
+        }));
+        if (restoredTargets.length === 0) return;
+
+        setRuntimes(Object.fromEntries(restoredTargets.map(item => [item.key, {
+          facilityId: item.facility.facility_id,
+          target: item.target,
+          sites: [],
+          loading: true,
+        } satisfies PPURuntime])));
+        const results = await Promise.allSettled(restoredTargets.map(async item => {
+          const targetBase = engineeringTargetApiBase(apiBase, item.facility.facility_id, item.target.ppu_id);
+          return { item, status: await getPPUStatus(targetBase) };
+        }));
+        if (stopped) return;
+        setRuntimes(current => {
+          const restored = { ...current };
+          results.forEach((result, index) => {
+            const item = restoredTargets[index];
+            if (result.status === "fulfilled") {
+              const selectedIds = new Set(item.siteIds);
+              restored[item.key] = {
+                facilityId: item.facility.facility_id,
+                target: item.target,
+                loading: false,
+                sites: result.value.status.sites.filter(site => selectedIds.has(site.site_id)).map(runtimeFromStatus),
+              };
+            } else {
+              restored[item.key] = {
+                facilityId: item.facility.facility_id,
+                target: item.target,
+                loading: false,
+                sites: [],
+                error: result.reason instanceof Error ? result.reason.message : text.loadFailed,
+              };
+            }
+          });
+          return restored;
+        });
+        appendLog(`[FPS] RESTORED · ${selectionCounts(restoredSelection).facilities} Facilities · ${restoredTargets.length} PPUs · ${selectionCounts(restoredSelection).sites} Sites`);
       } catch (error) {
         if (stopped) return;
         const detail = error instanceof Error ? error.message : "Mock Provider unavailable";
@@ -285,7 +340,7 @@ export default function FleetPage() {
       }
     })();
     return () => { stopped = true; };
-  }, [appendLog]);
+  }, [apiBase, appendLog, ensureEngineeringSession, text.loadFailed, workspaceHydrated]);
 
   const batchRunning = batchState === "running" || batchState === "cancelling";
   const draftCounts = useMemo(() => selectionCounts(draftSelection), [draftSelection]);
@@ -430,7 +485,7 @@ export default function FleetPage() {
     appendLog(`[FPS] CONFIRM · ${selectionCounts(snapshot).facilities} Facilities · ${targets.length} PPUs · ${selectionCounts(snapshot).sites} Sites`);
 
     const results = await Promise.allSettled(targets.map(async item => {
-      const targetBase = engineeringTargetApiBase(DEFAULT_API_BASE, item.facility.facility_id, item.target.ppu_id);
+      const targetBase = engineeringTargetApiBase(apiBase, item.facility.facility_id, item.target.ppu_id);
       return { item, status: await getPPUStatus(targetBase) };
     }));
 
@@ -486,7 +541,7 @@ export default function FleetPage() {
   }
 
   async function runSiteSequence(active: ActiveTarget, siteId: number, operations: Operation[]): Promise<SiteRunState> {
-    const targetBase = engineeringTargetApiBase(DEFAULT_API_BASE, active.facility.facility_id, active.target.ppu_id);
+    const targetBase = engineeringTargetApiBase(apiBase, active.facility.facility_id, active.target.ppu_id);
     const cancellationRequested = () => cancelAllRequested.current || cancelledTargets.current.has(active.key);
     try {
       updateSite(active.key, siteId, { state: "running", progress: 0, error: undefined });

@@ -6,6 +6,7 @@ import "./global-nav.css";
 import { DEFAULT_API_BASE } from "./plasma-api";
 import { GlobalNav } from "./global-nav";
 import { I18nProvider } from "./i18n";
+import { WorkspaceSessionProvider } from "./workspace-session";
 
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
@@ -55,8 +56,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className={`${sans.variable} ${mono.variable}`}>
         <I18nProvider>
-          <GlobalNav />
-          {children}
+          <WorkspaceSessionProvider>
+            <GlobalNav />
+            {children}
+          </WorkspaceSessionProvider>
         </I18nProvider>
       </body>
     </html>
