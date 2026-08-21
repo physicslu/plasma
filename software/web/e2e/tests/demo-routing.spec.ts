@@ -33,6 +33,11 @@ test("demo entry exposes only canonical Product Modes in top-level navigation", 
   const engineering = page.locator('a.demoCard[href="/engineering"]');
   await expect(production).toHaveAttribute("href", "/fleet");
   await expect(engineering).toHaveAttribute("href", "/engineering");
+  await expect(page.locator(".demoCard dl"), "Mode cards must not expose obsolete implementation metadata").toHaveCount(0);
+  await expect(production.getByText("production", { exact: true })).toHaveCount(0);
+  await expect(engineering.getByText("engineering", { exact: true })).toHaveCount(0);
+  await expect(production.getByText("唯讀聚合", { exact: true })).toHaveCount(0);
+  await expect(engineering.getByText("工程能力", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "產品模式" }).getByRole("link", { name: /Fleet/ })).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "產品模式" }).getByRole("link", { name: /單機 PPU/ })).toHaveCount(0);
 
@@ -82,6 +87,7 @@ test("demo landing content follows locale switching", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "選擇產品模式" })).toBeVisible();
   await expect(page.getByText("架構邊界", { exact: true })).toBeVisible();
   await expect(page.getByText("開啟量產模式 →", { exact: true })).toBeVisible();
+  await expect(page.locator(".demoCard dl")).toHaveCount(0);
 
   await page.getByRole("button", { name: "EN", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en-US", { timeout: 300 });
@@ -89,6 +95,8 @@ test("demo landing content follows locale switching", async ({ page }) => {
   await expect(page.getByText("Architecture boundary", { exact: true })).toBeVisible({ timeout: 300 });
   await expect(page.getByText("Open Production Mode →", { exact: true })).toBeVisible({ timeout: 300 });
   await expect(page.getByText("Open Engineering Mode →", { exact: true })).toBeVisible({ timeout: 300 });
+  await expect(page.getByText("Read-only aggregation", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Engineering capability", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "繁中", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-TW", { timeout: 300 });
