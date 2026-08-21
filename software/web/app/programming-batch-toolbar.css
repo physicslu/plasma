@@ -136,15 +136,15 @@
   text-align: center;
 }
 
+/* The readiness value itself already carries the BATCH semantic (for example
+ * BATCH READY). Hide the legacy eyebrow so the operator sees one status only. */
 .batchReadiness small {
-  display: block;
-  font: 7px var(--font-mono);
-  letter-spacing: .08em;
+  display: none;
 }
 
 .batchReadiness b {
   display: block;
-  margin-top: 1px;
+  margin: 0;
   font: 800 9px var(--font-mono);
 }
 
