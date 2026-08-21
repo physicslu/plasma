@@ -50,6 +50,7 @@
 }
 
 .globalNavControls { margin-left: auto; }
+.globalThemeSwitch { flex: 0 0 auto; margin-left: 2px; }
 .globalLocale { padding-left: 8px; border-left: 1px solid var(--line); }
 
 .globalAppNav nav a,

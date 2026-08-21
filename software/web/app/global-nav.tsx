@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./i18n";
 import { PRODUCT_MODE_ROUTES, productModeForPath } from "./product-mode";
+import ThemeSwitch from "./theme-switch";
 
 function subscribeHydration(): () => void {
   return () => {};
@@ -36,6 +37,8 @@ export function GlobalNav() {
             {t("mode.engineering")}
           </Link>
         </nav>
+
+        {activeMode && <ThemeSwitch className="globalThemeSwitch" />}
 
         <div className="globalLocale" role="group" aria-label="Language" aria-busy={!hydrated}>
           <button type="button" disabled={!hydrated} onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>
