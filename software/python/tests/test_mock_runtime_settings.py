@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
@@ -74,6 +75,18 @@ class MockRuntimeSettingsControllerTests(unittest.TestCase):
             saved = first.update(editable_settings(error_rate_per_mille=10, fixed_seed=77))
             second = MockRuntimeSettingsController(path)
             self.assertEqual(second.current(), saved)
+
+    def test_persistence_failure_does_not_apply_candidate_in_memory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "mock-runtime.yaml"
+            controller = MockRuntimeSettingsController(path)
+            before = controller.current()
+            with mock.patch.object(controller, "_write_atomic", side_effect=OSError("disk full")):
+                with self.assertRaisesRegex(OSError, "disk full"):
+                    controller.update(editable_settings(error_rate_per_mille=75, fixed_seed=99))
+            self.assertEqual(controller.current(), before)
+            self.assertEqual(controller.current()["revision"], DEFAULT_MOCK_PROFILE.revision)
+            self.assertFalse(path.exists())
 
 
 class MockInterfaceProfileExecutionTests(unittest.IsolatedAsyncioTestCase):
