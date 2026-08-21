@@ -1,8 +1,9 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useI18n } from "../i18n";
 import { useWorkspaceSession } from "../workspace-session";
+import MockRuntimeSettingsPanel from "./mock-runtime-settings";
 import ProgrammingWorkspace from "./programming-workspace";
 import "./engineering.css";
 import "./engineering-density.css";
@@ -12,6 +13,7 @@ const sections = [
   ["overview", "engineering.overview"],
   ["ppu-sites", "engineering.ppuSites"],
   ["programming", "engineering.programming"],
+  ["mock", "engineering.settings"],
   ["diagnostics", "engineering.diagnostics"],
   ["logs", "engineering.logs"],
   ["tools", "engineering.tools"],
@@ -24,8 +26,19 @@ function subscribeHydration(): () => void {
 
 export default function EngineeringPage() {
   const { t } = useI18n();
-  const { emodeSection: active, setEmodeSection: setActive } = useWorkspaceSession();
+  const { emodeSection, setEmodeSection } = useWorkspaceSession();
+  const [mockActive, setMockActive] = useState(false);
+  const active = mockActive ? "mock" : emodeSection;
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
+
+  function selectSection(id: (typeof sections)[number][0]) {
+    if (id === "mock") {
+      setMockActive(true);
+      return;
+    }
+    setMockActive(false);
+    setEmodeSection(id);
+  }
 
   return (
     <main className="engineeringPage">
@@ -45,9 +58,9 @@ export default function EngineeringPage() {
                 disabled={!hydrated}
                 className={active === id ? "active" : ""}
                 aria-pressed={active === id}
-                onClick={() => setActive(id)}
+                onClick={() => selectSection(id)}
               >
-                {t(key)}
+                {id === "mock" ? "Mock" : t(key)}
               </button>
             ))}
           </nav>
@@ -55,6 +68,8 @@ export default function EngineeringPage() {
           <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : ""}`}>
             {active === "programming" ? (
               <ProgrammingWorkspace />
+            ) : active === "mock" ? (
+              <MockRuntimeSettingsPanel />
             ) : (
               <div className="engineeringPlaceholder">
                 <small>EXTENSION SLOT</small>
