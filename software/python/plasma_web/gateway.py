@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import base64
 import json
+import mimetypes
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -80,6 +81,7 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
     max_body_bytes = 24 * 1024 * 1024
     allowed_origins = frozenset({"*"})
     output_root = Path("output")
+    static_root: Path | None = None
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -106,6 +108,45 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
 
     def _binary(self, path: Path) -> None:
         self._binary_data(path.read_bytes(), path.name)
+
+    def _static(self, request_path: str) -> bool:
+        if self.static_root is None:
+            return False
+
+        root = self.static_root.resolve()
+        relative_path = unquote(request_path).lstrip("/")
+        candidate = (root / relative_path).resolve()
+        if not candidate.is_relative_to(root):
+            self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
+            return True
+
+        if candidate.is_dir():
+            candidate = candidate / "index.html"
+        elif not candidate.is_file() and not Path(relative_path).suffix:
+            candidate = root / "index.html"
+
+        if not candidate.is_file():
+            self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
+            return True
+
+        content_type, _ = mimetypes.guess_type(candidate.name)
+        if content_type is None:
+            content_type = "application/octet-stream"
+        elif content_type.startswith("text/") or content_type == "application/javascript":
+            content_type += "; charset=utf-8"
+        data = candidate.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header(
+            "Cache-Control",
+            "public, max-age=31536000, immutable"
+            if candidate.parent.name == "assets"
+            else "no-cache",
+        )
+        self.end_headers()
+        self.wfile.write(data)
+        return True
 
     def _cors_headers(self) -> None:
         origin = self.headers.get("Origin")
@@ -292,6 +333,9 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
             if len(parts) == 6 and parts[1:3] == ["api", "jobs"] and parts[4] == "files":
                 self._download(parts[3], unquote(parts[5]))
                 return
+            if parsed.path != "/api" and not parsed.path.startswith("/api/"):
+                if self._static(parsed.path):
+                    return
             self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
         except Exception as exc:
             self._error(exc)
@@ -634,11 +678,13 @@ def serve(
     cors_origins: tuple[str, ...] = ("*",),
     output_root: Path = Path("output"),
     engineering_provider: EngineeringPPUProvider | None = None,
+    static_root: Path | None = None,
 ) -> None:
     PlasmaWebHandler.client_factory = staticmethod(lambda: PlasmaClient(plasma_host, plasma_port))
     PlasmaWebHandler.engineering_provider = engineering_provider
     PlasmaWebHandler.allowed_origins = frozenset(cors_origins)
     PlasmaWebHandler.output_root = output_root.resolve()
+    PlasmaWebHandler.static_root = static_root.resolve() if static_root is not None else None
     server = ThreadingHTTPServer((host, port), PlasmaWebHandler)
     print(f"Plasma Web REST Gateway listening on http://{host}:{port}")
     try:
@@ -657,6 +703,11 @@ def main() -> None:
     parser.add_argument("--plasma-port", type=int, default=9900)
     parser.add_argument("--output-root", type=Path, default=Path("output"))
     parser.add_argument(
+        "--static-root",
+        type=Path,
+        help="Serve a built Plasma Web Console and SPA routes from the Gateway origin",
+    )
+    parser.add_argument(
         "--cors-origin",
         action="append",
         dest="cors_origins",
@@ -673,12 +724,24 @@ def main() -> None:
         default=Path("engineering-mock"),
         help="Output/log root for Engineering mock PPU runtimes",
     )
+    parser.add_argument(
+        "--engineering-mock-flash-size",
+        type=int,
+        default=4 * 1024 * 1024,
+        help="Mock Flash bytes per Engineering Site (default: 4 MiB)",
+    )
     args = parser.parse_args()
+
+    if args.static_root is not None and not (args.static_root / "index.html").is_file():
+        parser.error(f"static root must contain index.html: {args.static_root}")
 
     provider: MockEngineeringPPUProvider | None = None
     try:
         if args.engineering_mock:
-            provider = MockEngineeringPPUProvider(args.engineering_mock_root)
+            provider = MockEngineeringPPUProvider(
+                args.engineering_mock_root,
+                flash_size_bytes=args.engineering_mock_flash_size,
+            )
             provider.start()
             catalog = provider.catalog()
             print(
@@ -694,6 +757,7 @@ def main() -> None:
             tuple(args.cors_origins or ["*"]),
             args.output_root,
             provider,
+            args.static_root,
         )
     finally:
         if provider is not None:

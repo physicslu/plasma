@@ -1,0 +1,27 @@
+ppu:
+  id: render-demo-ppu
+  facility_id: public-demo
+  model: MOCK-PPU
+  display_name: Plasma Public Demo PPU
+
+server:
+  host: 127.0.0.1
+  port: 9900
+  max_supported_sites: 8
+  max_concurrent_jobs: 4
+  max_queue_depth_per_site: 4
+  output_root: /tmp/plasma-render/output
+  log_root: /tmp/plasma-render/logs
+  max_metadata_bytes: 65536
+  max_map_bytes: 1048576
+  max_binary_bytes: 1048576
+
+sites:
+  - {id: 1, enabled: true, interface: mock, mock: {flash_size: 1048576, default_delay_s: 0.8, progress_steps: 20}}
+  - {id: 2, enabled: true, interface: mock, mock: {flash_size: 1048576, default_delay_s: 0.8, progress_steps: 20}}
+  - {id: 3, enabled: true, interface: mock, mock: {flash_size: 1048576, default_delay_s: 0.8, progress_steps: 20}}
+  - {id: 4, enabled: true, interface: mock, mock: {flash_size: 1048576, default_delay_s: 0.8, progress_steps: 20}}
+  - {id: 5, enabled: true, interface: mock, mock: {flash_size: 1048576, default_delay_s: 0.8, progress_steps: 20}}
+  - {id: 6, enabled: true, interface: mock, mock: {flash_size: 1048576, default_delay_s: 0.8, progress_steps: 20}}
+  - {id: 7, enabled: true, interface: mock, mock: {flash_size: 1048576, default_delay_s: 0.8, progress_steps: 20}}
+  - {id: 8, enabled: true, interface: mock, mock: {flash_size: 1048576, default_delay_s: 0.8, progress_steps: 20}}

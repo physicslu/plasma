@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: plasma-public-demo
+    runtime: python
+    plan: free
+    buildCommand: bash scripts/render-build.sh
+    startCommand: bash scripts/render-start.sh
+    healthCheckPath: /api/health/ready
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PLASMA_RENDER_ENGINEERING_MOCK
+        value: "1"
+      - key: PLASMA_RENDER_FLASH_BYTES
+        value: "1048576"
