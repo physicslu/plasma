@@ -238,8 +238,9 @@ Per Site
 Read resolution is logically:
 
 ```text
-latest backing / overlay state
-then older backing where not superseded
+overlay
+then latest backing region
+then older backing regions where not superseded
 then 0xFF
 ```
 
