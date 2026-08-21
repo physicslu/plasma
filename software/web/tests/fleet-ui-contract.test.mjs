@@ -67,12 +67,13 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(source, /activeSelection/);
   assert.match(source, /clearAll:\s*"全部取消"/);
   assert.match(source, /apply:\s*"確定選取"/);
+  assert.match(source, /liveStatus:\s*"Active FPS : 即時執行狀態"/);
   assert.match(source, /fpsSelectorCommandGroup/);
   assert.match(source, /applyFpsSelection/);
   assert.match(source, /groupedActiveTargets/);
   assert.match(source, /data-production-facility/);
   assert.match(source, /densityFor/);
-  assert.match(source, /setSelectorCollapsed\(true\)/);
+  assert.doesNotMatch(source, /setSelectorCollapsed\(true\)/);
   assert.match(source, /Promise\.allSettled/);
   assert.match(source, /runSiteSequence/);
   assert.match(source, /cancelPPU/);
