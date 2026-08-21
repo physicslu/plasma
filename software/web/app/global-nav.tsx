@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useI18n } from "./i18n";
 import { PRODUCT_MODE_ROUTES, productModeForPath } from "./product-mode";
 import ThemeSwitch from "./theme-switch";
+import "./fleet/pmod-theme.css";
 
 function subscribeHydration(): () => void {
   return () => {};
