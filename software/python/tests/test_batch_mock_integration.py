@@ -29,6 +29,17 @@ class BatchMockIntegrationTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.provider = MockEngineeringPPUProvider(self.root, flash_size_bytes=64 * 1024)
         self.provider.start()
+        key = ("mock-facility-01", "mock-facility-01-ppu-01")
+        server = self.provider._servers[key]
+        for site_id in (1, 2):
+            interface = server.manager.interfaces[site_id]
+            self.assertIsInstance(interface, MockInterface)
+            interface.delays.update({
+                "erase": 0.0,
+                "program": 0.0,
+                "verify": 0.0,
+                "read": 0.0,
+            })
         self.manager = BatchRuntimeManager(self.provider, poll_interval_s=0.005)
         session = self.provider.begin_session()
         self.session_id = session["session"]["session_id"]
