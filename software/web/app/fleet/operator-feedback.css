@@ -46,9 +46,51 @@ html[lang="en-US"] .fpsSelectorActions .confirmFpsButton::after {
   content: "Confirm";
 }
 
+/* Keep the Programming Image label and Browse action as one visual unit.
+ * The selected file name stays in the same row, while the requirement hint
+ * sits directly below them. */
+.productionImagePicker {
+  min-height: 38px;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  justify-content: start;
+  column-gap: 8px;
+  row-gap: 3px;
+}
+
+.productionImagePicker > span {
+  display: contents;
+}
+
+.productionImagePicker > span > b {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+}
+
+.productionImagePicker > .productionBrowseButton {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+  align-self: center;
+}
+
+.productionImagePicker > em {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+  max-width: 180px;
+}
+
+.productionImagePicker > span > small {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
 .productionBrowseButton {
-  min-height: 34px;
-  padding: 0 13px;
+  min-height: 30px;
+  padding: 0 11px;
   border: 1px solid #93c5fd;
   border-radius: 7px;
   background: #eff6ff;
@@ -61,6 +103,12 @@ html[lang="en-US"] .fpsSelectorActions .confirmFpsButton::after {
 .productionBrowseButton:hover:not(:disabled) {
   border-color: #2563eb;
   background: #dbeafe;
+}
+
+/* Facility is the top-level runtime hierarchy. Make it visually stronger than
+ * the PPU identity without changing the PPU typography. */
+.facilityRuntimeIdentity h3 {
+  font-weight: 800;
 }
 
 .productionOperationWarning {
@@ -155,6 +203,32 @@ html[lang="en-US"] .fpsSelectorActions .confirmFpsButton::after {
   .fpsSelectorActions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .productionImagePicker {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto;
+  }
+
+  .productionImagePicker > span > b {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .productionImagePicker > .productionBrowseButton {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .productionImagePicker > em {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: 100%;
+  }
+
+  .productionImagePicker > span > small {
+    grid-column: 1 / -1;
+    grid-row: 3;
   }
 
   .productionPpuPrototype {
