@@ -199,6 +199,240 @@ html[lang="en-US"] .fpsSelectorActions .confirmFpsButton::after {
   display: block;
 }
 
+/* Pmod originally used light-only hard-coded surfaces. Dark mode explicitly
+ * remaps every operator-facing surface while preserving the existing state
+ * colors for RUNNING/PASS/FAIL/CANCELLED. */
+[data-theme="dark"] .productionPrototypePage {
+  background: var(--navy);
+  color: var(--text);
+}
+
+[data-theme="dark"] .productionPrototypeHeading h1,
+[data-theme="dark"] .prototypeProvider b,
+[data-theme="dark"] .fpsSelectorHead h2,
+[data-theme="dark"] .fpsSelectorActions b,
+[data-theme="dark"] .fpsFacilityRow b,
+[data-theme="dark"] .fpsPpuRow b,
+[data-theme="dark"] .prototypeTopologySummary b,
+[data-theme="dark"] .batchOperations > span,
+[data-theme="dark"] .productionImagePicker span b,
+[data-theme="dark"] .batchState b,
+[data-theme="dark"] .runtimeBoardHead h2,
+[data-theme="dark"] .facilityRuntimeIdentity h3,
+[data-theme="dark"] .productionPpuIdentity h4,
+[data-theme="dark"] .productionSitePrototype > b {
+  color: var(--text);
+}
+
+[data-theme="dark"] .productionPrototypeHeading > div:first-child > span,
+[data-theme="dark"] .prototypeProvider small,
+[data-theme="dark"] .prototypeNotice,
+[data-theme="dark"] .emptyProductionSet,
+[data-theme="dark"] .ppuLoading,
+[data-theme="dark"] .fpsSelectorHead span,
+[data-theme="dark"] .fpsSelectorActions div,
+[data-theme="dark"] .fpsFacilityRow small,
+[data-theme="dark"] .fpsPpuRow small,
+[data-theme="dark"] .prototypeTopologySummary small,
+[data-theme="dark"] .prototypeTopologySummary span,
+[data-theme="dark"] .productionImagePicker span small,
+[data-theme="dark"] .productionImagePicker em,
+[data-theme="dark"] .batchState small,
+[data-theme="dark"] .runtimeBoardHead > div:first-child span,
+[data-theme="dark"] .runtimeLegend,
+[data-theme="dark"] .facilityRuntimeGroup > header > span,
+[data-theme="dark"] .productionPpuIdentity small,
+[data-theme="dark"] .productionPpuMeta span,
+[data-theme="dark"] .productionSitePrototype > small,
+[data-theme="dark"] .productionPrototypeLog summary span,
+[data-theme="dark"] .prototypeLogRow > span,
+[data-theme="dark"] .prototypeEmptyLog {
+  color: var(--muted);
+}
+
+[data-theme="dark"] .prototypeProvider,
+[data-theme="dark"] .prototypeNotice,
+[data-theme="dark"] .emptyProductionSet,
+[data-theme="dark"] .ppuLoading,
+[data-theme="dark"] .fpsSelector,
+[data-theme="dark"] .prototypeTopologySummary article,
+[data-theme="dark"] .productionBatchToolbar,
+[data-theme="dark"] .productionRuntimeBoard,
+[data-theme="dark"] .productionPpuPrototype,
+[data-theme="dark"] .productionSitePrototype,
+[data-theme="dark"] .productionPrototypeLog {
+  border-color: var(--line);
+  background: var(--panel);
+  box-shadow: 0 7px 24px var(--card-shadow);
+}
+
+[data-theme="dark"] .fpsSelectorCollapse,
+[data-theme="dark"] .fpsSelectorHead button,
+[data-theme="dark"] .fpsSelectorActions button,
+[data-theme="dark"] .batchOperations label,
+[data-theme="dark"] .batchState,
+[data-theme="dark"] .cancelBatchButton,
+[data-theme="dark"] .cancelPpuButton,
+[data-theme="dark"] .productionPrototypeLog button {
+  border-color: var(--line-strong);
+  background: var(--panel-2);
+  color: var(--text-soft);
+}
+
+[data-theme="dark"] .fpsSelectorActions,
+[data-theme="dark"] .runtimeBoardHead,
+[data-theme="dark"] .productionPpuPrototype > header,
+[data-theme="dark"] .prototypeLogBody {
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+
+[data-theme="dark"] .fpsSelectorHead,
+[data-theme="dark"] .productionPrototypeLog > header,
+[data-theme="dark"] .prototypeLogRow {
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .fpsFacilityNode,
+[data-theme="dark"] .facilityRuntimeGroup {
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+
+[data-theme="dark"] .fpsFacilityRow,
+[data-theme="dark"] .facilityRuntimeGroup > header {
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--cyan) 7%, var(--panel-2));
+}
+
+[data-theme="dark"] .fpsPpuNode {
+  border-left-color: color-mix(in srgb, var(--cyan) 42%, var(--line));
+}
+
+[data-theme="dark"] .fpsSiteChoiceGrid label {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--text-soft);
+}
+
+[data-theme="dark"] .fpsSiteChoiceGrid label.selected {
+  border-color: color-mix(in srgb, var(--cyan) 65%, var(--line));
+  background: color-mix(in srgb, var(--cyan) 12%, var(--panel));
+  color: var(--cyan);
+}
+
+[data-theme="dark"] .productionBrowseButton {
+  border-color: color-mix(in srgb, var(--cyan) 58%, var(--line));
+  background: color-mix(in srgb, var(--cyan) 10%, var(--panel));
+  color: var(--cyan);
+}
+
+[data-theme="dark"] .productionBrowseButton:hover:not(:disabled) {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 18%, var(--panel));
+}
+
+[data-theme="dark"] .batchOperations label b,
+[data-theme="dark"] .prototypeLogRow > b {
+  color: var(--cyan);
+}
+
+[data-theme="dark"] .executeBatchButton {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+[data-theme="dark"] .cancelBatchButton,
+[data-theme="dark"] .cancelPpuButton,
+[data-theme="dark"] .fpsSelectorActions .cancelDraftButton {
+  border-color: color-mix(in srgb, var(--red) 55%, var(--line));
+  background: color-mix(in srgb, var(--red) 7%, var(--panel));
+  color: var(--red);
+}
+
+[data-theme="dark"] .fpsSelectorActions .confirmFpsButton {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+[data-theme="dark"] .batchState.batch-running,
+[data-theme="dark"] .batchState.batch-cancelling {
+  border-color: color-mix(in srgb, var(--amber) 70%, var(--line));
+  background: color-mix(in srgb, var(--amber) 10%, var(--panel));
+}
+
+[data-theme="dark"] .batchState.batch-complete {
+  border-color: color-mix(in srgb, var(--green) 70%, var(--line));
+  background: color-mix(in srgb, var(--green) 10%, var(--panel));
+}
+
+[data-theme="dark"] .batchState.batch-partial {
+  border-color: color-mix(in srgb, var(--amber) 70%, var(--line));
+  background: color-mix(in srgb, var(--amber) 8%, var(--panel));
+}
+
+[data-theme="dark"] .productionPpuPrototype.ppu-running,
+[data-theme="dark"] .productionSitePrototype.site-running {
+  border-color: color-mix(in srgb, #60a5fa 72%, var(--line));
+  background: color-mix(in srgb, #2563eb 9%, var(--panel));
+}
+
+[data-theme="dark"] .productionPpuPrototype.ppu-success,
+[data-theme="dark"] .productionSitePrototype.site-success {
+  border-color: color-mix(in srgb, var(--green) 62%, var(--line));
+  background: color-mix(in srgb, var(--green) 8%, var(--panel));
+}
+
+[data-theme="dark"] .productionPpuPrototype.ppu-failed,
+[data-theme="dark"] .productionSitePrototype.site-failed {
+  border-color: color-mix(in srgb, var(--red) 68%, var(--line));
+  background: color-mix(in srgb, var(--red) 8%, var(--panel));
+}
+
+[data-theme="dark"] .productionPpuPrototype.ppu-cancelled,
+[data-theme="dark"] .productionPpuPrototype.ppu-partial,
+[data-theme="dark"] .productionSitePrototype.site-cancelled {
+  border-color: var(--line-strong);
+  background: var(--panel-2);
+}
+
+[data-theme="dark"] .prototypeSiteLamp {
+  background: color-mix(in srgb, var(--line-strong) 72%, var(--panel));
+  box-shadow: inset 0 -2px 4px rgba(0, 0, 0, .4);
+}
+
+[data-theme="dark"] .productionSitePrototype > strong {
+  color: var(--green);
+}
+
+[data-theme="dark"] .productionSitePrototype.site-running > strong { color: #60a5fa; }
+[data-theme="dark"] .productionSitePrototype.site-failed > strong { color: var(--red); }
+[data-theme="dark"] .productionSitePrototype.site-cancelled > strong { color: var(--muted); }
+[data-theme="dark"] .productionPpuMeta b { color: var(--green); }
+[data-theme="dark"] .runtimeSummary b { color: var(--green); }
+
+[data-theme="dark"] .productionOperationWarning {
+  border-color: color-mix(in srgb, var(--amber) 68%, var(--line));
+  background: color-mix(in srgb, var(--amber) 10%, var(--panel));
+  color: var(--amber);
+}
+
+[data-theme="dark"] .productionOperationWarning button {
+  border-color: color-mix(in srgb, var(--amber) 60%, var(--line));
+  background: var(--panel-2);
+  color: var(--amber);
+}
+
+[data-theme="dark"] .productionPrototypeLog summary,
+[data-theme="dark"] .prototypeLogRow code {
+  color: var(--text-soft);
+}
+
+[data-theme="dark"] .prototypeLogRow.level-warn > b { color: var(--amber); }
+[data-theme="dark"] .prototypeLogRow.level-error > b { color: var(--red); }
+
 @keyframes production-site-running-pulse {
   from {
     opacity: .38;
