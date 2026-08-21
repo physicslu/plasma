@@ -21,6 +21,7 @@ import type {
 } from "../plasma-api";
 import "./fleet.css";
 import "./production-prototype.css";
+import "./operator-feedback.css";
 
 type SiteRunState = "ready" | "running" | "success" | "failed" | "cancelled";
 type BatchState = "idle" | "running" | "cancelling" | "complete" | "partial" | "cancelled";
@@ -72,10 +73,10 @@ const copy = {
     loading: "正在連接 Mock Provider…",
     offline: "Mock Provider 無法使用。請確認 Plasma Web REST Gateway 已啟用 Engineering Mock Provider。",
     selector: "FPS 選擇",
-    selectorHint: "多選 Facility / PPU / Site，套用後保留完整 FPS 集合。",
-    clearAll: "清除全部",
+    selectorHint: "多選 Facility / PPU / Site，按確定選取後才更新 Active FPS。",
+    clearAll: "全部取消",
     selectAll: "全選",
-    apply: "套用 FPS",
+    apply: "確定選取",
     collapse: "收起選擇器",
     expand: "展開選擇器",
     selectedOverview: "已選擇 FPS 總覽",
@@ -114,10 +115,10 @@ const copy = {
     loading: "Connecting to Mock Provider…",
     offline: "Mock Provider is unavailable. Enable the Engineering Mock Provider on the Plasma Web REST Gateway.",
     selector: "FPS Selection",
-    selectorHint: "Select Facilities, PPUs, and Sites. Applying keeps the complete FPS set.",
-    clearAll: "Clear all",
+    selectorHint: "Select Facilities, PPUs, and Sites. Active FPS changes only after confirmation.",
+    clearAll: "Cancel all selections",
     selectAll: "Select all",
-    apply: "Apply FPS",
+    apply: "Confirm selection",
     collapse: "Collapse selector",
     expand: "Expand selector",
     selectedOverview: "Selected FPS Overview",
@@ -398,7 +399,7 @@ export default function FleetPage() {
       sites: [],
       loading: true,
     } satisfies PPURuntime])));
-    appendLog(`[FPS] APPLY · ${selectionCounts(snapshot).facilities} Facilities · ${targets.length} PPUs · ${selectionCounts(snapshot).sites} Sites`);
+    appendLog(`[FPS] CONFIRM · ${selectionCounts(snapshot).facilities} Facilities · ${targets.length} PPUs · ${selectionCounts(snapshot).sites} Sites`);
 
     const results = await Promise.allSettled(targets.map(async item => {
       const targetBase = engineeringTargetApiBase(DEFAULT_API_BASE, item.facility.facility_id, item.target.ppu_id);
@@ -612,11 +613,14 @@ export default function FleetPage() {
                 <>
                   <header className="fpsSelectorHead">
                     <div><h2>{text.selector}</h2><span>{text.selectorHint}</span></div>
-                    <button type="button" onClick={clearEverything} disabled={batchRunning || draftCounts.sites === 0}>{text.clearAll}</button>
                   </header>
 
                   <div className="fpsSelectorActions">
-                    <button type="button" onClick={selectEverything} disabled={batchRunning}>{text.selectAll}</button>
+                    <div className="fpsSelectorCommandGroup">
+                      <button type="button" onClick={selectEverything} disabled={batchRunning}>{text.selectAll}</button>
+                      <button type="button" className="cancelDraftButton" onClick={clearEverything} disabled={batchRunning || draftCounts.sites === 0}>{text.clearAll}</button>
+                      <button type="button" className="confirmFpsButton" onClick={() => void applyFpsSelection()} disabled={draftCounts.sites === 0 || batchRunning}>{text.apply}</button>
+                    </div>
                     <div><b>{draftCounts.facilities}</b> F / <b>{draftCounts.ppus}</b> P / <b>{draftCounts.sites}</b> S</div>
                   </div>
 
@@ -680,8 +684,6 @@ export default function FleetPage() {
                       </div>
                     )}
                   </section>
-
-                  <button type="button" className="applyFpsButton" onClick={() => void applyFpsSelection()} disabled={draftCounts.sites === 0 || batchRunning}>{text.apply}</button>
                 </>
               )}
             </aside>
@@ -773,8 +775,8 @@ export default function FleetPage() {
                                         >
                                           <b>{siteLabel(site.id)}</b>
                                           <div className={`prototypeSiteLamp ${site.state}`}><i /></div>
-                                          <strong>{site.state === "success" ? text.success : site.state === "failed" ? text.failed : site.state === "cancelled" ? text.cancelled : site.state === "running" ? `${site.progress}%` : text.ready}</strong>
-                                          {site.operation && <small>{operationCodes[site.operation]} · {t(`operation.${site.operation}`)}</small>}
+                                          <strong>{site.state === "success" ? text.success : site.state === "failed" ? text.failed : site.state === "cancelled" ? text.cancelled : site.state === "running" ? text.running : text.ready}</strong>
+                                          {site.operation && <small>{operationCodes[site.operation]} · {t(`operation.${site.operation}`)}{site.state === "running" ? ` · ${site.progress}%` : ""}</small>}
                                         </article>
                                       ))}
                                     </div>
