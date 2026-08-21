@@ -13,6 +13,10 @@ class BackingRegion:
     image_sha256: str
     image_offset: int = 0
 
+    @property
+    def end(self) -> int:
+        return self.address + self.length
+
 
 @dataclass(slots=True)
 class SparseOverlay:
@@ -30,7 +34,26 @@ class SparseOverlay:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "overlay data must be bytes")
         if not data:
             return
+        self.remove_range(address, len(data))
         self._regions[address] = data
+
+    def remove_range(self, address: int, length: int) -> None:
+        if address < 0 or length < 0:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "overlay removal range is invalid")
+        if length == 0:
+            return
+        end = address + length
+        replacement: dict[int, bytes] = {}
+        for region_address, data in self._regions.items():
+            region_end = region_address + len(data)
+            if region_end <= address or region_address >= end:
+                replacement[region_address] = data
+                continue
+            if region_address < address:
+                replacement[region_address] = data[: address - region_address]
+            if region_end > end:
+                replacement[end] = data[end - region_address :]
+        self._regions = replacement
 
     def apply(self, address: int, output: bytearray) -> None:
         end = address + len(output)
@@ -67,14 +90,8 @@ class MockFlashState:
             self.overlay.clear()
             return
 
-        erase_end = address + length
-        retained: list[BackingRegion] = []
-        for region in self.backing_regions:
-            region_end = region.address + region.length
-            if region_end <= address or region.address >= erase_end:
-                retained.append(region)
-        self.backing_regions = retained
-        # Partial erase semantics are represented by an explicit 0xFF overlay.
+        # Partial erase is represented as 0xFF copy-on-write data. Keeping the
+        # immutable backing regions lets bytes outside the erased range survive.
         self.overlay.write(address, bytes([0xFF]) * length)
 
     def program_shared(
@@ -89,10 +106,13 @@ class MockFlashState:
         if isinstance(image_offset, bool) or not isinstance(image_offset, int) or image_offset < 0:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "image_offset must be a non-negative integer")
         new_end = address + image_size_bytes
+        # Remove only backing regions completely superseded by this Program.
+        # Partially overlapping older regions remain underneath; read order makes
+        # the newly appended region authoritative for the overlap.
         self.backing_regions = [
             region
             for region in self.backing_regions
-            if region.address + region.length <= address or region.address >= new_end
+            if not (address <= region.address and region.end <= new_end)
         ]
         self.backing_regions.append(
             BackingRegion(
@@ -102,15 +122,15 @@ class MockFlashState:
                 image_offset=image_offset,
             )
         )
+        self.overlay.remove_range(address, image_size_bytes)
 
     def read(self, store: SharedImageStore, address: int, length: int) -> bytes:
         self._validate_range(address, length)
         output = bytearray([0xFF]) * length
         request_end = address + length
         for region in self.backing_regions:
-            region_end = region.address + region.length
             overlap_start = max(address, region.address)
-            overlap_end = min(request_end, region_end)
+            overlap_end = min(request_end, region.end)
             if overlap_start >= overlap_end:
                 continue
             ref = store.resolve(region.image_sha256)
