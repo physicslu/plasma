@@ -148,10 +148,10 @@ class MockRuntimeSettingsController:
                 read=parsed_operations["read"],
             )
             next_profile.validate()
+            if self._persistence_path is not None:
+                self._write_atomic(self._persistence_path, next_profile, seed)
             self._profile = next_profile
             self._seed = seed
-            if self._persistence_path is not None:
-                self._write_atomic(self._persistence_path)
             return self.current()
 
     def _load(self, path: Path) -> None:
@@ -175,11 +175,16 @@ class MockRuntimeSettingsController:
             self._profile = profile
             self._seed = seed
 
-    def _write_atomic(self, destination: Path) -> None:
+    def _write_atomic(
+        self,
+        destination: Path,
+        profile: MockProfile,
+        seed: MockSeedSettings,
+    ) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            **mock_profile_to_dict(self._profile),
-            "seed": self._seed.to_dict(),
+            **mock_profile_to_dict(profile),
+            "seed": seed.to_dict(),
         }
         text = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
         descriptor, temporary_name = tempfile.mkstemp(
