@@ -40,7 +40,6 @@ html .productionPrototypePage .fpsFacilityRow b,
 html .productionPrototypePage .fpsPpuRow b,
 html .productionPrototypePage .prototypeTopologySummary b,
 html .productionPrototypePage .batchOperations > span,
-html .productionPrototypePage .productionImagePicker span b,
 html .productionPrototypePage .batchState b,
 html .productionPrototypePage .runtimeBoardHead h2,
 html .productionPrototypePage .facilityRuntimeIdentity h3,
@@ -60,7 +59,7 @@ html .productionPrototypePage .fpsFacilityRow small,
 html .productionPrototypePage .fpsPpuRow small,
 html .productionPrototypePage .prototypeTopologySummary small,
 html .productionPrototypePage .prototypeTopologySummary span,
-html .productionPrototypePage .productionImagePicker span small,
+html .productionPrototypePage .productionImagePicker small,
 html .productionPrototypePage .productionImagePicker em,
 html .productionPrototypePage .batchState small,
 html .productionPrototypePage .runtimeBoardHead > div:first-child span,
@@ -146,15 +145,16 @@ html .productionPrototypePage .fpsSiteChoiceGrid label.selected {
   color: var(--pmod-accent-bright);
 }
 
+/* Programming-file picker is intentionally shared visually with Emode. */
 html .productionPrototypePage .productionBrowseButton {
-  border-color: color-mix(in srgb, var(--pmod-accent) 58%, var(--pmod-line));
-  background: color-mix(in srgb, var(--pmod-accent) 10%, var(--pmod-panel));
-  color: var(--pmod-accent-bright);
+  border-color: color-mix(in srgb, var(--cyan) 55%, var(--pmod-line));
+  background: color-mix(in srgb, var(--cyan) 8%, var(--pmod-panel));
+  color: var(--cyan);
 }
 
 html .productionPrototypePage .productionBrowseButton:hover:not(:disabled) {
-  border-color: var(--pmod-accent-bright);
-  background: color-mix(in srgb, var(--pmod-accent) 18%, var(--pmod-panel));
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 14%, var(--pmod-panel));
 }
 
 html .productionPrototypePage .batchOperations label b,
@@ -270,10 +270,9 @@ html .productionPrototypePage .prototypeLogRow.level-error > b {
 }
 
 /* The production operator sequence is image asset first, then EPVR. Keep this
- * ordering in the authoritative stylesheet rather than relying on the legacy
- * operator-feedback chunk that was missed by the deployed build. */
+ * ordering in the authoritative stylesheet and in the DOM. */
 html .productionPrototypePage .productionBatchToolbar {
-  grid-template-columns: minmax(290px, .95fr) minmax(360px, 1.05fr) auto;
+  grid-template-columns: minmax(330px, .95fr) minmax(360px, 1.05fr) auto;
   grid-template-areas: "image operations actions";
 }
 
