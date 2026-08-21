@@ -10,8 +10,9 @@ from typing import Any
 from plasma_core.config import SiteConfig
 from plasma_core.enums import JobState, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.failure_policy import terminal_state_for_error
 from plasma_core.job_logging import JobEventLogger, OutputManager
-from plasma_core.models import ErrorDetail, ExecutionOutput, JobResult, iso_now
+from plasma_core.models import ErrorDetail, ExecutionOutput, JobAttemptResult, JobResult, iso_now
 from plasma_handlers.base import BaseHandler
 
 from .job_manager import JobRuntime
@@ -25,6 +26,7 @@ def _terminal_log_event(state: JobState) -> tuple[str, str]:
         JobState.TIMEOUT: ("job_timeout", "ERROR"),
         JobState.ABORTED: ("job_aborted", "ERROR"),
         JobState.FAILED: ("job_failed", "ERROR"),
+        JobState.ERROR: ("job_error", "ERROR"),
     }
     try:
         return events[state]
@@ -178,23 +180,31 @@ class SiteWorker:
             job_id=request.job_id,
             operation=request.operation,
         )
+        state = terminal_state_for_error(error)
+        if state not in {JobState.ERROR, JobState.TIMEOUT, JobState.CANCELLED}:
+            # An exception escaping _process is an execution-infrastructure
+            # failure even if the originating code used a generic error code.
+            state = JobState.ERROR
         result = JobResult(
             job_id=request.job_id,
             site_id=request.site_id,
             operation=request.operation,
-            state=JobState.FAILED,
+            state=state,
             created_at=runtime.created_at,
             started_at=runtime.started_at,
             finished_at=iso_now(),
             elapsed_ms=0,
-            attempts=0,
+            attempts=runtime.attempt,
+            retry_exhausted=runtime.retry_exhausted,
+            attempt_history=list(runtime.attempt_history),
             image_name=request.metadata.get("image_name"),
-            image_size=len(request.image),
-            image_sha256=request.image_sha256 if request.image else None,
+            image_size=request.image_size,
+            image_sha256=request.image_sha256 if request.has_image else None,
             error=detail,
         )
-        runtime.state = JobState.FAILED
+        runtime.state = result.state
         runtime.result = result
+        runtime.updated_at = iso_now()
         with contextlib.suppress(Exception):
             self.output.write_state(request.job_id, self._state_payload(runtime, detail))
             self.output.write_result(result)
@@ -213,8 +223,8 @@ class SiteWorker:
             "updated_at": runtime.updated_at,
             "client_id": request.client_id,
             "target": request.target,
-            "image_size": len(request.image),
-            "image_sha256": request.image_sha256 if request.image else None,
+            "image_size": request.image_size,
+            "image_sha256": request.image_sha256 if request.has_image else None,
             "stage": runtime.stage,
             "stage_state": runtime.stage_state,
             "stage_progress_percent": runtime.stage_progress_percent,
@@ -222,6 +232,8 @@ class SiteWorker:
             "bytes_done": runtime.bytes_done,
             "bytes_total": runtime.bytes_total,
             "attempt": runtime.attempt,
+            "attempt_history": [item.to_dict() for item in runtime.attempt_history],
+            "retry_exhausted": runtime.retry_exhausted,
             "cancel_requested": runtime.cancel_requested,
             "error": error.to_dict() if error else None,
         }
@@ -250,8 +262,9 @@ class SiteWorker:
                 operation=request.operation.value,
                 target=request.target,
                 client_id=request.client_id,
-                image_size=len(request.image),
-                image_sha256=request.image_sha256 if request.image else None,
+                image_size=request.image_size,
+                image_sha256=request.image_sha256 if request.has_image else None,
+                image_reference_scheme=request.image_ref.scheme if request.image_ref else None,
             )
             started_monotonic = time.monotonic()
             attempts = 0
@@ -285,6 +298,8 @@ class SiteWorker:
                 attempts += 1
                 runtime.attempt = attempts
                 runtime.updated_at = iso_now()
+                attempt_started_at = iso_now()
+                attempt_started_monotonic = time.monotonic()
                 logger.event("attempt_started", attempt=attempts)
                 runtime.active_task = asyncio.create_task(
                     self.handler.execute(request, stage_callback),
@@ -293,7 +308,6 @@ class SiteWorker:
                 try:
                     output = await asyncio.wait_for(runtime.active_task, timeout=request.timeout_s)
                     final_error = None
-                    break
                 except TimeoutError as exc:
                     final_error = PlasmaError(
                         ErrorCode.OPERATION_TIMEOUT,
@@ -319,18 +333,69 @@ class SiteWorker:
                 finally:
                     runtime.active_task = None
 
+                if final_error is None:
+                    runtime.attempt_history.append(
+                        JobAttemptResult(
+                            attempt=attempts,
+                            state=JobState.SUCCESS,
+                            started_at=attempt_started_at,
+                            finished_at=iso_now(),
+                            elapsed_ms=round((time.monotonic() - attempt_started_monotonic) * 1000),
+                        )
+                    )
+                    break
+
+                retry_scheduled = bool(
+                    not cancelled
+                    and final_error.recoverable
+                    and attempts <= request.max_retries
+                )
+                attempt_error = ErrorDetail.from_exception(
+                    final_error,
+                    site_id=request.site_id,
+                    job_id=request.job_id,
+                    operation=request.operation,
+                    retry_count=max(0, attempts - 1),
+                )
+                runtime.attempt_history.append(
+                    JobAttemptResult(
+                        attempt=attempts,
+                        state=terminal_state_for_error(final_error),
+                        started_at=attempt_started_at,
+                        finished_at=iso_now(),
+                        elapsed_ms=round((time.monotonic() - attempt_started_monotonic) * 1000),
+                        retry_scheduled=retry_scheduled,
+                        error=attempt_error,
+                    )
+                )
+                runtime.updated_at = iso_now()
+
                 if cancelled:
                     break
-                if final_error and final_error.recoverable and attempts <= request.max_retries:
+                if retry_scheduled:
                     logger.event(
                         "job_retry",
                         level="WARNING",
                         attempt=attempts,
                         error_code=final_error.code.value,
+                        failure_source=attempt_error.failure_source,
                         message=final_error.message,
                         backoff_s=request.retry_backoff_s,
                     )
-                    await self.handler.interface.safe_shutdown()
+                    try:
+                        await self.handler.interface.safe_shutdown()
+                    except Exception as exc:
+                        final_error = (
+                            exc
+                            if isinstance(exc, PlasmaError)
+                            else PlasmaError(
+                                ErrorCode.INTERFACE_FAILURE,
+                                "interface safe shutdown failed before retry",
+                                original_exception=exc,
+                                context={"phase": "retry_safe_shutdown"},
+                            )
+                        )
+                        break
                     if request.retry_backoff_s > 0:
                         try:
                             await asyncio.wait_for(
@@ -347,6 +412,9 @@ class SiteWorker:
                         )
                         break
                     continue
+                runtime.retry_exhausted = bool(
+                    final_error.recoverable and attempts > request.max_retries
+                )
                 break
 
             elapsed_ms = round((time.monotonic() - started_monotonic) * 1000)
@@ -372,18 +440,12 @@ class SiteWorker:
                     shutdown_error.context.setdefault("prior_error_message", final_error.message)
                 final_error = shutdown_error
 
-            if shutdown_error is not None:
-                state = JobState.FAILED
-                runtime.stage_state = "failed"
-            elif cancelled:
+            if cancelled:
                 state = JobState.CANCELLED
                 runtime.stage_state = "cancelled"
-            elif final_error and final_error.code is ErrorCode.OPERATION_TIMEOUT:
-                state = JobState.TIMEOUT
-                runtime.stage_state = "timeout"
             elif final_error:
-                state = JobState.FAILED
-                runtime.stage_state = "failed"
+                state = terminal_state_for_error(final_error)
+                runtime.stage_state = "error" if state is JobState.ERROR else state.value
             else:
                 state = JobState.SUCCESS
                 runtime.stage_state = "completed"
@@ -412,9 +474,11 @@ class SiteWorker:
                 finished_at=iso_now(),
                 elapsed_ms=elapsed_ms,
                 attempts=attempts,
+                retry_exhausted=runtime.retry_exhausted,
+                attempt_history=list(runtime.attempt_history),
                 image_name=request.metadata.get("image_name"),
-                image_size=len(request.image),
-                image_sha256=request.image_sha256 if request.image else None,
+                image_size=request.image_size,
+                image_sha256=request.image_sha256 if request.has_image else None,
                 error=error_detail,
                 details=output.details,
             )
@@ -428,7 +492,7 @@ class SiteWorker:
                     )
                     result.output_files = [str(path) for path in paths]
                 except PlasmaError as exc:
-                    result.state = JobState.FAILED
+                    result.state = JobState.ERROR
                     result.error = ErrorDetail.from_exception(
                         exc,
                         site_id=request.site_id,
@@ -448,7 +512,9 @@ class SiteWorker:
                 state=result.state.value,
                 elapsed_ms=result.elapsed_ms,
                 attempts=result.attempts,
+                retry_exhausted=result.retry_exhausted,
                 error_code=result.error.error_code if result.error else None,
+                failure_source=result.error.failure_source if result.error else None,
                 output_files=result.output_files,
             )
             if not runtime.future.done():
@@ -479,6 +545,11 @@ class SiteWorker:
             finished_at=iso_now(),
             elapsed_ms=0,
             attempts=0,
+            retry_exhausted=False,
+            attempt_history=list(runtime.attempt_history),
+            image_name=request.metadata.get("image_name"),
+            image_size=request.image_size,
+            image_sha256=request.image_sha256 if request.has_image else None,
             error=detail,
         )
         runtime.state = JobState.CANCELLED
