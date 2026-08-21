@@ -99,8 +99,10 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     } catch {
       // Storage is optional. The compiled default remains valid.
     }
-    setApiBaseState(saved);
-    setHydrated(true);
+    queueMicrotask(() => {
+      setApiBaseState(saved);
+      setHydrated(true);
+    });
   }, []);
 
   const setApiBase = useCallback((value: string): string => {
