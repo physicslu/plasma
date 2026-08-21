@@ -24,6 +24,35 @@ def load_baseline_harness() -> ModuleType:
     return module
 
 
+def write_ci_mock_profile(path: Path) -> None:
+    """Keep acceptance deterministic while production defaults remain realistic.
+
+    Product defaults intentionally inject low-rate failures. A regression test
+    must not depend on a probability draw, so the browser stack explicitly uses
+    a fixed, zero-error profile with short deterministic timings.
+    """
+    operation = {
+        "error_rate_per_mille": 0,
+        "base_time_ms": 0,
+        "throughput_bytes_per_second": 64 * 1024 * 1024,
+        "jitter_ms": 0,
+    }
+    payload = {
+        "profile_id": "ci-browser",
+        "revision": 1,
+        "enabled": True,
+        "default_image_size_bytes": 1024 * 1024,
+        "operations": {
+            "erase": dict(operation),
+            "program": dict(operation),
+            "verify": dict(operation),
+            "read": dict(operation),
+        },
+        "seed": {"mode": "fixed", "fixed_seed": 1},
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     cd = load_baseline_harness()
     artifact_dir = cd.ARTIFACT_DIR
@@ -53,6 +82,8 @@ def main() -> None:
 
         manager_config = work / "manager.yaml"
         cd.write_manager_config(manager_config, work)
+        ci_mock_profile = work / "mock-runtime-ci.json"
+        write_ci_mock_profile(ci_mock_profile)
 
         for item, config in zip(cd.PPUS, configs, strict=True):
             server = cd.start_process(
@@ -88,6 +119,8 @@ def main() -> None:
                         "--engineering-mock",
                         "--engineering-mock-root",
                         str(work / "engineering-mock"),
+                        "--engineering-mock-profile",
+                        str(ci_mock_profile),
                     ]
                 )
             gateway = cd.start_process(
