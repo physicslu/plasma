@@ -29,6 +29,9 @@ This contract does not claim that Plasma can perform volume-production qualifica
 | Term | Meaning |
 |---|---|
 | Device identifier | A CMSIS/DFP or vendor identifier that may represent a family, device, or orderable part. |
+| Manufacturer family | The original family classification supplied by the MCU manufacturer or authoritative device pack. |
+| Manufacturer subfamily | An optional narrower manufacturer classification; absence does not make a device unselectable. |
+| Plasma series | A simplified, deterministic target/profile grouping used as supporting search context, not a replacement for manufacturer family. |
 | Ordering pattern | A wildcard or pattern covering multiple orderable parts. It is not an exact part number. |
 | Part number | An exact orderable manufacturer part number when the source proves that granularity. |
 | Programming backend | The implementation used to program a device, such as OpenOCD, a vendor CLI, or a future Plasma-native/FPGA backend. |
@@ -299,7 +302,9 @@ The batch-close categories are mutually exclusive final `UnitRun` dispositions. 
 
 ## 9. Customer-facing presentation
 
-The normal device selector should keep status simple:
+The normal device selector must prioritize live, case-insensitive part-number search. A customer starts typing a chip identifier without first selecting a manufacturer, manufacturer family, subfamily, or Plasma series. Results rank exact identifier matches first, then prefix matches, then other partial matches. Manufacturer, original family, optional subfamily, and simplified Plasma series provide supporting result context and optional filtering only. Backend target/profile assignment remains automatic after a device is chosen; a family or series must never be treated as proof that every device has identical package, Socket, electrical, or programming compatibility.
+
+The normal device selector should also keep status simple:
 
 | UI label | Derived meaning |
 |---|---|
@@ -378,6 +383,7 @@ Before import into Plasma:
 
 - deduplicate identifiers using vendor-aware normalization;
 - retain original spelling and provenance;
+- preserve original manufacturer family/subfamily and the simplified Plasma series as independent classifications;
 - separate exact part numbers from CMSIS names and ordering patterns;
 - keep unmapped records available for research but hidden from the normal supported-device selector;
 - assign imported records `source_only`, relationships `mapping_candidate`, and configurations `not_verified`;

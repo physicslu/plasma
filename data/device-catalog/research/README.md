@@ -27,6 +27,11 @@ This research catalog recursively converts OpenOCD `tcl/target/**/*.cfg` entries
 - Expansion targets awaiting a source adapter/rule: 0
 - Helper/alias, external-only, Flashless, or invalid-TAP expansion targets deferred: 15
 - Canonical selectable identifiers after cross-catalog deduplication: 7,657
+- Canonical MCU vendors: 19
+- Manufacturer MCU families preserved: 310
+- Simplified Plasma series preserved: 141
+- Manufacturer MCU subfamilies when available: 862
+- Selectable identifiers without an optional subfamily: 908
 - Canonical selectable target configurations: 152
 - Cross-catalog target conflicts resolved: 34 STM32H7R/S identifiers
 - Canonical CPU architectures: ARM Cortex-M, ARM7TDMI, ARM966E-S, AVR, MIPS32, RISC-V, and Xtensa
@@ -34,14 +39,18 @@ This research catalog recursively converts OpenOCD `tcl/target/**/*.cfg` entries
 ## User-facing selection
 
 ```text
-Search part number
-or
-Vendor → Series → Part number
+Start typing a chip part number
+    -> exact match first
+    -> then prefix matches
+    -> then other partial matches
+    -> show vendor, original manufacturer family, and Plasma series beside each result
 ```
 
-The target seed establishes **Vendor → Series → OpenOCD target**. The first enrichment adds STMicroelectronics, NXP, Microchip, Nordic Semiconductor, and Texas Instruments. The second adds Infineon, Espressif, Silicon Labs, Nuvoton, and Renesas. CMSIS DFP is used where available; Espressif device identifiers come from the official ESP-IDF SoC tree. Every mapping remains `not_validated` until Plasma hardware qualification is complete.
+Part-number autocomplete is the primary user interaction. It must not require a customer to know the vendor, manufacturer family, subfamily, or Plasma series before searching. Matching should be case-insensitive and prefer exact identifier matches over prefix and other partial matches. Vendor filtering and classification text are optional refinements/result context, not mandatory selection steps.
 
-## Columns
+The target seed establishes **Vendor → Plasma series → OpenOCD target**, while manufacturer sources preserve their original **Family → Subfamily** hierarchy. The canonical selector catalog retains both independently because many manufacturer families can map to the same simplified Plasma series, while some OpenOCD target series are narrower than a manufacturer family. `subfamily` is optional and must not hide an otherwise selectable device. The first enrichment adds STMicroelectronics, NXP, Microchip, Nordic Semiconductor, and Texas Instruments. The second adds Infineon, Espressif, Silicon Labs, Nuvoton, and Renesas. CMSIS DFP is used where available; Espressif device identifiers come from the official ESP-IDF SoC tree. Every canonical mapping remains `mapping_candidate` and `not_verified` until physical qualification produces separate evidence.
+
+## Target-seed columns
 
 | Column | Meaning |
 |---|---|
@@ -52,6 +61,23 @@ The target seed establishes **Vendor → Series → OpenOCD target**. The first 
 | `device_type` | MCU, Wireless MCU, SoC, FPGA SoC, etc. |
 | `classification_status` | Auto-classified, Needs review, or Internal/helper |
 | `part_number` | Reserved for authoritative full part number enrichment |
+
+## Canonical selector columns
+
+| Column | Meaning |
+|---|---|
+| `vendor` | User-facing manufacturer name |
+| `family` | Original manufacturer-defined MCU family |
+| `subfamily` | Original manufacturer-defined MCU subfamily, or empty when unavailable |
+| `plasma_series` | Simplified Plasma/OpenOCD target grouping |
+| `part_number` | Searchable manufacturer/device identifier; interpret according to `identifier_kind` |
+| `identifier_kind` | Exact manufacturer part number, vendor/CMSIS device name, or ordering pattern |
+| `cpu_architectures` | JSON list of CPU architectures supported by the mapped Target CFG |
+| `target_config` | Deterministically selected OpenOCD target configuration |
+| `openocd_distribution` | Required upstream OpenOCD or vendor-specific backend distribution |
+| `mapping_status` | Backend mapping state; imported candidates are not hardware validation |
+| `validation_status` | Physical-validation state; this research snapshot remains `not_verified` |
+| `catalog_origin` | Source-specific research catalog from which the selected record originated |
 
 ## Usage rules
 
@@ -65,6 +91,8 @@ The target seed establishes **Vendor → Series → OpenOCD target**. The first 
 8. A target must have a known usable OpenOCD Flash programming backend before its devices can enter the user-facing mapped table. The current rule excludes 24 STM32N6 and 12 TLE987x identifiers. The seven Espressif identifiers require the official `openocd-esp32` distribution rather than the pinned upstream OpenOCD build.
 9. A device that exposes more than one CPU architecture, such as RP2350, remains one canonical identifier and lists every architecture supported by its Target CFG.
 10. When a baseline family CFG overlaps a narrower newly mapped CFG, prefer the narrower mapping and retain the decision in `openocd-duplicate-resolutions.csv`.
+11. Search by chip identifier first; never require users to choose a manufacturer family or Plasma series before finding their device.
+12. Preserve the original manufacturer family/subfamily separately from the simplified Plasma series; do not rewrite either classification into the other.
 
 ## Known limitations
 

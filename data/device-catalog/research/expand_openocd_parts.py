@@ -787,10 +787,25 @@ def build_canonical_catalog(
     openocd_root: Path,
     researched_csvs: list[Path],
     mapped_rows: list[dict[str, object]],
+    plasma_series_by_target: dict[str, str],
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     canonical: dict[tuple[str, str], dict[str, object]] = {}
     conflicts: list[dict[str, object]] = []
     architecture_cache: dict[str, list[str]] = {}
+
+    def classification(source: dict[str, object]) -> dict[str, str]:
+        target_config = str(source["target_config"])
+        family = str(source["family"]).strip()
+        plasma_series = plasma_series_by_target.get(target_config, "").strip()
+        if not family:
+            raise RuntimeError(f"missing manufacturer family for {source['vendor']} {source['part_number']}")
+        if not plasma_series:
+            raise RuntimeError(f"missing Plasma series for selectable target {target_config}")
+        return {
+            "family": family,
+            "subfamily": str(source.get("subfamily", "")).strip(),
+            "plasma_series": plasma_series,
+        }
 
     for path in researched_csvs:
         with path.open(encoding="utf-8", newline="") as handle:
@@ -802,6 +817,7 @@ def build_canonical_catalog(
                     architecture_cache[source["target_config"]] = architecture
                 row: dict[str, object] = {
                     "vendor": source["vendor"],
+                    **classification(source),
                     "part_number": source["part_number"],
                     "identifier_kind": source["identifier_kind"],
                     "cpu_architectures": architecture,
@@ -819,6 +835,7 @@ def build_canonical_catalog(
     for source in mapped_rows:
         row = {
             "vendor": source["vendor"],
+            **classification(source),
             "part_number": source["part_number"],
             "identifier_kind": source["identifier_kind"],
             "cpu_architectures": source["cpu_architectures"],
@@ -861,6 +878,14 @@ def main() -> None:
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    target_rows = json.loads(args.targets.read_text(encoding="utf-8"))["targets"]
+    plasma_series_by_target: dict[str, str] = {}
+    for target in target_rows:
+        target_config = str(target["target_config"])
+        if target_config in plasma_series_by_target:
+            raise RuntimeError(f"duplicate target configuration in target taxonomy: {target_config}")
+        plasma_series_by_target[target_config] = str(target["series"])
+
     metadata, capabilities = build_capabilities(args.openocd_root, args.targets, args.researched_csv)
     capability_by_target = {str(row["target_config"]): row for row in capabilities}
     sources = load_sources(args.index, args.cache, args.openocd_root)
@@ -899,7 +924,7 @@ def main() -> None:
             mapped.setdefault(key, row)
     mapped_rows = sorted(mapped.values(), key=lambda row: (str(row["vendor"]), str(row["part_number"]), str(row["target_config"])))
     canonical_rows, duplicate_resolutions = build_canonical_catalog(
-        args.openocd_root, args.researched_csv, mapped_rows
+        args.openocd_root, args.researched_csv, mapped_rows, plasma_series_by_target
     )
 
     mapping_counts = Counter(str(row["target_config"]) for row in mapped_rows)
@@ -950,8 +975,9 @@ def main() -> None:
     write_csv(
         args.output_dir / "openocd-parts-canonical.csv",
         [
-            "vendor", "part_number", "identifier_kind", "cpu_architectures", "target_config",
-            "openocd_distribution", "mapping_status", "validation_status", "catalog_origin",
+            "vendor", "family", "subfamily", "plasma_series", "part_number", "identifier_kind",
+            "cpu_architectures", "target_config", "openocd_distribution", "mapping_status",
+            "validation_status", "catalog_origin",
         ],
         canonical_rows,
     )
@@ -1020,6 +1046,21 @@ def main() -> None:
     outcome_counts = Counter(str(row["expansion_outcome"]) for row in outcomes)
     vendor_counts = Counter(str(row["vendor"]) for row in mapped_rows)
     kind_counts = Counter(str(row["identifier_kind"]) for row in mapped_rows)
+    canonical_vendor_count = len({str(row["vendor"]) for row in canonical_rows})
+    canonical_family_count = len(
+        {(str(row["vendor"]), str(row["family"])) for row in canonical_rows}
+    )
+    canonical_plasma_series_count = len(
+        {(str(row["vendor"]), str(row["plasma_series"])) for row in canonical_rows}
+    )
+    canonical_subfamily_count = len(
+        {
+            (str(row["vendor"]), str(row["family"]), str(row["subfamily"]))
+            for row in canonical_rows
+            if row["subfamily"]
+        }
+    )
+    canonical_without_subfamily_count = sum(not row["subfamily"] for row in canonical_rows)
     architecture_counts = Counter(
         architecture
         for row in canonical_rows
@@ -1056,6 +1097,11 @@ def main() -> None:
         f"- Pinned OpenOCD MCU Flash-driver part tables parsed: **{driver_count}**",
         f"- Pinned OpenOCD exact-MCU target definitions parsed: **{target_count}**",
         f"- Canonical unique identifiers across baseline and expansion: **{len(canonical_rows)}**",
+        f"- Canonical MCU vendors: **{canonical_vendor_count}**",
+        f"- Manufacturer MCU families preserved: **{canonical_family_count}**",
+        f"- Simplified Plasma series preserved: **{canonical_plasma_series_count}**",
+        f"- Manufacturer MCU subfamilies when available: **{canonical_subfamily_count}**",
+        f"- Selectable identifiers without an optional subfamily: **{canonical_without_subfamily_count}**",
         f"- Canonical unique target CFG files: **{len({str(row['target_config']) for row in canonical_rows})}**",
         f"- Baseline/expansion target conflicts resolved: **{len(duplicate_resolutions)}**",
         f"- Helper, external-memory, Flashless, or invalid-TAP targets deferred: **{outcome_counts['deferred']}**",
@@ -1089,6 +1135,7 @@ def main() -> None:
             "- `source_adapter_pending`: Flash is declared, but the current automated sources/rules are insufficient.",
             "- `deferred`: the CFG is a helper/alias, is Flashless, has an unresolved TAP ID, or resolves only an external/general-purpose Flash bank.",
             "- Canonical deduplication prefers the narrower expansion rule when a baseline family CFG overlaps.",
+            "- Part-number-first live search uses manufacturer family, optional subfamily, and Plasma series only as secondary context.",
             "- A dual-architecture device appears once in the canonical CSV and once under each supported architecture.",
             "",
         ]

@@ -52,9 +52,14 @@ Current execution checkpoint:
 | Flash-capable targets awaiting an adapter/rule | **0** |
 | Baseline/expansion target conflicts resolved | 34 |
 | Canonical unique device identifiers | 7,657 |
+| Canonical MCU vendors | 19 |
+| Original manufacturer MCU families retained | 310 |
+| Simplified Plasma target series retained | 141 |
+| Optional manufacturer MCU subfamilies retained | 862 |
+| Selectable identifiers without an optional subfamily | 908 |
 | Canonical unique target CFG files | 152 |
 
-The 1,931 expansion identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Combining the 5,760 baseline identifiers with the expansion and collapsing 34 overlapping STM32H7R/S identifiers produces 7,657 canonical unique device identifiers. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint, then run `validate_openocd_expansion.py` offline.
+The 1,931 expansion identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Combining the 5,760 baseline identifiers with the expansion and collapsing 34 overlapping STM32H7R/S identifiers produces 7,657 canonical unique device identifiers. Every canonical record retains both its original manufacturer family and its simplified Plasma series; manufacturer subfamily is preserved when available. Future customer lookup must be live and identifier-first: exact matches rank before prefix and partial matches, while manufacturer/family/series remain supporting context rather than prerequisite selection steps. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint, then run `validate_openocd_expansion.py` offline.
 
 The 15 deferred CFGs consist of 11 helper/alias definitions, one external-Flash-only configuration, one Flashless LPC2460 configuration, and two configurations with unresolved `0xffffffff` JTAG TAP IDs. None is presented as a selectable MCU mapping.
 
@@ -155,7 +160,7 @@ For every CFG admitted from Wave 1 or Wave 2:
 1. Resolve the concrete Target CFG and Flash driver.
 2. Identify the authoritative vendor source and record its version and license metadata.
 3. Extract device names, ordering patterns, exact part numbers, packages, and memory sizes without conflating those identifier kinds.
-4. Normalize vendor/family names while preserving original spelling and provenance.
+4. Normalize vendor names while preserving the original manufacturer family/subfamily, separately deriving the Plasma series from the selected Target CFG.
 5. Apply a versioned vendor-specific mapping rule.
 6. Reject ambiguous many-to-many matches into an exception queue.
 7. Deduplicate aliases and common/base CFG relationships.

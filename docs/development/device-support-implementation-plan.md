@@ -65,6 +65,7 @@ Tasks:
 
 - [ ] Define a versioned JSON Schema for catalog records and provenance.
 - [ ] Normalize manufacturer names without losing the original source value.
+- [ ] Preserve original manufacturer family, optional manufacturer subfamily, and simplified Plasma series independently in every selectable catalog record.
 - [ ] Represent `family_alias`, `cmsis_device_name`, `ordering_pattern`, and `exact_part_number` explicitly.
 - [ ] Assign imported records `source_only`, backend relationships `mapping_candidate`, and configurations `not_verified` only.
 - [ ] Preserve unmapped research records separately from selectable records.
@@ -129,7 +130,8 @@ Tasks:
 
 - [ ] Extend the existing Plasma Web REST Gateway; do not assume FastAPI or WebSocket.
 - [ ] Specify REST contracts before implementation.
-- [ ] Provide vendor/family/identifier search with pagination and filters.
+- [ ] Provide live, case-insensitive identifier-first search with pagination; rank exact matches before prefix matches and other partial matches.
+- [ ] Expose manufacturer, original family, optional subfamily, and Plasma series as result context and optional filters; never require them before a part-number search.
 - [ ] Provide device details, candidate programming profiles, compatible programming configurations, limitations, and evidence summaries.
 - [ ] Expose model-level compatibility separately from current PPU/Site/Socket instance health.
 - [ ] Add Engineering-mode actions for authorized validation records.
@@ -182,7 +184,9 @@ Exit criteria: catalog refresh and product updates cannot silently overstate or 
 
 ```text
 manufacturer
-family
+manufacturer_family
+manufacturer_subfamily (nullable when unavailable)
+plasma_series
 identifier
 identifier_kind
 package (nullable until authoritative)

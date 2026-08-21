@@ -15,6 +15,11 @@ OpenOCD source commit: `56b8d93fbe61a78dc903d770820d6d896b6d8134`
 - Pinned OpenOCD MCU Flash-driver part tables parsed: **5**
 - Pinned OpenOCD exact-MCU target definitions parsed: **7**
 - Canonical unique identifiers across baseline and expansion: **7657**
+- Canonical MCU vendors: **19**
+- Manufacturer MCU families preserved: **310**
+- Simplified Plasma series preserved: **141**
+- Manufacturer MCU subfamilies when available: **862**
+- Selectable identifiers without an optional subfamily: **908**
 - Canonical unique target CFG files: **152**
 - Baseline/expansion target conflicts resolved: **34**
 - Helper, external-memory, Flashless, or invalid-TAP targets deferred: **15**
@@ -62,4 +67,5 @@ Every mapped row remains `not_verified`. This report proves only a deterministic
 - `source_adapter_pending`: Flash is declared, but the current automated sources/rules are insufficient.
 - `deferred`: the CFG is a helper/alias, is Flashless, has an unresolved TAP ID, or resolves only an external/general-purpose Flash bank.
 - Canonical deduplication prefers the narrower expansion rule when a baseline family CFG overlaps.
+- Part-number-first live search uses manufacturer family, optional subfamily, and Plasma series only as secondary context.
 - A dual-architecture device appears once in the canonical CSV and once under each supported architecture.

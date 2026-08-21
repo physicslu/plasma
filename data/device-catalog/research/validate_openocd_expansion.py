@@ -21,6 +21,7 @@ def main() -> None:
     parts = csv_rows("openocd-parts-expanded.csv")
     outcomes = csv_rows("openocd-expansion-outcomes.csv")
     canonical = csv_rows("openocd-parts-canonical.csv")
+    target_catalog = csv_rows("plasma_openocd_target_catalog.csv")
     resolutions = csv_rows("openocd-duplicate-resolutions.csv")
     baseline = csv_rows("plasma_openocd_parts_top5_mapped.csv") + csv_rows(
         "plasma_openocd_parts_next5_mapped.csv"
@@ -143,6 +144,38 @@ def main() -> None:
         (row["vendor"], row["part_number"].upper()) for row in baseline + parts
     }
     assert len({row["target_config"] for row in canonical}) == metadata["canonical_target_count"]
+    plasma_series_by_target = {row["target_config"]: row["series"] for row in target_catalog}
+    assert len(plasma_series_by_target) == len(target_catalog)
+    assert all(row["family"].strip() and row["plasma_series"].strip() for row in canonical)
+    assert all(
+        row["plasma_series"] == plasma_series_by_target[row["target_config"]]
+        for row in canonical
+    )
+    source_by_mapping = {
+        (row["vendor"], row["part_number"].upper(), row["target_config"]): row
+        for row in baseline + parts
+    }
+    assert all(
+        (
+            row["family"]
+            == source_by_mapping[(row["vendor"], row["part_number"].upper(), row["target_config"])]["family"]
+            and row["subfamily"]
+            == source_by_mapping[(row["vendor"], row["part_number"].upper(), row["target_config"])]["subfamily"]
+        )
+        for row in canonical
+    )
+    vendor_count = len({row["vendor"] for row in canonical})
+    family_count = len({(row["vendor"], row["family"]) for row in canonical})
+    plasma_series_count = len({(row["vendor"], row["plasma_series"]) for row in canonical})
+    subfamily_count = len(
+        {
+            (row["vendor"], row["family"], row["subfamily"])
+            for row in canonical
+            if row["subfamily"]
+        }
+    )
+    assert (vendor_count, family_count, plasma_series_count, subfamily_count) == (19, 310, 141, 862)
+    assert sum(not row["subfamily"] for row in canonical) == 908
     assert len(resolutions) == metadata["cross_catalog_duplicate_count"]
     canonical_by_key = {(row["vendor"], row["part_number"].upper()): row for row in canonical}
     assert all(
@@ -166,6 +199,8 @@ def main() -> None:
         f"114 candidates; {len(parts):,} expansion identifiers; "
         f"{metadata['mapped_target_count']} mapped targets; "
         f"{len(canonical):,} canonical identifiers; "
+        f"{vendor_count} vendors; {family_count} manufacturer families; "
+        f"{plasma_series_count} Plasma series; {subfamily_count} optional subfamilies; "
         f"{metadata['source_pack_count']} pinned PDSCs; "
         f"{len(resolutions)} target conflicts resolved"
     )
