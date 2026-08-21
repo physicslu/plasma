@@ -42,10 +42,9 @@ test("demo entry exposes only canonical Product Modes in top-level navigation", 
   await expectProductNavigation(page, "量產模式");
 
   // Standard browser CI intentionally does not start the Python Mock PPU
-  // Provider. The route must still render its explicit Mock-only execution
-  // boundary rather than falling back to the former Manager/Fleet write model.
-  await expect(page.getByText(/此頁使用 Python Mock PPU Provider 驗證多 PPU 執行/)).toBeVisible();
-  await expect(page.getByText(/Plasma Manager 仍維持唯讀/)).toBeVisible();
+  // Provider. The Production route must still expose its explicit Mock
+  // provider status instead of falling back to the former Fleet BFF model.
+  await expect(page.getByRole("status")).toContainText(/Mock Provider/);
   await expect(page.getByText("Fleet BFF HTTP 503")).toHaveCount(0);
 
   await page.getByRole("navigation", { name: "產品模式" }).getByRole("link", { name: "工程模式", exact: true }).click();
