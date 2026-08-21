@@ -8,7 +8,7 @@ from typing import Any
 
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.mock_flash import MockFlashState
-from plasma_core.mock_image_store import SharedImageStore
+from plasma_core.mock_image_store import SharedImageStore, default_mock_image_store
 
 from .base import BaseInterface, ProgressCallback
 
@@ -46,8 +46,8 @@ class MockInterface(BaseInterface):
     progress_steps: int = 20
     tracker: MockActivityTracker | None = None
     image_store: SharedImageStore | None = field(default=None, repr=False)
-    memory: bytearray | None = field(init=False, default=None, repr=False)
-    flash_state: MockFlashState | None = field(init=False, default=None, repr=False)
+    memory: None = field(init=False, default=None, repr=False)
+    flash_state: MockFlashState = field(init=False, repr=False)
     calls: Counter[str] = field(default_factory=Counter, init=False)
     shutdown_count: int = field(default=0, init=False)
 
@@ -105,15 +105,12 @@ class MockInterface(BaseInterface):
                 raise PlasmaError(ErrorCode.CONFIG_INVALID, f"invalid mock failure count for {operation}")
 
         if self.image_store is None:
-            self.memory = bytearray([0xFF]) * self.flash_size
-            self.flash_state = None
-        else:
-            self.memory = None
-            self.flash_state = MockFlashState(self.flash_size)
+            self.image_store = default_mock_image_store()
+        self.flash_state = MockFlashState(self.flash_size)
 
     @property
     def uses_shared_image_store(self) -> bool:
-        return self.image_store is not None
+        return True
 
     @staticmethod
     def _validate_operation_name(operation: str, option_name: str) -> None:
@@ -231,11 +228,7 @@ class MockInterface(BaseInterface):
 
     async def erase(self, progress: ProgressCallback | None = None) -> None:
         await self._before("erase", progress, self.flash_size)
-        if self.flash_state is not None:
-            self.flash_state.erase()
-            return
-        assert self.memory is not None
-        self.memory[:] = bytes([0xFF]) * self.flash_size
+        self.flash_state.erase()
 
     async def program(
         self,
@@ -245,16 +238,13 @@ class MockInterface(BaseInterface):
     ) -> None:
         self._validate_range(address, len(image))
         await self._before("program", progress, len(image))
-        if self.flash_state is not None and self.image_store is not None:
-            ref = self.image_store.put(image)
-            self.flash_state.program_shared(
-                image_sha256=ref.sha256,
-                image_size_bytes=ref.size_bytes,
-                address=address,
-            )
-            return
-        assert self.memory is not None
-        self.memory[address : address + len(image)] = image
+        assert self.image_store is not None
+        ref = self.image_store.put(image)
+        self.flash_state.program_shared(
+            image_sha256=ref.sha256,
+            image_size_bytes=ref.size_bytes,
+            address=address,
+        )
 
     async def verify(
         self,
@@ -264,29 +254,16 @@ class MockInterface(BaseInterface):
     ) -> None:
         self._validate_range(address, len(image))
         await self._before("verify", progress, len(image))
-        if self.flash_state is not None and self.image_store is not None:
-            mismatch = self.flash_state.verify(self.image_store, image, address)
-            if mismatch is None:
-                return
-            raise PlasmaError(
-                ErrorCode.VERIFY_FAILED,
-                "flash verification mismatch",
-                recoverable=True,
-                context={"address": mismatch, "failure_source": "data_mismatch"},
-            )
-        assert self.memory is not None
-        actual = bytes(self.memory[address : address + len(image)])
-        if actual != image:
-            mismatch = next(
-                (index for index, pair in enumerate(zip(actual, image, strict=True)) if pair[0] != pair[1]),
-                None,
-            )
-            raise PlasmaError(
-                ErrorCode.VERIFY_FAILED,
-                "flash verification mismatch",
-                recoverable=True,
-                context={"address": address + (mismatch or 0), "failure_source": "data_mismatch"},
-            )
+        assert self.image_store is not None
+        mismatch = self.flash_state.verify(self.image_store, image, address)
+        if mismatch is None:
+            return
+        raise PlasmaError(
+            ErrorCode.VERIFY_FAILED,
+            "flash verification mismatch",
+            recoverable=True,
+            context={"address": mismatch, "failure_source": "data_mismatch"},
+        )
 
     async def read(
         self,
@@ -296,10 +273,8 @@ class MockInterface(BaseInterface):
     ) -> bytes:
         self._validate_range(address, length)
         await self._before("read", progress, length)
-        if self.flash_state is not None and self.image_store is not None:
-            return self.flash_state.read(self.image_store, address, length)
-        assert self.memory is not None
-        return bytes(self.memory[address : address + length])
+        assert self.image_store is not None
+        return self.flash_state.read(self.image_store, address, length)
 
     async def safe_shutdown(self) -> None:
         self.shutdown_count += 1
