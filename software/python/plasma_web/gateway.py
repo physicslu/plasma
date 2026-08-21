@@ -14,7 +14,8 @@ from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway_legacy as legacy
 from .batch_runtime import BatchRuntimeManager
-from .engineering_targets import EngineeringPPUProvider, MockEngineeringPPUProvider
+from .engineering_targets import EngineeringPPUProvider
+from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
 FLEET_CONTRACT_VERSION = legacy.FLEET_CONTRACT_VERSION
@@ -330,10 +331,10 @@ def main() -> None:
     if args.static_root is not None and not (args.static_root / "index.html").is_file():
         parser.error(f"static root must contain index.html: {args.static_root}")
 
-    provider: MockEngineeringPPUProvider | None = None
+    provider: SharedImageMockEngineeringPPUProvider | None = None
     try:
         if args.engineering_mock:
-            provider = MockEngineeringPPUProvider(
+            provider = SharedImageMockEngineeringPPUProvider(
                 args.engineering_mock_root,
                 flash_size_bytes=args.engineering_mock_flash_size,
             )
