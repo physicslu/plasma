@@ -64,6 +64,10 @@ class STM32F103Handler(BaseHandler):
         return result
 
     async def execute(self, request: JobRequest, stage_callback: StageCallback) -> ExecutionOutput:
+        # SiteWorker calls the handler once per attempt. The interface hook is
+        # therefore also one-per-attempt without exposing Mock concepts to the
+        # generic retry engine.
+        self.interface.prepare_request(request)
         operation = request.operation
         if operation is Operation.ERASE:
             await self._stage(
