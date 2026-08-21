@@ -1,16 +1,9 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
 
-type StartObservation = {
-  ppuId: string;
-  siteId: number;
-  operation: string;
-  observedAtMs: number;
-};
-
 const facilityId = process.env.MOCK_CD_PRODUCTION_FACILITY_ID ?? "mock-facility-01";
 const ppuOne = process.env.MOCK_CD_PRODUCTION_PPU_ONE ?? `${facilityId}-ppu-01`;
 const ppuTwo = process.env.MOCK_CD_PRODUCTION_PPU_TWO ?? `${facilityId}-ppu-02`;
-const targetJobPath = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/jobs$/;
+const browserJobPath = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/jobs$/;
 
 function ppuCard(page: Page, ppuId: string) {
   return page.locator(`[data-production-target="${facilityId}::${ppuId}"]`);
@@ -49,51 +42,61 @@ async function openTwoPpuProductionSet(page: Page) {
   return { first, second };
 }
 
-function observeStarts(page: Page, starts: StartObservation[]) {
+function observeBrowserOwnership(page: Page) {
+  const batchBodies: Array<Record<string, unknown>> = [];
+  const batchPpuCancels: string[] = [];
+  let browserJobPosts = 0;
   page.on("request", (request: Request) => {
     if (request.method() !== "POST") return;
     const url = new URL(request.url());
-    const match = targetJobPath.exec(url.pathname);
-    if (!match) return;
-    const body = request.postDataJSON() as { site_id?: number; operation?: string };
-    if (typeof body.site_id !== "number" || typeof body.operation !== "string") return;
-    starts.push({
-      ppuId: decodeURIComponent(match[2]),
-      siteId: body.site_id,
-      operation: body.operation,
-      observedAtMs: Date.now(),
-    });
+    if (url.pathname === "/api/batches") {
+      batchBodies.push(request.postDataJSON() as Record<string, unknown>);
+      return;
+    }
+    if (browserJobPath.test(url.pathname)) {
+      browserJobPosts += 1;
+      return;
+    }
+    const ppuCancel = /^\/api\/batches\/[^/]+\/targets\/([^/]+)\/([^/]+)\/cancel$/.exec(url.pathname);
+    if (ppuCancel) batchPpuCancels.push(decodeURIComponent(ppuCancel[2]));
   });
+  return {
+    batchBodies,
+    batchPpuCancels,
+    browserJobPosts: () => browserJobPosts,
+  };
 }
 
-test("real Production Mock starts two different PPUs concurrently and completes both", async ({ page }) => {
-  const starts: StartObservation[] = [];
-  observeStarts(page, starts);
+test("real Production Mock submits one server Batch for two PPUs and completes both", async ({ page }) => {
+  const ownership = observeBrowserOwnership(page);
   const { first, second } = await openTwoPpuProductionSet(page);
 
   await page.locator(".executeBatchButton").click();
 
+  await expect.poll(() => ownership.batchBodies.length, { timeout: 5_000 }).toBe(1);
+  const body = ownership.batchBodies[0] as {
+    targets?: Array<{ ppu_id?: string }>;
+    execution_policy?: Record<string, unknown>;
+  };
+  expect(body.targets?.map(target => target.ppu_id)).toEqual([ppuOne, ppuTwo]);
+  expect(body.execution_policy).toEqual({
+    repeat_count: 1,
+    site_retry_limit: 0,
+    failed_site_stop_threshold: null,
+  });
+  expect(ownership.browserJobPosts()).toBe(0);
+
   await expect(first.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
   await expect(second.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
 
-  await expect.poll(() => new Set(starts.map(item => item.ppuId)).size, { timeout: 5_000 }).toBe(2);
-  const firstStartByPpu = new Map<string, number>();
-  for (const item of starts) {
-    if (!firstStartByPpu.has(item.ppuId)) firstStartByPpu.set(item.ppuId, item.observedAtMs);
-  }
-  expect(firstStartByPpu.has(ppuOne)).toBe(true);
-  expect(firstStartByPpu.has(ppuTwo)).toBe(true);
-  expect(Math.abs((firstStartByPpu.get(ppuOne) ?? 0) - (firstStartByPpu.get(ppuTwo) ?? 0))).toBeLessThan(1_500);
-
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
-  await expect(page.locator(".batchState")).toContainText("BATCH READY");
-  await expect(page.locator(".productionPrototypeLog")).toContainText("[BAT] COMPLETE");
+  await expect(page.locator(".serverBatchStatistics")).toHaveAttribute("data-batch-state", "success");
+  expect(ownership.browserJobPosts()).toBe(0);
 });
 
-test("real Production Mock cancels one PPU without stopping the other", async ({ page }) => {
-  const starts: StartObservation[] = [];
-  observeStarts(page, starts);
+test("real Production Mock cancels one PPU through Batch endpoint without stopping the other", async ({ page }) => {
+  const ownership = observeBrowserOwnership(page);
   const { first } = await openTwoPpuProductionSet(page);
 
   await page.locator(".executeBatchButton").click();
@@ -101,12 +104,11 @@ test("real Production Mock cancels one PPU without stopping the other", async ({
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
 
   await first.getByRole("button", { name: "Cancel PPU", exact: true }).click();
+  await expect.poll(() => ownership.batchPpuCancels, { timeout: 5_000 }).toContain(ppuOne);
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
-  await expect(page.locator(".batchState")).toContainText("BATCH READY");
+  await expect(page.locator(".serverBatchStatistics")).toHaveAttribute("data-batch-state", "partial");
 
-  const log = page.locator(".productionPrototypeLog");
-  await expect(log).toContainText(`[PPU] CANCEL REQUESTED · ${facilityId}::${ppuOne}`);
-  await expect(log).toContainText("[BAT] PARTIAL");
-  await expect(log).not.toContainText(`[PPU] CANCEL REQUESTED · ${facilityId}::${ppuTwo}`);
+  expect(ownership.batchPpuCancels).not.toContain(ppuTwo);
+  expect(ownership.browserJobPosts()).toBe(0);
 });
