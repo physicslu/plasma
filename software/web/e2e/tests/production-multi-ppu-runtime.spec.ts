@@ -87,7 +87,7 @@ test("real Production Mock starts two different PPUs concurrently and completes 
 
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
-  await expect(page.locator(".batchState")).toContainText("COMPLETE");
+  await expect(page.locator(".batchState")).toContainText("BATCH READY");
   await expect(page.locator(".productionPrototypeLog")).toContainText("[BAT] COMPLETE");
 });
 
@@ -103,7 +103,7 @@ test("real Production Mock cancels one PPU without stopping the other", async ({
   await first.getByRole("button", { name: "Cancel PPU", exact: true }).click();
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
-  await expect(page.locator(".batchState")).toContainText("PARTIAL");
+  await expect(page.locator(".batchState")).toContainText("BATCH READY");
 
   const log = page.locator(".productionPrototypeLog");
   await expect(log).toContainText(`[PPU] CANCEL REQUESTED · ${facilityId}::${ppuOne}`);
