@@ -155,6 +155,25 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
             },
         )
 
+    def _batch_error(self, exc: Exception) -> None:
+        if isinstance(exc, PlasmaError) and exc.code in {
+            ErrorCode.JOB_NOT_FOUND,
+            ErrorCode.BATCH_NOT_FOUND,
+        }:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {
+                    "ok": False,
+                    "error": {
+                        "error_code": exc.code.value,
+                        "error_type": exc.error_type,
+                        "message": exc.message,
+                    },
+                },
+            )
+            return
+        self._error(exc)
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         tail = self._batch_path(parsed.path)
@@ -170,7 +189,7 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
                 return
             self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
         except Exception as exc:
-            self._error(exc)
+            self._batch_error(exc)
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
@@ -236,7 +255,7 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
                 return
             self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
         except Exception as exc:
-            self._error(exc)
+            self._batch_error(exc)
 
 
 def serve(
