@@ -8,6 +8,7 @@ export default defineConfig({
     "mock-cd-runtime.spec.ts",
     "engineering-programming-asset-cache-runtime.spec.ts",
     "production-multi-ppu-runtime.spec.ts",
+    "mock-runtime-settings-runtime.spec.ts",
   ],
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
