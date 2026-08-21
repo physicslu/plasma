@@ -179,6 +179,9 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 async function encodeProgrammingAsset(file: File) {
+  if (file.size <= 0) {
+    throw new ServerBatchApiError("Programming Asset must not be empty");
+  }
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
   const digest = await window.crypto.subtle.digest("SHA-256", buffer);
@@ -206,7 +209,9 @@ export async function createServerBatch(
   if (usesAsset && !options.sessionId) {
     throw new ServerBatchApiError("Program / Verify Batch requires an Engineering session");
   }
-  const asset = options.assetFile ? await encodeProgrammingAsset(options.assetFile) : undefined;
+  const asset = usesAsset && options.assetFile
+    ? await encodeProgrammingAsset(options.assetFile)
+    : undefined;
   const payload = await requestBatchJson<BatchPayload>(
     apiBase,
     "/api/batches",
