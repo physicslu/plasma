@@ -1,0 +1,115 @@
+vendor,target_config,capability_status,expansion_outcome,mapped_identifier_count,reason,validation_status
+Analog Devices,tcl/target/aduc702x.cfg,flash_driver_declared,mapped,33,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/aducm360.cfg,flash_driver_declared,mapped,4,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32620.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32625.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max3263x.cfg,flash_driver_declared,mapped,2,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32650.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32655.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32660.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32662.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32670.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32672.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32675.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32680.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32690.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Analog Devices,tcl/target/max32xxx_common.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+Artery,tcl/target/artery/at32f4x.cfg,flash_driver_declared,mapped,107,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Bouffalo Lab,tcl/target/bl602.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Bouffalo Lab,tcl/target/bl602_common.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+Bouffalo Lab,tcl/target/bl702.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Bouffalo Lab,tcl/target/bl702l.cfg,flash_driver_declared,mapped,2,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Cypress/Fujitsu,tcl/target/fm3.cfg,flash_driver_declared,mapped,243,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Cypress/Fujitsu,tcl/target/fm4_mb9bf.cfg,flash_driver_declared,mapped,60,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Cypress/Fujitsu,tcl/target/fm4_s6e2cc.cfg,flash_driver_declared,mapped,9,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Geehy,tcl/target/geehy/apm32f0x.cfg,flash_driver_declared,mapped,38,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Geehy,tcl/target/geehy/apm32f1x.cfg,flash_driver_declared,mapped,32,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Geehy,tcl/target/geehy/apm32f4x.cfg,flash_driver_declared,mapped,54,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+GigaDevice,tcl/target/gigadevice/gd32e23x.cfg,flash_driver_declared,mapped,15,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+GigaDevice,tcl/target/gigadevice/gd32vf103.cfg,flash_driver_declared,mapped,14,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Holtek,tcl/target/holtek/ht32f4x.cfg,flash_driver_declared,mapped,30,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Infineon,tcl/target/psoc5lp.cfg,flash_driver_declared,mapped,18,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3ax_4x.cfg,flash_driver_declared,mapped,3,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3ax_8x.cfg,flash_driver_declared,mapped,4,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3nXX.cfg,flash_driver_declared,mapped,14,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3sXX.cfg,flash_driver_declared,mapped,13,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3u1c.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3u1e.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3u2c.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3u2e.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3u4c.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam3u4e.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam4c32x.cfg,flash_driver_declared,mapped,4,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam4cXXX.cfg,flash_driver_declared,mapped,10,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam4lXX.cfg,flash_driver_declared,mapped,18,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam4sXX.cfg,flash_driver_declared,mapped,15,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam4sd32x.cfg,flash_driver_declared,mapped,2,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam7se512.cfg,needs_review,deferred,0,Target defaults its unresolved JTAG TAP ID to the invalid value 0xffffffff,not_verified
+Microchip,tcl/target/at91sam7sx.cfg,flash_driver_declared,mapped,3,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam7x256.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam7x512.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/at91sam9260_ext_RAM_ext_flash.cfg,external_flash_only,deferred,0,Only an external/general-purpose Flash bank was resolved,not_verified
+Microchip,tcl/target/at91samg5x.cfg,flash_driver_declared,mapped,9,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/atmega128.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/atmega128rfa1.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/atmega32u4.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Microchip,tcl/target/pic32mx.cfg,flash_driver_declared,mapped,128,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NIIET,tcl/target/k1921vk01t.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/k40.cfg,flash_driver_declared,mapped,6,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/k60.cfg,flash_driver_declared,mapped,7,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/kl25.cfg,flash_driver_declared,mapped,3,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc11xx.cfg,flash_driver_declared,mapped,128,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc12xx.cfg,flash_driver_declared,mapped,12,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc13xx.cfg,flash_driver_declared,mapped,24,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc17xx.cfg,flash_driver_declared,mapped,21,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc1xxx.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+NXP,tcl/target/lpc2103.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc2124.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc2129.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc2148.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc2294.cfg,needs_review,deferred,0,Target has an unresolved JTAG TAP ID explicitly set to 0xffffffff,not_verified
+NXP,tcl/target/lpc2378.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc2460.cfg,flash_driver_missing,deferred,0,Flashless MCU; target configuration explicitly sets internal Flash size to zero,not_verified
+NXP,tcl/target/lpc2478.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc2900.cfg,flash_driver_declared,mapped,11,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc2xxx.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+NXP,tcl/target/lpc40xx.cfg,flash_driver_declared,mapped,16,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc4357.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc8nxx.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/lpc8xx.cfg,flash_driver_declared,mapped,20,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/nhs31xx.cfg,flash_driver_declared,mapped,3,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+NXP,tcl/target/s32k.cfg,flash_driver_declared,mapped,8,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Nuvoton,tcl/target/npcx.cfg,flash_driver_declared,mapped,3,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Nuvoton,tcl/target/numicro_m4.cfg,flash_driver_declared,mapped,207,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Raspberry Pi,tcl/target/rp2040.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Raspberry Pi,tcl/target/rp2350.cfg,flash_driver_declared,mapped,2,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/bluenrg-x.cfg,flash_driver_declared,mapped,5,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/stm32h7rsx.cfg,flash_driver_declared,mapped,34,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/stm32h7x_dual_bank.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+STMicroelectronics,tcl/target/stm32l0_dual_bank.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+STMicroelectronics,tcl/target/stm32l1x_dual_bank.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+STMicroelectronics,tcl/target/stm32w108xx.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/stm32wba2x.cfg,flash_driver_declared,mapped,8,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/stm32wba5x.cfg,flash_driver_declared,mapped,34,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/stm32wba6x.cfg,flash_driver_declared,mapped,19,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/stm32wbx.cfg,flash_driver_declared,mapped,23,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/stm32wlx.cfg,flash_driver_declared,mapped,17,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/stm32x5x_common.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+STMicroelectronics,tcl/target/stm32xl.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+STMicroelectronics,tcl/target/str710.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/str730.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/str750.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+STMicroelectronics,tcl/target/str912.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Silicon Labs,tcl/target/em357.cfg,flash_driver_declared,mapped,4,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Silicon Labs,tcl/target/em358.cfg,flash_driver_declared,mapped,8,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Silicon Labs,tcl/target/silabs/series0.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+Silicon Labs,tcl/target/silabs/series2.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
+Silicon Labs,tcl/target/sim3x.cfg,flash_driver_declared,mapped,30,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Texas Instruments,tcl/target/ti/cc13x0.cfg,flash_driver_declared,mapped,2,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Texas Instruments,tcl/target/ti/cc13x2.cfg,flash_driver_declared,mapped,3,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Texas Instruments,tcl/target/ti/cc26x0.cfg,flash_driver_declared,mapped,2,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Texas Instruments,tcl/target/ti/cc26x2.cfg,flash_driver_declared,mapped,4,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Texas Instruments,tcl/target/ti/cc26x2x7.cfg,flash_driver_declared,mapped,2,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Texas Instruments,tcl/target/ti/cc3220sf.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Texas Instruments,tcl/target/ti/stellaris.cfg,flash_driver_declared,mapped,340,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+XMOS,tcl/target/xmos_xs1-xau8a-10_arm.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified

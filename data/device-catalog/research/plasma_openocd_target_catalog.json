@@ -1,0 +1,3602 @@
+{
+  "schema_version": "1.0",
+  "source": {
+    "repository": "openocd-org/openocd",
+    "ref": "master",
+    "commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+    "path": "tcl/target/*.cfg"
+  },
+  "targets": [
+    {
+      "vendor": "Unclassified",
+      "series": "1986ВЕ1Т",
+      "display_name": "1986Ве1Т",
+      "target_config": "tcl/target/1986ве1т.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "ADSP-SC58X",
+      "display_name": "Adsp-Sc58X",
+      "target_config": "tcl/target/adsp-sc58x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "ADUC702X",
+      "display_name": "Aduc702X",
+      "target_config": "tcl/target/aduc702x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "ADUCM360",
+      "display_name": "Aducm360",
+      "target_config": "tcl/target/aducm360.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Allwinner",
+      "series": "ALLWINNER H618",
+      "display_name": "Allwinner H618",
+      "target_config": "tcl/target/allwinner_h618.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Allwinner",
+      "series": "ALLWINNER V3S",
+      "display_name": "Allwinner V3S",
+      "target_config": "tcl/target/allwinner_v3s.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "ALPHASCALE ASM9260T",
+      "display_name": "Alphascale Asm9260T",
+      "target_config": "tcl/target/alphascale_asm9260t.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Intel/Altera",
+      "series": "ALTERA FPGASOC",
+      "display_name": "Altera Fpgasoc",
+      "target_config": "tcl/target/altera_fpgasoc.cfg",
+      "device_type": "FPGA SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Intel/Altera",
+      "series": "ALTERA FPGASOC ARRIA10",
+      "display_name": "Altera Fpgasoc Arria10",
+      "target_config": "tcl/target/altera_fpgasoc_arria10.cfg",
+      "device_type": "FPGA SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "AMPERE EMAG",
+      "display_name": "Ampere Emag",
+      "target_config": "tcl/target/ampere_emag.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "AMPERE QS MQ",
+      "display_name": "Ampere Qs Mq",
+      "target_config": "tcl/target/ampere_qs_mq.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm/Atheros",
+      "series": "AR71XX",
+      "display_name": "Ar71Xx",
+      "target_config": "tcl/target/ar71xx.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Arm",
+      "series": "ARM CORELINK SSE200",
+      "display_name": "Arm Corelink Sse200",
+      "target_config": "tcl/target/arm_corelink_sse200.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "ARMADA370",
+      "display_name": "Armada370",
+      "target_config": "tcl/target/armada370.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Artery",
+      "series": "AT32F4X",
+      "display_name": "At32F4X",
+      "target_config": "tcl/target/artery/at32f4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "AT32AP7000",
+      "display_name": "At32Ap7000",
+      "target_config": "tcl/target/at32ap7000.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91R40008",
+      "display_name": "At91R40008",
+      "target_config": "tcl/target/at91r40008.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91RM9200",
+      "display_name": "At91Rm9200",
+      "target_config": "tcl/target/at91rm9200.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3X",
+      "display_name": "At91Sam3Xxx",
+      "target_config": "tcl/target/at91sam3XXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3AX",
+      "display_name": "At91Sam3Ax 4X",
+      "target_config": "tcl/target/at91sam3ax_4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3AX",
+      "display_name": "At91Sam3Ax 8X",
+      "target_config": "tcl/target/at91sam3ax_8x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3AX",
+      "display_name": "At91Sam3Ax Xx",
+      "target_config": "tcl/target/at91sam3ax_xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3NX",
+      "display_name": "At91Sam3Nxx",
+      "target_config": "tcl/target/at91sam3nXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3SX",
+      "display_name": "At91Sam3Sxx",
+      "target_config": "tcl/target/at91sam3sXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U1C",
+      "display_name": "At91Sam3U1C",
+      "target_config": "tcl/target/at91sam3u1c.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U1E",
+      "display_name": "At91Sam3U1E",
+      "target_config": "tcl/target/at91sam3u1e.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U2C",
+      "display_name": "At91Sam3U2C",
+      "target_config": "tcl/target/at91sam3u2c.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U2E",
+      "display_name": "At91Sam3U2E",
+      "target_config": "tcl/target/at91sam3u2e.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U4C",
+      "display_name": "At91Sam3U4C",
+      "target_config": "tcl/target/at91sam3u4c.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3U4E",
+      "display_name": "At91Sam3U4E",
+      "target_config": "tcl/target/at91sam3u4e.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM3UX",
+      "display_name": "At91Sam3Uxx",
+      "target_config": "tcl/target/at91sam3uxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4X",
+      "display_name": "At91Sam4Xxx",
+      "target_config": "tcl/target/at91sam4XXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4C32X",
+      "display_name": "At91Sam4C32X",
+      "target_config": "tcl/target/at91sam4c32x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4CX",
+      "display_name": "At91Sam4Cxxx",
+      "target_config": "tcl/target/at91sam4cXXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4LX",
+      "display_name": "At91Sam4Lxx",
+      "target_config": "tcl/target/at91sam4lXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4SX",
+      "display_name": "At91Sam4Sxx",
+      "target_config": "tcl/target/at91sam4sXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM4SD32X",
+      "display_name": "At91Sam4Sd32X",
+      "target_config": "tcl/target/at91sam4sd32x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7A2",
+      "display_name": "At91Sam7A2",
+      "target_config": "tcl/target/at91sam7a2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7SE512",
+      "display_name": "At91Sam7Se512",
+      "target_config": "tcl/target/at91sam7se512.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7SX",
+      "display_name": "At91Sam7Sx",
+      "target_config": "tcl/target/at91sam7sx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7X256",
+      "display_name": "At91Sam7X256",
+      "target_config": "tcl/target/at91sam7x256.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM7X512",
+      "display_name": "At91Sam7X512",
+      "target_config": "tcl/target/at91sam7x512.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9",
+      "display_name": "At91Sam9",
+      "target_config": "tcl/target/at91sam9.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9260",
+      "display_name": "At91Sam9260",
+      "target_config": "tcl/target/at91sam9260.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9260",
+      "display_name": "At91Sam9260 Ext Ram Ext Flash",
+      "target_config": "tcl/target/at91sam9260_ext_RAM_ext_flash.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9261",
+      "display_name": "At91Sam9261",
+      "target_config": "tcl/target/at91sam9261.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9263",
+      "display_name": "At91Sam9263",
+      "target_config": "tcl/target/at91sam9263.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9G10",
+      "display_name": "At91Sam9G10",
+      "target_config": "tcl/target/at91sam9g10.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9G20",
+      "display_name": "At91Sam9G20",
+      "target_config": "tcl/target/at91sam9g20.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9G45",
+      "display_name": "At91Sam9G45",
+      "target_config": "tcl/target/at91sam9g45.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAM9RL",
+      "display_name": "At91Sam9Rl",
+      "target_config": "tcl/target/at91sam9rl.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAMA5D2",
+      "display_name": "At91Sama5D2",
+      "target_config": "tcl/target/at91sama5d2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAMDX",
+      "display_name": "At91Samdxx",
+      "target_config": "tcl/target/at91samdXX.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AT91SAMG5X",
+      "display_name": "At91Samg5X",
+      "target_config": "tcl/target/at91samg5x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm/Atheros",
+      "series": "ATHEROS AR2313",
+      "display_name": "Atheros Ar2313",
+      "target_config": "tcl/target/atheros_ar2313.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm/Atheros",
+      "series": "ATHEROS AR2315",
+      "display_name": "Atheros Ar2315",
+      "target_config": "tcl/target/atheros_ar2315.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm/Atheros",
+      "series": "ATHEROS AR9331",
+      "display_name": "Atheros Ar9331",
+      "target_config": "tcl/target/atheros_ar9331.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm/Atheros",
+      "series": "ATHEROS AR9344",
+      "display_name": "Atheros Ar9344",
+      "target_config": "tcl/target/atheros_ar9344.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATMEGA128",
+      "display_name": "Atmega128",
+      "target_config": "tcl/target/atmega128.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATMEGA128",
+      "display_name": "Atmega128Rfa1",
+      "target_config": "tcl/target/atmega128rfa1.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATMEGA32",
+      "display_name": "Atmega32U4",
+      "target_config": "tcl/target/atmega32u4.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATSAME5X",
+      "display_name": "Atsame5X",
+      "target_config": "tcl/target/atsame5x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATSAML1X",
+      "display_name": "Atsaml1X",
+      "target_config": "tcl/target/atsaml1x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "ATSAMV",
+      "display_name": "Atsamv",
+      "target_config": "tcl/target/atsamv.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "AVR32",
+      "display_name": "Avr32",
+      "target_config": "tcl/target/avr32.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM2711",
+      "display_name": "Bcm2711",
+      "target_config": "tcl/target/bcm2711.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM281",
+      "display_name": "Bcm281Xx",
+      "target_config": "tcl/target/bcm281xx.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM2835",
+      "display_name": "Bcm2835",
+      "target_config": "tcl/target/bcm2835.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM2836",
+      "display_name": "Bcm2836",
+      "target_config": "tcl/target/bcm2836.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM2837",
+      "display_name": "Bcm2837",
+      "target_config": "tcl/target/bcm2837.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM4706",
+      "display_name": "Bcm4706",
+      "target_config": "tcl/target/bcm4706.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM4718",
+      "display_name": "Bcm4718",
+      "target_config": "tcl/target/bcm4718.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM47",
+      "display_name": "Bcm47Xx",
+      "target_config": "tcl/target/bcm47xx.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM5352",
+      "display_name": "Bcm5352E",
+      "target_config": "tcl/target/bcm5352e.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Broadcom",
+      "series": "BCM6348",
+      "display_name": "Bcm6348",
+      "target_config": "tcl/target/bcm6348.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL602",
+      "display_name": "Bl602",
+      "target_config": "tcl/target/bl602.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL602",
+      "display_name": "Bl602 Common",
+      "target_config": "tcl/target/bl602_common.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL616",
+      "display_name": "Bl616",
+      "target_config": "tcl/target/bl616.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL702",
+      "display_name": "Bl702",
+      "target_config": "tcl/target/bl702.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Bouffalo Lab",
+      "series": "BL702",
+      "display_name": "Bl702L",
+      "target_config": "tcl/target/bl702l.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "BLUEFIELD",
+      "display_name": "Bluefield",
+      "target_config": "tcl/target/bluefield.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "BLUENRG-X",
+      "display_name": "Bluenrg-X",
+      "target_config": "tcl/target/bluenrg-x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Infineon/Cypress",
+      "series": "C100",
+      "display_name": "C100",
+      "target_config": "tcl/target/c100.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "CAVIUM CN61XX",
+      "display_name": "Cavium Cn61Xx",
+      "target_config": "tcl/target/cavium_cn61xx.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "CS351X",
+      "display_name": "Cs351X",
+      "target_config": "tcl/target/cs351x.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "DRAGONITE",
+      "display_name": "Dragonite",
+      "target_config": "tcl/target/dragonite.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "DSP56321",
+      "display_name": "Dsp56321",
+      "target_config": "tcl/target/dsp56321.cfg",
+      "device_type": "DSP",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "DSP568013",
+      "display_name": "Dsp568013",
+      "target_config": "tcl/target/dsp568013.cfg",
+      "device_type": "DSP",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "DSP568037",
+      "display_name": "Dsp568037",
+      "target_config": "tcl/target/dsp568037.cfg",
+      "device_type": "DSP",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "EFM32",
+      "display_name": "Efm32",
+      "target_config": "tcl/target/efm32.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "EM357",
+      "display_name": "Em357",
+      "target_config": "tcl/target/em357.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "EM358",
+      "display_name": "Em358",
+      "target_config": "tcl/target/em358.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "EOS S3",
+      "display_name": "Eos S3",
+      "target_config": "tcl/target/eos_s3.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "EPC9301",
+      "display_name": "Epc9301",
+      "target_config": "tcl/target/epc9301.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "ESI32XX",
+      "display_name": "Esi32Xx",
+      "target_config": "tcl/target/esi32xx.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "ESP32",
+      "display_name": "Esp32",
+      "target_config": "tcl/target/esp32.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "ESP32C2",
+      "display_name": "Esp32C2",
+      "target_config": "tcl/target/esp32c2.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "ESP32C3",
+      "display_name": "Esp32C3",
+      "target_config": "tcl/target/esp32c3.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "ESP32C6",
+      "display_name": "Esp32C6",
+      "target_config": "tcl/target/esp32c6.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "ESP32H2",
+      "display_name": "Esp32H2",
+      "target_config": "tcl/target/esp32h2.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "ESP32S2",
+      "display_name": "Esp32S2",
+      "target_config": "tcl/target/esp32s2.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "ESP32S3",
+      "display_name": "Esp32S3",
+      "target_config": "tcl/target/esp32s3.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "ESP",
+      "display_name": "Esp Common",
+      "target_config": "tcl/target/esp_common.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Samsung",
+      "series": "EXYNOS5250",
+      "display_name": "Exynos5250",
+      "target_config": "tcl/target/exynos5250.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "FAUX",
+      "display_name": "Faux",
+      "target_config": "tcl/target/faux.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "FEROCEON",
+      "display_name": "Feroceon",
+      "target_config": "tcl/target/feroceon.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Cypress/Fujitsu",
+      "series": "FM3",
+      "display_name": "Fm3",
+      "target_config": "tcl/target/fm3.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Cypress/Fujitsu",
+      "series": "FM4",
+      "display_name": "Fm4",
+      "target_config": "tcl/target/fm4.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Cypress/Fujitsu",
+      "series": "FM4 MB9BF",
+      "display_name": "Fm4 Mb9Bf",
+      "target_config": "tcl/target/fm4_mb9bf.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Cypress/Fujitsu",
+      "series": "FM4 S6E2CC",
+      "display_name": "Fm4 S6E2Cc",
+      "target_config": "tcl/target/fm4_s6e2cc.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Geehy",
+      "series": "APM32F0X",
+      "display_name": "Apm32F0X",
+      "target_config": "tcl/target/geehy/apm32f0x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Geehy",
+      "series": "APM32F1X",
+      "display_name": "Apm32F1X",
+      "target_config": "tcl/target/geehy/apm32f1x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Geehy",
+      "series": "APM32F4X",
+      "display_name": "Apm32F4X",
+      "target_config": "tcl/target/geehy/apm32f4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "GigaDevice",
+      "series": "GD32E23X",
+      "display_name": "Gd32E23X",
+      "target_config": "tcl/target/gigadevice/gd32e23x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "GigaDevice",
+      "series": "GD32VF103",
+      "display_name": "Gd32Vf103",
+      "target_config": "tcl/target/gigadevice/gd32vf103.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "GP326XXXA",
+      "display_name": "Gp326Xxxa",
+      "target_config": "tcl/target/gp326xxxa.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "HI3798",
+      "display_name": "Hi3798",
+      "target_config": "tcl/target/hi3798.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "HI6220",
+      "display_name": "Hi6220",
+      "target_config": "tcl/target/hi6220.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "HILSCHER NETX10",
+      "display_name": "Hilscher Netx10",
+      "target_config": "tcl/target/hilscher_netx10.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "HILSCHER NETX50",
+      "display_name": "Hilscher Netx50",
+      "target_config": "tcl/target/hilscher_netx50.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "HILSCHER NETX500",
+      "display_name": "Hilscher Netx500",
+      "target_config": "tcl/target/hilscher_netx500.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Holtek",
+      "series": "HT32F4X",
+      "display_name": "Ht32F4X",
+      "target_config": "tcl/target/holtek/ht32f4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM5300",
+      "display_name": "Hpm5300",
+      "target_config": "tcl/target/hpmicro/hpm5300.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM6280-DUAL-CORE",
+      "display_name": "Hpm6280-Dual-Core",
+      "target_config": "tcl/target/hpmicro/hpm6280-dual-core.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM6280-SINGLE-CORE",
+      "display_name": "Hpm6280-Single-Core",
+      "target_config": "tcl/target/hpmicro/hpm6280-single-core.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM6360",
+      "display_name": "Hpm6360",
+      "target_config": "tcl/target/hpmicro/hpm6360.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM6750-DUAL-CORE",
+      "display_name": "Hpm6750-Dual-Core",
+      "target_config": "tcl/target/hpmicro/hpm6750-dual-core.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM6750-SINGLE-CORE",
+      "display_name": "Hpm6750-Single-Core",
+      "target_config": "tcl/target/hpmicro/hpm6750-single-core.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM6880",
+      "display_name": "Hpm6880",
+      "target_config": "tcl/target/hpmicro/hpm6880.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM6E80-DUAL-CORE",
+      "display_name": "Hpm6E80-Dual-Core",
+      "target_config": "tcl/target/hpmicro/hpm6e80-dual-core.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM6E80-SINGLE-CORE",
+      "display_name": "Hpm6E80-Single-Core",
+      "target_config": "tcl/target/hpmicro/hpm6e80-single-core.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM",
+      "display_name": "Hpm Common",
+      "target_config": "tcl/target/hpmicro/hpm_common.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM COMMON CSR",
+      "display_name": "Hpm Common Csr",
+      "target_config": "tcl/target/hpmicro/hpm_common_csr.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM COMMON CSR LITE",
+      "display_name": "Hpm Common Csr Lite",
+      "target_config": "tcl/target/hpmicro/hpm_common_csr_lite.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "HPMicro",
+      "series": "HPM RESET",
+      "display_name": "Hpm Reset",
+      "target_config": "tcl/target/hpmicro/hpm_reset.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX",
+      "display_name": "Imx",
+      "target_config": "tcl/target/imx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX21",
+      "display_name": "Imx21",
+      "target_config": "tcl/target/imx21.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX25",
+      "display_name": "Imx25",
+      "target_config": "tcl/target/imx25.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX27",
+      "display_name": "Imx27",
+      "target_config": "tcl/target/imx27.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX28",
+      "display_name": "Imx28",
+      "target_config": "tcl/target/imx28.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX31",
+      "display_name": "Imx31",
+      "target_config": "tcl/target/imx31.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX35",
+      "display_name": "Imx35",
+      "target_config": "tcl/target/imx35.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX51",
+      "display_name": "Imx51",
+      "target_config": "tcl/target/imx51.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX53",
+      "display_name": "Imx53",
+      "target_config": "tcl/target/imx53.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX6",
+      "display_name": "Imx6",
+      "target_config": "tcl/target/imx6.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX6SX",
+      "display_name": "Imx6Sx",
+      "target_config": "tcl/target/imx6sx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX6UL",
+      "display_name": "Imx6Ul",
+      "target_config": "tcl/target/imx6ul.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX7",
+      "display_name": "Imx7",
+      "target_config": "tcl/target/imx7.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX7ULP",
+      "display_name": "Imx7Ulp",
+      "target_config": "tcl/target/imx7ulp.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX8M",
+      "display_name": "Imx8M",
+      "target_config": "tcl/target/imx8m.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX8MP",
+      "display_name": "Imx8Mp",
+      "target_config": "tcl/target/imx8mp.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "IMX8QM",
+      "display_name": "Imx8Qm",
+      "target_config": "tcl/target/imx8qm.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Infineon",
+      "series": "TLE987X",
+      "display_name": "Tle987X",
+      "target_config": "tcl/target/infineon/tle987x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "IS5114",
+      "display_name": "Is5114",
+      "target_config": "tcl/target/is5114.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "IXP42X",
+      "display_name": "Ixp42X",
+      "target_config": "tcl/target/ixp42x.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "K1921VK01T",
+      "display_name": "K1921Vk01T",
+      "target_config": "tcl/target/k1921vk01t.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "K40",
+      "display_name": "K40",
+      "target_config": "tcl/target/k40.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "K60",
+      "display_name": "K60",
+      "target_config": "tcl/target/k60.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "KE0X",
+      "display_name": "Ke0X",
+      "target_config": "tcl/target/ke0x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "KE1XF",
+      "display_name": "Ke1Xf",
+      "target_config": "tcl/target/ke1xf.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "KE1XZ",
+      "display_name": "Ke1Xz",
+      "target_config": "tcl/target/ke1xz.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "KL25",
+      "display_name": "Kl25",
+      "target_config": "tcl/target/kl25.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "KL46",
+      "display_name": "Kl46",
+      "target_config": "tcl/target/kl46.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "KLX",
+      "display_name": "Klx",
+      "target_config": "tcl/target/klx.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "KS869X",
+      "display_name": "Ks869X",
+      "target_config": "tcl/target/ks869x.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "KX",
+      "display_name": "Kx",
+      "target_config": "tcl/target/kx.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC11",
+      "display_name": "Lpc11Xx",
+      "target_config": "tcl/target/lpc11xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC12",
+      "display_name": "Lpc12Xx",
+      "target_config": "tcl/target/lpc12xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC13",
+      "display_name": "Lpc13Xx",
+      "target_config": "tcl/target/lpc13xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC17",
+      "display_name": "Lpc17Xx",
+      "target_config": "tcl/target/lpc17xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC18",
+      "display_name": "Lpc1850",
+      "target_config": "tcl/target/lpc1850.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC1XXX",
+      "display_name": "Lpc1Xxx",
+      "target_config": "tcl/target/lpc1xxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC21",
+      "display_name": "Lpc2103",
+      "target_config": "tcl/target/lpc2103.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC21",
+      "display_name": "Lpc2124",
+      "target_config": "tcl/target/lpc2124.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC21",
+      "display_name": "Lpc2129",
+      "target_config": "tcl/target/lpc2129.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC21",
+      "display_name": "Lpc2148",
+      "target_config": "tcl/target/lpc2148.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC22",
+      "display_name": "Lpc2294",
+      "target_config": "tcl/target/lpc2294.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC23",
+      "display_name": "Lpc2378",
+      "target_config": "tcl/target/lpc2378.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC24",
+      "display_name": "Lpc2460",
+      "target_config": "tcl/target/lpc2460.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC24",
+      "display_name": "Lpc2478",
+      "target_config": "tcl/target/lpc2478.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC29",
+      "display_name": "Lpc2900",
+      "target_config": "tcl/target/lpc2900.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC2XXX",
+      "display_name": "Lpc2Xxx",
+      "target_config": "tcl/target/lpc2xxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC31",
+      "display_name": "Lpc3131",
+      "target_config": "tcl/target/lpc3131.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC32",
+      "display_name": "Lpc3250",
+      "target_config": "tcl/target/lpc3250.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC40",
+      "display_name": "Lpc40Xx",
+      "target_config": "tcl/target/lpc40xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC43",
+      "display_name": "Lpc4350",
+      "target_config": "tcl/target/lpc4350.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC43",
+      "display_name": "Lpc4357",
+      "target_config": "tcl/target/lpc4357.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC43",
+      "display_name": "Lpc4370",
+      "target_config": "tcl/target/lpc4370.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC84",
+      "display_name": "Lpc84X",
+      "target_config": "tcl/target/lpc84x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC8NXX",
+      "display_name": "Lpc8Nxx",
+      "target_config": "tcl/target/lpc8nxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LPC8XX",
+      "display_name": "Lpc8Xx",
+      "target_config": "tcl/target/lpc8xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LS1012A",
+      "display_name": "Ls1012A",
+      "target_config": "tcl/target/ls1012a.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LS1028A",
+      "display_name": "Ls1028A",
+      "target_config": "tcl/target/ls1028a.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LS1046A",
+      "display_name": "Ls1046A",
+      "target_config": "tcl/target/ls1046a.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LS1088A",
+      "display_name": "Ls1088A",
+      "target_config": "tcl/target/ls1088a.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LSCH3",
+      "display_name": "Lsch3 Common",
+      "target_config": "tcl/target/lsch3_common.cfg",
+      "device_type": "SoC",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Marvell",
+      "series": "88F3710",
+      "display_name": "88F3710",
+      "target_config": "tcl/target/marvell/88f3710.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Marvell",
+      "series": "88F3720",
+      "display_name": "88F3720",
+      "target_config": "tcl/target/marvell/88f3720.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Marvell",
+      "series": "88F37X0",
+      "display_name": "88F37X0",
+      "target_config": "tcl/target/marvell/88f37x0.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Marvell",
+      "series": "CN9130",
+      "display_name": "Cn9130",
+      "target_config": "tcl/target/marvell/cn9130.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32620",
+      "display_name": "Max32620",
+      "target_config": "tcl/target/max32620.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32625",
+      "display_name": "Max32625",
+      "target_config": "tcl/target/max32625.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX3263",
+      "display_name": "Max3263X",
+      "target_config": "tcl/target/max3263x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32650",
+      "display_name": "Max32650",
+      "target_config": "tcl/target/max32650.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32655",
+      "display_name": "Max32655",
+      "target_config": "tcl/target/max32655.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32660",
+      "display_name": "Max32660",
+      "target_config": "tcl/target/max32660.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32662",
+      "display_name": "Max32662",
+      "target_config": "tcl/target/max32662.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32670",
+      "display_name": "Max32670",
+      "target_config": "tcl/target/max32670.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32672",
+      "display_name": "Max32672",
+      "target_config": "tcl/target/max32672.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32675",
+      "display_name": "Max32675",
+      "target_config": "tcl/target/max32675.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32680",
+      "display_name": "Max32680",
+      "target_config": "tcl/target/max32680.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32690",
+      "display_name": "Max32690",
+      "target_config": "tcl/target/max32690.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Analog Devices",
+      "series": "MAX32XXX",
+      "display_name": "Max32Xxx Common",
+      "target_config": "tcl/target/max32xxx_common.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "MC13224V",
+      "display_name": "Mc13224V",
+      "target_config": "tcl/target/mc13224v.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "MDR32F9Q2I",
+      "display_name": "Mdr32F9Q2I",
+      "target_config": "tcl/target/mdr32f9q2i.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "MPFS",
+      "display_name": "Mpfs",
+      "target_config": "tcl/target/microchip/mpfs.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "PIC64GX",
+      "display_name": "Pic64Gx",
+      "target_config": "tcl/target/microchip/pic64gx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "SAMA7D6",
+      "display_name": "Sama7D6",
+      "target_config": "tcl/target/microchip/sama7d6.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "SAMA7G5",
+      "display_name": "Sama7G5",
+      "target_config": "tcl/target/microchip/sama7g5.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "NDS32V5",
+      "display_name": "Nds32V5",
+      "target_config": "tcl/target/nds32v5.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "NETL XLP304",
+      "display_name": "Netl Xlp304",
+      "target_config": "tcl/target/netl_xlp304.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "NETL XLP308",
+      "display_name": "Netl Xlp308",
+      "target_config": "tcl/target/netl_xlp308.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "NETL XLP316",
+      "display_name": "Netl Xlp316",
+      "target_config": "tcl/target/netl_xlp316.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "NETL XLP3XX",
+      "display_name": "Netl Xlp3Xx",
+      "target_config": "tcl/target/netl_xlp3xx.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "NGULTRA",
+      "display_name": "Ngultra",
+      "target_config": "tcl/target/ngultra.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "NHS31XX",
+      "display_name": "Nhs31Xx",
+      "target_config": "tcl/target/nhs31xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nordic Semiconductor",
+      "series": "COMMON",
+      "display_name": "Common",
+      "target_config": "tcl/target/nordic/common.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nordic Semiconductor",
+      "series": "NRF51",
+      "display_name": "Nrf51",
+      "target_config": "tcl/target/nordic/nrf51.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nordic Semiconductor",
+      "series": "NRF52",
+      "display_name": "Nrf52",
+      "target_config": "tcl/target/nordic/nrf52.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nordic Semiconductor",
+      "series": "NRF53",
+      "display_name": "Nrf53",
+      "target_config": "tcl/target/nordic/nrf53.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nordic Semiconductor",
+      "series": "NRF54",
+      "display_name": "Nrf54L",
+      "target_config": "tcl/target/nordic/nrf54l.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nordic Semiconductor",
+      "series": "NRF91",
+      "display_name": "Nrf91",
+      "target_config": "tcl/target/nordic/nrf91.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nuvoton",
+      "series": "NPCX",
+      "display_name": "Npcx",
+      "target_config": "tcl/target/npcx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nuvoton",
+      "series": "NUC910",
+      "display_name": "Nuc910",
+      "target_config": "tcl/target/nuc910.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nuvoton",
+      "series": "NUMICRO",
+      "display_name": "Numicro",
+      "target_config": "tcl/target/numicro.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Nuvoton",
+      "series": "NUMICRO",
+      "display_name": "Numicro M4",
+      "target_config": "tcl/target/numicro_m4.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "LX2160A",
+      "display_name": "Lx2160A",
+      "target_config": "tcl/target/nxp/lx2160a.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "OR1K",
+      "display_name": "Or1K",
+      "target_config": "tcl/target/or1k.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Microchip",
+      "series": "PIC32MX",
+      "display_name": "Pic32Mx",
+      "target_config": "tcl/target/pic32mx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Infineon",
+      "series": "PSOC4",
+      "display_name": "Psoc4",
+      "target_config": "tcl/target/psoc4.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Infineon",
+      "series": "PSOC5",
+      "display_name": "Psoc5Lp",
+      "target_config": "tcl/target/psoc5lp.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Infineon",
+      "series": "PSOC6",
+      "display_name": "Psoc6",
+      "target_config": "tcl/target/psoc6.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "PXA255",
+      "display_name": "Pxa255",
+      "target_config": "tcl/target/pxa255.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "PXA270",
+      "display_name": "Pxa270",
+      "target_config": "tcl/target/pxa270.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "PXA3XX",
+      "display_name": "Pxa3Xx",
+      "target_config": "tcl/target/pxa3xx.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "QN908X",
+      "display_name": "Qn908X",
+      "target_config": "tcl/target/qn908x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm",
+      "series": "AGATTI",
+      "display_name": "Agatti",
+      "target_config": "tcl/target/qualcomm/agatti.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm",
+      "series": "COMMON",
+      "display_name": "Common",
+      "target_config": "tcl/target/qualcomm/common.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm",
+      "series": "QCS6490",
+      "display_name": "Qcs6490",
+      "target_config": "tcl/target/qualcomm/qcs6490.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Qualcomm/Atheros",
+      "series": "QUALCOMM QCA4531",
+      "display_name": "Qualcomm Qca4531",
+      "target_config": "tcl/target/qualcomm_qca4531.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Intel",
+      "series": "QUARK D20XX",
+      "display_name": "Quark D20Xx",
+      "target_config": "tcl/target/quark_d20xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Intel",
+      "series": "QUARK X10XX",
+      "display_name": "Quark X10Xx",
+      "target_config": "tcl/target/quark_x10xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Renesas",
+      "series": "RENESAS_R7S72100",
+      "display_name": "Renesas R7S72100",
+      "target_config": "tcl/target/renesas_r7s72100.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Renesas",
+      "series": "RENESAS_RCAR",
+      "display_name": "Renesas Rcar Gen2",
+      "target_config": "tcl/target/renesas_rcar_gen2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Renesas",
+      "series": "RENESAS_RCAR",
+      "display_name": "Renesas Rcar Gen3",
+      "target_config": "tcl/target/renesas_rcar_gen3.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Renesas",
+      "series": "RENESAS_RCAR",
+      "display_name": "Renesas Rcar Reset Common",
+      "target_config": "tcl/target/renesas_rcar_reset_common.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Renesas",
+      "series": "RENESAS_RZ",
+      "display_name": "Renesas Rz",
+      "target_config": "tcl/target/renesas_rz.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Renesas",
+      "series": "RENESAS_RZ",
+      "display_name": "Renesas Rz Five",
+      "target_config": "tcl/target/renesas_rz_five.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Renesas",
+      "series": "RENESAS_S7G2",
+      "display_name": "Renesas S7G2",
+      "target_config": "tcl/target/renesas_s7g2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Rockchip",
+      "series": "RK3308",
+      "display_name": "Rk3308",
+      "target_config": "tcl/target/rk3308.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Rockchip",
+      "series": "RK3399",
+      "display_name": "Rk3399",
+      "target_config": "tcl/target/rk3399.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Rockchip",
+      "series": "RK3588",
+      "display_name": "Rk3588",
+      "target_config": "tcl/target/rk3588.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Raspberry Pi",
+      "series": "RP2040",
+      "display_name": "Rp2040",
+      "target_config": "tcl/target/rp2040.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Raspberry Pi",
+      "series": "RP2350",
+      "display_name": "Rp2350",
+      "target_config": "tcl/target/rp2350.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "RSL10",
+      "display_name": "Rsl10",
+      "target_config": "tcl/target/rsl10.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "RTL872XD",
+      "display_name": "Rtl872Xd",
+      "target_config": "tcl/target/rtl872xd.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "S32K",
+      "display_name": "S32K",
+      "target_config": "tcl/target/s32k.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Samsung",
+      "series": "SAMSUNG S3C2410",
+      "display_name": "Samsung S3C2410",
+      "target_config": "tcl/target/samsung_s3c2410.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Samsung",
+      "series": "SAMSUNG S3C2440",
+      "display_name": "Samsung S3C2440",
+      "target_config": "tcl/target/samsung_s3c2440.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Samsung",
+      "series": "SAMSUNG S3C2450",
+      "display_name": "Samsung S3C2450",
+      "target_config": "tcl/target/samsung_s3c2450.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Samsung",
+      "series": "SAMSUNG S3C4510",
+      "display_name": "Samsung S3C4510",
+      "target_config": "tcl/target/samsung_s3c4510.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Samsung",
+      "series": "SAMSUNG S3C6410",
+      "display_name": "Samsung S3C6410",
+      "target_config": "tcl/target/samsung_s3c6410.cfg",
+      "device_type": "SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SHARP LH79532",
+      "display_name": "Sharp Lh79532",
+      "target_config": "tcl/target/sharp_lh79532.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "SERIES0",
+      "display_name": "Series0",
+      "target_config": "tcl/target/silabs/series0.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "SERIES1",
+      "display_name": "Series1",
+      "target_config": "tcl/target/silabs/series1.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "SERIES2",
+      "display_name": "Series2",
+      "target_config": "tcl/target/silabs/series2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "XG21",
+      "display_name": "Xg21",
+      "target_config": "tcl/target/silabs/xg21.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "XG23",
+      "display_name": "Xg23",
+      "target_config": "tcl/target/silabs/xg23.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "XG24",
+      "display_name": "Xg24",
+      "target_config": "tcl/target/silabs/xg24.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "XG25",
+      "display_name": "Xg25",
+      "target_config": "tcl/target/silabs/xg25.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "XG26",
+      "display_name": "Xg26",
+      "target_config": "tcl/target/silabs/xg26.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "XG28",
+      "display_name": "Xg28",
+      "target_config": "tcl/target/silabs/xg28.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "XG29",
+      "display_name": "Xg29",
+      "target_config": "tcl/target/silabs/xg29.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Silicon Labs",
+      "series": "SIM3X",
+      "display_name": "Sim3X",
+      "target_config": "tcl/target/sim3x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SMP8634",
+      "display_name": "Smp8634",
+      "target_config": "tcl/target/smp8634.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SNPS EM SK FPGA",
+      "display_name": "Snps Em Sk Fpga",
+      "target_config": "tcl/target/snps_em_sk_fpga.cfg",
+      "device_type": "FPGA/SoC",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SNPS HSDK",
+      "display_name": "Snps Hsdk",
+      "target_config": "tcl/target/snps_hsdk.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SNPS HSDK 4XD",
+      "display_name": "Snps Hsdk 4Xd",
+      "target_config": "tcl/target/snps_hsdk_4xd.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SPACEMIT-K1",
+      "display_name": "Spacemit-K1",
+      "target_config": "tcl/target/spacemit-k1.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SPACEMIT-K3",
+      "display_name": "Spacemit-K3",
+      "target_config": "tcl/target/spacemit-k3.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SPEAR3XX",
+      "display_name": "Spear3Xx",
+      "target_config": "tcl/target/spear3xx.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32MP13X",
+      "display_name": "Stm32Mp13X",
+      "target_config": "tcl/target/st/stm32mp13x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32MP15X",
+      "display_name": "Stm32Mp15X",
+      "target_config": "tcl/target/st/stm32mp15x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32MP21X",
+      "display_name": "Stm32Mp21X",
+      "target_config": "tcl/target/st/stm32mp21x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32MP23X",
+      "display_name": "Stm32Mp23X",
+      "target_config": "tcl/target/st/stm32mp23x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32MP25X",
+      "display_name": "Stm32Mp25X",
+      "target_config": "tcl/target/st/stm32mp25x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32C0",
+      "display_name": "Stm32C0X",
+      "target_config": "tcl/target/stm32c0x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32F0",
+      "display_name": "Stm32F0X",
+      "target_config": "tcl/target/stm32f0x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32F1",
+      "display_name": "Stm32F1X",
+      "target_config": "tcl/target/stm32f1x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32F2",
+      "display_name": "Stm32F2X",
+      "target_config": "tcl/target/stm32f2x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32F3",
+      "display_name": "Stm32F3X",
+      "target_config": "tcl/target/stm32f3x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32F4",
+      "display_name": "Stm32F4X",
+      "target_config": "tcl/target/stm32f4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32F7",
+      "display_name": "Stm32F7X",
+      "target_config": "tcl/target/stm32f7x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32G0",
+      "display_name": "Stm32G0X",
+      "target_config": "tcl/target/stm32g0x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32G4",
+      "display_name": "Stm32G4X",
+      "target_config": "tcl/target/stm32g4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32H7",
+      "display_name": "Stm32H7Rsx",
+      "target_config": "tcl/target/stm32h7rsx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32H7",
+      "display_name": "Stm32H7X",
+      "target_config": "tcl/target/stm32h7x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32H7",
+      "display_name": "Stm32H7X Dual Bank",
+      "target_config": "tcl/target/stm32h7x_dual_bank.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32L0",
+      "display_name": "Stm32L0",
+      "target_config": "tcl/target/stm32l0.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32L0",
+      "display_name": "Stm32L0 Dual Bank",
+      "target_config": "tcl/target/stm32l0_dual_bank.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32L1",
+      "display_name": "Stm32L1",
+      "target_config": "tcl/target/stm32l1.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32L1",
+      "display_name": "Stm32L1X Dual Bank",
+      "target_config": "tcl/target/stm32l1x_dual_bank.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32L4",
+      "display_name": "Stm32L4X",
+      "target_config": "tcl/target/stm32l4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32L5",
+      "display_name": "Stm32L5X",
+      "target_config": "tcl/target/stm32l5x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32N6",
+      "display_name": "Stm32N6X",
+      "target_config": "tcl/target/stm32n6x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32U0",
+      "display_name": "Stm32U0X",
+      "target_config": "tcl/target/stm32u0x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32U3",
+      "display_name": "Stm32U3X",
+      "target_config": "tcl/target/stm32u3x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32U5",
+      "display_name": "Stm32U5X",
+      "target_config": "tcl/target/stm32u5x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32W108",
+      "display_name": "Stm32W108Xx",
+      "target_config": "tcl/target/stm32w108xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WBA2X",
+      "display_name": "Stm32Wba2X",
+      "target_config": "tcl/target/stm32wba2x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WBA5X",
+      "display_name": "Stm32Wba5X",
+      "target_config": "tcl/target/stm32wba5x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WBA6X",
+      "display_name": "Stm32Wba6X",
+      "target_config": "tcl/target/stm32wba6x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WBX",
+      "display_name": "Stm32Wbx",
+      "target_config": "tcl/target/stm32wbx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32WLX",
+      "display_name": "Stm32Wlx",
+      "target_config": "tcl/target/stm32wlx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32X5",
+      "display_name": "Stm32X5X Common",
+      "target_config": "tcl/target/stm32x5x_common.cfg",
+      "device_type": "MCU",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM32XL",
+      "display_name": "Stm32Xl",
+      "target_config": "tcl/target/stm32xl.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8L",
+      "display_name": "Stm8L",
+      "target_config": "tcl/target/stm8l.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8L",
+      "display_name": "Stm8L151X2",
+      "target_config": "tcl/target/stm8l151x2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8L",
+      "display_name": "Stm8L151X3",
+      "target_config": "tcl/target/stm8l151x3.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8L",
+      "display_name": "Stm8L152",
+      "target_config": "tcl/target/stm8l152.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8L",
+      "display_name": "Stm8L15Xx4",
+      "target_config": "tcl/target/stm8l15xx4.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8L",
+      "display_name": "Stm8L15Xx6",
+      "target_config": "tcl/target/stm8l15xx6.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8L",
+      "display_name": "Stm8L15Xx8",
+      "target_config": "tcl/target/stm8l15xx8.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8S",
+      "display_name": "Stm8S",
+      "target_config": "tcl/target/stm8s.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8S",
+      "display_name": "Stm8S003",
+      "target_config": "tcl/target/stm8s003.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8S",
+      "display_name": "Stm8S103",
+      "target_config": "tcl/target/stm8s103.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STM8S",
+      "display_name": "Stm8S105",
+      "target_config": "tcl/target/stm8s105.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STR710",
+      "display_name": "Str710",
+      "target_config": "tcl/target/str710.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STR730",
+      "display_name": "Str730",
+      "target_config": "tcl/target/str730.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STR750",
+      "display_name": "Str750",
+      "target_config": "tcl/target/str750.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "STMicroelectronics",
+      "series": "STR912",
+      "display_name": "Str912",
+      "target_config": "tcl/target/str912.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "SWM050",
+      "display_name": "Swm050",
+      "target_config": "tcl/target/swm050.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "TEST",
+      "display_name": "Test Reset Syntax Error",
+      "target_config": "tcl/target/test_reset_syntax_error.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "TEST SYNTAX ERROR",
+      "display_name": "Test Syntax Error",
+      "target_config": "tcl/target/test_syntax_error.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "AM335X",
+      "display_name": "Am335X",
+      "target_config": "tcl/target/ti/am335x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "AM437X",
+      "display_name": "Am437X",
+      "target_config": "tcl/target/ti/am437x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "AMDM37X",
+      "display_name": "Amdm37X",
+      "target_config": "tcl/target/ti/amdm37x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "AR7",
+      "display_name": "Ar7",
+      "target_config": "tcl/target/ti/ar7.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CALYPSO",
+      "display_name": "Calypso",
+      "target_config": "tcl/target/ti/calypso.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC13",
+      "display_name": "Cc13X0",
+      "target_config": "tcl/target/ti/cc13x0.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC13",
+      "display_name": "Cc13X2",
+      "target_config": "tcl/target/ti/cc13x2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC2538",
+      "display_name": "Cc2538",
+      "target_config": "tcl/target/ti/cc2538.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC26",
+      "display_name": "Cc26X0",
+      "target_config": "tcl/target/ti/cc26x0.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC26",
+      "display_name": "Cc26X2",
+      "target_config": "tcl/target/ti/cc26x2.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC26",
+      "display_name": "Cc26X2X7",
+      "target_config": "tcl/target/ti/cc26x2x7.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC3220",
+      "display_name": "Cc3220Sf",
+      "target_config": "tcl/target/ti/cc3220sf.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CC32",
+      "display_name": "Cc32Xx",
+      "target_config": "tcl/target/ti/cc32xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "CJTAG",
+      "display_name": "Cjtag",
+      "target_config": "tcl/target/ti/cjtag.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "DAVINCI",
+      "display_name": "Davinci",
+      "target_config": "tcl/target/ti/davinci.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "DM355",
+      "display_name": "Dm355",
+      "target_config": "tcl/target/ti/dm355.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "DM365",
+      "display_name": "Dm365",
+      "target_config": "tcl/target/ti/dm365.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "DM6446",
+      "display_name": "Dm6446",
+      "target_config": "tcl/target/ti/dm6446.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "ICEPICK",
+      "display_name": "Icepick",
+      "target_config": "tcl/target/ti/icepick.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "K3",
+      "display_name": "K3",
+      "target_config": "tcl/target/ti/k3.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "MSP432",
+      "display_name": "Msp432",
+      "target_config": "tcl/target/ti/msp432.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "MSPM0",
+      "display_name": "Mspm0",
+      "target_config": "tcl/target/ti/mspm0.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "OMAP2420",
+      "display_name": "Omap2420",
+      "target_config": "tcl/target/ti/omap2420.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "OMAP3530",
+      "display_name": "Omap3530",
+      "target_config": "tcl/target/ti/omap3530.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "OMAP4430",
+      "display_name": "Omap4430",
+      "target_config": "tcl/target/ti/omap4430.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "OMAP4460",
+      "display_name": "Omap4460",
+      "target_config": "tcl/target/ti/omap4460.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "OMAP5912",
+      "display_name": "Omap5912",
+      "target_config": "tcl/target/ti/omap5912.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "OMAPL138",
+      "display_name": "Omapl138",
+      "target_config": "tcl/target/ti/omapl138.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "RM4X",
+      "display_name": "Rm4X",
+      "target_config": "tcl/target/ti/rm4x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "STELLARIS",
+      "display_name": "Stellaris",
+      "target_config": "tcl/target/ti/stellaris.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "TMS570",
+      "display_name": "Tms570",
+      "target_config": "tcl/target/ti/tms570.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "TMS570LC43XX",
+      "display_name": "Tms570Lc43Xx",
+      "target_config": "tcl/target/ti/tms570lc43xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "TMS570LS1X",
+      "display_name": "Tms570Ls1X",
+      "target_config": "tcl/target/ti/tms570ls1x.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "TMS570LS20XXX",
+      "display_name": "Tms570Ls20Xxx",
+      "target_config": "tcl/target/ti/tms570ls20xxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Texas Instruments",
+      "series": "TMS570LS3137",
+      "display_name": "Tms570Ls3137",
+      "target_config": "tcl/target/ti/tms570ls3137.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "TMPA900",
+      "display_name": "Tmpa900",
+      "target_config": "tcl/target/tmpa900.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "TMPA910",
+      "display_name": "Tmpa910",
+      "target_config": "tcl/target/tmpa910.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "TNETC4401",
+      "display_name": "Tnetc4401",
+      "target_config": "tcl/target/tnetc4401.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "U8500",
+      "display_name": "U8500",
+      "target_config": "tcl/target/u8500.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "VD AARCH64",
+      "display_name": "Vd Aarch64",
+      "target_config": "tcl/target/vd_aarch64.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "VD CORTEX M",
+      "display_name": "Vd Cortex M",
+      "target_config": "tcl/target/vd_cortex_m.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "VD RISCV",
+      "display_name": "Vd Riscv",
+      "target_config": "tcl/target/vd_riscv.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "NXP",
+      "series": "VYBRID VF6XX",
+      "display_name": "Vybrid Vf6Xx",
+      "target_config": "tcl/target/vybrid_vf6xx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "AMD/Xilinx",
+      "series": "XILINX ZYNQMP",
+      "display_name": "Xilinx Zynqmp",
+      "target_config": "tcl/target/xilinx_zynqmp.cfg",
+      "device_type": "FPGA SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "AMD/Xilinx",
+      "series": "ZYNQ-7000",
+      "display_name": "Zynq-7000",
+      "target_config": "tcl/target/xlnx/zynq-7000.cfg",
+      "device_type": "FPGA SoC",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Infineon",
+      "series": "XMC1",
+      "display_name": "Xmc1Xxx",
+      "target_config": "tcl/target/xmc1xxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Infineon",
+      "series": "XMC4",
+      "display_name": "Xmc4Xxx",
+      "target_config": "tcl/target/xmc4xxx.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "XMOS",
+      "series": "XMOS XS1-XAU8A-10",
+      "display_name": "Xmos Xs1-Xau8A-10 Arm",
+      "target_config": "tcl/target/xmos_xs1-xau8a-10_arm.cfg",
+      "device_type": "MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "XTENSA-CORE-ESP32",
+      "display_name": "Xtensa-Core-Esp32",
+      "target_config": "tcl/target/xtensa-core-esp32.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "XTENSA-CORE-ESP32S2",
+      "display_name": "Xtensa-Core-Esp32S2",
+      "target_config": "tcl/target/xtensa-core-esp32s2.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Espressif",
+      "series": "XTENSA-CORE-ESP32S3",
+      "display_name": "Xtensa-Core-Esp32S3",
+      "target_config": "tcl/target/xtensa-core-esp32s3.cfg",
+      "device_type": "Wireless MCU",
+      "classification_status": "Auto-classified",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "XTENSA-CORE-NXP RT600",
+      "display_name": "Xtensa-Core-Nxp Rt600",
+      "target_config": "tcl/target/xtensa-core-nxp_rt600.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "XTENSA-CORE-XT8",
+      "display_name": "Xtensa-Core-Xt8",
+      "target_config": "tcl/target/xtensa-core-xt8.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "XTENSA",
+      "display_name": "Xtensa",
+      "target_config": "tcl/target/xtensa.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Internal/helper",
+      "part_number": ""
+    },
+    {
+      "vendor": "Unclassified",
+      "series": "К1879XБ1Я",
+      "display_name": "К1879Xб1Я",
+      "target_config": "tcl/target/к1879xб1я.cfg",
+      "device_type": "Unknown",
+      "classification_status": "Needs review",
+      "part_number": ""
+    }
+  ]
+}
