@@ -11,7 +11,14 @@ from typing import Any
 from plasma_core.config import PlasmaConfig, load_config
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import ErrorDetail, ExecutionImageRef, JobRequest, new_job_id
+from plasma_core.mock_image_store import default_mock_image_store
+from plasma_core.models import (
+    LOCAL_MOCK_BLOB_SCHEME,
+    ErrorDetail,
+    ExecutionImageRef,
+    JobRequest,
+    new_job_id,
+)
 from plasma_core.protocol import (
     PROTOCOL_VERSION,
     Frame,
@@ -272,6 +279,16 @@ class PlasmaServer:
                     context={"expected": expected_sha256, "actual": actual_sha256},
                 )
 
+        inline_image = frame.binary
+        if image_ref is None and frame.binary and site_config is not None and site_config.interface == "mock":
+            shared = default_mock_image_store().put(frame.binary)
+            image_ref = ExecutionImageRef(
+                scheme=LOCAL_MOCK_BLOB_SCHEME,
+                sha256=shared.sha256,
+                size_bytes=shared.size_bytes,
+            )
+            inline_image = b""
+
         known = {
             "protocol_version",
             "message_type",
@@ -297,7 +314,7 @@ class PlasmaServer:
         request = JobRequest(
             site_id=site_id,
             operation=operation,
-            image=frame.binary,
+            image=inline_image,
             image_ref=image_ref,
             map_data=frame.map_data,
             job_id=job_id_raw or new_job_id(),
