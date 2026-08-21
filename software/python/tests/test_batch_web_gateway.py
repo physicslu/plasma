@@ -60,7 +60,7 @@ class BatchWebGatewayTests(unittest.TestCase):
                 "targets": [
                     {"facility_id": "facility-1", "ppu_id": "ppu-1", "site_ids": [1, 2]},
                 ],
-                "operations": ["verify", "erase"],
+                "operations": ["read", "erase"],
                 "execution_policy": {
                     "repeat_count": 3,
                     "site_retry_limit": 2,
@@ -70,7 +70,7 @@ class BatchWebGatewayTests(unittest.TestCase):
         )
         self.assertEqual(status, 202)
         self.assertEqual(payload["rest_contract_version"], "3")
-        self.assertEqual(payload["batch"]["operations"], ["erase", "verify"])
+        self.assertEqual(payload["batch"]["operations"], ["erase", "read"])
         batch_id = payload["batch"]["batch_id"]
         final = self.wait_terminal(batch_id)
         self.assertEqual(final["state"], "success")
