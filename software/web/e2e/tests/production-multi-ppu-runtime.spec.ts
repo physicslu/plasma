@@ -95,6 +95,46 @@ test("real Production Mock submits one server Batch for two PPUs and completes b
   expect(ownership.browserJobPosts()).toBe(0);
 });
 
+test("real Production Mock shares one Programming Asset across two PPUs for Erase Program Verify", async ({ page }) => {
+  const ownership = observeBrowserOwnership(page);
+  await openTwoPpuProductionSet(page);
+
+  await page.getByLabel("Production Programming Image file").setInputFiles({
+    name: "production-shared-asset.bin",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.alloc(4096, 0xa5),
+  });
+  await page.locator(".batchOperations label").filter({ hasText: "P" }).getByRole("checkbox").check();
+  await page.locator(".batchOperations label").filter({ hasText: "V" }).getByRole("checkbox").check();
+  await page.locator(".executeBatchButton").click();
+
+  await expect.poll(() => ownership.batchBodies.length, { timeout: 5_000 }).toBe(1);
+  const body = ownership.batchBodies[0] as {
+    targets?: Array<{ ppu_id?: string }>;
+    operations?: string[];
+    asset?: {
+      asset_name?: string;
+      asset_size?: number;
+      asset_sha256?: string;
+      asset_base64?: string;
+    };
+  };
+  expect(body.targets?.map(target => target.ppu_id)).toEqual([ppuOne, ppuTwo]);
+  expect(body.operations).toEqual(["erase", "program", "verify"]);
+  expect(body.asset?.asset_name).toBe("production-shared-asset.bin");
+  expect(body.asset?.asset_size).toBe(4096);
+  expect(body.asset?.asset_sha256).toMatch(/^[0-9a-f]{64}$/);
+  expect(body.asset?.asset_base64).toBeTruthy();
+  expect(ownership.browserJobPosts()).toBe(0);
+
+  await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 30_000 });
+  await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 30_000 });
+  await expect(page.locator(".serverBatchStatistics")).toHaveAttribute("data-batch-state", "success");
+  await expect(page.locator('[data-operation-stat="program"]')).toContainText("Logical 2");
+  await expect(page.locator('[data-operation-stat="verify"]')).toContainText("Logical 2");
+  expect(ownership.browserJobPosts()).toBe(0);
+});
+
 test("real Production Mock cancels one PPU through Batch endpoint without stopping the other", async ({ page }) => {
   const ownership = observeBrowserOwnership(page);
   const { first } = await openTwoPpuProductionSet(page);
