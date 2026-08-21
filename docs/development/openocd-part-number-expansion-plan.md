@@ -1,6 +1,6 @@
 # OpenOCD Part-Number Expansion Plan
 
-Status: executing; first automated PDSC batch generated
+Status: executing; second automated multi-source batch generated
 
 ## 1. Goal and boundary
 
@@ -37,15 +37,31 @@ Current execution checkpoint:
 | Result | Count |
 |---|---:|
 | MCU/Wireless MCU CFG candidates evaluated | 114 |
-| CFG files with deterministic PDSC mappings | 36 |
-| Unique device identifiers mapped | 1,023 |
-| CMSIS device names | 893 |
+| CFG files with deterministic authoritative-source mappings | 78 |
+| Unique expansion device identifiers mapped | 1,804 |
+| CMSIS/vendor device names | 1,557 |
+| Exact manufacturer ordering part numbers | 117 |
 | Ordering patterns | 130 |
-| Pinned PDSC sources parsed | 27 |
-| Helper/alias or external-Flash-only targets deferred | 9 |
-| Flash-capable targets awaiting an adapter/rule | 69 |
+| Pinned PDSC sources parsed | 58 |
+| Pinned vendor SDK, board, or product sources parsed | 8 |
+| Helper/alias or external-Flash-only targets deferred | 12 |
+| Flash-capable targets awaiting an adapter/rule | 24 |
+| Baseline/expansion target conflicts resolved | 34 |
+| Canonical unique device identifiers | 7,530 |
+| Canonical unique target CFG files | 131 |
 
-The 1,023 identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint.
+The 1,804 expansion identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Combining the 5,760 baseline identifiers with the expansion and collapsing 34 overlapping STM32H7R/S identifiers produces 7,530 canonical unique device identifiers. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint, then run `validate_openocd_expansion.py` offline.
+
+| Canonical CPU architecture | Target CFG files | Device identifiers |
+|---|---:|---:|
+| ARM Cortex-M | 113 | 7,369 |
+| ARM7TDMI | 3 | 5 |
+| AVR | 3 | 3 |
+| MIPS32 | 1 | 128 |
+| RISC-V | 9 | 24 |
+| Xtensa | 3 | 3 |
+
+RP2350 supports both ARM Cortex-M and RISC-V in one Target CFG. Therefore architecture subtotals count its two identifiers in both CPU families, while the canonical table contains each device only once.
 
 ## 3. Priority waves
 
@@ -91,7 +107,7 @@ Start with the 82 Flash-declaring MCU CFG candidates belonging to vendor groups 
 
 Process these in batches of 10–20 CFG files. Prefer modern MCU families with current structured vendor packs, then handle legacy families whose identifiers may require archived packs or product tables.
 
-The first PDSC batch maps 36 CFG files across Microchip, NXP, STMicroelectronics, Texas Instruments, and Nuvoton. Wave 1 remains open because 46 of its original 82 candidates still require another structured source, a deterministic rule, or alias normalization. The outcome table, rather than the plan estimate, is authoritative for per-target progress.
+The first PDSC batch mapped 36 CFG files across Microchip, NXP, STMicroelectronics, Texas Instruments, and Nuvoton. The second batch adds official vendor-direct PDSCs and pinned vendor SDK product lists, including Microchip AVR/PIC32MX and Texas Instruments SimpleLink families. The outcome table, rather than the historical wave estimate, is authoritative for current per-target progress.
 
 Each vendor batch must add deterministic mapping fixtures. A filename or family-name substring alone is not sufficient when multiple CFG files overlap.
 
@@ -113,6 +129,8 @@ After Wave 1 rules are stable, process the remaining 32 Flash-declaring MCU CFG 
 | **Total** | **32** |
 
 Use an official structured device pack or machine-readable product source when available. If a vendor has no suitable structured source, retain the CFG as a capability record and put identifier extraction into the exception queue; do not guess complete part numbers from a family name.
+
+The second batch now maps Analog Devices/MAXIM, Artery, Bouffalo Lab, Cypress/Fujitsu, Geehy, GigaDevice, Holtek, and Raspberry Pi. Artery identifiers are accepted only when both the official vendor board catalog and the pinned OpenOCD Flash driver's explicit part table contain the same exact part number. The GigaDevice GD32VF103 source is an official manufacturer product announcement pinned by its expected SHA-256 content hash. Official Microchip SAM-BA release notes additionally establish a small, memory-compatible ARM7TDMI set. Legacy targets without sufficiently specific manufacturer evidence remain `source_adapter_pending`.
 
 ### Wave 3 — Deferred targets
 
@@ -162,9 +180,13 @@ data/device-catalog/research/openocd-target-capabilities.csv
 data/device-catalog/research/openocd-target-capabilities.json
 data/device-catalog/research/openocd-parts-expanded.csv
 data/device-catalog/research/openocd-parts-expanded.json
+data/device-catalog/research/openocd-parts-canonical.csv
+data/device-catalog/research/openocd-duplicate-resolutions.csv
+data/device-catalog/research/openocd-expansion-outcomes.csv
 data/device-catalog/research/source-manifest.json
 data/device-catalog/research/mapping-rules.json
 data/device-catalog/research/expansion-report.md
+data/device-catalog/research/validate_openocd_expansion.py
 ```
 
 The report for every batch must include:

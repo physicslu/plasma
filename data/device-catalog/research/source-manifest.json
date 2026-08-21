@@ -6,10 +6,290 @@
   },
   "sources": [
     {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "AnalogDevices",
+      "pack_name": "ADuCM36x_DFP",
+      "pack_version": "2.1.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://download.analog.com/tools/EZBoards/CM36x/Releases/AnalogDevices.ADuCM36x_DFP.pdsc",
+      "content_sha256": "1b872a5152a4871b096069238de42a676d4ce20e5311b74c6c19ff873bb4394b"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32620",
+      "pack_version": "1.0.2",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32620.pdsc",
+      "content_sha256": "e0fcdce3d9d44478fdb1bb4ab541291ca5454e4bf7e199554f8af30f84ba8c05"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32625",
+      "pack_version": "1.1.0-a",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32625.pdsc",
+      "content_sha256": "fd4a12fb7753ef1a0fcaa61f461b3f8e63ec1c3f6c349dc84122749861a9b0ec"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32630",
+      "pack_version": "0.2.8",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32630.pdsc",
+      "content_sha256": "f4dd89aad62eb5917c10cd9d45ff4156f9f0cc4a215164aa703d4301485b794a"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32650",
+      "pack_version": "1.1.0-a",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32650.pdsc",
+      "content_sha256": "45ecc5552d438e5b7e8803194da32d727adfa0fc6e466d6e271044e1641cdf09"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32655",
+      "pack_version": "1.0.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32655.pdsc",
+      "content_sha256": "5bf21469b313ba53bdab1b9651ef16e3adcfc1ee8007da70e3c899634e336192"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32660",
+      "pack_version": "1.5.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32660.pdsc",
+      "content_sha256": "4c83cfa4311bbaa62ffba4863569bee10b64dedcc695ae6b6a7b10f99dc815b9"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32665",
+      "pack_version": "1.1.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32665.pdsc",
+      "content_sha256": "313ad01cdcdb56fefdb404a159e0c9dfa052f36778923f806303f27ca9cf72ac"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32670",
+      "pack_version": "1.1.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32670.pdsc",
+      "content_sha256": "1ad15d1960e31f92bb2e28b214abd9cd11531991a520913dd499519e5186a584"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32672",
+      "pack_version": "1.6.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32672.pdsc",
+      "content_sha256": "dac07d7825fa09ff10df9ac7464c3323882d5abd4d20f325d57e2def93ba6913"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32675",
+      "pack_version": "1.3.2",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32675.pdsc",
+      "content_sha256": "e9ccc2d26469be26a1c9db724d5f0ba727dc5936aa7ae84444c1e6de1dd5facb"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "Maxim",
+      "pack_name": "MAX32690",
+      "pack_version": "1.3.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.mxim.net/microcontroller/pack/Maxim.MAX32690.pdsc",
+      "content_sha256": "c9d91c14ce8a8e10aedee0853269dcba570d63c501ffda547f72b13962c5d73a"
+    },
+    {
+      "silicon_vendor": "Cypress/Fujitsu",
+      "pack_vendor": "Keil",
+      "pack_name": "FM3Basic_DFP",
+      "pack_version": "1.1.1",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.keil.com/pack/Keil.FM3Basic_DFP.pdsc",
+      "content_sha256": "ceac5e9e48f8d90f1f3ce03fbeac24b2bae381c683a239d20e3846befa090fff"
+    },
+    {
+      "silicon_vendor": "Cypress/Fujitsu",
+      "pack_vendor": "Keil",
+      "pack_name": "FM3HighPerformance_DFP",
+      "pack_version": "1.2.1",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.keil.com/pack/Keil.FM3HighPerformance_DFP.pdsc",
+      "content_sha256": "2f1948b375b831aa273c795c920cb3e732b92f07e50cc15d44fa5bbed75452af"
+    },
+    {
+      "silicon_vendor": "Cypress/Fujitsu",
+      "pack_vendor": "Keil",
+      "pack_name": "FM3LowPower_DFP",
+      "pack_version": "1.1.1",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.keil.com/pack/Keil.FM3LowPower_DFP.pdsc",
+      "content_sha256": "0b684ebaab1afc2b8bc633d8d7e2662347a306832323e3a8791d077a8b06807e"
+    },
+    {
+      "silicon_vendor": "Cypress/Fujitsu",
+      "pack_vendor": "Keil",
+      "pack_name": "FM3UltraLowLeak_DFP",
+      "pack_version": "1.1.1",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.keil.com/pack/Keil.FM3UltraLowLeak_DFP.pdsc",
+      "content_sha256": "dd4708fe39394aa35f618079ffcae3c7b02e486f3aa9701b257a9d30c6bfc2bf"
+    },
+    {
+      "silicon_vendor": "Cypress/Fujitsu",
+      "pack_vendor": "Keil",
+      "pack_name": "FM4_DFP",
+      "pack_version": "1.6.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://www.keil.com/pack/Keil.FM4_DFP.pdsc",
+      "content_sha256": "d83c1f3fb8e6635d37bf585a85c4ebdc05b058197030069685ba7e5b873d760b"
+    },
+    {
+      "silicon_vendor": "Geehy",
+      "pack_vendor": "Geehy",
+      "pack_name": "APM32F00x_DFP",
+      "pack_version": "1.0.7",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://global.geehy.com/uploads/tool/Geehy.APM32F00x_DFP.pdsc",
+      "content_sha256": "aea6bcd60d673f03b0639e6b000d9a2a1d4556d683c2e6298442898c9499d18f"
+    },
+    {
+      "silicon_vendor": "Geehy",
+      "pack_vendor": "Geehy",
+      "pack_name": "APM32F035_DFP",
+      "pack_version": "1.0.4",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://global.geehy.com/uploads/tool/Geehy.APM32F035_DFP.pdsc",
+      "content_sha256": "ca79603cf84fa44003e2e3f2df3850ac4c7ddeee24ab23cad4dc6dc3a54c0c3e"
+    },
+    {
+      "silicon_vendor": "Geehy",
+      "pack_vendor": "Geehy",
+      "pack_name": "APM32F0xx_DFP",
+      "pack_version": "1.1.4",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://global.geehy.com/uploads/tool/Geehy.APM32F0xx_DFP.pdsc",
+      "content_sha256": "2551a4bfbdf8469193894b2da8d386accf5f34e196914138775c8b0155a3f490"
+    },
+    {
+      "silicon_vendor": "Geehy",
+      "pack_vendor": "Geehy",
+      "pack_name": "APM32F1xx_DFP",
+      "pack_version": "1.2.1",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://global.geehy.com/uploads/tool/Geehy.APM32F1xx_DFP.pdsc",
+      "content_sha256": "9afd6138c239788ba17848d46bf3a798d99715b09278518da5a07475c7a11a1d"
+    },
+    {
+      "silicon_vendor": "Geehy",
+      "pack_vendor": "Geehy",
+      "pack_name": "APM32F4xx_DFP",
+      "pack_version": "1.0.12",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://global.geehy.com/uploads/tool/Geehy.APM32F4xx_DFP.pdsc",
+      "content_sha256": "753034a148756bab2ee05a738f994aaff91785d82354390b1c5c4c9873b3053a"
+    },
+    {
+      "silicon_vendor": "Geehy",
+      "pack_vendor": "Geehy",
+      "pack_name": "APM32F445_446_DFP",
+      "pack_version": "1.0.0",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://global.geehy.com/uploads/tool/Geehy.APM32F445_446_DFP.pdsc",
+      "content_sha256": "31dcaa12b48d641843765c9153a39c57b5d9a466089bc7d057709ce0e02bd21c"
+    },
+    {
+      "silicon_vendor": "GigaDevice",
+      "pack_vendor": "GigaDevice",
+      "pack_name": "GD32E23x_DFP",
+      "pack_version": "1.0.2",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://gd32mcu.com/data/documents/pack/GigaDevice.GD32E23x_DFP.pdsc",
+      "content_sha256": "9f05864577668ee5c48c9fe1c3d906294f2ece1265694cf1c9ec14a112004411"
+    },
+    {
+      "silicon_vendor": "Holtek",
+      "pack_vendor": "Holtek",
+      "pack_name": "HT32F493x5_DFP",
+      "pack_version": "1.0.6",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://mcu.holtek.com.tw/pack/Holtek.HT32F493x5_DFP.pdsc",
+      "content_sha256": "2b0c19a83c3470d789b7fa1e542171a6a3554d6fa744f118ce1ee39b9ac08e81"
+    },
+    {
+      "silicon_vendor": "Holtek",
+      "pack_vendor": "Holtek",
+      "pack_name": "HT32F491x3_DFP",
+      "pack_version": "1.0.4",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://mcu.holtek.com.tw/pack/Holtek.HT32F491x3_DFP.pdsc",
+      "content_sha256": "96c763b0a659d45ddd0d2d22f4af60b28917292859416fe860d33bf322933ab7"
+    },
+    {
+      "silicon_vendor": "Holtek",
+      "pack_vendor": "Holtek",
+      "pack_name": "HT32F490x1_DFP",
+      "pack_version": "1.0.1",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://mcu.holtek.com.tw/pack/Holtek.HT32F490x1_DFP.pdsc",
+      "content_sha256": "f8bacdf7cb89175d309fcc7e8b2fa157b06e8d0fdee2eceada8ba4c09481052a"
+    },
+    {
+      "silicon_vendor": "Holtek",
+      "pack_vendor": "Holtek",
+      "pack_name": "HT32_DFP",
+      "pack_version": "1.0.79",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://mcu.holtek.com.tw/pack/Holtek.HT32_DFP.pdsc",
+      "content_sha256": "3ba2e3d3ea490dc7253267f5a1274a4c265fcfdcd1c6a50e61f3bb5eefd70276"
+    },
+    {
+      "silicon_vendor": "Microchip",
+      "pack_vendor": "Microchip",
+      "pack_name": "SAMG_DFP",
+      "pack_version": "3.10.223",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://packs.download.microchip.com/Microchip.SAMG_DFP.pdsc",
+      "content_sha256": "98af476d12d595af54a079b0f0bf63384c7f26a8da9736c7e4a9cf2c4cb5d0ff"
+    },
+    {
+      "silicon_vendor": "Microchip",
+      "pack_vendor": "Microchip",
+      "pack_name": "ATmega_DFP",
+      "pack_version": "3.6.299",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://packs.download.microchip.com/Microchip.ATmega_DFP.pdsc",
+      "content_sha256": "076ae74236ab09ab070ffbd8fcd7fc26adaeb7d7b30c70a761cd59739d4fb24c"
+    },
+    {
+      "silicon_vendor": "Microchip",
+      "pack_vendor": "Microchip",
+      "pack_name": "PIC32MX_DFP",
+      "pack_version": "1.7.380",
+      "source_kind": "cmsis_pdsc",
+      "source_url": "https://packs.download.microchip.com/Microchip.PIC32MX_DFP.pdsc",
+      "content_sha256": "35f66d60585508c5a5b756ca4246fce65928708a4a84fc4eda6664ffc53e24f0"
+    },
+    {
       "silicon_vendor": "NXP",
       "pack_vendor": "NXP",
       "pack_name": "LPC8N04_DFP",
       "pack_version": "12.2.0",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://mcuxpresso.nxp.com/cmsis_pack/repo/NXP.LPC8N04_DFP.pdsc",
       "content_sha256": "0c899111f237df24b7ee3cecabd788d41710b82190d2f1e481c2199d82b8ce2a"
     },
@@ -18,6 +298,7 @@
       "pack_vendor": "Keil",
       "pack_name": "SAM3_DFP",
       "pack_version": "1.2.3",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.SAM3_DFP.pdsc",
       "content_sha256": "baf4523cbf1f7c35bcd48e50a169c994a01d590bca9e7a259b5bf2a53072f17d"
     },
@@ -26,6 +307,7 @@
       "pack_vendor": "Keil",
       "pack_name": "SAM4_DFP",
       "pack_version": "1.6.2",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.SAM4_DFP.pdsc",
       "content_sha256": "dc0f3c0e38784835287dc5710dfb89af9e2a1f7688faeb5bd473fcd8fa79d4c3"
     },
@@ -34,6 +316,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LPC1100_DFP",
       "pack_version": "1.4.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LPC1100_DFP.pdsc",
       "content_sha256": "e3b235f0fcd5b6b789812c59f33023af7ce2db0f5a15222108ef616ad118c2ff"
     },
@@ -42,6 +325,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LPC1200_DFP",
       "pack_version": "1.0.2",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LPC1200_DFP.pdsc",
       "content_sha256": "21ee09801c117bd382193b210fde0eac95467c39d19e724d823a8bbdbe7398b2"
     },
@@ -50,6 +334,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LPC1300_DFP",
       "pack_version": "1.1.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LPC1300_DFP.pdsc",
       "content_sha256": "ceaee6def74c22ff2b027b49e921ffe8977759daadd9cae47decfbf512f598ca"
     },
@@ -58,6 +343,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LPC1700_DFP",
       "pack_version": "2.7.2",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LPC1700_DFP.pdsc",
       "content_sha256": "095145b4ef101b00253bc7635953fff7c41f707e164a00f2151255280da61091"
     },
@@ -66,6 +352,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LPC4000_DFP",
       "pack_version": "2.2.2",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LPC4000_DFP.pdsc",
       "content_sha256": "0cc10bc8a1e3a98d3bbb3511f7d60934840f54216da4267227b2e0c9fc30ec6e"
     },
@@ -74,6 +361,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LPC4300_DFP",
       "pack_version": "2.10.2",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LPC4300_DFP.pdsc",
       "content_sha256": "e9535d3c28a81da2c7c3b59c355fc234fd45bd58aa6ac301f8aebdd7e8fc5e03"
     },
@@ -82,6 +370,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LPC800_DFP",
       "pack_version": "1.10.2",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LPC800_DFP.pdsc",
       "content_sha256": "b5c8a113d1bd88387e21643c05de18ac7413a88be2a9859ac258a9cec02e53d1"
     },
@@ -90,6 +379,7 @@
       "pack_vendor": "Keil",
       "pack_name": "Kinetis_K40_DFP",
       "pack_version": "1.1.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.Kinetis_K40_DFP.pdsc",
       "content_sha256": "c19b289c04eda93407a57dac73e33c841bf4c45a2f79decd157242262eae5f93"
     },
@@ -98,6 +388,7 @@
       "pack_vendor": "Keil",
       "pack_name": "Kinetis_K60_DFP",
       "pack_version": "1.5.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.Kinetis_K60_DFP.pdsc",
       "content_sha256": "7981a155caff036fde73f4cd4ffb3f74c0008a06eaeb60f184b2d27e64cd81b6"
     },
@@ -106,6 +397,7 @@
       "pack_vendor": "Keil",
       "pack_name": "Kinetis_KLxx_DFP",
       "pack_version": "1.15.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.Kinetis_KLxx_DFP.pdsc",
       "content_sha256": "e81d3358e24f2d230987aafe8dd30602041186f9d8a6f43c85ead4d7842bd0ab"
     },
@@ -114,6 +406,7 @@
       "pack_vendor": "Keil",
       "pack_name": "S32K116_SDK_DFP",
       "pack_version": "1.2.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.S32K116_SDK_DFP.pdsc",
       "content_sha256": "11c5a159c2254aa83f2d9cd5afde8156165d934061011ead76aa946ad1309a3b"
     },
@@ -122,6 +415,7 @@
       "pack_vendor": "Keil",
       "pack_name": "S32K118_SDK_DFP",
       "pack_version": "1.2.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.S32K118_SDK_DFP.pdsc",
       "content_sha256": "11c891080bf261925ab001bc785bf16c202f8edee3b7388598b7083ca81daa2f"
     },
@@ -130,6 +424,7 @@
       "pack_vendor": "Keil",
       "pack_name": "STBlueNRG_DFP",
       "pack_version": "1.1.2",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.STBlueNRG_DFP.pdsc",
       "content_sha256": "b18d60b4d5d43ab25de6f461663f006676eecabc69926a8d224e3a56d05c0f27"
     },
@@ -138,6 +433,7 @@
       "pack_vendor": "Keil",
       "pack_name": "STBlueNRG-1_DFP",
       "pack_version": "1.2.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.STBlueNRG-1_DFP.pdsc",
       "content_sha256": "04f786b40ec3855d22aba12957117f0626fa3469442f90edefe2dbe820dc0c70"
     },
@@ -146,6 +442,7 @@
       "pack_vendor": "Keil",
       "pack_name": "STBlueNRG-2_DFP",
       "pack_version": "1.0.2",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.STBlueNRG-2_DFP.pdsc",
       "content_sha256": "a17bc2be49bab3bfdeec97dac87386da489f1762ebcbd354bcc71969bc5be656"
     },
@@ -154,6 +451,7 @@
       "pack_vendor": "Keil",
       "pack_name": "STBlueNRG-LP_DFP",
       "pack_version": "3.0.0",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.STBlueNRG-LP_DFP.pdsc",
       "content_sha256": "0e0c4a3b4310ab9f9513d60c32807dbcf3bf8871fd180fa9184a6aaf3cbe1e05"
     },
@@ -162,6 +460,7 @@
       "pack_vendor": "Keil",
       "pack_name": "STM32H7RSxx_DFP",
       "pack_version": "1.1.0",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.STM32H7RSxx_DFP.pdsc",
       "content_sha256": "6ba2d30ddc5f1c89d7dd38d23117cd46d711ccf886d0776133a4a3074efaa56e"
     },
@@ -170,6 +469,7 @@
       "pack_vendor": "Keil",
       "pack_name": "STM32WBAxx_DFP",
       "pack_version": "2.2.0",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.STM32WBAxx_DFP.pdsc",
       "content_sha256": "944bdaacae5161bcfd15069c57ea48d86717e3169d71aa6835c4be3ee4779b78"
     },
@@ -178,6 +478,7 @@
       "pack_vendor": "Keil",
       "pack_name": "STM32WBxx_DFP",
       "pack_version": "2.0.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.STM32WBxx_DFP.pdsc",
       "content_sha256": "8df5e6670fb4c62403accb7d5f49ea3fb25c402dd628f21069fccaa18312b472"
     },
@@ -186,6 +487,7 @@
       "pack_vendor": "Keil",
       "pack_name": "STM32WLxx_DFP",
       "pack_version": "2.1.0",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.STM32WLxx_DFP.pdsc",
       "content_sha256": "38d48e160498fe8d46fcf759ea26f71dd57f149ed32d916849321f2131a8ed0e"
     },
@@ -194,6 +496,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LM3S_DFP",
       "pack_version": "1.1.1",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LM3S_DFP.pdsc",
       "content_sha256": "14232360062733bd4c753a0ad8989e423ab6a7637239df1b6167a70ac153c391"
     },
@@ -202,6 +505,7 @@
       "pack_vendor": "Keil",
       "pack_name": "LM4F_DFP",
       "pack_version": "1.0.0",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.LM4F_DFP.pdsc",
       "content_sha256": "11a91a1d7f86d8f14d9b5851a7e14d5aba6281e7444cd05eae78e6b72b0b378a"
     },
@@ -210,6 +514,7 @@
       "pack_vendor": "Keil",
       "pack_name": "TM4C_DFP",
       "pack_version": "1.1.0",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://www.keil.com/pack/Keil.TM4C_DFP.pdsc",
       "content_sha256": "d0b91760767042b63012f86c28e83df234425ab80974ec958bf83939a307bb44"
     },
@@ -218,8 +523,89 @@
       "pack_vendor": "Nuvoton",
       "pack_name": "NuMicroM4_DFP",
       "pack_version": "1.0.3",
+      "source_kind": "cmsis_pdsc",
       "source_url": "https://github.com/OpenNuvoton/cmsis-packs/raw/master/Nuvoton_DFP/Nuvoton.NuMicroM4_DFP.pdsc",
       "content_sha256": "3e7943a350a2e66c7022ec44b8ef3c5339dbfe47cf03576b9f56eabc3bfc428e"
+    },
+    {
+      "silicon_vendor": "Analog Devices",
+      "pack_vendor": "AnalogDevices",
+      "pack_name": "MSDK-user-guide",
+      "pack_version": "e0446b176b7080098fecddd174317ba47946695e",
+      "source_kind": "vendor_sdk_text",
+      "device_pattern": "\\b(MAX32662|MAX32680)\\b",
+      "source_url": "https://raw.githubusercontent.com/analogdevicesinc/msdk/e0446b176b7080098fecddd174317ba47946695e/USERGUIDE.md",
+      "content_sha256": "d8f9f05e9a7f989b94a6440f2e036349fad98cc304fdc76599da67e1759a597b"
+    },
+    {
+      "silicon_vendor": "Artery",
+      "pack_vendor": "ArteryTek",
+      "pack_name": "PlatformIO-boards",
+      "pack_version": "7313140183db3ca5e74e723c2abcc4da82992dc5",
+      "source_kind": "vendor_board_archive",
+      "device_pattern": "",
+      "source_url": "https://github.com/ArteryTek/platform-arterytekat32/archive/7313140183db3ca5e74e723c2abcc4da82992dc5.tar.gz",
+      "content_sha256": "90f20a664462528fdf414d0833a1e5f70b6cc2edcbf3ae154b3cc8ad131a419a"
+    },
+    {
+      "silicon_vendor": "Bouffalo Lab",
+      "pack_vendor": "BouffaloLab",
+      "pack_name": "SDK-README",
+      "pack_version": "5cd17516dfe8d9813e79008aeb29c3f930797804",
+      "source_kind": "vendor_sdk_text",
+      "device_pattern": "\\b(BL602|BL604|BL702L|BL704L|BL702|BL704|BL706)\\b",
+      "source_url": "https://raw.githubusercontent.com/bouffalolab/bouffalo_sdk/5cd17516dfe8d9813e79008aeb29c3f930797804/README.md",
+      "content_sha256": "9a440e5c424efff0098c5e5c928a609bc243414de6fb0763f81818095d959c17"
+    },
+    {
+      "silicon_vendor": "GigaDevice",
+      "pack_vendor": "GigaDevice",
+      "pack_name": "GD32VF103-official-product-announcement",
+      "pack_version": "article-247",
+      "source_kind": "vendor_product_page",
+      "device_pattern": "\\b(GD32VF103[CRTV][468B][TU]6)\\b",
+      "source_url": "https://www.gd32mcu.com/cn/detail/247",
+      "content_sha256": "fe8526fb9ca74db230cf55b08a0464fb7958793184c78778a00e8dd8a2fc79d2"
+    },
+    {
+      "silicon_vendor": "Microchip",
+      "pack_vendor": "Microchip",
+      "pack_name": "SAM-BA-release-notes",
+      "pack_version": "2.16",
+      "source_kind": "vendor_sdk_text",
+      "device_pattern": "\\b(at91sam7s(?:64|128|256)|at91sam7x(?:256|512))\\b",
+      "source_url": "https://ww1.microchip.com/downloads/en/DeviceDoc/sam-ba_2.16_releasenote.txt",
+      "content_sha256": "d988b014d3e21c5320c3675f98eabfb56c828ff4d6974aa1767d1a8a41562514"
+    },
+    {
+      "silicon_vendor": "Raspberry Pi",
+      "pack_vendor": "RaspberryPi",
+      "pack_name": "PicoSDK-GPIO",
+      "pack_version": "98a542c1a62fb549ffb5d66a3e5892b06276b670",
+      "source_kind": "vendor_sdk_text",
+      "device_pattern": "\\b(RP2040|RP2350A|RP2350B)\\b",
+      "source_url": "https://raw.githubusercontent.com/raspberrypi/pico-sdk/98a542c1a62fb549ffb5d66a3e5892b06276b670/src/rp2_common/hardware_gpio/include/hardware/gpio.h",
+      "content_sha256": "cf0dc03697567b7a65fae88acce2a7d1f1aad812199460c972f0bbb856a264cd"
+    },
+    {
+      "silicon_vendor": "Texas Instruments",
+      "pack_vendor": "TexasInstruments",
+      "pack_name": "FlashRover-supported-devices",
+      "pack_version": "02b5d99477b3e7acc595af4bc0f123ae27a96473",
+      "source_kind": "vendor_sdk_text",
+      "device_pattern": "\\b(CC1310|CC1350|CC1312R|CC1352P|CC1352R|CC2640|CC2650|CC2642R|CC2652P7|CC2652R7|CC2652P|CC2652RB|CC2652R)\\b",
+      "source_url": "https://raw.githubusercontent.com/TexasInstruments/flash-rover/02b5d99477b3e7acc595af4bc0f123ae27a96473/README.md",
+      "content_sha256": "aaeb50399273debf8b62691121e5434d2822e2157f0399deb7eb50bab0c0562d"
+    },
+    {
+      "silicon_vendor": "Texas Instruments",
+      "pack_vendor": "TexasInstruments",
+      "pack_name": "SimpleLink-Zephyr-devices",
+      "pack_version": "498f982e61f0d652a1fbf47438f7686613d87670",
+      "source_kind": "vendor_sdk_text",
+      "device_pattern": "\\b(CC3220SF)\\b",
+      "source_url": "https://raw.githubusercontent.com/TexasInstruments/simplelink-zephyr/498f982e61f0d652a1fbf47438f7686613d87670/README.md",
+      "content_sha256": "2ab9731ef021c290d2f6a38fd41044ae68c83bd080b649927fbceddaf8e0b7fd"
     }
   ]
 }

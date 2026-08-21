@@ -16,6 +16,9 @@
       "target_config": "tcl/target/aduc702x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -42,6 +45,9 @@
       "target_config": "tcl/target/aducm360.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -69,6 +75,9 @@
       "target_config": "tcl/target/max32620.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -98,6 +107,9 @@
       "target_config": "tcl/target/max32625.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -127,6 +139,9 @@
       "target_config": "tcl/target/max3263x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -156,6 +171,9 @@
       "target_config": "tcl/target/max32650.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -185,6 +203,9 @@
       "target_config": "tcl/target/max32655.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -214,6 +235,9 @@
       "target_config": "tcl/target/max32660.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -243,6 +267,9 @@
       "target_config": "tcl/target/max32662.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -272,6 +299,9 @@
       "target_config": "tcl/target/max32670.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -301,6 +331,9 @@
       "target_config": "tcl/target/max32672.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -336,6 +369,9 @@
       "target_config": "tcl/target/max32675.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -365,6 +401,9 @@
       "target_config": "tcl/target/max32680.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -394,6 +433,9 @@
       "target_config": "tcl/target/max32690.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -429,6 +471,9 @@
       "target_config": "tcl/target/max32xxx_common.cfg",
       "device_type": "MCU",
       "classification_status": "Internal/helper",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "helper_or_alias",
       "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
@@ -457,6 +502,9 @@
       "target_config": "tcl/target/artery/at32f4x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -484,6 +532,9 @@
       "target_config": "tcl/target/bl602.cfg",
       "device_type": "Wireless MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "RISC-V"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -512,6 +563,9 @@
       "target_config": "tcl/target/bl602_common.cfg",
       "device_type": "Wireless MCU",
       "classification_status": "Internal/helper",
+      "cpu_architectures": [
+        "RISC-V"
+      ],
       "capability_status": "helper_or_alias",
       "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
@@ -539,6 +593,9 @@
       "target_config": "tcl/target/bl702.cfg",
       "device_type": "Wireless MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "RISC-V"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -567,6 +624,9 @@
       "target_config": "tcl/target/bl702l.cfg",
       "device_type": "Wireless MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "RISC-V"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -595,6 +655,9 @@
       "target_config": "tcl/target/fm3.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -622,6 +685,9 @@
       "target_config": "tcl/target/fm4_mb9bf.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -650,6 +716,9 @@
       "target_config": "tcl/target/fm4_s6e2cc.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -684,6 +753,9 @@
       "target_config": "tcl/target/geehy/apm32f0x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -711,6 +783,9 @@
       "target_config": "tcl/target/geehy/apm32f1x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -738,6 +813,9 @@
       "target_config": "tcl/target/geehy/apm32f4x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -765,6 +843,9 @@
       "target_config": "tcl/target/gigadevice/gd32e23x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -793,6 +874,9 @@
       "target_config": "tcl/target/gigadevice/gd32vf103.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "RISC-V"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -820,6 +904,9 @@
       "target_config": "tcl/target/holtek/ht32f4x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -847,6 +934,9 @@
       "target_config": "tcl/target/psoc5lp.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -889,6 +979,9 @@
       "target_config": "tcl/target/at91sam3ax_4x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -924,6 +1017,9 @@
       "target_config": "tcl/target/at91sam3ax_8x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -959,6 +1055,9 @@
       "target_config": "tcl/target/at91sam3nXX.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -986,6 +1085,9 @@
       "target_config": "tcl/target/at91sam3sXX.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1014,6 +1116,9 @@
       "target_config": "tcl/target/at91sam3u1c.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1043,6 +1148,9 @@
       "target_config": "tcl/target/at91sam3u1e.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1072,6 +1180,9 @@
       "target_config": "tcl/target/at91sam3u2c.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1101,6 +1212,9 @@
       "target_config": "tcl/target/at91sam3u2e.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1130,6 +1244,9 @@
       "target_config": "tcl/target/at91sam3u4c.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1165,6 +1282,9 @@
       "target_config": "tcl/target/at91sam3u4e.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1200,6 +1320,9 @@
       "target_config": "tcl/target/at91sam4c32x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1234,6 +1357,9 @@
       "target_config": "tcl/target/at91sam4cXXX.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1262,6 +1388,9 @@
       "target_config": "tcl/target/at91sam4lXX.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1290,6 +1419,9 @@
       "target_config": "tcl/target/at91sam4sXX.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1318,6 +1450,9 @@
       "target_config": "tcl/target/at91sam4sd32x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1352,6 +1487,9 @@
       "target_config": "tcl/target/at91sam7se512.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1378,6 +1516,9 @@
       "target_config": "tcl/target/at91sam7sx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1404,6 +1545,9 @@
       "target_config": "tcl/target/at91sam7x256.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1430,6 +1574,9 @@
       "target_config": "tcl/target/at91sam7x512.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1462,6 +1609,9 @@
       "target_config": "tcl/target/at91sam9260_ext_RAM_ext_flash.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM926EJ-S"
+      ],
       "capability_status": "external_flash_only",
       "capability_reason": "Only an external/general-purpose Flash bank was resolved",
       "flash_drivers": [
@@ -1490,6 +1640,9 @@
       "target_config": "tcl/target/at91samg5x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1518,6 +1671,9 @@
       "target_config": "tcl/target/atmega128.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "AVR"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1544,6 +1700,9 @@
       "target_config": "tcl/target/atmega128rfa1.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "AVR"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1570,6 +1729,9 @@
       "target_config": "tcl/target/atmega32u4.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "AVR"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1596,6 +1758,9 @@
       "target_config": "tcl/target/pic32mx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "MIPS32"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1648,11 +1813,14 @@
       "validation_status": "not_verified"
     },
     {
-      "vendor": "NXP",
+      "vendor": "NIIET",
       "series": "K1921VK01T",
       "target_config": "tcl/target/k1921vk01t.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1681,6 +1849,9 @@
       "target_config": "tcl/target/k40.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1709,6 +1880,9 @@
       "target_config": "tcl/target/k60.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1737,6 +1911,9 @@
       "target_config": "tcl/target/kl25.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1764,6 +1941,9 @@
       "target_config": "tcl/target/lpc11xx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1792,6 +1972,9 @@
       "target_config": "tcl/target/lpc12xx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1820,6 +2003,9 @@
       "target_config": "tcl/target/lpc13xx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1848,6 +2034,9 @@
       "target_config": "tcl/target/lpc17xx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1876,6 +2065,9 @@
       "target_config": "tcl/target/lpc1xxx.cfg",
       "device_type": "MCU",
       "classification_status": "Internal/helper",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "helper_or_alias",
       "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
@@ -1903,6 +2095,9 @@
       "target_config": "tcl/target/lpc2103.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1930,6 +2125,9 @@
       "target_config": "tcl/target/lpc2124.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1957,6 +2155,9 @@
       "target_config": "tcl/target/lpc2129.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -1984,6 +2185,9 @@
       "target_config": "tcl/target/lpc2148.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2011,6 +2215,9 @@
       "target_config": "tcl/target/lpc2294.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2038,6 +2245,9 @@
       "target_config": "tcl/target/lpc2378.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2065,6 +2275,9 @@
       "target_config": "tcl/target/lpc2460.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2092,6 +2305,9 @@
       "target_config": "tcl/target/lpc2478.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2119,6 +2335,9 @@
       "target_config": "tcl/target/lpc2900.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM966E-S"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2145,6 +2364,9 @@
       "target_config": "tcl/target/lpc2xxx.cfg",
       "device_type": "MCU",
       "classification_status": "Internal/helper",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "helper_or_alias",
       "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
@@ -2171,6 +2393,9 @@
       "target_config": "tcl/target/lpc40xx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2199,6 +2424,9 @@
       "target_config": "tcl/target/lpc4357.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2233,6 +2461,9 @@
       "target_config": "tcl/target/lpc8nxx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2260,6 +2491,9 @@
       "target_config": "tcl/target/lpc8xx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2288,6 +2522,9 @@
       "target_config": "tcl/target/nhs31xx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2316,6 +2553,9 @@
       "target_config": "tcl/target/s32k.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2343,6 +2583,9 @@
       "target_config": "tcl/target/npcx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2370,6 +2613,9 @@
       "target_config": "tcl/target/numicro_m4.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2414,6 +2660,9 @@
       "target_config": "tcl/target/rp2040.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2447,6 +2696,10 @@
       "target_config": "tcl/target/rp2350.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M",
+        "RISC-V"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2480,6 +2733,9 @@
       "target_config": "tcl/target/bluenrg-x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2508,6 +2764,9 @@
       "target_config": "tcl/target/stm32h7rsx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2536,6 +2795,9 @@
       "target_config": "tcl/target/stm32h7x_dual_bank.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "helper_or_alias",
       "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
@@ -2602,6 +2864,9 @@
       "target_config": "tcl/target/stm32l0_dual_bank.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "helper_or_alias",
       "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
@@ -2636,6 +2901,9 @@
       "target_config": "tcl/target/stm32l1x_dual_bank.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "helper_or_alias",
       "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
@@ -2671,6 +2939,9 @@
       "target_config": "tcl/target/stm32w108xx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2698,6 +2969,9 @@
       "target_config": "tcl/target/stm32wba2x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2732,6 +3006,9 @@
       "target_config": "tcl/target/stm32wba5x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2766,6 +3043,9 @@
       "target_config": "tcl/target/stm32wba6x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2800,6 +3080,9 @@
       "target_config": "tcl/target/stm32wbx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2834,6 +3117,9 @@
       "target_config": "tcl/target/stm32wlx.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2880,6 +3166,9 @@
       "target_config": "tcl/target/stm32x5x_common.cfg",
       "device_type": "MCU",
       "classification_status": "Internal/helper",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "helper_or_alias",
       "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
@@ -2918,8 +3207,11 @@
       "target_config": "tcl/target/stm32xl.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
-      "capability_status": "flash_driver_declared",
-      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
         "stm32f1x"
       ],
@@ -2953,6 +3245,9 @@
       "target_config": "tcl/target/str710.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -2985,6 +3280,9 @@
       "target_config": "tcl/target/str730.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3011,6 +3309,9 @@
       "target_config": "tcl/target/str750.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM7TDMI"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3051,6 +3352,9 @@
       "target_config": "tcl/target/str912.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM966E-S"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3083,6 +3387,9 @@
       "target_config": "tcl/target/em357.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3110,6 +3417,9 @@
       "target_config": "tcl/target/em358.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3138,8 +3448,11 @@
       "target_config": "tcl/target/silabs/series0.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
-      "capability_status": "flash_driver_declared",
-      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
         "efm32"
       ],
@@ -3177,8 +3490,11 @@
       "target_config": "tcl/target/silabs/series2.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
-      "capability_status": "flash_driver_declared",
-      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
+      "capability_status": "helper_or_alias",
+      "capability_reason": "Common/base or bank-layout configuration; collapse into a customer target",
       "flash_drivers": [
         "efm32"
       ],
@@ -3210,6 +3526,9 @@
       "target_config": "tcl/target/sim3x.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3237,6 +3556,9 @@
       "target_config": "tcl/target/ti/cc13x0.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3266,6 +3588,9 @@
       "target_config": "tcl/target/ti/cc13x2.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3295,6 +3620,9 @@
       "target_config": "tcl/target/ti/cc26x0.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3323,6 +3651,9 @@
       "target_config": "tcl/target/ti/cc26x2.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3352,6 +3683,9 @@
       "target_config": "tcl/target/ti/cc26x2x7.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3381,6 +3715,9 @@
       "target_config": "tcl/target/ti/cc3220sf.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3410,6 +3747,9 @@
       "target_config": "tcl/target/ti/stellaris.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [
@@ -3440,6 +3780,9 @@
       "target_config": "tcl/target/xmos_xs1-xau8a-10_arm.cfg",
       "device_type": "MCU",
       "classification_status": "Auto-classified",
+      "cpu_architectures": [
+        "ARM Cortex-M"
+      ],
       "capability_status": "flash_driver_declared",
       "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
       "flash_drivers": [

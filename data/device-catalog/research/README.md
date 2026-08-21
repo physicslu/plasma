@@ -21,11 +21,15 @@ This research catalog recursively converts OpenOCD `tcl/target/**/*.cfg` entries
 - Selectable target configurations: 53
 - Excluded for missing configured Flash bank/driver: 36 identifiers across 2 target configurations
 - MCU/Wireless MCU expansion candidates evaluated: 114
-- First automated expansion: 1,023 identifiers across 36 additional target configurations
-- First automated expansion identifier kinds: 893 CMSIS device names and 130 ordering patterns
-- First automated expansion sources: 27 pinned PDSC files
-- Expansion targets awaiting a source adapter/rule: 69
-- Helper/alias or external-Flash-only expansion targets deferred: 9
+- Current automated expansion: 1,804 identifiers across 78 additional target configurations
+- Current expansion identifier kinds: 1,557 device names, 117 exact manufacturer ordering part numbers, and 130 ordering patterns
+- Current expansion sources: 58 pinned PDSC files and 8 pinned vendor SDK, board, or product sources
+- Expansion targets awaiting a source adapter/rule: 24
+- Helper/alias or external-Flash-only expansion targets deferred: 12
+- Canonical selectable identifiers after cross-catalog deduplication: 7,530
+- Canonical selectable target configurations: 131
+- Cross-catalog target conflicts resolved: 34 STM32H7R/S identifiers
+- Canonical CPU architectures: ARM Cortex-M, ARM7TDMI, AVR, MIPS32, RISC-V, and Xtensa
 
 ## User-facing selection
 
@@ -56,9 +60,11 @@ The target seed establishes **Vendor → Series → OpenOCD target**. The first 
 3. Enrich exact part numbers from manufacturer sources and map each part to one target record.
 4. Production mode must show only part profiles with `production_validated` status.
 5. Engineering mode may expose unvalidated mappings with a clear warning.
-6. The user-facing selector should use the `*_mapped.csv` files, not the full research files.
+6. The user-facing selector should use `openocd-parts-canonical.csv`, not the overlapping source-specific research files.
 7. Generic family aliases such as `Generic_M051_Series` are excluded from the user-facing mapped table.
 8. A target must have a known usable OpenOCD Flash programming backend before its devices can enter the user-facing mapped table. The current rule excludes 24 STM32N6 and 12 TLE987x identifiers. The seven Espressif identifiers require the official `openocd-esp32` distribution rather than the pinned upstream OpenOCD build.
+9. A device that exposes more than one CPU architecture, such as RP2350, remains one canonical identifier and lists every architecture supported by its Target CFG.
+10. When a baseline family CFG overlaps a narrower newly mapped CFG, prefer the narrower mapping and retain the decision in `openocd-duplicate-resolutions.csv`.
 
 ## Known limitations
 
@@ -66,7 +72,7 @@ The target seed establishes **Vendor → Series → OpenOCD target**. The first 
 - A single target config can cover many part numbers.
 - Package, flash size, voltage, silicon ID, and socket data are not reliably available from target filenames.
 - TLE987x and STM32N6 identifiers remain in the full research files as unmapped records because their current target CFG files do not configure a Flash bank/driver.
-- The current mapped schema does not yet carry the required backend distribution/version per record; Espressif's vendor-fork requirement must be added before canonical import.
+- Historical source-specific mapped CSVs do not carry the required backend distribution; use the canonical CSV, which explicitly records Espressif's `openocd-esp32` requirement.
 - Historical vendor names and acquisitions require a deliberate normalization policy.
 
 ## Files
@@ -79,10 +85,13 @@ The target seed establishes **Vendor → Series → OpenOCD target**. The first 
 - `enrich_cmsis_parts.py`: reproducible CMSIS DFP enrichment tool.
 - `expand_openocd_parts.py`: fail-closed generator for the 114-target MCU-first expansion backlog.
 - `openocd-target-capabilities.csv` / `.json`: resolved include graph and Flash capability for all 114 candidates.
-- `openocd-parts-expanded.csv` / `.json`: deterministic PDSC-to-Target mappings from the current execution batch.
+- `openocd-parts-expanded.csv` / `.json`: deterministic authoritative-source-to-Target mappings from the current execution batch.
+- `openocd-parts-canonical.csv`: deduplicated Plasma import/selector table combining the existing mapped identifiers and current expansion.
+- `openocd-duplicate-resolutions.csv`: auditable target-selection decisions for identifiers appearing in both baseline and expansion catalogs.
 - `openocd-expansion-outcomes.csv`: one terminal current-run outcome for each of the 114 candidates.
-- `source-manifest.json`: Pack Index and PDSC versions, URLs, and SHA-256 provenance.
+- `source-manifest.json`: Pack Index, PDSC, pinned vendor SDK/board/product sources, versions, URLs, and SHA-256 provenance.
 - `mapping-rules.json`: exported deterministic rule set used by the generator.
 - `expansion-report.md`: current execution totals and status interpretation.
+- `validate_openocd_expansion.py`: offline invariants for source provenance, CPU architectures, aliases, source-aware rules, and cross-catalog uniqueness.
 
 The generator can also produce JSON and full research exports containing unmapped identifiers. Those larger or duplicate source-audit artifacts are intentionally not checked in here; the selectable mapped CSV tables are the checked-in part-number research documents.

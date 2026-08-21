@@ -2,6 +2,210 @@
   "schema_version": "1.0",
   "rules": [
     {
+      "rule_id": "adi-aducm36",
+      "vendor": "Analog Devices",
+      "part_pattern": "^ADUCM36",
+      "target_config": "tcl/target/aducm360.cfg"
+    },
+    {
+      "rule_id": "adi-max32620",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32620$",
+      "target_config": "tcl/target/max32620.cfg"
+    },
+    {
+      "rule_id": "adi-max32625",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32625",
+      "target_config": "tcl/target/max32625.cfg"
+    },
+    {
+      "rule_id": "adi-max3263",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX3263",
+      "target_config": "tcl/target/max3263x.cfg"
+    },
+    {
+      "rule_id": "adi-max32650",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32650",
+      "target_config": "tcl/target/max32650.cfg"
+    },
+    {
+      "rule_id": "adi-max32655",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32655",
+      "target_config": "tcl/target/max32655.cfg"
+    },
+    {
+      "rule_id": "adi-max32660",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32660",
+      "target_config": "tcl/target/max32660.cfg"
+    },
+    {
+      "rule_id": "adi-max32662",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32662",
+      "target_config": "tcl/target/max32662.cfg"
+    },
+    {
+      "rule_id": "adi-max32670",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32670",
+      "target_config": "tcl/target/max32670.cfg"
+    },
+    {
+      "rule_id": "adi-max32672",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32672",
+      "target_config": "tcl/target/max32672.cfg"
+    },
+    {
+      "rule_id": "adi-max32675",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32675",
+      "target_config": "tcl/target/max32675.cfg"
+    },
+    {
+      "rule_id": "adi-max32680",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32680",
+      "target_config": "tcl/target/max32680.cfg"
+    },
+    {
+      "rule_id": "adi-max32690",
+      "vendor": "Analog Devices",
+      "part_pattern": "^MAX32690",
+      "target_config": "tcl/target/max32690.cfg"
+    },
+    {
+      "rule_id": "artery-at32f4",
+      "vendor": "Artery",
+      "part_pattern": "^AT32F4",
+      "target_config": "tcl/target/artery/at32f4x.cfg"
+    },
+    {
+      "rule_id": "bouffalo-bl602",
+      "vendor": "Bouffalo Lab",
+      "part_pattern": "^BL60[24]$",
+      "target_config": "tcl/target/bl602.cfg"
+    },
+    {
+      "rule_id": "bouffalo-bl702l",
+      "vendor": "Bouffalo Lab",
+      "part_pattern": "^BL70[24]L$",
+      "target_config": "tcl/target/bl702l.cfg"
+    },
+    {
+      "rule_id": "bouffalo-bl702",
+      "vendor": "Bouffalo Lab",
+      "part_pattern": "^BL70[246]$",
+      "target_config": "tcl/target/bl702.cfg"
+    },
+    {
+      "rule_id": "fujitsu-fm4-mb9bf",
+      "vendor": "Cypress/Fujitsu",
+      "part_pattern": "^MB9BF",
+      "target_config": "tcl/target/fm4_mb9bf.cfg"
+    },
+    {
+      "rule_id": "fujitsu-fm4-s6e2cc",
+      "vendor": "Cypress/Fujitsu",
+      "part_pattern": "^S6E2CC",
+      "target_config": "tcl/target/fm4_s6e2cc.cfg"
+    },
+    {
+      "rule_id": "fujitsu-fm3",
+      "vendor": "Cypress/Fujitsu",
+      "part_pattern": "^MB9[AB]",
+      "target_config": "tcl/target/fm3.cfg"
+    },
+    {
+      "rule_id": "geehy-apm32f0",
+      "vendor": "Geehy",
+      "part_pattern": "^APM32F0",
+      "target_config": "tcl/target/geehy/apm32f0x.cfg"
+    },
+    {
+      "rule_id": "geehy-apm32f1",
+      "vendor": "Geehy",
+      "part_pattern": "^APM32F1",
+      "target_config": "tcl/target/geehy/apm32f1x.cfg"
+    },
+    {
+      "rule_id": "geehy-apm32f4",
+      "vendor": "Geehy",
+      "part_pattern": "^APM32F4",
+      "target_config": "tcl/target/geehy/apm32f4x.cfg"
+    },
+    {
+      "rule_id": "gigadevice-gd32e23",
+      "vendor": "GigaDevice",
+      "part_pattern": "^GD32E23",
+      "target_config": "tcl/target/gigadevice/gd32e23x.cfg"
+    },
+    {
+      "rule_id": "gigadevice-gd32vf103",
+      "vendor": "GigaDevice",
+      "part_pattern": "^GD32VF103",
+      "target_config": "tcl/target/gigadevice/gd32vf103.cfg"
+    },
+    {
+      "rule_id": "holtek-ht32f4",
+      "vendor": "Holtek",
+      "part_pattern": "^HT32F4",
+      "target_config": "tcl/target/holtek/ht32f4x.cfg"
+    },
+    {
+      "rule_id": "microchip-atmega128rfa1",
+      "vendor": "Microchip",
+      "part_pattern": "^ATMEGA128RFA1$",
+      "target_config": "tcl/target/atmega128rfa1.cfg"
+    },
+    {
+      "rule_id": "microchip-atmega128",
+      "vendor": "Microchip",
+      "part_pattern": "^ATMEGA128$",
+      "target_config": "tcl/target/atmega128.cfg"
+    },
+    {
+      "rule_id": "microchip-atmega32u4",
+      "vendor": "Microchip",
+      "part_pattern": "^ATMEGA32U4$",
+      "target_config": "tcl/target/atmega32u4.cfg"
+    },
+    {
+      "rule_id": "microchip-pic32mx",
+      "vendor": "Microchip",
+      "part_pattern": "^PIC32MX",
+      "target_config": "tcl/target/pic32mx.cfg"
+    },
+    {
+      "rule_id": "microchip-sam7x256",
+      "vendor": "Microchip",
+      "part_pattern": "^AT91SAM7X256$",
+      "target_config": "tcl/target/at91sam7x256.cfg"
+    },
+    {
+      "rule_id": "microchip-sam7x512",
+      "vendor": "Microchip",
+      "part_pattern": "^AT91SAM7X512$",
+      "target_config": "tcl/target/at91sam7x512.cfg"
+    },
+    {
+      "rule_id": "microchip-sam7s",
+      "vendor": "Microchip",
+      "part_pattern": "^AT91SAM7S(?:64|128|256)$",
+      "target_config": "tcl/target/at91sam7sx.cfg"
+    },
+    {
+      "rule_id": "microchip-samg5",
+      "vendor": "Microchip",
+      "part_pattern": "^ATSAMG5",
+      "target_config": "tcl/target/at91samg5x.cfg"
+    },
+    {
       "rule_id": "microchip-sam3a4x4",
       "vendor": "Microchip",
       "part_pattern": "^ATSAM3[AX]4",
@@ -170,6 +374,18 @@
       "target_config": "tcl/target/s32k.cfg"
     },
     {
+      "rule_id": "raspberry-rp2040",
+      "vendor": "Raspberry Pi",
+      "part_pattern": "^RP2040$",
+      "target_config": "tcl/target/rp2040.cfg"
+    },
+    {
+      "rule_id": "raspberry-rp2350",
+      "vendor": "Raspberry Pi",
+      "part_pattern": "^RP2350[AB]$",
+      "target_config": "tcl/target/rp2350.cfg"
+    },
+    {
       "rule_id": "st-bluenrg",
       "vendor": "STMicroelectronics",
       "part_pattern": "^BlueNRG",
@@ -210,6 +426,42 @@
       "vendor": "STMicroelectronics",
       "part_pattern": "^STM32WL",
       "target_config": "tcl/target/stm32wlx.cfg"
+    },
+    {
+      "rule_id": "ti-cc13x0",
+      "vendor": "Texas Instruments",
+      "part_pattern": "^CC13(?:10|50)$",
+      "target_config": "tcl/target/ti/cc13x0.cfg"
+    },
+    {
+      "rule_id": "ti-cc13x2",
+      "vendor": "Texas Instruments",
+      "part_pattern": "^CC13(?:12R|52[PR])$",
+      "target_config": "tcl/target/ti/cc13x2.cfg"
+    },
+    {
+      "rule_id": "ti-cc26x0",
+      "vendor": "Texas Instruments",
+      "part_pattern": "^CC26(?:40|50)$",
+      "target_config": "tcl/target/ti/cc26x0.cfg"
+    },
+    {
+      "rule_id": "ti-cc26x2x7",
+      "vendor": "Texas Instruments",
+      "part_pattern": "^CC2652[PR]7$",
+      "target_config": "tcl/target/ti/cc26x2x7.cfg"
+    },
+    {
+      "rule_id": "ti-cc26x2",
+      "vendor": "Texas Instruments",
+      "part_pattern": "^CC26(?:42R|52(?:P|R|RB))$",
+      "target_config": "tcl/target/ti/cc26x2.cfg"
+    },
+    {
+      "rule_id": "ti-cc3220sf",
+      "vendor": "Texas Instruments",
+      "part_pattern": "^CC3220SF$",
+      "target_config": "tcl/target/ti/cc3220sf.cfg"
     },
     {
       "rule_id": "ti-stellaris",
