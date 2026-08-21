@@ -1,0 +1,91 @@
+.fpsSelectorActions {
+  align-items: center;
+}
+
+.fpsSelectorCommandGroup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fpsSelectorActions .cancelDraftButton {
+  color: #dc2626;
+}
+
+.fpsSelectorActions .confirmFpsButton {
+  border-color: #1d4ed8;
+  background: #2563eb;
+  color: #fff;
+}
+
+.productionRuntimeBoard {
+  --ppu-card-w: calc(
+    var(--site-tile-w) + var(--site-tile-w) + var(--site-tile-w) + var(--site-tile-w) + 36px
+  );
+}
+
+.facilityRuntimePpuGrid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.productionPpuPrototype {
+  flex: 0 0 var(--ppu-card-w);
+  width: var(--ppu-card-w);
+  max-width: 100%;
+}
+
+.productionSitePrototypeGrid {
+  grid-template-columns: repeat(4, var(--site-tile-w));
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.runtimeLegend i.ready,
+.prototypeSiteLamp.ready i {
+  background: #94a3b8;
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, .55), 0 0 6px rgba(148, 163, 184, .24);
+}
+
+.prototypeSiteLamp.running i {
+  animation: production-site-running-pulse .72s ease-in-out infinite alternate;
+}
+
+.productionRuntimeBoard.density-dense .productionSitePrototype > small {
+  display: block;
+}
+
+@keyframes production-site-running-pulse {
+  from {
+    opacity: .38;
+    transform: scale(.82);
+    box-shadow: inset 0 2px 2px rgba(255,255,255,.55), 0 0 4px rgba(37,99,235,.24);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: inset 0 2px 2px rgba(255,255,255,.65), 0 0 14px rgba(37,99,235,.72);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prototypeSiteLamp.running i {
+    animation: none;
+    outline: 3px solid rgba(37, 99, 235, .22);
+  }
+}
+
+@media (max-width: 620px) {
+  .fpsSelectorActions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .productionPpuPrototype {
+    flex-basis: 100%;
+    width: 100%;
+  }
+}
