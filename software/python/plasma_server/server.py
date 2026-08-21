@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import hashlib
 import math
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,7 @@ from typing import Any
 from plasma_core.config import PlasmaConfig, load_config
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.models import ErrorDetail, JobRequest, new_job_id
+from plasma_core.models import ErrorDetail, ExecutionImageRef, JobRequest, new_job_id
 from plasma_core.protocol import (
     PROTOCOL_VERSION,
     Frame,
@@ -221,6 +222,20 @@ class PlasmaServer:
         ):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid timeout or retry settings")
 
+        image_ref_raw = metadata.get("execution_image_ref")
+        image_ref = ExecutionImageRef.from_dict(image_ref_raw) if image_ref_raw is not None else None
+        if image_ref is not None:
+            if frame.binary:
+                raise PlasmaError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "execution image reference cannot be combined with inline binary",
+                )
+            if site_config is None or site_config.interface != "mock":
+                raise PlasmaError(
+                    ErrorCode.OPERATION_UNSUPPORTED,
+                    "execution image references are only supported by the local Mock interface",
+                )
+
         expected_size = metadata.get("image_size")
         if expected_size is not None:
             if isinstance(expected_size, bool):
@@ -233,11 +248,28 @@ class PlasmaServer:
                     "image_size must be an integer",
                     original_exception=exc,
                 ) from exc
-            if parsed_size != len(frame.binary):
+            actual_size = image_ref.size_bytes if image_ref is not None else len(frame.binary)
+            if parsed_size != actual_size:
                 raise PlasmaError(
                     ErrorCode.PROTOCOL_INCOMPLETE,
-                    "image_size does not match BINLEN",
-                    context={"image_size": expected_size, "binlen": len(frame.binary)},
+                    "image_size does not match execution image payload",
+                    context={"image_size": expected_size, "actual_size": actual_size},
+                )
+
+        expected_sha256 = metadata.get("image_sha256")
+        if expected_sha256 is not None:
+            if not isinstance(expected_sha256, str):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "image_sha256 must be a string")
+            actual_sha256 = (
+                image_ref.sha256
+                if image_ref is not None
+                else hashlib.sha256(frame.binary).hexdigest()
+            )
+            if expected_sha256 != actual_sha256:
+                raise PlasmaError(
+                    ErrorCode.PROTOCOL_CHECKSUM_MISMATCH,
+                    "image_sha256 does not match execution image payload",
+                    context={"expected": expected_sha256, "actual": actual_sha256},
                 )
 
         known = {
@@ -253,6 +285,7 @@ class PlasmaServer:
             "target",
             "image_size",
             "image_sha256",
+            "execution_image_ref",
             "wait_for_completion",
         }
         job_id_raw = metadata.get("job_id")
@@ -265,6 +298,7 @@ class PlasmaServer:
             site_id=site_id,
             operation=operation,
             image=frame.binary,
+            image_ref=image_ref,
             map_data=frame.map_data,
             job_id=job_id_raw or new_job_id(),
             timeout_s=timeout_s,
