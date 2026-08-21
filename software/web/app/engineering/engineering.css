@@ -419,3 +419,44 @@
     flex-direction: column;
   }
 }
+
+/* Native select popups must participate in Plasma's theme. Chromium on Windows
+ * otherwise paints the dropdown list with the OS light palette even while the
+ * surrounding Emode surface is dark. */
+.engineeringTargetSelector select {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background-color: var(--panel-2);
+  color: var(--text);
+  padding: 6px 8px;
+  color-scheme: inherit;
+}
+
+.engineeringTargetSelector select option {
+  background-color: var(--panel);
+  color: var(--text);
+}
+
+[data-theme="dark"] .engineeringTargetSelector select,
+[data-theme="dark"] .engineeringTargetSelector select option {
+  color-scheme: dark;
+  background-color: var(--panel);
+  color: var(--text);
+}
+
+[data-theme="light"] .engineeringTargetSelector select,
+[data-theme="light"] .engineeringTargetSelector select option {
+  color-scheme: light;
+}
+
+/* Keep the image action beside the image label/name instead of distributing it
+ * to the far edge of the parameter panel. */
+.engineeringProgramming .compactFile {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.engineeringProgramming .compactFile > div {
+  flex: 0 1 auto;
+  max-width: min(520px, 70%);
+}
