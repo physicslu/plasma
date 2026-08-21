@@ -17,6 +17,7 @@ class JobState(StrEnum):
     RUNNING = "running"
     SUCCESS = "success"
     FAILED = "failed"
+    ERROR = "error"
     CANCELLED = "cancelled"
     TIMEOUT = "timeout"
     ABORTED = "aborted"
@@ -26,6 +27,7 @@ class JobState(StrEnum):
         return self in {
             JobState.SUCCESS,
             JobState.FAILED,
+            JobState.ERROR,
             JobState.CANCELLED,
             JobState.TIMEOUT,
             JobState.ABORTED,
