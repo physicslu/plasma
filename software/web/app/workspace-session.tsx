@@ -29,6 +29,11 @@ export type EngineeringSection =
   | "logs"
   | "tools"
   | "settings";
+export type WorkspaceSessionAuditEntry = {
+  id: number;
+  time: string;
+  message: string;
+};
 
 type SessionState = { apiBase: string; sessionId: string };
 type SessionRequest = { apiBase: string; promise: Promise<string> };
@@ -40,6 +45,8 @@ type WorkspaceSessionContextValue = {
   engineeringSessionId: string | null;
   ensureEngineeringSession: (apiBase?: string) => Promise<string>;
   restartEngineeringSession: (apiBase?: string) => Promise<string>;
+  sessionAuditEntries: WorkspaceSessionAuditEntry[];
+  clearSessionAuditEntries: () => void;
 
   programmingImage: File | null;
   setProgrammingImage: Dispatch<SetStateAction<File | null>>;
@@ -70,12 +77,18 @@ type WorkspaceSessionContextValue = {
 const WorkspaceSessionContext = createContext<WorkspaceSessionContextValue | null>(null);
 const API_STORAGE_KEY = "plasma-api-base";
 
+function nowTime(): string {
+  return new Date().toLocaleTimeString("en-GB", { hour12: false });
+}
+
 export function WorkspaceSessionProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [apiBase, setApiBaseState] = useState(DEFAULT_API_BASE);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
+  const [sessionAuditEntries, setSessionAuditEntries] = useState<WorkspaceSessionAuditEntry[]>([]);
   const sessionStateRef = useRef<SessionState | null>(null);
   const sessionRequestRef = useRef<SessionRequest | null>(null);
+  const sessionAuditSequence = useRef(0);
 
   const [programmingImage, setProgrammingImage] = useState<File | null>(null);
 
@@ -112,6 +125,18 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     return normalized;
   }, []);
 
+  const appendSessionAudit = useCallback((message: string) => {
+    setSessionAuditEntries(current => [...current, {
+      id: ++sessionAuditSequence.current,
+      time: nowTime(),
+      message,
+    }].slice(-100));
+  }, []);
+
+  const clearSessionAuditEntries = useCallback(() => {
+    setSessionAuditEntries([]);
+  }, []);
+
   const publishSession = useCallback((next: SessionState) => {
     sessionStateRef.current = next;
     setSessionState(next);
@@ -125,25 +150,33 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     const pending = sessionRequestRef.current;
     if (pending?.apiBase === normalized) return await pending.promise;
 
-    const promise = beginEngineeringSession(normalized).then(session => publishSession({
-      apiBase: normalized,
-      sessionId: session.session_id,
-    }));
+    const promise = beginEngineeringSession(normalized).then(session => {
+      const sessionId = publishSession({
+        apiBase: normalized,
+        sessionId: session.session_id,
+      });
+      appendSessionAudit(`[SESSION] NEW · fresh connection · ${sessionId.slice(0, 8)}…`);
+      return sessionId;
+    });
     sessionRequestRef.current = { apiBase: normalized, promise };
     try {
       return await promise;
     } finally {
       if (sessionRequestRef.current?.promise === promise) sessionRequestRef.current = null;
     }
-  }, [apiBase, publishSession]);
+  }, [apiBase, appendSessionAudit, publishSession]);
 
   const restartEngineeringSession = useCallback(async (requestedBase?: string): Promise<string> => {
     const normalized = normalizeApiBase(requestedBase ?? apiBase);
     const current = sessionStateRef.current;
     const previousSessionId = current?.apiBase === normalized ? current.sessionId : undefined;
     const session = await beginEngineeringSession(normalized, previousSessionId);
-    return publishSession({ apiBase: normalized, sessionId: session.session_id });
-  }, [apiBase, publishSession]);
+    const sessionId = publishSession({ apiBase: normalized, sessionId: session.session_id });
+    appendSessionAudit(
+      `[SESSION] NEW · ${session.previous_session_cleared ? "previous Programming Asset cache cleared" : "fresh connection"} · ${sessionId.slice(0, 8)}…`,
+    );
+    return sessionId;
+  }, [apiBase, appendSessionAudit, publishSession]);
 
   const engineeringSessionId = sessionState?.apiBase === apiBase ? sessionState.sessionId : null;
 
@@ -154,6 +187,8 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     engineeringSessionId,
     ensureEngineeringSession,
     restartEngineeringSession,
+    sessionAuditEntries,
+    clearSessionAuditEntries,
     programmingImage,
     setProgrammingImage,
     pmodDraftSelection,
@@ -183,6 +218,8 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     engineeringSessionId,
     ensureEngineeringSession,
     restartEngineeringSession,
+    sessionAuditEntries,
+    clearSessionAuditEntries,
     programmingImage,
     pmodDraftSelection,
     pmodActiveSelection,
