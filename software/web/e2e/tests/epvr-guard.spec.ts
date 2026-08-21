@@ -116,7 +116,7 @@ async function chooseFileFromButton(page: Page, buttonName: string, expectedFile
   });
 }
 
-test("Pmod Browse is explicit and empty EPVR shows a warning without submitting jobs", async ({ page }) => {
+test("Pmod programming file picker is explicit and empty EPVR submits no jobs", async ({ page }) => {
   const api = await installEngineeringApi(page);
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
@@ -125,10 +125,13 @@ test("Pmod Browse is explicit and empty EPVR shows a warning without submitting 
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
   await expect(page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`)).toBeVisible();
 
-  const browse = page.getByRole("button", { name: "選擇檔案", exact: true });
+  const picker = page.locator(".productionImagePicker");
+  const browse = page.getByRole("button", { name: "選擇燒錄檔", exact: true });
   await expect(browse).toBeVisible();
-  await chooseFileFromButton(page, "選擇檔案", "pmod-test.bin");
-  await expect(page.locator(".productionImagePicker")).toContainText("pmod-test.bin");
+  await expect(picker).not.toContainText("Programming Image (.bin)");
+  await expect(picker.locator("em")).toHaveText("—");
+  await chooseFileFromButton(page, "選擇燒錄檔", "pmod-test.bin");
+  await expect(picker.locator("em")).toHaveText("pmod-test.bin");
 
   await page.locator(".executeBatchButton").click();
   await expect(page.getByRole("alert")).toContainText(
@@ -137,17 +140,20 @@ test("Pmod Browse is explicit and empty EPVR shows a warning without submitting 
   expect(api.jobRequests).toBe(0);
 });
 
-test("Emode Browse is explicit and empty EPVR shows a warning without submitting jobs", async ({ page }) => {
+test("Emode programming file picker matches Pmod and empty EPVR submits no jobs", async ({ page }) => {
   const api = await installEngineeringApi(page);
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
-  const browse = page.getByRole("button", { name: "瀏覽檔案", exact: true });
+  const picker = page.locator(".compactFile");
+  const browse = page.getByRole("button", { name: "選擇燒錄檔", exact: true });
   await expect(browse).toBeVisible();
-  await chooseFileFromButton(page, "瀏覽檔案", "emode-test.bin");
-  await expect(page.locator(".compactFile")).toContainText("emode-test.bin");
+  await expect(picker).not.toContainText("Programming Image (.bin)");
+  await expect(picker.locator("b")).toHaveText("—");
+  await chooseFileFromButton(page, "選擇燒錄檔", "emode-test.bin");
+  await expect(picker.locator("b")).toHaveText("emode-test.bin");
 
   const execute = page.locator(".executeBatch");
   await expect(execute).toBeEnabled();

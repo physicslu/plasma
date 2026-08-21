@@ -87,7 +87,7 @@ const copy = {
     operations: "批次操作",
     image: "Programming Image (.bin)",
     imageHint: "Program / Verify 需要 Image Asset，最大 16 MiB。",
-    browse: "選擇檔案",
+    browse: "選擇燒錄檔",
     execute: "執行批次",
     cancelAll: "取消批次",
     ready: "READY",
@@ -131,7 +131,7 @@ const copy = {
     operations: "Batch Operations",
     image: "Programming Image (.bin)",
     imageHint: "Program / Verify requires an Image Asset, max 16 MiB.",
-    browse: "Browse",
+    browse: "Select Programming File",
     execute: "Execute Batch",
     cancelAll: "Cancel Batch",
     ready: "READY",
@@ -706,17 +706,7 @@ export default function FleetPage() {
               </section>
 
               <section className="productionBatchToolbar" aria-label="Batch operation toolbar">
-                <div className="batchOperations">
-                  <span>{text.operations}</span>
-                  {operationOrder.map(operation => (
-                    <label key={operation}>
-                      <input type="checkbox" checked={selectedOperations.includes(operation)} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
-                      <b>{operationCodes[operation]}</b> {t(`operation.${operation}`)}
-                    </label>
-                  ))}
-                </div>
                 <div className="productionImagePicker">
-                  <span><b>{text.image}</b><small>{text.imageHint}</small></span>
                   <button type="button" className="productionBrowseButton" disabled={batchRunning} onClick={() => imageInputRef.current?.click()}>{text.browse}</button>
                   <input
                     ref={imageInputRef}
@@ -737,7 +727,17 @@ export default function FleetPage() {
                       }
                     }}
                   />
-                  <em>{imageAsset?.name ?? "—"}</em>
+                  <em title={imageAsset?.name}>{imageAsset?.name ?? "—"}</em>
+                  <small>{text.imageHint}</small>
+                </div>
+                <div className="batchOperations">
+                  <span>{text.operations}</span>
+                  {operationOrder.map(operation => (
+                    <label key={operation}>
+                      <input type="checkbox" checked={selectedOperations.includes(operation)} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
+                      <b>{operationCodes[operation]}</b> {t(`operation.${operation}`)}
+                    </label>
+                  ))}
                 </div>
                 <div className="productionBatchActions">
                   <div className={`batchState batch-${batchState}`}><small>{text.batch}</small><b>{batchLabel}</b></div>
