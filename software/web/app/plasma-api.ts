@@ -143,6 +143,58 @@ export class PlasmaSubmissionBlockedError extends Error {
   }
 }
 
+const terminalJobStates = new Set<JobState>(["success", "failed", "cancelled", "timeout", "aborted"]);
+const ppuExecutionListeners = new Set<() => void>();
+const activeExecutionJobs = new Set<string>();
+let pendingJobSubmissions = 0;
+let lastExecutionActivityCount = 0;
+
+function executionJobKey(apiBase: string, jobId: string): string {
+  return `${apiBase}|${jobId}`;
+}
+
+function executionActivityCount(): number {
+  return pendingJobSubmissions + activeExecutionJobs.size;
+}
+
+function emitPpuExecutionActivityIfChanged(): void {
+  const next = executionActivityCount();
+  if (next === lastExecutionActivityCount) return;
+  lastExecutionActivityCount = next;
+  ppuExecutionListeners.forEach(listener => listener());
+}
+
+function beginJobSubmission(): void {
+  pendingJobSubmissions += 1;
+  emitPpuExecutionActivityIfChanged();
+}
+
+function endJobSubmission(): void {
+  pendingJobSubmissions = Math.max(0, pendingJobSubmissions - 1);
+  emitPpuExecutionActivityIfChanged();
+}
+
+function syncExecutionJob(apiBase: string, job: JobSnapshot): void {
+  const key = executionJobKey(apiBase, job.job_id);
+  if (terminalJobStates.has(job.state)) activeExecutionJobs.delete(key);
+  else activeExecutionJobs.add(key);
+  emitPpuExecutionActivityIfChanged();
+}
+
+function markExecutionJobActive(apiBase: string, jobId: string): void {
+  activeExecutionJobs.add(executionJobKey(apiBase, jobId));
+  emitPpuExecutionActivityIfChanged();
+}
+
+export function subscribePpuExecutionActivity(listener: () => void): () => void {
+  ppuExecutionListeners.add(listener);
+  return () => ppuExecutionListeners.delete(listener);
+}
+
+export function getPpuExecutionActivityCount(): number {
+  return executionActivityCount();
+}
+
 export function normalizeApiBase(value: string): string {
   const url = new URL(value.trim());
   if (url.protocol !== "http:" && url.protocol !== "https:") {
@@ -339,7 +391,9 @@ export async function getJob(
     apiBase,
     `/api/status?job=${encodeURIComponent(jobId)}`,
   );
-  return normalizeJobSnapshot(payload.job);
+  const job = normalizeJobSnapshot(payload.job);
+  syncExecutionJob(apiBase, job);
+  return job;
 }
 
 export async function startJob(
@@ -355,70 +409,88 @@ export async function startJob(
     onAssetEvent?: (event: AssetTransferEvent) => void;
   },
 ): Promise<JobSnapshot> {
-  const usesAsset = options.operation === "program" || options.operation === "verify";
-  const engineeringTarget = apiBase.includes("/api/engineering/targets/");
-  let fingerprint: ProgrammingAssetFingerprint | null = null;
-  let assetBase64 = "";
+  beginJobSubmission();
+  try {
+    const usesAsset = options.operation === "program" || options.operation === "verify";
+    const engineeringTarget = apiBase.includes("/api/engineering/targets/");
+    let fingerprint: ProgrammingAssetFingerprint | null = null;
+    let assetBase64 = "";
 
-  if (usesAsset) {
-    if (!options.assetFile) {
-      throw new PlasmaApiError("Program and Verify require an Image Asset");
-    }
-    fingerprint = await fingerprintFile(options.assetFile);
-    if (engineeringTarget) {
-      if (!options.engineeringSessionId) {
-        throw new PlasmaApiError("Engineering connection session is not ready");
+    if (usesAsset) {
+      if (!options.assetFile) {
+        throw new PlasmaApiError("Program and Verify require an Image Asset");
       }
-      fingerprint = await ensureEngineeringAsset(
-        apiBase,
-        options.engineeringSessionId,
-        options.assetFile,
-        options.onAssetEvent,
-      );
-    } else {
-      assetBase64 = await fileToBase64(options.assetFile);
+      fingerprint = await fingerprintFile(options.assetFile);
+      if (engineeringTarget) {
+        if (!options.engineeringSessionId) {
+          throw new PlasmaApiError("Engineering connection session is not ready");
+        }
+        fingerprint = await ensureEngineeringAsset(
+          apiBase,
+          options.engineeringSessionId,
+          options.assetFile,
+          options.onAssetEvent,
+        );
+      } else {
+        assetBase64 = await fileToBase64(options.assetFile);
+      }
     }
-  }
 
-  if (options.submissionGuard && !options.submissionGuard()) {
-    throw new PlasmaSubmissionBlockedError();
-  }
+    if (options.submissionGuard && !options.submissionGuard()) {
+      throw new PlasmaSubmissionBlockedError();
+    }
 
-  const body: Record<string, unknown> = {
-    site_id: options.siteId,
-    operation: options.operation,
-  };
-  if (fingerprint && engineeringTarget && options.engineeringSessionId) {
-    body.session_id = options.engineeringSessionId;
-    body.asset_sha256 = fingerprint.asset_sha256;
-  } else if (fingerprint && usesAsset) {
-    Object.assign(body, fingerprint, {
-      asset_base64: assetBase64,
-      timeout_s: 30,
-    });
-  }
-  if (options.operation === "read") {
-    body.offset = options.offset ?? 0;
-    body.length = options.length ?? 256;
-  }
+    const body: Record<string, unknown> = {
+      site_id: options.siteId,
+      operation: options.operation,
+    };
+    if (fingerprint && engineeringTarget && options.engineeringSessionId) {
+      body.session_id = options.engineeringSessionId;
+      body.asset_sha256 = fingerprint.asset_sha256;
+    } else if (fingerprint && usesAsset) {
+      Object.assign(body, fingerprint, {
+        asset_base64: assetBase64,
+        timeout_s: 30,
+      });
+    }
+    if (options.operation === "read") {
+      body.offset = options.offset ?? 0;
+      body.length = options.length ?? 256;
+    }
 
-  const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
-    apiBase,
-    "/api/jobs",
-    { method: "POST", body: JSON.stringify(body) },
-  );
-  return normalizeJobSnapshot(payload.job);
+    const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
+      apiBase,
+      "/api/jobs",
+      { method: "POST", body: JSON.stringify(body) },
+    );
+    const job = normalizeJobSnapshot(payload.job);
+    syncExecutionJob(apiBase, job);
+    return job;
+  } finally {
+    endJobSubmission();
+  }
 }
 
 export async function cancelJob(
   apiBase: string,
   jobId: string,
 ): Promise<void> {
-  await requestJson(
-    apiBase,
-    `/api/jobs/${encodeURIComponent(jobId)}/cancel`,
-    { method: "POST", body: "{}" },
-  );
+  const key = executionJobKey(apiBase, jobId);
+  const wasTracked = activeExecutionJobs.has(key);
+  markExecutionJobActive(apiBase, jobId);
+  try {
+    await requestJson(
+      apiBase,
+      `/api/jobs/${encodeURIComponent(jobId)}/cancel`,
+      { method: "POST", body: "{}" },
+    );
+  } catch (error) {
+    if (!wasTracked) {
+      activeExecutionJobs.delete(key);
+      emitPpuExecutionActivityIfChanged();
+    }
+    throw error;
+  }
 }
 
 export function readDownloadUrl(apiBase: string, jobId: string, filename: string): string {

@@ -15,6 +15,7 @@ function jobPayload(job: MockJob, state: JobState) {
   const running = state === "running";
   const success = state === "success";
   const failed = state === "failed";
+  const cancelled = state === "cancelled";
   return {
     job_id: job.jobId,
     site_id: job.siteId,
@@ -23,8 +24,8 @@ function jobPayload(job: MockJob, state: JobState) {
     cancel_requested: job.cancelRequested,
     stage: running || success ? job.operation : null,
     stage_state: running ? "running" : success ? "success" : failed ? "failed" : null,
-    stage_progress_percent: success ? 100 : running ? 50 : 0,
-    progress_percent: success ? 100 : running ? 50 : 0,
+    stage_progress_percent: success ? 100 : running || cancelled ? 50 : 0,
+    progress_percent: success ? 100 : running || cancelled ? 50 : 0,
     bytes_done: null,
     bytes_total: null,
     result: success || failed
