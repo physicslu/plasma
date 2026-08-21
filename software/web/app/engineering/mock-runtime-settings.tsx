@@ -120,26 +120,26 @@ export default function MockRuntimeSettingsPanel() {
   const { apiBase } = useWorkspaceSession();
   const [applied, setApplied] = useState<MockRuntimeSettings | null>(null);
   const [draft, setDraft] = useState<MockRuntimeSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedApiBase, setLoadedApiBase] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     getMockRuntimeSettings(apiBase)
       .then(settings => {
         if (cancelled) return;
         setApplied(settings);
         setDraft(cloneSettings(settings));
+        setError(null);
+        setNotice(null);
+        setLoadedApiBase(apiBase);
       })
       .catch(reason => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : text.unavailable);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        setError(reason instanceof Error ? reason.message : text.unavailable);
+        setLoadedApiBase(apiBase);
       });
     return () => { cancelled = true; };
   }, [apiBase, text.unavailable]);
@@ -173,10 +173,10 @@ export default function MockRuntimeSettingsPanel() {
     }
   }
 
-  if (loading) {
+  if (loadedApiBase !== apiBase) {
     return <div className="mockRuntimeLoading" role="status">{text.loading}</div>;
   }
-  if (!draft || !applied) {
+  if (!draft || !applied || error && applied === null) {
     return <div className="mockRuntimeError" role="alert">{error ?? text.unavailable}</div>;
   }
 
