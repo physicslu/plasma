@@ -15,6 +15,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from . import gateway_legacy as legacy
 from .batch_runtime import BatchRuntimeManager
 from .engineering_targets import EngineeringPPUProvider
+from .mock_batch_runtime import MockAwareBatchRuntimeManager
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
@@ -28,6 +29,14 @@ def _batch_payload(snapshot: dict[str, Any]) -> dict[str, Any]:
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
         "batch": snapshot,
+    }
+
+
+def _mock_runtime_payload(settings: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "rest_contract_version": WEB_REST_CONTRACT_VERSION,
+        "mock_runtime": settings,
     }
 
 
@@ -143,6 +152,28 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
             return None
         return parts[2:]
 
+    @staticmethod
+    def _is_mock_runtime_path(path: str) -> bool:
+        return path.rstrip("/") == "/api/mock/runtime"
+
+    @classmethod
+    def _mock_provider(cls) -> SharedImageMockEngineeringPPUProvider | None:
+        provider = cls.engineering_provider
+        return provider if isinstance(provider, SharedImageMockEngineeringPPUProvider) else None
+
+    def _mock_unavailable(self) -> None:
+        self._json(
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {
+                "ok": False,
+                "error": {
+                    "error_code": ErrorCode.BATCH_INFRASTRUCTURE_ERROR.value,
+                    "error_type": "MOCK_RUNTIME_UNAVAILABLE",
+                    "message": "Mock runtime settings are not enabled",
+                },
+            },
+        )
+
     def _batch_unavailable(self) -> None:
         self._json(
             HTTPStatus.SERVICE_UNAVAILABLE,
@@ -177,6 +208,17 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if self._is_mock_runtime_path(parsed.path):
+            try:
+                provider = self._mock_provider()
+                if provider is None:
+                    self._mock_unavailable()
+                    return
+                self._json(HTTPStatus.OK, _mock_runtime_payload(provider.mock_runtime_settings()))
+            except Exception as exc:
+                self._error(exc)
+            return
+
         tail = self._batch_path(parsed.path)
         if tail is None:
             super().do_GET()
@@ -194,6 +236,21 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if self._is_mock_runtime_path(parsed.path):
+            try:
+                provider = self._mock_provider()
+                if provider is None:
+                    self._mock_unavailable()
+                    return
+                body = self._body()
+                self._json(
+                    HTTPStatus.OK,
+                    _mock_runtime_payload(provider.update_mock_runtime_settings(body)),
+                )
+            except Exception as exc:
+                self._error(exc)
+            return
+
         tail = self._batch_path(parsed.path)
         if tail is None:
             super().do_POST()
@@ -271,9 +328,12 @@ def serve(
 ) -> None:
     PlasmaWebHandler.client_factory = staticmethod(lambda: legacy.PlasmaClient(plasma_host, plasma_port))
     PlasmaWebHandler.engineering_provider = engineering_provider
-    PlasmaWebHandler.batch_runtime = (
-        BatchRuntimeManager(engineering_provider) if engineering_provider is not None else None
-    )
+    if isinstance(engineering_provider, SharedImageMockEngineeringPPUProvider):
+        PlasmaWebHandler.batch_runtime = MockAwareBatchRuntimeManager(engineering_provider)
+    else:
+        PlasmaWebHandler.batch_runtime = (
+            BatchRuntimeManager(engineering_provider) if engineering_provider is not None else None
+        )
     PlasmaWebHandler.allowed_origins = frozenset(cors_origins)
     PlasmaWebHandler.output_root = output_root.resolve()
     PlasmaWebHandler.static_root = static_root.resolve() if static_root is not None else None
@@ -326,6 +386,11 @@ def main() -> None:
         default=4 * 1024 * 1024,
         help="Mock Flash bytes per Engineering Site (default: 4 MiB)",
     )
+    parser.add_argument(
+        "--engineering-mock-profile",
+        type=Path,
+        help="Persistent Mock runtime profile YAML (default: <engineering-mock-root>/mock-runtime.yaml)",
+    )
     args = parser.parse_args()
 
     if args.static_root is not None and not (args.static_root / "index.html").is_file():
@@ -334,9 +399,11 @@ def main() -> None:
     provider: SharedImageMockEngineeringPPUProvider | None = None
     try:
         if args.engineering_mock:
+            profile_path = args.engineering_mock_profile or (args.engineering_mock_root / "mock-runtime.yaml")
             provider = SharedImageMockEngineeringPPUProvider(
                 args.engineering_mock_root,
                 flash_size_bytes=args.engineering_mock_flash_size,
+                mock_profile_path=profile_path,
             )
             provider.start()
             catalog = provider.catalog()
