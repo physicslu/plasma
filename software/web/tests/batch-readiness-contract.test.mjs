@@ -10,7 +10,8 @@ async function read(path) {
 
 test("Pmod and Emode share one batch readiness source of truth", async () => {
   const readiness = await read("batch-readiness.ts");
-  const pmod = await read("fleet/page.tsx");
+  const pmodRoute = await read("fleet/page.tsx");
+  const pmod = await read("fleet/server-batch-page.tsx");
   const emode = await read("engineering/programming-workspace.tsx");
 
   for (const label of [
@@ -28,15 +29,16 @@ test("Pmod and Emode share one batch readiness source of truth", async () => {
   ]) assert.match(readiness, new RegExp(label.replace(/ /g, "\\s")));
 
   assert.match(readiness, /export function evaluateBatchReadiness/);
+  assert.match(pmodRoute, /server-batch-page/);
   assert.match(pmod, /evaluateBatchReadiness\(/);
   assert.match(emode, /evaluateBatchReadiness\(/);
-  assert.match(pmod, /disabled=\{!batchReadiness\.ready\}/);
+  assert.match(pmod, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
   assert.match(emode, /disabled=\{!batchReadiness\.ready\}/);
 });
 
 test("Pmod and Emode use the same programming batch toolbar contract", async () => {
   const css = await read("programming-batch-toolbar.css");
-  const pmod = await read("fleet/page.tsx");
+  const pmod = await read("fleet/server-batch-page.tsx");
   const emode = await read("engineering/programming-workspace.tsx");
 
   assert.match(css, /\.programmingFileName[\s\S]*font-size:\s*13px/);

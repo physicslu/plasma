@@ -47,22 +47,29 @@ test("Web source defines ProductMode rather than Fleet as a product-mode value",
   assert.match(model, /engineering:\s*"\/engineering"/);
   assert.match(nav, /PRODUCT_MODE_ROUTES\.production/);
   assert.match(nav, /PRODUCT_MODE_ROUTES\.engineering/);
+  assert.match(nav, /getBatchExecutionActivityCount/);
+  assert.match(nav, /subscribeBatchExecutionActivity/);
   assert.doesNotMatch(nav, /nav\.fleet/);
   assert.doesNotMatch(nav, /nav\.singlePpu/);
 });
 
-test("fleet implementation uses retained FPS selection, four-column PPU layout and running LED feedback", async () => {
+test("Production implementation keeps FPS layout but delegates execution ownership to server Batch", async () => {
   const worker = await workerFor("fleet-page");
   const page = await worker.fetch(new Request("http://localhost/fleet", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, />Factory Production Console</);
-  assert.match(html, /PRODUCTION MODE · MOCK PROTOTYPE/);
+  assert.match(html, /PRODUCTION MODE · SERVER BATCH/);
 
-  const source = await fs.readFile(new URL("../app/fleet/page.tsx", import.meta.url), "utf8");
+  const route = await fs.readFile(new URL("../app/fleet/page.tsx", import.meta.url), "utf8");
+  const source = await fs.readFile(new URL("../app/fleet/server-batch-page.tsx", import.meta.url), "utf8");
+  const batchApi = await fs.readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
   const css = await fs.readFile(new URL("../app/fleet/production-prototype.css", import.meta.url), "utf8");
+  const serverBatchCss = await fs.readFile(new URL("../app/fleet/server-batch.css", import.meta.url), "utf8");
   const operatorFeedback = await fs.readFile(new URL("../app/fleet/operator-feedback.css", import.meta.url), "utf8");
   const batchToolbar = await fs.readFile(new URL("../app/programming-batch-toolbar.css", import.meta.url), "utf8");
+
+  assert.match(route, /server-batch-page/);
   assert.match(source, /type SelectionMap/);
   assert.match(source, /draftSelection/);
   assert.match(source, /activeSelection/);
@@ -77,13 +84,36 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(source, /densityFor/);
   assert.doesNotMatch(source, /setSelectorCollapsed\(true\)/);
   assert.match(source, /Promise\.allSettled/);
-  assert.match(source, /runSiteSequence/);
-  assert.match(source, /cancelPPU/);
-  assert.match(source, /site\.state === "running" \? ` · \$\{site\.progress\}%`/);
-  assert.match(source, /<div className="productionImagePicker programmingBatchFile">[\s\S]*<\/div>\s*<div className="batchOperations programmingBatchOperations">/);
+
+  assert.match(source, /createServerBatch/);
+  assert.match(source, /getServerBatch/);
+  assert.match(source, /cancelServerBatch/);
+  assert.match(source, /cancelServerBatchPPU/);
+  assert.match(source, /beginBatchExecutionActivity/);
+  assert.match(source, /ACTIVE_BATCH_STORAGE_KEY/);
+  assert.doesNotMatch(source, /runSiteSequence/);
+  assert.doesNotMatch(source, /waitForTerminal/);
+  assert.doesNotMatch(source, /startJob\s*\(/);
+  assert.doesNotMatch(source, /currentJobs/);
+
+  assert.match(source, /aria-label="Repeat Count"/);
+  assert.match(source, /aria-label="Site Retry Limit"/);
+  assert.match(source, /aria-label="Failed Site Stop Threshold"/);
+  assert.match(source, /FAULTED — Retry Exhausted/);
+  assert.match(source, /ERROR — Infrastructure/);
+  assert.match(source, /STOPPED — Batch Policy/);
+  assert.match(source, /data-completed-rounds/);
+  assert.match(source, /data-total-attempts/);
+  assert.match(source, /operation_statistics/);
+  assert.match(source, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
+  assert.match(source, /<div className="productionImagePicker programmingBatchFile">[\s\S]*<\/div>\s*\n\s*<div className="batchOperations programmingBatchOperations">/);
   assert.match(source, /productionBatchActions programmingBatchActions/);
-  assert.match(source, /disabled=\{!batchReadiness\.ready\}/);
-  assert.doesNotMatch(source, /<b>\{text\.image\}<\/b>/);
+
+  assert.match(batchApi, /POST|method:\s*"POST"/);
+  assert.match(batchApi, /"\/api\/batches"/);
+  assert.match(batchApi, /failed_site_stop_threshold/);
+  assert.match(batchApi, /terminalServerBatchStates/);
+
   assert.match(css, /background:\s*#f5f8fc/);
   assert.match(css, /--site-tile-w/);
   assert.match(css, /density-dense/);
@@ -100,6 +130,11 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(batchToolbar, /\.programmingBatchOperations\s*\{[\s\S]*justify-self:\s*end/);
   assert.match(batchToolbar, /\.programmingFileName\s*\{[\s\S]*font-size:\s*13px/);
   assert.match(operatorFeedback, /\.facilityRuntimeIdentity h3\s*\{[^}]*font-weight:\s*800;/s);
+  assert.match(serverBatchCss, /\.batchPolicyPanel/);
+  assert.match(serverBatchCss, /\.serverBatchStatistics/);
+  assert.match(serverBatchCss, /\.prototypeSiteLamp\.faulted i/);
+  assert.match(serverBatchCss, /\.prototypeSiteLamp\.error i/);
+  assert.match(serverBatchCss, /\.prototypeSiteLamp\.stopped i/);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
   assert.equal(api.status, 404);

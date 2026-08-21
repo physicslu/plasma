@@ -8,6 +8,10 @@ import {
   getPpuExecutionActivityCount,
   subscribePpuExecutionActivity,
 } from "./plasma-api";
+import {
+  getBatchExecutionActivityCount,
+  subscribeBatchExecutionActivity,
+} from "./batch-execution-activity";
 import { PRODUCT_MODE_ROUTES, productModeForPath } from "./product-mode";
 import ThemeSwitch from "./theme-switch";
 import "./fleet/pmod-theme.css";
@@ -25,14 +29,20 @@ export function GlobalNav() {
     getPpuExecutionActivityCount,
     () => 0,
   );
+  const batchExecutionCount = useSyncExternalStore(
+    subscribeBatchExecutionActivity,
+    getBatchExecutionActivityCount,
+    () => 0,
+  );
+  const executionCount = ppuExecutionCount + batchExecutionCount;
   const activeMode = productModeForPath(pathname);
   const entryActive = pathname === "/demo";
-  const navigationLocked = Boolean(activeMode) && ppuExecutionCount > 0;
+  const navigationLocked = Boolean(activeMode) && executionCount > 0;
   const productionLocked = navigationLocked && activeMode !== "production";
   const engineeringLocked = navigationLocked && activeMode !== "engineering";
   const lockReason = locale === "zh-TW"
-    ? "PPU 執行中，完成或取消後才可切換模式。"
-    : "Mode switching is locked while PPU jobs are active.";
+    ? "PPU / Batch 執行中，完成或取消後才可切換模式。"
+    : "Mode switching is locked while PPU jobs or a server Batch are active.";
 
   function blockLockedNavigation(event: MouseEvent<HTMLAnchorElement>, locked: boolean) {
     if (!locked) return;
@@ -91,7 +101,7 @@ export function GlobalNav() {
 
         {navigationLocked && (
           <span className="globalExecutionGuard" role="status" aria-live="polite" title={lockReason}>
-            PPU BUSY · {ppuExecutionCount} {ppuExecutionCount === 1 ? "JOB" : "JOBS"}
+            EXECUTION BUSY · {executionCount}
           </span>
         )}
 
