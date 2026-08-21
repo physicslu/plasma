@@ -217,7 +217,8 @@ test("FPS selector retains selections across Facilities and renders Facility →
 
   await expect(fpsCheckbox(page, firstFacility, firstPpu)).toBeChecked();
   await expect(fpsCheckbox(page, secondFacility, secondPpu, 2)).toBeChecked();
-  await expect(page.getByRole("region", { name: "已選擇 FPS 總覽" })).toContainText("2 F / 2 P / 2 S");
+  await expect(page.locator(".fpsSelectorActions")).toContainText("2 F / 2 P / 2 S");
+  await expect(page.locator(".fpsSelectionSummary")).toBeHidden();
 
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
   const facilityOne = page.locator(`[data-production-facility="${firstFacility}"]`);
@@ -241,7 +242,8 @@ test("Cancel all clears only the draft FPS selection and leaves Active FPS uncha
 
   await page.getByRole("button", { name: "全部取消", exact: true }).click();
   await expect(site).not.toBeChecked();
-  await expect(page.getByRole("region", { name: "已選擇 FPS 總覽" })).toContainText("0 F / 0 P / 0 S");
+  await expect(page.locator(".fpsSelectorActions")).toContainText("0 F / 0 P / 0 S");
+  await expect(page.locator(".fpsSelectionSummary")).toBeHidden();
   await expect(page.getByRole("button", { name: "確定選取", exact: true })).toBeDisabled();
   await expect(activeSite).toBeVisible();
 });
