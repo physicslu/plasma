@@ -23,6 +23,10 @@ function subscribeTheme(onStoreChange: () => void): () => void {
   };
 }
 
+function subscribeHydration(): () => void {
+  return () => {};
+}
+
 function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.colorScheme = theme;
@@ -30,6 +34,7 @@ function applyTheme(theme: Theme) {
 
 export default function ThemeSwitch({ className = "" }: { className?: string }) {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "light");
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
 
   useEffect(() => {
     applyTheme(theme);
@@ -42,9 +47,15 @@ export default function ThemeSwitch({ className = "" }: { className?: string }) 
   }
 
   return (
-    <div className={`themeSwitch ${className}`.trim()} role="group" aria-label="Theme">
+    <div
+      className={`themeSwitch ${className}`.trim()}
+      role="group"
+      aria-label="Theme"
+      aria-busy={!hydrated}
+    >
       <button
         type="button"
+        disabled={!hydrated}
         className={theme === "light" ? "active" : ""}
         aria-pressed={theme === "light"}
         data-theme-choice="light"
@@ -54,6 +65,7 @@ export default function ThemeSwitch({ className = "" }: { className?: string }) 
       </button>
       <button
         type="button"
+        disabled={!hydrated}
         className={theme === "dark" ? "active" : ""}
         aria-pressed={theme === "dark"}
         data-theme-choice="dark"
