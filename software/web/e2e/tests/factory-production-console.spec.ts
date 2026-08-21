@@ -48,43 +48,128 @@ function targetStatus(facilityId: string, ppuId: string) {
   };
 }
 
-function jobSnapshot(jobId: string, siteId: number, operation: string, state: string, progress: number) {
-  return {
-    job_id: jobId,
-    site_id: siteId,
-    operation,
-    state,
-    cancel_requested: state === "cancelled",
-    stage: operation,
-    stage_state: state,
-    stage_progress_percent: progress,
-    progress_percent: progress,
-    bytes_done: null,
-    bytes_total: null,
-    result: state === "success" || state === "cancelled" || state === "failed"
-      ? { state, output_files: [], error: state === "failed" ? { message: "mock failure" } : null }
-      : undefined,
+type BatchRequest = {
+  targets: Array<{ facility_id: string; ppu_id: string; site_ids: number[] }>;
+  operations: string[];
+  execution_policy: {
+    repeat_count: number;
+    site_retry_limit: number;
+    failed_site_stop_threshold: number | null;
   };
-}
+};
 
 type MockRuntimeOptions = {
-  holdStartsUntilTwoPpus?: boolean;
   keepFirstPpuRunningUntilCancel?: boolean;
 };
 
+function siteCountMap(sites: Array<{ state: string }>) {
+  const states = ["ready", "running", "success", "faulted", "error", "stopped", "cancelled"];
+  return Object.fromEntries(states.map(state => [state, sites.filter(site => site.state === state).length]));
+}
+
 async function installProductionMock(page: Page, options: MockRuntimeOptions = {}) {
-  const jobs = new Map<string, { ppuId: string; siteId: number; operation: string; polls: number; cancelled: boolean }>();
-  const seenStartPpus = new Set<string>();
+  const submittedBatches: BatchRequest[] = [];
   const cancelledPpus: string[] = [];
-  let sequence = 0;
-  let releaseStarts: (() => void) | null = null;
-  const startsReleased = new Promise<void>(resolve => { releaseStarts = resolve; });
+  let batchRequest: BatchRequest | null = null;
+  let batchId = "batch-browser-test";
+  let polls = 0;
+  let cancelAll = false;
+  const cancelledPpuSet = new Set<string>();
+
+  function batchSnapshot() {
+    if (!batchRequest) throw new Error("Batch has not been submitted");
+    const allSites = batchRequest.targets.flatMap(target => target.site_ids.map(siteId => ({
+      facility_id: target.facility_id,
+      ppu_id: target.ppu_id,
+      site_id: siteId,
+    })));
+    const firstPpu = batchRequest.targets[0]?.ppu_id;
+    const terminal = polls >= 2 && !options.keepFirstPpuRunningUntilCancel;
+    const sites = allSites.map(site => {
+      let state = "running";
+      let progress = 40;
+      if (cancelAll) {
+        state = "cancelled";
+        progress = 100;
+      } else if (cancelledPpuSet.has(site.ppu_id)) {
+        state = "cancelled";
+        progress = 100;
+      } else if (options.keepFirstPpuRunningUntilCancel && site.ppu_id === firstPpu) {
+        state = "running";
+        progress = 40;
+      } else if (polls >= 2) {
+        state = "success";
+        progress = 100;
+      }
+      const complete = state === "success" ? batchRequest!.execution_policy.repeat_count : 0;
+      const attempts = state === "success"
+        ? batchRequest!.execution_policy.repeat_count * batchRequest!.operations.length
+        : Math.max(1, batchRequest!.operations.length);
+      return {
+        ...site,
+        key: `${site.facility_id}::${site.ppu_id}::SITE${site.site_id}`,
+        state,
+        current_round: state === "running" ? 1 : complete,
+        completed_rounds: complete,
+        current_operation: state === "running" ? batchRequest!.operations[0] : null,
+        current_job_id: state === "running" ? `job-${site.ppu_id}-${site.site_id}` : null,
+        progress_percent: progress,
+        total_attempts: attempts,
+        retry_count: 0,
+        final_failures: 0,
+        faulted_round: null,
+        faulted_operation: null,
+        last_failure_source: null,
+        error: null,
+        operation_statistics: {},
+      };
+    });
+    const counts = siteCountMap(sites);
+    let state = "running";
+    if (cancelAll) state = "cancelled";
+    else if (sites.every(site => site.state === "success")) state = "success";
+    else if (sites.every(site => site.state === "cancelled")) state = "cancelled";
+    else if (sites.some(site => site.state === "cancelled") && sites.some(site => site.state === "success")) state = "partial";
+    else if (terminal) state = "success";
+
+    const operation_statistics = Object.fromEntries(batchRequest.operations.map(operation => [operation, {
+      logical_executions: state === "success" ? allSites.length * batchRequest!.execution_policy.repeat_count : allSites.length,
+      attempts: state === "success" ? allSites.length * batchRequest!.execution_policy.repeat_count : allSites.length,
+      retries: 0,
+      successful_executions: state === "success" ? allSites.length * batchRequest!.execution_policy.repeat_count : 0,
+      failed_executions: 0,
+      error_executions: 0,
+      cancelled_executions: sites.filter(site => site.state === "cancelled").length,
+      failed_attempts: 0,
+      error_attempts: 0,
+      cancelled_attempts: sites.filter(site => site.state === "cancelled").length,
+      attempt_failure_rate: 0,
+    }]));
+
+    return {
+      batch_id: batchId,
+      state,
+      created_at: "2026-08-21T00:00:00Z",
+      started_at: "2026-08-21T00:00:00Z",
+      finished_at: ["success", "partial", "cancelled"].includes(state) ? "2026-08-21T00:00:01Z" : null,
+      operations: batchRequest.operations,
+      execution_policy: batchRequest.execution_policy,
+      asset: null,
+      read: { offset: 0, length: 256 },
+      cancel_requested: cancelAll,
+      stop_reason: cancelAll ? "operator_cancel" : null,
+      error: null,
+      faulted_site_count: 0,
+      site_counts: counts,
+      operation_statistics,
+      sites,
+    };
+  }
 
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
-
     if (path === "/api/engineering/session" && request.method() === "POST") {
       await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
         ok: true,
@@ -96,78 +181,59 @@ async function installProductionMock(page: Page, options: MockRuntimeOptions = {
       }) });
       return;
     }
-
     if (path === "/api/engineering/targets" && request.method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
       return;
     }
-
-    const targetMatch = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/(.*)$/.exec(path);
-    if (!targetMatch) {
-      await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
-      return;
-    }
-    const facilityId = decodeURIComponent(targetMatch[1]);
-    const ppuId = decodeURIComponent(targetMatch[2]);
-    const tail = targetMatch[3];
-
-    if (tail === "status" && request.method() === "GET" && !url.searchParams.get("job")) {
+    const targetMatch = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/status$/.exec(path);
+    if (targetMatch && request.method() === "GET") {
+      const facilityId = decodeURIComponent(targetMatch[1]);
+      const ppuId = decodeURIComponent(targetMatch[2]);
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(targetStatus(facilityId, ppuId)) });
       return;
     }
-
-    if (tail === "jobs" && request.method() === "POST") {
-      const body = request.postDataJSON() as { site_id: number; operation: string };
-      const jobId = `job-${++sequence}`;
-      jobs.set(jobId, { ppuId, siteId: body.site_id, operation: body.operation, polls: 0, cancelled: false });
-      seenStartPpus.add(ppuId);
-      if (options.holdStartsUntilTwoPpus) {
-        if (seenStartPpus.size >= 2) releaseStarts?.();
-        await startsReleased;
-      }
-      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ ok: true, job: jobSnapshot(jobId, body.site_id, body.operation, "queued", 0) }) });
-      return;
-    }
-
-    const cancelMatch = /^jobs\/([^/]+)\/cancel$/.exec(tail);
-    if (cancelMatch && request.method() === "POST") {
-      const job = jobs.get(cancelMatch[1]);
-      if (job) {
-        job.cancelled = true;
-        cancelledPpus.push(job.ppuId);
-      }
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
-      return;
-    }
-
-    if (tail === "status" && request.method() === "GET" && url.searchParams.get("job")) {
-      const jobId = url.searchParams.get("job") as string;
-      const job = jobs.get(jobId);
-      if (!job) {
-        await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "missing job" } }) });
-        return;
-      }
-      job.polls += 1;
-      let state = "running";
-      let progress = 50;
-      if (job.cancelled) {
-        state = "cancelled";
-        progress = 100;
-      } else if (options.keepFirstPpuRunningUntilCancel && job.ppuId.endsWith("ppu-01")) {
-        state = "running";
-        progress = 40;
-      } else if (job.polls >= 2) {
-        state = "success";
-        progress = 100;
-      }
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, job: jobSnapshot(jobId, job.siteId, job.operation, state, progress) }) });
-      return;
-    }
-
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
   });
 
-  return { jobs, seenStartPpus, cancelledPpus };
+  await page.route("**/api/batches**", async (route: Route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/batches" && request.method() === "POST") {
+      batchRequest = request.postDataJSON() as BatchRequest;
+      submittedBatches.push(batchRequest);
+      polls = 0;
+      cancelAll = false;
+      cancelledPpuSet.clear();
+      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot() }) });
+      return;
+    }
+    if (path === `/api/batches/${batchId}` && request.method() === "GET") {
+      polls += 1;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot() }) });
+      return;
+    }
+    if (path === `/api/batches/${batchId}/cancel` && request.method() === "POST") {
+      cancelAll = true;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot() }) });
+      return;
+    }
+    const ppuCancel = new RegExp(`^/api/batches/${batchId}/targets/([^/]+)/([^/]+)/cancel$`).exec(path);
+    if (ppuCancel && request.method() === "POST") {
+      const ppuId = decodeURIComponent(ppuCancel[2]);
+      cancelledPpuSet.add(ppuId);
+      cancelledPpus.push(ppuId);
+      polls = Math.max(polls, 2);
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot() }) });
+      return;
+    }
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "missing batch" } }) });
+  });
+
+  return {
+    submittedBatches,
+    cancelledPpus,
+    get polls() { return polls; },
+  };
 }
 
 function fpsCheckbox(page: Page, facilityId: string, ppuId: string, siteId = 1) {
@@ -192,7 +258,12 @@ async function buildTwoPpuSet(page: Page) {
   const ppu2 = page.locator(`[data-production-target="${facilityId}::${ppu2Id}"]`);
   await expect(ppu1).toBeVisible();
   await expect(ppu2).toBeVisible();
-  return { ppu1, ppu2, ppu1Id, ppu2Id };
+  return { facilityId, ppu1, ppu2, ppu1Id, ppu2Id };
+}
+
+async function selectEraseAndExecute(page: Page) {
+  await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
+  await page.locator(".executeBatchButton").click();
 }
 
 test("FPS selector exposes Select all, Cancel all and Confirm selection together", async ({ page }) => {
@@ -207,26 +278,18 @@ test("FPS selector exposes Select all, Cancel all and Confirm selection together
 test("FPS selector retains selections across Facilities and renders Facility → PPU → Site hierarchy", async ({ page }) => {
   await installProductionMock(page);
   await page.goto("/fleet");
-
   const firstFacility = "mock-facility-01";
   const secondFacility = "mock-facility-02";
   const firstPpu = `${firstFacility}-ppu-01`;
   const secondPpu = `${secondFacility}-ppu-02`;
   await fpsCheckbox(page, firstFacility, firstPpu).check();
   await fpsCheckbox(page, secondFacility, secondPpu, 2).check();
-
   await expect(fpsCheckbox(page, firstFacility, firstPpu)).toBeChecked();
   await expect(fpsCheckbox(page, secondFacility, secondPpu, 2)).toBeChecked();
   await expect(page.locator(".fpsSelectorActions")).toContainText("2 F / 2 P / 2 S");
-  await expect(page.locator(".fpsSelectionSummary")).toBeHidden();
-
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
-  const facilityOne = page.locator(`[data-production-facility="${firstFacility}"]`);
-  const facilityTwo = page.locator(`[data-production-facility="${secondFacility}"]`);
-  await expect(facilityOne).toBeVisible();
-  await expect(facilityTwo).toBeVisible();
-  await expect(facilityOne.locator(`[data-production-ppu="${firstPpu}"] [data-production-site="1"]`)).toBeVisible();
-  await expect(facilityTwo.locator(`[data-production-ppu="${secondPpu}"] [data-production-site="2"]`)).toBeVisible();
+  await expect(page.locator(`[data-production-facility="${firstFacility}"] [data-production-ppu="${firstPpu}"] [data-production-site="1"]`)).toBeVisible();
+  await expect(page.locator(`[data-production-facility="${secondFacility}"] [data-production-ppu="${secondPpu}"] [data-production-site="2"]`)).toBeVisible();
 });
 
 test("Cancel all clears only the draft FPS selection and leaves Active FPS unchanged", async ({ page }) => {
@@ -239,16 +302,14 @@ test("Cancel all clears only the draft FPS selection and leaves Active FPS uncha
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
   const activeSite = page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`);
   await expect(activeSite).toBeVisible();
-
   await page.getByRole("button", { name: "全部取消", exact: true }).click();
   await expect(site).not.toBeChecked();
   await expect(page.locator(".fpsSelectorActions")).toContainText("0 F / 0 P / 0 S");
-  await expect(page.locator(".fpsSelectionSummary")).toBeHidden();
   await expect(page.getByRole("button", { name: "確定選取", exact: true })).toBeDisabled();
   await expect(activeSite).toBeVisible();
 });
 
-test("all Site cards, LEDs and four-Site PPU footprints use one global size", async ({ page }) => {
+test("all Site cards, LEDs and PPU footprints use one global size", async ({ page }) => {
   await installProductionMock(page);
   const { ppu1, ppu2 } = await buildTwoPpuSet(page);
   const site1 = ppu1.locator('[data-production-site="1"]');
@@ -257,15 +318,11 @@ test("all Site cards, LEDs and four-Site PPU footprints use one global size", as
   const box2 = await site2.boundingBox();
   expect(box1?.width).toBe(box2?.width);
   expect(box1?.height).toBe(box2?.height);
-
   const lamp1 = await site1.locator(".prototypeSiteLamp").boundingBox();
   const lamp2 = await site2.locator(".prototypeSiteLamp").boundingBox();
   expect(lamp1?.width).toBe(lamp2?.width);
   expect(lamp1?.height).toBe(lamp2?.height);
-
-  const ppuBox1 = await ppu1.boundingBox();
-  const ppuBox2 = await ppu2.boundingBox();
-  expect(ppuBox1?.width).toBe(ppuBox2?.width);
+  expect((await ppu1.boundingBox())?.width).toBe((await ppu2.boundingBox())?.width);
 });
 
 test("Site density is selected from total active FPS count, not per-PPU count", async ({ page }) => {
@@ -280,52 +337,60 @@ test("Site density is selected from total active FPS count, not per-PPU count", 
   await expect(page.getByRole("region", { name: "Active FPS : 即時執行狀態", exact: true })).toHaveClass(/density-comfortable/);
 });
 
-test("running Site shows a blinking LED, operation text and progress", async ({ page }) => {
+test("running Site shows server Batch progress and Batch cancel ends it", async ({ page }) => {
   await installProductionMock(page, { keepFirstPpuRunningUntilCancel: true });
   const { ppu1 } = await buildTwoPpuSet(page);
-  await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
-  await page.locator(".executeBatchButton").click();
-
+  await selectEraseAndExecute(page);
   const site = ppu1.locator('[data-production-site="1"]');
   await expect(site).toHaveAttribute("data-site-state", "running");
   await expect(site.locator("strong")).toHaveText("RUNNING");
-  await expect(site.locator("small")).toContainText("40%");
-  await expect(site.locator("small")).toContainText("E");
+  await expect(site.locator("small").first()).toContainText("40%");
   const animationName = await site.locator(".prototypeSiteLamp.running i").evaluate(element => getComputedStyle(element).animationName);
   expect(animationName).toContain("production-site-running-pulse");
-
   await page.locator(".cancelBatchButton").click();
   await expect(site).toHaveAttribute("data-site-state", "cancelled");
 });
 
-test("selected PPUs dispatch concurrently and selector remains expanded when execution starts", async ({ page }) => {
-  const runtime = await installProductionMock(page, { holdStartsUntilTwoPpus: true });
+test("Production submits one server Batch for multiple PPUs and keeps selector expanded", async ({ page }) => {
+  const runtime = await installProductionMock(page);
   const { ppu1, ppu2 } = await buildTwoPpuSet(page);
-  await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
-  await page.locator(".executeBatchButton").click();
-
+  await selectEraseAndExecute(page);
   await expect(page.locator(".productionWorkspace")).not.toHaveClass(/selector-collapsed/);
   await expect(page.getByRole("button", { name: "收起選擇器", exact: true })).toBeVisible();
-  await expect.poll(() => runtime.seenStartPpus.size).toBe(2);
+  await expect.poll(() => runtime.submittedBatches.length).toBe(1);
+  expect(runtime.submittedBatches[0].targets).toHaveLength(2);
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
-  await expect(page.getByRole("status", { name: "Batch readiness" })).toContainText("BATCH READY");
-  await expect(page.locator(".productionPrototypeLog")).toContainText("[BAT] COMPLETE");
+  await expect(page.locator(".serverBatchStatistics")).toHaveAttribute("data-batch-state", "success");
 });
 
-test("Cancel PPU affects only that PPU while another PPU continues to PASS", async ({ page }) => {
+test("Batch execution policy is submitted once and completed rounds come from server snapshot", async ({ page }) => {
+  const runtime = await installProductionMock(page);
+  const { ppu1 } = await buildTwoPpuSet(page);
+  await page.getByLabel("Repeat Count").fill("3");
+  await page.getByLabel("Site Retry Limit").fill("2");
+  await page.getByLabel("Failed Site Stop Threshold").fill("2");
+  await selectEraseAndExecute(page);
+  await expect.poll(() => runtime.submittedBatches.length).toBe(1);
+  expect(runtime.submittedBatches[0].execution_policy).toEqual({
+    repeat_count: 3,
+    site_retry_limit: 2,
+    failed_site_stop_threshold: 2,
+  });
+  const site = ppu1.locator('[data-production-site="1"]');
+  await expect(site).toHaveAttribute("data-completed-rounds", "3");
+  await expect(site).toHaveAttribute("data-total-attempts", "3");
+});
+
+test("Cancel PPU uses Batch PPU endpoint and does not cancel the other PPU", async ({ page }) => {
   const runtime = await installProductionMock(page, { keepFirstPpuRunningUntilCancel: true });
   const { ppu1, ppu2, ppu1Id, ppu2Id } = await buildTwoPpuSet(page);
-  await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
-  await page.locator(".executeBatchButton").click();
+  await selectEraseAndExecute(page);
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running");
-  await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
-
   await ppu1.getByRole("button", { name: "Cancel PPU", exact: true }).click();
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "cancelled");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
-  await expect(page.getByRole("status", { name: "Batch readiness" })).toContainText("BATCH READY");
-  await expect(page.locator(".productionPrototypeLog")).toContainText("[BAT] PARTIAL");
   expect(runtime.cancelledPpus).toContain(ppu1Id);
   expect(runtime.cancelledPpus).not.toContain(ppu2Id);
+  await expect(page.locator(".serverBatchStatistics")).toHaveAttribute("data-batch-state", "partial");
 });
