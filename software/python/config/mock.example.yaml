@@ -1,0 +1,26 @@
+profile_id: default
+revision: 1
+enabled: true
+default_image_size_bytes: 262144
+
+operations:
+  erase:
+    error_rate_per_mille: 1
+    base_time_ms: 1000
+    throughput_bytes_per_second: 2097152
+    jitter_ms: 200
+  program:
+    error_rate_per_mille: 50
+    base_time_ms: 500
+    throughput_bytes_per_second: 524288
+    jitter_ms: 200
+  verify:
+    error_rate_per_mille: 20
+    base_time_ms: 300
+    throughput_bytes_per_second: 1048576
+    jitter_ms: 100
+  read:
+    error_rate_per_mille: 5
+    base_time_ms: 200
+    throughput_bytes_per_second: 1048576
+    jitter_ms: 100
