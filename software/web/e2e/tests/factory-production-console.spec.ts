@@ -217,7 +217,8 @@ test("FPS selector retains selections across Facilities and renders Facility →
 
   await expect(fpsCheckbox(page, firstFacility, firstPpu)).toBeChecked();
   await expect(fpsCheckbox(page, secondFacility, secondPpu, 2)).toBeChecked();
-  await expect(page.getByRole("region", { name: "已選擇 FPS 總覽" })).toContainText("2 F / 2 P / 2 S");
+  await expect(page.locator(".fpsSelectorActions")).toContainText("2 F / 2 P / 2 S");
+  await expect(page.locator(".fpsSelectionSummary")).toBeHidden();
 
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
   const facilityOne = page.locator(`[data-production-facility="${firstFacility}"]`);
@@ -241,7 +242,8 @@ test("Cancel all clears only the draft FPS selection and leaves Active FPS uncha
 
   await page.getByRole("button", { name: "全部取消", exact: true }).click();
   await expect(site).not.toBeChecked();
-  await expect(page.getByRole("region", { name: "已選擇 FPS 總覽" })).toContainText("0 F / 0 P / 0 S");
+  await expect(page.locator(".fpsSelectorActions")).toContainText("0 F / 0 P / 0 S");
+  await expect(page.locator(".fpsSelectionSummary")).toBeHidden();
   await expect(page.getByRole("button", { name: "確定選取", exact: true })).toBeDisabled();
   await expect(activeSite).toBeVisible();
 });
@@ -275,7 +277,7 @@ test("Site density is selected from total active FPS count, not per-PPU count", 
   for (const siteId of [1, 2]) await fpsCheckbox(page, facilityId, ppu1, siteId).check();
   for (let siteId = 1; siteId <= 8; siteId += 1) await fpsCheckbox(page, facilityId, ppu4, siteId).check();
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
-  await expect(page.getByRole("region", { name: "即時執行狀態" })).toHaveClass(/density-comfortable/);
+  await expect(page.getByRole("region", { name: "Active FPS : 即時執行狀態", exact: true })).toHaveClass(/density-comfortable/);
 });
 
 test("running Site shows a blinking LED, operation text and progress", async ({ page }) => {
@@ -296,13 +298,14 @@ test("running Site shows a blinking LED, operation text and progress", async ({ 
   await expect(site).toHaveAttribute("data-site-state", "cancelled");
 });
 
-test("selected PPUs dispatch concurrently and selector collapses when execution starts", async ({ page }) => {
+test("selected PPUs dispatch concurrently and selector remains expanded when execution starts", async ({ page }) => {
   const runtime = await installProductionMock(page, { holdStartsUntilTwoPpus: true });
   const { ppu1, ppu2 } = await buildTwoPpuSet(page);
   await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
   await page.locator(".executeBatchButton").click();
 
-  await expect(page.locator(".productionWorkspace")).toHaveClass(/selector-collapsed/);
+  await expect(page.locator(".productionWorkspace")).not.toHaveClass(/selector-collapsed/);
+  await expect(page.getByRole("button", { name: "收起選擇器", exact: true })).toBeVisible();
   await expect.poll(() => runtime.seenStartPpus.size).toBe(2);
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");

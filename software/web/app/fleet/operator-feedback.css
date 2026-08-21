@@ -19,6 +19,33 @@
   color: #fff;
 }
 
+/* The tree and action counter already show the draft FPS selection. Keep the
+ * duplicate overview out of the operator layout so the selector stays compact. */
+.fpsSelectionSummary {
+  display: none;
+}
+
+/* Keep the concise English operator verbs requested for the selector without
+ * changing the Traditional Chinese labels. */
+html[lang="en-US"] .fpsSelectorActions .cancelDraftButton,
+html[lang="en-US"] .fpsSelectorActions .confirmFpsButton {
+  font-size: 0;
+}
+
+html[lang="en-US"] .fpsSelectorActions .cancelDraftButton::after,
+html[lang="en-US"] .fpsSelectorActions .confirmFpsButton::after {
+  font-size: 10px;
+  line-height: 1;
+}
+
+html[lang="en-US"] .fpsSelectorActions .cancelDraftButton::after {
+  content: "Cancel All";
+}
+
+html[lang="en-US"] .fpsSelectorActions .confirmFpsButton::after {
+  content: "Confirm";
+}
+
 .productionRuntimeBoard {
   --ppu-card-w: calc(
     var(--site-tile-w) + var(--site-tile-w) + var(--site-tile-w) + var(--site-tile-w) + 36px

@@ -97,7 +97,7 @@ const copy = {
     partial: "PARTIAL",
     complete: "COMPLETE",
     batch: "Batch",
-    liveStatus: "即時執行狀態",
+    liveStatus: "Active FPS : 即時執行狀態",
     hierarchyHint: "依 Facility / PPU / Site 定位",
     log: "Production Prototype Log",
     clearLog: "清除 Log",
@@ -139,7 +139,7 @@ const copy = {
     partial: "PARTIAL",
     complete: "COMPLETE",
     batch: "Batch",
-    liveStatus: "Live Execution Status",
+    liveStatus: "Active FPS : Live Execution Status",
     hierarchyHint: "Locate by Facility / PPU / Site",
     log: "Production Prototype Log",
     clearLog: "Clear Log",
@@ -527,7 +527,6 @@ export default function FleetPage() {
       return;
     }
 
-    setSelectorCollapsed(true);
     cancelAllRequested.current = false;
     cancelledTargets.current.clear();
     currentJobs.current.clear();
