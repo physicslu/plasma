@@ -148,7 +148,7 @@ function sameTarget(left: TargetSelection, right: TargetSelection): boolean {
 }
 
 export default function ProgrammingWorkspace() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [apiBase, setApiBase] = useState(DEFAULT_API_BASE);
   const [apiDraft, setApiDraft] = useState(DEFAULT_API_BASE);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
@@ -161,6 +161,7 @@ export default function ProgrammingWorkspace() {
   const [selectedSiteIdsState, setSelectedSiteIdsState] = useState<number[] | null>(null);
   const [selectedOperations, setSelectedOperations] = useState<Operation[]>([]);
   const [imageAsset, setImageAsset] = useState<File | null>(null);
+  const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
   const [readOffset, setReadOffset] = useState("0");
   const [readLength, setReadLength] = useState("256");
   const [submittingSiteIds, setSubmittingSiteIds] = useState<number[]>([]);
@@ -174,6 +175,7 @@ export default function ProgrammingWorkspace() {
   const batchLifecycle = useRef<BatchLifecycle | null>(null);
   const cancelRequests = useRef<Set<string>>(new Set());
   const engineeringSessionId = useRef<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
   const siteSelectionTarget = useRef<string | null>(null);
   const pendingRestore = useRef<PendingRestore | null>(null);
@@ -193,6 +195,10 @@ export default function ProgrammingWorkspace() {
     && Number.isInteger(Number(readLength))
     && Number(readLength) > 0;
   const targetLocked = batchRunning || submittingSiteIds.length > 0 || sites.some(isRunning);
+  const noOperationWarning = locale === "zh-TW"
+    ? "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。"
+    : "No operation selected. Select at least one of Erase, Program, Verify, or Read.";
+  const dismissWarning = locale === "zh-TW" ? "關閉警告" : "Dismiss warning";
 
   const appendLog = useCallback((
     message: string,
@@ -452,6 +458,7 @@ export default function ProgrammingWorkspace() {
 
   function toggleOperation(operation: Operation) {
     if (batchRunning) return;
+    setOperatorWarning(null);
     const next = selectedOperations.includes(operation)
       ? selectedOperations.filter(item => item !== operation)
       : operationOrder.filter(item => selectedOperations.includes(item) || item === operation);
@@ -577,7 +584,14 @@ export default function ProgrammingWorkspace() {
   }
 
   async function runBatch() {
-    if (batchRunning || selectedOperations.length === 0 || selectedOperations.some(batchDisabled)) return;
+    if (batchRunning) return;
+    if (selectedOperations.length === 0) {
+      setOperatorWarning(noOperationWarning);
+      appendLog(`[BATCH] BLOCKED · ${noOperationWarning}`, false, "USR");
+      return;
+    }
+    setOperatorWarning(null);
+    if (selectedOperations.some(batchDisabled)) return;
     const siteIds = [...selectedSiteIds];
     const operations = [...selectedOperations];
     const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
@@ -791,7 +805,8 @@ export default function ProgrammingWorkspace() {
       <section className="operationConfig" aria-label="Engineering programming parameters">
         <div className="compactFile">
           <div><b>{imageAsset?.name ?? t("engineeringProgramming.imageAsset")}</b><small>{imageAsset ? `${(imageAsset.size / 1024).toFixed(1)} KB` : t("engineeringProgramming.imageAssetHint")}</small></div>
-          <label>{t("engineeringProgramming.browse")}<input aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} /></label>
+          <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>{t("engineeringProgramming.browse")}</button>
+          <input ref={imageInputRef} aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" hidden disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} />
         </div>
         <div className="compactRead">
           <label>READ Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
@@ -817,10 +832,16 @@ export default function ProgrammingWorkspace() {
             })}
           </div>
           <div className="batchExecutionControls">
-            <button type="button" className="executeBatch" onClick={() => void runBatch()} disabled={batchRunning || selectedOperations.length === 0 || selectedOperations.some(batchDisabled)}>▶ {t("engineeringProgramming.execute")}</button>
+            <button type="button" className="executeBatch" onClick={() => void runBatch()} disabled={batchRunning || (selectedOperations.length > 0 && selectedOperations.some(batchDisabled))}>▶ {t("engineeringProgramming.execute")}</button>
             <button type="button" className="cancelBatch" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}>■ {batchCancelling ? t("engineeringProgramming.cancelling") : t("engineeringProgramming.cancel")}</button>
           </div>
         </div>
+        {operatorWarning && (
+          <div className="warning engineeringOperationWarning" role="alert">
+            <span>{operatorWarning}</span>
+            <button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button>
+          </div>
+        )}
       </section>
 
       {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}

@@ -87,6 +87,7 @@ const copy = {
     operations: "批次操作",
     image: "Programming Image (.bin)",
     imageHint: "Program / Verify 需要 Image Asset，最大 16 MiB。",
+    browse: "選擇檔案",
     execute: "執行批次",
     cancelAll: "取消批次",
     ready: "READY",
@@ -103,7 +104,8 @@ const copy = {
     clearLog: "清除 Log",
     imageTooLarge: "Programming Image 超過 16 MiB。",
     imageRequired: "Program / Verify 需要先選擇 Programming Image。",
-    chooseOperation: "請至少選擇一個操作。",
+    chooseOperation: "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。",
+    dismissWarning: "關閉警告",
     noSelectedSites: "目前 FPS 集合沒有可執行的 Site。",
     loadFailed: "PPU 狀態載入失敗",
   },
@@ -116,9 +118,9 @@ const copy = {
     offline: "Mock Provider is unavailable. Enable the Engineering Mock Provider on the Plasma Web REST Gateway.",
     selector: "FPS Selection",
     selectorHint: "Select Facilities, PPUs, and Sites. Active FPS changes only after confirmation.",
-    clearAll: "Cancel all selections",
+    clearAll: "Cancel All",
     selectAll: "Select all",
-    apply: "Confirm selection",
+    apply: "Confirm",
     collapse: "Collapse selector",
     expand: "Expand selector",
     selectedOverview: "Selected FPS Overview",
@@ -129,6 +131,7 @@ const copy = {
     operations: "Batch Operations",
     image: "Programming Image (.bin)",
     imageHint: "Program / Verify requires an Image Asset, max 16 MiB.",
+    browse: "Browse",
     execute: "Execute Batch",
     cancelAll: "Cancel Batch",
     ready: "READY",
@@ -145,7 +148,8 @@ const copy = {
     clearLog: "Clear Log",
     imageTooLarge: "Programming Image exceeds 16 MiB.",
     imageRequired: "Program / Verify requires a Programming Image.",
-    chooseOperation: "Select at least one operation.",
+    chooseOperation: "No operation selected. Select at least one of Erase, Program, Verify, or Read.",
+    dismissWarning: "Dismiss warning",
     noSelectedSites: "The active FPS set has no executable Site.",
     loadFailed: "PPU status load failed",
   },
@@ -243,6 +247,7 @@ export default function FleetPage() {
   const [runtimes, setRuntimes] = useState<Record<string, PPURuntime>>({});
   const [selectedOperations, setSelectedOperations] = useState<Operation[]>([]);
   const [imageAsset, setImageAsset] = useState<File | null>(null);
+  const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
   const [batchState, setBatchState] = useState<BatchState>("idle");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -251,6 +256,7 @@ export default function FleetPage() {
   const currentJobs = useRef<Map<string, ActiveJob>>(new Map());
   const cancelAllRequested = useRef(false);
   const cancelledTargets = useRef<Set<string>>(new Set());
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
 
   const appendLog = useCallback((textValue: string, level: LogEntry["level"] = "INFO") => {
@@ -390,6 +396,7 @@ export default function FleetPage() {
 
     setActiveSelection(snapshot);
     setBatchState("idle");
+    setOperatorWarning(null);
     cancelAllRequested.current = false;
     cancelledTargets.current.clear();
     currentJobs.current.clear();
@@ -434,6 +441,7 @@ export default function FleetPage() {
 
   function toggleOperation(operation: Operation) {
     if (batchRunning) return;
+    setOperatorWarning(null);
     setSelectedOperations(current => current.includes(operation)
       ? current.filter(item => item !== operation)
       : [...current, operation]);
@@ -511,9 +519,11 @@ export default function FleetPage() {
     if (batchRunning || activeTargets.length === 0) return;
     const operations = orderedOperations(selectedOperations);
     if (operations.length === 0) {
+      setOperatorWarning(text.chooseOperation);
       appendLog(`[BAT] BLOCKED · ${text.chooseOperation}`, "WARN");
       return;
     }
+    setOperatorWarning(null);
     if (operations.some(operation => operation === "program" || operation === "verify") && !imageAsset) {
       appendLog(`[BAT] BLOCKED · ${text.imageRequired}`, "WARN");
       return;
@@ -705,11 +715,15 @@ export default function FleetPage() {
                     </label>
                   ))}
                 </div>
-                <label className="productionImagePicker">
+                <div className="productionImagePicker">
                   <span><b>{text.image}</b><small>{text.imageHint}</small></span>
+                  <button type="button" className="productionBrowseButton" disabled={batchRunning} onClick={() => imageInputRef.current?.click()}>{text.browse}</button>
                   <input
+                    ref={imageInputRef}
+                    aria-label="Production Programming Image file"
                     type="file"
                     accept=".bin,application/octet-stream"
+                    hidden
                     disabled={batchRunning}
                     onChange={event => {
                       const file = event.target.files?.[0] ?? null;
@@ -724,13 +738,20 @@ export default function FleetPage() {
                     }}
                   />
                   <em>{imageAsset?.name ?? "—"}</em>
-                </label>
+                </div>
                 <div className="productionBatchActions">
                   <div className={`batchState batch-${batchState}`}><small>{text.batch}</small><b>{batchLabel}</b></div>
                   <button type="button" className="executeBatchButton" onClick={() => void executeBatch()} disabled={batchRunning || activeCounts.sites === 0}>{text.execute}</button>
                   <button type="button" className="cancelBatchButton" onClick={() => void cancelBatch()} disabled={!batchRunning}>{text.cancelAll}</button>
                 </div>
               </section>
+
+              {operatorWarning && (
+                <div className="productionOperationWarning" role="alert">
+                  <span>{operatorWarning}</span>
+                  <button type="button" aria-label={text.dismissWarning} onClick={() => setOperatorWarning(null)}>×</button>
+                </div>
+              )}
 
               <section className={`productionRuntimeBoard density-${siteDensity}`} aria-label={text.liveStatus}>
                 <header className="runtimeBoardHead">
