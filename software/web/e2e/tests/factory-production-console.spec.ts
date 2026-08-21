@@ -186,7 +186,7 @@ async function buildTwoPpuSet(page: Page) {
   await expect(fpsCheckbox(page, facilityId, ppu2Id)).toBeVisible();
   await fpsCheckbox(page, facilityId, ppu1Id).check();
   await fpsCheckbox(page, facilityId, ppu2Id).check();
-  await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
+  await page.getByRole("button", { name: "確定選取", exact: true }).click();
 
   const ppu1 = page.locator(`[data-production-target="${facilityId}::${ppu1Id}"]`);
   const ppu2 = page.locator(`[data-production-target="${facilityId}::${ppu2Id}"]`);
@@ -194,6 +194,15 @@ async function buildTwoPpuSet(page: Page) {
   await expect(ppu2).toBeVisible();
   return { ppu1, ppu2, ppu1Id, ppu2Id };
 }
+
+test("FPS selector exposes Select all, Cancel all and Confirm selection together", async ({ page }) => {
+  await installProductionMock(page);
+  await page.goto("/fleet");
+  const actions = page.locator(".fpsSelectorActions");
+  await expect(actions.getByRole("button", { name: "全選", exact: true })).toBeVisible();
+  await expect(actions.getByRole("button", { name: "全部取消", exact: true })).toBeVisible();
+  await expect(actions.getByRole("button", { name: "確定選取", exact: true })).toBeVisible();
+});
 
 test("FPS selector retains selections across Facilities and renders Facility → PPU → Site hierarchy", async ({ page }) => {
   await installProductionMock(page);
@@ -210,7 +219,7 @@ test("FPS selector retains selections across Facilities and renders Facility →
   await expect(fpsCheckbox(page, secondFacility, secondPpu, 2)).toBeChecked();
   await expect(page.getByRole("region", { name: "已選擇 FPS 總覽" })).toContainText("2 F / 2 P / 2 S");
 
-  await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
+  await page.getByRole("button", { name: "確定選取", exact: true }).click();
   const facilityOne = page.locator(`[data-production-facility="${firstFacility}"]`);
   const facilityTwo = page.locator(`[data-production-facility="${secondFacility}"]`);
   await expect(facilityOne).toBeVisible();
@@ -219,7 +228,25 @@ test("FPS selector retains selections across Facilities and renders Facility →
   await expect(facilityTwo.locator(`[data-production-ppu="${secondPpu}"] [data-production-site="2"]`)).toBeVisible();
 });
 
-test("all Site cards and LEDs use one global size after FPS selection", async ({ page }) => {
+test("Cancel all clears only the draft FPS selection and leaves Active FPS unchanged", async ({ page }) => {
+  await installProductionMock(page);
+  await page.goto("/fleet");
+  const facilityId = "mock-facility-01";
+  const ppuId = `${facilityId}-ppu-01`;
+  const site = fpsCheckbox(page, facilityId, ppuId);
+  await site.check();
+  await page.getByRole("button", { name: "確定選取", exact: true }).click();
+  const activeSite = page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`);
+  await expect(activeSite).toBeVisible();
+
+  await page.getByRole("button", { name: "全部取消", exact: true }).click();
+  await expect(site).not.toBeChecked();
+  await expect(page.getByRole("region", { name: "已選擇 FPS 總覽" })).toContainText("0 F / 0 P / 0 S");
+  await expect(page.getByRole("button", { name: "確定選取", exact: true })).toBeDisabled();
+  await expect(activeSite).toBeVisible();
+});
+
+test("all Site cards, LEDs and four-Site PPU footprints use one global size", async ({ page }) => {
   await installProductionMock(page);
   const { ppu1, ppu2 } = await buildTwoPpuSet(page);
   const site1 = ppu1.locator('[data-production-site="1"]');
@@ -233,6 +260,10 @@ test("all Site cards and LEDs use one global size after FPS selection", async ({
   const lamp2 = await site2.locator(".prototypeSiteLamp").boundingBox();
   expect(lamp1?.width).toBe(lamp2?.width);
   expect(lamp1?.height).toBe(lamp2?.height);
+
+  const ppuBox1 = await ppu1.boundingBox();
+  const ppuBox2 = await ppu2.boundingBox();
+  expect(ppuBox1?.width).toBe(ppuBox2?.width);
 });
 
 test("Site density is selected from total active FPS count, not per-PPU count", async ({ page }) => {
@@ -243,8 +274,26 @@ test("Site density is selected from total active FPS count, not per-PPU count", 
   const ppu4 = `${facilityId}-ppu-04`;
   for (const siteId of [1, 2]) await fpsCheckbox(page, facilityId, ppu1, siteId).check();
   for (let siteId = 1; siteId <= 8; siteId += 1) await fpsCheckbox(page, facilityId, ppu4, siteId).check();
-  await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
+  await page.getByRole("button", { name: "確定選取", exact: true }).click();
   await expect(page.getByRole("region", { name: "即時執行狀態" })).toHaveClass(/density-comfortable/);
+});
+
+test("running Site shows a blinking LED, operation text and progress", async ({ page }) => {
+  await installProductionMock(page, { keepFirstPpuRunningUntilCancel: true });
+  const { ppu1 } = await buildTwoPpuSet(page);
+  await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
+  await page.locator(".executeBatchButton").click();
+
+  const site = ppu1.locator('[data-production-site="1"]');
+  await expect(site).toHaveAttribute("data-site-state", "running");
+  await expect(site.locator("strong")).toHaveText("RUNNING");
+  await expect(site.locator("small")).toContainText("40%");
+  await expect(site.locator("small")).toContainText("E");
+  const animationName = await site.locator(".prototypeSiteLamp.running i").evaluate(element => getComputedStyle(element).animationName);
+  expect(animationName).toContain("production-site-running-pulse");
+
+  await page.locator(".cancelBatchButton").click();
+  await expect(site).toHaveAttribute("data-site-state", "cancelled");
 });
 
 test("selected PPUs dispatch concurrently and selector collapses when execution starts", async ({ page }) => {
