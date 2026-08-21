@@ -37,7 +37,7 @@ async function openTwoPpuProductionSet(page: Page) {
 
   await fpsCheckbox(page, ppuOne).check();
   await fpsCheckbox(page, ppuTwo).check();
-  await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
+  await page.getByRole("button", { name: "確定選取", exact: true }).click();
 
   const first = ppuCard(page, ppuOne);
   const second = ppuCard(page, ppuTwo);
