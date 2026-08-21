@@ -2,6 +2,12 @@
   "schema_version": "1.0",
   "rules": [
     {
+      "rule_id": "adi-aduc70-62k",
+      "vendor": "Analog Devices",
+      "part_pattern": "^ADUC70(?:19|20|21|22|24|25|26|27|28|29)(?:BCPZ|BSTZ|BBCZ)62",
+      "target_config": "tcl/target/aduc702x.cfg"
+    },
+    {
       "rule_id": "adi-aducm36",
       "vendor": "Analog Devices",
       "part_pattern": "^ADUCM36",
@@ -158,6 +164,12 @@
       "target_config": "tcl/target/holtek/ht32f4x.cfg"
     },
     {
+      "rule_id": "infineon-psoc5lp",
+      "vendor": "Infineon",
+      "part_pattern": "^CY8C5[2468][68][5678]XXX-LPXXX$",
+      "target_config": "tcl/target/psoc5lp.cfg"
+    },
+    {
       "rule_id": "microchip-atmega128rfa1",
       "vendor": "Microchip",
       "part_pattern": "^ATMEGA128RFA1$",
@@ -302,6 +314,18 @@
       "target_config": "tcl/target/at91sam4sXX.cfg"
     },
     {
+      "rule_id": "niiet-k1921vk01t",
+      "vendor": "NIIET",
+      "part_pattern": "^K1921VK01T$",
+      "target_config": "tcl/target/k1921vk01t.cfg"
+    },
+    {
+      "rule_id": "nuvoton-npcx7",
+      "vendor": "Nuvoton",
+      "part_pattern": "^NPCX7M(?:6FB|6FC|7FC)$",
+      "target_config": "tcl/target/npcx.cfg"
+    },
+    {
       "rule_id": "nxp-k40",
       "vendor": "NXP",
       "part_pattern": "^MK40",
@@ -344,6 +368,48 @@
       "target_config": "tcl/target/lpc17xx.cfg"
     },
     {
+      "rule_id": "nxp-lpc2103",
+      "vendor": "NXP",
+      "part_pattern": "^LPC2103$",
+      "target_config": "tcl/target/lpc2103.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc2124",
+      "vendor": "NXP",
+      "part_pattern": "^LPC2124$",
+      "target_config": "tcl/target/lpc2124.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc2129",
+      "vendor": "NXP",
+      "part_pattern": "^LPC2129$",
+      "target_config": "tcl/target/lpc2129.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc2148",
+      "vendor": "NXP",
+      "part_pattern": "^LPC2148$",
+      "target_config": "tcl/target/lpc2148.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc2378",
+      "vendor": "NXP",
+      "part_pattern": "^LPC2378$",
+      "target_config": "tcl/target/lpc2378.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc2478",
+      "vendor": "NXP",
+      "part_pattern": "^LPC2478$",
+      "target_config": "tcl/target/lpc2478.cfg"
+    },
+    {
+      "rule_id": "nxp-lpc2900",
+      "vendor": "NXP",
+      "part_pattern": "^LPC29(?:17(?:/01)?|19(?:/01)?|21|23|25|26|27|29|39)$",
+      "target_config": "tcl/target/lpc2900.cfg"
+    },
+    {
       "rule_id": "nxp-lpc40",
       "vendor": "NXP",
       "part_pattern": "^LPC40",
@@ -368,6 +434,12 @@
       "target_config": "tcl/target/lpc8xx.cfg"
     },
     {
+      "rule_id": "nxp-nhs31",
+      "vendor": "NXP",
+      "part_pattern": "^NHS31(?:00|52|53)$",
+      "target_config": "tcl/target/nhs31xx.cfg"
+    },
+    {
       "rule_id": "nxp-s32k11",
       "vendor": "NXP",
       "part_pattern": "^S32K11",
@@ -386,6 +458,24 @@
       "target_config": "tcl/target/rp2350.cfg"
     },
     {
+      "rule_id": "silabs-em357",
+      "vendor": "Silicon Labs",
+      "part_pattern": "^EM357(?:-[A-Z]+)?$",
+      "target_config": "tcl/target/em357.cfg"
+    },
+    {
+      "rule_id": "silabs-em358-512k",
+      "vendor": "Silicon Labs",
+      "part_pattern": "^EM358[5-8](?:-[A-Z]+)?$",
+      "target_config": "tcl/target/em358.cfg"
+    },
+    {
+      "rule_id": "silabs-sim3",
+      "vendor": "Silicon Labs",
+      "part_pattern": "^SIM3[CUL](?:134|136|144|146|154|156|157|164|166|167)$",
+      "target_config": "tcl/target/sim3x.cfg"
+    },
+    {
       "rule_id": "st-bluenrg",
       "vendor": "STMicroelectronics",
       "part_pattern": "^BlueNRG",
@@ -396,6 +486,12 @@
       "vendor": "STMicroelectronics",
       "part_pattern": "^STM32H7[RS]",
       "target_config": "tcl/target/stm32h7rsx.cfg"
+    },
+    {
+      "rule_id": "st-stm32w108-64k",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STM32W108C8$",
+      "target_config": "tcl/target/stm32w108xx.cfg"
     },
     {
       "rule_id": "st-stm32wba2",
@@ -426,6 +522,30 @@
       "vendor": "STMicroelectronics",
       "part_pattern": "^STM32WL",
       "target_config": "tcl/target/stm32wlx.cfg"
+    },
+    {
+      "rule_id": "st-str710-256k",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STR710FZ2$",
+      "target_config": "tcl/target/str710.cfg"
+    },
+    {
+      "rule_id": "st-str730-256k",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STR730FZ2$",
+      "target_config": "tcl/target/str730.cfg"
+    },
+    {
+      "rule_id": "st-str750-256k",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STR750FV2$",
+      "target_config": "tcl/target/str750.cfg"
+    },
+    {
+      "rule_id": "st-str912-512k",
+      "vendor": "STMicroelectronics",
+      "part_pattern": "^STR912FAW44$",
+      "target_config": "tcl/target/str912.cfg"
     },
     {
       "rule_id": "ti-cc13x0",
@@ -468,6 +588,12 @@
       "vendor": "Texas Instruments",
       "part_pattern": "^(?:LM3S|LM4F|TM4C)",
       "target_config": "tcl/target/ti/stellaris.cfg"
+    },
+    {
+      "rule_id": "xmos-xs1-xau8a-10",
+      "vendor": "XMOS",
+      "part_pattern": "^XS1-XAU8A-10-FB265$",
+      "target_config": "tcl/target/xmos_xs1-xau8a-10_arm.cfg"
     },
     {
       "rule_id": "nuvoton-numicro-m4",

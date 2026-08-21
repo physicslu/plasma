@@ -1,4 +1,37 @@
 vendor,part_number,identifier_kind,cpu_architectures,target_config,openocd_distribution,mapping_status,validation_status,catalog_origin
+Analog Devices,ADUC7019BCPZ62I,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7020BCPZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7020BCPZ62-RL7,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7020BCPZ62I,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7020BCPZ62I-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7020BCPZ62IRL7,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7021BCPZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7021BCPZ62-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7021BCPZ62-RL7,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7021BCPZ62I,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7021BCPZ62I-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7022BCPZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7022BCPZ62-RL7,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7024BCPZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7024BCPZ62-RL7,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7024BCPZ62I,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7024BSTZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7024BSTZ62-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7025BCPZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7025BCPZ62-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7025BSTZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7025BSTZ62-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7026BSTZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7026BSTZ62-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7026BSTZ62I,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7027BSTZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7027BSTZ62I,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7028BBCZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7028BBCZ62-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7029BBCZ62,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7029BBCZ62-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7029BBCZ62I,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Analog Devices,ADUC7029BBCZ62I-RL,manufacturer_part_number,"[""ARM7TDMI""]",tcl/target/aduc702x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Analog Devices,ADuCM360,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/aducm360.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Analog Devices,ADuCM361,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/aducm360.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Analog Devices,ADuCM362,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/aducm360.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
@@ -1533,6 +1566,24 @@ Infineon,CY8C4745LQI-S401,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/psoc
 Infineon,CY8C4745LQI-S411,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/psoc4.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Infineon,CY8C4746LQS-S263,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/psoc4.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Infineon,CY8C4747LQS-S453,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/psoc4.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
+Infineon,CY8C5265XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5266XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5267XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5268XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5288XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5465XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5466XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5467XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5468XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5488XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5666XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5667XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5668XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5688XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5866XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5867XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5868XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Infineon,CY8C5888XXX-LPXXX,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/psoc5lp.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Infineon,CY8C6016BZI-F04,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/psoc6.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Infineon,CY8C6036BZI-F04,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/psoc6.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Infineon,CY8C6116BZI-F54,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/psoc6.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
@@ -2480,6 +2531,7 @@ Microchip,PIC32MX775F512H,cmsis_device_name,"[""MIPS32""]",tcl/target/pic32mx.cf
 Microchip,PIC32MX775F512L,cmsis_device_name,"[""MIPS32""]",tcl/target/pic32mx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Microchip,PIC32MX795F512H,cmsis_device_name,"[""MIPS32""]",tcl/target/pic32mx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Microchip,PIC32MX795F512L,cmsis_device_name,"[""MIPS32""]",tcl/target/pic32mx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NIIET,K1921VK01T,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/k1921vk01t.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,LPC1101LVUK,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc11xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,LPC1102LVUK,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc11xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,LPC1102UK,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc11xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
@@ -2665,6 +2717,23 @@ NXP,LPC1785,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc17xx.cfg,upstre
 NXP,LPC1786,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc17xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,LPC1787,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc17xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,LPC1788,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc17xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2103,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/lpc2103.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2124,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/lpc2124.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2129,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/lpc2129.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2148,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/lpc2148.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2378,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/lpc2378.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2478,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/lpc2478.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2917,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2917/01,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2919,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2919/01,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2921,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2923,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2925,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2926,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2927,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2929,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,LPC2939,cmsis_device_name,"[""ARM966E-S""]",tcl/target/lpc2900.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,LPC4072FBD80,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc40xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,LPC4072FET80,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc40xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,LPC4074FBD144,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/lpc40xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
@@ -2826,6 +2895,9 @@ NXP,MKL46Z256VLH4,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/kl46.cfg,ups
 NXP,MKL46Z256VLL4,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/kl46.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
 NXP,MKL46Z256VMC4,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/kl46.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
 NXP,MKL46Z256VMP4,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/kl46.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
+NXP,NHS3100,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/nhs31xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,NHS3152,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/nhs31xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+NXP,NHS3153,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/nhs31xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 NXP,QN9080A,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/qn908x.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
 NXP,QN9080B,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/qn908x.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
 NXP,QN9080C,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/qn908x.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
@@ -3371,6 +3443,9 @@ Nuvoton,NM18402Y,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/numicro.cfg,u
 Nuvoton,NM18407SY,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/numicro.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Nuvoton,NM18407Y,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/numicro.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Nuvoton,NM18440D,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/numicro.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
+Nuvoton,NPCX7M6FB,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/npcx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Nuvoton,NPCX7M6FC,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/npcx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Nuvoton,NPCX7M7FC,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/npcx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Nuvoton,NUC029FAE,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/numicro.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Nuvoton,NUC029KGE,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/numicro.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Nuvoton,NUC029LAN,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/numicro.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
@@ -5875,6 +5950,7 @@ STMicroelectronics,STM32U5G9NJHxQ,cmsis_device_name,"[""ARM Cortex-M""]",tcl/tar
 STMicroelectronics,STM32U5G9VJTxQ,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/stm32u5x.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
 STMicroelectronics,STM32U5G9ZJJxQ,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/stm32u5x.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
 STMicroelectronics,STM32U5G9ZJTxQ,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/stm32u5x.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_top5_mapped.csv
+STMicroelectronics,STM32W108C8,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/stm32w108xx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 STMicroelectronics,STM32WB10CCUx,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/stm32wbx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 STMicroelectronics,STM32WB15CCUx,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/stm32wbx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 STMicroelectronics,STM32WB15CCUxE,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/stm32wbx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
@@ -5976,6 +6052,10 @@ STMicroelectronics,STM32WLE5CCUx,ordering_pattern,"[""ARM Cortex-M""]",tcl/targe
 STMicroelectronics,STM32WLE5J8Ix,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/stm32wlx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 STMicroelectronics,STM32WLE5JBIx,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/stm32wlx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 STMicroelectronics,STM32WLE5JCIx,ordering_pattern,"[""ARM Cortex-M""]",tcl/target/stm32wlx.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+STMicroelectronics,STR710FZ2,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/str710.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+STMicroelectronics,STR730FZ2,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/str730.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+STMicroelectronics,STR750FV2,cmsis_device_name,"[""ARM7TDMI""]",tcl/target/str750.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+STMicroelectronics,STR912FAW44,cmsis_device_name,"[""ARM966E-S""]",tcl/target/str912.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Silicon Labs,BGM210LA22JIF,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg21.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Silicon Labs,BGM210LA22JNF,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg21.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Silicon Labs,BGM210P022JIA,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg21.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
@@ -6979,6 +7059,18 @@ Silicon Labs,EFR32ZG28B320F1024IM48,cmsis_device_name,"[""ARM Cortex-M""]",tcl/t
 Silicon Labs,EFR32ZG28B320F1024IM68,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg28.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Silicon Labs,EFR32ZG28B322F1024IM48,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg28.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Silicon Labs,EFR32ZG28B322F1024IM68,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg28.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
+Silicon Labs,EM357-IRT,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em357.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM357-IRTR,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em357.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM357-ZRT,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em357.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM357-ZRTR,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em357.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM3585-IRT,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em358.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM3585-IRTR,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em358.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM3586-IRT,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em358.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM3586-IRTR,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em358.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM3587-IRT,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em358.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM3587-IRTR,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em358.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM3588-IRT,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em358.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,EM3588-IRTR,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/em358.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Silicon Labs,EZR32HG220F32R55,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/efm32.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Silicon Labs,EZR32HG220F32R60,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/efm32.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Silicon Labs,EZR32HG220F32R61,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/efm32.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
@@ -7123,6 +7215,36 @@ Silicon Labs,MGM260PB32VNN,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sil
 Silicon Labs,MGM260PD22VNA,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg26.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Silicon Labs,MGM260PD32VNA,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg26.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
 Silicon Labs,MGM260PD32VNN,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/silabs/xg26.cfg,upstream-openocd,mapping_candidate,not_verified,plasma_openocd_parts_next5_mapped.csv
+Silicon Labs,SIM3C134,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C136,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C144,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C146,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C154,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C156,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C157,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C164,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C166,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3C167,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L134,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L136,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L144,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L146,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L154,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L156,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L157,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L164,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L166,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3L167,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U134,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U136,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U144,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U146,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U154,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U156,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U157,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U164,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U166,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Silicon Labs,SIM3U167,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/sim3x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Texas Instruments,CC1310,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/ti/cc13x0.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Texas Instruments,CC1312R,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/ti/cc13x2.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Texas Instruments,CC1350,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/ti/cc13x0.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
@@ -7533,3 +7655,4 @@ Texas Instruments,TM4C129ENCZAD,cmsis_device_name,"[""ARM Cortex-M""]",tcl/targe
 Texas Instruments,TM4C129LNCZAD,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/ti/stellaris.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Texas Instruments,TM4C129XKCZAD,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/ti/stellaris.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Texas Instruments,TM4C129XNCZAD,cmsis_device_name,"[""ARM Cortex-M""]",tcl/target/ti/stellaris.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+XMOS,XS1-XAU8A-10-FB265,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/xmos_xs1-xau8a-10_arm.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv

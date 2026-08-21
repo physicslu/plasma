@@ -1,6 +1,6 @@
 # OpenOCD Part-Number Expansion Plan
 
-Status: executing; second automated multi-source batch generated
+Status: 114-target MCU-first expansion completed; all selectable CFG candidates resolved
 
 ## 1. Goal and boundary
 
@@ -39,26 +39,30 @@ Current execution checkpoint:
 | Result | Count |
 |---|---:|
 | MCU/Wireless MCU CFG candidates evaluated | 114 |
-| CFG files with deterministic authoritative-source mappings | 78 |
-| Unique expansion device identifiers mapped | 1,808 |
-| CMSIS/vendor device names | 1,557 |
-| Exact manufacturer ordering part numbers | 121 |
-| Ordering patterns | 130 |
+| CFG files with deterministic authoritative-source mappings | 99 |
+| Unique expansion device identifiers mapped | 1,931 |
+| CMSIS/vendor device names | 1,616 |
+| Exact manufacturer ordering part numbers | 167 |
+| Ordering patterns | 148 |
 | Pinned PDSC sources parsed | 58 |
-| Pinned vendor MCU SDK or product sources parsed | 7 |
-| Pinned OpenOCD MCU Flash-driver part tables parsed | 1 |
-| Helper/alias or external-Flash-only targets deferred | 12 |
-| Flash-capable targets awaiting an adapter/rule | 24 |
+| Pinned vendor/Arm MCU SDK, device-database, or product sources parsed | 16 |
+| Pinned OpenOCD MCU Flash-driver part tables parsed | 5 |
+| Pinned OpenOCD exact-MCU target definitions parsed | 7 |
+| Helper/alias, external-only, Flashless, or invalid-TAP targets deferred | 15 |
+| Flash-capable targets awaiting an adapter/rule | **0** |
 | Baseline/expansion target conflicts resolved | 34 |
-| Canonical unique device identifiers | 7,534 |
-| Canonical unique target CFG files | 131 |
+| Canonical unique device identifiers | 7,657 |
+| Canonical unique target CFG files | 152 |
 
-The 1,808 expansion identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Combining the 5,760 baseline identifiers with the expansion and collapsing 34 overlapping STM32H7R/S identifiers produces 7,534 canonical unique device identifiers. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint, then run `validate_openocd_expansion.py` offline.
+The 1,931 expansion identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Combining the 5,760 baseline identifiers with the expansion and collapsing 34 overlapping STM32H7R/S identifiers produces 7,657 canonical unique device identifiers. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint, then run `validate_openocd_expansion.py` offline.
+
+The 15 deferred CFGs consist of 11 helper/alias definitions, one external-Flash-only configuration, one Flashless LPC2460 configuration, and two configurations with unresolved `0xffffffff` JTAG TAP IDs. None is presented as a selectable MCU mapping.
 
 | Canonical CPU architecture | Target CFG files | Device identifiers |
 |---|---:|---:|
-| ARM Cortex-M | 113 | 7,373 |
-| ARM7TDMI | 3 | 5 |
+| ARM Cortex-M | 122 | 7,442 |
+| ARM7TDMI | 13 | 47 |
+| ARM966E-S | 2 | 12 |
 | AVR | 3 | 3 |
 | MIPS32 | 1 | 128 |
 | RISC-V | 9 | 24 |
@@ -93,7 +97,7 @@ needs_review
 
 Only `flash_driver_declared` proceeds automatically to MCU identifier expansion.
 
-### Wave 1 — Reuse existing vendor-source pipelines (in progress)
+### Wave 1 — Reuse existing vendor-source pipelines (complete)
 
 Start with the 82 Flash-declaring MCU CFG candidates belonging to vendor groups already handled by the current DFP/PDSC enrichment pipeline.
 
@@ -110,11 +114,11 @@ Start with the 82 Flash-declaring MCU CFG candidates belonging to vendor groups 
 
 Process these in batches of 10–20 CFG files. Prefer modern MCU families with current structured vendor packs, then handle legacy families whose identifiers may require archived packs or product tables.
 
-The first PDSC batch mapped 36 CFG files across Microchip, NXP, STMicroelectronics, Texas Instruments, and Nuvoton. The second batch adds official vendor-direct PDSCs and pinned vendor SDK product lists, including Microchip AVR/PIC32MX and Texas Instruments SimpleLink families. The outcome table, rather than the historical wave estimate, is authoritative for current per-target progress.
+The first PDSC batch mapped 36 CFG files across Microchip, NXP, STMicroelectronics, Texas Instruments, and Nuvoton. Subsequent batches added official vendor-direct PDSCs, pinned manufacturer SDK/product documents, Arm Keil chip databases, explicit OpenOCD driver part tables, and exact-MCU target definitions. Together they resolve every eligible MCU target in both vendor waves; the outcome table is authoritative for current per-target progress.
 
 Each vendor batch must add deterministic mapping fixtures. A filename or family-name substring alone is not sufficient when multiple CFG files overlap.
 
-### Wave 2 — Add new vendor-source adapters
+### Wave 2 — Add new vendor-source adapters (complete)
 
 After Wave 1 rules are stable, process the remaining 32 Flash-declaring MCU CFG candidates.
 
@@ -133,7 +137,7 @@ After Wave 1 rules are stable, process the remaining 32 Flash-declaring MCU CFG 
 
 Use an official structured device pack or machine-readable product source when available. If a vendor has no suitable structured source, retain the CFG as a capability record and put identifier extraction into the exception queue; do not guess complete part numbers from a family name.
 
-The second batch now maps Analog Devices/MAXIM, Artery, Bouffalo Lab, Cypress/Fujitsu, Geehy, GigaDevice, Holtek, and Raspberry Pi. Artery identifiers are extracted directly from the pinned OpenOCD Flash driver's explicit MCU supported-part table; only AT32F4 chips compatible with the existing `at32f4x.cfg` target are retained. No development-board definitions or inventories are consulted. The GigaDevice GD32VF103 source is an official manufacturer product announcement pinned by its expected SHA-256 content hash. Official Microchip SAM-BA release notes additionally establish a small, memory-compatible ARM7TDMI set. Legacy targets without sufficiently specific manufacturer evidence remain `source_adapter_pending`.
+The completed batches map Analog Devices/MAXIM, Artery, Bouffalo Lab, Cypress/Fujitsu, Geehy, GigaDevice, Holtek, Infineon, Microchip, NIIET, NXP, Nuvoton, Raspberry Pi, Silicon Labs, STMicroelectronics, Texas Instruments, and XMOS. OpenOCD driver tables directly establish AT32F4, PSoC 5LP, K1921VK01T, LPC29xx, and NHS31xx compatibility. Manufacturer documents constrain ADuC70xx to the driver's 62 KB Flash geometry, EM358x to its configured 512 KB geometry, and STM32W108 to the configured 64 KB STM32W108C8. Arm Keil device records cover legacy STR7/STR9 and SiM3 targets; Nuvoton's own SoC definitions establish NPCX7 identifiers. No development-board definitions or inventories are consulted, and no eligible CFG remains `source_adapter_pending`.
 
 ### Wave 3 — Deferred targets
 

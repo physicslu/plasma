@@ -41,13 +41,13 @@ def main() -> None:
     assert all(
         row["identifier_kind"] == "manufacturer_part_number"
         for row in parts
-        if row["source_kind"] in {"openocd_flash_driver", "vendor_product_page"}
+        if row["source_kind"] == "vendor_product_page"
     )
     assert Counter(row["device_type"] for row in capabilities) == {"MCU": 110, "Wireless MCU": 4}
     outcome_counts = Counter(row["expansion_outcome"] for row in outcomes)
-    assert set(outcome_counts) == {"source_adapter_pending", "mapped", "deferred"}
+    assert set(outcome_counts) == {"mapped", "deferred"}
     assert outcome_counts["mapped"] == metadata["mapped_target_count"]
-    assert outcome_counts["source_adapter_pending"] < 69
+    assert outcome_counts["source_adapter_pending"] == 0
 
     capability_by_target = {row["target_config"]: row for row in capabilities}
     assert len(capability_by_target) == len(capabilities)
@@ -59,6 +59,11 @@ def main() -> None:
     assert all(row["validation_status"] == "not_verified" for row in parts + outcomes + capabilities + canonical)
     assert all(json.loads(row["cpu_architectures"]) for row in capabilities + parts + canonical)
     assert capability_by_target["tcl/target/k1921vk01t.cfg"]["vendor"] == "NIIET"
+    assert capability_by_target["tcl/target/lpc2460.cfg"]["capability_status"] == "flash_driver_missing"
+    assert all(
+        capability_by_target[target]["capability_status"] == "needs_review"
+        for target in ("tcl/target/at91sam7se512.cfg", "tcl/target/lpc2294.cfg")
+    )
     assert all(
         capability_by_target[target]["capability_status"] == "helper_or_alias"
         for target in (
@@ -81,13 +86,41 @@ def main() -> None:
         row["source_kind"] == "cmsis_pdsc" for row in manifest["sources"]
     )
     assert {row["source_kind"] for row in manifest["sources"]} == {
-        "cmsis_pdsc", "vendor_sdk_text", "openocd_flash_driver", "vendor_product_page"
+        "cmsis_pdsc", "vendor_sdk_text", "openocd_flash_driver", "vendor_product_page",
+        "vendor_product_pdf", "cmsis_device_database", "openocd_target_definition",
     }
     assert all("board" not in row["source_kind"] for row in manifest["sources"])
     artery_parts = [row for row in parts if row["vendor"] == "Artery"]
     assert len(artery_parts) == 107
     assert all(row["source_kind"] == "openocd_flash_driver" for row in artery_parts)
+    assert all(row["identifier_kind"] == "manufacturer_part_number" for row in artery_parts)
     assert all(row["part_number"].startswith("AT32F4") for row in artery_parts)
+    assert not any(row["part_number"] == "LPC2930" for row in parts)
+    assert all(
+        "62" in row["part_number"] and "32" not in row["part_number"]
+        for row in parts
+        if row["target_config"] == "tcl/target/aduc702x.cfg"
+    )
+    assert all(
+        row["identifier_kind"] == "ordering_pattern"
+        for row in parts
+        if row["target_config"] == "tcl/target/psoc5lp.cfg"
+    )
+    assert all(
+        row["part_number"].startswith(("EM3585-", "EM3586-", "EM3587-", "EM3588-"))
+        for row in parts
+        if row["target_config"] == "tcl/target/em358.cfg"
+    )
+    assert all(
+        row["part_number"] == "STM32W108C8"
+        for row in parts
+        if row["target_config"] == "tcl/target/stm32w108xx.cfg"
+    )
+    assert {
+        row["part_number"]
+        for row in parts
+        if row["target_config"] == "tcl/target/npcx.cfg"
+    } == {"NPCX7M6FB", "NPCX7M6FC", "NPCX7M7FC"}
     assert all(
         (row["source_pack_vendor"], row["source_pack_name"], row["source_content_sha256"])
         in source_keys
@@ -124,7 +157,7 @@ def main() -> None:
         architecture
         for row in canonical
         for architecture in json.loads(row["cpu_architectures"])
-    } >= {"ARM Cortex-M", "ARM7TDMI", "AVR", "MIPS32", "RISC-V", "Xtensa"}
+    } >= {"ARM Cortex-M", "ARM7TDMI", "ARM966E-S", "AVR", "MIPS32", "RISC-V", "Xtensa"}
     rp2350 = canonical_by_key[("Raspberry Pi", "RP2350A")]
     assert json.loads(rp2350["cpu_architectures"]) == ["ARM Cortex-M", "RISC-V"]
 

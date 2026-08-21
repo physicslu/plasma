@@ -21,15 +21,15 @@ This research catalog recursively converts OpenOCD `tcl/target/**/*.cfg` entries
 - Selectable target configurations: 53
 - Excluded for missing configured Flash bank/driver: 36 identifiers across 2 target configurations
 - MCU/Wireless MCU expansion candidates evaluated: 114
-- Current automated expansion: 1,804 identifiers across 78 additional target configurations
-- Current expansion identifier kinds: 1,557 device names, 117 exact manufacturer ordering part numbers, and 130 ordering patterns
-- Current expansion sources: 58 pinned PDSC files and 8 pinned vendor SDK, board, or product sources
-- Expansion targets awaiting a source adapter/rule: 24
-- Helper/alias or external-Flash-only expansion targets deferred: 12
-- Canonical selectable identifiers after cross-catalog deduplication: 7,530
-- Canonical selectable target configurations: 131
+- Current automated expansion: 1,931 identifiers across 99 additional target configurations
+- Current expansion identifier kinds: 1,616 device names, 167 exact manufacturer ordering part numbers, and 148 ordering patterns
+- Current expansion sources: 58 pinned PDSCs, 16 manufacturer/Arm MCU sources, 5 OpenOCD Flash-driver tables, and 7 exact-MCU OpenOCD target definitions; no board sources
+- Expansion targets awaiting a source adapter/rule: 0
+- Helper/alias, external-only, Flashless, or invalid-TAP expansion targets deferred: 15
+- Canonical selectable identifiers after cross-catalog deduplication: 7,657
+- Canonical selectable target configurations: 152
 - Cross-catalog target conflicts resolved: 34 STM32H7R/S identifiers
-- Canonical CPU architectures: ARM Cortex-M, ARM7TDMI, AVR, MIPS32, RISC-V, and Xtensa
+- Canonical CPU architectures: ARM Cortex-M, ARM7TDMI, ARM966E-S, AVR, MIPS32, RISC-V, and Xtensa
 
 ## User-facing selection
 
@@ -89,7 +89,7 @@ The target seed establishes **Vendor → Series → OpenOCD target**. The first 
 - `openocd-parts-canonical.csv`: deduplicated Plasma import/selector table combining the existing mapped identifiers and current expansion.
 - `openocd-duplicate-resolutions.csv`: auditable target-selection decisions for identifiers appearing in both baseline and expansion catalogs.
 - `openocd-expansion-outcomes.csv`: one terminal current-run outcome for each of the 114 candidates.
-- `source-manifest.json`: Pack Index, PDSC, pinned vendor SDK/board/product sources, versions, URLs, and SHA-256 provenance.
+- `source-manifest.json`: Pack Index, PDSC, pinned MCU vendor SDK/product sources, exact-chip OpenOCD target definitions, Flash-driver tables, versions, URLs, and SHA-256 provenance; board sources are excluded.
 - `mapping-rules.json`: exported deterministic rule set used by the generator.
 - `expansion-report.md`: current execution totals and status interpretation.
 - `validate_openocd_expansion.py`: offline invariants for source provenance, CPU architectures, aliases, source-aware rules, and cross-catalog uniqueness.

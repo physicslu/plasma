@@ -1490,8 +1490,8 @@
       "cpu_architectures": [
         "ARM7TDMI"
       ],
-      "capability_status": "flash_driver_declared",
-      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "capability_status": "needs_review",
+      "capability_reason": "Target defaults its unresolved JTAG TAP ID to the invalid value 0xffffffff",
       "flash_drivers": [
         "at91sam7"
       ],
@@ -2218,8 +2218,8 @@
       "cpu_architectures": [
         "ARM7TDMI"
       ],
-      "capability_status": "flash_driver_declared",
-      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "capability_status": "needs_review",
+      "capability_reason": "Target has an unresolved JTAG TAP ID explicitly set to 0xffffffff",
       "flash_drivers": [
         "lpc2000"
       ],
@@ -2278,8 +2278,8 @@
       "cpu_architectures": [
         "ARM7TDMI"
       ],
-      "capability_status": "flash_driver_declared",
-      "capability_reason": "Concrete OpenOCD Flash driver resolved statically",
+      "capability_status": "flash_driver_missing",
+      "capability_reason": "Flashless MCU; target configuration explicitly sets internal Flash size to zero",
       "flash_drivers": [
         "lpc2000"
       ],

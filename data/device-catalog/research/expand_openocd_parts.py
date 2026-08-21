@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Expand Flash-capable OpenOCD MCU targets into sourced device identifiers.
 
-The generator is deliberately fail-closed.  It emits all 114 MCU/Wireless MCU
-capability candidates, but only emits a part mapping when a versioned CMSIS
-PDSC source and a deterministic rule select exactly one customer target CFG.
+The generator is deliberately fail-closed. It emits all 114 MCU/Wireless MCU
+capability candidates, but only emits a mapping when a pinned authoritative
+MCU source and a deterministic rule select exactly one customer target CFG.
 """
 from __future__ import annotations
 
@@ -33,6 +33,20 @@ HELPER_TARGETS = {
     "tcl/target/stm32xl.cfg",
 }
 VENDOR_OVERRIDES = {"tcl/target/k1921vk01t.cfg": "NIIET"}
+TARGET_CAPABILITY_OVERRIDES = {
+    "tcl/target/at91sam7se512.cfg": (
+        "needs_review",
+        "Target defaults its unresolved JTAG TAP ID to the invalid value 0xffffffff",
+    ),
+    "tcl/target/lpc2294.cfg": (
+        "needs_review",
+        "Target has an unresolved JTAG TAP ID explicitly set to 0xffffffff",
+    ),
+    "tcl/target/lpc2460.cfg": (
+        "flash_driver_missing",
+        "Flashless MCU; target configuration explicitly sets internal Flash size to zero",
+    ),
+}
 TARGET_ARCHITECTURES = {
     "arm7tdmi": "ARM7TDMI",
     "arm926ejs": "ARM926EJ-S",
@@ -72,6 +86,8 @@ class VendorSourceSpec:
     source_kind: str
     device_pattern: str = ""
     expected_content_sha256: str = ""
+    source_path: str = ""
+    identifier_kind: str = ""
 
 
 PACK_SPECS = (
@@ -143,6 +159,15 @@ PACK_SPECS = (
 
 VENDOR_SOURCES = (
     VendorSourceSpec(
+        "Analog Devices", "AnalogDevices.ADuC70xx-manufacturer-datasheet", "Rev-H",
+        "https://www.analog.com/media/en/technical-documentation/data-sheets/"
+        "aduc7019_20_21_22_24_25_26_27_28_29.pdf",
+        "vendor_product_pdf",
+        r"\b(ADuC70(?:19|20|21|22|24|25|26|27|28|29)(?:BCPZ|BSTZ|BBCZ)62I?(?:-?RL7?)?)\b",
+        "15851bc0f1cc8074a2a1d43723ebdb21137d30389ff33979679ba037fcf35154",
+        identifier_kind="manufacturer_part_number",
+    ),
+    VendorSourceSpec(
         "Analog Devices", "AnalogDevices.MSDK-user-guide", "e0446b176b7080098fecddd174317ba47946695e",
         "https://raw.githubusercontent.com/analogdevicesinc/msdk/"
         "e0446b176b7080098fecddd174317ba47946695e/USERGUIDE.md",
@@ -154,6 +179,9 @@ VENDOR_SOURCES = (
         "https://github.com/openocd-org/openocd/blob/"
         f"{OPENOCD_COMMIT}/src/flash/nor/artery.c",
         "openocd_flash_driver",
+        r'\.name\s*=\s*"(AT32[^\"]+)"',
+        source_path="src/flash/nor/artery.c",
+        identifier_kind="manufacturer_part_number",
     ),
     VendorSourceSpec(
         "Bouffalo Lab", "BouffaloLab.SDK-README", "5cd17516dfe8d9813e79008aeb29c3f930797804",
@@ -177,12 +205,110 @@ VENDOR_SOURCES = (
         "d988b014d3e21c5320c3675f98eabfb56c828ff4d6974aa1767d1a8a41562514",
     ),
     VendorSourceSpec(
+        "Infineon", "OpenOCD.Infineon-PSoC5LP-MCU-Flash-driver", OPENOCD_COMMIT,
+        "https://github.com/openocd-org/openocd/blob/"
+        f"{OPENOCD_COMMIT}/src/flash/nor/psoc5lp.c",
+        "openocd_flash_driver",
+        r"\.fam\s*=\s*(\d+),\s*\.speed_mhz\s*=\s*(\d+),\s*\.flash_kb\s*=\s*(\d+)",
+        source_path="src/flash/nor/psoc5lp.c",
+        identifier_kind="ordering_pattern",
+    ),
+    VendorSourceSpec(
+        "NIIET", "OpenOCD.NIIET-K1921-MCU-Flash-driver", OPENOCD_COMMIT,
+        "https://github.com/openocd-org/openocd/blob/"
+        f"{OPENOCD_COMMIT}/src/flash/nor/niietcm4.c",
+        "openocd_flash_driver",
+        r'chip_name\s*=\s*"(K1921VK01T)"',
+        source_path="src/flash/nor/niietcm4.c",
+        identifier_kind="cmsis_device_name",
+    ),
+    VendorSourceSpec(
+        "NXP", "OpenOCD.NXP-LPC2900-MCU-Flash-driver", OPENOCD_COMMIT,
+        "https://github.com/openocd-org/openocd/blob/"
+        f"{OPENOCD_COMMIT}/src/flash/nor/lpc2900.c",
+        "openocd_flash_driver",
+        r'"(LPC29(?:17(?:/01)?|19(?:/01)?|21|23|25|26|27|29|39))"',
+        source_path="src/flash/nor/lpc2900.c",
+        identifier_kind="cmsis_device_name",
+    ),
+    VendorSourceSpec(
+        "NXP", "OpenOCD.NXP-NHS31-MCU-Flash-driver", OPENOCD_COMMIT,
+        "https://github.com/openocd-org/openocd/blob/"
+        f"{OPENOCD_COMMIT}/src/flash/nor/lpc2000.c",
+        "openocd_flash_driver",
+        r"(?m)^#define\s+(NHS31(?:00|52|53))\s+0x",
+        source_path="src/flash/nor/lpc2000.c",
+        identifier_kind="cmsis_device_name",
+    ),
+    *(
+        VendorSourceSpec(
+            "NXP", f"OpenOCD.NXP-{device}-MCU-target", OPENOCD_COMMIT,
+            "https://github.com/openocd-org/openocd/blob/"
+            f"{OPENOCD_COMMIT}/tcl/target/{device.lower()}.cfg",
+            "openocd_target_definition",
+            rf"(?m)^\s*setup_lpc2xxx\s+({device.lower()})\s+",
+            source_path=f"tcl/target/{device.lower()}.cfg",
+            identifier_kind="cmsis_device_name",
+        )
+        for device in ("LPC2103", "LPC2124", "LPC2129", "LPC2148", "LPC2378", "LPC2478")
+    ),
+    VendorSourceSpec(
+        "Nuvoton", "Nuvoton.NPCX7-manufacturer-SoC-definitions", "3be104f3b5a3368e7672ad424afec1b6d3bfa5d8",
+        "https://raw.githubusercontent.com/Nuvoton-Israel/zephyr/"
+        "3be104f3b5a3368e7672ad424afec1b6d3bfa5d8/soc/arm/nuvoton_npcx/npcx7/Kconfig.soc",
+        "vendor_sdk_text",
+        r"(?m)^config\s+SOC_(NPCX7M(?:6FB|6FC|7FC))\s*$",
+        "23a00e617c43dbbd5c93ac44baca685411a742d3901e1c7bc9c8a5e35e2ea4b2",
+        identifier_kind="cmsis_device_name",
+    ),
+    VendorSourceSpec(
         "Raspberry Pi", "RaspberryPi.PicoSDK-GPIO", "98a542c1a62fb549ffb5d66a3e5892b06276b670",
         "https://raw.githubusercontent.com/raspberrypi/pico-sdk/"
         "98a542c1a62fb549ffb5d66a3e5892b06276b670/"
         "src/rp2_common/hardware_gpio/include/hardware/gpio.h",
         "vendor_sdk_text",
         r"\b(RP2040|RP2350A|RP2350B)\b",
+    ),
+    VendorSourceSpec(
+        "Silicon Labs", "SiliconLabs.EM35x-assembly-change-notice-1512214", "1512214-rev-AW",
+        "https://www.silabs.com/documents/public/pcns/"
+        "PCN-1512214-EM357x-8x-9x-Assembly-site-addition.pdf",
+        "vendor_product_pdf",
+        r"\b(EM357-(?:ZRT|ZRTR|IRT|IRTR)|EM358[5-8]-(?:IRT|IRTR))\b",
+        "7c2a255bcde674c1a81f809a831555c0c807f7ab1da0ba073c51670766d0d2cd",
+        identifier_kind="manufacturer_part_number",
+    ),
+    VendorSourceSpec(
+        "Silicon Labs", "ArmKeil.SiliconLabs-SiM3-MCU-device-database", "snapshot-2026-08-21",
+        "https://www.keil.com/dd/chips/siliconlabs/arm.htm",
+        "cmsis_device_database",
+        r"\b(SiM3[CUL](?:134|136|144|146|154|156|157|164|166|167))\b",
+        "dcd5bccf3e6e5aefa8bf6ace6c11bf7abc3a8b0fc33cae7b0ed19db2afe076cf",
+        identifier_kind="cmsis_device_name",
+    ),
+    VendorSourceSpec(
+        "STMicroelectronics", "STMicroelectronics.STM32W108C8-manufacturer-datasheet", "DM00024653",
+        "https://www.keil.com/dd/docs/datashts/st/stm32w108xx/dm00024653.pdf",
+        "vendor_product_pdf",
+        r"\b(STM32W108C8)\b",
+        "8605baa0a971a61795a990af92c04682ef10b6a2ed64126b29ae747dcafef6c2",
+        identifier_kind="cmsis_device_name",
+    ),
+    *(
+        VendorSourceSpec(
+            "STMicroelectronics", f"ArmKeil.ST-{device}-device-database", "snapshot-2026-08-21",
+            f"https://www.keil.com/dd/chip/{chip_id}.htm",
+            "cmsis_device_database",
+            rf"\b({device})\b",
+            content_hash,
+            identifier_kind="cmsis_device_name",
+        )
+        for device, chip_id, content_hash in (
+            ("STR710FZ2", "3805", "53864b5d2c203bca4c2a6a46c879d6d06ad091efee8410cb7fdb2e65236a8dfd"),
+            ("STR730FZ2", "3898", "c6997c0c5b164bb473058beb5f430e3d30fe011388319da6f3b997aad57d3fad"),
+            ("STR750FV2", "4154", "63fb4126999b69d41eba954493c30f225bc7e8c5829587379ff03c70b141d117"),
+            ("STR912FAW44", "4585", "043f6c2893dde5e7f7a42b1bbd82142f1e7ac0278fbc166fa6d30c4f43757093"),
+        )
     ),
     VendorSourceSpec(
         "Texas Instruments", "TexasInstruments.FlashRover-supported-devices",
@@ -201,11 +327,21 @@ VENDOR_SOURCES = (
         "vendor_sdk_text",
         r"\b(CC3220SF)\b",
     ),
+    VendorSourceSpec(
+        "XMOS", "OpenOCD.XMOS-XS1-XAU8A-10-MCU-target", OPENOCD_COMMIT,
+        "https://github.com/openocd-org/openocd/blob/"
+        f"{OPENOCD_COMMIT}/tcl/target/xmos_xs1-xau8a-10_arm.cfg",
+        "openocd_target_definition",
+        r"\b(XS1-XAU8A-10-FB265)\b",
+        source_path="tcl/target/xmos_xs1-xau8a-10_arm.cfg",
+        identifier_kind="manufacturer_part_number",
+    ),
 )
 
 
 # Order matters: put narrower selectors before family selectors.
 MAPPING_RULES = (
+    ("adi-aduc70-62k", "Analog Devices", r"^ADUC70(?:19|20|21|22|24|25|26|27|28|29)(?:BCPZ|BSTZ|BBCZ)62", "tcl/target/aduc702x.cfg"),
     ("adi-aducm36", "Analog Devices", r"^ADUCM36", "tcl/target/aducm360.cfg"),
     ("adi-max32620", "Analog Devices", r"^MAX32620$", "tcl/target/max32620.cfg"),
     ("adi-max32625", "Analog Devices", r"^MAX32625", "tcl/target/max32625.cfg"),
@@ -232,6 +368,7 @@ MAPPING_RULES = (
     ("gigadevice-gd32e23", "GigaDevice", r"^GD32E23", "tcl/target/gigadevice/gd32e23x.cfg"),
     ("gigadevice-gd32vf103", "GigaDevice", r"^GD32VF103", "tcl/target/gigadevice/gd32vf103.cfg"),
     ("holtek-ht32f4", "Holtek", r"^HT32F4", "tcl/target/holtek/ht32f4x.cfg"),
+    ("infineon-psoc5lp", "Infineon", r"^CY8C5[2468][68][5678]XXX-LPXXX$", "tcl/target/psoc5lp.cfg"),
     ("microchip-atmega128rfa1", "Microchip", r"^ATMEGA128RFA1$", "tcl/target/atmega128rfa1.cfg"),
     ("microchip-atmega128", "Microchip", r"^ATMEGA128$", "tcl/target/atmega128.cfg"),
     ("microchip-atmega32u4", "Microchip", r"^ATMEGA32U4$", "tcl/target/atmega32u4.cfg"),
@@ -256,6 +393,8 @@ MAPPING_RULES = (
     ("microchip-sam4l", "Microchip", r"^ATSAM4L[CS]", "tcl/target/at91sam4lXX.cfg"),
     ("microchip-sam4sd32", "Microchip", r"^ATSAM4SD32", "tcl/target/at91sam4sd32x.cfg"),
     ("microchip-sam4s", "Microchip", r"^ATSAM4S(?!D32)", "tcl/target/at91sam4sXX.cfg"),
+    ("niiet-k1921vk01t", "NIIET", r"^K1921VK01T$", "tcl/target/k1921vk01t.cfg"),
+    ("nuvoton-npcx7", "Nuvoton", r"^NPCX7M(?:6FB|6FC|7FC)$", "tcl/target/npcx.cfg"),
     ("nxp-k40", "NXP", r"^MK40", "tcl/target/k40.cfg"),
     ("nxp-k60", "NXP", r"^MK60", "tcl/target/k60.cfg"),
     ("nxp-kl25", "NXP", r"^MKL25", "tcl/target/kl25.cfg"),
@@ -263,20 +402,36 @@ MAPPING_RULES = (
     ("nxp-lpc12", "NXP", r"^LPC12", "tcl/target/lpc12xx.cfg"),
     ("nxp-lpc13", "NXP", r"^LPC13", "tcl/target/lpc13xx.cfg"),
     ("nxp-lpc17", "NXP", r"^LPC17", "tcl/target/lpc17xx.cfg"),
+    ("nxp-lpc2103", "NXP", r"^LPC2103$", "tcl/target/lpc2103.cfg"),
+    ("nxp-lpc2124", "NXP", r"^LPC2124$", "tcl/target/lpc2124.cfg"),
+    ("nxp-lpc2129", "NXP", r"^LPC2129$", "tcl/target/lpc2129.cfg"),
+    ("nxp-lpc2148", "NXP", r"^LPC2148$", "tcl/target/lpc2148.cfg"),
+    ("nxp-lpc2378", "NXP", r"^LPC2378$", "tcl/target/lpc2378.cfg"),
+    ("nxp-lpc2478", "NXP", r"^LPC2478$", "tcl/target/lpc2478.cfg"),
+    ("nxp-lpc2900", "NXP", r"^LPC29(?:17(?:/01)?|19(?:/01)?|21|23|25|26|27|29|39)$", "tcl/target/lpc2900.cfg"),
     ("nxp-lpc40", "NXP", r"^LPC40", "tcl/target/lpc40xx.cfg"),
     ("nxp-lpc4357", "NXP", r"^LPC4357$", "tcl/target/lpc4357.cfg"),
     ("nxp-lpc8n", "NXP", r"^LPC8N", "tcl/target/lpc8nxx.cfg"),
     ("nxp-lpc8", "NXP", r"^LPC8[0-3]", "tcl/target/lpc8xx.cfg"),
+    ("nxp-nhs31", "NXP", r"^NHS31(?:00|52|53)$", "tcl/target/nhs31xx.cfg"),
     ("nxp-s32k11", "NXP", r"^S32K11", "tcl/target/s32k.cfg"),
     ("raspberry-rp2040", "Raspberry Pi", r"^RP2040$", "tcl/target/rp2040.cfg"),
     ("raspberry-rp2350", "Raspberry Pi", r"^RP2350[AB]$", "tcl/target/rp2350.cfg"),
+    ("silabs-em357", "Silicon Labs", r"^EM357(?:-[A-Z]+)?$", "tcl/target/em357.cfg"),
+    ("silabs-em358-512k", "Silicon Labs", r"^EM358[5-8](?:-[A-Z]+)?$", "tcl/target/em358.cfg"),
+    ("silabs-sim3", "Silicon Labs", r"^SIM3[CUL](?:134|136|144|146|154|156|157|164|166|167)$", "tcl/target/sim3x.cfg"),
     ("st-bluenrg", "STMicroelectronics", r"^BlueNRG", "tcl/target/bluenrg-x.cfg"),
     ("st-stm32h7rs", "STMicroelectronics", r"^STM32H7[RS]", "tcl/target/stm32h7rsx.cfg"),
+    ("st-stm32w108-64k", "STMicroelectronics", r"^STM32W108C8$", "tcl/target/stm32w108xx.cfg"),
     ("st-stm32wba2", "STMicroelectronics", r"^STM32WBA2", "tcl/target/stm32wba2x.cfg"),
     ("st-stm32wba5", "STMicroelectronics", r"^STM32WBA5", "tcl/target/stm32wba5x.cfg"),
     ("st-stm32wba6", "STMicroelectronics", r"^STM32WBA6", "tcl/target/stm32wba6x.cfg"),
     ("st-stm32wb", "STMicroelectronics", r"^STM32WB", "tcl/target/stm32wbx.cfg"),
     ("st-stm32wl", "STMicroelectronics", r"^STM32WL", "tcl/target/stm32wlx.cfg"),
+    ("st-str710-256k", "STMicroelectronics", r"^STR710FZ2$", "tcl/target/str710.cfg"),
+    ("st-str730-256k", "STMicroelectronics", r"^STR730FZ2$", "tcl/target/str730.cfg"),
+    ("st-str750-256k", "STMicroelectronics", r"^STR750FV2$", "tcl/target/str750.cfg"),
+    ("st-str912-512k", "STMicroelectronics", r"^STR912FAW44$", "tcl/target/str912.cfg"),
     ("ti-cc13x0", "Texas Instruments", r"^CC13(?:10|50)$", "tcl/target/ti/cc13x0.cfg"),
     ("ti-cc13x2", "Texas Instruments", r"^CC13(?:12R|52[PR])$", "tcl/target/ti/cc13x2.cfg"),
     ("ti-cc26x0", "Texas Instruments", r"^CC26(?:40|50)$", "tcl/target/ti/cc26x0.cfg"),
@@ -284,6 +439,7 @@ MAPPING_RULES = (
     ("ti-cc26x2", "Texas Instruments", r"^CC26(?:42R|52(?:P|R|RB))$", "tcl/target/ti/cc26x2.cfg"),
     ("ti-cc3220sf", "Texas Instruments", r"^CC3220SF$", "tcl/target/ti/cc3220sf.cfg"),
     ("ti-stellaris", "Texas Instruments", r"^(?:LM3S|LM4F|TM4C)", "tcl/target/ti/stellaris.cfg"),
+    ("xmos-xs1-xau8a-10", "XMOS", r"^XS1-XAU8A-10-FB265$", "tcl/target/xmos_xs1-xau8a-10_arm.cfg"),
     ("nuvoton-numicro-m4", "Nuvoton", r".+", "tcl/target/numicro_m4.cfg"),
 )
 
@@ -342,6 +498,8 @@ def target_architectures(openocd_root: Path, includes: list[str]) -> list[str]:
 
 
 def capability_status(target_config: str, classification_status: str, banks: list[dict[str, str]]) -> tuple[str, str]:
+    if target_config in TARGET_CAPABILITY_OVERRIDES:
+        return TARGET_CAPABILITY_OVERRIDES[target_config]
     stem = Path(target_config).stem.lower()
     concrete = {bank["driver"] for bank in banks if bank["driver"] != "virtual"}
     if (
@@ -478,10 +636,12 @@ def extract_devices(pdsc: Path, source: dict[str, str]) -> list[dict[str, str]]:
     return records
 
 
-def identifier_kind(name: str, source_kind: str = "cmsis_pdsc") -> str:
+def identifier_kind(name: str, source_kind: str = "cmsis_pdsc", source_identifier_kind: str = "") -> str:
     if re.search(r"(?:_xx|x(?:tr)?$|xxx)", name, re.IGNORECASE):
         return "ordering_pattern"
-    if source_kind in {"openocd_flash_driver", "vendor_product_page"}:
+    if source_identifier_kind:
+        return source_identifier_kind
+    if source_kind in {"openocd_flash_driver", "vendor_product_page", "vendor_product_pdf"}:
         return "manufacturer_part_number"
     return "cmsis_device_name"
 
@@ -514,8 +674,8 @@ def load_sources(index_path: Path, cache: Path, openocd_root: Path) -> list[dict
         pending.append((spec, url, path, element.get("version", "") if element is not None else ""))
     for spec in VENDOR_SOURCES:
         path = (
-            openocd_root / "src/flash/nor/artery.c"
-            if spec.source_kind == "openocd_flash_driver"
+            openocd_root / spec.source_path
+            if spec.source_path
             else cache / f"{spec.source_name}.txt"
         )
         pending.append((spec, spec.source_url, path, spec.source_commit))
@@ -544,7 +704,7 @@ def load_sources(index_path: Path, cache: Path, openocd_root: Path) -> list[dict
                 "content_sha256": content_hash,
                 "path": str(path),
             }
-        return {
+        source = {
             "silicon_vendor": spec.silicon_vendor,
             "pack_vendor": spec.source_name.split(".", 1)[0],
             "pack_name": spec.source_name.split(".", 1)[1],
@@ -555,6 +715,9 @@ def load_sources(index_path: Path, cache: Path, openocd_root: Path) -> list[dict
             "content_sha256": content_hash,
             "path": str(path),
         }
+        if spec.identifier_kind:
+            source["identifier_kind"] = spec.identifier_kind
+        return source
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         sources = list(executor.map(fetch, pending))
@@ -567,18 +730,31 @@ def extract_source_devices(source: dict[str, str]) -> list[dict[str, str]]:
         return extract_devices(path, source)
 
     names: set[str] = set()
-    if source["source_kind"] in {"vendor_sdk_text", "vendor_product_page"}:
-        names.update(
-            name.upper()
-            for name in re.findall(source["device_pattern"], path.read_text(encoding="utf-8"))
+    if source["source_kind"] == "vendor_product_pdf":
+        result = subprocess.run(
+            ["pdftotext", str(path), "-"],
+            check=True,
+            capture_output=True,
+            text=True,
         )
-    elif source["source_kind"] == "openocd_flash_driver":
-        names.update(
-            name.upper()
-            for name in re.findall(r'\.name\s*=\s*"(AT32[^\"]+)"', path.read_text(encoding="utf-8"))
-        )
+        text = result.stdout
+    elif source["source_kind"] in {
+        "vendor_sdk_text", "vendor_product_page", "cmsis_device_database",
+        "openocd_flash_driver", "openocd_target_definition",
+    }:
+        text = path.read_text(encoding="utf-8")
     else:
         raise RuntimeError(f"unsupported authoritative source kind: {source['source_kind']}")
+
+    if source["pack_name"] == "Infineon-PSoC5LP-MCU-Flash-driver":
+        speed_codes = {"67": "6", "80": "8"}
+        flash_codes = {"32": "5", "64": "6", "128": "7", "256": "8"}
+        for family, speed_mhz, flash_kb in re.findall(source["device_pattern"], text):
+            if family not in {"2", "4", "6", "8"}:
+                raise RuntimeError(f"unknown PSoC5LP family: {family}")
+            names.add(f"CY8C5{family}{speed_codes[speed_mhz]}{flash_codes[flash_kb]}XXX-LPXXX")
+    else:
+        names.update(name.upper() for name in re.findall(source["device_pattern"], text))
 
     return [
         {
@@ -701,7 +877,9 @@ def main() -> None:
                 continue
             row: dict[str, object] = {
                 **device,
-                "identifier_kind": identifier_kind(device["part_number"], source["source_kind"]),
+                "identifier_kind": identifier_kind(
+                    device["part_number"], source["source_kind"], source.get("identifier_kind", "")
+                ),
                 "target_config": target_config,
                 "cpu_architectures": capability["cpu_architectures"],
                 "flash_drivers": capability["flash_drivers"],
@@ -847,8 +1025,19 @@ def main() -> None:
         for row in canonical_rows
         for architecture in row["cpu_architectures"]
     )
+    architecture_target_counts = {
+        architecture: len(
+            {
+                str(row["target_config"])
+                for row in canonical_rows
+                if architecture in row["cpu_architectures"]
+            }
+        )
+        for architecture in architecture_counts
+    }
     pdsc_count = sum(source["source_kind"] == "cmsis_pdsc" for source in sources)
     driver_count = sum(source["source_kind"] == "openocd_flash_driver" for source in sources)
+    target_count = sum(source["source_kind"] == "openocd_target_definition" for source in sources)
     report = [
         "# OpenOCD MCU Part-Number Expansion Report",
         "",
@@ -863,12 +1052,13 @@ def main() -> None:
         f"- Manufacturer ordering part numbers: **{kind_counts['manufacturer_part_number']}**",
         f"- Ordering patterns: **{kind_counts['ordering_pattern']}**",
         f"- Pinned PDSC sources parsed: **{pdsc_count}**",
-        f"- Pinned vendor MCU SDK/product sources parsed: **{len(sources) - pdsc_count - driver_count}**",
+        f"- Pinned vendor MCU SDK/product sources parsed: **{len(sources) - pdsc_count - driver_count - target_count}**",
         f"- Pinned OpenOCD MCU Flash-driver part tables parsed: **{driver_count}**",
+        f"- Pinned OpenOCD exact-MCU target definitions parsed: **{target_count}**",
         f"- Canonical unique identifiers across baseline and expansion: **{len(canonical_rows)}**",
         f"- Canonical unique target CFG files: **{len({str(row['target_config']) for row in canonical_rows})}**",
         f"- Baseline/expansion target conflicts resolved: **{len(duplicate_resolutions)}**",
-        f"- Helper/external-memory targets deferred: **{outcome_counts['deferred']}**",
+        f"- Helper, external-memory, Flashless, or invalid-TAP targets deferred: **{outcome_counts['deferred']}**",
         f"- Flash-capable targets awaiting a source adapter/rule: **{outcome_counts['source_adapter_pending']}**",
         "",
         "Every mapped row remains `not_verified`. This report proves only a deterministic software mapping and a declared OpenOCD Flash driver, not engineering, Socket, or production validation.",
@@ -879,8 +1069,17 @@ def main() -> None:
         "|---|---:|",
     ]
     report.extend(f"| {vendor} | {count} |" for vendor, count in sorted(vendor_counts.items()))
-    report.extend(["", "## Canonical identifiers by CPU architecture", "", "| CPU architecture | Identifiers |", "|---|---:|"])
-    report.extend(f"| {architecture} | {count} |" for architecture, count in sorted(architecture_counts.items()))
+    report.extend(
+        [
+            "", "## Canonical identifiers by CPU architecture", "",
+            "| CPU architecture | Target CFG files | Identifiers |",
+            "|---|---:|---:|",
+        ]
+    )
+    report.extend(
+        f"| {architecture} | {architecture_target_counts[architecture]} | {count} |"
+        for architecture, count in sorted(architecture_counts.items())
+    )
     report.extend(
         [
             "",
@@ -888,7 +1087,7 @@ def main() -> None:
             "",
             "- `mapped`: a pinned authoritative source plus one deterministic rule selected the Target CFG.",
             "- `source_adapter_pending`: Flash is declared, but the current automated sources/rules are insufficient.",
-            "- `deferred`: the CFG is a helper/alias or resolves only an external/general-purpose Flash bank.",
+            "- `deferred`: the CFG is a helper/alias, is Flashless, has an unresolved TAP ID, or resolves only an external/general-purpose Flash bank.",
             "- Canonical deduplication prefers the narrower expansion rule when a baseline family CFG overlaps.",
             "- A dual-architecture device appears once in the canonical CSV and once under each supported architecture.",
             "",
