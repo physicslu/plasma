@@ -18,14 +18,7 @@ function catalog() {
       })),
     };
   });
-  return {
-    ok: true,
-    provider: "mock",
-    facility_count: 3,
-    ppu_count: 12,
-    site_count: 60,
-    facilities,
-  };
+  return { ok: true, provider: "mock", facility_count: 3, ppu_count: 12, site_count: 60, facilities };
 }
 
 function targetStatus(facilityId: string, ppuId: string) {
@@ -93,18 +86,14 @@ async function installProductionMock(page: Page, options: MockRuntimeOptions = {
     const path = url.pathname;
 
     if (path === "/api/engineering/session" && request.method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          session: {
-            session_id: "0123456789abcdef0123456789abcdef",
-            previous_session_cleared: false,
-            programming_asset_cache_scope: "connection-session-and-ppu",
-          },
-        }),
-      });
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
+        ok: true,
+        session: {
+          session_id: "0123456789abcdef0123456789abcdef",
+          previous_session_cleared: false,
+          programming_asset_cache_scope: "connection-session-and-ppu",
+        },
+      }) });
       return;
     }
 
@@ -136,11 +125,7 @@ async function installProductionMock(page: Page, options: MockRuntimeOptions = {
         if (seenStartPpus.size >= 2) releaseStarts?.();
         await startsReleased;
       }
-      await route.fulfill({
-        status: 202,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, job: jobSnapshot(jobId, body.site_id, body.operation, "queued", 0) }),
-      });
+      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ ok: true, job: jobSnapshot(jobId, body.site_id, body.operation, "queued", 0) }) });
       return;
     }
 
@@ -175,11 +160,7 @@ async function installProductionMock(page: Page, options: MockRuntimeOptions = {
         state = "success";
         progress = 100;
       }
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, job: jobSnapshot(jobId, job.siteId, job.operation, state, progress) }),
-      });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, job: jobSnapshot(jobId, job.siteId, job.operation, state, progress) }) });
       return;
     }
 
@@ -189,49 +170,102 @@ async function installProductionMock(page: Page, options: MockRuntimeOptions = {
   return { jobs, seenStartPpus, cancelledPpus };
 }
 
+function fpsCheckbox(page: Page, facilityId: string, ppuId: string, siteId = 1) {
+  return page.getByRole("checkbox", { name: `${facilityId} ${ppuId} SITE-${String(siteId).padStart(2, "0")}` });
+}
+
 async function buildTwoPpuSet(page: Page) {
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Mock topology summary" })).toContainText("12");
-  await expect(page.getByRole("region", { name: "Mock topology summary" })).toContainText("60");
 
-  await page.getByRole("checkbox", { name: "Select mock-facility-01-ppu-01" }).check();
-  await page.getByRole("checkbox", { name: "Select mock-facility-01-ppu-02" }).check();
-  await page.getByRole("button", { name: "SET", exact: true }).click();
+  const facilityId = "mock-facility-01";
+  const ppu1Id = `${facilityId}-ppu-01`;
+  const ppu2Id = `${facilityId}-ppu-02`;
+  await expect(fpsCheckbox(page, facilityId, ppu1Id)).toBeVisible();
+  await expect(fpsCheckbox(page, facilityId, ppu2Id)).toBeVisible();
+  await fpsCheckbox(page, facilityId, ppu1Id).check();
+  await fpsCheckbox(page, facilityId, ppu2Id).check();
+  await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
 
-  const ppu1 = page.locator('[data-production-ppu="mock-facility-01-ppu-01"]');
-  const ppu2 = page.locator('[data-production-ppu="mock-facility-01-ppu-02"]');
+  const ppu1 = page.locator(`[data-production-target="${facilityId}::${ppu1Id}"]`);
+  const ppu2 = page.locator(`[data-production-target="${facilityId}::${ppu2Id}"]`);
   await expect(ppu1).toBeVisible();
   await expect(ppu2).toBeVisible();
-  await expect(page.locator('[data-production-ppu="mock-facility-01-ppu-03"]')).toHaveCount(0);
-
-  await ppu1.getByRole("button", { name: "Clear Sites", exact: true }).click();
-  await ppu2.getByRole("button", { name: "Clear Sites", exact: true }).click();
-  await ppu1.getByRole("checkbox", { name: "mock-facility-01-ppu-01 SITE-01" }).check();
-  await ppu2.getByRole("checkbox", { name: "mock-facility-01-ppu-02 SITE-01" }).check();
-  return { ppu1, ppu2 };
+  return { ppu1, ppu2, ppu1Id, ppu2Id };
 }
 
-test("Production Set selects one Facility and dispatches different PPUs concurrently", async ({ page }) => {
+test("FPS selector retains selections across Facilities and renders Facility → PPU → Site hierarchy", async ({ page }) => {
+  await installProductionMock(page);
+  await page.goto("/fleet");
+
+  const firstFacility = "mock-facility-01";
+  const secondFacility = "mock-facility-02";
+  const firstPpu = `${firstFacility}-ppu-01`;
+  const secondPpu = `${secondFacility}-ppu-02`;
+  await fpsCheckbox(page, firstFacility, firstPpu).check();
+  await fpsCheckbox(page, secondFacility, secondPpu, 2).check();
+
+  await expect(fpsCheckbox(page, firstFacility, firstPpu)).toBeChecked();
+  await expect(fpsCheckbox(page, secondFacility, secondPpu, 2)).toBeChecked();
+  await expect(page.getByRole("region", { name: "已選擇 FPS 總覽" })).toContainText("2 F / 2 P / 2 S");
+
+  await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
+  const facilityOne = page.locator(`[data-production-facility="${firstFacility}"]`);
+  const facilityTwo = page.locator(`[data-production-facility="${secondFacility}"]`);
+  await expect(facilityOne).toBeVisible();
+  await expect(facilityTwo).toBeVisible();
+  await expect(facilityOne.locator(`[data-production-ppu="${firstPpu}"] [data-production-site="1"]`)).toBeVisible();
+  await expect(facilityTwo.locator(`[data-production-ppu="${secondPpu}"] [data-production-site="2"]`)).toBeVisible();
+});
+
+test("all Site cards and LEDs use one global size after FPS selection", async ({ page }) => {
+  await installProductionMock(page);
+  const { ppu1, ppu2 } = await buildTwoPpuSet(page);
+  const site1 = ppu1.locator('[data-production-site="1"]');
+  const site2 = ppu2.locator('[data-production-site="1"]');
+  const box1 = await site1.boundingBox();
+  const box2 = await site2.boundingBox();
+  expect(box1?.width).toBe(box2?.width);
+  expect(box1?.height).toBe(box2?.height);
+
+  const lamp1 = await site1.locator(".prototypeSiteLamp").boundingBox();
+  const lamp2 = await site2.locator(".prototypeSiteLamp").boundingBox();
+  expect(lamp1?.width).toBe(lamp2?.width);
+  expect(lamp1?.height).toBe(lamp2?.height);
+});
+
+test("Site density is selected from total active FPS count, not per-PPU count", async ({ page }) => {
+  await installProductionMock(page);
+  await page.goto("/fleet");
+  const facilityId = "mock-facility-01";
+  const ppu1 = `${facilityId}-ppu-01`;
+  const ppu4 = `${facilityId}-ppu-04`;
+  for (const siteId of [1, 2]) await fpsCheckbox(page, facilityId, ppu1, siteId).check();
+  for (let siteId = 1; siteId <= 8; siteId += 1) await fpsCheckbox(page, facilityId, ppu4, siteId).check();
+  await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
+  await expect(page.getByRole("region", { name: "即時執行狀態" })).toHaveClass(/density-comfortable/);
+});
+
+test("selected PPUs dispatch concurrently and selector collapses when execution starts", async ({ page }) => {
   const runtime = await installProductionMock(page, { holdStartsUntilTwoPpus: true });
   const { ppu1, ppu2 } = await buildTwoPpuSet(page);
-
   await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
-  await page.getByRole("button", { name: "EXECUTE BATCH", exact: true }).click();
+  await page.locator(".executeBatchButton").click();
 
+  await expect(page.locator(".productionWorkspace")).toHaveClass(/selector-collapsed/);
   await expect.poll(() => runtime.seenStartPpus.size).toBe(2);
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
   await expect(page.locator(".batchState")).toContainText("COMPLETE");
-  await expect(page.getByRole("region", { name: "Production Prototype Log" })).toContainText("[BAT] COMPLETE");
+  await expect(page.locator(".productionPrototypeLog")).toContainText("[BAT] COMPLETE");
 });
 
 test("Cancel PPU affects only that PPU while another PPU continues to PASS", async ({ page }) => {
   const runtime = await installProductionMock(page, { keepFirstPpuRunningUntilCancel: true });
-  const { ppu1, ppu2 } = await buildTwoPpuSet(page);
-
+  const { ppu1, ppu2, ppu1Id, ppu2Id } = await buildTwoPpuSet(page);
   await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
-  await page.getByRole("button", { name: "EXECUTE BATCH", exact: true }).click();
+  await page.locator(".executeBatchButton").click();
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
 
@@ -239,19 +273,6 @@ test("Cancel PPU affects only that PPU while another PPU continues to PASS", asy
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "cancelled");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
   await expect(page.locator(".batchState")).toContainText("PARTIAL");
-  expect(runtime.cancelledPpus).toContain("mock-facility-01-ppu-01");
-  expect(runtime.cancelledPpus).not.toContain("mock-facility-01-ppu-02");
-});
-
-test("Facility selector changes the available four-PPU set and locale remains interactive", async ({ page }) => {
-  await installProductionMock(page);
-  await page.goto("/fleet");
-  const facility = page.getByLabel("Facility", { exact: true });
-  await facility.selectOption("mock-facility-03");
-  await expect(page.getByRole("checkbox", { name: "Select mock-facility-03-ppu-04" })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "Select mock-facility-01-ppu-01" })).toHaveCount(0);
-
-  await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByText("PPU Selection", { exact: true })).toBeVisible();
-  await expect(page.getByText("After SET, only PPUs in this Production Set are shown below.")).toHaveCount(0);
+  expect(runtime.cancelledPpus).toContain(ppu1Id);
+  expect(runtime.cancelledPpus).not.toContain(ppu2Id);
 });

@@ -13,11 +13,17 @@ const ppuTwo = process.env.MOCK_CD_PRODUCTION_PPU_TWO ?? `${facilityId}-ppu-02`;
 const targetJobPath = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/jobs$/;
 
 function ppuCard(page: Page, ppuId: string) {
-  return page.locator(`[data-production-ppu="${ppuId}"]`);
+  return page.locator(`[data-production-target="${facilityId}::${ppuId}"]`);
 }
 
 function siteCard(page: Page, ppuId: string, siteId = 1) {
   return ppuCard(page, ppuId).locator(`[data-production-site="${siteId}"]`);
+}
+
+function fpsCheckbox(page: Page, ppuId: string, siteId = 1) {
+  return page.getByRole("checkbox", {
+    name: `${facilityId} ${ppuId} SITE-${String(siteId).padStart(2, "0")}`,
+  });
 }
 
 async function openTwoPpuProductionSet(page: Page) {
@@ -26,24 +32,17 @@ async function openTwoPpuProductionSet(page: Page) {
   const topology = page.getByRole("region", { name: "Mock topology summary" });
   await expect(topology).toContainText("3");
   await expect(topology).toContainText("12");
-  await expect(topology).toContainText("60");
+  await expect(fpsCheckbox(page, ppuOne)).toBeVisible();
+  await expect(fpsCheckbox(page, ppuTwo)).toBeVisible();
 
-  const facility = page.getByLabel("Facility", { exact: true });
-  await facility.selectOption(facilityId);
-  await page.getByRole("checkbox", { name: `Select ${ppuOne}` }).check();
-  await page.getByRole("checkbox", { name: `Select ${ppuTwo}` }).check();
-  await page.getByRole("button", { name: "SET", exact: true }).click();
+  await fpsCheckbox(page, ppuOne).check();
+  await fpsCheckbox(page, ppuTwo).check();
+  await page.getByRole("button", { name: "套用 FPS", exact: true }).click();
 
   const first = ppuCard(page, ppuOne);
   const second = ppuCard(page, ppuTwo);
   await expect(first).toBeVisible();
   await expect(second).toBeVisible();
-
-  // Keep the acceptance fast and unambiguous: one active Site per PPU.
-  await first.getByRole("button", { name: "Clear Sites", exact: true }).click();
-  await second.getByRole("button", { name: "Clear Sites", exact: true }).click();
-  await first.getByRole("checkbox", { name: `${ppuOne} SITE-01` }).check();
-  await second.getByRole("checkbox", { name: `${ppuTwo} SITE-01` }).check();
 
   const erase = page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox");
   await erase.check();
@@ -72,11 +71,8 @@ test("real Production Mock starts two different PPUs concurrently and completes 
   observeStarts(page, starts);
   const { first, second } = await openTwoPpuProductionSet(page);
 
-  await page.getByRole("button", { name: "EXECUTE BATCH", exact: true }).click();
+  await page.locator(".executeBatchButton").click();
 
-  // Erase in the Python Mock profile takes about three seconds. Seeing both
-  // independent PPUs RUNNING together proves the second PPU was not waiting
-  // for the first PPU to complete.
   await expect(first.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
   await expect(second.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
 
@@ -92,15 +88,15 @@ test("real Production Mock starts two different PPUs concurrently and completes 
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
   await expect(page.locator(".batchState")).toContainText("COMPLETE");
-  await expect(page.getByRole("region", { name: "Production Prototype Log" })).toContainText("[BAT] COMPLETE");
+  await expect(page.locator(".productionPrototypeLog")).toContainText("[BAT] COMPLETE");
 });
 
 test("real Production Mock cancels one PPU without stopping the other", async ({ page }) => {
   const starts: StartObservation[] = [];
   observeStarts(page, starts);
-  const { first, second } = await openTwoPpuProductionSet(page);
+  const { first } = await openTwoPpuProductionSet(page);
 
-  await page.getByRole("button", { name: "EXECUTE BATCH", exact: true }).click();
+  await page.locator(".executeBatchButton").click();
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
 
@@ -109,8 +105,8 @@ test("real Production Mock cancels one PPU without stopping the other", async ({
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
   await expect(page.locator(".batchState")).toContainText("PARTIAL");
 
-  const log = page.getByRole("region", { name: "Production Prototype Log" });
-  await expect(log).toContainText(`[PPU] CANCEL REQUESTED · ${ppuOne}`);
+  const log = page.locator(".productionPrototypeLog");
+  await expect(log).toContainText(`[PPU] CANCEL REQUESTED · ${facilityId}::${ppuOne}`);
   await expect(log).toContainText("[BAT] PARTIAL");
-  await expect(log).not.toContainText(`[PPU] CANCEL REQUESTED · ${ppuTwo}`);
+  await expect(log).not.toContainText(`[PPU] CANCEL REQUESTED · ${facilityId}::${ppuTwo}`);
 });

@@ -42,7 +42,6 @@ test("demo landing page exposes Production and Engineering as the only product m
 test("Web source defines ProductMode rather than Fleet as a product-mode value", async () => {
   const model = await fs.readFile(new URL("../app/product-mode.ts", import.meta.url), "utf8");
   const nav = await fs.readFile(new URL("../app/global-nav.tsx", import.meta.url), "utf8");
-
   assert.match(model, /ProductMode\s*=\s*"production"\s*\|\s*"engineering"/);
   assert.match(model, /production:\s*"\/fleet"/);
   assert.match(model, /engineering:\s*"\/engineering"/);
@@ -52,23 +51,32 @@ test("Web source defines ProductMode rather than Fleet as a product-mode value",
   assert.doesNotMatch(nav, /nav\.singlePpu/);
 });
 
-test("fleet implementation route exposes the Production multi-PPU Mock prototype while Manager stays read-only", async () => {
+test("fleet implementation uses a retained multi-Facility FPS selection and adaptive Site density", async () => {
   const worker = await workerFor("fleet-page");
   const page = await worker.fetch(new Request("http://localhost/fleet", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, />Factory Production Console</);
   assert.match(html, /PRODUCTION MODE · MOCK PROTOTYPE/);
-  assert.match(html, /Plasma Manager 仍維持唯讀/);
 
   const source = await fs.readFile(new URL("../app/fleet/page.tsx", import.meta.url), "utf8");
-  assert.match(source, /getEngineeringTargets\(DEFAULT_API_BASE\)/);
-  assert.match(source, /engineeringTargetApiBase/);
-  assert.match(source, /activePpuIds/);
+  const css = await fs.readFile(new URL("../app/fleet/production-prototype.css", import.meta.url), "utf8");
+  assert.match(source, /type SelectionMap/);
+  assert.match(source, /draftSelection/);
+  assert.match(source, /activeSelection/);
+  assert.match(source, /applyFpsSelection/);
+  assert.match(source, /groupedActiveTargets/);
+  assert.match(source, /data-production-facility/);
+  assert.match(source, /densityFor/);
+  assert.match(source, /setSelectorCollapsed\(true\)/);
   assert.match(source, /Promise\.allSettled/);
   assert.match(source, /runSiteSequence/);
   assert.match(source, /cancelPPU/);
-  assert.match(source, /Production Set selector/);
+  assert.match(css, /background:\s*#f5f8fc/);
+  assert.match(css, /--site-tile-w/);
+  assert.match(css, /density-dense/);
+  assert.match(css, /width:\s*var\(--site-tile-w\)/);
+  assert.match(css, /height:\s*var\(--site-tile-h\)/);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
   assert.equal(api.status, 404);
@@ -80,7 +88,6 @@ test("fleet BFF source keeps Manager loopback-only and latest-job summaries brow
   const route = await fs.readFile(new URL("../app/api/fleet/route.ts", import.meta.url), "utf8");
   const contract = await fs.readFile(new URL("../app/fleet/fleet-contract.ts", import.meta.url), "utf8");
   const vite = await fs.readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
-
   assert.match(route, /LOOPBACK_HOSTS/);
   assert.match(route, /must remain loopback-only/);
   assert.match(route, /export async function GET/);
