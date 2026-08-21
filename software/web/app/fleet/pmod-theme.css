@@ -1,0 +1,270 @@
+/*
+ * Pmod semantic theme contract.
+ *
+ * Production Mode used to be authored as light-only CSS with a second set of
+ * [data-theme="dark"] overrides. That made the rendered result depend on route
+ * CSS ordering. These rules are intentionally theme-agnostic: every surface
+ * consumes the shared Plasma semantic variables, and only :root / data-theme
+ * owns the Light/Dark values.
+ *
+ * The extra html + page specificity makes this contract authoritative over the
+ * legacy prototype declarations while that stylesheet is gradually retired.
+ */
+html .productionPrototypePage {
+  --pmod-bg: var(--navy);
+  --pmod-panel: var(--panel);
+  --pmod-panel-soft: var(--panel-2);
+  --pmod-panel-muted: var(--panel-3);
+  --pmod-line: var(--line);
+  --pmod-line-strong: var(--line-strong);
+  --pmod-text: var(--text);
+  --pmod-text-soft: var(--text-soft);
+  --pmod-muted: var(--muted);
+  --pmod-shadow: var(--card-shadow);
+  --pmod-accent: #2563eb;
+  --pmod-accent-bright: #60a5fa;
+  --pmod-ready: #94a3b8;
+  --pmod-success: var(--green);
+  --pmod-warning: var(--amber);
+  --pmod-danger: var(--red);
+
+  background: var(--pmod-bg);
+  color: var(--pmod-text);
+}
+
+html .productionPrototypePage .productionPrototypeHeading h1,
+html .productionPrototypePage .prototypeProvider b,
+html .productionPrototypePage .fpsSelectorHead h2,
+html .productionPrototypePage .fpsSelectorActions b,
+html .productionPrototypePage .fpsFacilityRow b,
+html .productionPrototypePage .fpsPpuRow b,
+html .productionPrototypePage .prototypeTopologySummary b,
+html .productionPrototypePage .batchOperations > span,
+html .productionPrototypePage .productionImagePicker span b,
+html .productionPrototypePage .batchState b,
+html .productionPrototypePage .runtimeBoardHead h2,
+html .productionPrototypePage .facilityRuntimeIdentity h3,
+html .productionPrototypePage .productionPpuIdentity h4,
+html .productionPrototypePage .productionSitePrototype > b {
+  color: var(--pmod-text);
+}
+
+html .productionPrototypePage .productionPrototypeHeading > div:first-child > span,
+html .productionPrototypePage .prototypeProvider small,
+html .productionPrototypePage .prototypeNotice,
+html .productionPrototypePage .emptyProductionSet,
+html .productionPrototypePage .ppuLoading,
+html .productionPrototypePage .fpsSelectorHead span,
+html .productionPrototypePage .fpsSelectorActions div,
+html .productionPrototypePage .fpsFacilityRow small,
+html .productionPrototypePage .fpsPpuRow small,
+html .productionPrototypePage .prototypeTopologySummary small,
+html .productionPrototypePage .prototypeTopologySummary span,
+html .productionPrototypePage .productionImagePicker span small,
+html .productionPrototypePage .productionImagePicker em,
+html .productionPrototypePage .batchState small,
+html .productionPrototypePage .runtimeBoardHead > div:first-child span,
+html .productionPrototypePage .runtimeLegend,
+html .productionPrototypePage .facilityRuntimeGroup > header > span,
+html .productionPrototypePage .productionPpuIdentity small,
+html .productionPrototypePage .productionPpuMeta span,
+html .productionPrototypePage .productionSitePrototype > small,
+html .productionPrototypePage .productionPrototypeLog summary span,
+html .productionPrototypePage .prototypeLogRow > span,
+html .productionPrototypePage .prototypeEmptyLog {
+  color: var(--pmod-muted);
+}
+
+html .productionPrototypePage .prototypeProvider,
+html .productionPrototypePage .prototypeNotice,
+html .productionPrototypePage .emptyProductionSet,
+html .productionPrototypePage .ppuLoading,
+html .productionPrototypePage .fpsSelector,
+html .productionPrototypePage .prototypeTopologySummary article,
+html .productionPrototypePage .productionBatchToolbar,
+html .productionPrototypePage .productionRuntimeBoard,
+html .productionPrototypePage .productionPpuPrototype,
+html .productionPrototypePage .productionSitePrototype,
+html .productionPrototypePage .productionPrototypeLog {
+  border-color: var(--pmod-line);
+  background: var(--pmod-panel);
+  box-shadow: 0 7px 24px var(--pmod-shadow);
+}
+
+html .productionPrototypePage .fpsSelectorCollapse,
+html .productionPrototypePage .fpsSelectorHead button,
+html .productionPrototypePage .fpsSelectorActions button,
+html .productionPrototypePage .batchOperations label,
+html .productionPrototypePage .batchState,
+html .productionPrototypePage .cancelBatchButton,
+html .productionPrototypePage .cancelPpuButton,
+html .productionPrototypePage .productionPrototypeLog button {
+  border-color: var(--pmod-line-strong);
+  background: var(--pmod-panel-soft);
+  color: var(--pmod-text-soft);
+}
+
+html .productionPrototypePage .fpsSelectorActions,
+html .productionPrototypePage .runtimeBoardHead,
+html .productionPrototypePage .productionPpuPrototype > header,
+html .productionPrototypePage .prototypeLogBody {
+  border-color: var(--pmod-line);
+  background: var(--pmod-panel-soft);
+}
+
+html .productionPrototypePage .fpsSelectorHead,
+html .productionPrototypePage .productionPrototypeLog > header,
+html .productionPrototypePage .prototypeLogRow {
+  border-color: var(--pmod-line);
+}
+
+html .productionPrototypePage .fpsFacilityNode,
+html .productionPrototypePage .facilityRuntimeGroup {
+  border-color: var(--pmod-line);
+  background: var(--pmod-panel-soft);
+}
+
+html .productionPrototypePage .fpsFacilityRow,
+html .productionPrototypePage .facilityRuntimeGroup > header {
+  border-color: var(--pmod-line);
+  background: color-mix(in srgb, var(--pmod-accent) 7%, var(--pmod-panel-soft));
+}
+
+html .productionPrototypePage .fpsPpuNode {
+  border-left-color: color-mix(in srgb, var(--pmod-accent) 42%, var(--pmod-line));
+}
+
+html .productionPrototypePage .fpsSiteChoiceGrid label {
+  border-color: var(--pmod-line);
+  background: var(--pmod-panel);
+  color: var(--pmod-text-soft);
+}
+
+html .productionPrototypePage .fpsSiteChoiceGrid label.selected {
+  border-color: color-mix(in srgb, var(--pmod-accent) 65%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-accent) 12%, var(--pmod-panel));
+  color: var(--pmod-accent-bright);
+}
+
+html .productionPrototypePage .productionBrowseButton {
+  border-color: color-mix(in srgb, var(--pmod-accent) 58%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-accent) 10%, var(--pmod-panel));
+  color: var(--pmod-accent-bright);
+}
+
+html .productionPrototypePage .productionBrowseButton:hover:not(:disabled) {
+  border-color: var(--pmod-accent-bright);
+  background: color-mix(in srgb, var(--pmod-accent) 18%, var(--pmod-panel));
+}
+
+html .productionPrototypePage .batchOperations label b,
+html .productionPrototypePage .prototypeLogRow > b {
+  color: var(--pmod-accent-bright);
+}
+
+html .productionPrototypePage .executeBatchButton,
+html .productionPrototypePage .fpsSelectorActions .confirmFpsButton {
+  border-color: var(--pmod-accent);
+  background: var(--pmod-accent);
+  color: #fff;
+}
+
+html .productionPrototypePage .cancelBatchButton,
+html .productionPrototypePage .cancelPpuButton,
+html .productionPrototypePage .fpsSelectorActions .cancelDraftButton {
+  border-color: color-mix(in srgb, var(--pmod-danger) 55%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-danger) 7%, var(--pmod-panel));
+  color: var(--pmod-danger);
+}
+
+html .productionPrototypePage .batchState.batch-running,
+html .productionPrototypePage .batchState.batch-cancelling {
+  border-color: color-mix(in srgb, var(--pmod-warning) 70%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-warning) 10%, var(--pmod-panel));
+}
+
+html .productionPrototypePage .batchState.batch-complete {
+  border-color: color-mix(in srgb, var(--pmod-success) 70%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-success) 10%, var(--pmod-panel));
+}
+
+html .productionPrototypePage .batchState.batch-partial {
+  border-color: color-mix(in srgb, var(--pmod-warning) 70%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-warning) 8%, var(--pmod-panel));
+}
+
+html .productionPrototypePage .productionPpuPrototype.ppu-running,
+html .productionPrototypePage .productionSitePrototype.site-running {
+  border-color: color-mix(in srgb, var(--pmod-accent-bright) 72%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-accent) 9%, var(--pmod-panel));
+}
+
+html .productionPrototypePage .productionPpuPrototype.ppu-success,
+html .productionPrototypePage .productionSitePrototype.site-success {
+  border-color: color-mix(in srgb, var(--pmod-success) 62%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-success) 8%, var(--pmod-panel));
+}
+
+html .productionPrototypePage .productionPpuPrototype.ppu-failed,
+html .productionPrototypePage .productionSitePrototype.site-failed {
+  border-color: color-mix(in srgb, var(--pmod-danger) 68%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-danger) 8%, var(--pmod-panel));
+}
+
+html .productionPrototypePage .productionPpuPrototype.ppu-cancelled,
+html .productionPrototypePage .productionPpuPrototype.ppu-partial,
+html .productionPrototypePage .productionSitePrototype.site-cancelled {
+  border-color: var(--pmod-line-strong);
+  background: var(--pmod-panel-soft);
+}
+
+html .productionPrototypePage .prototypeSiteLamp {
+  background: color-mix(in srgb, var(--pmod-line-strong) 72%, var(--pmod-panel));
+  box-shadow: inset 0 -2px 4px color-mix(in srgb, #000 30%, transparent);
+}
+
+html .productionPrototypePage .productionSitePrototype > strong {
+  color: var(--pmod-success);
+}
+
+html .productionPrototypePage .productionSitePrototype.site-running > strong {
+  color: var(--pmod-accent-bright);
+}
+
+html .productionPrototypePage .productionSitePrototype.site-failed > strong {
+  color: var(--pmod-danger);
+}
+
+html .productionPrototypePage .productionSitePrototype.site-cancelled > strong {
+  color: var(--pmod-muted);
+}
+
+html .productionPrototypePage .productionPpuMeta b,
+html .productionPrototypePage .runtimeSummary b {
+  color: var(--pmod-success);
+}
+
+html .productionPrototypePage .productionOperationWarning {
+  border-color: color-mix(in srgb, var(--pmod-warning) 68%, var(--pmod-line));
+  background: color-mix(in srgb, var(--pmod-warning) 10%, var(--pmod-panel));
+  color: var(--pmod-warning);
+}
+
+html .productionPrototypePage .productionOperationWarning button {
+  border-color: color-mix(in srgb, var(--pmod-warning) 60%, var(--pmod-line));
+  background: var(--pmod-panel-soft);
+  color: var(--pmod-warning);
+}
+
+html .productionPrototypePage .productionPrototypeLog summary,
+html .productionPrototypePage .prototypeLogRow code {
+  color: var(--pmod-text-soft);
+}
+
+html .productionPrototypePage .prototypeLogRow.level-warn > b {
+  color: var(--pmod-warning);
+}
+
+html .productionPrototypePage .prototypeLogRow.level-error > b {
+  color: var(--pmod-danger);
+}
