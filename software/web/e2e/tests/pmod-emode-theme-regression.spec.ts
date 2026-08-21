@@ -125,13 +125,18 @@ test("Pmod dark theme covers operator surfaces and keeps Programming Image befor
 test("Emode dark target dropdown and image Browse control follow the dark operator palette", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
-  await page.getByRole("group", { name: "Theme" }).getByRole("button", { name: "Dark", exact: true }).click();
-  await page.goto("/engineering");
+  const theme = page.getByRole("group", { name: "Theme" });
+  const darkButton = theme.getByRole("button", { name: "Dark", exact: true });
+  await darkButton.click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(darkButton).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("plasma-theme"))).toBe("dark");
 
+  await page.goto("/engineering");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.locator(".engineeringWorkspace nav button").nth(2).click();
   const ppuSelect = page.getByLabel("Engineering PPU", { exact: true });
   await expect(ppuSelect).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
   const selectStyle = await ppuSelect.evaluate(element => {
     const style = getComputedStyle(element);
