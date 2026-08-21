@@ -275,7 +275,7 @@ test("Site density is selected from total active FPS count, not per-PPU count", 
   for (const siteId of [1, 2]) await fpsCheckbox(page, facilityId, ppu1, siteId).check();
   for (let siteId = 1; siteId <= 8; siteId += 1) await fpsCheckbox(page, facilityId, ppu4, siteId).check();
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
-  await expect(page.getByRole("region", { name: "即時執行狀態" })).toHaveClass(/density-comfortable/);
+  await expect(page.getByRole("region", { name: "Active FPS : 即時執行狀態", exact: true })).toHaveClass(/density-comfortable/);
 });
 
 test("running Site shows a blinking LED, operation text and progress", async ({ page }) => {
@@ -296,13 +296,14 @@ test("running Site shows a blinking LED, operation text and progress", async ({ 
   await expect(site).toHaveAttribute("data-site-state", "cancelled");
 });
 
-test("selected PPUs dispatch concurrently and selector collapses when execution starts", async ({ page }) => {
+test("selected PPUs dispatch concurrently and selector remains expanded when execution starts", async ({ page }) => {
   const runtime = await installProductionMock(page, { holdStartsUntilTwoPpus: true });
   const { ppu1, ppu2 } = await buildTwoPpuSet(page);
   await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
   await page.locator(".executeBatchButton").click();
 
-  await expect(page.locator(".productionWorkspace")).toHaveClass(/selector-collapsed/);
+  await expect(page.locator(".productionWorkspace")).not.toHaveClass(/selector-collapsed/);
+  await expect(page.getByRole("button", { name: "收起選擇器", exact: true })).toBeVisible();
   await expect.poll(() => runtime.seenStartPpus.size).toBe(2);
   await expect(ppu1.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
   await expect(ppu2.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "success");
