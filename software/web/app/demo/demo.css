@@ -18,10 +18,6 @@
 .demoCardHead b { color: var(--muted); font: 10px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
 .demoCard h2 { margin: 26px 0 9px; font-size: 24px; }
 .demoCard p { margin: 0; color: var(--text-soft); font-size: 12px; line-height: 1.75; }
-.demoCard dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 22px 0; }
-.demoCard dl div { border: 1px solid var(--line); border-radius: 7px; background: var(--panel-3); padding: 9px 10px; }
-.demoCard dt { color: var(--muted); font: 8px var(--font-mono); text-transform: uppercase; }
-.demoCard dd { margin: 4px 0 0; font: 700 11px var(--font-mono); }
 .demoCard strong { margin-top: auto; color: var(--cyan); font-size: 12px; }
 .demoBoundary { display: flex; justify-content: space-between; gap: 16px; margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 11px 13px; font-size: 10px; }
 .demoBoundary b { color: var(--text); }
