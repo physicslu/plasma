@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import threading
 import time
@@ -77,6 +79,44 @@ class BatchWebGatewayTests(unittest.TestCase):
         self.assertEqual(final["execution_policy"]["repeat_count"], 3)
         self.assertEqual(final["execution_policy"]["site_retry_limit"], 2)
         self.assertEqual(final["site_counts"]["success"], 2)
+
+    def test_program_batch_accepts_one_asset_snapshot(self):
+        image = b"batch-rest-image" * 16
+        digest = hashlib.sha256(image).hexdigest()
+        status, payload = self.request(
+            "POST",
+            "/api/batches",
+            {
+                "session_id": "1" * 32,
+                "targets": [
+                    {"facility_id": "facility-1", "ppu_id": "ppu-1", "site_ids": [1, 2]},
+                ],
+                "operations": ["program", "verify"],
+                "execution_policy": {
+                    "repeat_count": 2,
+                    "site_retry_limit": 1,
+                    "failed_site_stop_threshold": None,
+                },
+                "asset": {
+                    "asset_name": "batch.bin",
+                    "asset_type": "image",
+                    "asset_format": "binary",
+                    "asset_size": len(image),
+                    "asset_sha256": digest,
+                    "asset_base64": base64.b64encode(image).decode(),
+                },
+            },
+        )
+        self.assertEqual(status, 202)
+        batch_id = payload["batch"]["batch_id"]
+        final = self.wait_terminal(batch_id)
+        self.assertEqual(final["state"], "success")
+        self.assertEqual(final["asset"]["sha256"], digest)
+        self.assertEqual(final["asset"]["size_bytes"], len(image))
+        self.assertEqual(final["operation_statistics"]["program"]["logical_executions"], 4)
+        self.assertEqual(final["operation_statistics"]["verify"]["logical_executions"], 4)
+        cached = [entry for entry in self.provider.cache_log if entry[2] == digest]
+        self.assertEqual(len(cached), 1)
 
     def test_threshold_cannot_exceed_selected_sites(self):
         status, payload = self.request(
