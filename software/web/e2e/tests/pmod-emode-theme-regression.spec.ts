@@ -129,7 +129,7 @@ test("Emode dark target dropdown and image Browse control follow the dark operat
   await page.goto("/engineering");
 
   await page.locator(".engineeringWorkspace nav button").nth(2).click();
-  const ppuSelect = page.getByLabel("Engineering PPU");
+  const ppuSelect = page.getByLabel("Engineering PPU", { exact: true });
   await expect(ppuSelect).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
