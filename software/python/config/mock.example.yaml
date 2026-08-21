@@ -3,6 +3,10 @@ revision: 1
 enabled: true
 default_image_size_bytes: 262144
 
+seed:
+  mode: auto
+  fixed_seed: null
+
 operations:
   erase:
     error_rate_per_mille: 1

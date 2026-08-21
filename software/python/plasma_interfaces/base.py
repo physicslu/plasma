@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from plasma_core.errors import ErrorCode, PlasmaError
 
 if TYPE_CHECKING:
-    from plasma_core.models import ExecutionImageRef
+    from plasma_core.models import ExecutionImageRef, JobRequest
 
 
 ProgressCallback = Callable[[int, int], Awaitable[None]]
@@ -15,6 +15,15 @@ ProgressCallback = Callable[[int, int], Awaitable[None]]
 
 class BaseInterface(ABC):
     """Hardware boundary. One instance belongs to exactly one Programming Site."""
+
+    def prepare_request(self, request: "JobRequest") -> None:
+        """Prepare one handler attempt for a Job.
+
+        Handlers invoke this hook every time an attempt enters the hardware
+        boundary. Real interfaces normally need no preparation. MockInterface
+        uses it to bind the immutable Mock runtime snapshot and advance the
+        deterministic attempt number without coupling SiteWorker to Mock.
+        """
 
     @abstractmethod
     async def erase(self, progress: ProgressCallback | None = None) -> None:

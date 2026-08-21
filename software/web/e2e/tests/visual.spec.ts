@@ -238,6 +238,8 @@ test.describe("maximized desktop visual regression", () => {
     await page.getByLabel("取消批次工作").click();
     await expect.poll(() => mock.cancelRequests.length).toBe(2);
     await expect(batchSummary(page)).toContainText("取消 2");
+    await expect(page.getByLabel("取消 SITE 1 工作")).toBeDisabled();
+    await expect(page.getByLabel("取消 SITE 2 工作")).toBeDisabled();
     await expectVisual(page, "desktop-max-batch-cancelled.webp");
   });
 

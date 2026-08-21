@@ -3,7 +3,31 @@ import { expect, test, type Page, type Request } from "@playwright/test";
 const facilityId = process.env.MOCK_CD_PRODUCTION_FACILITY_ID ?? "mock-facility-01";
 const ppuOne = process.env.MOCK_CD_PRODUCTION_PPU_ONE ?? `${facilityId}-ppu-01`;
 const ppuTwo = process.env.MOCK_CD_PRODUCTION_PPU_TWO ?? `${facilityId}-ppu-02`;
+const gateway = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
 const browserJobPath = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/jobs$/;
+
+type RuntimeOperationSettings = {
+  error_rate_per_mille: number;
+  base_time_ms: number;
+  throughput_bytes_per_second: number;
+  jitter_ms: number;
+};
+
+type RuntimeSettings = {
+  enabled: boolean;
+  default_image_size_bytes: number;
+  operations: Record<"erase" | "program" | "verify" | "read", RuntimeOperationSettings>;
+  seed: { mode: "auto" | "fixed"; fixed_seed: number | null };
+};
+
+function editableRuntime(settings: RuntimeSettings) {
+  return {
+    enabled: settings.enabled,
+    default_image_size_bytes: settings.default_image_size_bytes,
+    operations: settings.operations,
+    seed: settings.seed,
+  };
+}
 
 function ppuCard(page: Page, ppuId: string) {
   return page.locator(`[data-production-target="${facilityId}::${ppuId}"]`);
@@ -135,20 +159,45 @@ test("real Production Mock shares one Programming Asset across two PPUs for Eras
   expect(ownership.browserJobPosts()).toBe(0);
 });
 
-test("real Production Mock cancels one PPU through Batch endpoint without stopping the other", async ({ page }) => {
-  const ownership = observeBrowserOwnership(page);
-  const { first } = await openTwoPpuProductionSet(page);
+test("real Production Mock cancels one PPU through Batch endpoint without stopping the other", async ({ page, request }) => {
+  const runtimeResponse = await request.get(`${gateway}/api/mock/runtime`);
+  expect(runtimeResponse.ok()).toBeTruthy();
+  const runtimePayload = await runtimeResponse.json();
+  const original = runtimePayload.mock_runtime as RuntimeSettings;
+  const slowed = {
+    ...editableRuntime(original),
+    operations: {
+      ...original.operations,
+      erase: {
+        ...original.operations.erase,
+        error_rate_per_mille: 0,
+        base_time_ms: 800,
+        jitter_ms: 0,
+      },
+    },
+  };
 
-  await page.locator(".executeBatchButton").click();
-  await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
-  await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
+  const updateResponse = await request.post(`${gateway}/api/mock/runtime`, { data: slowed });
+  expect(updateResponse.ok()).toBeTruthy();
 
-  await first.getByRole("button", { name: "Cancel PPU", exact: true }).click();
-  await expect.poll(() => ownership.batchPpuCancels, { timeout: 5_000 }).toContain(ppuOne);
-  await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
-  await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
-  await expect(page.locator(".serverBatchStatistics")).toHaveAttribute("data-batch-state", "partial");
+  try {
+    const ownership = observeBrowserOwnership(page);
+    const { first } = await openTwoPpuProductionSet(page);
 
-  expect(ownership.batchPpuCancels).not.toContain(ppuTwo);
-  expect(ownership.browserJobPosts()).toBe(0);
+    await page.locator(".executeBatchButton").click();
+    await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
+    await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
+
+    await first.getByRole("button", { name: "Cancel PPU", exact: true }).click();
+    await expect.poll(() => ownership.batchPpuCancels, { timeout: 5_000 }).toContain(ppuOne);
+    await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
+    await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
+    await expect(page.locator(".serverBatchStatistics")).toHaveAttribute("data-batch-state", "partial");
+
+    expect(ownership.batchPpuCancels).not.toContain(ppuTwo);
+    expect(ownership.browserJobPosts()).toBe(0);
+  } finally {
+    const restoreResponse = await request.post(`${gateway}/api/mock/runtime`, { data: editableRuntime(original) });
+    expect(restoreResponse.ok()).toBeTruthy();
+  }
 });
