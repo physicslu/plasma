@@ -1,30 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "plasma-theme";
+const THEME_CHANGE_EVENT = "plasma-theme-change";
+
+function readTheme(): Theme {
+  return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+}
+
+function subscribeTheme(onStoreChange: () => void): () => void {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === THEME_STORAGE_KEY) onStoreChange();
+  };
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(THEME_CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(THEME_CHANGE_EVENT, onStoreChange);
+  };
+}
 
 function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.colorScheme = theme;
-  window.localStorage.setItem(THEME_STORAGE_KEY, theme);
 }
 
 export default function ThemeSwitch({ className = "" }: { className?: string }) {
-  const [theme, setTheme] = useState<Theme>("light");
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "light");
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const restored: Theme = saved === "dark" ? "dark" : "light";
-    setTheme(restored);
-    applyTheme(restored);
-  }, []);
+    applyTheme(theme);
+  }, [theme]);
 
   function selectTheme(next: Theme) {
-    setTheme(next);
+    window.localStorage.setItem(THEME_STORAGE_KEY, next);
     applyTheme(next);
+    window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
   }
 
   return (
