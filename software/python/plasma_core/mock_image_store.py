@@ -7,6 +7,7 @@ import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Iterator
 
 from .errors import ErrorCode, PlasmaError
@@ -71,9 +72,8 @@ class SharedImageStore:
                 handle.write(data)
                 handle.flush()
                 os.fsync(handle.fileno())
-            # os.replace is atomic on one filesystem. Concurrent writers of the
-            # same content may both reach this point; the final bytes are
-            # identical because the path is content-addressed.
+            # Atomic on one filesystem. Concurrent writers of the same digest
+            # can safely race because the destination content is identical.
             os.replace(temporary, destination)
         finally:
             if temporary.exists():
@@ -121,3 +121,28 @@ class SharedImageStore:
                 yield mapped
             finally:
                 mapped.close()
+
+
+_DEFAULT_STORE: SharedImageStore | None = None
+_DEFAULT_STORE_LOCK = Lock()
+
+
+def default_mock_image_store() -> SharedImageStore:
+    """Return the process-wide Phase-1 Mock image store.
+
+    `PLASMA_MOCK_BLOB_ROOT` may pin a deployment-specific directory. Without it,
+    each process receives one temporary content-addressed store, which is enough
+    to remove per-Site Flash copies while keeping persistence/GC policy out of
+    the foundation phase.
+    """
+    global _DEFAULT_STORE
+    with _DEFAULT_STORE_LOCK:
+        if _DEFAULT_STORE is None:
+            configured = os.environ.get("PLASMA_MOCK_BLOB_ROOT")
+            root = (
+                Path(configured).expanduser()
+                if configured
+                else Path(tempfile.gettempdir()) / f"plasma-mock-{os.getpid()}" / "blobs"
+            )
+            _DEFAULT_STORE = SharedImageStore(root)
+        return _DEFAULT_STORE
