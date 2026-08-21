@@ -4,6 +4,7 @@ const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
 
 type MutableJobState = "running" | "cancelled" | "success";
+type MutableBatchState = "running" | "stopping" | "cancelled" | "success";
 
 function catalog() {
   return {
@@ -72,11 +73,82 @@ function jobPayload(jobId: string, state: "queued" | MutableJobState, cancelRequ
   };
 }
 
+function batchPayload(state: "queued" | MutableBatchState, cancelRequested = false) {
+  const siteState = state === "cancelled" ? "cancelled" : state === "success" ? "success" : "running";
+  const terminal = state === "cancelled" || state === "success";
+  const counts = {
+    ready: 0,
+    running: terminal ? 0 : 1,
+    success: state === "success" ? 1 : 0,
+    faulted: 0,
+    error: 0,
+    stopped: 0,
+    cancelled: state === "cancelled" ? 1 : 0,
+  };
+  return {
+    ok: true,
+    rest_contract_version: "3",
+    batch: {
+      batch_id: "batch-mode-guard",
+      state,
+      created_at: "2026-08-21T00:00:00Z",
+      started_at: state === "queued" ? null : "2026-08-21T00:00:00Z",
+      finished_at: terminal ? "2026-08-21T00:00:01Z" : null,
+      operations: ["erase"],
+      execution_policy: { repeat_count: 1, site_retry_limit: 0, failed_site_stop_threshold: null },
+      asset: null,
+      read: { offset: 0, length: 256 },
+      cancel_requested: cancelRequested,
+      stop_reason: cancelRequested ? "operator_cancel" : null,
+      error: null,
+      faulted_site_count: 0,
+      site_counts: counts,
+      operation_statistics: {
+        erase: {
+          logical_executions: 1,
+          attempts: 1,
+          retries: 0,
+          successful_executions: state === "success" ? 1 : 0,
+          failed_executions: 0,
+          error_executions: 0,
+          cancelled_executions: state === "cancelled" ? 1 : 0,
+          failed_attempts: 0,
+          error_attempts: 0,
+          cancelled_attempts: state === "cancelled" ? 1 : 0,
+          attempt_failure_rate: 0,
+        },
+      },
+      sites: [{
+        facility_id: facilityId,
+        ppu_id: ppuId,
+        site_id: 1,
+        key: `${facilityId}::${ppuId}::SITE1`,
+        state: siteState,
+        current_round: terminal ? 1 : 1,
+        completed_rounds: state === "success" ? 1 : 0,
+        current_operation: terminal ? null : "erase",
+        current_job_id: terminal ? null : "batch-owned-job",
+        progress_percent: terminal ? 100 : 45,
+        total_attempts: 1,
+        retry_count: 0,
+        final_failures: 0,
+        faulted_round: null,
+        faulted_operation: null,
+        last_failure_source: null,
+        error: null,
+        operation_statistics: {},
+      }],
+    },
+  };
+}
+
 async function installExecutionApi(page: Page) {
   let jobState: MutableJobState = "running";
-  let cancelRequested = false;
+  let jobCancelRequested = false;
   let jobCounter = 0;
   let activeJobId = "";
+  let batchState: MutableBatchState = "running";
+  let batchCancelRequested = false;
 
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
@@ -118,50 +190,62 @@ async function installExecutionApi(page: Page) {
     if (request.method() === "POST" && tail === "jobs") {
       jobCounter += 1;
       activeJobId = `guard-job-${jobCounter}`;
-      cancelRequested = false;
+      jobCancelRequested = false;
       jobState = "running";
-      await route.fulfill({
-        status: 202,
-        contentType: "application/json",
-        body: JSON.stringify(jobPayload(activeJobId, "queued")),
-      });
+      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify(jobPayload(activeJobId, "queued")) });
       return;
     }
 
     if (request.method() === "GET" && tail === "status" && url.searchParams.has("job")) {
       const jobId = url.searchParams.get("job") ?? activeJobId;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(jobPayload(jobId, jobState, cancelRequested)),
-      });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(jobPayload(jobId, jobState, jobCancelRequested)) });
       return;
     }
 
     const cancelMatch = /^jobs\/([^/]+)\/cancel$/.exec(tail);
     if (request.method() === "POST" && cancelMatch) {
-      cancelRequested = true;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, job: { job_id: cancelMatch[1], cancel_requested: true } }),
-      });
+      jobCancelRequested = true;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, job: { job_id: cancelMatch[1], cancel_requested: true } }) });
       return;
     }
 
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
   });
 
+  await page.route("**/api/batches**", async (route: Route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/batches" && request.method() === "POST") {
+      batchState = "running";
+      batchCancelRequested = false;
+      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify(batchPayload("queued")) });
+      return;
+    }
+    if (path === "/api/batches/batch-mode-guard" && request.method() === "GET") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(batchPayload(batchState, batchCancelRequested)) });
+      return;
+    }
+    if (path === "/api/batches/batch-mode-guard/cancel" && request.method() === "POST") {
+      batchCancelRequested = true;
+      batchState = "stopping";
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(batchPayload("stopping", true)) });
+      return;
+    }
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "missing batch" } }) });
+  });
+
   return {
-    finish(state: "cancelled" | "success") { jobState = state; },
-    get cancelRequested() { return cancelRequested; },
+    finishBatch(state: "cancelled" | "success") { batchState = state; },
+    finishJob(state: "cancelled" | "success") { jobState = state; },
+    get batchCancelRequested() { return batchCancelRequested; },
+    get jobCancelRequested() { return jobCancelRequested; },
   };
 }
 
 async function expectModeLocked(page: Page, linkName: string) {
   const link = page.getByRole("link", { name: linkName, exact: true });
   await expect(link).toHaveAttribute("aria-disabled", "true");
-  await expect(page.locator(".globalExecutionGuard")).toContainText("PPU BUSY · 1 JOB");
+  await expect(page.locator(".globalExecutionGuard")).toContainText("EXECUTION BUSY · 1");
   const before = page.url();
   await link.click({ force: true });
   await expect.poll(() => page.url()).toBe(before);
@@ -173,7 +257,7 @@ async function expectModeUnlocked(page: Page, linkName: string) {
   await expect(page.locator(".globalExecutionGuard")).toHaveCount(0);
 }
 
-test("Pmod batch execution locks Emode through running and cancelling until terminal", async ({ page }) => {
+test("Pmod server Batch locks Emode through running and stopping until terminal", async ({ page }) => {
   const api = await installExecutionApi(page);
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
@@ -189,14 +273,14 @@ test("Pmod batch execution locks Emode through running and cancelling until term
 
   await expectModeLocked(page, "工程模式");
   await toolbar.locator(".cancelBatchButton").click();
-  await expect.poll(() => api.cancelRequested).toBe(true);
+  await expect.poll(() => api.batchCancelRequested).toBe(true);
   await expectModeLocked(page, "工程模式");
 
-  api.finish("cancelled");
+  api.finishBatch("cancelled");
   await expectModeUnlocked(page, "工程模式");
 });
 
-test("Emode single-Site PPU action locks Pmod through cancel until terminal", async ({ page }) => {
+test("Emode single-Site PPU action still locks Pmod through cancel until terminal", async ({ page }) => {
   const api = await installExecutionApi(page);
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
@@ -207,9 +291,9 @@ test("Emode single-Site PPU action locks Pmod through cancel until terminal", as
   await expectModeLocked(page, "量產模式");
 
   await page.getByRole("button", { name: "Cancel SITE 1", exact: true }).click();
-  await expect.poll(() => api.cancelRequested).toBe(true);
+  await expect.poll(() => api.jobCancelRequested).toBe(true);
   await expectModeLocked(page, "量產模式");
 
-  api.finish("cancelled");
+  api.finishJob("cancelled");
   await expectModeUnlocked(page, "量產模式");
 });
