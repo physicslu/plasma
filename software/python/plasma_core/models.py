@@ -10,10 +10,13 @@ from typing import Any
 
 from .enums import JobState, Operation
 from .errors import ErrorCode, PlasmaError, error_name
+from .failure_policy import failure_source
 
 
 PROTOCOL_VERSION = "3.3"
 JOB_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+LOCAL_MOCK_BLOB_SCHEME = "local_mock_blob"
 RESERVED_METADATA_KEYS = frozenset(
     {
         "protocol_version",
@@ -28,6 +31,7 @@ RESERVED_METADATA_KEYS = frozenset(
         "target",
         "image_size",
         "image_sha256",
+        "execution_image_ref",
         "wait_for_completion",
     }
 )
@@ -61,12 +65,70 @@ def validate_site_id(site_id: int) -> int:
     return site_id
 
 
+@dataclass(frozen=True, slots=True)
+class ExecutionImageRef:
+    """Reference to an immutable execution image already available to a PPU runtime.
+
+    Phase 1 supports only ``local_mock_blob``. The contract carries a content
+    identity and size, never a filesystem path. Real PPUs may continue using
+    inline Protocol v3.3 binary without implementing this optional capability.
+    """
+
+    scheme: str
+    sha256: str
+    size_bytes: int
+
+    def __post_init__(self) -> None:
+        if self.scheme != LOCAL_MOCK_BLOB_SCHEME:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"unsupported execution image reference scheme: {self.scheme!r}",
+            )
+        if not isinstance(self.sha256, str) or SHA256_PATTERN.fullmatch(self.sha256) is None:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "invalid execution image reference SHA-256")
+        if (
+            isinstance(self.size_bytes, bool)
+            or not isinstance(self.size_bytes, int)
+            or self.size_bytes <= 0
+        ):
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "execution image reference size_bytes must be a positive integer",
+            )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "scheme": self.scheme,
+            "sha256": self.sha256,
+            "size_bytes": self.size_bytes,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "ExecutionImageRef":
+        if not isinstance(value, dict):
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "execution_image_ref must be an object")
+        unknown = sorted(set(value) - {"scheme", "sha256", "size_bytes"})
+        missing = sorted({"scheme", "sha256", "size_bytes"} - set(value))
+        if unknown or missing:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "execution_image_ref has invalid fields",
+                context={"unknown_fields": unknown, "missing_fields": missing},
+            )
+        return cls(
+            scheme=str(value["scheme"]),
+            sha256=str(value["sha256"]),
+            size_bytes=value["size_bytes"],
+        )
+
+
 @dataclass(slots=True)
 class ErrorDetail:
     error_code: str
     error_type: str
     message: str
     recoverable: bool
+    failure_source: str | None = None
     timestamp: str = field(default_factory=iso_now)
     site_id: int | None = None
     job_id: str | None = None
@@ -91,6 +153,7 @@ class ErrorDetail:
             error_type=error.error_type,
             message=error.message,
             recoverable=error.recoverable,
+            failure_source=failure_source(error),
             site_id=resolved_site,
             job_id=job_id,
             operation=operation.value if isinstance(operation, Operation) else operation,
@@ -105,11 +168,30 @@ class ErrorDetail:
         return data
 
 
+@dataclass(slots=True)
+class JobAttemptResult:
+    attempt: int
+    state: JobState
+    started_at: str
+    finished_at: str
+    elapsed_ms: int
+    retry_scheduled: bool = False
+    error: ErrorDetail | None = None
+
+    def to_dict(self, protocol_version: str = PROTOCOL_VERSION) -> dict[str, Any]:
+        data = asdict(self)
+        data["state"] = self.state.value
+        if self.error is not None:
+            data["error"] = self.error.to_dict(protocol_version)
+        return data
+
+
 @dataclass(slots=True, init=False)
 class JobRequest:
     site_id: int
     operation: Operation
     image: bytes
+    image_ref: ExecutionImageRef | None
     map_data: dict[str, Any]
     job_id: str
     timeout_s: float
@@ -124,6 +206,7 @@ class JobRequest:
         site_id: int,
         operation: Operation,
         image: bytes = b"",
+        image_ref: ExecutionImageRef | None = None,
         map_data: dict[str, Any] | None = None,
         job_id: str | None = None,
         timeout_s: float = 30.0,
@@ -136,6 +219,7 @@ class JobRequest:
         self.site_id = validate_site_id(site_id)
         self.operation = operation
         self.image = image
+        self.image_ref = image_ref
         self.map_data = dict(map_data or {})
         self.job_id = job_id or new_job_id()
         self.timeout_s = timeout_s
@@ -153,6 +237,13 @@ class JobRequest:
         validate_job_id(self.job_id)
         if not isinstance(self.image, bytes):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "image must be bytes")
+        if self.image_ref is not None and not isinstance(self.image_ref, ExecutionImageRef):
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "image_ref must be an ExecutionImageRef")
+        if self.image and self.image_ref is not None:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "inline image and execution image reference are mutually exclusive",
+            )
         if not isinstance(self.map_data, dict):
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "map_data must be an object")
         if not isinstance(self.metadata, dict):
@@ -186,7 +277,17 @@ class JobRequest:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "target must be 1-256 characters")
 
     @property
+    def image_size(self) -> int:
+        return self.image_ref.size_bytes if self.image_ref is not None else len(self.image)
+
+    @property
+    def has_image(self) -> bool:
+        return self.image_ref is not None or bool(self.image)
+
+    @property
     def image_sha256(self) -> str:
+        if self.image_ref is not None:
+            return self.image_ref.sha256
         return hashlib.sha256(self.image).hexdigest()
 
     def protocol_metadata(self, protocol_version: str = PROTOCOL_VERSION) -> dict[str, Any]:
@@ -196,7 +297,7 @@ class JobRequest:
                 ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
                 f"unsupported protocol version: {protocol_version!r}",
             )
-        return {
+        result: dict[str, Any] = {
             **self.metadata,
             "protocol_version": protocol_version,
             "message_type": "request",
@@ -208,9 +309,12 @@ class JobRequest:
             "retry_backoff_s": self.retry_backoff_s,
             "client_id": self.client_id,
             "target": self.target,
-            "image_size": len(self.image),
+            "image_size": self.image_size,
             "image_sha256": self.image_sha256,
         }
+        if self.image_ref is not None:
+            result["execution_image_ref"] = self.image_ref.to_dict()
+        return result
 
 
 @dataclass(slots=True)
@@ -230,6 +334,8 @@ class JobResult:
     finished_at: str = ""
     elapsed_ms: int = 0
     attempts: int = 0
+    retry_exhausted: bool = False
+    attempt_history: list[JobAttemptResult] = field(default_factory=list)
     image_name: str | None = None
     image_size: int = 0
     image_sha256: str | None = None
@@ -239,6 +345,7 @@ class JobResult:
 
     def __post_init__(self) -> None:
         self.site_id = validate_site_id(self.site_id)
+        self.attempt_history = list(self.attempt_history)
         self.output_files = list(self.output_files)
         self.details = dict(self.details)
 
@@ -255,6 +362,7 @@ class JobResult:
         data = asdict(self)
         data["operation"] = self.operation.value
         data["state"] = self.state.value
+        data["attempt_history"] = [item.to_dict(protocol_version) for item in self.attempt_history]
         if self.error is not None:
             data["error"] = self.error.to_dict(protocol_version)
         return data
