@@ -90,6 +90,8 @@ test("fleet implementation uses retained FPS selection, four-column PPU layout a
   assert.match(operatorFeedback, /\.fpsSelectionSummary\s*\{\s*display:\s*none;/s);
   assert.match(operatorFeedback, /content:\s*"Cancel All"/);
   assert.match(operatorFeedback, /content:\s*"Confirm"/);
+  assert.match(operatorFeedback, /\.productionBatchToolbar\s*\{[^}]*grid-template-areas:\s*"image operations actions";/s);
+  assert.match(operatorFeedback, /@media\s*\(max-width:\s*920px\)[\s\S]*grid-template-areas:\s*"image"\s*"operations"\s*"actions";/s);
   assert.match(operatorFeedback, /\.productionImagePicker\s*\{[^}]*grid-template-columns:\s*max-content\s+max-content\s+minmax\(0,\s*1fr\)/s);
   assert.match(operatorFeedback, /\.productionImagePicker\s*>\s*\.productionBrowseButton\s*\{[^}]*grid-column:\s*2;[^}]*grid-row:\s*1;/s);
   assert.match(operatorFeedback, /\.facilityRuntimeIdentity h3\s*\{[^}]*font-weight:\s*800;/s);
