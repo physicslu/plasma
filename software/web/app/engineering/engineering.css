@@ -298,6 +298,49 @@
   box-shadow: none;
 }
 
+.engineeringBrowseButton {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--cyan) 55%, var(--line));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--cyan) 10%, var(--panel));
+  color: var(--text-soft);
+  padding: 7px 11px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.engineeringBrowseButton:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.engineeringBrowseButton:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.engineeringOperationWarning {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.engineeringOperationWarning button {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--amber) 60%, var(--line));
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--amber);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
 .engineeringLogCard pre span {
   display: block;
 }
