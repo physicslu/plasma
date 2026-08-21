@@ -1,4 +1,5 @@
 import type { Operation } from "./plasma-api";
+import type { MockBatchRuntimeSnapshot } from "./mock-runtime-api";
 
 export type ServerBatchState =
   | "queued"
@@ -87,6 +88,7 @@ export type ServerBatchSnapshot = {
   site_counts: Record<ServerBatchSiteState, number>;
   operation_statistics: Partial<Record<Operation, BatchOperationStatistics>>;
   sites: BatchSiteSnapshot[];
+  mock_runtime?: MockBatchRuntimeSnapshot;
 };
 
 export type BatchTargetRequest = {
