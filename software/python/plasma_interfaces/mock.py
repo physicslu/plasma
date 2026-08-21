@@ -9,7 +9,9 @@ from typing import Any
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.mock_flash import MockFlashState
 from plasma_core.mock_image_store import SharedImageStore, default_mock_image_store
-from plasma_core.models import ExecutionImageRef
+from plasma_core.mock_profile import MockProfile, calculate_duration_ms, rng_for_job, should_fail
+from plasma_core.mock_profile_io import mock_profile_from_dict
+from plasma_core.models import ExecutionImageRef, JobRequest
 
 from .base import BaseInterface, ProgressCallback
 
@@ -35,6 +37,18 @@ class MockActivityTracker:
         self.active -= 1
 
 
+@dataclass(frozen=True, slots=True)
+class MockAttemptContext:
+    profile: MockProfile
+    batch_seed: int
+    batch_id: str
+    facility_id: str
+    ppu_id: str
+    site_id: int
+    round_index: int
+    attempt: int
+
+
 @dataclass(slots=True)
 class MockInterface(BaseInterface):
     flash_size: int = 256 * 1024
@@ -51,6 +65,9 @@ class MockInterface(BaseInterface):
     flash_state: MockFlashState = field(init=False, repr=False)
     calls: Counter[str] = field(default_factory=Counter, init=False)
     shutdown_count: int = field(default=0, init=False)
+    _active_job_id: str | None = field(default=None, init=False, repr=False)
+    _active_attempt: int = field(default=0, init=False, repr=False)
+    _attempt_context: MockAttemptContext | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if isinstance(self.flash_size, bool) or not isinstance(self.flash_size, int) or self.flash_size <= 0:
@@ -165,12 +182,89 @@ class MockInterface(BaseInterface):
             )
         return cls(tracker=tracker, image_store=image_store, **options)
 
+    def prepare_request(self, request: JobRequest) -> None:
+        if request.job_id == self._active_job_id:
+            self._active_attempt += 1
+        else:
+            self._active_job_id = request.job_id
+            self._active_attempt = 1
+
+        raw = request.metadata.get("mock_runtime")
+        if raw is None:
+            self._attempt_context = None
+            return
+        if not isinstance(raw, dict):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock_runtime Job metadata must be an object")
+        required = {
+            "profile",
+            "resolved_seed",
+            "batch_id",
+            "facility_id",
+            "ppu_id",
+            "site_id",
+            "round_index",
+        }
+        missing = sorted(required - set(raw))
+        if missing:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "mock_runtime Job metadata is incomplete",
+                context={"missing_fields": missing},
+            )
+        profile = mock_profile_from_dict(raw["profile"])
+        batch_seed = raw["resolved_seed"]
+        site_id = raw["site_id"]
+        round_index = raw["round_index"]
+        if isinstance(batch_seed, bool) or not isinstance(batch_seed, int) or batch_seed < 0:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock resolved_seed must be a non-negative integer")
+        if site_id != request.site_id:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock_runtime site_id does not match Job site_id")
+        if isinstance(round_index, bool) or not isinstance(round_index, int) or round_index < 1:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "mock round_index must be a positive integer")
+        for field_name in ("batch_id", "facility_id", "ppu_id"):
+            if not isinstance(raw[field_name], str) or not raw[field_name]:
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, f"mock {field_name} is required")
+        self._attempt_context = MockAttemptContext(
+            profile=profile,
+            batch_seed=batch_seed,
+            batch_id=raw["batch_id"],
+            facility_id=raw["facility_id"],
+            ppu_id=raw["ppu_id"],
+            site_id=site_id,
+            round_index=round_index,
+            attempt=self._active_attempt,
+        )
+
+    def _profile_rng(self, operation: str):
+        context = self._attempt_context
+        if context is None or not context.profile.enabled:
+            return None
+        return rng_for_job(
+            batch_seed=context.batch_seed,
+            batch_id=context.batch_id,
+            facility_id=context.facility_id,
+            ppu_id=context.ppu_id,
+            site_id=context.site_id,
+            round_index=context.round_index,
+            operation=operation,
+            attempt=context.attempt,
+            profile_revision=context.profile.revision,
+        )
+
     def estimated_delay_s(self, operation: str, total_bytes: int) -> float:
         """Return the configured Mock execution time for one operation."""
         if operation not in OPERATION_ERRORS:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"unknown mock operation: {operation}")
         if isinstance(total_bytes, bool) or not isinstance(total_bytes, int) or total_bytes < 0:
             raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "mock timing byte count must be non-negative")
+        context = self._attempt_context
+        rng = self._profile_rng(operation)
+        if context is not None and context.profile.enabled and rng is not None:
+            return calculate_duration_ms(
+                profile=context.profile.operation(operation),
+                data_size_bytes=total_bytes,
+                rng=rng,
+            ) / 1000.0
         if operation in self.delays:
             return max(0.0, float(self.delays[operation]))
         throughput = self.throughput_bytes_per_s.get(operation)
@@ -189,7 +283,19 @@ class MockInterface(BaseInterface):
         if self.tracker:
             self.tracker.enter()
         try:
-            delay_s = self.estimated_delay_s(operation, total_units)
+            context = self._attempt_context
+            rng = self._profile_rng(operation)
+            if context is not None and context.profile.enabled and rng is not None:
+                operation_profile = context.profile.operation(operation)
+                delay_s = calculate_duration_ms(
+                    profile=operation_profile,
+                    data_size_bytes=total_units,
+                    rng=rng,
+                ) / 1000.0
+            else:
+                operation_profile = None
+                delay_s = self.estimated_delay_s(operation, total_units)
+
             steps = max(1, int(self.progress_steps))
             if progress:
                 await progress(0, total_units)
@@ -202,6 +308,27 @@ class MockInterface(BaseInterface):
                         await progress(round(total_units * step / steps), total_units)
             if progress and delay_s == 0:
                 await progress(total_units, total_units)
+
+            if operation_profile is not None and rng is not None and should_fail(
+                rng,
+                operation_profile.error_rate_per_mille,
+            ):
+                assert context is not None
+                raise PlasmaError(
+                    OPERATION_ERRORS[operation],
+                    f"injected Mock Profile {operation} failure",
+                    recoverable=True,
+                    context={
+                        "operation": operation,
+                        "failure_source": "injected",
+                        "profile_id": context.profile.profile_id,
+                        "profile_revision": context.profile.revision,
+                        "batch_seed": context.batch_seed,
+                        "round_index": context.round_index,
+                        "attempt": context.attempt,
+                    },
+                )
+
             remaining = int(self.failures.get(operation, 0))
             if remaining > 0:
                 self.failures[operation] = remaining - 1
