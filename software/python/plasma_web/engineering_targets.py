@@ -135,8 +135,11 @@ class MockEngineeringPPUProvider:
     the same programming resource from the PPU's concurrency perspective.
     """
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, flash_size_bytes: int = MOCK_FLASH_SIZE_BYTES) -> None:
+        if isinstance(flash_size_bytes, bool) or not isinstance(flash_size_bytes, int) or flash_size_bytes <= 0:
+            raise ValueError("Engineering mock flash_size_bytes must be a positive integer")
         self.root = root.resolve()
+        self.flash_size_bytes = flash_size_bytes
         self._specs = self._build_specs()
         self._servers: dict[tuple[str, str], PlasmaServer] = {}
         self._ports: dict[tuple[str, str], int] = {}
@@ -288,7 +291,7 @@ class MockEngineeringPPUProvider:
                     max_retries=0,
                     retry_backoff_s=0.01,
                     mock={
-                        "flash_size": MOCK_FLASH_SIZE_BYTES,
+                        "flash_size": self.flash_size_bytes,
                         "throughput_bytes_per_s": dict(MOCK_THROUGHPUT_BYTES_PER_S),
                         "operation_overheads_s": dict(MOCK_OPERATION_OVERHEADS_S),
                         "progress_steps": MOCK_PROGRESS_STEPS,
@@ -606,7 +609,7 @@ class MockEngineeringPPUProvider:
             ],
             "timing_profile": {
                 "model": "fixed-overhead-plus-bytes-over-throughput",
-                "flash_size_bytes": MOCK_FLASH_SIZE_BYTES,
+                "flash_size_bytes": self.flash_size_bytes,
                 "throughput_bytes_per_s": dict(MOCK_THROUGHPUT_BYTES_PER_S),
                 "operation_overheads_s": dict(MOCK_OPERATION_OVERHEADS_S),
                 "operation_timeout_s": MOCK_OPERATION_TIMEOUT_S,

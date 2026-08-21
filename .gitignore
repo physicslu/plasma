@@ -38,6 +38,7 @@ software/web/node_modules/
 software/web/.next/
 software/web/.sites-runtime/
 software/web/dist/
+software/web/dist-render/
 
 # Local secrets and credentials
 .env

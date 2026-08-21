@@ -90,6 +90,7 @@ Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration�
 - FPGA / PL：[`pl/README.md`](pl/README.md)
 - Multi-machine development：[`docs/development/multi-machine-development-guide.md`](docs/development/multi-machine-development-guide.md)
 - Integration-host deployment：[`docs/development/swpc-deployment.md`](docs/development/swpc-deployment.md)
+- Render Free public Mock demo：[`docs/deployment/render-free-public-demo.md`](docs/deployment/render-free-public-demo.md)
 - Codex Cloud：[`docs/development/codex-cloud-environment.md`](docs/development/codex-cloud-environment.md)
 - Local AI / Cline / Ollama：[`docs/development/local-ai-development-guide.md`](docs/development/local-ai-development-guide.md)
 
