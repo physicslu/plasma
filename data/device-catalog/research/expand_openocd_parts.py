@@ -13,7 +13,6 @@ import hashlib
 import json
 import re
 import subprocess
-import tarfile
 import xml.etree.ElementTree as ET
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -151,10 +150,10 @@ VENDOR_SOURCES = (
         r"\b(MAX32662|MAX32680)\b",
     ),
     VendorSourceSpec(
-        "Artery", "ArteryTek.PlatformIO-boards", "7313140183db3ca5e74e723c2abcc4da82992dc5",
-        "https://github.com/ArteryTek/platform-arterytekat32/archive/"
-        "7313140183db3ca5e74e723c2abcc4da82992dc5.tar.gz",
-        "vendor_board_archive",
+        "Artery", "OpenOCD.Artery-MCU-Flash-driver", OPENOCD_COMMIT,
+        "https://github.com/openocd-org/openocd/blob/"
+        f"{OPENOCD_COMMIT}/src/flash/nor/artery.c",
+        "openocd_flash_driver",
     ),
     VendorSourceSpec(
         "Bouffalo Lab", "BouffaloLab.SDK-README", "5cd17516dfe8d9813e79008aeb29c3f930797804",
@@ -482,7 +481,7 @@ def extract_devices(pdsc: Path, source: dict[str, str]) -> list[dict[str, str]]:
 def identifier_kind(name: str, source_kind: str = "cmsis_pdsc") -> str:
     if re.search(r"(?:_xx|x(?:tr)?$|xxx)", name, re.IGNORECASE):
         return "ordering_pattern"
-    if source_kind in {"vendor_board_archive", "vendor_product_page"}:
+    if source_kind in {"openocd_flash_driver", "vendor_product_page"}:
         return "manufacturer_part_number"
     return "cmsis_device_name"
 
@@ -502,7 +501,7 @@ def find_rule(vendor: str, part_number: str, source_pack_name: str) -> tuple[str
     return None
 
 
-def load_sources(index_path: Path, cache: Path) -> list[dict[str, str]]:
+def load_sources(index_path: Path, cache: Path, openocd_root: Path) -> list[dict[str, str]]:
     root = ET.parse(index_path).getroot()
     available = {(node.get("vendor", ""), node.get("name", "")): node for node in root.findall(".//pdsc")}
     pending: list[tuple[PackSpec | VendorSourceSpec, str, Path, str]] = []
@@ -514,8 +513,12 @@ def load_sources(index_path: Path, cache: Path) -> list[dict[str, str]]:
         path = cache / f"{spec.pack_vendor}.{spec.pack_name}.pdsc"
         pending.append((spec, url, path, element.get("version", "") if element is not None else ""))
     for spec in VENDOR_SOURCES:
-        suffix = ".tar.gz" if spec.source_kind == "vendor_board_archive" else ".txt"
-        pending.append((spec, spec.source_url, cache / f"{spec.source_name}{suffix}", spec.source_commit))
+        path = (
+            openocd_root / "src/flash/nor/artery.c"
+            if spec.source_kind == "openocd_flash_driver"
+            else cache / f"{spec.source_name}.txt"
+        )
+        pending.append((spec, spec.source_url, path, spec.source_commit))
 
     def fetch(item: tuple[PackSpec | VendorSourceSpec, str, Path, str]) -> dict[str, str]:
         spec, url, path, version = item
@@ -558,9 +561,7 @@ def load_sources(index_path: Path, cache: Path) -> list[dict[str, str]]:
     return sources
 
 
-def extract_source_devices(
-    source: dict[str, str], openocd_root: Path
-) -> list[dict[str, str]]:
+def extract_source_devices(source: dict[str, str]) -> list[dict[str, str]]:
     path = Path(source["path"])
     if source["source_kind"] == "cmsis_pdsc":
         return extract_devices(path, source)
@@ -571,19 +572,11 @@ def extract_source_devices(
             name.upper()
             for name in re.findall(source["device_pattern"], path.read_text(encoding="utf-8"))
         )
-    elif source["source_kind"] == "vendor_board_archive":
-        driver_source = (openocd_root / "src/flash/nor/artery.c").read_text(encoding="utf-8")
-        supported = set(re.findall(r'\.name\s*=\s*"(AT32[^\"]+)"', driver_source))
-        with tarfile.open(path, "r:gz") as archive:
-            for member in archive:
-                if not member.isfile() or "/boards/" not in member.name or not member.name.endswith(".json"):
-                    continue
-                handle = archive.extractfile(member)
-                if handle is None:
-                    continue
-                name = str(json.load(handle).get("build", {}).get("mcu", "")).upper()
-                if name in supported:
-                    names.add(name)
+    elif source["source_kind"] == "openocd_flash_driver":
+        names.update(
+            name.upper()
+            for name in re.findall(r'\.name\s*=\s*"(AT32[^\"]+)"', path.read_text(encoding="utf-8"))
+        )
     else:
         raise RuntimeError(f"unsupported authoritative source kind: {source['source_kind']}")
 
@@ -694,11 +687,11 @@ def main() -> None:
 
     metadata, capabilities = build_capabilities(args.openocd_root, args.targets, args.researched_csv)
     capability_by_target = {str(row["target_config"]): row for row in capabilities}
-    sources = load_sources(args.index, args.cache)
+    sources = load_sources(args.index, args.cache, args.openocd_root)
 
     mapped: dict[tuple[str, str, str], dict[str, object]] = {}
     for source in sources:
-        for device in extract_source_devices(source, args.openocd_root):
+        for device in extract_source_devices(source):
             match = find_rule(device["vendor"], device["part_number"], source["pack_name"])
             if match is None:
                 continue
@@ -855,6 +848,7 @@ def main() -> None:
         for architecture in row["cpu_architectures"]
     )
     pdsc_count = sum(source["source_kind"] == "cmsis_pdsc" for source in sources)
+    driver_count = sum(source["source_kind"] == "openocd_flash_driver" for source in sources)
     report = [
         "# OpenOCD MCU Part-Number Expansion Report",
         "",
@@ -869,7 +863,8 @@ def main() -> None:
         f"- Manufacturer ordering part numbers: **{kind_counts['manufacturer_part_number']}**",
         f"- Ordering patterns: **{kind_counts['ordering_pattern']}**",
         f"- Pinned PDSC sources parsed: **{pdsc_count}**",
-        f"- Pinned vendor SDK/board/product sources parsed: **{len(sources) - pdsc_count}**",
+        f"- Pinned vendor MCU SDK/product sources parsed: **{len(sources) - pdsc_count - driver_count}**",
+        f"- Pinned OpenOCD MCU Flash-driver part tables parsed: **{driver_count}**",
         f"- Canonical unique identifiers across baseline and expansion: **{len(canonical_rows)}**",
         f"- Canonical unique target CFG files: **{len({str(row['target_config']) for row in canonical_rows})}**",
         f"- Baseline/expansion target conflicts resolved: **{len(duplicate_resolutions)}**",

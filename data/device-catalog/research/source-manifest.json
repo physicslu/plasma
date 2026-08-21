@@ -539,13 +539,13 @@
     },
     {
       "silicon_vendor": "Artery",
-      "pack_vendor": "ArteryTek",
-      "pack_name": "PlatformIO-boards",
-      "pack_version": "7313140183db3ca5e74e723c2abcc4da82992dc5",
-      "source_kind": "vendor_board_archive",
+      "pack_vendor": "OpenOCD",
+      "pack_name": "Artery-MCU-Flash-driver",
+      "pack_version": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+      "source_kind": "openocd_flash_driver",
       "device_pattern": "",
-      "source_url": "https://github.com/ArteryTek/platform-arterytekat32/archive/7313140183db3ca5e74e723c2abcc4da82992dc5.tar.gz",
-      "content_sha256": "90f20a664462528fdf414d0833a1e5f70b6cc2edcbf3ae154b3cc8ad131a419a"
+      "source_url": "https://github.com/openocd-org/openocd/blob/56b8d93fbe61a78dc903d770820d6d896b6d8134/src/flash/nor/artery.c",
+      "content_sha256": "93a653abd331fedf05d8ac4fada82b61a6566a0ae4a9580650879ff790ddcf52"
     },
     {
       "silicon_vendor": "Bouffalo Lab",

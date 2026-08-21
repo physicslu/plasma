@@ -6,13 +6,14 @@ OpenOCD source commit: `56b8d93fbe61a78dc903d770820d6d896b6d8134`
 
 - MCU/Wireless MCU CFG candidates evaluated: **114**
 - CFG files with deterministic authoritative-source mappings: **78**
-- Unique device identifiers mapped: **1804**
+- Unique device identifiers mapped: **1808**
 - CMSIS/vendor device names: **1557**
-- Manufacturer ordering part numbers: **117**
+- Manufacturer ordering part numbers: **121**
 - Ordering patterns: **130**
 - Pinned PDSC sources parsed: **58**
-- Pinned vendor SDK/board/product sources parsed: **8**
-- Canonical unique identifiers across baseline and expansion: **7530**
+- Pinned vendor MCU SDK/product sources parsed: **7**
+- Pinned OpenOCD MCU Flash-driver part tables parsed: **1**
+- Canonical unique identifiers across baseline and expansion: **7534**
 - Canonical unique target CFG files: **131**
 - Baseline/expansion target conflicts resolved: **34**
 - Helper/external-memory targets deferred: **12**
@@ -25,7 +26,7 @@ Every mapped row remains `not_verified`. This report proves only a deterministic
 | Vendor | Identifiers |
 |---|---:|
 | Analog Devices | 17 |
-| Artery | 103 |
+| Artery | 107 |
 | Bouffalo Lab | 4 |
 | Cypress/Fujitsu | 312 |
 | Geehy | 124 |
@@ -42,7 +43,7 @@ Every mapped row remains `not_verified`. This report proves only a deterministic
 
 | CPU architecture | Identifiers |
 |---|---:|
-| ARM Cortex-M | 7369 |
+| ARM Cortex-M | 7373 |
 | ARM7TDMI | 5 |
 | AVR | 3 |
 | MIPS32 | 128 |

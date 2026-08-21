@@ -14,7 +14,7 @@ Analog Devices,tcl/target/max32675.cfg,flash_driver_declared,mapped,1,One or mor
 Analog Devices,tcl/target/max32680.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
 Analog Devices,tcl/target/max32690.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
 Analog Devices,tcl/target/max32xxx_common.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
-Artery,tcl/target/artery/at32f4x.cfg,flash_driver_declared,mapped,103,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
+Artery,tcl/target/artery/at32f4x.cfg,flash_driver_declared,mapped,107,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
 Bouffalo Lab,tcl/target/bl602.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified
 Bouffalo Lab,tcl/target/bl602_common.cfg,helper_or_alias,deferred,0,Common/base or bank-layout configuration; collapse into a customer target,not_verified
 Bouffalo Lab,tcl/target/bl702.cfg,flash_driver_declared,mapped,1,One or more deterministic identifiers were found in a pinned authoritative source,not_verified

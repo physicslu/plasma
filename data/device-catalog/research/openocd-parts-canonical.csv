@@ -24,6 +24,7 @@ Artery,AT32F403ARCT7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/ar
 Artery,AT32F403ARET7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F403AVCT7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F403AVET7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Artery,AT32F407AVCT7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F407RCT7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F407RET7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F407VCT7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
@@ -54,8 +55,11 @@ Artery,AT32F421C4T7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/art
 Artery,AT32F421C6T7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F421C8T7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F421F4P7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Artery,AT32F421F4U7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F421F6P7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Artery,AT32F421F6U7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F421F8P7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
+Artery,AT32F421F8U7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F421G4U7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F421G6U7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv
 Artery,AT32F421G8U7,manufacturer_part_number,"[""ARM Cortex-M""]",tcl/target/artery/at32f4x.cfg,upstream-openocd,mapping_candidate,not_verified,openocd-parts-expanded.csv

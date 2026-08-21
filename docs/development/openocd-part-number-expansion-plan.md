@@ -18,6 +18,8 @@ Two of the 55 researched CFG files, `stm32n6x.cfg` and `infineon/tle987x.cfg`, a
 
 CPU debug access alone is insufficient. A device can become a selectable mapping candidate only when OpenOCD has a compatible programming path for its non-volatile memory. Static discovery is evidence of declared capability, not proof of successful Plasma or real-device programming.
 
+The customer-selectable object is always an MCU chip, never a development board, evaluation kit, module, or assembled PCB. Expansion sources must identify the MCU itself through a device pack, a manufacturer MCU document, or an explicit supported-part table in the pinned OpenOCD Flash driver. Board definitions and board inventories are not accepted as MCU part-number sources.
+
 ## 2. Initial automated triage
 
 The OpenOCD snapshot at commit `56b8d93fbe61a78dc903d770820d6d896b6d8134` produces this first-pass backlog:
@@ -38,23 +40,24 @@ Current execution checkpoint:
 |---|---:|
 | MCU/Wireless MCU CFG candidates evaluated | 114 |
 | CFG files with deterministic authoritative-source mappings | 78 |
-| Unique expansion device identifiers mapped | 1,804 |
+| Unique expansion device identifiers mapped | 1,808 |
 | CMSIS/vendor device names | 1,557 |
-| Exact manufacturer ordering part numbers | 117 |
+| Exact manufacturer ordering part numbers | 121 |
 | Ordering patterns | 130 |
 | Pinned PDSC sources parsed | 58 |
-| Pinned vendor SDK, board, or product sources parsed | 8 |
+| Pinned vendor MCU SDK or product sources parsed | 7 |
+| Pinned OpenOCD MCU Flash-driver part tables parsed | 1 |
 | Helper/alias or external-Flash-only targets deferred | 12 |
 | Flash-capable targets awaiting an adapter/rule | 24 |
 | Baseline/expansion target conflicts resolved | 34 |
-| Canonical unique device identifiers | 7,530 |
+| Canonical unique device identifiers | 7,534 |
 | Canonical unique target CFG files | 131 |
 
-The 1,804 expansion identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Combining the 5,760 baseline identifiers with the expansion and collapsing 34 overlapping STM32H7R/S identifiers produces 7,530 canonical unique device identifiers. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint, then run `validate_openocd_expansion.py` offline.
+The 1,808 expansion identifiers are `mapping_candidate` and `not_verified`; they do not increase the engineering-verified or production-qualified count. Combining the 5,760 baseline identifiers with the expansion and collapsing 34 overlapping STM32H7R/S identifiers produces 7,534 canonical unique device identifiers. Re-run `expand_openocd_parts.py` from the pinned OpenOCD checkout and source index to reproduce the checkpoint, then run `validate_openocd_expansion.py` offline.
 
 | Canonical CPU architecture | Target CFG files | Device identifiers |
 |---|---:|---:|
-| ARM Cortex-M | 113 | 7,369 |
+| ARM Cortex-M | 113 | 7,373 |
 | ARM7TDMI | 3 | 5 |
 | AVR | 3 | 3 |
 | MIPS32 | 1 | 128 |
@@ -130,7 +133,7 @@ After Wave 1 rules are stable, process the remaining 32 Flash-declaring MCU CFG 
 
 Use an official structured device pack or machine-readable product source when available. If a vendor has no suitable structured source, retain the CFG as a capability record and put identifier extraction into the exception queue; do not guess complete part numbers from a family name.
 
-The second batch now maps Analog Devices/MAXIM, Artery, Bouffalo Lab, Cypress/Fujitsu, Geehy, GigaDevice, Holtek, and Raspberry Pi. Artery identifiers are accepted only when both the official vendor board catalog and the pinned OpenOCD Flash driver's explicit part table contain the same exact part number. The GigaDevice GD32VF103 source is an official manufacturer product announcement pinned by its expected SHA-256 content hash. Official Microchip SAM-BA release notes additionally establish a small, memory-compatible ARM7TDMI set. Legacy targets without sufficiently specific manufacturer evidence remain `source_adapter_pending`.
+The second batch now maps Analog Devices/MAXIM, Artery, Bouffalo Lab, Cypress/Fujitsu, Geehy, GigaDevice, Holtek, and Raspberry Pi. Artery identifiers are extracted directly from the pinned OpenOCD Flash driver's explicit MCU supported-part table; only AT32F4 chips compatible with the existing `at32f4x.cfg` target are retained. No development-board definitions or inventories are consulted. The GigaDevice GD32VF103 source is an official manufacturer product announcement pinned by its expected SHA-256 content hash. Official Microchip SAM-BA release notes additionally establish a small, memory-compatible ARM7TDMI set. Legacy targets without sufficiently specific manufacturer evidence remain `source_adapter_pending`.
 
 ### Wave 3 — Deferred targets
 

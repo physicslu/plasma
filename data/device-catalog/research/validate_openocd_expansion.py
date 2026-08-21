@@ -41,7 +41,7 @@ def main() -> None:
     assert all(
         row["identifier_kind"] == "manufacturer_part_number"
         for row in parts
-        if row["source_kind"] in {"vendor_board_archive", "vendor_product_page"}
+        if row["source_kind"] in {"openocd_flash_driver", "vendor_product_page"}
     )
     assert Counter(row["device_type"] for row in capabilities) == {"MCU": 110, "Wireless MCU": 4}
     outcome_counts = Counter(row["expansion_outcome"] for row in outcomes)
@@ -81,8 +81,13 @@ def main() -> None:
         row["source_kind"] == "cmsis_pdsc" for row in manifest["sources"]
     )
     assert {row["source_kind"] for row in manifest["sources"]} == {
-        "cmsis_pdsc", "vendor_sdk_text", "vendor_board_archive", "vendor_product_page"
+        "cmsis_pdsc", "vendor_sdk_text", "openocd_flash_driver", "vendor_product_page"
     }
+    assert all("board" not in row["source_kind"] for row in manifest["sources"])
+    artery_parts = [row for row in parts if row["vendor"] == "Artery"]
+    assert len(artery_parts) == 107
+    assert all(row["source_kind"] == "openocd_flash_driver" for row in artery_parts)
+    assert all(row["part_number"].startswith("AT32F4") for row in artery_parts)
     assert all(
         (row["source_pack_vendor"], row["source_pack_name"], row["source_content_sha256"])
         in source_keys
