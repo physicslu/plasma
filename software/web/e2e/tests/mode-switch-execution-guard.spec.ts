@@ -161,7 +161,7 @@ async function installExecutionApi(page: Page) {
 async function expectModeLocked(page: Page, linkName: string) {
   const link = page.getByRole("link", { name: linkName, exact: true });
   await expect(link).toHaveAttribute("aria-disabled", "true");
-  await expect(page.getByRole("status")).toContainText("PPU BUSY · 1 JOB");
+  await expect(page.locator(".globalExecutionGuard")).toContainText("PPU BUSY · 1 JOB");
   const before = page.url();
   await link.click({ force: true });
   await expect.poll(() => page.url()).toBe(before);
