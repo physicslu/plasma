@@ -89,7 +89,12 @@ export async function updateMockRuntimeSettings(
   apiBase: string,
   settings: MockRuntimeSettings,
 ): Promise<MockRuntimeSettings> {
-  const { profile_id: _profileId, revision: _revision, ...editable } = settings;
+  const editable = {
+    enabled: settings.enabled,
+    default_image_size_bytes: settings.default_image_size_bytes,
+    operations: settings.operations,
+    seed: settings.seed,
+  };
   return await requestMockRuntime(apiBase, {
     method: "POST",
     body: JSON.stringify(editable),
