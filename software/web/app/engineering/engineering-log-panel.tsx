@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useI18n } from "../i18n";
+import { useWorkspaceSession } from "../workspace-session";
 
 export type EngineeringLogCategory = "USR" | "NET" | "PPU" | "DAT" | "BAT" | "SYS";
 
@@ -60,10 +61,24 @@ type EngineeringLogPanelProps = {
 
 export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPanelProps) {
   const { t } = useI18n();
+  const { sessionAuditEntries, clearSessionAuditEntries } = useWorkspaceSession();
   const [visibleCategories, setVisibleCategories] = useState<EngineeringLogCategory[]>(ENGINEERING_LOG_CATEGORIES);
+  const allLogs = useMemo<EngineeringLogEntry[]>(() => {
+    const localLogs = logs.filter(log => !log.text.includes("[SESSION] ACTIVE ·"));
+    const sessionLogs: EngineeringLogEntry[] = sessionAuditEntries.map(entry => ({
+      id: -entry.id,
+      text: `${entry.time}  [NET] ${entry.message}`,
+      error: false,
+      category: "NET",
+    }));
+    return [...localLogs, ...sessionLogs].sort((left, right) => {
+      const timeOrder = right.text.slice(0, 8).localeCompare(left.text.slice(0, 8));
+      return timeOrder || right.id - left.id;
+    });
+  }, [logs, sessionAuditEntries]);
   const visibleLogs = useMemo(
-    () => logs.filter(log => visibleCategories.includes(log.category)),
-    [logs, visibleCategories],
+    () => allLogs.filter(log => visibleCategories.includes(log.category)),
+    [allLogs, visibleCategories],
   );
   const allVisible = visibleCategories.length === ENGINEERING_LOG_CATEGORIES.length;
 
@@ -74,8 +89,8 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
   }
 
   function downloadLog() {
-    if (!logs.length) return;
-    const content = `${logs.map(engineeringLogText).join("\n")}\n`;
+    if (!allLogs.length) return;
+    const content = `${allLogs.map(engineeringLogText).join("\n")}\n`;
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -87,13 +102,18 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
   }
 
+  function clearLog() {
+    onClear();
+    clearSessionAuditEntries();
+  }
+
   return (
     <section className="logCard engineeringLogCard">
       <div className="logHead engineeringLogHead">
         <div className="engineeringLogTitle"><span />{t("engineeringProgramming.jobLog")}</div>
         <div className="engineeringLogActions">
-          <button type="button" onClick={downloadLog} disabled={!logs.length}>Download .log</button>
-          <button type="button" onClick={onClear}>{t("engineeringProgramming.clear")}</button>
+          <button type="button" onClick={downloadLog} disabled={!allLogs.length}>Download .log</button>
+          <button type="button" onClick={clearLog}>{t("engineeringProgramming.clear")}</button>
         </div>
       </div>
       <div className="engineeringLogFilters" role="group" aria-label="Engineering log filters">
@@ -121,7 +141,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
         {visibleLogs.length
           ? visibleLogs.map(log => (
             <span
-              key={log.id}
+              key={`${log.category}-${log.id}`}
               data-level={log.error ? "error" : "info"}
               data-category={log.category}
             >
