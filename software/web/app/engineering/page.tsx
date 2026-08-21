@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useI18n } from "../i18n";
 import ProgrammingWorkspace from "./programming-workspace";
 import "./engineering.css";
+import "./engineering-density.css";
 import "./engineering-log.css";
 
 const sections = [
