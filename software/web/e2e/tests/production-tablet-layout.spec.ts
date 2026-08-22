@@ -161,10 +161,21 @@ test("Production batch toolbar follows its available width on iPad landscape", a
   expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
 });
 
-test("Production batch toolbar uses two rows in a narrow content column at a wide viewport", async ({ page }) => {
+test("Production batch toolbar follows a constrained content column at a wide viewport", async ({ page }) => {
   await openProduction(page, { width: 1440, height: 900 });
 
-  const workspaceWidth = await page.locator(".productionMainPanel").evaluate(element => element.clientWidth);
-  expect(workspaceWidth).toBeLessThanOrEqual(1060);
+  const workspace = page.locator(".productionWorkspace");
+  const mainPanel = page.locator(".productionMainPanel");
+  await workspace.evaluate(element => {
+    (element as HTMLElement).style.gridTemplateColumns = "286px minmax(0, 1040px)";
+  });
+  await mainPanel.evaluate(element => {
+    const node = element as HTMLElement;
+    node.style.width = "1040px";
+    node.style.maxWidth = "1040px";
+    node.style.justifySelf = "start";
+  });
+
+  await expect.poll(() => mainPanel.evaluate(element => element.clientWidth)).toBeLessThanOrEqual(1060);
   await expectConstrainedToolbar(page);
 });

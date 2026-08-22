@@ -945,7 +945,8 @@ const dashboardCopy = locale === "zh-TW" ? {
 
             <section className="productionMainPanel">
               <BatchTopologySummary
-      facilityCount={catalog.facility_count}
+                ariaLabel="Mock topology summary"
+                facilityCount={catalog.facility_count}
       ppuCount={catalog.ppu_count}
       selectedSiteCount={summary.sites}
       selectedFacilityCount={summary.facilities}
