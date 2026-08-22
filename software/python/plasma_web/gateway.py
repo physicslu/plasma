@@ -10,6 +10,7 @@ from urllib.parse import unquote, urlparse
 
 from plasma_core.assets import ProgrammingAsset
 from plasma_core.batch import BatchExecutionPolicy, BatchTarget
+from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway_legacy as legacy
@@ -160,6 +161,23 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
     def _mock_provider(cls) -> SharedImageMockEngineeringPPUProvider | None:
         provider = cls.engineering_provider
         return provider if isinstance(provider, SharedImageMockEngineeringPPUProvider) else None
+
+    def _body(self) -> dict[str, Any]:
+        body = super()._body()
+        if self._mock_provider() is None:
+            return body
+        engineering = self._engineering_target(urlparse(self.path).path)
+        if engineering is None or engineering[2] != ["api", "jobs"]:
+            return body
+        operation = body.get("operation")
+        if operation in {Operation.PROGRAM.value, Operation.VERIFY.value} and "asset_sha256" not in body:
+            # The legacy Engineering contract normally requires an Asset SHA.
+            # Canonical Shared-Image Mock jobs may intentionally omit it so the
+            # provider can generate one Synthetic Image from the immutable Mock
+            # execution profile.  The key is normalized to None only in this
+            # Mock-specific handler; non-Mock providers remain fail-closed.
+            body["asset_sha256"] = None
+        return body
 
     def _mock_unavailable(self) -> None:
         self._json(
