@@ -1,4 +1,5 @@
 name: PR99 Format Cleanup
+# One-shot source-only formatting cleanup; generated files stay ignored.
 
 on:
   pull_request:
@@ -26,7 +27,6 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          # Production: indent dashboard copy and replace only the newly introduced dashboard block.
           path = Path('software/web/app/fleet/server-batch-page.tsx')
           text = path.read_text(encoding='utf-8')
           start = text.index('const dashboardCopy = locale === "zh-TW" ? {')
@@ -77,7 +77,6 @@ jobs:
           text = text[:start] + new + text[end:]
           path.write_text(text, encoding='utf-8')
 
-          # Engineering: re-indent the nested Repeat/Operation/Retry loops and result classification only.
           path = Path('software/web/app/engineering/programming-workspace.tsx')
           text = path.read_text(encoding='utf-8')
           old = '''        for (let round = 1; round <= repeatValue; round += 1) {
