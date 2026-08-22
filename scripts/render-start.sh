@@ -43,6 +43,25 @@ trap 'exit 0' INT TERM
 
 mkdir -p "${state_root}/output" "${state_root}/logs" "${state_root}/engineering"
 
+# This metadata is public by design. Render supplies RENDER_GIT_COMMIT and
+# RENDER_GIT_BRANCH at runtime; exposing only those non-secret values lets an
+# external smoke test prove which source revision is actually serving traffic.
+python - "${static_root}/deployment.json" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+payload = {
+    "schema_version": 1,
+    "service": "plasma-public-demo",
+    "platform": "render" if os.environ.get("RENDER") == "true" else "local",
+    "git_commit": os.environ.get("RENDER_GIT_COMMIT") or None,
+    "git_branch": os.environ.get("RENDER_GIT_BRANCH") or None,
+}
+Path(sys.argv[1]).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+
 printf '[render-start] Starting localhost-only Plasma Protocol v3.3 Server\n'
 python -m plasma_server.server --config "${config_path}" &
 server_pid=$!
