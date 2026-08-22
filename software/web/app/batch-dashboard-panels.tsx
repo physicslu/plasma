@@ -19,6 +19,7 @@ type TopologySummaryProps = {
   selectedFacilityCount: number;
   selectedPpuCount: number;
   counts: BatchDashboardCounts;
+  ariaLabel?: string;
 };
 
 type PolicyCopy = {
@@ -78,9 +79,10 @@ export function BatchTopologySummary({
   selectedFacilityCount,
   selectedPpuCount,
   counts,
+  ariaLabel = "Batch topology summary",
 }: TopologySummaryProps) {
   return (
-    <section className="batchTopologySummary" aria-label="Batch topology summary">
+    <section className="batchTopologySummary" aria-label={ariaLabel}>
       <article><small>Facilities</small><b>{facilityCount}</b></article>
       <article><small>PPUs</small><b>{ppuCount}</b></article>
       <article><small>Sites</small><b>{selectedSiteCount}</b><span>{selectedFacilityCount} F / {selectedPpuCount} P</span></article>
