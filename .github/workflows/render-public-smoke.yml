@@ -1,0 +1,82 @@
+name: Render Public Smoke Acceptance
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/render-public-smoke.yml"
+      - "scripts/render-start.sh"
+      - "scripts/tests/test-render-public-smoke.py"
+      - "docs/deployment/render-public-smoke.md"
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: "Expected deployed Git commit; blank means the selected ref SHA"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-public-smoke
+  cancel-in-progress: false
+
+jobs:
+  public-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate smoke sources
+        run: |
+          bash -n scripts/render-start.sh
+          python -m py_compile scripts/tests/test-render-public-smoke.py
+
+      - name: Resolve expected deployed commit
+        id: target
+        env:
+          DISPATCH_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: |
+          expected=""
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            expected="${DISPATCH_EXPECTED_COMMIT:-${GITHUB_SHA}}"
+          fi
+          printf 'expected_commit=%s\n' "${expected}" >> "${GITHUB_OUTPUT}"
+          if [[ -n "${expected}" ]]; then
+            printf 'Will require deployed commit %s\n' "${expected}"
+          else
+            printf 'PR validation: checking the currently deployed public service without commit pinning.\n'
+          fi
+
+      - name: Run cold-start-aware public smoke acceptance
+        id: smoke
+        continue-on-error: true
+        env:
+          EXPECTED_COMMIT: ${{ steps.target.outputs.expected_commit }}
+        run: |
+          args=(
+            --origin "https://plasma-6zz7.onrender.com"
+            --wake-timeout 150
+            --poll-interval 5
+            --request-timeout 15
+            --report artifacts/render-public-smoke/report.json
+          )
+          if [[ -n "${EXPECTED_COMMIT}" ]]; then
+            args+=(--expected-commit "${EXPECTED_COMMIT}")
+          fi
+          python scripts/tests/test-render-public-smoke.py "${args[@]}"
+
+      - name: Upload Render public smoke report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-public-smoke-report
+          path: artifacts/render-public-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce public smoke result
+        if: ${{ steps.smoke.outcome != 'success' }}
+        run: exit 1
