@@ -99,8 +99,9 @@ const copy = {
     selectedSites: "Sites",
     noSelection: "尚未選擇 FPS。",
     operations: "批次操作",
-    imageHint: "Program / Verify 使用單一不可變 Programming Asset Snapshot，Mock 上限 4 MiB。",
+    imageHint: "未選 Image 時由 Mock Settings 的 Default Image Size 自動產生 Synthetic Image；手動選檔時以選檔優先。",
     browse: "選擇燒錄檔",
+    syntheticImage: "Mock Synthetic Image",
     execute: "執行批次",
     cancelAll: "取消批次",
     ready: "READY",
@@ -147,8 +148,9 @@ const copy = {
     selectedSites: "Sites",
     noSelection: "No FPS selected.",
     operations: "Batch Operations",
-    imageHint: "Program / Verify uses one immutable Programming Asset Snapshot; Mock limit is 4 MiB.",
+    imageHint: "Without a selected Image, Mock generates a Synthetic Image from Default Image Size; a selected file takes precedence.",
     browse: "Select Programming File",
+    syntheticImage: "Mock Synthetic Image",
     execute: "Execute Batch",
     cancelAll: "Cancel Batch",
     ready: "READY",
@@ -614,6 +616,7 @@ export default function ServerBatchFleetPage() {
 
   const siteDensity = densityFor(summary.sites);
   const requiresImage = selectedOperations.some(operation => operation === "program" || operation === "verify");
+  const syntheticMockImageAvailable = catalog?.provider === "mock";
   const allSitesExecutable = activeTargets.length > 0 && activeTargets.every(active => {
     const runtime = runtimes[active.key];
     return Boolean(
@@ -630,7 +633,7 @@ export default function ServerBatchFleetPage() {
     selectedSiteCount: activeCounts.sites,
     selectedOperationCount: selectedOperations.length,
     requiresImage,
-    imagePresent: Boolean(imageAsset),
+    imagePresent: Boolean(imageAsset) || syntheticMockImageAvailable,
     imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_BYTES,
     readSelected: selectedOperations.includes("read"),
     readParamsValid: true,
@@ -741,9 +744,13 @@ export default function ServerBatchFleetPage() {
         operations,
         executionPolicy,
         assetFile: imageAsset,
+        allowSyntheticMockImage: syntheticMockImageAvailable,
         readOffset: 0,
         readLength: 256,
       });
+      if (!imageAsset && accepted.asset) {
+        appendLog(`[IMG] SYNTHETIC · ${accepted.asset.name} · ${accepted.asset.size_bytes} bytes`);
+      }
       applyBatchSnapshot(accepted, catalog);
       writeStoredBatch(apiBase, accepted.batch_id);
       const generation = ++pollGenerationRef.current;
@@ -920,7 +927,13 @@ export default function ServerBatchFleetPage() {
                       }
                     }}
                   />
-                  <em className="programmingFileName" title={imageAsset?.name}>{imageAsset?.name ?? "—"}</em>
+                  <em
+                    className="programmingFileName"
+                    data-image-source={imageAsset ? "user" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none"}
+                    title={imageAsset?.name}
+                  >
+                    {imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? text.syntheticImage : "—")}
+                  </em>
                   <small className="programmingFileHint">{text.imageHint}</small>
                 </div>
 
