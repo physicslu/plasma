@@ -102,7 +102,7 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
   await expect(active.locator('[data-active-fps-state="error"]')).toHaveCount(1);
 
   const policy = root.getByRole("region", { name: "Batch execution policy" });
-  const repeatInfo = policy.getByLabel("Repeat Count information");
+  const repeatInfo = policy.getByLabel("Help for Repeat Count");
   await repeatInfo.hover();
   const tooltip = repeatInfo.getByRole("tooltip");
   await expect.poll(() => tooltip.evaluate(element => getComputedStyle(element).opacity)).toBe("1");
