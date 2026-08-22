@@ -94,14 +94,20 @@ def wait_until_ready(
     while time.monotonic() < deadline:
         if expected_commit:
             observed = deployment_commit(origin, timeout=request_timeout)
-            if observed:
-                report.observed_commit = observed
-                if observed != expected_commit:
-                    last_issue = (
-                        f"Render is healthy on commit {observed}, waiting for expected {expected_commit}"
-                    )
-                    time.sleep(poll_interval)
-                    continue
+            if not observed:
+                last_issue = (
+                    "deployment identity is not available yet; waiting for a deployment "
+                    f"that reports expected commit {expected_commit}"
+                )
+                time.sleep(poll_interval)
+                continue
+            report.observed_commit = observed
+            if observed != expected_commit:
+                last_issue = (
+                    f"Render is serving commit {observed}, waiting for expected {expected_commit}"
+                )
+                time.sleep(poll_interval)
+                continue
 
         try:
             payload = request_json(origin, "/api/health/ready", timeout=request_timeout)
