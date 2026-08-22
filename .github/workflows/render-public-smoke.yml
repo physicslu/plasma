@@ -29,6 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate smoke sources
+        run: |
+          bash -n scripts/render-start.sh
+          python -m py_compile scripts/tests/test-render-public-smoke.py
+
       - name: Resolve expected deployed commit
         id: target
         env:
