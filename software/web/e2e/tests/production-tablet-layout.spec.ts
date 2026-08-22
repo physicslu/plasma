@@ -93,8 +93,8 @@ async function installProductionCatalog(page: Page) {
   });
 }
 
-test("Production batch toolbar follows its container width on iPad landscape", async ({ page }) => {
-  // iPad Pro 11-inch landscape CSS viewport.  The expanded FPS selector leaves
+test("Production batch toolbar follows its available width on iPad landscape", async ({ page }) => {
+  // iPad Pro 11-inch landscape CSS viewport. The expanded FPS selector leaves
   // substantially less width for the Production main panel than the viewport
   // itself, which is the regression this test protects.
   await page.setViewportSize({ width: 1194, height: 834 });
@@ -107,10 +107,10 @@ test("Production batch toolbar follows its container width on iPad landscape", a
 
   const expanded = await toolbar.evaluate(element => {
     const toolbarRect = element.getBoundingClientRect();
-    const file = element.querySelector<HTMLElement>(".programmingBatchFile")!;
+    const image = element.querySelector<HTMLElement>(".programmingBatchFile")!;
     const operations = element.querySelector<HTMLElement>(".programmingBatchOperations")!;
     const actions = element.querySelector<HTMLElement>(".programmingBatchActions")!;
-    const fileRect = file.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
     const operationsRect = operations.getBoundingClientRect();
     const actionsRect = actions.getBoundingClientRect();
     const operationTops = [...operations.querySelectorAll<HTMLElement>("label")].map(label => label.getBoundingClientRect().top);
@@ -121,7 +121,7 @@ test("Production batch toolbar follows its container width on iPad landscape", a
       operationTopSpread: Math.max(...operationTops) - Math.min(...operationTops),
       toolbarRight: toolbarRect.right,
       actionsRight: actionsRect.right,
-      fileBottom: fileRect.bottom,
+      imageBottom: imageRect.bottom,
       operationsBottom: operationsRect.bottom,
       actionsTop: actionsRect.top,
       scrollWidth: element.scrollWidth,
@@ -129,10 +129,10 @@ test("Production batch toolbar follows its container width on iPad landscape", a
     };
   });
 
-  expect(expanded.areas).toBe('"file operations" "actions actions"');
+  expect(expanded.areas).toBe('"image operations" "actions actions"');
   expect(expanded.operationWrap).toBe("nowrap");
   expect(expanded.operationTopSpread).toBeLessThanOrEqual(1);
-  expect(expanded.actionsTop).toBeGreaterThanOrEqual(Math.max(expanded.fileBottom, expanded.operationsBottom) - 1);
+  expect(expanded.actionsTop).toBeGreaterThanOrEqual(Math.max(expanded.imageBottom, expanded.operationsBottom) - 1);
   expect(expanded.actionsRight).toBeLessThanOrEqual(expanded.toolbarRight + 1);
   expect(expanded.scrollWidth).toBeLessThanOrEqual(expanded.clientWidth + 1);
 
