@@ -7,6 +7,7 @@ export default defineConfig({
     "engineering-programming-asset-cache-runtime.spec.ts",
     "production-multi-ppu-runtime.spec.ts",
     "mock-runtime-settings-runtime.spec.ts",
+    "render-public-runtime.spec.ts",
   ],
   snapshotPathTemplate: "{testDir}/__snapshots__/{testFilePath}/{arg}{ext}",
   fullyParallel: false,

@@ -1,0 +1,80 @@
+name: Render Public Browser Acceptance
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/render-public-browser.yml"
+      - "software/web/e2e/playwright.render-public.config.ts"
+      - "software/web/e2e/tests/render-public-runtime.spec.ts"
+      - "docs/deployment/render-public-browser.md"
+  workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: "Expected deployed Git commit; blank means the selected ref SHA"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-public-browser
+  cancel-in-progress: false
+
+jobs:
+  public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: software/web/e2e/package-lock.json
+
+      - name: Install Playwright test runtime
+        working-directory: software/web/e2e
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: software/web/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Resolve expected deployed commit
+        id: target
+        env:
+          DISPATCH_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            expected="${PR_BASE_SHA}"
+          else
+            expected="${DISPATCH_EXPECTED_COMMIT:-${GITHUB_SHA}}"
+          fi
+          if [[ -z "${expected}" ]]; then
+            echo "Expected Render commit could not be resolved" >&2
+            exit 64
+          fi
+          printf 'expected_commit=%s\n' "${expected}" >> "${GITHUB_OUTPUT}"
+          printf 'Will require Render deployment %s\n' "${expected}"
+
+      - name: Run public Render browser acceptance
+        working-directory: software/web/e2e
+        env:
+          EXPECTED_RENDER_COMMIT: ${{ steps.target.outputs.expected_commit }}
+          PLASMA_RENDER_ORIGIN: https://plasma-6zz7.onrender.com
+        run: npx playwright test --config playwright.render-public.config.ts
+
+      - name: Upload public browser diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-public-browser-report
+          path: |
+            software/web/e2e/playwright-report/
+            software/web/e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
