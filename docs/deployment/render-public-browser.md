@@ -31,16 +31,25 @@ At a 1194 x 834 CSS viewport:
 - the toolbar does not horizontally overflow;
 - collapsing the FPS selector restores the desktop single-row toolbar.
 
-### Mock Synthetic Image readiness
+### Mock Synthetic Image selection
 
 Against the live Mock provider:
 
 1. select `mock-facility-01 / mock-facility-01-ppu-01 / SITE-01`;
 2. confirm the selection;
 3. select Program without choosing a user Programming Image;
-4. require `Mock Synthetic Image`, `data-image-source=mock_synthetic`, `BATCH READY`, and an enabled Execute button.
+4. require `Mock Synthetic Image` and `data-image-source=mock_synthetic`;
+5. require that readiness is **not** `IMAGE REQUIRED`.
 
-The test deliberately does **not** click Execute. It therefore creates no Batch or Job, uploads no Programming Image, and changes no Mock Runtime settings. The page may create its normal short-lived Engineering session.
+The public Render demo is shared state. A fixed Site can legitimately be `SITE BUSY` because another browser/session or prior acceptance work is using it. Site availability therefore must not determine whether the Synthetic Image contract passes:
+
+- `BATCH READY` -> Execute must be enabled;
+- `SITE BUSY` -> Execute must remain disabled;
+- either state is acceptable for this public Image-selection acceptance, but `IMAGE REQUIRED` is not.
+
+Deterministic local Playwright and Mock CD tests separately prove that an idle Mock Site with Program selected and no user Image becomes `BATCH READY`.
+
+The public test deliberately does **not** click Execute. It therefore creates no Batch or Job, uploads no Programming Image, and changes no Mock Runtime settings. The page may create its normal short-lived Engineering session.
 
 ## Boundary
 
