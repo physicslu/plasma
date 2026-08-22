@@ -1,0 +1,38 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+const shared = fs.readFileSync(new URL("../app/batch-dashboard-panels.tsx", import.meta.url), "utf8");
+const pmod = fs.readFileSync(new URL("../app/fleet/server-batch-page.tsx", import.meta.url), "utf8");
+const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace.tsx", import.meta.url), "utf8");
+
+test("Pmod and Emode share the same three upper Batch dashboard primitives", () => {
+  for (const source of [pmod, emode]) {
+    assert.match(source, /BatchTopologySummary/);
+    assert.match(source, /unifiedBatchControlStack/);
+    assert.match(source, /ActiveFpsSummary/);
+    assert.match(source, /BatchPolicyPanel/);
+  }
+});
+
+test("shared Active FPS summary keeps FAULTED and ERROR distinct without duplicate error state", () => {
+  assert.match(shared, /\["faulted", copy\.faulted, counts\.faulted\]/);
+  assert.match(shared, /\["error", copy\.error, counts\.error\]/);
+  assert.equal((shared.match(/data-active-fps-state/g) ?? []).length, 1);
+  assert.match(shared, /selected.*running.*pass.*faulted.*error.*stopped.*cancelled/s);
+});
+
+test("policy controls expose hover/focus help and canonical ranges", () => {
+  assert.match(shared, /role="tooltip"/);
+  assert.match(shared, /aria-label="Repeat Count" type="number" min="1" max="10000"/);
+  assert.match(shared, /aria-label="Site Retry Limit" type="number" min="0" max="20"/);
+  assert.match(shared, /aria-label="Failed Site Stop Threshold"/);
+});
+
+test("Emode policy is behavioral rather than decorative", () => {
+  assert.match(emode, /for \(let round = 1; round <= repeatValue; round \+= 1\)/);
+  assert.match(emode, /for \(let attempt = 0; attempt <= retryValue; attempt \+= 1\)/);
+  assert.match(emode, /terminalize\(siteId, "faulted"/);
+  assert.match(emode, /terminalize\(siteId, "error"/);
+  assert.match(emode, /batchStopReason\.current = "threshold"/);
+});

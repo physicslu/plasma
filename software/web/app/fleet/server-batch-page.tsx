@@ -31,6 +31,7 @@ import type {
   ServerBatchState,
 } from "../server-batch-api";
 import { useWorkspaceSession, type SelectionMap } from "../workspace-session";
+import { ActiveFpsSummary, BatchPolicyPanel, BatchTopologySummary } from "../batch-dashboard-panels";
 import "../programming-batch-toolbar.css";
 import "./fleet.css";
 import "./production-prototype.css";
@@ -347,6 +348,51 @@ function clearStoredBatch(): void {
 export default function ServerBatchFleetPage() {
   const { locale, t } = useI18n();
   const text = copy[locale];
+const dashboardCopy = locale === "zh-TW" ? {
+  policy: {
+    repeatCount: "Repeat Count",
+    retryLimit: "Site Retry Limit",
+    stopThreshold: "Failed Site Stop Threshold",
+    repeatTooltip: "整個 Batch 連續執行的輪數（1–10000）。",
+    retryTooltip: "單一 Site 的操作失敗後最多重試次數（0–20）。",
+    thresholdTooltip: "Retry 用盡後成為 FAULTED 的 Site 數達門檻時停止 Batch；off 表示不啟用。",
+    hint: "Repeat 套用整個 Batch；Retry 只針對可信操作失敗；Threshold 只計入 Retry 用盡的 FAULTED Site。",
+    invalid: "Batch Execution Policy 設定無效。",
+  },
+  active: {
+    title: "Active FPS : 即時結果摘要",
+    hint: "FAULTED = Retry 用盡的可信 DUT/Site 失敗；ERROR = 基礎設施或 Runtime 錯誤。",
+    selected: "總選擇",
+    running: "執行中",
+    pass: "成功 (PASS)",
+    faulted: "失敗 (FAULTED)",
+    error: "錯誤 (ERROR)",
+    stopped: "已停止",
+    cancelled: "已取消",
+  },
+} : {
+  policy: {
+    repeatCount: "Repeat Count",
+    retryLimit: "Site Retry Limit",
+    stopThreshold: "Failed Site Stop Threshold",
+    repeatTooltip: "Number of complete Batch rounds (1–10000).",
+    retryTooltip: "Maximum retries after a trustworthy Site operation failure (0–20).",
+    thresholdTooltip: "Stop the Batch when retry-exhausted FAULTED Sites reach this count; off disables the threshold.",
+    hint: "Repeat applies to the whole Batch; Retry applies only to trustworthy operation failures; Threshold counts retry-exhausted FAULTED Sites.",
+    invalid: "Batch Execution Policy is invalid.",
+  },
+  active: {
+    title: "Active FPS : Live Result Summary",
+    hint: "FAULTED = trustworthy DUT/Site failure after retry exhaustion; ERROR = infrastructure or runtime failure.",
+    selected: "Selected",
+    running: "Running",
+    pass: "PASS",
+    faulted: "FAULTED",
+    error: "ERROR",
+    stopped: "Stopped",
+    cancelled: "Cancelled",
+  },
+};
   const {
     hydrated: workspaceHydrated,
     apiBase,
@@ -898,14 +944,17 @@ export default function ServerBatchFleetPage() {
             </aside>
 
             <section className="productionMainPanel">
-              <section className="prototypeTopologySummary" aria-label="Mock topology summary">
-                <article><small>Facilities</small><b>{catalog.facility_count}</b></article>
-                <article><small>PPUs</small><b>{catalog.ppu_count}</b></article>
-                <article><small>{text.selectedSites}</small><b>{summary.sites}</b><span>{summary.facilities} F / {summary.ppus} P</span></article>
-                <article className="runtimeSummary"><small>PASS</small><b>{summary.success}</b><span>FAULT {summary.faulted} · ERR {summary.error} · RUN {summary.running} · STOP {summary.stopped} · CAN {summary.cancelled}</span></article>
-              </section>
+              <BatchTopologySummary
+      facilityCount={catalog.facility_count}
+      ppuCount={catalog.ppu_count}
+      selectedSiteCount={summary.sites}
+      selectedFacilityCount={summary.facilities}
+      selectedPpuCount={summary.ppus}
+      counts={{ selected: summary.sites, running: summary.running, pass: summary.success, faulted: summary.faulted, error: summary.error, stopped: summary.stopped, cancelled: summary.cancelled }}
+    />
 
-              <section className="productionBatchToolbar programmingBatchToolbar" aria-label="Batch operation toolbar">
+    <section className="unifiedBatchControlStack" data-dashboard-mode="production">
+    <section className="productionBatchToolbar programmingBatchToolbar" aria-label="Batch operation toolbar">
                 <div className="productionImagePicker programmingBatchFile">
                   <button type="button" className="productionBrowseButton" disabled={batchRunning} onClick={() => imageInputRef.current?.click()}>{text.browse}</button>
                   <input
@@ -956,12 +1005,24 @@ export default function ServerBatchFleetPage() {
                 </div>
               </section>
 
-              <section className="batchPolicyPanel" aria-label="Batch execution policy">
-                <label><span>{text.repeatCount}</span><input aria-label="Repeat Count" type="number" min="1" max="10000" value={repeatCount} disabled={batchRunning} onChange={event => setRepeatCount(event.target.value)} /></label>
-                <label><span>{text.retryLimit}</span><input aria-label="Site Retry Limit" type="number" min="0" max="20" value={siteRetryLimit} disabled={batchRunning} onChange={event => setSiteRetryLimit(event.target.value)} /></label>
-                <label><span>{text.stopThreshold}</span><input aria-label="Failed Site Stop Threshold" type="number" min="1" max={Math.max(1, activeCounts.sites)} placeholder="off" value={failedSiteThreshold} disabled={batchRunning} onChange={event => setFailedSiteThreshold(event.target.value)} /></label>
-                <small>{policyValid ? text.thresholdHint : text.policyInvalid}</small>
-              </section>
+              <BatchPolicyPanel
+      repeatCount={repeatCount}
+      retryLimit={siteRetryLimit}
+      stopThreshold={failedSiteThreshold}
+      maxThreshold={activeCounts.sites}
+      disabled={batchRunning}
+      valid={policyValid}
+      copy={dashboardCopy.policy}
+      onRepeatCount={setRepeatCount}
+      onRetryLimit={setSiteRetryLimit}
+      onStopThreshold={setFailedSiteThreshold}
+    />
+    </section>
+
+    <ActiveFpsSummary
+      counts={{ selected: summary.sites, running: summary.running, pass: summary.success, faulted: summary.faulted, error: summary.error, stopped: summary.stopped, cancelled: summary.cancelled }}
+      copy={dashboardCopy.active}
+    />
 
               {batchSnapshot && (
                 <section className={`serverBatchStatistics state-${batchSnapshot.state}`} aria-label={text.statistics} data-batch-id={batchSnapshot.batch_id} data-batch-state={batchSnapshot.state}>
