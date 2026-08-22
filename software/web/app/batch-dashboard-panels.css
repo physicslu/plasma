@@ -1,0 +1,267 @@
+.batchTopologySummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.batchTopologySummary article {
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid var(--line, #dae4ef);
+  border-radius: 9px;
+  background: var(--panel, #fff);
+  box-shadow: 0 3px 12px rgba(15, 23, 42, .035);
+}
+
+.batchTopologySummary small,
+.batchTopologySummary b,
+.batchTopologySummary span {
+  display: block;
+}
+
+.batchTopologySummary small {
+  color: var(--muted, #64748b);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.batchTopologySummary b {
+  margin-top: 2px;
+  color: var(--text, #172033);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.batchTopologySummary span {
+  margin-top: 3px;
+  color: var(--muted, #64748b);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.batchTopologySummary .batchTopologyPass b {
+  color: #15803d;
+}
+
+.unifiedBatchControlStack {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--line, #d8e2ee);
+  border-radius: 11px;
+  background: var(--panel, #fff);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, .04);
+  overflow: visible;
+}
+
+.unifiedBatchControlStack > .programmingBatchToolbar {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.unifiedBatchPolicyPanel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 8px 10px 9px;
+  border-top: 1px solid var(--line, #e2e8f0);
+  background: var(--panel, #fff);
+}
+
+.batchPolicyField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(76px, 112px);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.batchPolicyLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-soft, #334155);
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.batchPolicyField input {
+  width: 100%;
+  min-height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-strong, #cbd5e1);
+  border-radius: 7px;
+  background: var(--panel-2, #f8fafc);
+  color: var(--text, #0f172a);
+  padding: 0 8px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.batchPolicyInfo {
+  position: relative;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  border: 1px solid color-mix(in srgb, var(--cyan, #0891b2) 55%, var(--line, #cbd5e1));
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  color: var(--cyan, #0891b2);
+  font: 800 9px/1 ui-sans-serif, system-ui, sans-serif;
+  cursor: help;
+  outline: none;
+}
+
+.batchPolicyInfo [role="tooltip"] {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 260px;
+  transform: translateX(-50%) translateY(3px);
+  padding: 7px 9px;
+  border: 1px solid var(--line-strong, #cbd5e1);
+  border-radius: 7px;
+  background: var(--text, #0f172a);
+  color: var(--panel, #fff);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .18);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+.batchPolicyInfo:hover [role="tooltip"],
+.batchPolicyInfo:focus [role="tooltip"],
+.batchPolicyInfo:focus-visible [role="tooltip"] {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.batchPolicyHint {
+  grid-column: 1 / -1;
+  margin-top: -2px;
+  color: var(--muted, #64748b);
+  font-size: 8px;
+}
+
+.batchPolicyHint.invalid {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.activeFpsSummary {
+  display: grid;
+  grid-template-columns: minmax(220px, .9fr) minmax(0, 2.1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--line, #d8e2ee);
+  border-radius: 10px;
+  background: var(--panel, #fff);
+  box-shadow: 0 3px 14px rgba(15, 23, 42, .035);
+}
+
+.activeFpsSummary header h2 {
+  margin: 0;
+  color: var(--text, #172033);
+  font-size: 15px;
+}
+
+.activeFpsSummary header span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted, #64748b);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.activeFpsMetrics {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(66px, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.activeFpsMetrics article {
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 7px;
+  border: 1px solid var(--line, #dbe3ee);
+  border-radius: 7px;
+  background: var(--panel-2, #f8fafc);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  text-align: center;
+}
+
+.activeFpsMetrics small {
+  color: var(--muted, #64748b);
+  font-size: 7px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.activeFpsMetrics b {
+  margin-top: 1px;
+  color: var(--text, #172033);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.activeFpsMetrics [data-active-fps-state="pass"] {
+  border-color: color-mix(in srgb, #22c55e 38%, var(--line, #dbe3ee));
+}
+.activeFpsMetrics [data-active-fps-state="pass"] b { color: #16a34a; }
+.activeFpsMetrics [data-active-fps-state="faulted"] {
+  border-color: color-mix(in srgb, #f97316 42%, var(--line, #dbe3ee));
+}
+.activeFpsMetrics [data-active-fps-state="faulted"] b { color: #ea580c; }
+.activeFpsMetrics [data-active-fps-state="error"] {
+  border-color: color-mix(in srgb, #dc2626 42%, var(--line, #dbe3ee));
+}
+.activeFpsMetrics [data-active-fps-state="error"] b { color: #dc2626; }
+
+[data-theme="dark"] .unifiedBatchControlStack,
+[data-theme="dark"] .unifiedBatchPolicyPanel,
+[data-theme="dark"] .batchTopologySummary article,
+[data-theme="dark"] .activeFpsSummary {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+@media (max-width: 1080px) {
+  .activeFpsSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .activeFpsMetrics {
+    grid-template-columns: repeat(4, minmax(72px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .batchTopologySummary,
+  .unifiedBatchPolicyPanel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .activeFpsMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .batchPolicyField {
+    grid-template-columns: 1fr;
+  }
+}
