@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import tempfile
+import threading
 import time
 import unittest
+from http.client import HTTPConnection
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from plasma_core.assets import ProgrammingAsset
 from plasma_core.batch import BatchExecutionPolicy, BatchTarget
 from plasma_core.enums import Operation
 from plasma_core.models import JobRequest
+from plasma_web.gateway import PlasmaWebHandler
 from plasma_web.mock_batch_runtime import MockAwareBatchRuntimeManager
 from plasma_web.mock_synthetic_image import build_synthetic_mock_asset
 from plasma_web.shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
@@ -40,6 +45,22 @@ def user_asset(data: bytes) -> ProgrammingAsset:
         data=data,
         sha256=hashlib.sha256(data).hexdigest(),
     )
+
+
+class NonSyntheticEngineeringProvider:
+    def job_timeout_s(self, facility_id: str, ppu_id: str) -> float:
+        return 30.0
+
+    async def start_job(
+        self,
+        facility_id: str,
+        ppu_id: str,
+        request: JobRequest,
+        *,
+        session_id: str | None = None,
+        asset_sha256: str | None = None,
+    ) -> dict[str, object]:
+        raise AssertionError("non-synthetic provider must not receive an Image-less Program job")
 
 
 class MockSyntheticImageTests(unittest.TestCase):
@@ -79,6 +100,39 @@ class MockSyntheticRuntimeTests(unittest.TestCase):
                 return snapshot
             time.sleep(0.01)
         self.fail(f"Batch {batch_id} did not reach terminal state")
+
+    def request_gateway_job(self, provider: object, body: dict[str, object]) -> tuple[int, dict[str, object]]:
+        previous_provider = PlasmaWebHandler.engineering_provider
+        previous_runtime = PlasmaWebHandler.batch_runtime
+        server = None
+        thread = None
+        try:
+            PlasmaWebHandler.engineering_provider = provider  # type: ignore[assignment]
+            PlasmaWebHandler.batch_runtime = self.manager if provider is self.provider else None
+            server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            conn = HTTPConnection("127.0.0.1", server.server_port)
+            raw = json.dumps(body).encode("utf-8")
+            conn.request(
+                "POST",
+                "/api/engineering/targets/mock-facility-01/mock-facility-01-ppu-01/api/jobs",
+                raw,
+                {"Content-Type": "application/json"},
+            )
+            response = conn.getresponse()
+            payload = json.loads(response.read())
+            status = response.status
+            conn.close()
+            return status, payload
+        finally:
+            if server is not None:
+                server.shutdown()
+                server.server_close()
+            if thread is not None:
+                thread.join()
+            PlasmaWebHandler.engineering_provider = previous_provider
+            PlasmaWebHandler.batch_runtime = previous_runtime
 
     def test_batch_without_uploaded_image_uses_frozen_profile_size(self) -> None:
         started = self.manager.create_batch(
@@ -133,6 +187,31 @@ class MockSyntheticRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(accepted["ok"])
         self.assertTrue(accepted["job"]["job_id"])
+
+    def test_gateway_accepts_image_less_program_only_for_shared_image_mock_provider(self) -> None:
+        status, payload = self.request_gateway_job(
+            self.provider,
+            {
+                "site_id": 1,
+                "operation": "program",
+                "session_id": self.session_id,
+            },
+        )
+        self.assertEqual(status, 202)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["job"]["operation"], "program")
+
+    def test_gateway_keeps_non_synthetic_provider_fail_closed(self) -> None:
+        status, payload = self.request_gateway_job(
+            NonSyntheticEngineeringProvider(),
+            {
+                "site_id": 1,
+                "operation": "program",
+                "session_id": self.session_id,
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("asset_sha256", payload["error"]["message"])
 
 
 if __name__ == "__main__":
