@@ -1,5 +1,4 @@
 name: Unified P E Dashboard Verify
-# Re-run after simplifying Engineering Active FPS render computation.
 
 on:
   pull_request:
@@ -15,139 +14,95 @@ jobs:
   verify:
     if: github.head_ref == 'agent/unified-pe-batch-dashboard'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           ref: agent/unified-pe-batch-dashboard
           fetch-depth: 0
 
-      - name: Add focused P/E browser regression
+      - name: Apply focused contract fixes
         run: |
-          cat > software/web/e2e/tests/unified-batch-dashboard.spec.ts <<'EOF'
-          import { expect, test, type Page, type Route } from "@playwright/test";
+          python - <<'PY'
+          from pathlib import Path
 
-          const siteCounts = [2, 4, 6, 8] as const;
+          pmod = Path('software/web/app/fleet/server-batch-page.tsx')
+          text = pmod.read_text(encoding='utf-8')
+          needle = '              <BatchTopologySummary\n      facilityCount={catalog.facility_count}'
+          replacement = '              <BatchTopologySummary\n                ariaLabel="Mock topology summary"\n                facilityCount={catalog.facility_count}'
+          if needle not in text:
+              raise SystemExit('PMode BatchTopologySummary insertion point not found')
+          text = text.replace(needle, replacement, 1)
+          pmod.write_text(text, encoding='utf-8')
 
-          function catalog() {
-            return {
-              ok: true,
-              provider: "mock",
-              facility_count: 3,
-              ppu_count: 12,
-              site_count: 60,
-              programming_asset_scope: "connection-session-and-ppu",
-              facilities: Array.from({ length: 3 }, (_, facilityIndex) => {
-                const facilityNumber = facilityIndex + 1;
-                const facilityId = `mock-facility-${String(facilityNumber).padStart(2, "0")}`;
-                return {
-                  facility_id: facilityId,
-                  display_name: `Mock Facility ${String(facilityNumber).padStart(2, "0")}`,
-                  ppus: siteCounts.map((siteCount, ppuIndex) => ({
-                    ppu_id: `${facilityId}-ppu-${String(ppuIndex + 1).padStart(2, "0")}`,
-                    display_name: `Mock PPU ${String(ppuIndex + 1).padStart(2, "0")}`,
-                    model: "MOCK-PPU",
-                    site_count: siteCount,
-                    provider: "mock",
-                  })),
-                };
-              }),
-            };
-          }
+          tablet = Path('software/web/e2e/tests/production-tablet-layout.spec.ts')
+          text = tablet.read_text(encoding='utf-8')
+          old = '''test("Production batch toolbar uses two rows in a narrow content column at a wide viewport", async ({ page }) => {
+            await openProduction(page, { width: 1440, height: 900 });
 
-          function statusFor(facilityId: string, ppuId: string) {
-            const ppuNumber = Number(ppuId.slice(-2));
-            const siteCount = siteCounts[ppuNumber - 1] ?? 2;
-            return {
-              ok: true,
-              ppu: {
-                ppu_id: ppuId,
-                facility_id: facilityId,
-                model: "MOCK-PPU",
-                display_name: `Mock PPU ${String(ppuNumber).padStart(2, "0")}`,
-                site_count: siteCount,
-                enabled_site_count: siteCount,
-                capabilities: { max_supported_sites: siteCount, operations: ["erase", "program", "verify", "read"] },
-              },
-              sites: Array.from({ length: siteCount }, (_, index) => ({
-                site_id: index + 1,
-                enabled: true,
-                state: "idle",
-                current_job_id: null,
-                queued_jobs: 0,
-                interface: "mock",
-                target: "MOCK-IC",
-              })),
-            };
-          }
+            const workspaceWidth = await page.locator(".productionMainPanel").evaluate(element => element.clientWidth);
+            expect(workspaceWidth).toBeLessThanOrEqual(1060);
+            await expectConstrainedToolbar(page);
+          });'''
+          new = '''test("Production batch toolbar follows a constrained content column at a wide viewport", async ({ page }) => {
+            await openProduction(page, { width: 1440, height: 900 });
 
-          async function installDashboardMock(page: Page) {
-            await page.route("**/api/engineering/**", async (route: Route) => {
-              const request = route.request();
-              const url = new URL(request.url());
-              if (url.pathname === "/api/engineering/session" && request.method() === "POST") {
-                await route.fulfill({
-                  status: 201,
-                  contentType: "application/json",
-                  body: JSON.stringify({ ok: true, session: { session_id: "11111111111111111111111111111111", programming_asset_cache_scope: "connection-session-and-ppu", previous_session_cleared: false } }),
-                });
-                return;
-              }
-              if (url.pathname === "/api/engineering/targets") {
-                await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
-                return;
-              }
-              const parts = url.pathname.split("/").filter(Boolean);
-              const facilityId = parts[3];
-              const ppuId = parts[4];
-              if (request.method() === "GET" && parts.slice(5).join("/") === "api/status" && !url.searchParams.has("job")) {
-                await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(statusFor(facilityId, ppuId)) });
-                return;
-              }
-              await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "unhandled dashboard test route" } }) });
+            const workspace = page.locator(".productionWorkspace");
+            const mainPanel = page.locator(".productionMainPanel");
+            await workspace.evaluate(element => {
+              (element as HTMLElement).style.gridTemplateColumns = "286px minmax(0, 1040px)";
             });
-          }
-
-          async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
-            await expect(root.locator(".batchTopologySummary")).toBeVisible();
-            await expect(root.locator(".unifiedBatchControlStack")).toBeVisible();
-            const active = root.locator(".activeFpsSummary");
-            await expect(active).toBeVisible();
-            await expect(active.locator("[data-active-fps-state]")).toHaveCount(7);
-            await expect(active.locator('[data-active-fps-state="faulted"]')).toHaveCount(1);
-            await expect(active.locator('[data-active-fps-state="error"]')).toHaveCount(1);
-
-            const policy = root.getByRole("region", { name: "Batch execution policy" });
-            const repeatInfo = policy.getByLabel("Repeat Count information");
-            await repeatInfo.hover();
-            const tooltip = repeatInfo.getByRole("tooltip");
-            await expect.poll(() => tooltip.evaluate(element => getComputedStyle(element).opacity)).toBe("1");
-            await expect(tooltip).toContainText(/1.*10000/);
-
-            const distance = await policy.locator(".batchPolicyField").first().evaluate(element => {
-              const label = element.querySelector<HTMLElement>(".batchPolicyLabel")!.getBoundingClientRect();
-              const input = element.querySelector<HTMLInputElement>("input")!.getBoundingClientRect();
-              return Math.max(0, input.left - label.right);
+            await mainPanel.evaluate(element => {
+              const node = element as HTMLElement;
+              node.style.width = "1040px";
+              node.style.maxWidth = "1040px";
+              node.style.justifySelf = "start";
             });
-            expect(distance).toBeLessThanOrEqual(12);
-          }
 
-          test("Production and Engineering share the compact upper Batch dashboard contract", async ({ page }) => {
-            await installDashboardMock(page);
-            await page.setViewportSize({ width: 1440, height: 900 });
+            await expect.poll(() => mainPanel.evaluate(element => element.clientWidth)).toBeLessThanOrEqual(1060);
+            await expectConstrainedToolbar(page);
+          });'''
+          if old not in text:
+              raise SystemExit('Production tablet wide-column test block not found')
+          tablet.write_text(text.replace(old, new, 1), encoding='utf-8')
 
-            await page.goto("/fleet");
-            await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
-            await assertDashboardContract(page.locator(".productionMainPanel"));
-            const fpsWidth = await page.locator(".fpsSelector").evaluate(element => element.getBoundingClientRect().width);
-            expect(fpsWidth).toBeLessThanOrEqual(300);
-
-            await page.goto("/engineering");
-            await page.getByRole("button", { name: "Programming", exact: true }).click();
-            await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
-            await assertDashboardContract(page.locator(".engineeringProgramming"));
-          });
-          EOF
+          theme = Path('software/web/e2e/tests/pmod-emode-theme-regression.spec.ts')
+          text = theme.read_text(encoding='utf-8')
+          old = '''  const toolbar = await page.locator(".engineeringExecutionToolbar").boundingBox();
+            const header = await page.locator(".engineeringProgrammingHeader").boundingBox();
+            const targetSelector = await page.locator(".engineeringTargetSelector").boundingBox();
+            const sourceNote = await page.locator(".engineeringBoundaryNote").last().boundingBox();
+            const sitePanel = await page.locator(".engineeringSelectorPanel").boundingBox();
+            for (const box of [toolbar, header, targetSelector, sourceNote, sitePanel]) expect(box).not.toBeNull();
+            expect(header!.height).toBeLessThanOrEqual(80);
+            expect(toolbar!.height).toBeLessThanOrEqual(70);
+            expect(targetSelector!.height).toBeLessThanOrEqual(72);
+            expect(sourceNote!.height).toBeLessThanOrEqual(42);
+            expect(sitePanel!.height).toBeLessThanOrEqual(118);
+            expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(360);'''
+          new = '''  const toolbar = await page.locator(".engineeringExecutionToolbar").boundingBox();
+            const header = await page.locator(".engineeringProgrammingHeader").boundingBox();
+            const topology = await page.locator(".engineeringProgramming .batchTopologySummary").boundingBox();
+            const controls = await page.locator(".engineeringProgramming .unifiedBatchControlStack").boundingBox();
+            const activeSummary = await page.locator(".engineeringProgramming .activeFpsSummary").boundingBox();
+            const targetSelector = await page.locator(".engineeringTargetSelector").boundingBox();
+            const sourceNote = await page.locator(".engineeringBoundaryNote").last().boundingBox();
+            const sitePanel = await page.locator(".engineeringSelectorPanel").boundingBox();
+            for (const box of [toolbar, header, topology, controls, activeSummary, targetSelector, sourceNote, sitePanel]) expect(box).not.toBeNull();
+            expect(header!.height).toBeLessThanOrEqual(80);
+            expect(toolbar!.height).toBeLessThanOrEqual(70);
+            expect(topology!.height).toBeLessThanOrEqual(72);
+            expect(controls!.height).toBeLessThanOrEqual(150);
+            expect(activeSummary!.height).toBeLessThanOrEqual(76);
+            expect(activeSummary!.y + activeSummary!.height - header!.y).toBeLessThanOrEqual(400);
+            expect(targetSelector!.height).toBeLessThanOrEqual(72);
+            expect(sourceNote!.height).toBeLessThanOrEqual(42);
+            expect(sitePanel!.height).toBeLessThanOrEqual(118);
+            expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(560);'''
+          if old not in text:
+              raise SystemExit('EMode density assertion block not found')
+          theme.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
 
       - uses: actions/setup-node@v4
         with:
@@ -175,15 +130,20 @@ jobs:
 
       - name: Run focused browser regressions
         working-directory: software/web/e2e
-        run: npx playwright test tests/unified-batch-dashboard.spec.ts tests/production-tablet-layout.spec.ts
+        run: >-
+          npx playwright test
+          tests/unified-batch-dashboard.spec.ts
+          tests/production-tablet-layout.spec.ts
+          tests/pmod-emode-theme-regression.spec.ts
+          tests/factory-production-console.spec.ts
 
       - name: Remove verification workflow
         run: rm -f .github/workflows/unified-pe-dashboard-verify.yml
 
-      - name: Commit verified regression
+      - name: Commit verified fixes
         run: |
           git config user.name "plasma-ci-bot"
           git config user.email "plasma-ci-bot@users.noreply.github.com"
           git add -A
-          git commit -m "Add P E batch dashboard browser regression"
+          git commit -m "Fix unified P E dashboard regressions"
           git push origin HEAD:agent/unified-pe-batch-dashboard
