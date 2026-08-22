@@ -35,6 +35,9 @@ pl/.venv/
 
 # Web generated files
 software/web/node_modules/
+software/web/e2e/node_modules/
+software/web/e2e/playwright-report/
+software/web/e2e/test-results/
 software/web/.next/
 software/web/.sites-runtime/
 software/web/dist/
