@@ -200,14 +200,21 @@ test("Emode stays dense and shares the Pmod file picker and dark operator palett
 
   const toolbar = await page.locator(".engineeringExecutionToolbar").boundingBox();
   const header = await page.locator(".engineeringProgrammingHeader").boundingBox();
+  const topology = await page.locator(".engineeringProgramming .batchTopologySummary").boundingBox();
+  const controls = await page.locator(".engineeringProgramming .unifiedBatchControlStack").boundingBox();
+  const activeSummary = await page.locator(".engineeringProgramming .activeFpsSummary").boundingBox();
   const targetSelector = await page.locator(".engineeringTargetSelector").boundingBox();
   const sourceNote = await page.locator(".engineeringBoundaryNote").last().boundingBox();
   const sitePanel = await page.locator(".engineeringSelectorPanel").boundingBox();
-  for (const box of [toolbar, header, targetSelector, sourceNote, sitePanel]) expect(box).not.toBeNull();
+  for (const box of [toolbar, header, topology, controls, activeSummary, targetSelector, sourceNote, sitePanel]) expect(box).not.toBeNull();
   expect(header!.height).toBeLessThanOrEqual(80);
   expect(toolbar!.height).toBeLessThanOrEqual(70);
+  expect(topology!.height).toBeLessThanOrEqual(72);
+  expect(controls!.height).toBeLessThanOrEqual(150);
+  expect(activeSummary!.height).toBeLessThanOrEqual(76);
+  expect(activeSummary!.y + activeSummary!.height - header!.y).toBeLessThanOrEqual(400);
   expect(targetSelector!.height).toBeLessThanOrEqual(72);
   expect(sourceNote!.height).toBeLessThanOrEqual(42);
   expect(sitePanel!.height).toBeLessThanOrEqual(118);
-  expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(360);
+  expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(560);
 });

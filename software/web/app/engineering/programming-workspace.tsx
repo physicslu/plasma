@@ -25,6 +25,7 @@ import type {
   SiteSnapshot,
 } from "../plasma-api";
 import { useWorkspaceSession, type TargetSelection } from "../workspace-session";
+import { ActiveFpsSummary, BatchPolicyPanel, BatchTopologySummary } from "../batch-dashboard-panels";
 import "../programming-batch-toolbar.css";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
@@ -43,6 +44,9 @@ type Stage =
   | "success"
   | "cancelled"
   | "failed"
+  | "faulted"
+  | "error"
+  | "stopped"
   | "timeout"
   | "aborted";
 
@@ -60,8 +64,8 @@ type Site = {
 };
 
 type ConnectionState = "connecting" | "online" | "offline";
-type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "failed";
-type BatchTerminalState = "success" | "cancelled" | "failed";
+type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "faulted" | "error" | "stopped";
+type BatchTerminalState = "success" | "cancelled" | "faulted" | "error" | "stopped";
 type PendingRestore = {
   target: TargetSelection;
   siteIds: number[] | null;
@@ -149,6 +153,18 @@ function sameTarget(left: TargetSelection, right: TargetSelection): boolean {
   return left.facilityId === right.facilityId && left.ppuId === right.ppuId;
 }
 
+function parsePositiveInt(value: string): number | null {
+  if (!/^\d+$/.test(value.trim())) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseNonNegativeInt(value: string): number | null {
+  if (!/^\d+$/.test(value.trim())) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 export default function ProgrammingWorkspace() {
   const { locale, t } = useI18n();
   const {
@@ -183,11 +199,16 @@ export default function ProgrammingWorkspace() {
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchCancelling, setBatchCancelling] = useState(false);
   const [batchSiteStates, setBatchSiteStates] = useState<Record<number, BatchSiteState>>({});
+  const [repeatCount, setRepeatCount] = useState("1");
+  const [siteRetryLimit, setSiteRetryLimit] = useState("0");
+  const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
   const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);
 
   const trackedJobs = useRef<Record<number, string>>({});
   const submissionGenerations = useRef<Record<number, number>>({});
   const batchLifecycle = useRef<BatchLifecycle | null>(null);
+  const batchStopReason = useRef<"operator" | "threshold" | null>(null);
+  const operatorCancelledSites = useRef<Set<number>>(new Set());
   const cancelRequests = useRef<Set<string>>(new Set());
   const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
@@ -240,6 +261,83 @@ export default function ProgrammingWorkspace() {
   const syntheticImageHint = locale === "zh-TW"
     ? "未選 Image 時由 Mock Settings 的 Default Image Size 自動產生 Synthetic Image；手動選檔時以選檔優先。"
     : "Without a selected Image, Mock generates a Synthetic Image from Default Image Size; a selected file takes precedence.";
+  const repeatValue = parsePositiveInt(repeatCount);
+  const retryValue = parseNonNegativeInt(siteRetryLimit);
+  const thresholdValue = failedSiteThreshold.trim() === "" ? null : parsePositiveInt(failedSiteThreshold);
+  const policyValid = repeatValue !== null
+    && repeatValue <= 10_000
+    && retryValue !== null
+    && retryValue <= 20
+    && (failedSiteThreshold.trim() === "" || (thresholdValue !== null && thresholdValue <= selectedSiteIds.length));
+  const dashboardCopy = locale === "zh-TW" ? {
+    policy: {
+      repeatCount: "Repeat Count",
+      retryLimit: "Site Retry Limit",
+      stopThreshold: "Failed Site Stop Threshold",
+      repeatTooltip: "整個 Batch 連續執行的輪數（1–10000）。",
+      retryTooltip: "單一 Site 的操作失敗後最多重試次數（0–20）。",
+      thresholdTooltip: "Retry 用盡後成為 FAULTED 的 Site 數達門檻時停止 Batch；off 表示不啟用。",
+      hint: "Repeat 套用整個 Batch；Retry 只針對可信操作失敗；Threshold 只計入 Retry 用盡的 FAULTED Site。",
+      invalid: "Batch Execution Policy 設定無效。",
+    },
+    active: {
+      title: "Active FPS : 即時結果摘要",
+      hint: "FAULTED = Retry 用盡的可信 DUT/Site 失敗；ERROR = 基礎設施或 Runtime 錯誤。",
+      selected: "總選擇",
+      running: "執行中",
+      pass: "成功 (PASS)",
+      faulted: "失敗 (FAULTED)",
+      error: "錯誤 (ERROR)",
+      stopped: "已停止",
+      cancelled: "已取消",
+    },
+  } : {
+    policy: {
+      repeatCount: "Repeat Count",
+      retryLimit: "Site Retry Limit",
+      stopThreshold: "Failed Site Stop Threshold",
+      repeatTooltip: "Number of complete Batch rounds (1–10000).",
+      retryTooltip: "Maximum retries after a trustworthy Site operation failure (0–20).",
+      thresholdTooltip: "Stop the Batch when retry-exhausted FAULTED Sites reach this count; off disables the threshold.",
+      hint: "Repeat applies to the whole Batch; Retry applies only to trustworthy operation failures; Threshold counts retry-exhausted FAULTED Sites.",
+      invalid: "Batch Execution Policy is invalid.",
+    },
+    active: {
+      title: "Active FPS : Live Result Summary",
+      hint: "FAULTED = trustworthy DUT/Site failure after retry exhaustion; ERROR = infrastructure or runtime failure.",
+      selected: "Selected",
+      running: "Running",
+      pass: "PASS",
+      faulted: "FAULTED",
+      error: "ERROR",
+      stopped: "Stopped",
+      cancelled: "Cancelled",
+    },
+  };
+  const activeFpsCounts = (() => {
+    const batchStates = selectedSiteIds.map(siteId => batchSiteStates[siteId]).filter(Boolean) as BatchSiteState[];
+    if (batchStates.length > 0) {
+      const count = (state: BatchSiteState) => batchStates.filter(item => item === state).length;
+      return {
+        selected: selectedSiteIds.length,
+        running: count("running") + count("cancelling"),
+        pass: count("success"),
+        faulted: count("faulted"),
+        error: count("error"),
+        stopped: count("stopped"),
+        cancelled: count("cancelled"),
+      };
+    }
+    return {
+      selected: selectedSiteIds.length,
+      running: selectedSites.filter(isRunning).length,
+      pass: selectedSites.filter(site => site.stage === "success").length,
+      faulted: selectedSites.filter(site => site.stage === "faulted").length,
+      error: selectedSites.filter(site => site.stage === "failed" || site.stage === "error" || site.stage === "timeout" || site.stage === "aborted").length,
+      stopped: selectedSites.filter(site => site.stage === "stopped").length,
+      cancelled: selectedSites.filter(site => site.stage === "cancelled").length,
+    };
+  })();
 
   const appendLog = useCallback((
     message: string,
@@ -279,6 +377,8 @@ export default function ProgrammingWorkspace() {
     submissionGenerations.current = {};
     cancelRequests.current.clear();
     batchLifecycle.current = null;
+    batchStopReason.current = null;
+    operatorCancelledSites.current.clear();
     setPPU(null);
     setSites([]);
     if (!preserveSiteSelection) {
@@ -479,6 +579,7 @@ export default function ProgrammingWorkspace() {
 
   function toggleSite(siteId: number) {
     if (batchRunning) return;
+    setBatchSiteStates({});
     if (targetSelectionKey) siteSelectionTarget.current = targetSelectionKey;
     const next = selectedSiteIds.includes(siteId)
       ? selectedSiteIds.filter(id => id !== siteId)
@@ -589,6 +690,7 @@ export default function ProgrammingWorkspace() {
   }
 
   function runSingleSite(siteId: number, operation: Operation) {
+    setBatchSiteStates({});
     const readDetail = operation === "read" ? ` · offset ${readOffset} · length ${readLength}` : "";
     appendLog(`[${siteLabel(siteId)}] EXECUTE ${operation.toUpperCase()}${readDetail}`, false, "USR");
     void runSite(siteId, operation);
@@ -624,95 +726,142 @@ export default function ProgrammingWorkspace() {
       appendLog(`[BATCH] BLOCKED · ${batchReadiness.label}`, false, "USR");
       return;
     }
+    if (!policyValid || repeatValue === null || retryValue === null) {
+      setOperatorWarning(dashboardCopy.policy.invalid);
+      appendLog(`[BATCH] BLOCKED · ${dashboardCopy.policy.invalid}`, false, "USR");
+      return;
+    }
     setOperatorWarning(null);
     const siteIds = [...selectedSiteIds];
     const operations = [...selectedOperations];
     const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
     appendLog(
-      `[BATCH] EXECUTE · ${operationListLabel(operations)} · ${siteListLabel(siteIds)}${readDetail}`,
+      `[BATCH] EXECUTE · ${operationListLabel(operations)} · ${siteListLabel(siteIds)} · repeat ${repeatValue} · retry ${retryValue} · threshold ${thresholdValue ?? "off"}${readDetail}`,
       false,
       "USR",
     );
     const lifecycle = new BatchLifecycle(siteIds);
     const results: Partial<Record<number, BatchTerminalState>> = {};
+    const faultedSites = new Set<number>();
     batchLifecycle.current = lifecycle;
+    batchStopReason.current = null;
+    operatorCancelledSites.current.clear();
     setBatchRunning(true);
     setBatchCancelling(false);
     setBatchSiteStates(Object.fromEntries(siteIds.map(id => [id, "running"])) as Record<number, BatchSiteState>);
     appendLog(`START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteListLabel(siteIds)}`, false, "BAT");
+
+    const terminalize = (siteId: number, state: BatchTerminalState, error?: string) => {
+      results[siteId] = state;
+      setBatchSiteState(siteId, state);
+      if (state === "faulted" || state === "error" || state === "stopped") {
+        setSites(current => current.map(site => site.id === siteId ? { ...site, stage: state, error: error ?? site.error } : site));
+      }
+      lifecycle.finish(siteId);
+    };
+    const cancellationState = (siteId: number): BatchTerminalState => {
+      if (operatorCancelledSites.current.has(siteId)) return "cancelled";
+      return batchStopReason.current === "threshold" ? "stopped" : "cancelled";
+    };
+    const triggerThresholdIfNeeded = async () => {
+      if (thresholdValue === null || faultedSites.size < thresholdValue || batchStopReason.current) return;
+      batchStopReason.current = "threshold";
+      setBatchCancelling(true);
+      setBatchSiteStates(current => Object.fromEntries(Object.entries(current).map(([siteId, state]) => [
+        siteId,
+        state === "running" ? "cancelling" : state,
+      ])) as Record<number, BatchSiteState>);
+      const { activeJobs } = lifecycle.cancel();
+      appendLog(`[BATCH] THRESHOLD · ${faultedSites.size}/${thresholdValue} FAULTED · stopping unfinished Sites`, true, "BAT");
+      await Promise.all(activeJobs.map(([siteId, jobId]) => requestCancel(siteId, jobId)));
+    };
+
     try {
       await Promise.all(siteIds.map(async siteId => {
-        for (const operation of operations) {
-          if (!lifecycle.prepare(siteId, operation)) {
-            results[siteId] = "cancelled";
-            setBatchSiteState(siteId, "cancelled");
-            lifecycle.finish(siteId);
-            return;
-          }
-          await new Promise(resolve => window.setTimeout(resolve, 0));
-          if (!lifecycle.beginSubmit(siteId)) {
-            results[siteId] = "cancelled";
-            setBatchSiteState(siteId, "cancelled");
-            lifecycle.finish(siteId);
-            return;
-          }
-          const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
-          if (!job) {
-            const state = lifecycle.isCancelRequested(siteId) ? "cancelled" : "failed";
-            results[siteId] = state;
-            setBatchSiteState(siteId, state);
-            lifecycle.finish(siteId);
-            return;
-          }
-          if (lifecycle.accepted(siteId, job.job_id)) await requestCancel(siteId, job.job_id);
-          try {
-            const finalJob = await waitTerminal(job);
-            if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
-              results[siteId] = "cancelled";
-              setBatchSiteState(siteId, "cancelled");
-              lifecycle.finish(siteId);
-              return;
-            }
-            if (finalJob.state !== "success") {
-              const state = finalJob.state === "cancelled" ? "cancelled" : "failed";
-              results[siteId] = state;
-              setBatchSiteState(siteId, state);
-              lifecycle.finish(siteId);
-              return;
-            }
-          } catch (error) {
-            const state = lifecycle.isCancelRequested(siteId) ? "cancelled" : "failed";
-            results[siteId] = state;
-            setBatchSiteState(siteId, state);
-            appendLog(`[${siteLabel(siteId)}] Batch polling failed · ${error instanceof Error ? error.message : "unknown error"}`, true);
-            lifecycle.finish(siteId);
-            return;
-          }
+        for (let round = 1; round <= repeatValue; round += 1) {
+for (const operation of operations) {
+  let operationSucceeded = false;
+  for (let attempt = 0; attempt <= retryValue; attempt += 1) {
+    if (batchStopReason.current === "threshold") {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    if (!lifecycle.prepare(siteId, operation)) {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    await new Promise(resolve => window.setTimeout(resolve, 0));
+    if (!lifecycle.beginSubmit(siteId)) {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
+    if (!job) {
+      if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+      else terminalize(siteId, "error", "Job submission failed");
+      return;
+    }
+    if (lifecycle.accepted(siteId, job.job_id)) await requestCancel(siteId, job.job_id);
+    let finalJob: JobSnapshot;
+    try {
+      finalJob = await waitTerminal(job);
+    } catch (error) {
+      if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+      else terminalize(siteId, "error", error instanceof Error ? error.message : "Batch polling failed");
+      return;
+    }
+    if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    if (finalJob.state === "success") {
+      operationSucceeded = true;
+      break;
+    }
+    if (finalJob.state === "failed") {
+      if (attempt < retryValue) {
+        appendLog(`[${siteLabel(siteId)}] RETRY ${attempt + 1}/${retryValue} · Round ${round}/${repeatValue} · ${operation.toUpperCase()}`, false, "BAT");
+        continue;
+      }
+      faultedSites.add(siteId);
+      terminalize(siteId, "faulted", finalJob.result?.error?.message);
+      await triggerThresholdIfNeeded();
+      return;
+    }
+    if (finalJob.state === "cancelled") {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    terminalize(siteId, "error", finalJob.result?.error?.message ?? finalJob.state.toUpperCase());
+    return;
+  }
+  if (!operationSucceeded) return;
+}
         }
-        results[siteId] = "success";
-        setBatchSiteState(siteId, "success");
-        lifecycle.finish(siteId);
+        terminalize(siteId, "success");
       }));
 
       const successful = siteIds.filter(siteId => results[siteId] === "success");
       const cancelled = siteIds.filter(siteId => results[siteId] === "cancelled");
-      const failed = siteIds.filter(siteId => results[siteId] === "failed");
-      const outcome = failed.length > 0
-        ? "FAILED"
-        : cancelled.length === siteIds.length
-          ? "CANCELLED"
-          : cancelled.length > 0
-            ? "PARTIAL"
-            : "COMPLETE";
+      const faulted = siteIds.filter(siteId => results[siteId] === "faulted");
+      const errors = siteIds.filter(siteId => results[siteId] === "error");
+      const stopped = siteIds.filter(siteId => results[siteId] === "stopped");
       const groups: string[] = [];
       if (successful.length > 0) groups.push(`success: ${siteListLabel(successful)}`);
+      if (faulted.length > 0) groups.push(`faulted: ${siteListLabel(faulted)}`);
+      if (errors.length > 0) groups.push(`error: ${siteListLabel(errors)}`);
+      if (stopped.length > 0) groups.push(`stopped: ${siteListLabel(stopped)}`);
       if (cancelled.length > 0) groups.push(`cancelled: ${siteListLabel(cancelled)}`);
-      if (failed.length > 0) groups.push(`failed: ${siteListLabel(failed)}`);
-      appendLog(
-        `${outcome} · ${groups.join(" · ")}`,
-        failed.length > 0,
-        "BAT",
-      );
+      const outcome = errors.length > 0 || stopped.length > 0
+        ? "ERROR"
+        : faulted.length > 0
+? "PARTIAL"
+: cancelled.length === siteIds.length
+  ? "CANCELLED"
+  : cancelled.length > 0
+    ? "PARTIAL"
+    : "COMPLETE";
+      appendLog(`${outcome} · ${groups.join(" · ")}`, errors.length > 0 || faulted.length > 0 || stopped.length > 0, "BAT");
     } finally {
       if (batchLifecycle.current === lifecycle) batchLifecycle.current = null;
       setBatchRunning(false);
@@ -724,6 +873,7 @@ export default function ProgrammingWorkspace() {
     const lifecycle = batchLifecycle.current;
     if (!batchRunning || batchCancelling || !lifecycle) return;
     appendLog("[BATCH] CANCEL", false, "USR");
+    batchStopReason.current = "operator";
     const { activeJobs } = lifecycle.cancel();
     setBatchCancelling(true);
     setBatchSiteStates(current => Object.fromEntries(
@@ -738,6 +888,7 @@ export default function ProgrammingWorkspace() {
     appendLog(`[${siteLabel(siteId)}] CANCEL`, false, "USR");
     const lifecycle = batchLifecycle.current;
     if (batchRunning && lifecycle) {
+      operatorCancelledSites.current.add(siteId);
       const jobId = lifecycle.cancelSite(siteId);
       setBatchSiteState(siteId, "cancelling");
       if (jobId) await requestCancel(siteId, jobId);
@@ -764,6 +915,16 @@ export default function ProgrammingWorkspace() {
         </form>
       </div>
 
+      <BatchTopologySummary
+        facilityCount={catalog?.facility_count ?? 0}
+        ppuCount={catalog?.ppu_count ?? 0}
+        selectedSiteCount={selectedSiteIds.length}
+        selectedFacilityCount={selection.facilityId ? 1 : 0}
+        selectedPpuCount={selection.ppuId ? 1 : 0}
+        counts={activeFpsCounts}
+      />
+
+      <section className="unifiedBatchControlStack" data-dashboard-mode="engineering">
       <section className="engineeringExecutionToolbar programmingBatchToolbar" aria-label="Engineering batch control">
         <div className="programmingBatchFile">
           <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>{t("engineeringProgramming.browse")}</button>
@@ -795,6 +956,21 @@ export default function ProgrammingWorkspace() {
           <button type="button" className="cancelBatch" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}>{t("selection.cancel")}</button>
         </div>
       </section>
+      <BatchPolicyPanel
+        repeatCount={repeatCount}
+        retryLimit={siteRetryLimit}
+        stopThreshold={failedSiteThreshold}
+        maxThreshold={selectedSiteIds.length}
+        disabled={batchRunning}
+        valid={policyValid}
+        copy={dashboardCopy.policy}
+        onRepeatCount={setRepeatCount}
+        onRetryLimit={setSiteRetryLimit}
+        onStopThreshold={setFailedSiteThreshold}
+      />
+      </section>
+
+      <ActiveFpsSummary counts={activeFpsCounts} copy={dashboardCopy.active} />
 
       {selectedOperations.includes("read") && (
         <section className="engineeringReadParameters" aria-label="Engineering READ parameters">

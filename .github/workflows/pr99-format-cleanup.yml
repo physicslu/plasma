@@ -1,0 +1,272 @@
+name: PR99 Format Cleanup
+# One-shot source-only formatting cleanup; generated files stay ignored.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/pr99-format-cleanup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  clean-format:
+    if: github.head_ref == 'agent/unified-pe-batch-dashboard'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unified-pe-batch-dashboard
+          fetch-depth: 0
+
+      - name: Format only the new P E dashboard source blocks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('software/web/app/fleet/server-batch-page.tsx')
+          text = path.read_text(encoding='utf-8')
+          start = text.index('const dashboardCopy = locale === "zh-TW" ? {')
+          end = text.index('\n  const {', start)
+          block = text[start:end]
+          if block.startswith('  '):
+              raise SystemExit('Production dashboardCopy already formatted unexpectedly')
+          text = text[:start] + '\n'.join('  ' + line for line in block.splitlines()) + text[end:]
+
+          start = text.index('              <BatchTopologySummary\n', text.index('<section className="productionMainPanel">'))
+          end = text.index('\n\n              {batchSnapshot && (', start)
+          old = text[start:end]
+          toolbar_start = old.index('                <div className="productionImagePicker programmingBatchFile">')
+          toolbar_end = old.index('\n              </section>\n\n              <BatchPolicyPanel') + len('\n              </section>')
+          toolbar_body = old[toolbar_start:toolbar_end]
+          new = '''              <BatchTopologySummary
+                ariaLabel="Mock topology summary"
+                facilityCount={catalog.facility_count}
+                ppuCount={catalog.ppu_count}
+                selectedSiteCount={summary.sites}
+                selectedFacilityCount={summary.facilities}
+                selectedPpuCount={summary.ppus}
+                counts={{ selected: summary.sites, running: summary.running, pass: summary.success, faulted: summary.faulted, error: summary.error, stopped: summary.stopped, cancelled: summary.cancelled }}
+              />
+
+              <section className="unifiedBatchControlStack" data-dashboard-mode="production">
+                <section className="productionBatchToolbar programmingBatchToolbar" aria-label="Batch operation toolbar">
+''' + toolbar_body + '''
+
+                <BatchPolicyPanel
+                  repeatCount={repeatCount}
+                  retryLimit={siteRetryLimit}
+                  stopThreshold={failedSiteThreshold}
+                  maxThreshold={activeCounts.sites}
+                  disabled={batchRunning}
+                  valid={policyValid}
+                  copy={dashboardCopy.policy}
+                  onRepeatCount={setRepeatCount}
+                  onRetryLimit={setSiteRetryLimit}
+                  onStopThreshold={setFailedSiteThreshold}
+                />
+              </section>
+
+              <ActiveFpsSummary
+                counts={{ selected: summary.sites, running: summary.running, pass: summary.success, faulted: summary.faulted, error: summary.error, stopped: summary.stopped, cancelled: summary.cancelled }}
+                copy={dashboardCopy.active}
+              />'''
+          text = text[:start] + new + text[end:]
+          path.write_text(text, encoding='utf-8')
+
+          path = Path('software/web/app/engineering/programming-workspace.tsx')
+          text = path.read_text(encoding='utf-8')
+          old = '''        for (let round = 1; round <= repeatValue; round += 1) {
+for (const operation of operations) {
+  let operationSucceeded = false;
+  for (let attempt = 0; attempt <= retryValue; attempt += 1) {
+    if (batchStopReason.current === "threshold") {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    if (!lifecycle.prepare(siteId, operation)) {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    await new Promise(resolve => window.setTimeout(resolve, 0));
+    if (!lifecycle.beginSubmit(siteId)) {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
+    if (!job) {
+      if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+      else terminalize(siteId, "error", "Job submission failed");
+      return;
+    }
+    if (lifecycle.accepted(siteId, job.job_id)) await requestCancel(siteId, job.job_id);
+    let finalJob: JobSnapshot;
+    try {
+      finalJob = await waitTerminal(job);
+    } catch (error) {
+      if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+      else terminalize(siteId, "error", error instanceof Error ? error.message : "Batch polling failed");
+      return;
+    }
+    if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    if (finalJob.state === "success") {
+      operationSucceeded = true;
+      break;
+    }
+    if (finalJob.state === "failed") {
+      if (attempt < retryValue) {
+        appendLog(`[${siteLabel(siteId)}] RETRY ${attempt + 1}/${retryValue} · Round ${round}/${repeatValue} · ${operation.toUpperCase()}`, false, "BAT");
+        continue;
+      }
+      faultedSites.add(siteId);
+      terminalize(siteId, "faulted", finalJob.result?.error?.message);
+      await triggerThresholdIfNeeded();
+      return;
+    }
+    if (finalJob.state === "cancelled") {
+      terminalize(siteId, cancellationState(siteId));
+      return;
+    }
+    terminalize(siteId, "error", finalJob.result?.error?.message ?? finalJob.state.toUpperCase());
+    return;
+  }
+  if (!operationSucceeded) return;
+}
+        }'''
+          new = '''        for (let round = 1; round <= repeatValue; round += 1) {
+          for (const operation of operations) {
+            let operationSucceeded = false;
+            for (let attempt = 0; attempt <= retryValue; attempt += 1) {
+              if (batchStopReason.current === "threshold") {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              if (!lifecycle.prepare(siteId, operation)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              await new Promise(resolve => window.setTimeout(resolve, 0));
+              if (!lifecycle.beginSubmit(siteId)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
+              if (!job) {
+                if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+                else terminalize(siteId, "error", "Job submission failed");
+                return;
+              }
+              if (lifecycle.accepted(siteId, job.job_id)) await requestCancel(siteId, job.job_id);
+              let finalJob: JobSnapshot;
+              try {
+                finalJob = await waitTerminal(job);
+              } catch (error) {
+                if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+                else terminalize(siteId, "error", error instanceof Error ? error.message : "Batch polling failed");
+                return;
+              }
+              if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              if (finalJob.state === "success") {
+                operationSucceeded = true;
+                break;
+              }
+              if (finalJob.state === "failed") {
+                if (attempt < retryValue) {
+                  appendLog(`[${siteLabel(siteId)}] RETRY ${attempt + 1}/${retryValue} · Round ${round}/${repeatValue} · ${operation.toUpperCase()}`, false, "BAT");
+                  continue;
+                }
+                faultedSites.add(siteId);
+                terminalize(siteId, "faulted", finalJob.result?.error?.message);
+                await triggerThresholdIfNeeded();
+                return;
+              }
+              if (finalJob.state === "cancelled") {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              terminalize(siteId, "error", finalJob.result?.error?.message ?? finalJob.state.toUpperCase());
+              return;
+            }
+            if (!operationSucceeded) return;
+          }
+        }'''
+          if old not in text:
+              raise SystemExit('Engineering retry loop block not found')
+          text = text.replace(old, new, 1)
+
+          old = '''      const outcome = errors.length > 0 || stopped.length > 0
+        ? "ERROR"
+        : faulted.length > 0
+? "PARTIAL"
+: cancelled.length === siteIds.length
+  ? "CANCELLED"
+  : cancelled.length > 0
+    ? "PARTIAL"
+    : "COMPLETE";'''
+          new = '''      const outcome = errors.length > 0 || stopped.length > 0
+        ? "ERROR"
+        : faulted.length > 0
+          ? "PARTIAL"
+          : cancelled.length === siteIds.length
+            ? "CANCELLED"
+            : cancelled.length > 0
+              ? "PARTIAL"
+              : "COMPLETE";'''
+          if old not in text:
+              raise SystemExit('Engineering outcome block not found')
+          text = text.replace(old, new, 1)
+
+          start = text.index('      <section className="unifiedBatchControlStack" data-dashboard-mode="engineering">')
+          end = text.index('\n\n      <ActiveFpsSummary', start)
+          block = text[start:end]
+          lines = block.splitlines()
+          formatted = []
+          for index, line in enumerate(lines):
+              if index == 0 or index == len(lines) - 1:
+                  formatted.append(line)
+              else:
+                  formatted.append('  ' + line)
+          text = text[:start] + '\n'.join(formatted) + text[end:]
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: |
+            software/web/package-lock.json
+            software/web/e2e/package-lock.json
+
+      - name: Verify source formatting did not change behavior
+        working-directory: software/web
+        run: |
+          npm ci
+          npm run lint
+          npm test
+
+      - name: Run focused browser regressions
+        run: |
+          cd software/web/e2e
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test tests/unified-batch-dashboard.spec.ts tests/production-tablet-layout.spec.ts tests/pmod-emode-theme-regression.spec.ts tests/factory-production-console.spec.ts
+
+      - name: Commit only formatted source files
+        run: |
+          rm -f .github/workflows/pr99-format-cleanup.yml
+          git config user.name "plasma-ci-bot"
+          git config user.email "plasma-ci-bot@users.noreply.github.com"
+          git add software/web/app/fleet/server-batch-page.tsx software/web/app/engineering/programming-workspace.tsx
+          git add -u .github/workflows/pr99-format-cleanup.yml
+          git commit -m "Clean up unified P E dashboard formatting"
+          git push origin HEAD:agent/unified-pe-batch-dashboard
