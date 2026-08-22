@@ -135,7 +135,6 @@ class WebMockEndToEndTests(unittest.IsolatedAsyncioTestCase):
                 "site_id": 2,
                 "operation": "program",
                 **self.asset_body(image, "web-e2e.bin"),
-                "timeout_s": 2,
             },
         )
         self.assertEqual(status, 202)
