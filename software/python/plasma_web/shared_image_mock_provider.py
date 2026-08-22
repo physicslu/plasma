@@ -44,15 +44,6 @@ class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
             with self._mock_context_lock:
                 self._batch_mock_contexts.clear()
 
-    def catalog(self) -> dict[str, Any]:
-        catalog = super().catalog()
-        return {
-            **catalog,
-            "provider_capabilities": {
-                "synthetic_image": True,
-            },
-        }
-
     def mock_runtime_settings(self) -> dict[str, Any]:
         return self.mock_runtime.current()
 
