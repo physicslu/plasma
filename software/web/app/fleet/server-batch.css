@@ -211,3 +211,53 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Production owns a fixed-width FPS selector, so viewport breakpoints do not
+ * describe the width actually available to the batch toolbar.  Make the main
+ * panel a size container and adapt the toolbar to that real component width.
+ * This is especially important for 1366px iPad landscape: the viewport is
+ * wider than the old 1280px breakpoint while the expanded 330px FPS selector
+ * leaves the toolbar with roughly 1kpx of usable width. */
+.productionMainPanel {
+  container-type: inline-size;
+  container-name: production-main;
+}
+
+@container production-main (max-width: 1040px) {
+  .productionBatchToolbar.programmingBatchToolbar {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-areas:
+      "file operations"
+      "actions actions";
+    align-items: start;
+  }
+
+  .productionBatchToolbar .batchOperations,
+  .productionBatchToolbar .programmingBatchOperations {
+    flex-wrap: nowrap;
+    justify-self: end;
+  }
+
+  .productionBatchToolbar .productionBatchActions,
+  .productionBatchToolbar .programmingBatchActions {
+    justify-self: end;
+  }
+}
+
+@container production-main (max-width: 760px) {
+  .productionBatchToolbar.programmingBatchToolbar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "file"
+      "operations"
+      "actions";
+  }
+
+  .productionBatchToolbar .batchOperations,
+  .productionBatchToolbar .programmingBatchOperations,
+  .productionBatchToolbar .productionBatchActions,
+  .productionBatchToolbar .programmingBatchActions {
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+}
