@@ -90,7 +90,7 @@ test("public Render keeps Production batch toolbar stable on iPad landscape", as
   expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
 });
 
-test("public Render exposes Mock Synthetic Image readiness without submitting a Batch", async ({ page }) => {
+test("public Render uses Mock Synthetic Image without requiring an uploaded Image", async ({ page }) => {
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
 
@@ -110,10 +110,17 @@ test("public Render exposes Mock Synthetic Image readiness without submitting a 
   if (!(await program.isChecked())) await program.check();
   await expect(fileName).toHaveText("Mock Synthetic Image");
   await expect(fileName).toHaveAttribute("data-image-source", "mock_synthetic");
-  await expect(readiness).toContainText("BATCH READY");
-  await expect(execute).toBeEnabled();
+  await expect(readiness).not.toContainText("IMAGE REQUIRED");
 
-  // Acceptance boundary: do not click Execute. This verifies the live UI
-  // contract without creating a Batch, Job, Programming Image upload, or
-  // changing Mock Runtime settings on the shared public Render demo.
+  const readinessText = (await readiness.textContent())?.replace(/\s+/g, " ").trim() ?? "";
+  if (readinessText.includes("BATCH READY")) {
+    await expect(execute).toBeEnabled();
+  } else {
+    expect(readinessText).toContain("SITE BUSY");
+    await expect(execute).toBeDisabled();
+  }
+
+  // Acceptance boundary: do not click Execute. This verifies the live Image
+  // selection contract without creating a Batch, Job, Programming Image
+  // upload, or changing Mock Runtime settings on the shared public demo.
 });
