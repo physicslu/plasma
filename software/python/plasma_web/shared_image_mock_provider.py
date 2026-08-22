@@ -13,6 +13,7 @@ from plasma_core.models import LOCAL_MOCK_BLOB_SCHEME, ExecutionImageRef, JobReq
 
 from .engineering_targets import MockEngineeringPPUProvider
 from .mock_runtime_settings import MockRuntimeSettingsController
+from .mock_synthetic_image import synthetic_mock_asset_from_context
 
 
 class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
@@ -58,6 +59,10 @@ class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
                 existing = self.mock_runtime.execution_snapshot(batch_id)
                 self._batch_mock_contexts[batch_id] = existing
             return copy.deepcopy(existing)
+
+    def release_batch_context(self, batch_id: str) -> None:
+        with self._mock_context_lock:
+            self._batch_mock_contexts.pop(batch_id, None)
 
     def batch_context(self, batch_id: str) -> dict[str, Any] | None:
         with self._mock_context_lock:
@@ -141,16 +146,24 @@ class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
             if request.image or request.image_ref is not None:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
-                    "Engineering program/verify must use a session-cached Programming Asset",
+                    "Engineering program/verify must use a session-cached or Mock Synthetic Programming Asset",
                 )
-            if not session_id or not asset_sha256:
+            if not session_id:
                 raise PlasmaError(
                     ErrorCode.INVALID_ARGUMENT,
-                    "Engineering program/verify requires session_id and asset_sha256",
+                    "Engineering program/verify requires session_id",
                 )
-            asset = self._cached_asset(session_id, facility_id, ppu_id, asset_sha256)
+            if asset_sha256:
+                asset = self._cached_asset(session_id, facility_id, ppu_id, asset_sha256)
+                asset_origin = "user"
+            else:
+                context = request.metadata.get("mock_runtime")
+                if not isinstance(context, dict):
+                    raise PlasmaError(ErrorCode.CONFIG_INVALID, "Mock execution context is unavailable")
+                asset = synthetic_mock_asset_from_context(context)
+                asset_origin = "mock_synthetic"
             image = asset.normalize_image()
-            shared = default_mock_image_store().resolve(image.sha256, expected_size=image.size)
+            shared = default_mock_image_store().put(image.data)
             lease_key = self._key(facility_id, ppu_id)
             self._reserve_ppu_image(lease_key, image.sha256, request.job_id)
             request = replace(
@@ -167,6 +180,7 @@ class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
                     "source_asset_sha256": asset.sha256,
                     "source_asset_type": asset.asset_type.value,
                     "source_asset_format": asset.asset_format.value,
+                    "source_asset_origin": asset_origin,
                 },
             )
         elif session_id is not None or asset_sha256 is not None:
