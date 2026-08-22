@@ -1,5 +1,5 @@
 name: Unified P E Dashboard Verify
-# Re-run after disambiguating policy help accessibility names.
+# Final re-run after separating policy help names from input labels.
 
 on:
   pull_request:
