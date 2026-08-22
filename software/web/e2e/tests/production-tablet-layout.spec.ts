@@ -93,19 +93,11 @@ async function installProductionCatalog(page: Page) {
   });
 }
 
-test("Production batch toolbar follows its available width on iPad landscape", async ({ page }) => {
-  // iPad Pro 11-inch landscape CSS viewport. The expanded FPS selector leaves
-  // substantially less width for the Production main panel than the viewport
-  // itself, which is the regression this test protects.
-  await page.setViewportSize({ width: 1194, height: 834 });
-  await installProductionCatalog(page);
-  await page.goto("/fleet");
-
+async function expectConstrainedToolbar(page: Page) {
   const toolbar = page.getByRole("region", { name: "Batch operation toolbar" });
   await expect(toolbar).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: `${facilityId} ${facilityId}-ppu-01 SITE-01` })).toBeVisible();
 
-  const expanded = await toolbar.evaluate(element => {
+  const layout = await toolbar.evaluate(element => {
     const toolbarRect = element.getBoundingClientRect();
     const image = element.querySelector<HTMLElement>(".programmingBatchFile")!;
     const operations = element.querySelector<HTMLElement>(".programmingBatchOperations")!;
@@ -114,13 +106,17 @@ test("Production batch toolbar follows its available width on iPad landscape", a
     const operationsRect = operations.getBoundingClientRect();
     const actionsRect = actions.getBoundingClientRect();
     const operationTops = [...operations.querySelectorAll<HTMLElement>("label")].map(label => label.getBoundingClientRect().top);
+    const actionRects = [...actions.querySelectorAll<HTMLElement>("button")].map(button => button.getBoundingClientRect());
 
     return {
       areas: getComputedStyle(element).gridTemplateAreas,
       operationWrap: getComputedStyle(operations).flexWrap,
       operationTopSpread: Math.max(...operationTops) - Math.min(...operationTops),
+      toolbarLeft: toolbarRect.left,
       toolbarRight: toolbarRect.right,
       actionsRight: actionsRect.right,
+      actionLefts: actionRects.map(rect => rect.left),
+      actionRights: actionRects.map(rect => rect.right),
       imageBottom: imageRect.bottom,
       operationsBottom: operationsRect.bottom,
       actionsTop: actionsRect.top,
@@ -129,13 +125,28 @@ test("Production batch toolbar follows its available width on iPad landscape", a
     };
   });
 
-  expect(expanded.areas).toBe('"image operations" "actions actions"');
-  expect(expanded.operationWrap).toBe("nowrap");
-  expect(expanded.operationTopSpread).toBeLessThanOrEqual(1);
-  expect(expanded.actionsTop).toBeGreaterThanOrEqual(Math.max(expanded.imageBottom, expanded.operationsBottom) - 1);
-  expect(expanded.actionsRight).toBeLessThanOrEqual(expanded.toolbarRight + 1);
-  expect(expanded.scrollWidth).toBeLessThanOrEqual(expanded.clientWidth + 1);
+  expect(layout.areas).toBe('"image operations" "actions actions"');
+  expect(layout.operationWrap).toBe("nowrap");
+  expect(layout.operationTopSpread).toBeLessThanOrEqual(1);
+  expect(layout.actionsTop).toBeGreaterThanOrEqual(Math.max(layout.imageBottom, layout.operationsBottom) - 1);
+  expect(layout.actionsRight).toBeLessThanOrEqual(layout.toolbarRight + 1);
+  expect(Math.min(...layout.actionLefts)).toBeGreaterThanOrEqual(layout.toolbarLeft - 1);
+  expect(Math.max(...layout.actionRights)).toBeLessThanOrEqual(layout.toolbarRight + 1);
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+}
 
+async function openProduction(page: Page, viewport: { width: number; height: number }) {
+  await page.setViewportSize(viewport);
+  await installProductionCatalog(page);
+  await page.goto("/fleet");
+  await expect(page.getByRole("checkbox", { name: `${facilityId} ${facilityId}-ppu-01 SITE-01` })).toBeVisible();
+}
+
+test("Production batch toolbar follows its available width on iPad landscape", async ({ page }) => {
+  await openProduction(page, { width: 1194, height: 834 });
+  await expectConstrainedToolbar(page);
+
+  const toolbar = page.getByRole("region", { name: "Batch operation toolbar" });
   await page.getByRole("button", { name: "收起選擇器" }).click();
   await expect(page.getByRole("button", { name: "展開選擇器" })).toBeVisible();
   await page.waitForTimeout(220);
@@ -148,4 +159,12 @@ test("Production batch toolbar follows its available width on iPad landscape", a
 
   expect(collapsed.areas).toBe('"image operations actions"');
   expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
+});
+
+test("Production batch toolbar uses two rows in a narrow content column at a wide viewport", async ({ page }) => {
+  await openProduction(page, { width: 1440, height: 900 });
+
+  const workspaceWidth = await page.locator(".productionMainPanel").evaluate(element => element.clientWidth);
+  expect(workspaceWidth).toBeLessThanOrEqual(1060);
+  await expectConstrainedToolbar(page);
 });
