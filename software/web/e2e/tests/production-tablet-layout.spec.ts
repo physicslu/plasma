@@ -94,7 +94,10 @@ async function installProductionCatalog(page: Page) {
 }
 
 test("Production batch toolbar follows its container width on iPad landscape", async ({ page }) => {
-  await page.setViewportSize({ width: 1366, height: 1024 });
+  // iPad Pro 11-inch landscape CSS viewport.  The expanded FPS selector leaves
+  // substantially less width for the Production main panel than the viewport
+  // itself, which is the regression this test protects.
+  await page.setViewportSize({ width: 1194, height: 834 });
   await installProductionCatalog(page);
   await page.goto("/fleet");
 
@@ -143,6 +146,6 @@ test("Production batch toolbar follows its container width on iPad landscape", a
     clientWidth: element.clientWidth,
   }));
 
-  expect(collapsed.areas).toBe('"file operations actions"');
+  expect(collapsed.areas).toBe('"image operations actions"');
   expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
 });
