@@ -1,10 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 const expectedCommit = process.env.EXPECTED_RENDER_COMMIT ?? "";
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
 
-async function requireExpectedDeployment(request: Parameters<Parameters<typeof test.beforeAll>[0]>[0]["request"]) {
+async function requireExpectedDeployment(request: APIRequestContext) {
   if (!expectedCommit) throw new Error("EXPECTED_RENDER_COMMIT is required");
 
   await expect.poll(
