@@ -63,6 +63,8 @@ test("Production implementation keeps FPS layout but delegates execution ownersh
 
   const route = await fs.readFile(new URL("../app/fleet/page.tsx", import.meta.url), "utf8");
   const source = await fs.readFile(new URL("../app/fleet/server-batch-page.tsx", import.meta.url), "utf8");
+  const dashboardPanels = await fs.readFile(new URL("../app/batch-dashboard-panels.tsx", import.meta.url), "utf8");
+  const dashboardCss = await fs.readFile(new URL("../app/batch-dashboard-panels.css", import.meta.url), "utf8");
   const batchApi = await fs.readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
   const css = await fs.readFile(new URL("../app/fleet/production-prototype.css", import.meta.url), "utf8");
   const serverBatchCss = await fs.readFile(new URL("../app/fleet/server-batch.css", import.meta.url), "utf8");
@@ -96,9 +98,11 @@ test("Production implementation keeps FPS layout but delegates execution ownersh
   assert.doesNotMatch(source, /startJob\s*\(/);
   assert.doesNotMatch(source, /currentJobs/);
 
-  assert.match(source, /aria-label="Repeat Count"/);
-  assert.match(source, /aria-label="Site Retry Limit"/);
-  assert.match(source, /aria-label="Failed Site Stop Threshold"/);
+  assert.match(source, /BatchPolicyPanel/);
+  assert.match(dashboardPanels, /aria-label="Repeat Count"/);
+  assert.match(dashboardPanels, /aria-label="Site Retry Limit"/);
+  assert.match(dashboardPanels, /aria-label="Failed Site Stop Threshold"/);
+  assert.match(dashboardPanels, /role="tooltip"/);
   assert.match(source, /FAULTED — Retry Exhausted/);
   assert.match(source, /ERROR — Infrastructure/);
   assert.match(source, /STOPPED — Batch Policy/);
@@ -130,7 +134,7 @@ test("Production implementation keeps FPS layout but delegates execution ownersh
   assert.match(batchToolbar, /\.programmingBatchOperations\s*\{[\s\S]*justify-self:\s*end/);
   assert.match(batchToolbar, /\.programmingFileName\s*\{[\s\S]*font-size:\s*13px/);
   assert.match(operatorFeedback, /\.facilityRuntimeIdentity h3\s*\{[^}]*font-weight:\s*800;/s);
-  assert.match(serverBatchCss, /\.batchPolicyPanel/);
+  assert.match(dashboardCss, /\.unifiedBatchPolicyPanel/);
   assert.match(serverBatchCss, /\.serverBatchStatistics/);
   assert.match(serverBatchCss, /\.prototypeSiteLamp\.faulted i/);
   assert.match(serverBatchCss, /\.prototypeSiteLamp\.error i/);
