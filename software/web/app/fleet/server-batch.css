@@ -212,15 +212,15 @@
   }
 }
 
-/* operator-feedback.css is intentionally loaded after production-prototype.css
- * and establishes the desktop `image operations actions` contract.  That
- * desktop rule also overrides the older <=1280px prototype media rule, which
- * made the expanded FPS selector squeeze E/P/V/R and Batch actions on iPad
- * landscape.  server-batch.css loads last, so restore an explicit tablet
- * layout here while preserving the desktop row when the FPS selector is
- * collapsed and the main panel regains the horizontal space. */
-@media (max-width: 1280px) {
-  .productionWorkspace:not(.selector-collapsed) .productionBatchToolbar.programmingBatchToolbar {
+/* The FPS selector changes the Production content-column width independently
+ * of the viewport. Query that column directly so the toolbar uses its own
+ * available space as the layout contract. */
+.productionMainPanel {
+  container: production-main / inline-size;
+}
+
+@container production-main (max-width: 1060px) {
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar.programmingBatchToolbar {
     grid-template-columns: minmax(0, 1fr) max-content;
     grid-template-areas:
       "image operations"
@@ -228,20 +228,20 @@
     align-items: start;
   }
 
-  .productionWorkspace:not(.selector-collapsed) .productionBatchToolbar .batchOperations,
-  .productionWorkspace:not(.selector-collapsed) .productionBatchToolbar .programmingBatchOperations {
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar .batchOperations,
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar .programmingBatchOperations {
     flex-wrap: nowrap;
     justify-self: end;
   }
 
-  .productionWorkspace:not(.selector-collapsed) .productionBatchToolbar .productionBatchActions,
-  .productionWorkspace:not(.selector-collapsed) .productionBatchToolbar .programmingBatchActions {
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar .productionBatchActions,
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar .programmingBatchActions {
     justify-self: end;
   }
 }
 
-@media (max-width: 920px) {
-  .productionWorkspace .productionBatchToolbar.programmingBatchToolbar {
+@container production-main (max-width: 560px) {
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar.programmingBatchToolbar {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "image"
@@ -249,10 +249,10 @@
       "actions";
   }
 
-  .productionWorkspace .productionBatchToolbar .batchOperations,
-  .productionWorkspace .productionBatchToolbar .programmingBatchOperations,
-  .productionWorkspace .productionBatchToolbar .productionBatchActions,
-  .productionWorkspace .productionBatchToolbar .programmingBatchActions {
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar .batchOperations,
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar .programmingBatchOperations,
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar .productionBatchActions,
+  html .productionPrototypePage .productionMainPanel .productionBatchToolbar .programmingBatchActions {
     justify-self: start;
     flex-wrap: wrap;
   }
