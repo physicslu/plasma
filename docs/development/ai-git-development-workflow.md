@@ -23,12 +23,29 @@ CI Validation
         ↓
 PR Review
         ↓
-Merge main
+Merge main  ← Single Human Approval Gate
         ↓
 Render Deploy
         ↓
 Acceptance Test
 ```
+
+## Approval Gate Policy
+
+Plasma uses **one human approval gate only**:
+
+```text
+Merge main
+```
+
+The following are validation activities, not approval gates:
+
+- PR Review
+- Unit Test
+- CI Validation
+- Render Deploy
+
+AI agents should continue autonomous execution through development and validation. Human intervention is required only when deciding whether completed work enters `main`.
 
 ## Workflow Rules
 
@@ -111,7 +128,7 @@ Passing a lower layer does not prove higher-level correctness.
 
 ### 6. PR Review
 
-Create PR only when ready for review.
+Create PR when the feature is ready for review.
 
 PR must include:
 
@@ -120,7 +137,11 @@ PR must include:
 - UI screenshots when applicable
 - Known limitations
 
+PR Review provides engineering feedback but is not a separate approval gate.
+
 ### 7. Merge Main
+
+Merge main is the only human approval gate.
 
 Merge requires:
 
@@ -167,4 +188,4 @@ AI agents must:
 2. Follow this workflow.
 3. Preserve architecture contracts.
 4. Run relevant validation before review.
-5. Stop at protected approval gates.
+5. Stop only at protected Merge main approval gate.
