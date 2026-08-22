@@ -65,7 +65,7 @@ type ActiveProps = {
 
 function PolicyInfo({ label, text }: { label: string; text: string }) {
   return (
-    <span className="batchPolicyInfo" tabIndex={0} aria-label={`${label} information`}>
+    <span className="batchPolicyInfo" tabIndex={0} aria-label={`Help for ${label}`}>
       i
       <span role="tooltip">{text}</span>
     </span>
