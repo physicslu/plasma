@@ -357,7 +357,6 @@ async function ensureEngineeringAsset(
   const key = `${sessionId}|${apiBase}|${fingerprint.asset_sha256}`;
   const existing = assetEnsureInFlight.get(key);
   if (existing) return await existing;
-
   const ensure = (async () => {
     emitAssetEvent(onAssetEvent, "cache_check", fingerprint);
     const checked = await requestJson<{
@@ -434,6 +433,7 @@ export async function startJob(
     operation: Operation;
     assetFile?: File | null;
     engineeringSessionId?: string;
+    allowSyntheticMockImage?: boolean;
     offset?: number;
     length?: number;
     submissionGuard?: () => boolean;
@@ -444,26 +444,32 @@ export async function startJob(
   try {
     const usesAsset = options.operation === "program" || options.operation === "verify";
     const engineeringTarget = apiBase.includes("/api/engineering/targets/");
+    const syntheticMockImage = usesAsset && !options.assetFile && options.allowSyntheticMockImage === true;
     let fingerprint: ProgrammingAssetFingerprint | null = null;
     let assetBase64 = "";
 
     if (usesAsset) {
-      if (!options.assetFile) {
+      if (!options.assetFile && !syntheticMockImage) {
         throw new PlasmaApiError("Program and Verify require an Image Asset");
       }
-      fingerprint = await fingerprintFile(options.assetFile);
-      if (engineeringTarget) {
-        if (!options.engineeringSessionId) {
-          throw new PlasmaApiError("Engineering connection session is not ready");
+      if (syntheticMockImage && !engineeringTarget) {
+        throw new PlasmaApiError("Synthetic Mock Image is only valid for an Engineering Mock target");
+      }
+      if (engineeringTarget && !options.engineeringSessionId) {
+        throw new PlasmaApiError("Engineering connection session is not ready");
+      }
+      if (options.assetFile) {
+        fingerprint = await fingerprintFile(options.assetFile);
+        if (engineeringTarget) {
+          fingerprint = await ensureEngineeringAsset(
+            apiBase,
+            options.engineeringSessionId!,
+            options.assetFile,
+            options.onAssetEvent,
+          );
+        } else {
+          assetBase64 = await fileToBase64(options.assetFile);
         }
-        fingerprint = await ensureEngineeringAsset(
-          apiBase,
-          options.engineeringSessionId,
-          options.assetFile,
-          options.onAssetEvent,
-        );
-      } else {
-        assetBase64 = await fileToBase64(options.assetFile);
       }
     }
 
@@ -475,9 +481,9 @@ export async function startJob(
       site_id: options.siteId,
       operation: options.operation,
     };
-    if (fingerprint && engineeringTarget && options.engineeringSessionId) {
+    if (usesAsset && engineeringTarget && options.engineeringSessionId) {
       body.session_id = options.engineeringSessionId;
-      body.asset_sha256 = fingerprint.asset_sha256;
+      if (fingerprint) body.asset_sha256 = fingerprint.asset_sha256;
     } else if (fingerprint && usesAsset) {
       Object.assign(body, fingerprint, {
         asset_base64: assetBase64,

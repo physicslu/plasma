@@ -103,6 +103,7 @@ export type CreateServerBatchOptions = {
   operations: Operation[];
   executionPolicy: BatchExecutionPolicy;
   assetFile?: File | null;
+  allowSyntheticMockImage?: boolean;
   readOffset?: number;
   readLength?: number;
 };
@@ -205,7 +206,7 @@ export async function createServerBatch(
   options: CreateServerBatchOptions,
 ): Promise<ServerBatchSnapshot> {
   const usesAsset = options.operations.some(operation => operation === "program" || operation === "verify");
-  if (usesAsset && !options.assetFile) {
+  if (usesAsset && !options.assetFile && !options.allowSyntheticMockImage) {
     throw new ServerBatchApiError("Program / Verify Batch requires one Programming Asset");
   }
   if (usesAsset && !options.sessionId) {

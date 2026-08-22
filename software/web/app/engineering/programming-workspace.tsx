@@ -200,6 +200,7 @@ export default function ProgrammingWorkspace() {
 
   const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === selection.ppuId) ?? null;
+  const syntheticMockImageAvailable = selectedPPU?.provider === "mock";
   const targetSelectionKey = selection.facilityId && selection.ppuId
     ? `${selection.facilityId}/${selection.ppuId}`
     : null;
@@ -223,7 +224,7 @@ export default function ProgrammingWorkspace() {
     selectedSiteCount: selectedSiteIds.length,
     selectedOperationCount: selectedOperations.length,
     requiresImage,
-    imagePresent: Boolean(imageAsset),
+    imagePresent: Boolean(imageAsset) || syntheticMockImageAvailable,
     imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_ASSET_BYTES,
     readSelected: selectedOperations.includes("read"),
     readParamsValid: readRangeValid,
@@ -235,6 +236,10 @@ export default function ProgrammingWorkspace() {
     ? "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。"
     : "No operation selected. Select at least one of Erase, Program, Verify, or Read.";
   const dismissWarning = locale === "zh-TW" ? "關閉警告" : "Dismiss warning";
+  const syntheticImageLabel = locale === "zh-TW" ? "Mock Synthetic Image" : "Mock Synthetic Image";
+  const syntheticImageHint = locale === "zh-TW"
+    ? "未選 Image 時由 Mock Settings 的 Default Image Size 自動產生 Synthetic Image；手動選檔時以選檔優先。"
+    : "Without a selected Image, Mock generates a Synthetic Image from Default Image Size; a selected file takes precedence.";
 
   const appendLog = useCallback((
     message: string,
@@ -507,7 +512,7 @@ export default function ProgrammingWorkspace() {
     if (!targetApiBase || connection !== "online" || !site.enabled || isRunning(site)) return true;
     if (!forBatch && batchRunning) return true;
     if (submittingSiteIds.includes(site.id)) return true;
-    if ((operation === "program" || operation === "verify") && !imageAsset) return true;
+    if ((operation === "program" || operation === "verify") && !imageAsset && !syntheticMockImageAvailable) return true;
     if ((operation === "program" || operation === "verify") && Boolean(imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES)) return true;
     if (operation === "read" && !readRangeValid) return true;
     return false;
@@ -539,11 +544,18 @@ export default function ProgrammingWorkspace() {
     submissionGenerations.current[siteId] = (submissionGenerations.current[siteId] ?? 0) + 1;
     setSubmittingSiteIds(current => current.includes(siteId) ? current : [...current, siteId]);
     try {
+      const usesSyntheticImage = (operation === "program" || operation === "verify")
+        && !imageAsset
+        && syntheticMockImageAvailable;
+      if (usesSyntheticImage) {
+        appendLog(`[IMG] SYNTHETIC · ${siteLabel(siteId)} · ${operation.toUpperCase()} · Mock Settings Default Image Size`);
+      }
       const job = await startJob(targetApiBase, {
         siteId,
         operation,
         assetFile: operation === "erase" || operation === "read" ? null : imageAsset,
         engineeringSessionId: engineeringSessionId ?? undefined,
+        allowSyntheticMockImage: usesSyntheticImage,
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
         submissionGuard,
@@ -756,8 +768,14 @@ export default function ProgrammingWorkspace() {
         <div className="programmingBatchFile">
           <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>{t("engineeringProgramming.browse")}</button>
           <input ref={imageInputRef} aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" hidden disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} />
-          <em className="programmingFileName" title={imageAsset?.name}>{imageAsset?.name ?? "—"}</em>
-          <small className="programmingFileHint">{t("engineeringProgramming.imageAssetHint")}</small>
+          <em
+            className="programmingFileName"
+            data-image-source={imageAsset ? "user" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none"}
+            title={imageAsset?.name}
+          >
+            {imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? syntheticImageLabel : "—")}
+          </em>
+          <small className="programmingFileHint">{syntheticMockImageAvailable ? syntheticImageHint : t("engineeringProgramming.imageAssetHint")}</small>
         </div>
         <div className="programmingBatchOperations" role="group" aria-label="Engineering batch operations">
           <span>{t("engineeringProgramming.batchOperations")}</span>
