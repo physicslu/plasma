@@ -1,0 +1,586 @@
+name: Unified P E Dashboard Bootstrap
+
+on:
+  push:
+    branches:
+      - agent/unified-pe-batch-dashboard
+    paths:
+      - .github/workflows/unified-pe-dashboard-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/unified-pe-batch-dashboard
+          fetch-depth: 0
+
+      - name: Apply P/E dashboard integration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"expected block not found in {path}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          pmod = "software/web/app/fleet/server-batch-page.tsx"
+          replace_once(
+              pmod,
+              'import { useWorkspaceSession, type SelectionMap } from "../workspace-session";\nimport "../programming-batch-toolbar.css";',
+              'import { useWorkspaceSession, type SelectionMap } from "../workspace-session";\nimport { ActiveFpsSummary, BatchPolicyPanel, BatchTopologySummary } from "../batch-dashboard-panels";\nimport "../programming-batch-toolbar.css";',
+          )
+          replace_once(
+              pmod,
+              '  const text = copy[locale];\n',
+              '''  const text = copy[locale];
+          const dashboardCopy = locale === "zh-TW" ? {
+            policy: {
+              repeatCount: "Repeat Count",
+              retryLimit: "Site Retry Limit",
+              stopThreshold: "Failed Site Stop Threshold",
+              repeatTooltip: "整個 Batch 連續執行的輪數（1–10000）。",
+              retryTooltip: "單一 Site 的操作失敗後最多重試次數（0–20）。",
+              thresholdTooltip: "Retry 用盡後成為 FAULTED 的 Site 數達門檻時停止 Batch；off 表示不啟用。",
+              hint: "Repeat 套用整個 Batch；Retry 只針對可信操作失敗；Threshold 只計入 Retry 用盡的 FAULTED Site。",
+              invalid: "Batch Execution Policy 設定無效。",
+            },
+            active: {
+              title: "Active FPS : 即時結果摘要",
+              hint: "FAULTED = Retry 用盡的可信 DUT/Site 失敗；ERROR = 基礎設施或 Runtime 錯誤。",
+              selected: "總選擇",
+              running: "執行中",
+              pass: "成功 (PASS)",
+              faulted: "失敗 (FAULTED)",
+              error: "錯誤 (ERROR)",
+              stopped: "已停止",
+              cancelled: "已取消",
+            },
+          } : {
+            policy: {
+              repeatCount: "Repeat Count",
+              retryLimit: "Site Retry Limit",
+              stopThreshold: "Failed Site Stop Threshold",
+              repeatTooltip: "Number of complete Batch rounds (1–10000).",
+              retryTooltip: "Maximum retries after a trustworthy Site operation failure (0–20).",
+              thresholdTooltip: "Stop the Batch when retry-exhausted FAULTED Sites reach this count; off disables the threshold.",
+              hint: "Repeat applies to the whole Batch; Retry applies only to trustworthy operation failures; Threshold counts retry-exhausted FAULTED Sites.",
+              invalid: "Batch Execution Policy is invalid.",
+            },
+            active: {
+              title: "Active FPS : Live Result Summary",
+              hint: "FAULTED = trustworthy DUT/Site failure after retry exhaustion; ERROR = infrastructure or runtime failure.",
+              selected: "Selected",
+              running: "Running",
+              pass: "PASS",
+              faulted: "FAULTED",
+              error: "ERROR",
+              stopped: "Stopped",
+              cancelled: "Cancelled",
+            },
+          };
+''',
+          )
+          old_topology = '''              <section className="prototypeTopologySummary" aria-label="Mock topology summary">
+                <article><small>Facilities</small><b>{catalog.facility_count}</b></article>
+                <article><small>PPUs</small><b>{catalog.ppu_count}</b></article>
+                <article><small>{text.selectedSites}</small><b>{summary.sites}</b><span>{summary.facilities} F / {summary.ppus} P</span></article>
+                <article className="runtimeSummary"><small>PASS</small><b>{summary.success}</b><span>FAULT {summary.faulted} · ERR {summary.error} · RUN {summary.running} · STOP {summary.stopped} · CAN {summary.cancelled}</span></article>
+              </section>
+
+              <section className="productionBatchToolbar programmingBatchToolbar" aria-label="Batch operation toolbar">'''
+          new_topology = '''              <BatchTopologySummary
+                facilityCount={catalog.facility_count}
+                ppuCount={catalog.ppu_count}
+                selectedSiteCount={summary.sites}
+                selectedFacilityCount={summary.facilities}
+                selectedPpuCount={summary.ppus}
+                counts={{ selected: summary.sites, running: summary.running, pass: summary.success, faulted: summary.faulted, error: summary.error, stopped: summary.stopped, cancelled: summary.cancelled }}
+              />
+
+              <section className="unifiedBatchControlStack" data-dashboard-mode="production">
+              <section className="productionBatchToolbar programmingBatchToolbar" aria-label="Batch operation toolbar">'''
+          replace_once(pmod, old_topology, new_topology)
+          old_policy = '''              <section className="batchPolicyPanel" aria-label="Batch execution policy">
+                <label><span>{text.repeatCount}</span><input aria-label="Repeat Count" type="number" min="1" max="10000" value={repeatCount} disabled={batchRunning} onChange={event => setRepeatCount(event.target.value)} /></label>
+                <label><span>{text.retryLimit}</span><input aria-label="Site Retry Limit" type="number" min="0" max="20" value={siteRetryLimit} disabled={batchRunning} onChange={event => setSiteRetryLimit(event.target.value)} /></label>
+                <label><span>{text.stopThreshold}</span><input aria-label="Failed Site Stop Threshold" type="number" min="1" max={Math.max(1, activeCounts.sites)} placeholder="off" value={failedSiteThreshold} disabled={batchRunning} onChange={event => setFailedSiteThreshold(event.target.value)} /></label>
+                <small>{policyValid ? text.thresholdHint : text.policyInvalid}</small>
+              </section>
+'''
+          new_policy = '''              <BatchPolicyPanel
+                repeatCount={repeatCount}
+                retryLimit={siteRetryLimit}
+                stopThreshold={failedSiteThreshold}
+                maxThreshold={activeCounts.sites}
+                disabled={batchRunning}
+                valid={policyValid}
+                copy={dashboardCopy.policy}
+                onRepeatCount={setRepeatCount}
+                onRetryLimit={setSiteRetryLimit}
+                onStopThreshold={setFailedSiteThreshold}
+              />
+              </section>
+
+              <ActiveFpsSummary
+                counts={{ selected: summary.sites, running: summary.running, pass: summary.success, faulted: summary.faulted, error: summary.error, stopped: summary.stopped, cancelled: summary.cancelled }}
+                copy={dashboardCopy.active}
+              />
+'''
+          replace_once(pmod, old_policy, new_policy)
+
+          css = "software/web/app/fleet/production-prototype.css"
+          replace_once(css, "  grid-template-columns: 330px minmax(0, 1fr);", "  grid-template-columns: 286px minmax(0, 1fr);")
+          replace_once(css, "  min-height: 66px;\n  padding: 14px 50px 12px 14px;", "  min-height: 54px;\n  padding: 11px 46px 9px 12px;")
+          replace_once(css, "  max-height: min(58vh, 640px);", "  max-height: min(52vh, 560px);")
+          replace_once(css, "  min-height: 42px;\n  padding: 8px 10px;", "  min-height: 36px;\n  padding: 6px 8px;")
+
+          emode = "software/web/app/engineering/programming-workspace.tsx"
+          replace_once(emode, 'import { useCallback, useEffect, useRef, useState } from "react";', 'import { useCallback, useEffect, useMemo, useRef, useState } from "react";')
+          replace_once(
+              emode,
+              'import { useWorkspaceSession, type TargetSelection } from "../workspace-session";\nimport "../programming-batch-toolbar.css";',
+              'import { useWorkspaceSession, type TargetSelection } from "../workspace-session";\nimport { ActiveFpsSummary, BatchPolicyPanel, BatchTopologySummary } from "../batch-dashboard-panels";\nimport "../programming-batch-toolbar.css";',
+          )
+          replace_once(emode, '  | "failed"\n  | "timeout"', '  | "failed"\n  | "faulted"\n  | "error"\n  | "stopped"\n  | "timeout"')
+          replace_once(
+              emode,
+              'type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "failed";\ntype BatchTerminalState = "success" | "cancelled" | "failed";',
+              'type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "faulted" | "error" | "stopped";\ntype BatchTerminalState = "success" | "cancelled" | "faulted" | "error" | "stopped";',
+          )
+          replace_once(
+              emode,
+              '  const [batchSiteStates, setBatchSiteStates] = useState<Record<number, BatchSiteState>>({});\n  const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);',
+              '  const [batchSiteStates, setBatchSiteStates] = useState<Record<number, BatchSiteState>>({});\n  const [repeatCount, setRepeatCount] = useState("1");\n  const [siteRetryLimit, setSiteRetryLimit] = useState("0");\n  const [failedSiteThreshold, setFailedSiteThreshold] = useState("");\n  const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);',
+          )
+          replace_once(
+              emode,
+              '  const batchLifecycle = useRef<BatchLifecycle | null>(null);\n  const cancelRequests = useRef<Set<string>>(new Set());',
+              '  const batchLifecycle = useRef<BatchLifecycle | null>(null);\n  const batchStopReason = useRef<"operator" | "threshold" | null>(null);\n  const operatorCancelledSites = useRef<Set<number>>(new Set());\n  const cancelRequests = useRef<Set<string>>(new Set());',
+          )
+          replace_once(
+              emode,
+              '''function sameTarget(left: TargetSelection, right: TargetSelection): boolean {
+  return left.facilityId === right.facilityId && left.ppuId === right.ppuId;
+}
+''',
+              '''function sameTarget(left: TargetSelection, right: TargetSelection): boolean {
+  return left.facilityId === right.facilityId && left.ppuId === right.ppuId;
+}
+
+function parsePositiveInt(value: string): number | null {
+  if (!/^\\d+$/.test(value.trim())) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseNonNegativeInt(value: string): number | null {
+  if (!/^\\d+$/.test(value.trim())) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+''',
+          )
+          replace_once(
+              emode,
+              '''  const syntheticImageHint = locale === "zh-TW"
+    ? "未選 Image 時由 Mock Settings 的 Default Image Size 自動產生 Synthetic Image；手動選檔時以選檔優先。"
+    : "Without a selected Image, Mock generates a Synthetic Image from Default Image Size; a selected file takes precedence.";
+''',
+              '''  const syntheticImageHint = locale === "zh-TW"
+    ? "未選 Image 時由 Mock Settings 的 Default Image Size 自動產生 Synthetic Image；手動選檔時以選檔優先。"
+    : "Without a selected Image, Mock generates a Synthetic Image from Default Image Size; a selected file takes precedence.";
+  const repeatValue = parsePositiveInt(repeatCount);
+  const retryValue = parseNonNegativeInt(siteRetryLimit);
+  const thresholdValue = failedSiteThreshold.trim() === "" ? null : parsePositiveInt(failedSiteThreshold);
+  const policyValid = repeatValue !== null
+    && repeatValue <= 10_000
+    && retryValue !== null
+    && retryValue <= 20
+    && (failedSiteThreshold.trim() === "" || (thresholdValue !== null && thresholdValue <= selectedSiteIds.length));
+  const dashboardCopy = locale === "zh-TW" ? {
+    policy: {
+      repeatCount: "Repeat Count",
+      retryLimit: "Site Retry Limit",
+      stopThreshold: "Failed Site Stop Threshold",
+      repeatTooltip: "整個 Batch 連續執行的輪數（1–10000）。",
+      retryTooltip: "單一 Site 的操作失敗後最多重試次數（0–20）。",
+      thresholdTooltip: "Retry 用盡後成為 FAULTED 的 Site 數達門檻時停止 Batch；off 表示不啟用。",
+      hint: "Repeat 套用整個 Batch；Retry 只針對可信操作失敗；Threshold 只計入 Retry 用盡的 FAULTED Site。",
+      invalid: "Batch Execution Policy 設定無效。",
+    },
+    active: {
+      title: "Active FPS : 即時結果摘要",
+      hint: "FAULTED = Retry 用盡的可信 DUT/Site 失敗；ERROR = 基礎設施或 Runtime 錯誤。",
+      selected: "總選擇",
+      running: "執行中",
+      pass: "成功 (PASS)",
+      faulted: "失敗 (FAULTED)",
+      error: "錯誤 (ERROR)",
+      stopped: "已停止",
+      cancelled: "已取消",
+    },
+  } : {
+    policy: {
+      repeatCount: "Repeat Count",
+      retryLimit: "Site Retry Limit",
+      stopThreshold: "Failed Site Stop Threshold",
+      repeatTooltip: "Number of complete Batch rounds (1–10000).",
+      retryTooltip: "Maximum retries after a trustworthy Site operation failure (0–20).",
+      thresholdTooltip: "Stop the Batch when retry-exhausted FAULTED Sites reach this count; off disables the threshold.",
+      hint: "Repeat applies to the whole Batch; Retry applies only to trustworthy operation failures; Threshold counts retry-exhausted FAULTED Sites.",
+      invalid: "Batch Execution Policy is invalid.",
+    },
+    active: {
+      title: "Active FPS : Live Result Summary",
+      hint: "FAULTED = trustworthy DUT/Site failure after retry exhaustion; ERROR = infrastructure or runtime failure.",
+      selected: "Selected",
+      running: "Running",
+      pass: "PASS",
+      faulted: "FAULTED",
+      error: "ERROR",
+      stopped: "Stopped",
+      cancelled: "Cancelled",
+    },
+  };
+  const activeFpsCounts = useMemo(() => {
+    const batchStates = selectedSiteIds.map(siteId => batchSiteStates[siteId]).filter(Boolean) as BatchSiteState[];
+    if (batchStates.length > 0) {
+      const count = (state: BatchSiteState) => batchStates.filter(item => item === state).length;
+      return {
+        selected: selectedSiteIds.length,
+        running: count("running") + count("cancelling"),
+        pass: count("success"),
+        faulted: count("faulted"),
+        error: count("error"),
+        stopped: count("stopped"),
+        cancelled: count("cancelled"),
+      };
+    }
+    return {
+      selected: selectedSiteIds.length,
+      running: selectedSites.filter(isRunning).length,
+      pass: selectedSites.filter(site => site.stage === "success").length,
+      faulted: selectedSites.filter(site => site.stage === "faulted").length,
+      error: selectedSites.filter(site => site.stage === "failed" || site.stage === "error" || site.stage === "timeout" || site.stage === "aborted").length,
+      stopped: selectedSites.filter(site => site.stage === "stopped").length,
+      cancelled: selectedSites.filter(site => site.stage === "cancelled").length,
+    };
+  }, [batchSiteStates, selectedSiteIds, selectedSites]);
+''',
+          )
+          replace_once(
+              emode,
+              '    batchLifecycle.current = null;\n    setPPU(null);',
+              '    batchLifecycle.current = null;\n    batchStopReason.current = null;\n    operatorCancelledSites.current.clear();\n    setPPU(null);',
+          )
+          replace_once(
+              emode,
+              '''  function toggleSite(siteId: number) {
+    if (batchRunning) return;
+    if (targetSelectionKey) siteSelectionTarget.current = targetSelectionKey;''',
+              '''  function toggleSite(siteId: number) {
+    if (batchRunning) return;
+    setBatchSiteStates({});
+    if (targetSelectionKey) siteSelectionTarget.current = targetSelectionKey;''',
+          )
+          replace_once(
+              emode,
+              '''  function runSingleSite(siteId: number, operation: Operation) {
+    const readDetail = operation === "read" ? ` · offset ${readOffset} · length ${readLength}` : "";''',
+              '''  function runSingleSite(siteId: number, operation: Operation) {
+    setBatchSiteStates({});
+    const readDetail = operation === "read" ? ` · offset ${readOffset} · length ${readLength}` : "";''',
+          )
+
+          p = Path(emode)
+          text = p.read_text()
+          start = text.index('  async function runBatch() {')
+          end = text.index('\n  async function cancelBatch() {', start)
+          new_run_batch = r'''  async function runBatch() {
+    if (batchRunning) return;
+    if (!batchReadiness.ready) {
+      if (batchReadiness.code === "no-op") setOperatorWarning(noOperationWarning);
+      appendLog(`[BATCH] BLOCKED · ${batchReadiness.label}`, false, "USR");
+      return;
+    }
+    if (!policyValid || repeatValue === null || retryValue === null) {
+      setOperatorWarning(dashboardCopy.policy.invalid);
+      appendLog(`[BATCH] BLOCKED · ${dashboardCopy.policy.invalid}`, false, "USR");
+      return;
+    }
+    setOperatorWarning(null);
+    const siteIds = [...selectedSiteIds];
+    const operations = [...selectedOperations];
+    const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
+    appendLog(
+      `[BATCH] EXECUTE · ${operationListLabel(operations)} · ${siteListLabel(siteIds)} · repeat ${repeatValue} · retry ${retryValue} · threshold ${thresholdValue ?? "off"}${readDetail}`,
+      false,
+      "USR",
+    );
+    const lifecycle = new BatchLifecycle(siteIds);
+    const results: Partial<Record<number, BatchTerminalState>> = {};
+    const faultedSites = new Set<number>();
+    batchLifecycle.current = lifecycle;
+    batchStopReason.current = null;
+    operatorCancelledSites.current.clear();
+    setBatchRunning(true);
+    setBatchCancelling(false);
+    setBatchSiteStates(Object.fromEntries(siteIds.map(id => [id, "running"])) as Record<number, BatchSiteState>);
+    appendLog(`START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteListLabel(siteIds)}`, false, "BAT");
+
+    const terminalize = (siteId: number, state: BatchTerminalState, error?: string) => {
+      results[siteId] = state;
+      setBatchSiteState(siteId, state);
+      if (state === "faulted" || state === "error" || state === "stopped") {
+        setSites(current => current.map(site => site.id === siteId ? { ...site, stage: state, error: error ?? site.error } : site));
+      }
+      lifecycle.finish(siteId);
+    };
+    const cancellationState = (siteId: number): BatchTerminalState => {
+      if (operatorCancelledSites.current.has(siteId)) return "cancelled";
+      return batchStopReason.current === "threshold" ? "stopped" : "cancelled";
+    };
+    const triggerThresholdIfNeeded = async () => {
+      if (thresholdValue === null || faultedSites.size < thresholdValue || batchStopReason.current) return;
+      batchStopReason.current = "threshold";
+      setBatchCancelling(true);
+      setBatchSiteStates(current => Object.fromEntries(Object.entries(current).map(([siteId, state]) => [
+        siteId,
+        state === "running" ? "cancelling" : state,
+      ])) as Record<number, BatchSiteState>);
+      const { activeJobs } = lifecycle.cancel();
+      appendLog(`[BATCH] THRESHOLD · ${faultedSites.size}/${thresholdValue} FAULTED · stopping unfinished Sites`, true, "BAT");
+      await Promise.all(activeJobs.map(([siteId, jobId]) => requestCancel(siteId, jobId)));
+    };
+
+    try {
+      await Promise.all(siteIds.map(async siteId => {
+        for (let round = 1; round <= repeatValue; round += 1) {
+          for (const operation of operations) {
+            let operationSucceeded = false;
+            for (let attempt = 0; attempt <= retryValue; attempt += 1) {
+              if (batchStopReason.current === "threshold") {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              if (!lifecycle.prepare(siteId, operation)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              await new Promise(resolve => window.setTimeout(resolve, 0));
+              if (!lifecycle.beginSubmit(siteId)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
+              if (!job) {
+                if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+                else terminalize(siteId, "error", "Job submission failed");
+                return;
+              }
+              if (lifecycle.accepted(siteId, job.job_id)) await requestCancel(siteId, job.job_id);
+              let finalJob: JobSnapshot;
+              try {
+                finalJob = await waitTerminal(job);
+              } catch (error) {
+                if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+                else terminalize(siteId, "error", error instanceof Error ? error.message : "Batch polling failed");
+                return;
+              }
+              if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              if (finalJob.state === "success") {
+                operationSucceeded = true;
+                break;
+              }
+              if (finalJob.state === "failed") {
+                if (attempt < retryValue) {
+                  appendLog(`[${siteLabel(siteId)}] RETRY ${attempt + 1}/${retryValue} · Round ${round}/${repeatValue} · ${operation.toUpperCase()}`, false, "BAT");
+                  continue;
+                }
+                faultedSites.add(siteId);
+                terminalize(siteId, "faulted", finalJob.result?.error?.message);
+                await triggerThresholdIfNeeded();
+                return;
+              }
+              if (finalJob.state === "cancelled") {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              terminalize(siteId, "error", finalJob.result?.error?.message ?? finalJob.state.toUpperCase());
+              return;
+            }
+            if (!operationSucceeded) return;
+          }
+        }
+        terminalize(siteId, "success");
+      }));
+
+      const successful = siteIds.filter(siteId => results[siteId] === "success");
+      const cancelled = siteIds.filter(siteId => results[siteId] === "cancelled");
+      const faulted = siteIds.filter(siteId => results[siteId] === "faulted");
+      const errors = siteIds.filter(siteId => results[siteId] === "error");
+      const stopped = siteIds.filter(siteId => results[siteId] === "stopped");
+      const groups: string[] = [];
+      if (successful.length > 0) groups.push(`success: ${siteListLabel(successful)}`);
+      if (faulted.length > 0) groups.push(`faulted: ${siteListLabel(faulted)}`);
+      if (errors.length > 0) groups.push(`error: ${siteListLabel(errors)}`);
+      if (stopped.length > 0) groups.push(`stopped: ${siteListLabel(stopped)}`);
+      if (cancelled.length > 0) groups.push(`cancelled: ${siteListLabel(cancelled)}`);
+      const outcome = errors.length > 0 || stopped.length > 0
+        ? "ERROR"
+        : faulted.length > 0
+          ? "PARTIAL"
+          : cancelled.length === siteIds.length
+            ? "CANCELLED"
+            : cancelled.length > 0
+              ? "PARTIAL"
+              : "COMPLETE";
+      appendLog(`${outcome} · ${groups.join(" · ")}`, errors.length > 0 || faulted.length > 0 || stopped.length > 0, "BAT");
+    } finally {
+      if (batchLifecycle.current === lifecycle) batchLifecycle.current = null;
+      setBatchRunning(false);
+      setBatchCancelling(false);
+    }
+  }
+'''
+          p.write_text(text[:start] + new_run_batch + text[end:])
+
+          replace_once(
+              emode,
+              '''  async function cancelBatch() {
+    const lifecycle = batchLifecycle.current;
+    if (!batchRunning || batchCancelling || !lifecycle) return;
+    appendLog("[BATCH] CANCEL", false, "USR");
+    const { activeJobs } = lifecycle.cancel();
+    setBatchCancelling(true);
+    setBatchSiteStates(current => Object.fromEntries(
+      Object.entries(current).map(([siteId, state]) => [siteId, state === "running" ? "cancelling" : state]),
+    ) as Record<number, BatchSiteState>);
+    await Promise.all(activeJobs.map(([siteId, jobId]) => requestCancel(siteId, jobId)));
+  }
+''',
+              '''  async function cancelBatch() {
+    const lifecycle = batchLifecycle.current;
+    if (!batchRunning || batchCancelling || !lifecycle) return;
+    appendLog("[BATCH] CANCEL", false, "USR");
+    batchStopReason.current = "operator";
+    const { activeJobs } = lifecycle.cancel();
+    setBatchCancelling(true);
+    setBatchSiteStates(current => Object.fromEntries(
+      Object.entries(current).map(([siteId, state]) => [siteId, state === "running" ? "cancelling" : state]),
+    ) as Record<number, BatchSiteState>);
+    await Promise.all(activeJobs.map(([siteId, jobId]) => requestCancel(siteId, jobId)));
+  }
+''',
+          )
+          replace_once(
+              emode,
+              '''    if (batchRunning && lifecycle) {
+      const jobId = lifecycle.cancelSite(siteId);
+      setBatchSiteState(siteId, "cancelling");''',
+              '''    if (batchRunning && lifecycle) {
+      operatorCancelledSites.current.add(siteId);
+      const jobId = lifecycle.cancelSite(siteId);
+      setBatchSiteState(siteId, "cancelling");''',
+          )
+          old_header_toolbar = '''      <section className="engineeringExecutionToolbar programmingBatchToolbar" aria-label="Engineering batch control">'''
+          new_header_toolbar = '''      <BatchTopologySummary
+        facilityCount={catalog?.facility_count ?? 0}
+        ppuCount={catalog?.ppu_count ?? 0}
+        selectedSiteCount={selectedSiteIds.length}
+        selectedFacilityCount={selection.facilityId ? 1 : 0}
+        selectedPpuCount={selection.ppuId ? 1 : 0}
+        counts={activeFpsCounts}
+      />
+
+      <section className="unifiedBatchControlStack" data-dashboard-mode="engineering">
+      <section className="engineeringExecutionToolbar programmingBatchToolbar" aria-label="Engineering batch control">'''
+          replace_once(emode, old_header_toolbar, new_header_toolbar)
+          old_after_toolbar = '''      </section>
+
+      {selectedOperations.includes("read") && ('''
+          new_after_toolbar = '''      </section>
+      <BatchPolicyPanel
+        repeatCount={repeatCount}
+        retryLimit={siteRetryLimit}
+        stopThreshold={failedSiteThreshold}
+        maxThreshold={selectedSiteIds.length}
+        disabled={batchRunning}
+        valid={policyValid}
+        copy={dashboardCopy.policy}
+        onRepeatCount={setRepeatCount}
+        onRetryLimit={setSiteRetryLimit}
+        onStopThreshold={setFailedSiteThreshold}
+      />
+      </section>
+
+      <ActiveFpsSummary counts={activeFpsCounts} copy={dashboardCopy.active} />
+
+      {selectedOperations.includes("read") && ('''
+          replace_once(emode, old_after_toolbar, new_after_toolbar)
+
+          # Add focused source contract coverage. Browser-level geometry and tooltips are
+          # covered by the existing Playwright suites plus the new shared DOM contract.
+          Path("software/web/tests/unified-batch-dashboard-contract.test.mjs").write_text(r'''import test from "node:test";
+          import assert from "node:assert/strict";
+          import fs from "node:fs";
+
+          const shared = fs.readFileSync(new URL("../app/batch-dashboard-panels.tsx", import.meta.url), "utf8");
+          const pmod = fs.readFileSync(new URL("../app/fleet/server-batch-page.tsx", import.meta.url), "utf8");
+          const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace.tsx", import.meta.url), "utf8");
+
+          test("Pmod and Emode share the same three upper Batch dashboard primitives", () => {
+            for (const source of [pmod, emode]) {
+              assert.match(source, /BatchTopologySummary/);
+              assert.match(source, /unifiedBatchControlStack/);
+              assert.match(source, /ActiveFpsSummary/);
+              assert.match(source, /BatchPolicyPanel/);
+            }
+          });
+
+          test("shared Active FPS summary keeps FAULTED and ERROR distinct without duplicate error state", () => {
+            assert.match(shared, /\["faulted", copy\.faulted, counts\.faulted\]/);
+            assert.match(shared, /\["error", copy\.error, counts\.error\]/);
+            assert.equal((shared.match(/data-active-fps-state/g) ?? []).length, 1);
+            assert.match(shared, /selected.*running.*pass.*faulted.*error.*stopped.*cancelled/s);
+          });
+
+          test("policy controls expose hover/focus help and canonical ranges", () => {
+            assert.match(shared, /role="tooltip"/);
+            assert.match(shared, /aria-label="Repeat Count" type="number" min="1" max="10000"/);
+            assert.match(shared, /aria-label="Site Retry Limit" type="number" min="0" max="20"/);
+            assert.match(shared, /aria-label="Failed Site Stop Threshold"/);
+          });
+
+          test("Emode policy is behavioral rather than decorative", () => {
+            assert.match(emode, /for \(let round = 1; round <= repeatValue; round \+= 1\)/);
+            assert.match(emode, /for \(let attempt = 0; attempt <= retryValue; attempt \+= 1\)/);
+            assert.match(emode, /terminalize\(siteId, "faulted"/);
+            assert.match(emode, /terminalize\(siteId, "error"/);
+            assert.match(emode, /batchStopReason\.current = "threshold"/);
+          });
+          ''')
+
+          # The bootstrap has completed its one-shot job; delete it from the feature
+          # branch so no implementation helper workflow ships with the PR.
+          Path(".github/workflows/unified-pe-dashboard-bootstrap.yml").unlink()
+          PY
+
+      - name: Commit integrated dashboard
+        run: |
+          git config user.name "plasma-ci-bot"
+          git config user.email "plasma-ci-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Unify P E batch dashboard controls and summaries"
+          git push origin HEAD:agent/unified-pe-batch-dashboard
