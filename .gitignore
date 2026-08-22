@@ -35,6 +35,7 @@ pl/.venv/
 
 # Web generated files
 software/web/node_modules/
+# Playwright E2E dependencies and run artifacts are generated locally/CI only.
 software/web/e2e/node_modules/
 software/web/e2e/playwright-report/
 software/web/e2e/test-results/
