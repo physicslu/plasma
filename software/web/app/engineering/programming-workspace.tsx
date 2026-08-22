@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BatchLifecycle } from "../batch-lifecycle";
 import { evaluateBatchReadiness } from "../batch-readiness";
@@ -314,7 +314,7 @@ export default function ProgrammingWorkspace() {
       cancelled: "Cancelled",
     },
   };
-  const activeFpsCounts = useMemo(() => {
+  const activeFpsCounts = (() => {
     const batchStates = selectedSiteIds.map(siteId => batchSiteStates[siteId]).filter(Boolean) as BatchSiteState[];
     if (batchStates.length > 0) {
       const count = (state: BatchSiteState) => batchStates.filter(item => item === state).length;
@@ -337,7 +337,7 @@ export default function ProgrammingWorkspace() {
       stopped: selectedSites.filter(site => site.stage === "stopped").length,
       cancelled: selectedSites.filter(site => site.stage === "cancelled").length,
     };
-  }, [batchSiteStates, selectedSiteIds, selectedSites]);
+  })();
 
   const appendLog = useCallback((
     message: string,
