@@ -36,7 +36,7 @@ jobs:
               body.append(line[10:] if line.startswith('          ') else line)
           script = '\n'.join(body) + '\n'
           old = '''    if old not in text:\n        raise SystemExit(f"expected block not found in {path}: {old[:100]!r}")\n    p.write_text(text.replace(old, new, 1))'''
-          new = '''    if old not in text:\n        stripped = old.strip()\n        if stripped not in text:\n            raise SystemExit(f"expected block not found in {path}: {old[:100]!r}")\n        old = stripped\n        new = new.strip()\n    p.write_text(text.replace(old, new, 1))'''
+          new = '''    if old in text:\n        p.write_text(text.replace(old, new, 1))\n        return\n    import re\n    tokens = re.split(r"\\s+", old.strip())\n    pattern = r"\\s+".join(re.escape(token) for token in tokens)\n    match = re.search(pattern, text)\n    if not match:\n        raise SystemExit(f"expected block not found in {path}: {old[:100]!r}")\n    p.write_text(text[:match.start()] + new.strip() + text[match.end():])'''
           if old not in script:
               raise SystemExit('bootstrap replace_once implementation was not found')
           Path('/tmp/unified_pe_dashboard.py').write_text(script.replace(old, new, 1))
