@@ -123,15 +123,18 @@ test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR
     "productionBatchActions programmingBatchActions",
   ]);
 
+  const toolbarBox = await page.locator(".productionBatchToolbar").boundingBox();
   const imageBox = await page.locator(".programmingBatchFile").boundingBox();
   const operationsBox = await page.locator(".programmingBatchOperations").boundingBox();
   const actionsBox = await page.locator(".programmingBatchActions").boundingBox();
+  expect(toolbarBox).not.toBeNull();
   expect(imageBox).not.toBeNull();
   expect(operationsBox).not.toBeNull();
   expect(actionsBox).not.toBeNull();
-  expect(imageBox!.x).toBeLessThan(operationsBox!.x);
-  expect(actionsBox!.x - (operationsBox!.x + operationsBox!.width)).toBeGreaterThanOrEqual(0);
-  expect(actionsBox!.x - (operationsBox!.x + operationsBox!.width)).toBeLessThanOrEqual(16);
+  expect(imageBox!.x).toBeLessThanOrEqual(toolbarBox!.x + 12);
+  expect(imageBox!.x + imageBox!.width).toBeGreaterThanOrEqual(toolbarBox!.x + toolbarBox!.width - 12);
+  expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(Math.min(operationsBox!.y, actionsBox!.y));
+  expect(actionsBox!.x).toBeGreaterThanOrEqual(operationsBox!.x + operationsBox!.width);
 
   const theme = page.getByRole("group", { name: "Theme" });
   await theme.getByRole("button", { name: "Dark", exact: true }).click();
@@ -208,13 +211,13 @@ test("Emode stays dense and shares the Pmod file picker and dark operator palett
   const sitePanel = await page.locator(".engineeringSelectorPanel").boundingBox();
   for (const box of [toolbar, header, topology, controls, activeSummary, targetSelector, sourceNote, sitePanel]) expect(box).not.toBeNull();
   expect(header!.height).toBeLessThanOrEqual(80);
-  expect(toolbar!.height).toBeLessThanOrEqual(70);
+  expect(toolbar!.height).toBeLessThanOrEqual(140);
   expect(topology!.height).toBeLessThanOrEqual(72);
-  expect(controls!.height).toBeLessThanOrEqual(150);
+  expect(controls!.height).toBeLessThanOrEqual(230);
   expect(activeSummary!.height).toBeLessThanOrEqual(76);
-  expect(activeSummary!.y + activeSummary!.height - header!.y).toBeLessThanOrEqual(400);
+  expect(activeSummary!.y + activeSummary!.height - header!.y).toBeLessThanOrEqual(490);
   expect(targetSelector!.height).toBeLessThanOrEqual(72);
   expect(sourceNote!.height).toBeLessThanOrEqual(42);
   expect(sitePanel!.height).toBeLessThanOrEqual(118);
-  expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(560);
+  expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(650);
 });

@@ -38,12 +38,15 @@ test("Pmod and Emode share one batch readiness source of truth", async () => {
 
 test("Pmod and Emode use the same programming batch toolbar contract", async () => {
   const css = await read("programming-batch-toolbar.css");
+  const dashboardCss = await read("batch-dashboard-panels.css");
   const pmod = await read("fleet/server-batch-page.tsx");
   const emode = await read("engineering/programming-workspace.tsx");
 
   assert.match(css, /\.programmingFileName[\s\S]*font-size:\s*13px/);
-  assert.match(css, /\.programmingBatchOperations[\s\S]*justify-self:\s*end/);
-  assert.match(css, /grid-template-areas:\s*"file operations actions"/);
+  assert.match(css, /\.programmingBatchOperations[\s\S]*justify-self:\s*start/);
+  assert.match(css, /grid-template-areas:\s*"file file"\s*"operations actions"/);
+  assert.match(css, /\.programmingBatchFile::before\s*\{[\s\S]*content:\s*"Programming Image"/);
+  assert.match(dashboardCss, /\.unifiedBatchPolicyPanel::before\s*\{[\s\S]*content:\s*"Batch Policy"/);
   assert.match(pmod, /productionBatchToolbar programmingBatchToolbar/);
   assert.match(emode, /engineeringExecutionToolbar programmingBatchToolbar/);
   assert.match(pmod, /programmingBatchFile/);

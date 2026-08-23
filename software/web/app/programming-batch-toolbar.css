@@ -1,10 +1,12 @@
-/* Shared Pmod/Emode programming-file + EPVR + batch-action contract. */
+/* Shared Pmod/Emode Programming Image + EPVR + batch-action contract. */
 .programmingBatchToolbar {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) max-content max-content;
-  grid-template-areas: "file operations actions";
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-areas:
+    "file file"
+    "operations actions";
   align-items: center;
-  gap: 12px;
+  gap: 9px 12px;
   min-width: 0;
   padding: 9px 11px;
   border: 1px solid var(--line);
@@ -12,20 +14,54 @@
   background: var(--panel);
 }
 
+/* Production has page-specific toolbar rules loaded later. Keep the shared
+ * Batch Layout contract authoritative in both P Mode and E Mode. */
+.productionBatchToolbar.programmingBatchToolbar,
+.engineeringExecutionToolbar.programmingBatchToolbar,
+html .productionPrototypePage .productionBatchToolbar.programmingBatchToolbar {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-areas:
+    "file file"
+    "operations actions";
+}
+
+/* `operator-feedback.css`, `production-prototype.css`, and `pmod-theme.css`
+ * still own legacy production picker rules. These compound selectors pin
+ * Production back to the shared file row and prevent a stale implicit `image`
+ * grid area from being created by the older Pmod contract. */
+.productionImagePicker.programmingBatchFile,
+html .productionPrototypePage .productionImagePicker.programmingBatchFile {
+  grid-area: file;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+}
+
 .programmingBatchFile {
   grid-area: file;
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   align-items: center;
   column-gap: 10px;
   row-gap: 3px;
   min-width: 0;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.programmingBatchFile::before {
+  content: "Programming Image";
+  grid-column: 1 / -1;
+  grid-row: 1;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .02em;
 }
 
 .programmingBatchFile button {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
   min-height: 30px;
   padding: 0 11px;
   border: 1px solid color-mix(in srgb, var(--cyan) 55%, var(--line));
@@ -49,9 +85,9 @@
 
 .programmingBatchFile .programmingFileName {
   grid-column: 2;
-  grid-row: 1;
+  grid-row: 2;
   min-width: 0;
-  max-width: 420px;
+  max-width: 640px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -63,26 +99,27 @@
 
 .programmingBatchFile .programmingFileHint {
   grid-column: 1 / -1;
-  grid-row: 2;
+  grid-row: 3;
   color: var(--muted);
   font-size: 8px;
 }
 
 .programmingBatchOperations {
   grid-area: operations;
-  justify-self: end;
+  justify-self: start;
   display: flex;
   align-items: center;
   gap: 7px;
   flex-wrap: nowrap;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .programmingBatchOperations > span {
   margin-right: 2px;
   color: var(--text);
   font-size: 10px;
-  font-weight: 650;
+  font-weight: 800;
 }
 
 .programmingBatchOperations label {
@@ -240,17 +277,11 @@
   font: 9px var(--font-mono);
 }
 
-@media (max-width: 1180px) {
-  .programmingBatchToolbar {
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      "file file"
-      "operations actions";
-  }
-}
-
 @media (max-width: 820px) {
-  .programmingBatchToolbar {
+  .programmingBatchToolbar,
+  .productionBatchToolbar.programmingBatchToolbar,
+  .engineeringExecutionToolbar.programmingBatchToolbar,
+  html .productionPrototypePage .productionBatchToolbar.programmingBatchToolbar {
     grid-template-columns: 1fr;
     grid-template-areas:
       "file"
@@ -258,10 +289,20 @@
       "actions";
   }
 
+  .productionImagePicker.programmingBatchFile,
+  html .productionPrototypePage .productionImagePicker.programmingBatchFile {
+    grid-area: file;
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
   .programmingBatchOperations,
   .programmingBatchActions {
     justify-self: start;
     flex-wrap: wrap;
+  }
+
+  .programmingBatchFile .programmingFileName {
+    max-width: 100%;
   }
 
   .engineeringReadParameters {
