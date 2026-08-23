@@ -114,6 +114,32 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
     return Math.max(0, input.left - label.right);
   });
   expect(distance).toBeLessThanOrEqual(12);
+
+  const layout = await root.locator(".unifiedBatchControlStack").evaluate(element => {
+    const rect = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const toolbar = rect(".programmingBatchToolbar");
+    const image = rect(".programmingBatchFile");
+    const operations = rect(".programmingBatchOperations");
+    const actions = rect(".programmingBatchActions");
+    const policyRect = rect(".unifiedBatchPolicyPanel");
+    return {
+      toolbarLeft: toolbar.left,
+      toolbarRight: toolbar.right,
+      imageLeft: image.left,
+      imageRight: image.right,
+      imageBottom: image.bottom,
+      operationsTop: operations.top,
+      operationsBottom: operations.bottom,
+      actionsTop: actions.top,
+      actionsBottom: actions.bottom,
+      policyTop: policyRect.top,
+    };
+  });
+
+  expect(layout.imageLeft).toBeLessThanOrEqual(layout.toolbarLeft + 12);
+  expect(layout.imageRight).toBeGreaterThanOrEqual(layout.toolbarRight - 12);
+  expect(layout.imageBottom).toBeLessThanOrEqual(Math.min(layout.operationsTop, layout.actionsTop));
+  expect(Math.max(layout.operationsBottom, layout.actionsBottom)).toBeLessThanOrEqual(layout.policyTop);
 }
 
 test("Production and Engineering share the compact upper Batch dashboard contract", async ({ page }) => {
