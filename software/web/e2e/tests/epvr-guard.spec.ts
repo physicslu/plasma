@@ -121,15 +121,18 @@ async function expectSharedToolbarGeometry(page: Page) {
   const file = toolbar.locator(".programmingBatchFile");
   const operations = toolbar.locator(".programmingBatchOperations");
   const actions = toolbar.locator(".programmingBatchActions");
+  const toolbarBox = await toolbar.boundingBox();
   const fileBox = await file.boundingBox();
   const operationBox = await operations.boundingBox();
   const actionBox = await actions.boundingBox();
+  expect(toolbarBox).not.toBeNull();
   expect(fileBox).not.toBeNull();
   expect(operationBox).not.toBeNull();
   expect(actionBox).not.toBeNull();
-  expect(fileBox!.x).toBeLessThan(operationBox!.x);
-  expect(actionBox!.x - (operationBox!.x + operationBox!.width)).toBeGreaterThanOrEqual(0);
-  expect(actionBox!.x - (operationBox!.x + operationBox!.width)).toBeLessThanOrEqual(16);
+  expect(fileBox!.x).toBeLessThanOrEqual(toolbarBox!.x + 12);
+  expect(fileBox!.x + fileBox!.width).toBeGreaterThanOrEqual(toolbarBox!.x + toolbarBox!.width - 12);
+  expect(fileBox!.y + fileBox!.height).toBeLessThanOrEqual(Math.min(operationBox!.y, actionBox!.y));
+  expect(actionBox!.x).toBeGreaterThanOrEqual(operationBox!.x + operationBox!.width);
   await expect(toolbar.locator(".programmingFileName")).toHaveCSS("font-size", "13px");
 }
 
