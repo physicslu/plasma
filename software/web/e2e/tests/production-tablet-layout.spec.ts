@@ -114,21 +114,26 @@ async function expectConstrainedToolbar(page: Page) {
       operationTopSpread: Math.max(...operationTops) - Math.min(...operationTops),
       toolbarLeft: toolbarRect.left,
       toolbarRight: toolbarRect.right,
+      imageBottom: imageRect.bottom,
+      operationsTop: operationsRect.top,
+      operationsBottom: operationsRect.bottom,
+      actionsTop: actionsRect.top,
+      actionsBottom: actionsRect.bottom,
       actionsRight: actionsRect.right,
       actionLefts: actionRects.map(rect => rect.left),
       actionRights: actionRects.map(rect => rect.right),
-      imageBottom: imageRect.bottom,
-      operationsBottom: operationsRect.bottom,
-      actionsTop: actionsRect.top,
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
     };
   });
 
-  expect(layout.areas).toBe('"image operations" "actions actions"');
+  expect(layout.areas).toBe('"file file" "operations actions"');
   expect(layout.operationWrap).toBe("nowrap");
   expect(layout.operationTopSpread).toBeLessThanOrEqual(1);
-  expect(layout.actionsTop).toBeGreaterThanOrEqual(Math.max(layout.imageBottom, layout.operationsBottom) - 1);
+  expect(layout.operationsTop).toBeGreaterThanOrEqual(layout.imageBottom - 1);
+  expect(layout.actionsTop).toBeGreaterThanOrEqual(layout.imageBottom - 1);
+  expect(layout.actionsTop).toBeLessThan(layout.operationsBottom + 1);
+  expect(layout.operationsTop).toBeLessThan(layout.actionsBottom + 1);
   expect(layout.actionsRight).toBeLessThanOrEqual(layout.toolbarRight + 1);
   expect(Math.min(...layout.actionLefts)).toBeGreaterThanOrEqual(layout.toolbarLeft - 1);
   expect(Math.max(...layout.actionRights)).toBeLessThanOrEqual(layout.toolbarRight + 1);
@@ -157,7 +162,7 @@ test("Production batch toolbar follows its available width on iPad landscape", a
     clientWidth: element.clientWidth,
   }));
 
-  expect(collapsed.areas).toBe('"image operations actions"');
+  expect(collapsed.areas).toBe('"file file" "operations actions"');
   expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
 });
 
