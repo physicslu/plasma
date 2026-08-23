@@ -150,7 +150,8 @@ test("Production and Engineering share the compact upper Batch dashboard contrac
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
   await assertDashboardContract(page.locator(".productionMainPanel"));
   const fpsWidth = await page.locator(".fpsSelector").evaluate(element => element.getBoundingClientRect().width);
-  expect(fpsWidth).toBeLessThanOrEqual(300);
+  expect(fpsWidth).toBeGreaterThanOrEqual(319);
+  expect(fpsWidth).toBeLessThanOrEqual(361);
 
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
