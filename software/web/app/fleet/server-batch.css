@@ -213,8 +213,8 @@
 }
 
 /* The FPS selector changes the Production content-column width independently
- * of the viewport. Query that column directly so the toolbar uses its own
- * available space as the layout contract. */
+ * of the viewport. Query that column directly, but keep the same operator
+ * hierarchy at every width: Programming Image first, then Batch Action. */
 .productionMainPanel {
   container: production-main / inline-size;
 }
@@ -223,15 +223,15 @@
   html .productionPrototypePage .productionMainPanel .productionBatchToolbar.programmingBatchToolbar {
     grid-template-columns: minmax(0, 1fr) max-content;
     grid-template-areas:
-      "image operations"
-      "actions actions";
-    align-items: start;
+      "file file"
+      "operations actions";
+    align-items: center;
   }
 
   html .productionPrototypePage .productionMainPanel .productionBatchToolbar .batchOperations,
   html .productionPrototypePage .productionMainPanel .productionBatchToolbar .programmingBatchOperations {
     flex-wrap: nowrap;
-    justify-self: end;
+    justify-self: start;
   }
 
   html .productionPrototypePage .productionMainPanel .productionBatchToolbar .productionBatchActions,
@@ -244,7 +244,7 @@
   html .productionPrototypePage .productionMainPanel .productionBatchToolbar.programmingBatchToolbar {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "image"
+      "file"
       "operations"
       "actions";
   }
