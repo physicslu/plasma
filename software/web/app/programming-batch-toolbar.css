@@ -14,7 +14,7 @@
   background: var(--panel);
 }
 
-/* Production has a page-specific toolbar rule loaded later. Keep the shared
+/* Production has page-specific toolbar rules loaded later. Keep the shared
  * Batch Layout contract authoritative in both P Mode and E Mode. */
 .productionBatchToolbar.programmingBatchToolbar,
 .engineeringExecutionToolbar.programmingBatchToolbar {
@@ -22,6 +22,14 @@
   grid-template-areas:
     "file file"
     "operations actions";
+}
+
+/* `production-prototype.css` also owns legacy `.productionImagePicker` grid
+ * columns. This more specific rule prevents that page-local rule from folding
+ * Programming Image back into the old horizontal toolbar layout. */
+.productionImagePicker.programmingBatchFile {
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
 }
 
 .programmingBatchFile {
@@ -274,6 +282,10 @@
       "file"
       "operations"
       "actions";
+  }
+
+  .productionImagePicker.programmingBatchFile {
+    grid-template-columns: max-content minmax(0, 1fr);
   }
 
   .programmingBatchOperations,
