@@ -14,8 +14,8 @@ html .productionPrototypePage .productionWorkspace.selector-collapsed {
 }
 
 html .productionPrototypePage .fpsSelector {
-  height: min(960px, calc(100dvh - 110px));
-  max-height: min(960px, calc(100dvh - 110px));
+  height: min(960px, calc(100dvh - 150px));
+  max-height: min(960px, calc(100dvh - 150px));
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
