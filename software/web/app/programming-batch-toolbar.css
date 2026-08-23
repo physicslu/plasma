@@ -24,10 +24,11 @@
     "operations actions";
 }
 
-/* `production-prototype.css` also owns legacy `.productionImagePicker` grid
- * columns. This more specific rule prevents that page-local rule from folding
- * Programming Image back into the old horizontal toolbar layout. */
+/* `operator-feedback.css` and `production-prototype.css` still own legacy
+ * production picker rules. The compound selector pins Production back to the
+ * shared file row and prevents a stale implicit `image` grid area. */
 .productionImagePicker.programmingBatchFile {
+  grid-area: file;
   grid-template-columns: max-content minmax(0, 1fr);
   grid-template-rows: auto auto auto;
 }
@@ -285,6 +286,7 @@
   }
 
   .productionImagePicker.programmingBatchFile {
+    grid-area: file;
     grid-template-columns: max-content minmax(0, 1fr);
   }
 
