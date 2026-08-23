@@ -1,0 +1,67 @@
+/*
+ * Production FPS selector layout contract.
+ *
+ * The selector is a Facility -> PPU -> Site resource navigator, not a compact
+ * dropdown. Give it a stable operator-sized column and let the tree consume
+ * the available viewport budget before introducing its own scrollbar.
+ */
+html .productionPrototypePage .productionWorkspace {
+  grid-template-columns: clamp(320px, 22vw, 360px) minmax(0, 1fr);
+}
+
+html .productionPrototypePage .productionWorkspace.selector-collapsed {
+  grid-template-columns: 46px minmax(0, 1fr);
+}
+
+html .productionPrototypePage .fpsSelector {
+  height: min(960px, calc(100dvh - 110px));
+  max-height: min(960px, calc(100dvh - 110px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+html .productionPrototypePage .fpsTree {
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+
+html .productionPrototypePage .selector-collapsed .fpsSelector {
+  height: 160px;
+  min-height: 160px;
+  max-height: 160px;
+  display: block;
+}
+
+@media (max-width: 1280px) {
+  html .productionPrototypePage .productionWorkspace {
+    grid-template-columns: clamp(320px, 28vw, 340px) minmax(0, 1fr);
+  }
+
+  html .productionPrototypePage .productionWorkspace.selector-collapsed {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 920px) {
+  html .productionPrototypePage .productionWorkspace,
+  html .productionPrototypePage .productionWorkspace.selector-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  html .productionPrototypePage .fpsSelector {
+    height: auto;
+    max-height: none;
+    display: block;
+  }
+
+  html .productionPrototypePage .fpsTree {
+    max-height: min(68dvh, 720px);
+  }
+
+  html .productionPrototypePage .selector-collapsed .fpsSelector {
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+  }
+}
