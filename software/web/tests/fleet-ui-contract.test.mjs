@@ -130,11 +130,13 @@ test("Production implementation keeps FPS layout but delegates execution ownersh
   assert.match(operatorFeedback, /\.fpsSelectionSummary\s*\{\s*display:\s*none;/s);
   assert.match(operatorFeedback, /content:\s*"Cancel All"/);
   assert.match(operatorFeedback, /content:\s*"Confirm"/);
-  assert.match(batchToolbar, /grid-template-areas:\s*"file operations actions"/);
-  assert.match(batchToolbar, /\.programmingBatchOperations\s*\{[\s\S]*justify-self:\s*end/);
+  assert.match(batchToolbar, /grid-template-areas:\s*"file file"\s*"operations actions"/);
+  assert.match(batchToolbar, /\.programmingBatchOperations\s*\{[\s\S]*justify-self:\s*start/);
   assert.match(batchToolbar, /\.programmingFileName\s*\{[\s\S]*font-size:\s*13px/);
+  assert.match(batchToolbar, /\.programmingBatchFile::before\s*\{[\s\S]*content:\s*"Programming Image"/);
   assert.match(operatorFeedback, /\.facilityRuntimeIdentity h3\s*\{[^}]*font-weight:\s*800;/s);
   assert.match(dashboardCss, /\.unifiedBatchPolicyPanel/);
+  assert.match(dashboardCss, /\.unifiedBatchPolicyPanel::before\s*\{[\s\S]*content:\s*"Batch Policy"/);
   assert.match(serverBatchCss, /\.serverBatchStatistics/);
   assert.match(serverBatchCss, /\.prototypeSiteLamp\.faulted i/);
   assert.match(serverBatchCss, /\.prototypeSiteLamp\.error i/);
