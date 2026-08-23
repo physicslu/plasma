@@ -48,7 +48,8 @@ test("Pmod image controls precede EPVR and Pmod Emode share persistent Light Dar
   const operationsBox = await page.locator(".batchOperations").boundingBox();
   expect(imageBox).not.toBeNull();
   expect(operationsBox).not.toBeNull();
-  expect(imageBox!.x).toBeLessThan(operationsBox!.x);
+  expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(operationsBox!.y);
+  expect(imageBox!.x).toBeLessThanOrEqual(operationsBox!.x);
 
   const theme = page.getByRole("group", { name: "Theme" });
   await expect(theme.getByRole("button", { name: "Light", exact: true })).toHaveAttribute("aria-pressed", "true");
