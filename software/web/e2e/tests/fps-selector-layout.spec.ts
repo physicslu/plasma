@@ -142,7 +142,10 @@ test("iPad landscape keeps an operator-sized FPS column and collapses it back to
 
   await page.getByRole("button", { name: "收起選擇器" }).click();
   await expect(page.getByRole("button", { name: "展開選擇器" })).toBeVisible();
+  await expect.poll(async () => {
+    const box = await page.locator(".fpsSelector").boundingBox();
+    return box?.width ?? Number.POSITIVE_INFINITY;
+  }).toBeLessThanOrEqual(48);
   const collapsed = await page.locator(".fpsSelector").boundingBox();
-  expect(collapsed?.width).toBeLessThanOrEqual(48);
   expect(collapsed?.height).toBeLessThanOrEqual(162);
 });
