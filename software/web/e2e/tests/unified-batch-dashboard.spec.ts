@@ -135,9 +135,9 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
   await expect(active.locator('[data-active-fps-state="selected"]')).toHaveCount(1);
   await expect(active.locator('[data-active-fps-state="running"]')).toHaveCount(1);
   await expect(active.locator('[data-active-fps-state="terminal"]')).toHaveCount(1);
-  await expect(active.getByText("TOTAL SELECTED SITES", { exact: true })).toBeVisible();
-  await expect(active.getByText("RUNNING SITES", { exact: true })).toBeVisible();
-  await expect(active.getByText("STOPPED SITES", { exact: true })).toBeVisible();
+  await expect(active.locator('[data-active-fps-state="selected"]').getByText("TOTAL SELECTED SITES", { exact: true })).toBeVisible();
+  await expect(active.locator('[data-active-fps-state="running"]').getByText("RUNNING SITES", { exact: true })).toBeVisible();
+  await expect(active.locator('[data-active-fps-state="terminal"]').getByText("STOPPED SITES", { exact: true })).toBeVisible();
 
   const policy = root.getByRole("region", { name: "Batch execution policy" });
   const repeatInfo = policy.getByLabel("Repeat policy help");
