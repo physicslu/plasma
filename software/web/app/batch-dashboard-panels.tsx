@@ -203,8 +203,8 @@ export function ActiveFpsSummary({ counts, copy }: ActiveProps) {
   return (
     <section className="activeFpsSummary" aria-label={copy.title} data-summary-unit="site">
       <header>
-        <h2>{copy.title}</h2>
-        <span><strong>SITE STATUS</strong> · {copy.hint}</span>
+        <h2>Active FPS · SITE STATUS</h2>
+        <span>{copy.hint}</span>
         <details className="engineeringBatchDetails">
           <summary>Batch Details</summary>
           <div className="engineeringBatchDetailsGrid">
