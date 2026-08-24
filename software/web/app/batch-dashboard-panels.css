@@ -322,12 +322,66 @@
 }
 .activeFpsMetrics [data-active-fps-state="error"] b { color: #dc2626; }
 
+.engineeringBatchDetails {
+  display: none;
+}
+
+.engineeringProgramming .engineeringBatchDetails {
+  display: block;
+  grid-column: 1 / -1;
+  padding-top: 7px;
+  border-top: 1px solid var(--line, #dbe3ee);
+}
+
+.engineeringBatchDetails summary {
+  width: max-content;
+  color: var(--text-soft, #334155);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+  user-select: none;
+}
+
+.engineeringBatchDetailsGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(72px, 1fr));
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.engineeringBatchDetailsGrid > div {
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid var(--line, #dbe3ee);
+  border-radius: 7px;
+  background: var(--panel-2, #f8fafc);
+}
+
+.engineeringBatchDetailsGrid small {
+  display: block;
+  color: var(--muted, #64748b);
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.engineeringBatchDetailsGrid b {
+  display: block;
+  margin-top: 2px;
+  color: var(--text, #172033);
+  font-size: 11px;
+}
+
 [data-theme="dark"] .unifiedBatchControlStack,
 [data-theme="dark"] .unifiedBatchPolicyPanel,
 [data-theme="dark"] .batchTopologySummary article,
 [data-theme="dark"] .activeFpsSummary {
   background: var(--panel);
   border-color: var(--line);
+}
+
+[data-theme="dark"] .engineeringBatchDetailsGrid > div {
+  border-color: var(--line-strong);
+  background: var(--panel-2);
 }
 
 @media (max-width: 1080px) {
@@ -339,7 +393,8 @@
     grid-template-columns: 1fr;
   }
 
-  .activeFpsMetrics {
+  .activeFpsMetrics,
+  .engineeringBatchDetailsGrid {
     grid-template-columns: repeat(4, minmax(72px, 1fr));
   }
 }
@@ -350,7 +405,8 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .activeFpsMetrics {
+  .activeFpsMetrics,
+  .engineeringBatchDetailsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
