@@ -155,7 +155,7 @@ test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR
   expect(headingColor).toBe("rgb(233, 243, 248)");
 });
 
-test("Emode stays dense and shares the Pmod file picker and dark operator palette", async ({ page }) => {
+test("Emode v2 stays dense and shares the Pmod file picker and dark operator palette", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
   const theme = page.getByRole("group", { name: "Theme" });
@@ -201,23 +201,16 @@ test("Emode stays dense and shares the Pmod file picker and dark operator palett
   expect(imageText!.x - (browse!.x + browse!.width)).toBeGreaterThanOrEqual(0);
   expect(imageText!.x - (browse!.x + browse!.width)).toBeLessThanOrEqual(16);
 
-  const toolbar = await page.locator(".engineeringExecutionToolbar").boundingBox();
-  const header = await page.locator(".engineeringProgrammingHeader").boundingBox();
-  const topology = await page.locator(".engineeringProgramming .batchTopologySummary").boundingBox();
-  const controls = await page.locator(".engineeringProgramming .unifiedBatchControlStack").boundingBox();
-  const activeSummary = await page.locator(".engineeringProgramming .activeFpsSummary").boundingBox();
-  const targetSelector = await page.locator(".engineeringTargetSelector").boundingBox();
-  const sourceNote = await page.locator(".engineeringBoundaryNote").last().boundingBox();
-  const sitePanel = await page.locator(".engineeringSelectorPanel").boundingBox();
-  for (const box of [toolbar, header, topology, controls, activeSummary, targetSelector, sourceNote, sitePanel]) expect(box).not.toBeNull();
-  expect(header!.height).toBeLessThanOrEqual(80);
-  expect(toolbar!.height).toBeLessThanOrEqual(140);
-  expect(topology!.height).toBeLessThanOrEqual(72);
-  expect(controls!.height).toBeLessThanOrEqual(230);
-  expect(activeSummary!.height).toBeLessThanOrEqual(76);
-  expect(activeSummary!.y + activeSummary!.height - header!.y).toBeLessThanOrEqual(490);
-  expect(targetSelector!.height).toBeLessThanOrEqual(72);
-  expect(sourceNote!.height).toBeLessThanOrEqual(42);
-  expect(sitePanel!.height).toBeLessThanOrEqual(118);
-  expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(650);
+  const header = await page.locator(".engineeringProgrammingV2Header").boundingBox();
+  const kpis = await page.locator(".productionProgrammingKpis").boundingBox();
+  const workflow = await page.locator(".productionProgrammingWorkflow").boundingBox();
+  const job = await page.locator(".programmingJobCard").boundingBox();
+  const liveStatus = await page.locator(".liveSiteStatus").boundingBox();
+  const recent = await page.locator(".recentEvents").boundingBox();
+  for (const box of [header, kpis, workflow, job, liveStatus, recent]) expect(box).not.toBeNull();
+  expect(header!.height).toBeLessThanOrEqual(90);
+  expect(kpis!.height).toBeLessThanOrEqual(180);
+  expect(job!.height).toBeLessThanOrEqual(520);
+  expect(liveStatus!.y).toBeGreaterThan(workflow!.y);
+  expect(recent!.y).toBeGreaterThan(liveStatus!.y);
 });
