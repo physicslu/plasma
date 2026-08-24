@@ -121,9 +121,6 @@ async function runBatchAndAssert(
   await execute.click();
   await expect.poll(() => starts.length, { timeout: 30_000 }).toBe(before + selectedSites.length * operations.length);
 
-  // The UI intentionally keeps a bounded rolling log. Do not count historical
-  // COMPLETE lines because earlier batches can be evicted. Prove that this
-  // specific batch terminated and emitted its own completion summary instead.
   await expect(execute).toBeEnabled({ timeout: 30_000 });
   const expectedSummary = `[BATCH] COMPLETE · success: ${selectedSites.map(siteId => `SITE ${siteId}`).join(", ")}`;
   await expect(liveLog(page)).toContainText(expectedSummary, { timeout: 30_000 });
@@ -280,8 +277,7 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });
   await expect(facility.locator("option")).toHaveCount(3, { timeout: 15_000 });
-  const sourceOfTruth = page.locator(".engineeringBoundaryNote").filter({ hasText: "SERVER SOURCE OF TRUTH" });
-  await expect(sourceOfTruth).toContainText("3 Facilities · 12 PPUs · 60 Sites");
+  await expect(page.locator(".topologyFoot")).toContainText("System Topology: 3 Facilities | 12 PPUs | 60 Sites");
 
   await facility.selectOption(engineeringFacilityId);
   await ppu.selectOption(engineeringPpuId);
@@ -299,10 +295,7 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
     buffer: imageAssetBytes,
   });
 
-  // Emode intentionally hides READ parameters until READ is selected. The
-  // defaults (offset 0, length 256) already match imageAssetBytes, so this
-  // single-Site E/P/V/R acceptance does not need to expose or rewrite them.
-  await expect(page.getByLabel("Engineering READ parameters")).toHaveCount(0);
+  await expect(page.locator(".engineeringReadRow")).toHaveCount(0);
 
   for (const operation of operationOrder) {
     await test.step(`Engineering ${engineeringFacilityId}/${engineeringPpuId}/${engineeringSiteLabel}: ${operation}`, async () => {

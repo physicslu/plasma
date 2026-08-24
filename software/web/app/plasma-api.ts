@@ -95,6 +95,11 @@ export type AssetTransferEvent = ProgrammingAssetFingerprint & {
   kind: "cache_check" | "cache_hit" | "cache_miss" | "upload_start" | "upload_complete";
 };
 
+export type JobTargetDeviceRequest = {
+  vendor: string;
+  identifier: string;
+};
+
 type StatusPayload = {
   ok: boolean;
   ppu?: PPUSnapshot;
@@ -436,6 +441,7 @@ export async function startJob(
     allowSyntheticMockImage?: boolean;
     offset?: number;
     length?: number;
+    targetDevice?: JobTargetDeviceRequest;
     submissionGuard?: () => boolean;
     onAssetEvent?: (event: AssetTransferEvent) => void;
   },
@@ -481,6 +487,12 @@ export async function startJob(
       site_id: options.siteId,
       operation: options.operation,
     };
+    if (engineeringTarget && options.targetDevice) {
+      body.target_device = {
+        vendor: options.targetDevice.vendor,
+        identifier: options.targetDevice.identifier,
+      };
+    }
     if (usesAsset && engineeringTarget && options.engineeringSessionId) {
       body.session_id = options.engineeringSessionId;
       if (fingerprint) body.asset_sha256 = fingerprint.asset_sha256;

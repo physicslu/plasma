@@ -13,7 +13,7 @@ async function selectSitesOneAndTwo(page: import("@playwright/test").Page) {
     if (shouldSelect && !(await checkbox.isChecked())) await checkbox.check();
     if (!shouldSelect && await checkbox.isChecked()) await checkbox.uncheck();
   }
-  await expect(page.getByLabel("Engineering Site selection")).toContainText(`2 / ${engineeringPpuSites}`);
+  await expect(page.locator(".targetSitesSection input:checked")).toHaveCount(2);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 }
 
@@ -94,7 +94,7 @@ test("1 MiB Engineering Image Asset uploads once per PPU session and reloads aft
   await expect(facility.locator("option")).toHaveCount(3, { timeout: 15_000 });
   await expect(facility).toHaveValue(engineeringFacilityId);
   await expect(ppu).toHaveValue(engineeringPpuId);
-  await expect(page.getByLabel("Engineering Site selection")).toContainText(`2 / ${engineeringPpuSites}`);
+  await expect(page.locator(".targetSitesSection input:checked")).toHaveCount(2);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2, { timeout: 15_000 });
   expect(sessionBodies.at(-1)?.previous_session_id).toBeTruthy();
 

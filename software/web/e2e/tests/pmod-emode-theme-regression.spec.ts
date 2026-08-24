@@ -52,34 +52,27 @@ async function installMockProvider(page: Page) {
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
-
     if (url.pathname === "/api/engineering/session" && request.method() === "POST") {
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          session: {
-            session_id: "0123456789abcdef0123456789abcdef",
-            programming_asset_cache_scope: "connection-session-and-ppu",
-            previous_session_cleared: false,
-          },
-        }),
+        body: JSON.stringify({ ok: true, session: {
+          session_id: "0123456789abcdef0123456789abcdef",
+          programming_asset_cache_scope: "connection-session-and-ppu",
+          previous_session_cleared: false,
+        } }),
       });
       return;
     }
-
     if (url.pathname === "/api/engineering/targets" && request.method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
       return;
     }
-
     const targetMatch = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/status$/.exec(url.pathname);
     if (targetMatch && request.method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(targetStatus(decodeURIComponent(targetMatch[2]))) });
       return;
     }
-
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
   });
 }
@@ -88,28 +81,10 @@ async function background(page: Page, selector: string) {
   return page.locator(selector).first().evaluate(element => getComputedStyle(element).backgroundColor);
 }
 
-async function fileButtonStyle(page: Page, selector: string) {
-  return page.locator(selector).evaluate(element => {
-    const style = getComputedStyle(element);
-    return {
-      height: style.height,
-      paddingLeft: style.paddingLeft,
-      paddingRight: style.paddingRight,
-      borderRadius: style.borderRadius,
-      fontSize: style.fontSize,
-      fontWeight: style.fontWeight,
-      color: style.color,
-      background: style.backgroundColor,
-      borderColor: style.borderColor,
-    };
-  });
-}
-
 test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
-
   await page.getByRole("checkbox", { name: `${facilityId} ${ppu1Id} SITE-01` }).check();
   await page.getByRole("button", { name: "確定選取", exact: true }).click();
   await expect(page.locator(`[data-production-target="${facilityId}::${ppu1Id}"]`)).toBeVisible();
@@ -139,23 +114,15 @@ test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR
   const theme = page.getByRole("group", { name: "Theme" });
   await theme.getByRole("button", { name: "Dark", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-
   await expect.poll(() => background(page, ".productionPrototypePage")).toBe("rgb(7, 17, 29)");
-  for (const selector of [
-    ".fpsSelector",
-    ".productionBatchToolbar",
-    ".productionRuntimeBoard",
-    ".productionPpuPrototype",
-    ".productionSitePrototype",
-  ]) {
+  for (const selector of [".fpsSelector", ".productionBatchToolbar", ".productionRuntimeBoard", ".productionPpuPrototype", ".productionSitePrototype"]) {
     await expect.poll(() => background(page, selector)).toBe("rgb(12, 25, 39)");
   }
-
   const headingColor = await page.locator(".productionPrototypeHeading h1").evaluate(element => getComputedStyle(element).color);
   expect(headingColor).toBe("rgb(233, 243, 248)");
 });
 
-test("Emode stays dense and shares the Pmod file picker and dark operator palette", async ({ page }) => {
+test("Emode v2 stays dense and keeps its approved image picker and dark operator palette", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
   const theme = page.getByRole("group", { name: "Theme" });
@@ -164,8 +131,6 @@ test("Emode stays dense and shares the Pmod file picker and dark operator palett
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(darkButton).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => page.evaluate(() => localStorage.getItem("plasma-theme"))).toBe("dark");
-
-  const pmodButtonStyle = await fileButtonStyle(page, ".productionBrowseButton");
 
   await page.goto("/engineering");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -190,34 +155,37 @@ test("Emode stays dense and shares the Pmod file picker and dark operator palett
   expect(selectStyle.optionBackground).toBe("rgb(12, 25, 39)");
   expect(selectStyle.optionColor).toBe("rgb(233, 243, 248)");
 
-  const emodeButtonStyle = await fileButtonStyle(page, ".engineeringBrowseButton");
-  expect(emodeButtonStyle).toEqual(pmodButtonStyle);
+  const browseStyle = await page.locator(".engineeringBrowseButton").evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      height: Number.parseFloat(style.height),
+      radius: style.borderRadius,
+      color: style.color,
+      background: style.backgroundColor,
+    };
+  });
+  expect(browseStyle.height).toBeGreaterThanOrEqual(30);
+  expect(browseStyle.radius).toBe("7px");
+  expect(browseStyle.color).toBe("rgb(233, 243, 248)");
+  expect(browseStyle.background).not.toBe("rgba(0, 0, 0, 0)");
 
   const browse = await page.locator(".engineeringBrowseButton").boundingBox();
   const imageText = await page.locator(".engineeringProgramming .programmingFileName").boundingBox();
   expect(browse).not.toBeNull();
   expect(imageText).not.toBeNull();
-  expect(browse!.x).toBeLessThan(imageText!.x);
-  expect(imageText!.x - (browse!.x + browse!.width)).toBeGreaterThanOrEqual(0);
-  expect(imageText!.x - (browse!.x + browse!.width)).toBeLessThanOrEqual(16);
+  expect(imageText!.x).toBeLessThan(browse!.x);
+  expect(Math.abs(browse!.x - (imageText!.x + imageText!.width))).toBeLessThanOrEqual(2);
 
-  const toolbar = await page.locator(".engineeringExecutionToolbar").boundingBox();
-  const header = await page.locator(".engineeringProgrammingHeader").boundingBox();
-  const topology = await page.locator(".engineeringProgramming .batchTopologySummary").boundingBox();
-  const controls = await page.locator(".engineeringProgramming .unifiedBatchControlStack").boundingBox();
-  const activeSummary = await page.locator(".engineeringProgramming .activeFpsSummary").boundingBox();
-  const targetSelector = await page.locator(".engineeringTargetSelector").boundingBox();
-  const sourceNote = await page.locator(".engineeringBoundaryNote").last().boundingBox();
-  const sitePanel = await page.locator(".engineeringSelectorPanel").boundingBox();
-  for (const box of [toolbar, header, topology, controls, activeSummary, targetSelector, sourceNote, sitePanel]) expect(box).not.toBeNull();
-  expect(header!.height).toBeLessThanOrEqual(80);
-  expect(toolbar!.height).toBeLessThanOrEqual(140);
-  expect(topology!.height).toBeLessThanOrEqual(72);
-  expect(controls!.height).toBeLessThanOrEqual(230);
-  expect(activeSummary!.height).toBeLessThanOrEqual(76);
-  expect(activeSummary!.y + activeSummary!.height - header!.y).toBeLessThanOrEqual(490);
-  expect(targetSelector!.height).toBeLessThanOrEqual(72);
-  expect(sourceNote!.height).toBeLessThanOrEqual(42);
-  expect(sitePanel!.height).toBeLessThanOrEqual(118);
-  expect(sitePanel!.y + sitePanel!.height - header!.y).toBeLessThanOrEqual(650);
+  const header = await page.locator(".engineeringProgrammingV2Header").boundingBox();
+  const kpis = await page.locator(".productionProgrammingKpis").boundingBox();
+  const workflow = await page.locator(".productionProgrammingWorkflow").boundingBox();
+  const job = await page.locator(".programmingJobCard").boundingBox();
+  const liveStatus = await page.locator(".liveSiteStatus").boundingBox();
+  const recent = await page.locator(".recentEvents").boundingBox();
+  for (const box of [header, kpis, workflow, job, liveStatus, recent]) expect(box).not.toBeNull();
+  expect(header!.height).toBeLessThanOrEqual(90);
+  expect(kpis!.height).toBeLessThanOrEqual(180);
+  expect(job!.height).toBeLessThanOrEqual(520);
+  expect(liveStatus!.y).toBeGreaterThan(workflow!.y);
+  expect(recent!.y).toBeGreaterThan(liveStatus!.y);
 });

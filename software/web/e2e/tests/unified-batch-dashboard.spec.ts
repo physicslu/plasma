@@ -153,9 +153,7 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
     return Math.max(0, input.left - info.right);
   }));
   expect(visibleLabelDistances).toHaveLength(3);
-  for (const distance of visibleLabelDistances) {
-    expect(distance).toBeLessThanOrEqual(12);
-  }
+  for (const distance of visibleLabelDistances) expect(distance).toBeLessThanOrEqual(12);
 
   const policyInputWidths = await policy.locator(".batchPolicyField input").evaluateAll(inputs =>
     inputs.map(element => element.getBoundingClientRect().width),
@@ -213,7 +211,7 @@ async function assertBatchControlCollapses(root: ReturnType<Page["locator"]>) {
   await expect(control.getByRole("region", { name: "Batch execution policy" }).getByLabel("Site Retry Limit")).toHaveValue("3");
 }
 
-test("Production and Engineering share the compact upper Batch dashboard contract", async ({ page }) => {
+test("Production keeps its compact Batch dashboard while Engineering uses the approved v2 programming workflow", async ({ page }) => {
   await installDashboardMock(page);
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -229,17 +227,12 @@ test("Production and Engineering share the compact upper Batch dashboard contrac
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
-  await assertDashboardContract(page.locator(".engineeringProgramming"));
-  await assertBatchControlCollapses(page.locator(".engineeringProgramming"));
-
-  const details = page.locator(".engineeringProgramming .engineeringBatchDetails");
-  await expect(details).toBeVisible();
-  await expect(details).not.toHaveAttribute("open", "");
-  await details.locator("summary").click();
-  await expect(details).toHaveAttribute("open", "");
-  await expect(details.getByText("STATE", { exact: true })).toBeVisible();
-  await expect(details.getByText("PASSED SITES", { exact: true })).toBeVisible();
-  await expect(details.getByText("FAULTED SITES", { exact: true })).toBeVisible();
-  await expect(details.getByText("ERROR SITES", { exact: true })).toBeVisible();
-  await expect(details.getByText("CANCELLED SITES", { exact: true })).toBeVisible();
+  await expect(page.locator(".engineeringProgrammingV2 .productionProgrammingKpis")).toBeVisible();
+  await expect(page.locator(".engineeringProgrammingV2 .targetingCard")).toBeVisible();
+  await expect(page.locator(".engineeringProgrammingV2 .programmingJobCard")).toBeVisible();
+  await expect(page.locator(".engineeringProgrammingV2 .liveProgressCard")).toBeVisible();
+  await expect(page.locator(".engineeringProgrammingV2 .liveSiteStatus")).toBeVisible();
+  await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
+  await expect(page.locator(".engineeringProgrammingV2 .batchTopologySummary")).toHaveCount(0);
+  await expect(page.locator(".engineeringProgrammingV2 .engineeringBatchDetails")).toHaveCount(0);
 });

@@ -117,7 +117,7 @@ test("Engineering Programming topology comes from the Python target catalog", as
   });
 
   await openProgramming(page);
-  await expect(page.getByText("SERVER SOURCE OF TRUTH")).toBeVisible();
+  await expect(page.locator(".topologyFoot")).toContainText("System Topology: 3 Facilities | 12 PPUs | 60 Sites");
 
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });
@@ -128,7 +128,7 @@ test("Engineering Programming topology comes from the Python target catalog", as
   await ppu.selectOption("mock-facility-01-ppu-03");
   await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText("Server Facility 01 / Server PPU 03");
   await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText("6 Sites");
-  await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(6);
+  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(6);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(6);
   await expect(page.getByText("SITE-00", { exact: true })).toHaveCount(0);
   await expect(page.getByText("SITE-07", { exact: true })).toHaveCount(0);

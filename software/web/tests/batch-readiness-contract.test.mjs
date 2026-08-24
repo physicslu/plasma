@@ -8,11 +8,11 @@ async function read(path) {
   return fs.readFile(new URL(path, root), "utf8");
 }
 
-test("Pmod and Emode share one batch readiness source of truth", async () => {
+test("Pmod and Engineering Programming v2 share one batch readiness source of truth", async () => {
   const readiness = await read("batch-readiness.ts");
   const pmodRoute = await read("fleet/page.tsx");
   const pmod = await read("fleet/server-batch-page.tsx");
-  const emode = await read("engineering/programming-workspace.tsx");
+  const emode = await read("engineering/programming-workspace-v2.tsx");
 
   for (const label of [
     "BATCH READY",
@@ -33,33 +33,30 @@ test("Pmod and Emode share one batch readiness source of truth", async () => {
   assert.match(pmod, /evaluateBatchReadiness\(/);
   assert.match(emode, /evaluateBatchReadiness\(/);
   assert.match(pmod, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
-  assert.match(emode, /disabled=\{!batchReadiness\.ready\}/);
+  assert.match(emode, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
 });
 
-test("Pmod and Emode use the same programming batch toolbar contract", async () => {
-  const css = await read("programming-batch-toolbar.css");
-  const dashboardCss = await read("batch-dashboard-panels.css");
+test("Production and Engineering v2 share programming control vocabulary without sharing layout ownership", async () => {
   const pmod = await read("fleet/server-batch-page.tsx");
-  const emode = await read("engineering/programming-workspace.tsx");
+  const emode = await read("engineering/programming-workspace-v2.tsx");
 
-  assert.match(css, /\.programmingFileName[\s\S]*font-size:\s*13px/);
-  assert.match(css, /\.programmingBatchOperations[\s\S]*justify-self:\s*start/);
-  assert.match(css, /grid-template-areas:\s*"file file"\s*"operations actions"/);
-  assert.match(css, /\.programmingBatchFile::before\s*\{[\s\S]*content:\s*"Programming Image"/);
-  assert.match(dashboardCss, /\.unifiedBatchPolicyPanel::before\s*\{[\s\S]*content:\s*"Batch Policy"/);
-  assert.match(pmod, /productionBatchToolbar programmingBatchToolbar/);
-  assert.match(emode, /engineeringExecutionToolbar programmingBatchToolbar/);
-  assert.match(pmod, /programmingBatchFile/);
-  assert.match(emode, /programmingBatchFile/);
+  assert.match(pmod, /programmingBatchToolbar/);
+  assert.match(emode, /programmingBatchToolbar/);
+  assert.match(pmod, /programmingFileName/);
+  assert.match(emode, /programmingFileName/);
   assert.match(pmod, /programmingBatchOperations/);
   assert.match(emode, /programmingBatchOperations/);
-  assert.match(pmod, /programmingBatchActions/);
-  assert.match(emode, /programmingBatchActions/);
+  assert.match(emode, /PROGRAMMING JOB/);
+  assert.match(emode, /START PROGRAMMING/);
+  assert.match(emode, /Site Retry Limit/);
+  assert.doesNotMatch(emode, /BatchTopologySummary/);
 });
 
-test("Emode density contract matches Pmod upper-page rhythm", async () => {
+test("Emode shell density still protects the Programming v2 viewport", async () => {
   const css = await read("engineering/engineering-density.css");
+  const v2Css = await read("engineering/programming-workspace-v2.css");
   assert.match(css, /\.engineeringShell\s*\{[\s\S]*padding:\s*18px clamp\(12px, 1\.8vw, 28px\) 36px/);
   assert.match(css, /\.engineeringHeading\s*\{[\s\S]*min-height:\s*54px/);
-  assert.match(css, /\.engineeringProgramming\s*\{[\s\S]*gap:\s*6px/);
+  assert.match(v2Css, /\.engineeringProgrammingV2/);
+  assert.match(v2Css, /\.productionProgrammingWorkflow/);
 });
