@@ -120,8 +120,10 @@
 }
 
 .unifiedBatchControlStack {
+  position: relative;
   display: grid;
   gap: 0;
+  padding-top: 31px;
   border: 1px solid var(--line, #d8e2ee);
   border-radius: 11px;
   background: var(--panel, #fff);
@@ -133,6 +135,60 @@
   border: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.batchControlPanelHeader {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 31px;
+  padding: 3px 6px 3px 10px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+  border-radius: 10px 10px 0 0;
+  background: var(--panel-2, #f8fafc);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.batchControlPanelHeader strong {
+  color: var(--text-soft, #334155);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.batchControlPanelToggle {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 1px solid var(--line-strong, #cbd5e1);
+  border-radius: 6px;
+  background: var(--panel, #fff);
+  color: var(--text-soft, #334155);
+  display: inline-grid;
+  place-items: center;
+  font: 800 17px/1 ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.batchControlPanelToggle:hover,
+.batchControlPanelToggle:focus-visible {
+  border-color: color-mix(in srgb, var(--cyan, #0891b2) 55%, var(--line-strong, #cbd5e1));
+  color: var(--cyan, #0891b2);
+  outline: none;
+}
+
+.unifiedBatchControlStack[data-collapsed="true"] > .programmingBatchToolbar {
+  display: none;
+}
+
+.unifiedBatchControlStack[data-collapsed="true"] .batchControlPanelHeader {
+  border-bottom: 0;
+  border-radius: 10px;
 }
 
 .unifiedBatchPolicyPanel {
@@ -152,6 +208,16 @@
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .02em;
+}
+
+.unifiedBatchPolicyPanel[data-control-expanded="false"] {
+  min-height: 0;
+  padding: 0;
+  border-top: 0;
+}
+
+.unifiedBatchPolicyPanel[data-control-expanded="false"]::before {
+  content: none;
 }
 
 .batchPolicyField {
@@ -388,6 +454,11 @@
 [data-theme="dark"] .batchTopologySummary article,
 [data-theme="dark"] .activeFpsSummary {
   background: var(--panel);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .batchControlPanelHeader {
+  background: var(--panel-2);
   border-color: var(--line);
 }
 
