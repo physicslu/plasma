@@ -1,10 +1,21 @@
 .engineeringProgrammingV2 {
   min-width: 0;
+  container-type: inline-size;
+  container-name: engineering-programming;
 }
 
 .engineeringProgrammingV2 .productionProgrammingV2 {
   width: 100%;
+  min-width: 0;
   padding: 0 0 18px;
+}
+
+.engineeringProgrammingV2 .productionProgrammingWorkflow,
+.engineeringProgrammingV2 .productionProgrammingWorkflow > *,
+.engineeringProgrammingV2 .productionProgrammingRight,
+.engineeringProgrammingV2 .programmingJobCard,
+.engineeringProgrammingV2 .targetingCard {
+  min-width: 0;
 }
 
 .engineeringProgrammingV2Header {
@@ -89,13 +100,15 @@
 .engineeringProgrammingV2 .channelChecks {
   display: grid;
   gap: 7px;
+  min-width: 0;
 }
 
 .engineeringProgrammingV2 .channelChecks label {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   min-height: 38px;
   padding: 7px 8px;
   border: 1px solid var(--line, #d6dde6);
@@ -113,13 +126,41 @@
 
 .engineeringProgrammingV2 .programmingBatchToolbar {
   display: grid;
+  min-width: 0;
 }
 
-.engineeringProgrammingV2 .programmingFileName {
+/* Engineering v2 owns this picker. Pin its grid explicitly so legacy
+   Programming Image toolbar rules cannot reorder the filename and Browse button. */
+.engineeringProgrammingV2 .imageField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  grid-template-rows: minmax(38px, auto);
   min-width: 0;
+}
+
+.engineeringProgrammingV2 .imageField .programmingFileName {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: none;
+  padding: 0 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.engineeringProgrammingV2 .imageField .engineeringBrowseButton {
+  grid-column: 2;
+  grid-row: 1;
+  width: 92px;
+  min-width: 92px;
+  min-height: 38px;
+  padding: 0 10px;
 }
 
 .engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
@@ -219,12 +260,12 @@
   margin-top: 10px;
 }
 
-/* The Engineering sidebar consumes 220px before this workspace. Stack the
-   two workflow cards while the remaining canvas is too narrow for the approved
-   two-column layout; viewport-only Production breakpoints are insufficient. */
-@media (max-width: 1400px) {
+/* The Engineering sidebar consumes part of the viewport before this workspace.
+   Decide two-column versus stacked layout from the actual workspace canvas,
+   not from the browser viewport. */
+@container engineering-programming (max-width: 1400px) {
   .engineeringProgrammingV2 .productionProgrammingWorkflow {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
