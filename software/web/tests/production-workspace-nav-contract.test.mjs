@@ -11,7 +11,7 @@ test("Programming is a Production workspace rather than a global utility", async
   const productionNav = await source("../app/fleet/production-workspace-nav.tsx");
 
   assert.doesNotMatch(globalNav, /href="\/fleet\/programming"/);
-  assert.match(globalNav, /href="\/devices"/);
+  assert.doesNotMatch(globalNav, /href="\/devices"/);
   assert.match(productionNav, /aria-label="Production workspaces"/);
   assert.match(productionNav, /href="\/fleet"/);
   assert.match(productionNav, /href="\/fleet\/programming"/);
