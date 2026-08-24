@@ -112,6 +112,35 @@ class DeviceCatalog:
                 )
         return cls(records)
 
+    def resolve(
+        self,
+        vendor: str,
+        identifier: str,
+        *,
+        target_config: str | None = None,
+    ) -> DeviceCatalogRecord | None:
+        """Resolve one canonical catalog record without trusting browser-supplied display metadata."""
+        if not isinstance(vendor, str) or not isinstance(identifier, str):
+            return None
+        normalized_vendor = vendor.strip().casefold()
+        normalized_identifier = identifier.strip().casefold()
+        normalized_target = target_config.strip().casefold() if isinstance(target_config, str) else None
+        if not normalized_vendor or not normalized_identifier:
+            return None
+
+        matches = [
+            record
+            for record in self._records
+            if record.vendor.casefold() == normalized_vendor
+            and record.identifier.casefold() == normalized_identifier
+            and (normalized_target is None or record.target_config.casefold() == normalized_target)
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if matches and all(record == matches[0] for record in matches[1:]):
+            return matches[0]
+        return None
+
     def search(self, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT) -> list[DeviceCatalogRecord]:
         normalized = query.strip().casefold()
         if not normalized:

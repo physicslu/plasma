@@ -26,6 +26,19 @@ export type BatchExecutionPolicy = {
   failed_site_stop_threshold: number | null;
 };
 
+export type BatchTargetDeviceSnapshot = {
+  vendor: string;
+  family: string;
+  identifier: string;
+  identifier_kind: string;
+  icpn: string | null;
+};
+
+export type BatchTargetDeviceRequest = {
+  vendor: string;
+  identifier: string;
+};
+
 export type BatchOperationStatistics = {
   logical_executions: number;
   attempts: number;
@@ -69,6 +82,7 @@ export type ServerBatchSnapshot = {
   finished_at: string | null;
   operations: Operation[];
   execution_policy: BatchExecutionPolicy;
+  target_device: BatchTargetDeviceSnapshot | null;
   asset: {
     name: string;
     asset_type: string;
@@ -103,6 +117,7 @@ export type CreateServerBatchOptions = {
   targets: BatchTargetRequest[];
   operations: Operation[];
   executionPolicy: BatchExecutionPolicy;
+  targetDevice?: BatchTargetDeviceRequest | null;
   assetFile?: File | null;
   allowSyntheticMockImage?: boolean;
   readOffset?: number;
@@ -231,6 +246,7 @@ export async function createServerBatch(
         targets: options.targets,
         operations: options.operations,
         execution_policy: options.executionPolicy,
+        ...(options.targetDevice ? { target_device: options.targetDevice } : {}),
         ...(asset ? { asset } : {}),
         read: {
           offset: options.readOffset ?? 0,

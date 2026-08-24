@@ -14,7 +14,7 @@ from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway_legacy as legacy
-from .batch_runtime import BatchRuntimeManager
+from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .engineering_targets import EngineeringPPUProvider
 from .mock_batch_runtime import MockAwareBatchRuntimeManager
@@ -101,6 +101,34 @@ def _parse_targets(value: Any) -> tuple[BatchTarget, ...]:
                 )
             )
     return tuple(targets)
+
+
+def _parse_target_device(value: Any) -> BatchTargetDeviceSnapshot | None:
+    if value is None:
+        return None
+    raw = _require_object(value, "Batch target_device")
+    legacy._require_declared_keys(
+        raw,
+        allowed={"vendor", "identifier"},
+        required={"vendor", "identifier"},
+        label="Batch target_device",
+    )
+    vendor = raw["vendor"]
+    identifier = raw["identifier"]
+    if not isinstance(vendor, str) or not vendor.strip():
+        raise ValueError("Batch target_device vendor is required")
+    if not isinstance(identifier, str) or not identifier.strip():
+        raise ValueError("Batch target_device identifier is required")
+    record = get_default_device_catalog().resolve(vendor, identifier)
+    if record is None:
+        raise ValueError("Batch target_device must resolve to one canonical Device Catalog record")
+    return BatchTargetDeviceSnapshot(
+        vendor=record.vendor,
+        family=record.family,
+        identifier=record.identifier,
+        identifier_kind=record.identifier_kind,
+        icpn=record.icpn,
+    )
 
 
 def _parse_asset(value: Any) -> ProgrammingAsset | None:
@@ -328,6 +356,7 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
                         "targets",
                         "operations",
                         "execution_policy",
+                        "target_device",
                         "asset",
                         "read",
                     },
@@ -346,6 +375,7 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
                     operations=operations,
                     policy=_parse_policy(body),
                     session_id=session_id,
+                    target_device=_parse_target_device(body.get("target_device")),
                     asset=_parse_asset(body.get("asset")),
                     read_offset=read_offset,
                     read_length=read_length,
