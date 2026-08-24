@@ -118,6 +118,16 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
     expect(distance).toBeLessThanOrEqual(12);
   }
 
+  const policyInputWidths = await policy.locator(".batchPolicyField input").evaluateAll(inputs =>
+    inputs.map(element => element.getBoundingClientRect().width),
+  );
+  expect(policyInputWidths).toHaveLength(3);
+  for (const width of policyInputWidths) {
+    expect(width).toBeGreaterThanOrEqual(60);
+    expect(width).toBeLessThanOrEqual(100);
+  }
+  expect(Math.max(...policyInputWidths) - Math.min(...policyInputWidths)).toBeLessThanOrEqual(1);
+
   const layout = await root.locator(".unifiedBatchControlStack").evaluate(element => {
     const rect = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
     const toolbar = rect(".programmingBatchToolbar");
