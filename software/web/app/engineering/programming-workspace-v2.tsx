@@ -148,6 +148,7 @@ export default function ProgrammingWorkspaceV2() {
   const selectedTargetKey = useRef<string | null>(null);
   const emodeSiteIdsRef = useRef<number[] | null>(emodeSiteIds);
   const emodeSelectionRef = useRef(emodeSelection);
+  const nowTickRef = useRef(nowTick);
 
   const facility = catalog?.facilities.find(item => item.facility_id === emodeSelection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === emodeSelection.ppuId) ?? null;
@@ -176,10 +177,6 @@ export default function ProgrammingWorkspaceV2() {
   }, []);
 
   useEffect(() => {
-    setApiDraft(apiBase);
-  }, [apiBase]);
-
-  useEffect(() => {
     emodeSiteIdsRef.current = emodeSiteIds;
   }, [emodeSiteIds]);
 
@@ -188,15 +185,17 @@ export default function ProgrammingWorkspaceV2() {
   }, [emodeSelection]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNowTick(Date.now()), 500);
+    const timer = window.setInterval(() => {
+      const next = Date.now();
+      nowTickRef.current = next;
+      setNowTick(next);
+    }, 500);
     return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
     let cancelled = false;
-    setConnection("connecting");
-    setError(null);
     void (async () => {
       try {
         await ensureEngineeringSession(apiBase);
@@ -218,6 +217,7 @@ export default function ProgrammingWorkspaceV2() {
           setEmodeSiteIds(null);
         }
         setConnection("online");
+        setError(null);
         appendEvent(`Connected to ${nextCatalog.provider} Engineering topology.`);
       } catch (loadError) {
         if (cancelled) return;
@@ -388,7 +388,7 @@ export default function ProgrammingWorkspaceV2() {
     if (executionLocked) return;
     setDirectBusy(true);
     setError(null);
-    setBatchStartedAt(Date.now());
+    setBatchStartedAt(nowTickRef.current);
     setBatchFinishedAt(null);
     try {
       const result = await runJob(siteId, operation);
@@ -400,7 +400,7 @@ export default function ProgrammingWorkspaceV2() {
       appendEvent(`${siteLabel(siteId)} ${operation.toUpperCase()} failed · ${message}.`, "error");
     } finally {
       setDirectBusy(false);
-      setBatchFinishedAt(Date.now());
+      setBatchFinishedAt(nowTickRef.current);
     }
   }
 
@@ -416,7 +416,7 @@ export default function ProgrammingWorkspaceV2() {
     setError(null);
     setBatchRunning(true);
     setBatchAborting(false);
-    setBatchStartedAt(Date.now());
+    setBatchStartedAt(nowTickRef.current);
     setBatchFinishedAt(null);
     abortRequested.current = false;
     thresholdStopRequested.current = false;
@@ -476,7 +476,7 @@ export default function ProgrammingWorkspaceV2() {
     } finally {
       setBatchRunning(false);
       setBatchAborting(false);
-      setBatchFinishedAt(Date.now());
+      setBatchFinishedAt(nowTickRef.current);
     }
   }
 
@@ -495,6 +495,7 @@ export default function ProgrammingWorkspaceV2() {
     setError(null);
     try {
       const normalized = setApiBase(apiDraft);
+      setApiDraft(normalized);
       await restartEngineeringSession(normalized);
       setRefreshGeneration(current => current + 1);
       setConnection("online");
@@ -506,7 +507,6 @@ export default function ProgrammingWorkspaceV2() {
   }
 
   const selectedTargetFallback = selectedSites[0]?.target ?? sites[0]?.target ?? "—";
-  const liveTarget = targetDeviceLabel(targetDevice, selectedTargetFallback);
 
   return (
     <section className="engineeringProgrammingV2" aria-label="Engineering Programming workspace">
