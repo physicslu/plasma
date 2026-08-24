@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ServerBatchSnapshot } from "./server-batch-api";
 import {
   getServerBatchServerSnapshot,
@@ -154,6 +154,8 @@ export function BatchPolicyPanel({
   onStopThreshold,
 }: PolicyProps) {
   const retryDefaultApplied = useRef(false);
+  const controlPanelRef = useRef<HTMLElement>(null);
+  const [controlExpanded, setControlExpanded] = useState(true);
 
   useEffect(() => {
     if (retryDefaultApplied.current) return;
@@ -161,21 +163,48 @@ export function BatchPolicyPanel({
     if (retryLimit === "0") onRetryLimit(DEFAULT_SITE_RETRY_LIMIT);
   }, [onRetryLimit, retryLimit]);
 
+  useEffect(() => {
+    const stack = controlPanelRef.current?.closest(".unifiedBatchControlStack") as HTMLElement | null;
+    if (stack) stack.dataset.collapsed = controlExpanded ? "false" : "true";
+  }, [controlExpanded]);
+
   return (
-    <section className="unifiedBatchPolicyPanel" aria-label="Batch execution policy">
-      <label className="batchPolicyField">
-        <span className="batchPolicyLabel">{copy.repeatCount}<PolicyInfo ariaLabel="Repeat policy help" text={copy.repeatTooltip} /></span>
-        <input aria-label="Repeat Count" type="number" min="1" max="10000" value={repeatCount} disabled={disabled} onChange={event => onRepeatCount(event.target.value)} />
-      </label>
-      <label className="batchPolicyField">
-        <span className="batchPolicyLabel">{copy.retryLimit}<PolicyInfo ariaLabel="Retry policy help" text={copy.retryTooltip} /></span>
-        <input aria-label="Site Retry Limit" type="number" min="0" max="20" value={retryLimit} disabled={disabled} onChange={event => onRetryLimit(event.target.value)} />
-      </label>
-      <label className="batchPolicyField">
-        <span className="batchPolicyLabel">{copy.stopThreshold}<PolicyInfo ariaLabel="Stop threshold policy help" text={copy.thresholdTooltip} /></span>
-        <input aria-label="Failed Site Stop Threshold" type="number" min="1" max={Math.max(1, maxThreshold)} placeholder="off" value={stopThreshold} disabled={disabled} onChange={event => onStopThreshold(event.target.value)} />
-      </label>
-      <small className={`batchPolicyHint ${valid ? "" : "invalid"}`}>{valid ? copy.hint : copy.invalid}</small>
+    <section
+      ref={controlPanelRef}
+      className="unifiedBatchPolicyPanel"
+      aria-label="Batch execution policy"
+      data-control-expanded={controlExpanded ? "true" : "false"}
+    >
+      <header className="batchControlPanelHeader">
+        <strong>PROGRAMMING / BATCH CONTROL</strong>
+        <button
+          type="button"
+          className="batchControlPanelToggle"
+          aria-expanded={controlExpanded}
+          aria-label={`${controlExpanded ? "Collapse" : "Expand"} Programming / Batch Control`}
+          onClick={() => setControlExpanded(current => !current)}
+        >
+          <span aria-hidden="true">{controlExpanded ? "−" : "+"}</span>
+        </button>
+      </header>
+
+      {controlExpanded && (
+        <>
+          <label className="batchPolicyField">
+            <span className="batchPolicyLabel">{copy.repeatCount}<PolicyInfo ariaLabel="Repeat policy help" text={copy.repeatTooltip} /></span>
+            <input aria-label="Repeat Count" type="number" min="1" max="10000" value={repeatCount} disabled={disabled} onChange={event => onRepeatCount(event.target.value)} />
+          </label>
+          <label className="batchPolicyField">
+            <span className="batchPolicyLabel">{copy.retryLimit}<PolicyInfo ariaLabel="Retry policy help" text={copy.retryTooltip} /></span>
+            <input aria-label="Site Retry Limit" type="number" min="0" max="20" value={retryLimit} disabled={disabled} onChange={event => onRetryLimit(event.target.value)} />
+          </label>
+          <label className="batchPolicyField">
+            <span className="batchPolicyLabel">{copy.stopThreshold}<PolicyInfo ariaLabel="Stop threshold policy help" text={copy.thresholdTooltip} /></span>
+            <input aria-label="Failed Site Stop Threshold" type="number" min="1" max={Math.max(1, maxThreshold)} placeholder="off" value={stopThreshold} disabled={disabled} onChange={event => onStopThreshold(event.target.value)} />
+          </label>
+          <small className={`batchPolicyHint ${valid ? "" : "invalid"}`}>{valid ? copy.hint : copy.invalid}</small>
+        </>
+      )}
     </section>
   );
 }

@@ -132,7 +132,7 @@ test("desktop FPS selector uses the remaining viewport instead of a 52vh tree ca
   expect(geometry.treeScrollHeight).toBeGreaterThan(geometry.treeClientHeight);
 });
 
-test("iPad landscape keeps an operator-sized FPS column and collapses it back to a compact rail", async ({ page }) => {
+test("iPad landscape keeps an operator-sized FPS column and collapses it back to a named compact rail", async ({ page }) => {
   await openProduction(page, { width: 1194, height: 834 });
   const expanded = await selectorGeometry(page);
 
@@ -148,4 +148,10 @@ test("iPad landscape keeps an operator-sized FPS column and collapses it back to
   }).toBeLessThanOrEqual(48);
   const collapsed = await page.locator(".fpsSelector").boundingBox();
   expect(collapsed?.height).toBeLessThanOrEqual(162);
+
+  const railLabel = await page.locator(".fpsSelector").evaluate(element => {
+    const style = getComputedStyle(element, "::after");
+    return style.content.replace(/^['\"]|['\"]$/g, "");
+  });
+  expect(railLabel).toBe("FPS SELECTOR");
 });

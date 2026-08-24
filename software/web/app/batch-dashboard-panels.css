@@ -120,6 +120,7 @@
 }
 
 .unifiedBatchControlStack {
+  position: relative;
   display: grid;
   gap: 0;
   border: 1px solid var(--line, #d8e2ee);
@@ -133,6 +134,68 @@
   border: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.batchControlPanelHeader {
+  position: absolute;
+  z-index: 6;
+  top: 4px;
+  right: 6px;
+  min-height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.batchControlPanelHeader strong {
+  color: var(--text-soft, #334155);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.batchControlPanelToggle {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 1px solid var(--line-strong, #cbd5e1);
+  border-radius: 6px;
+  background: var(--panel, #fff);
+  color: var(--text-soft, #334155);
+  display: inline-grid;
+  place-items: center;
+  font: 800 17px/1 ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.batchControlPanelToggle:hover,
+.batchControlPanelToggle:focus-visible {
+  border-color: color-mix(in srgb, var(--cyan, #0891b2) 55%, var(--line-strong, #cbd5e1));
+  color: var(--cyan, #0891b2);
+  outline: none;
+}
+
+.unifiedBatchControlStack[data-collapsed="true"] {
+  min-height: 33px;
+  padding-top: 31px;
+}
+
+.unifiedBatchControlStack[data-collapsed="true"] > .programmingBatchToolbar {
+  display: none;
+}
+
+.unifiedBatchControlStack[data-collapsed="true"] .batchControlPanelHeader {
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 31px;
+  padding: 3px 6px 3px 10px;
+  border-radius: 10px;
+  background: var(--panel-2, #f8fafc);
+  justify-content: space-between;
 }
 
 .unifiedBatchPolicyPanel {
@@ -152,6 +215,16 @@
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .02em;
+}
+
+.unifiedBatchPolicyPanel[data-control-expanded="false"] {
+  min-height: 0;
+  padding: 0;
+  border-top: 0;
+}
+
+.unifiedBatchPolicyPanel[data-control-expanded="false"]::before {
+  content: none;
 }
 
 .batchPolicyField {
@@ -391,6 +464,10 @@
   border-color: var(--line);
 }
 
+[data-theme="dark"] .unifiedBatchControlStack[data-collapsed="true"] .batchControlPanelHeader {
+  background: var(--panel-2);
+}
+
 [data-theme="dark"] .engineeringBatchDetailsGrid {
   border-color: var(--line-strong);
   background: var(--panel);
@@ -432,5 +509,9 @@
 
   .batchPolicyField {
     grid-template-columns: 1fr;
+  }
+
+  .batchControlPanelHeader strong {
+    font-size: 8px;
   }
 }

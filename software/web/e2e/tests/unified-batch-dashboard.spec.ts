@@ -194,6 +194,25 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
   expect(Math.max(layout.operationsBottom, layout.actionsBottom)).toBeLessThanOrEqual(layout.policyTop);
 }
 
+async function assertBatchControlCollapses(root: ReturnType<Page["locator"]>) {
+  const control = root.locator(".unifiedBatchControlStack");
+  await expect(control.getByText("PROGRAMMING / BATCH CONTROL", { exact: true })).toBeVisible();
+
+  const collapse = control.getByRole("button", { name: "Collapse Programming / Batch Control" });
+  await expect(collapse).toHaveAttribute("aria-expanded", "true");
+  await collapse.click();
+  await expect(control).toHaveAttribute("data-collapsed", "true");
+  await expect(control.locator(".programmingBatchToolbar")).toBeHidden();
+  await expect(control.getByRole("region", { name: "Batch execution policy" }).getByLabel("Site Retry Limit")).toHaveCount(0);
+
+  const expand = control.getByRole("button", { name: "Expand Programming / Batch Control" });
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  await expand.click();
+  await expect(control).toHaveAttribute("data-collapsed", "false");
+  await expect(control.locator(".programmingBatchToolbar")).toBeVisible();
+  await expect(control.getByRole("region", { name: "Batch execution policy" }).getByLabel("Site Retry Limit")).toHaveValue("3");
+}
+
 test("Production and Engineering share the compact upper Batch dashboard contract", async ({ page }) => {
   await installDashboardMock(page);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -201,6 +220,7 @@ test("Production and Engineering share the compact upper Batch dashboard contrac
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
   await assertDashboardContract(page.locator(".productionMainPanel"));
+  await assertBatchControlCollapses(page.locator(".productionMainPanel"));
   const fpsWidth = await page.locator(".fpsSelector").evaluate(element => element.getBoundingClientRect().width);
   expect(fpsWidth).toBeGreaterThanOrEqual(319);
   expect(fpsWidth).toBeLessThanOrEqual(361);
@@ -210,6 +230,7 @@ test("Production and Engineering share the compact upper Batch dashboard contrac
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await assertDashboardContract(page.locator(".engineeringProgramming"));
+  await assertBatchControlCollapses(page.locator(".engineeringProgramming"));
 
   const details = page.locator(".engineeringProgramming .engineeringBatchDetails");
   await expect(details).toBeVisible();
