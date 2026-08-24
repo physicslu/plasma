@@ -1,0 +1,169 @@
+.engineeringProgrammingV2 {
+  min-width: 0;
+}
+
+.engineeringProgrammingV2 .productionProgrammingV2 {
+  width: 100%;
+  padding: 0 0 18px;
+}
+
+.engineeringProgrammingV2Header {
+  min-height: 50px;
+}
+
+.engineeringProgrammingV2Header .engineeringGateway {
+  display: grid;
+  grid-template-columns: 10px minmax(180px, 300px) auto auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.engineeringProgrammingV2Header .engineeringGateway input {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.engineeringProgrammingV2Header .engineeringGateway button {
+  min-height: 30px;
+  border: 1px solid rgba(255, 255, 255, .32);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  padding: 0 10px;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.engineeringProgrammingV2Header .engineeringGateway button:disabled,
+.engineeringProgrammingV2Header .engineeringGateway input:disabled {
+  opacity: .55;
+}
+
+.engineeringProgrammingV2Header .engineeringGateway.offline .onlineDot {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, .16);
+}
+
+.engineeringProgrammingV2Header .engineeringGateway.connecting .onlineDot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, .16);
+}
+
+.engineeringPpuIdentityV2 {
+  display: grid;
+  gap: 2px;
+  margin-top: 18px;
+  padding: 9px 11px;
+  border: 1px solid var(--line, #d6dde6);
+  border-radius: 7px;
+  background: var(--panel-2, #f6f8fa);
+}
+
+.engineeringPpuIdentityV2 b {
+  font-size: 10px;
+}
+
+.engineeringPpuIdentityV2 small {
+  color: var(--muted, #64748b);
+  font-size: 8px;
+}
+
+.engineeringPolicyRow {
+  grid-template-columns: 165px max-content max-content max-content;
+}
+
+.engineeringRetryField {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.engineeringRetryField input {
+  width: 62px;
+  min-width: 62px;
+  max-width: 62px;
+}
+
+.engineeringReadRow {
+  grid-template-columns: 165px max-content max-content;
+}
+
+.engineeringReadRow label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+
+.engineeringReadRow input {
+  width: 86px;
+}
+
+.engineeringV2TableWrap {
+  overflow-x: auto;
+}
+
+.engineeringProgrammingV2 .channelTable {
+  min-width: 840px;
+}
+
+.engineeringProgrammingV2 .channelTable th:nth-child(1) { width: 12%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(2) { width: 20%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(3) { width: 14%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(4) { width: 24%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(5) { width: 10%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(6) { width: 20%; }
+
+.engineeringV2Actions {
+  flex-wrap: nowrap;
+}
+
+.engineeringResult[data-result="PASS"] { color: #15803d; }
+.engineeringResult[data-result="FAIL"],
+.engineeringResult[data-result="ERROR"] { color: #dc2626; }
+.engineeringResult[data-result="CANCELLED"],
+.engineeringResult[data-result="STOPPED"] { color: #64748b; }
+
+@media (max-width: 1320px) {
+  .engineeringProgrammingV2 .productionProgrammingKpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .engineeringPolicyRow {
+    grid-template-columns: 145px max-content max-content max-content;
+  }
+}
+
+@media (max-width: 1100px) {
+  .engineeringProgrammingV2 .productionProgrammingWorkflow {
+    grid-template-columns: 1fr;
+  }
+
+  .engineeringProgrammingV2Header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: 10px;
+  }
+
+  .engineeringProgrammingV2Header .engineeringGateway {
+    width: 100%;
+    grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .engineeringPolicyRow,
+  .engineeringReadRow {
+    grid-template-columns: 1fr;
+  }
+}
