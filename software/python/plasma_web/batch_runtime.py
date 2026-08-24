@@ -28,6 +28,24 @@ BATCH_INFRASTRUCTURE_ERROR = "BATCH_INFRASTRUCTURE_ERROR"
 
 
 @dataclass(frozen=True, slots=True)
+class BatchTargetDeviceSnapshot:
+    vendor: str
+    family: str
+    identifier: str
+    identifier_kind: str
+    icpn: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "vendor": self.vendor,
+            "family": self.family,
+            "identifier": self.identifier,
+            "identifier_kind": self.identifier_kind,
+            "icpn": self.icpn,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class BatchAssetSnapshot:
     name: str
     asset_type: str
@@ -175,6 +193,7 @@ class BatchRecord:
     targets: tuple[BatchTarget, ...]
     sites: dict[str, BatchSiteRuntime]
     session_id: str | None
+    target_device: BatchTargetDeviceSnapshot | None
     asset: BatchAssetSnapshot | None
     read_offset: int
     read_length: int
@@ -225,6 +244,7 @@ class BatchRecord:
                 "finished_at": self.finished_at,
                 "operations": [operation.value for operation in self.operations],
                 "execution_policy": self.policy.to_dict(),
+                "target_device": self.target_device.to_dict() if self.target_device else None,
                 "asset": self.asset.to_dict() if self.asset else None,
                 "read": {"offset": self.read_offset, "length": self.read_length},
                 "cancel_requested": self.cancel_requested,
@@ -265,6 +285,7 @@ class BatchRuntimeManager:
         operations: list[str] | tuple[str, ...],
         policy: BatchExecutionPolicy,
         session_id: str | None = None,
+        target_device: BatchTargetDeviceSnapshot | None = None,
         asset: ProgrammingAsset | None = None,
         read_offset: int = 0,
         read_length: int = 256,
@@ -324,6 +345,7 @@ class BatchRuntimeManager:
             targets=targets,
             sites=site_runtimes,
             session_id=session_id,
+            target_device=target_device,
             asset=BatchAssetSnapshot.from_asset(asset) if asset else None,
             read_offset=read_offset,
             read_length=read_length,
@@ -564,6 +586,12 @@ class BatchRuntimeManager:
                     }
                 ]
             }
+        metadata: dict[str, Any] = {
+            "batch_id": batch.batch_id,
+            "batch_round": round_index,
+        }
+        if batch.target_device is not None:
+            metadata["target_device"] = batch.target_device.to_dict()
         request = JobRequest(
             site_id=site.target.site_id,
             operation=operation,
@@ -572,10 +600,7 @@ class BatchRuntimeManager:
             max_retries=batch.policy.site_retry_limit,
             retry_backoff_s=0.05,
             client_id="plasma-batch-runtime",
-            metadata={
-                "batch_id": batch.batch_id,
-                "batch_round": round_index,
-            },
+            metadata=metadata,
         )
         asset_sha256 = batch.asset.sha256 if batch.asset and operation in {Operation.PROGRAM, Operation.VERIFY} else None
         session_id = batch.session_id if asset_sha256 is not None else None
