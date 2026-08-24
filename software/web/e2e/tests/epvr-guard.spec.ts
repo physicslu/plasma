@@ -109,6 +109,22 @@ async function expectSharedToolbarGeometry(page: Page) {
   await expect(toolbar.locator(".programmingFileName")).toHaveCSS("font-size", "13px");
 }
 
+async function expectEngineeringV2Geometry(page: Page) {
+  const toolbar = page.locator(".engineeringProgrammingV2 .programmingBatchToolbar");
+  const image = toolbar.locator(".imageField");
+  const operations = toolbar.locator(".programmingBatchOperations");
+  const actions = toolbar.locator(".programmingActions");
+  const imageBox = await image.boundingBox();
+  const operationBox = await operations.boundingBox();
+  const actionBox = await actions.boundingBox();
+  expect(imageBox).not.toBeNull();
+  expect(operationBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(operationBox!.y);
+  expect(operationBox!.y + operationBox!.height).toBeLessThanOrEqual(actionBox!.y);
+  await expect(toolbar.locator(".programmingFileName")).toHaveCSS("font-size", "11px");
+}
+
 test("Pmod Mock readiness uses Synthetic Image when no file is selected", async ({ page }) => {
   const api = await installEngineeringApi(page);
   await page.goto("/fleet");
@@ -166,12 +182,12 @@ test("Emode Mock uses Synthetic Image and keeps READ validation", async ({ page 
   await expect(fileName).toHaveAttribute("data-image-source", "mock_synthetic");
   await expect(readiness).toContainText("BATCH READY");
   await expect(execute).toBeEnabled();
-  await chooseFileFromButton(page, "選擇燒錄檔", "emode-test.bin");
+  await chooseFileFromButton(page, "Browse...", "emode-test.bin");
   await expect(fileName).toHaveText("emode-test.bin");
   await expect(fileName).toHaveAttribute("data-image-source", "user");
   await expect(readiness).toContainText("BATCH READY");
   await expect(execute).toBeEnabled();
-  await expectSharedToolbarGeometry(page);
+  await expectEngineeringV2Geometry(page);
   expect(api.jobRequests).toBe(0);
 });
 
