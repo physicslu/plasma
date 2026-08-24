@@ -63,7 +63,7 @@
 }
 
 .engineeringProgrammingV2 select option {
-  background: var(--panel-2, #f6f8fa);
+  background: var(--panel, #fff);
   color: var(--text, #172033);
 }
 
