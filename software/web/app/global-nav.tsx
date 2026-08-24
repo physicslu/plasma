@@ -100,12 +100,6 @@ export function GlobalNav() {
           </Link>
         </nav>
 
-        <nav className="globalUtilityNav" aria-label={locale === "zh-TW" ? "全域工具" : "Global tools"}>
-          <Link href="/devices" aria-current={devicesActive ? "page" : undefined}>
-            IC Selector
-          </Link>
-        </nav>
-
         {navigationLocked && (
           <span className="globalExecutionGuard" role="status" aria-live="polite" title={lockReason}>
             EXECUTION BUSY · {executionCount}
