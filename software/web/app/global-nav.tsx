@@ -38,6 +38,7 @@ export function GlobalNav() {
   const activeMode = productModeForPath(pathname);
   const entryActive = pathname === "/demo";
   const devicesActive = pathname === "/devices" || pathname.startsWith("/devices/");
+  const programmingActive = pathname === "/fleet/programming" || pathname.startsWith("/fleet/programming/");
   const navigationLocked = Boolean(activeMode) && executionCount > 0;
   const productionLocked = navigationLocked && activeMode !== "production";
   const engineeringLocked = navigationLocked && activeMode !== "engineering";
@@ -100,7 +101,10 @@ export function GlobalNav() {
           </Link>
         </nav>
 
-        <nav className="globalUtilityNav" aria-label={locale === "zh-TW" ? "全域工具" : "Global tools"}>
+        <nav className="globalUtilityNav" aria-label={locale === "zh-TW" ? "全域工具與工作區" : "Global tools and workspaces"}>
+          <Link href="/fleet/programming" aria-current={programmingActive ? "page" : undefined}>
+            Programming
+          </Link>
           <Link href="/devices" aria-current={devicesActive ? "page" : undefined}>
             IC Selector
           </Link>
