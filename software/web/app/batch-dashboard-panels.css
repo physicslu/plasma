@@ -62,6 +62,7 @@
 }
 
 .unifiedBatchPolicyPanel {
+  --batch-policy-input-width: 10ch;
   display: grid;
   grid-template-columns: repeat(3, minmax(150px, 1fr));
   gap: 7px 10px;
@@ -81,8 +82,9 @@
 
 .batchPolicyField {
   display: grid;
-  grid-template-columns: max-content minmax(76px, 1fr);
+  grid-template-columns: max-content max-content;
   align-items: center;
+  justify-content: start;
   gap: 10px;
   min-width: 0;
 }
@@ -101,10 +103,11 @@
 }
 
 .batchPolicyField input {
-  width: 100%;
-  min-width: 0;
+  width: var(--batch-policy-input-width);
+  min-width: var(--batch-policy-input-width);
+  max-width: var(--batch-policy-input-width);
   min-height: 28px;
-  box-sizing: border-box;
+  box-sizing: content-box;
   border: 1px solid var(--line-strong, #cbd5e1);
   border-radius: 7px;
   background: var(--panel-2, #f8fafc);
