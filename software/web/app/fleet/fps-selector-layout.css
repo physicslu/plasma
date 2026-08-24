@@ -4,6 +4,11 @@
  * The selector is a Facility -> PPU -> Site resource navigator, not a compact
  * dropdown. Give it a stable operator-sized column and let the tree consume
  * the available viewport budget before introducing its own scrollbar.
+ *
+ * The Production-local workspace switch now occupies roughly 50 px above the
+ * Factory Console, so the selector viewport budget is 200 px rather than the
+ * previous 150 px. This keeps the sticky selector inside the visible viewport
+ * without reverting to a compact 52vh-style tree.
  */
 html .productionPrototypePage .productionWorkspace {
   grid-template-columns: clamp(320px, 22vw, 360px) minmax(0, 1fr);
@@ -14,8 +19,8 @@ html .productionPrototypePage .productionWorkspace.selector-collapsed {
 }
 
 html .productionPrototypePage .fpsSelector {
-  height: min(960px, calc(100dvh - 150px));
-  max-height: min(960px, calc(100dvh - 150px));
+  height: min(960px, calc(100dvh - 200px));
+  max-height: min(960px, calc(100dvh - 200px));
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
