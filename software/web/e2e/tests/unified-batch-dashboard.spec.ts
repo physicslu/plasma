@@ -108,12 +108,15 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
   await expect.poll(() => tooltip.evaluate(element => getComputedStyle(element).opacity)).toBe("1");
   await expect(tooltip).toContainText(/1.*10000/);
 
-  const distance = await policy.locator(".batchPolicyField").first().evaluate(element => {
-    const label = element.querySelector<HTMLElement>(".batchPolicyLabel")!.getBoundingClientRect();
+  const visibleLabelDistances = await policy.locator(".batchPolicyField").evaluateAll(fields => fields.map(element => {
+    const info = element.querySelector<HTMLElement>(".batchPolicyInfo")!.getBoundingClientRect();
     const input = element.querySelector<HTMLInputElement>("input")!.getBoundingClientRect();
-    return Math.max(0, input.left - label.right);
-  });
-  expect(distance).toBeLessThanOrEqual(12);
+    return Math.max(0, input.left - info.right);
+  }));
+  expect(visibleLabelDistances).toHaveLength(3);
+  for (const distance of visibleLabelDistances) {
+    expect(distance).toBeLessThanOrEqual(12);
+  }
 
   const layout = await root.locator(".unifiedBatchControlStack").evaluate(element => {
     const rect = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
