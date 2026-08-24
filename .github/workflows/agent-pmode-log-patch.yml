@@ -1,0 +1,67 @@
+name: Agent PMode Log Patch
+
+on:
+  push:
+    branches:
+      - agent/pmode-log-emode-parity
+    paths:
+      - ".github/workflows/agent-pmode-log-patch.yml"
+      - "software/web/app/fleet/production-log-panel.tsx"
+      - "software/web/app/fleet/production-log.css"
+      - "software/web/e2e/tests/production-log-parity.spec.ts"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/pmode-log-emode-parity
+          fetch-depth: 0
+
+      - name: Replace Production legacy log with Engineering-style panel
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("software/web/app/fleet/server-batch-page.tsx")
+          text = path.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  'import { ActiveFpsSummary, BatchPolicyPanel, BatchTopologySummary } from "../batch-dashboard-panels";\nimport "../programming-batch-toolbar.css";',
+                  'import { ActiveFpsSummary, BatchPolicyPanel, BatchTopologySummary } from "../batch-dashboard-panels";\nimport ProductionLogPanel, { type ProductionLogEntry } from "./production-log-panel";\nimport "../programming-batch-toolbar.css";',
+              ),
+              (
+                  'type LogEntry = { id: number; time: string; level: "INFO" | "WARN" | "ERROR"; text: string };',
+                  'type LogEntry = ProductionLogEntry;',
+              ),
+              (
+                  '''              <details className="productionPrototypeLog">\n                <summary>{text.log} <span>{logs.length}</span></summary>\n                <header><button type="button" onClick={() => setLogs([])}>{text.clearLog}</button></header>\n                <div className="prototypeLogBody">\n                  {logs.length === 0 && <div className="prototypeEmptyLog">—</div>}\n                  {logs.map(entry => <div className={`prototypeLogRow level-${entry.level.toLowerCase()}`} key={entry.id}><span>{entry.time}</span><b>{entry.level}</b><code>{entry.text}</code></div>)}\n                </div>\n              </details>''',
+                  '''              <ProductionLogPanel\n                logs={logs}\n                title={text.log}\n                clearLabel={text.clearLog}\n                onClear={() => setLogs([])}\n              />''',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one replacement target, found {count}: {old[:80]!r}")
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit generated patch
+        run: |
+          if git diff --quiet -- software/web/app/fleet/server-batch-page.tsx; then
+            echo "No patch needed"
+            exit 0
+          fi
+          git config user.name "plasma-agent"
+          git config user.email "plasma-agent@users.noreply.github.com"
+          git add software/web/app/fleet/server-batch-page.tsx
+          git commit -m "ui: align Production log section with Engineering"
+          git push origin HEAD:agent/pmode-log-emode-parity
