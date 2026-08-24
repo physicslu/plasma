@@ -47,18 +47,23 @@ test("Production KPI authority is the latest server Batch snapshot", () => {
   assert.match(shared, /data-kpi-source=\{productionBatch \? "server-batch-snapshot" : "local-projection"\}/);
 });
 
-test("shared Active FPS summary is explicitly Site-state scoped", () => {
+test("shared Active FPS summary exposes only selected, running and stopped Site counts", () => {
   assert.match(shared, /data-summary-unit="site"/);
-  assert.match(shared, /SITE STATUS/);
-  assert.match(shared, /TOTAL SITES/);
-  assert.match(shared, /RUNNING SITES/);
-  assert.match(shared, /PASSED SITES/);
-  assert.match(shared, /FAULTED SITES/);
-  assert.match(shared, /ERROR SITES/);
-  assert.match(shared, /STOPPED SITES/);
-  assert.match(shared, /CANCELLED SITES/);
-  assert.equal((shared.match(/data-active-fps-state/g) ?? []).length, 1);
-  assert.match(shared, /selected.*running.*pass.*faulted.*error.*stopped.*cancelled/s);
+  assert.match(shared, /Active FPS · SITE STATUS/);
+  assert.match(shared, /const stoppedSiteCount = counts\.pass \+ counts\.faulted \+ counts\.error \+ counts\.stopped \+ counts\.cancelled/);
+  assert.match(shared, /\["selected", "TOTAL SELECTED SITES", counts\.selected\]/);
+  assert.match(shared, /\["running", "RUNNING SITES", counts\.running\]/);
+  assert.match(shared, /\["terminal", "STOPPED SITES", stoppedSiteCount\]/);
+  assert.match(shared, /repeat\(auto-fit, minmax\(110px, 1fr\)\)/);
+  assert.equal((shared.match(/\["(?:selected|running|terminal)",/g) ?? []).length, 3);
+});
+
+test("Engineering Batch Details retain the full Site terminal breakdown", () => {
+  assert.match(shared, /<small>PASSED SITES<\/small>/);
+  assert.match(shared, /<small>FAULTED SITES<\/small>/);
+  assert.match(shared, /<small>ERROR SITES<\/small>/);
+  assert.match(shared, /<small>STOPPED SITES<\/small>/);
+  assert.match(shared, /<small>CANCELLED SITES<\/small>/);
 });
 
 test("policy controls expose hover/focus help, canonical ranges, and default Retry 3", () => {

@@ -131,9 +131,13 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
 
   const active = root.locator(".activeFpsSummary");
   await expect(active).toBeVisible();
-  await expect(active.locator("[data-active-fps-state]")).toHaveCount(7);
-  await expect(active.locator('[data-active-fps-state="faulted"]')).toHaveCount(1);
-  await expect(active.locator('[data-active-fps-state="error"]')).toHaveCount(1);
+  await expect(active.locator("[data-active-fps-state]")).toHaveCount(3);
+  await expect(active.locator('[data-active-fps-state="selected"]')).toHaveCount(1);
+  await expect(active.locator('[data-active-fps-state="running"]')).toHaveCount(1);
+  await expect(active.locator('[data-active-fps-state="terminal"]')).toHaveCount(1);
+  await expect(active.locator('[data-active-fps-state="selected"]').getByText("TOTAL SELECTED SITES", { exact: true })).toBeVisible();
+  await expect(active.locator('[data-active-fps-state="running"]').getByText("RUNNING SITES", { exact: true })).toBeVisible();
+  await expect(active.locator('[data-active-fps-state="terminal"]').getByText("STOPPED SITES", { exact: true })).toBeVisible();
 
   const policy = root.getByRole("region", { name: "Batch execution policy" });
   const repeatInfo = policy.getByLabel("Repeat policy help");
@@ -213,4 +217,8 @@ test("Production and Engineering share the compact upper Batch dashboard contrac
   await details.locator("summary").click();
   await expect(details).toHaveAttribute("open", "");
   await expect(details.getByText("STATE", { exact: true })).toBeVisible();
+  await expect(details.getByText("PASSED SITES", { exact: true })).toBeVisible();
+  await expect(details.getByText("FAULTED SITES", { exact: true })).toBeVisible();
+  await expect(details.getByText("ERROR SITES", { exact: true })).toBeVisible();
+  await expect(details.getByText("CANCELLED SITES", { exact: true })).toBeVisible();
 });
