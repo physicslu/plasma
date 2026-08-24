@@ -74,6 +74,17 @@ test("policy controls expose hover/focus help, canonical ranges, and default Ret
   assert.match(shared, /aria-label="Failed Site Stop Threshold"/);
 });
 
+test("Pmod and Emode share a collapsible Programming and Batch Control panel", () => {
+  assert.match(shared, /const \[controlExpanded, setControlExpanded\] = useState\(true\)/);
+  assert.match(shared, /PROGRAMMING \/ BATCH CONTROL/);
+  assert.match(shared, /aria-expanded=\{controlExpanded\}/);
+  assert.match(shared, /data-control-expanded=\{controlExpanded \? "true" : "false"\}/);
+  assert.match(shared, /stack\.dataset\.collapsed = controlExpanded \? "false" : "true"/);
+  assert.match(sharedCss, /\.unifiedBatchControlStack\[data-collapsed="true"\]\s*>\s*\.programmingBatchToolbar\s*\{[^}]*display:\s*none;/s);
+  assert.match(sharedCss, /\.batchControlPanelHeader/);
+  assert.match(sharedCss, /\.batchControlPanelToggle/);
+});
+
 test("Batch diagnostics stay off P Mode and are expandable in E Mode", () => {
   assert.match(pmodCss, /\.productionMainPanel\s*>\s*\.serverBatchStatistics\s*\{[^}]*display:\s*none;/s);
   assert.match(shared, /<details className="engineeringBatchDetails">/);
