@@ -50,6 +50,7 @@
 }
 
 .globalNavControls { margin-left: auto; }
+.globalUtilityNav { padding-left: 8px; border-left: 1px solid var(--line); }
 .globalThemeSwitch { flex: 0 0 auto; margin-left: 2px; }
 .globalLocale { padding-left: 8px; border-left: 1px solid var(--line); }
 
@@ -82,6 +83,10 @@
 
 .globalProductNav a[aria-current="page"] {
   box-shadow: inset 0 -2px 0 var(--cyan);
+}
+
+.globalUtilityNav a[aria-current="page"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cyan) 24%, transparent);
 }
 
 .globalAppNav a[aria-disabled="true"] {
