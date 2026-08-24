@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useI18n } from "../i18n";
 import { useWorkspaceSession } from "../workspace-session";
 import MockRuntimeSettingsPanel from "./mock-runtime-settings";
-import ProgrammingWorkspace from "./programming-workspace";
+import ProgrammingWorkspaceV2 from "./programming-workspace-v2";
 import "./engineering.css";
 import "./engineering-density.css";
 import "./engineering-log.css";
@@ -67,7 +67,7 @@ export default function EngineeringPage() {
 
           <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : ""}`}>
             {active === "programming" ? (
-              <ProgrammingWorkspace />
+              <ProgrammingWorkspaceV2 />
             ) : active === "mock" ? (
               <MockRuntimeSettingsPanel />
             ) : (
