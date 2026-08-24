@@ -102,6 +102,8 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
     return {
       contextLabelSize: Number.parseFloat(style(".batchTopologyContext small").fontSize),
       contextValueSize: Number.parseFloat(style(".batchTopologyContext b").fontSize),
+      totalLabelSize: Number.parseFloat(style(".batchTopologyTotal small").fontSize),
+      totalValueSize: Number.parseFloat(style(".batchTopologyTotal b").fontSize),
       kpiLabelSize: Number.parseFloat(style(".batchTopologyPass small").fontSize),
       kpiValueSize: Number.parseFloat(style(".batchTopologyPass b").fontSize),
       passLabelWeight: Number(style(".batchTopologyPass small").fontWeight),
@@ -114,6 +116,10 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
   });
   expect(typography.contextLabelSize).toBeLessThan(typography.kpiLabelSize);
   expect(typography.contextValueSize).toBeLessThan(typography.kpiValueSize);
+  expect(typography.kpiLabelSize).toBeGreaterThanOrEqual(12);
+  expect(typography.kpiValueSize).toBeGreaterThanOrEqual(34);
+  expect(typography.kpiLabelSize).toBeGreaterThan(typography.totalLabelSize);
+  expect(typography.kpiValueSize).toBeGreaterThan(typography.totalValueSize);
   for (const weight of [
     typography.passLabelWeight,
     typography.passValueWeight,
