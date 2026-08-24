@@ -190,14 +190,11 @@ function batchState(counts: BatchDashboardCounts): string {
 }
 
 export function ActiveFpsSummary({ counts, copy }: ActiveProps) {
+  const stoppedSiteCount = counts.pass + counts.faulted + counts.error + counts.stopped + counts.cancelled;
   const metrics = [
-    ["selected", "TOTAL SITES", counts.selected],
+    ["selected", "TOTAL SELECTED SITES", counts.selected],
     ["running", "RUNNING SITES", counts.running],
-    ["pass", "PASSED SITES", counts.pass],
-    ["faulted", "FAULTED SITES", counts.faulted],
-    ["error", "ERROR SITES", counts.error],
-    ["stopped", "STOPPED SITES", counts.stopped],
-    ["cancelled", "CANCELLED SITES", counts.cancelled],
+    ["terminal", "STOPPED SITES", stoppedSiteCount],
   ] as const;
 
   return (
@@ -218,7 +215,7 @@ export function ActiveFpsSummary({ counts, copy }: ActiveProps) {
           </div>
         </details>
       </header>
-      <div className="activeFpsMetrics">
+      <div className="activeFpsMetrics" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
         {metrics.map(([state, label, value]) => (
           <article key={state} data-active-fps-state={state}>
             <small>{label}</small><b>{value}</b>
