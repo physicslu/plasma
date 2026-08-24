@@ -141,6 +141,7 @@ async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
   const tooltip = repeatInfo.getByRole("tooltip");
   await expect.poll(() => tooltip.evaluate(element => getComputedStyle(element).opacity)).toBe("1");
   await expect(tooltip).toContainText(/1.*10000/);
+  await expect(policy.getByLabel("Site Retry Limit")).toHaveValue("3");
 
   const visibleLabelDistances = await policy.locator(".batchPolicyField").evaluateAll(fields => fields.map(element => {
     const info = element.querySelector<HTMLElement>(".batchPolicyInfo")!.getBoundingClientRect();
@@ -199,9 +200,17 @@ test("Production and Engineering share the compact upper Batch dashboard contrac
   const fpsWidth = await page.locator(".fpsSelector").evaluate(element => element.getBoundingClientRect().width);
   expect(fpsWidth).toBeGreaterThanOrEqual(319);
   expect(fpsWidth).toBeLessThanOrEqual(361);
+  await expect(page.locator(".productionMainPanel .engineeringBatchDetails")).toBeHidden();
 
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await assertDashboardContract(page.locator(".engineeringProgramming"));
+
+  const details = page.locator(".engineeringProgramming .engineeringBatchDetails");
+  await expect(details).toBeVisible();
+  await expect(details).not.toHaveAttribute("open", "");
+  await details.locator("summary").click();
+  await expect(details).toHaveAttribute("open", "");
+  await expect(details.getByText("STATE", { exact: true })).toBeVisible();
 });

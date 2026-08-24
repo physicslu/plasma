@@ -73,7 +73,7 @@ function terminalBatch() {
     operations: ["program"],
     execution_policy: {
       repeat_count: 1,
-      site_retry_limit: 0,
+      site_retry_limit: 3,
       failed_site_stop_threshold: null,
     },
     asset: {
@@ -201,6 +201,8 @@ test("Production Mock submits Synthetic Image intent without browser-generated a
   expect(submitted.session_id).toBe("0123456789abcdef0123456789abcdef");
   expect(submitted).not.toHaveProperty("asset");
 
-  await expect(page.locator("[data-batch-state=\"success\"]")).toBeVisible();
+  const hiddenBatchStatistics = page.locator(".serverBatchStatistics");
+  await expect(hiddenBatchStatistics).toHaveAttribute("data-batch-state", "success");
+  await expect(hiddenBatchStatistics).toBeHidden();
   await expect(page.locator(".programmingFileName")).toHaveAttribute("data-image-source", "mock_synthetic");
 });

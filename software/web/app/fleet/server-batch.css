@@ -221,6 +221,11 @@
   container: production-main / inline-size;
 }
 
+/* Batch runtime diagnostics are Engineering concerns; keep them off the P Mode operator surface. */
+.productionMainPanel > .serverBatchStatistics {
+  display: none;
+}
+
 @container production-main (max-width: 1060px) {
   html .productionPrototypePage .productionMainPanel .productionBatchToolbar.programmingBatchToolbar {
     grid-template-columns: minmax(0, 1fr) max-content;
