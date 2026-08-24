@@ -10,6 +10,7 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
 from plasma_web.batch_runtime import BatchRuntimeManager
+from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 from tests.test_batch_runtime import FakeBatchProvider
 
@@ -73,12 +74,69 @@ class BatchWebGatewayTests(unittest.TestCase):
         self.assertEqual(status, 202)
         self.assertEqual(payload["rest_contract_version"], "3")
         self.assertEqual(payload["batch"]["operations"], ["erase", "read"])
+        self.assertIsNone(payload["batch"]["target_device"])
         batch_id = payload["batch"]["batch_id"]
         final = self.wait_terminal(batch_id)
         self.assertEqual(final["state"], "success")
         self.assertEqual(final["execution_policy"]["repeat_count"], 3)
         self.assertEqual(final["execution_policy"]["site_retry_limit"], 2)
         self.assertEqual(final["site_counts"]["success"], 2)
+
+    def test_batch_resolves_and_freezes_canonical_target_device(self):
+        record = get_default_device_catalog().search("ADUC7019BCPZ62I", limit=1)[0]
+        status, payload = self.request(
+            "POST",
+            "/api/batches",
+            {
+                "targets": [
+                    {"facility_id": "facility-1", "ppu_id": "ppu-1", "site_ids": [1]},
+                ],
+                "operations": ["erase"],
+                "execution_policy": {
+                    "repeat_count": 1,
+                    "site_retry_limit": 0,
+                    "failed_site_stop_threshold": None,
+                },
+                "target_device": {
+                    "vendor": record.vendor,
+                    "identifier": record.identifier,
+                },
+            },
+        )
+        self.assertEqual(status, 202)
+        target = payload["batch"]["target_device"]
+        self.assertEqual(target["vendor"], record.vendor)
+        self.assertEqual(target["family"], record.family)
+        self.assertEqual(target["identifier"], record.identifier)
+        self.assertEqual(target["identifier_kind"], record.identifier_kind)
+        self.assertEqual(target["icpn"], record.icpn)
+
+        final = self.wait_terminal(payload["batch"]["batch_id"])
+        self.assertEqual(final["target_device"], target)
+
+    def test_batch_rejects_target_device_not_in_canonical_catalog(self):
+        status, payload = self.request(
+            "POST",
+            "/api/batches",
+            {
+                "targets": [
+                    {"facility_id": "facility-1", "ppu_id": "ppu-1", "site_ids": [1]},
+                ],
+                "operations": ["erase"],
+                "execution_policy": {
+                    "repeat_count": 1,
+                    "site_retry_limit": 0,
+                    "failed_site_stop_threshold": None,
+                },
+                "target_device": {
+                    "vendor": "Not A Vendor",
+                    "identifier": "NOT-A-DEVICE",
+                },
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertFalse(payload["ok"])
+        self.assertIn("canonical Device Catalog", payload["error"]["message"])
 
     def test_program_batch_accepts_one_asset_snapshot(self):
         image = b"batch-rest-image" * 16
