@@ -37,7 +37,6 @@ export function GlobalNav() {
   const executionCount = ppuExecutionCount + batchExecutionCount;
   const activeMode = productModeForPath(pathname);
   const entryActive = pathname === "/demo";
-  const devicesActive = pathname === "/devices" || pathname.startsWith("/devices/");
   const navigationLocked = Boolean(activeMode) && executionCount > 0;
   const productionLocked = navigationLocked && activeMode !== "production";
   const engineeringLocked = navigationLocked && activeMode !== "engineering";
@@ -106,7 +105,7 @@ export function GlobalNav() {
           </span>
         )}
 
-        {(activeMode || devicesActive) && <ThemeSwitch className="globalThemeSwitch" />}
+        <ThemeSwitch className="globalThemeSwitch" />
 
         <div className="globalLocale" role="group" aria-label="Language" aria-busy={!hydrated}>
           <button type="button" disabled={!hydrated} onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>
