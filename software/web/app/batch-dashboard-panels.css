@@ -123,7 +123,6 @@
   position: relative;
   display: grid;
   gap: 0;
-  padding-top: 31px;
   border: 1px solid var(--line, #d8e2ee);
   border-radius: 11px;
   background: var(--panel, #fff);
@@ -140,23 +139,19 @@
 .batchControlPanelHeader {
   position: absolute;
   z-index: 6;
-  top: 0;
-  left: 0;
-  right: 0;
-  min-height: 31px;
-  padding: 3px 6px 3px 10px;
-  border-bottom: 1px solid var(--line, #e2e8f0);
-  border-radius: 10px 10px 0 0;
-  background: var(--panel-2, #f8fafc);
+  top: 4px;
+  right: 6px;
+  min-height: 25px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-end;
+  gap: 7px;
+  pointer-events: none;
 }
 
 .batchControlPanelHeader strong {
   color: var(--text-soft, #334155);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: .05em;
 }
@@ -173,6 +168,7 @@
   place-items: center;
   font: 800 17px/1 ui-sans-serif, system-ui, sans-serif;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .batchControlPanelToggle:hover,
@@ -182,13 +178,24 @@
   outline: none;
 }
 
+.unifiedBatchControlStack[data-collapsed="true"] {
+  min-height: 33px;
+  padding-top: 31px;
+}
+
 .unifiedBatchControlStack[data-collapsed="true"] > .programmingBatchToolbar {
   display: none;
 }
 
 .unifiedBatchControlStack[data-collapsed="true"] .batchControlPanelHeader {
-  border-bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 31px;
+  padding: 3px 6px 3px 10px;
   border-radius: 10px;
+  background: var(--panel-2, #f8fafc);
+  justify-content: space-between;
 }
 
 .unifiedBatchPolicyPanel {
@@ -457,9 +464,8 @@
   border-color: var(--line);
 }
 
-[data-theme="dark"] .batchControlPanelHeader {
+[data-theme="dark"] .unifiedBatchControlStack[data-collapsed="true"] .batchControlPanelHeader {
   background: var(--panel-2);
-  border-color: var(--line);
 }
 
 [data-theme="dark"] .engineeringBatchDetailsGrid {
@@ -503,5 +509,9 @@
 
   .batchPolicyField {
     grid-template-columns: 1fr;
+  }
+
+  .batchControlPanelHeader strong {
+    font-size: 8px;
   }
 }
