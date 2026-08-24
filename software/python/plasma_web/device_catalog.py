@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Iterable
 
 DEFAULT_SEARCH_LIMIT = 20
 MAX_SEARCH_LIMIT = 100
+DEVICE_CATALOG_PATH_ENV = "PLASMA_DEVICE_CATALOG_PATH"
 
 _IDENTIFIER_KIND_PRIORITY = {
     "manufacturer_part_number": 0,
@@ -175,6 +177,9 @@ class DeviceCatalog:
 
 
 def default_catalog_path() -> Path:
+    configured = os.environ.get(DEVICE_CATALOG_PATH_ENV, "").strip()
+    if configured:
+        return Path(configured).expanduser()
     return Path(__file__).resolve().parents[3] / "data" / "device-catalog" / "research" / "openocd-parts-canonical.csv"
 
 

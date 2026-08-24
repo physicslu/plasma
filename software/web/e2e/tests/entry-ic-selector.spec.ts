@@ -18,4 +18,11 @@ test("entry portal exposes IC lookup as card 03 and global navigation does not d
   await expect(page).toHaveURL(/\/devices$/);
   await expect(page.getByRole("heading", { name: "IC Selector" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "產品模式" }).getByRole("link", { name: "IC Selector", exact: true })).toHaveCount(0);
+
+  const theme = page.getByRole("group", { name: "Theme" });
+  await expect(theme).toBeVisible();
+  await expect(theme.getByRole("button", { name: "Light" })).toBeVisible();
+  await expect(theme.getByRole("button", { name: "Dark" })).toBeVisible();
+  await theme.getByRole("button", { name: "Dark" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });

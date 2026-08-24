@@ -9,6 +9,7 @@ state_root="/tmp/plasma-render"
 public_port="${PORT:-10000}"
 flash_bytes="${PLASMA_RENDER_FLASH_BYTES:-1048576}"
 engineering_enabled="${PLASMA_RENDER_ENGINEERING_MOCK:-1}"
+catalog_path="${PLASMA_DEVICE_CATALOG_PATH:-${repo_root}/data/device-catalog/research/openocd-parts-canonical.csv}"
 server_pid=""
 gateway_pid=""
 
@@ -28,6 +29,11 @@ if [[ ! -f "${static_root}/index.html" ]]; then
   printf '[render-start] Missing built Web Console: %s/index.html\n' "${static_root}" >&2
   exit 69
 fi
+if [[ ! -f "${catalog_path}" ]]; then
+  printf '[render-start] Missing Device Catalog: %s\n' "${catalog_path}" >&2
+  exit 69
+fi
+export PLASMA_DEVICE_CATALOG_PATH="${catalog_path}"
 
 cleanup() {
   if [[ -n "${gateway_pid}" ]] && kill -0 "${gateway_pid}" 2>/dev/null; then
