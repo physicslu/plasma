@@ -1,0 +1,15 @@
+@import "../engineering/engineering-log.css";
+
+.productionLogCard pre span {
+  display: block;
+}
+
+.productionLogCard pre span[data-level="warn"] {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.productionLogCard pre span[data-level="error"] {
+  color: var(--red);
+  font-weight: 700;
+}

@@ -32,6 +32,7 @@ import type {
 } from "../server-batch-api";
 import { useWorkspaceSession, type SelectionMap } from "../workspace-session";
 import { ActiveFpsSummary, BatchPolicyPanel, BatchTopologySummary } from "../batch-dashboard-panels";
+import ProductionLogPanel, { type ProductionLogEntry } from "./production-log-panel";
 import "../programming-batch-toolbar.css";
 import "./fleet.css";
 import "./production-prototype.css";
@@ -70,7 +71,7 @@ type ActiveTarget = {
   target: EngineeringPPUTarget;
   siteIds: number[];
 };
-type LogEntry = { id: number; time: string; level: "INFO" | "WARN" | "ERROR"; text: string };
+type LogEntry = ProductionLogEntry;
 
 type StoredBatch = { apiBase: string; batchId: string };
 
@@ -1122,14 +1123,12 @@ const dashboardCopy = locale === "zh-TW" ? {
                 )}
               </section>
 
-              <details className="productionPrototypeLog">
-                <summary>{text.log} <span>{logs.length}</span></summary>
-                <header><button type="button" onClick={() => setLogs([])}>{text.clearLog}</button></header>
-                <div className="prototypeLogBody">
-                  {logs.length === 0 && <div className="prototypeEmptyLog">—</div>}
-                  {logs.map(entry => <div className={`prototypeLogRow level-${entry.level.toLowerCase()}`} key={entry.id}><span>{entry.time}</span><b>{entry.level}</b><code>{entry.text}</code></div>)}
-                </div>
-              </details>
+              <ProductionLogPanel
+                logs={logs}
+                title={text.log}
+                clearLabel={text.clearLog}
+                onClear={() => setLogs([])}
+              />
             </section>
           </div>
         )}
