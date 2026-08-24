@@ -2,6 +2,7 @@ import type { DeviceSearchResult } from "./device-catalog-api";
 import type { Operation } from "./plasma-api";
 import type {
   BatchExecutionPolicy,
+  BatchTargetDeviceSnapshot,
   BatchTargetRequest,
   CreateServerBatchOptions,
   ServerBatchSnapshot,
@@ -33,6 +34,11 @@ export type ProductionManufacturingKpis = {
 };
 
 export function targetDeviceLabel(device: DeviceSearchResult | null): string {
+  if (!device) return "—";
+  return device.icpn ?? device.identifier;
+}
+
+export function batchTargetDeviceLabel(device: BatchTargetDeviceSnapshot | null | undefined): string {
   if (!device) return "—";
   return device.icpn ?? device.identifier;
 }
@@ -69,6 +75,9 @@ export function buildServerBatchOptions(
     targets: singlePpuBatchTargets(draft.facilityId, draft.ppuId, draft.siteIds),
     operations: draft.operations,
     executionPolicy: productionPolicy(draft.repeatCount, draft.stopPolicy),
+    targetDevice: draft.targetDevice
+      ? { vendor: draft.targetDevice.vendor, identifier: draft.targetDevice.identifier }
+      : null,
     assetFile: draft.programmingImage,
     allowSyntheticMockImage: false,
   };
