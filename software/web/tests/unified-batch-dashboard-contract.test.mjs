@@ -47,9 +47,16 @@ test("Production KPI authority is the latest server Batch snapshot", () => {
   assert.match(shared, /data-kpi-source=\{productionBatch \? "server-batch-snapshot" : "local-projection"\}/);
 });
 
-test("shared Active FPS summary keeps FAULTED and ERROR distinct without duplicate error state", () => {
-  assert.match(shared, /\["faulted", copy\.faulted, counts\.faulted\]/);
-  assert.match(shared, /\["error", copy\.error, counts\.error\]/);
+test("shared Active FPS summary is explicitly Site-state scoped", () => {
+  assert.match(shared, /data-summary-unit="site"/);
+  assert.match(shared, /SITE STATUS/);
+  assert.match(shared, /TOTAL SITES/);
+  assert.match(shared, /RUNNING SITES/);
+  assert.match(shared, /PASSED SITES/);
+  assert.match(shared, /FAULTED SITES/);
+  assert.match(shared, /ERROR SITES/);
+  assert.match(shared, /STOPPED SITES/);
+  assert.match(shared, /CANCELLED SITES/);
   assert.equal((shared.match(/data-active-fps-state/g) ?? []).length, 1);
   assert.match(shared, /selected.*running.*pass.*faulted.*error.*stopped.*cancelled/s);
 });

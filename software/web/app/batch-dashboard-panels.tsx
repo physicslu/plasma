@@ -191,30 +191,30 @@ function batchState(counts: BatchDashboardCounts): string {
 
 export function ActiveFpsSummary({ counts, copy }: ActiveProps) {
   const metrics = [
-    ["selected", copy.selected, counts.selected],
-    ["running", copy.running, counts.running],
-    ["pass", copy.pass, counts.pass],
-    ["faulted", copy.faulted, counts.faulted],
-    ["error", copy.error, counts.error],
-    ["stopped", copy.stopped, counts.stopped],
-    ["cancelled", copy.cancelled, counts.cancelled],
+    ["selected", "TOTAL SITES", counts.selected],
+    ["running", "RUNNING SITES", counts.running],
+    ["pass", "PASSED SITES", counts.pass],
+    ["faulted", "FAULTED SITES", counts.faulted],
+    ["error", "ERROR SITES", counts.error],
+    ["stopped", "STOPPED SITES", counts.stopped],
+    ["cancelled", "CANCELLED SITES", counts.cancelled],
   ] as const;
 
   return (
-    <section className="activeFpsSummary" aria-label={copy.title}>
+    <section className="activeFpsSummary" aria-label={copy.title} data-summary-unit="site">
       <header>
-        <h2>{copy.title}</h2>
+        <h2>Active FPS · SITE STATUS</h2>
         <span>{copy.hint}</span>
         <details className="engineeringBatchDetails">
           <summary>Batch Details</summary>
           <div className="engineeringBatchDetailsGrid">
             <div><small>STATE</small><b>{batchState(counts)}</b></div>
-            <div><small>SELECTED</small><b>{counts.selected}</b></div>
-            <div><small>PASS</small><b>{counts.pass}</b></div>
-            <div><small>FAULTED</small><b>{counts.faulted}</b></div>
-            <div><small>ERROR</small><b>{counts.error}</b></div>
-            <div><small>STOPPED</small><b>{counts.stopped}</b></div>
-            <div><small>CANCELLED</small><b>{counts.cancelled}</b></div>
+            <div><small>TOTAL SITES</small><b>{counts.selected}</b></div>
+            <div><small>PASSED SITES</small><b>{counts.pass}</b></div>
+            <div><small>FAULTED SITES</small><b>{counts.faulted}</b></div>
+            <div><small>ERROR SITES</small><b>{counts.error}</b></div>
+            <div><small>STOPPED SITES</small><b>{counts.stopped}</b></div>
+            <div><small>CANCELLED SITES</small><b>{counts.cancelled}</b></div>
           </div>
         </details>
       </header>
