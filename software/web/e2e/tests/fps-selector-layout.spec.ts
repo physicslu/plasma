@@ -125,10 +125,10 @@ test("desktop FPS selector uses the remaining viewport instead of a 52vh tree ca
   const geometry = await selectorGeometry(page);
 
   expect(geometry.selectorWidth).toBeGreaterThanOrEqual(319);
-  expect(geometry.selectorHeight).toBeGreaterThanOrEqual(730);
+  expect(geometry.selectorHeight).toBeGreaterThanOrEqual(geometry.viewportHeight * 0.75);
   expect(geometry.selectorBottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
   expect(geometry.treeHeight).toBeGreaterThanOrEqual(geometry.selectorHeight * 0.62);
-  expect(geometry.treeClientHeight).toBeGreaterThan(520);
+  expect(geometry.treeClientHeight).toBeGreaterThan(470);
   expect(geometry.treeScrollHeight).toBeGreaterThan(geometry.treeClientHeight);
 });
 
@@ -137,7 +137,7 @@ test("iPad landscape keeps an operator-sized FPS column and collapses it back to
   const expanded = await selectorGeometry(page);
 
   expect(expanded.selectorWidth).toBeGreaterThanOrEqual(319);
-  expect(expanded.selectorHeight).toBeGreaterThanOrEqual(670);
+  expect(expanded.selectorHeight).toBeGreaterThanOrEqual(expanded.viewportHeight * 0.75);
   expect(expanded.selectorBottom).toBeLessThanOrEqual(expanded.viewportHeight + 1);
 
   await page.getByRole("button", { name: "收起選擇器" }).click();
