@@ -1,8 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import DemoLandingPage from "../app/demo/page";
+import DevicesPage from "../app/devices/page";
 import EngineeringPage from "../app/engineering/page";
 import FleetPage from "../app/fleet/page";
+import FleetProgrammingPage from "../app/fleet/programming/page";
 import { GlobalNav } from "../app/global-nav";
 import { I18nProvider } from "../app/i18n";
 import PPUConsole from "../app/page";
@@ -14,6 +16,8 @@ import "../app/global-nav.css";
 
 function CurrentPage() {
   const pathname = usePathname();
+  if (pathname === "/devices" || pathname.startsWith("/devices/")) return <DevicesPage />;
+  if (pathname === "/fleet/programming") return <FleetProgrammingPage />;
   if (pathname === "/fleet" || pathname.startsWith("/fleet/")) return <FleetPage />;
   if (pathname === "/engineering" || pathname.startsWith("/engineering/")) {
     return <EngineeringPage />;
