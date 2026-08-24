@@ -33,6 +33,22 @@ html .productionPrototypePage .selector-collapsed .fpsSelector {
   display: block;
 }
 
+html .productionPrototypePage .selector-collapsed .fpsSelector::after {
+  content: "FPS SELECTOR";
+  position: absolute;
+  top: 49px;
+  left: 50%;
+  transform: translateX(-50%) rotate(180deg);
+  writing-mode: vertical-rl;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .1em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 @media (max-width: 1280px) {
   html .productionPrototypePage .productionWorkspace {
     grid-template-columns: clamp(320px, 28vw, 340px) minmax(0, 1fr);
@@ -63,5 +79,12 @@ html .productionPrototypePage .selector-collapsed .fpsSelector {
     height: 44px;
     min-height: 44px;
     max-height: 44px;
+  }
+
+  html .productionPrototypePage .selector-collapsed .fpsSelector::after {
+    top: 50%;
+    left: 48px;
+    transform: translateY(-50%);
+    writing-mode: horizontal-tb;
   }
 }
