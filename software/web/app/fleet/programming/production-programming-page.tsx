@@ -21,6 +21,7 @@ import {
   type ServerBatchSnapshot,
 } from "../../server-batch-api";
 import {
+  batchTargetDeviceLabel,
   buildServerBatchOptions,
   manufacturingKpis,
   targetDeviceLabel,
@@ -213,8 +214,12 @@ export default function ProductionProgrammingPage() {
 
   const draftError = validateProgrammingDraft(draft);
   const imageTooLarge = Boolean(programmingImage && programmingImage.size > MAX_IMAGE_BYTES);
+  const unsupportedImage = Boolean(programmingImage && !programmingImage.name.toLowerCase().endsWith(".bin"));
   const kpis = manufacturingKpis(activeBatch, selectedSiteIds.length);
   const runningSites = activeBatch?.site_counts.running ?? sites.filter(site => Boolean(site.current_job_id)).length;
+  const liveTargetLabel = activeBatch?.target_device
+    ? batchTargetDeviceLabel(activeBatch.target_device)
+    : targetDeviceLabel(targetDevice);
 
   function chooseFacility(nextFacilityId: string) {
     if (executionLocked || !catalog) return;
@@ -259,6 +264,10 @@ export default function ProductionProgrammingPage() {
     }
     if (imageTooLarge) {
       setError("Programming Image exceeds the current 4 MiB PMode limit.");
+      return;
+    }
+    if (unsupportedImage) {
+      setError("Current PMode normalizer supports binary Programming Image (.bin) only.");
       return;
     }
 
@@ -361,13 +370,13 @@ export default function ProductionProgrammingPage() {
               <div className="jobRow">
                 <strong>2. Programming Image</strong>
                 <div className="imageField">
-                  <span title={programmingImage?.name}>{programmingImage?.name ?? "Select programming image (.bin, .hex)..."}</span>
+                  <span title={programmingImage?.name}>{programmingImage?.name ?? "Select programming image (.bin)..."}</span>
                   <button type="button" disabled={executionLocked} onClick={() => fileInput.current?.click()}>Browse...</button>
                   <input
                     ref={fileInput}
                     type="file"
                     hidden
-                    accept=".bin,.hex,.ihex"
+                    accept=".bin"
                     disabled={executionLocked}
                     onChange={event => setProgrammingImage(event.target.files?.[0] ?? null)}
                   />
@@ -402,12 +411,16 @@ export default function ProductionProgrammingPage() {
                 </label>
               </div>
 
-              {(error || draftError || imageTooLarge) && (
-                <div className="programmingGuard" role="alert">{error ?? (imageTooLarge ? "Programming Image exceeds the current 4 MiB PMode limit." : draftError)}</div>
+              {(error || draftError || imageTooLarge || unsupportedImage) && (
+                <div className="programmingGuard" role="alert">{error ?? (imageTooLarge
+                  ? "Programming Image exceeds the current 4 MiB PMode limit."
+                  : unsupportedImage
+                    ? "Current PMode normalizer supports binary Programming Image (.bin) only."
+                    : draftError)}</div>
               )}
 
               <div className="programmingActions">
-                <button className="startProgramming" type="button" disabled={executionLocked || Boolean(draftError) || imageTooLarge} onClick={() => submit(selectedSiteIds, pmodOperations)}>▶ START PROGRAMMING</button>
+                <button className="startProgramming" type="button" disabled={executionLocked || Boolean(draftError) || imageTooLarge || unsupportedImage} onClick={() => submit(selectedSiteIds, pmodOperations)}>▶ START PROGRAMMING</button>
                 <button className="abortProgramming" type="button" disabled={!activeBatch || terminalServerBatchStates.has(activeBatch.state)} onClick={abortBatch}>■ ABORT</button>
               </div>
             </div>
@@ -433,7 +446,7 @@ export default function ProductionProgrammingPage() {
             return (
               <div className="siteTableRow" role="row" key={site.site_id} data-state={state}>
                 <span>{siteLabel(site.site_id)}</span>
-                <span className="targetIcCell">{targetDeviceLabel(targetDevice)}</span>
+                <span className="targetIcCell">{liveTargetLabel}</span>
                 <span><i className="siteStatePill" data-state={state}>{state.toUpperCase()}</i></span>
                 <span className="progressCell"><i><b style={{ width: `${progress}%` }} /></i><em>{progress}%</em></span>
                 <span className="resultCell" data-result={resultLabel(state)}>{resultLabel(state)}</span>
@@ -443,7 +456,7 @@ export default function ProductionProgrammingPage() {
                       type="button"
                       key={operation}
                       title={`${operation} ${siteLabel(site.site_id)}`}
-                      disabled={executionLocked || !site.enabled || !targetDevice || ((operation === "program" || operation === "verify") && !programmingImage)}
+                      disabled={executionLocked || !site.enabled || !targetDevice || ((operation === "program" || operation === "verify") && (!programmingImage || unsupportedImage))}
                       onClick={() => submit([site.site_id], [operation])}
                     >{operationCodes[operation]}</button>
                   ))}
