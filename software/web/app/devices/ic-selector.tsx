@@ -57,12 +57,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
 
   useEffect(() => {
     const normalized = query.trim();
-    if (!normalized) {
-      setResults([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
+    if (!normalized) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -90,6 +85,14 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       controller.abort();
     };
   }, [query, resolvedApiBase]);
+
+  function updateQuery(value: string) {
+    setQuery(value);
+    setResults([]);
+    setError(null);
+    setLoading(false);
+    if (!value.trim()) setSelected(null);
+  }
 
   function choose(device: DeviceSearchResult) {
     setSelected(device);
@@ -122,7 +125,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             autoComplete="off"
             autoFocus={usage === "lookup"}
             value={query}
-            onChange={event => setQuery(event.target.value)}
+            onChange={event => updateQuery(event.target.value)}
             placeholder="STM32F103C8T6 / LPC845 / nRF52840 ..."
             aria-label="Search ICPN or IC identifier"
           />
