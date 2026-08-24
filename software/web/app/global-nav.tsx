@@ -35,8 +35,14 @@ export function GlobalNav() {
     () => 0,
   );
   const executionCount = ppuExecutionCount + batchExecutionCount;
-  const activeMode = productModeForPath(pathname);
-  const entryActive = pathname === "/demo";
+
+  // Render is a client-routed Vite shell. After hydration the browser URL is
+  // authoritative even if a framework pathname adapter is temporarily stale.
+  // Keep SSR on the framework pathname, then converge on window.location.
+  const routePath = hydrated && typeof window !== "undefined" ? window.location.pathname : pathname;
+  const activeMode = productModeForPath(routePath);
+  const entryActive = routePath === "/demo";
+  const devicesActive = routePath === "/devices" || routePath.startsWith("/devices/");
   const navigationLocked = Boolean(activeMode) && executionCount > 0;
   const productionLocked = navigationLocked && activeMode !== "production";
   const engineeringLocked = navigationLocked && activeMode !== "engineering";
@@ -105,7 +111,7 @@ export function GlobalNav() {
           </span>
         )}
 
-        <ThemeSwitch className="globalThemeSwitch" />
+        {(activeMode || devicesActive) && <ThemeSwitch className="globalThemeSwitch" />}
 
         <div className="globalLocale" role="group" aria-label="Language" aria-busy={!hydrated}>
           <button type="button" disabled={!hydrated} onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>
