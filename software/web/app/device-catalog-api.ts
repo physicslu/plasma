@@ -42,10 +42,9 @@ export type DeviceSearchResponse = {
 
 export function configuredDeviceApiBase(): string {
   if (typeof window === "undefined") return DEFAULT_API_BASE;
-  const saved = window.localStorage.getItem("plasma-api-base");
-  if (!saved) return DEFAULT_API_BASE;
   try {
-    return normalizeApiBase(saved);
+    const saved = window.localStorage.getItem("plasma-api-base");
+    return saved ? normalizeApiBase(saved) : DEFAULT_API_BASE;
   } catch {
     return DEFAULT_API_BASE;
   }
