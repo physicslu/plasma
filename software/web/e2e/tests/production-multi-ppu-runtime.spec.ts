@@ -105,7 +105,7 @@ test("real Production Mock submits one server Batch for two PPUs and completes b
   expect(body.targets?.map(target => target.ppu_id)).toEqual([ppuOne, ppuTwo]);
   expect(body.execution_policy).toEqual({
     repeat_count: 1,
-    site_retry_limit: 0,
+    site_retry_limit: 3,
     failed_site_stop_threshold: null,
   });
   expect(ownership.browserJobPosts()).toBe(0);
