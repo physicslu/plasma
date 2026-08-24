@@ -131,7 +131,7 @@ def wait_until_ready(
 
 
 def assert_ui_routes(origin: str, *, timeout: float, report: SmokeReport) -> None:
-    for path in ("/", "/demo", "/fleet", "/engineering", "/ppu"):
+    for path in ("/", "/demo", "/fleet", "/fleet/programming", "/engineering", "/devices", "/ppu"):
         status, content_type, body = request(origin, path, timeout=timeout)
         if status != 200 or content_type != "text/html":
             raise RuntimeError(f"{path} returned HTTP {status} {content_type}")
@@ -165,6 +165,20 @@ def assert_contracts(origin: str, *, timeout: float, report: SmokeReport) -> Non
             f"counts={actual_counts!r}"
         )
     report.checks["api:engineering-targets"] = "PASS"
+
+    device_search = request_json(origin, "/api/devices/search?q=stm32&limit=1", timeout=timeout)
+    results = device_search.get("results")
+    catalog_size = device_search.get("catalog_size")
+    if device_search.get("ok") is not True or device_search.get("rest_contract_version") != "3":
+        raise RuntimeError("Device Catalog search is not Web REST v3 ready")
+    if isinstance(catalog_size, bool) or not isinstance(catalog_size, int) or catalog_size < 7000:
+        raise RuntimeError(f"Device Catalog size is invalid: {catalog_size!r}")
+    if not isinstance(results, list) or not results:
+        raise RuntimeError("Device Catalog search returned no STM32 result")
+    identifier = results[0].get("identifier") if isinstance(results[0], dict) else None
+    if not isinstance(identifier, str) or "stm32" not in identifier.casefold():
+        raise RuntimeError(f"Device Catalog search returned an unexpected identifier: {identifier!r}")
+    report.checks["api:device-catalog-search"] = "PASS"
 
     mock_runtime = request_json(origin, "/api/mock/runtime", timeout=timeout)
     settings = mock_runtime.get("mock_runtime")
