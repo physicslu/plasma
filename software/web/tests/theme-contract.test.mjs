@@ -13,7 +13,8 @@ test("Pmod, Emode and global IC Selector expose one persistent Light Dark theme 
   assert.match(themeSwitch, /data-theme-choice="light"/);
   assert.match(themeSwitch, /data-theme-choice="dark"/);
   assert.match(themeSwitch, /document\.documentElement\.dataset\.theme\s*=\s*theme/);
-  assert.match(globalNav, /\(activeMode \|\| devicesActive\)\s*&&\s*<ThemeSwitch/);
+  assert.match(globalNav, /<ThemeSwitch className="globalThemeSwitch"\s*\/>/);
+  assert.doesNotMatch(globalNav, /devicesActive/);
   assert.match(globals, /\[data-theme="dark"\]/);
   assert.match(globals, /color-scheme:\s*dark/);
   assert.match(productionTheme, /\[data-theme="dark"\]\s+\.productionPrototypePage/);
