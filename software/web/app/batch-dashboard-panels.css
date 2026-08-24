@@ -46,6 +46,17 @@
   padding-right: 9px;
 }
 
+.batchTopologySummary .batchTopologyContext small,
+.batchTopologySummary .batchTopologyContext span {
+  font-size: 7px;
+  font-weight: 600;
+}
+
+.batchTopologySummary .batchTopologyContext b {
+  font-size: 17px;
+  font-weight: 700;
+}
+
 .batchTopologySummary .batchTopologyKpi {
   position: relative;
   overflow: hidden;
@@ -65,6 +76,15 @@
   height: 3px;
   border-radius: 3px 3px 0 0;
   background: var(--line-strong, #cbd5e1);
+}
+
+.batchTopologySummary .batchTopologyPass small,
+.batchTopologySummary .batchTopologyFail small,
+.batchTopologySummary .batchTopologyYield small,
+.batchTopologySummary .batchTopologyPass b,
+.batchTopologySummary .batchTopologyFail b,
+.batchTopologySummary .batchTopologyYield b {
+  font-weight: 800;
 }
 
 .batchTopologySummary .batchTopologyPass b {
