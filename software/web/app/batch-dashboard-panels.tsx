@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import "./batch-dashboard-panels.css";
+
+export const DEFAULT_SITE_RETRY_LIMIT = "3";
 
 export type BatchDashboardCounts = {
   selected: number;
@@ -110,6 +113,14 @@ export function BatchPolicyPanel({
   onRetryLimit,
   onStopThreshold,
 }: PolicyProps) {
+  const retryDefaultApplied = useRef(false);
+
+  useEffect(() => {
+    if (retryDefaultApplied.current) return;
+    retryDefaultApplied.current = true;
+    if (retryLimit === "0") onRetryLimit(DEFAULT_SITE_RETRY_LIMIT);
+  }, [onRetryLimit, retryLimit]);
+
   return (
     <section className="unifiedBatchPolicyPanel" aria-label="Batch execution policy">
       <label className="batchPolicyField">
@@ -127,6 +138,15 @@ export function BatchPolicyPanel({
       <small className={`batchPolicyHint ${valid ? "" : "invalid"}`}>{valid ? copy.hint : copy.invalid}</small>
     </section>
   );
+}
+
+function batchState(counts: BatchDashboardCounts): string {
+  if (counts.running > 0) return "RUNNING";
+  if (counts.error > 0 || counts.stopped > 0) return "ERROR";
+  if (counts.faulted > 0) return "PARTIAL";
+  if (counts.selected > 0 && counts.pass === counts.selected) return "SUCCESS";
+  if (counts.cancelled > 0) return "CANCELLED";
+  return "READY";
 }
 
 export function ActiveFpsSummary({ counts, copy }: ActiveProps) {
@@ -150,6 +170,18 @@ export function ActiveFpsSummary({ counts, copy }: ActiveProps) {
           </article>
         ))}
       </div>
+      <details className="engineeringBatchDetails">
+        <summary>Batch Details</summary>
+        <div className="engineeringBatchDetailsGrid">
+          <div><small>STATE</small><b>{batchState(counts)}</b></div>
+          <div><small>SELECTED</small><b>{counts.selected}</b></div>
+          <div><small>PASS</small><b>{counts.pass}</b></div>
+          <div><small>FAULTED</small><b>{counts.faulted}</b></div>
+          <div><small>ERROR</small><b>{counts.error}</b></div>
+          <div><small>STOPPED</small><b>{counts.stopped}</b></div>
+          <div><small>CANCELLED</small><b>{counts.cancelled}</b></div>
+        </div>
+      </details>
     </section>
   );
 }
