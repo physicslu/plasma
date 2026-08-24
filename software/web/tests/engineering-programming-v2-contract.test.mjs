@@ -55,6 +55,16 @@ test("Engineering v2 advertises only the implemented binary Programming Image no
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
 
   assert.match(workspace, /accept="\.bin,application\/octet-stream"/);
-  assert.match(workspace, /binary Programming Image \(\.bin\)/);
+  assert.match(workspace, /Programming Image \(\.bin\)/);
   assert.doesNotMatch(workspace, /\.hex/);
+});
+
+test("Engineering v2 retains per-Site cancellation, polling and full audit evidence", async () => {
+  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+
+  assert.match(workspace, /Cancel SITE \$\{site\.id\}/);
+  assert.match(workspace, /window\.setTimeout\(poll, POLL_INTERVAL_MS\)/);
+  assert.match(workspace, /EngineeringLogPanel/);
+  assert.match(workspace, /CACHE CHECK/);
+  assert.match(workspace, /\[TARGET\] RESTORED/);
 });
