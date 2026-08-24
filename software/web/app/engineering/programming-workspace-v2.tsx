@@ -134,6 +134,7 @@ export default function ProgrammingWorkspaceV2() {
   const [events, setEvents] = useState<EventEntry[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchAborting, setBatchAborting] = useState(false);
+  const [directBusy, setDirectBusy] = useState(false);
   const [batchStartedAt, setBatchStartedAt] = useState<number | null>(null);
   const [batchFinishedAt, setBatchFinishedAt] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -145,6 +146,8 @@ export default function ProgrammingWorkspaceV2() {
   const abortRequested = useRef(false);
   const thresholdStopRequested = useRef(false);
   const selectedTargetKey = useRef<string | null>(null);
+  const emodeSiteIdsRef = useRef<number[] | null>(emodeSiteIds);
+  const emodeSelectionRef = useRef(emodeSelection);
 
   const facility = catalog?.facilities.find(item => item.facility_id === emodeSelection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === emodeSelection.ppuId) ?? null;
@@ -154,7 +157,7 @@ export default function ProgrammingWorkspaceV2() {
     ? engineeringTargetApiBase(apiBase, emodeSelection.facilityId, emodeSelection.ppuId)
     : null;
   const hasRunningSite = sites.some(site => site.runtimeState === "queued" || site.runtimeState === "running");
-  const executionLocked = batchRunning || hasRunningSite;
+  const executionLocked = batchRunning || directBusy || hasRunningSite;
   const syntheticMockImageAvailable = selectedPPU?.provider === "mock";
   const repeatValue = Number(repeatCount);
   const retryValue = Number(retryLimit);
@@ -177,6 +180,14 @@ export default function ProgrammingWorkspaceV2() {
   }, [apiBase]);
 
   useEffect(() => {
+    emodeSiteIdsRef.current = emodeSiteIds;
+  }, [emodeSiteIds]);
+
+  useEffect(() => {
+    emodeSelectionRef.current = emodeSelection;
+  }, [emodeSelection]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNowTick(Date.now()), 500);
     return () => window.clearInterval(timer);
   }, []);
@@ -192,14 +203,18 @@ export default function ProgrammingWorkspaceV2() {
         const nextCatalog = await getEngineeringTargets(apiBase);
         if (cancelled) return;
         setCatalog(nextCatalog);
-        const currentFacility = nextCatalog.facilities.find(item => item.facility_id === emodeSelection.facilityId);
-        const currentPpu = currentFacility?.ppus.find(item => item.ppu_id === emodeSelection.ppuId);
+        const selection = emodeSelectionRef.current;
+        const currentFacility = nextCatalog.facilities.find(item => item.facility_id === selection.facilityId);
+        const currentPpu = currentFacility?.ppus.find(item => item.ppu_id === selection.ppuId);
         if (!currentFacility || !currentPpu) {
           const firstFacility = nextCatalog.facilities[0];
-          setEmodeSelection({
+          const nextSelection = {
             facilityId: firstFacility?.facility_id ?? "",
             ppuId: firstFacility?.ppus[0]?.ppu_id ?? "",
-          });
+          };
+          emodeSelectionRef.current = nextSelection;
+          emodeSiteIdsRef.current = null;
+          setEmodeSelection(nextSelection);
           setEmodeSiteIds(null);
         }
         setConnection("online");
@@ -211,7 +226,7 @@ export default function ProgrammingWorkspaceV2() {
       }
     })();
     return () => { cancelled = true; };
-  }, [apiBase, appendEvent, emodeSelection.facilityId, emodeSelection.ppuId, ensureEngineeringSession, hydrated, refreshGeneration, setEmodeSelection, setEmodeSiteIds]);
+  }, [apiBase, appendEvent, ensureEngineeringSession, hydrated, refreshGeneration, setEmodeSelection, setEmodeSiteIds]);
 
   useEffect(() => {
     if (!catalog || !targetApiBase || !selectedPPU) return;
@@ -223,14 +238,15 @@ export default function ProgrammingWorkspaceV2() {
         setPPU(status.ppu ?? null);
         setSites(nextSites);
         const key = `${emodeSelection.facilityId}/${emodeSelection.ppuId}`;
-        const validExisting = selectedTargetKey.current === key && emodeSiteIds !== null
-          ? emodeSiteIds.filter(siteId => nextSites.some(site => site.site_id === siteId && site.enabled))
+        const existing = emodeSiteIdsRef.current;
+        const validExisting = selectedTargetKey.current === key && existing !== null
+          ? existing.filter(siteId => nextSites.some(site => site.site_id === siteId && site.enabled))
           : [];
-        if (validExisting.length > 0 || (selectedTargetKey.current === key && emodeSiteIds?.length === 0)) {
-          setEmodeSiteIds(validExisting);
-        } else {
-          setEmodeSiteIds(nextSites.filter(site => site.enabled).map(site => site.site_id));
-        }
+        const nextSelection = validExisting.length > 0 || (selectedTargetKey.current === key && existing?.length === 0)
+          ? validExisting
+          : nextSites.filter(site => site.enabled).map(site => site.site_id);
+        emodeSiteIdsRef.current = nextSelection;
+        setEmodeSiteIds(nextSelection);
         selectedTargetKey.current = key;
         appendEvent(`Loaded ${facility?.display_name ?? emodeSelection.facilityId} / ${selectedPPU.display_name}.`);
       })
@@ -238,7 +254,7 @@ export default function ProgrammingWorkspaceV2() {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : "PPU status unavailable.");
       });
     return () => { cancelled = true; };
-  }, [appendEvent, catalog, emodeSelection.facilityId, emodeSelection.ppuId, emodeSiteIds, facility?.display_name, selectedPPU, setEmodeSiteIds, targetApiBase]);
+  }, [appendEvent, catalog, emodeSelection.facilityId, emodeSelection.ppuId, facility?.display_name, refreshGeneration, selectedPPU, setEmodeSiteIds, targetApiBase]);
 
   const counts = useMemo(() => {
     const pass = selectedSites.filter(site => site.runtimeState === "success").length;
@@ -259,7 +275,10 @@ export default function ProgrammingWorkspaceV2() {
   function chooseFacility(facilityId: string) {
     if (executionLocked || !catalog) return;
     const nextFacility = catalog.facilities.find(item => item.facility_id === facilityId);
-    setEmodeSelection({ facilityId, ppuId: nextFacility?.ppus[0]?.ppu_id ?? "" });
+    const nextSelection = { facilityId, ppuId: nextFacility?.ppus[0]?.ppu_id ?? "" };
+    emodeSelectionRef.current = nextSelection;
+    emodeSiteIdsRef.current = null;
+    setEmodeSelection(nextSelection);
     setEmodeSiteIds(null);
     selectedTargetKey.current = null;
     setTargetDevice(null);
@@ -268,7 +287,10 @@ export default function ProgrammingWorkspaceV2() {
 
   function choosePpu(ppuId: string) {
     if (executionLocked) return;
-    setEmodeSelection({ facilityId: emodeSelection.facilityId, ppuId });
+    const nextSelection = { facilityId: emodeSelection.facilityId, ppuId };
+    emodeSelectionRef.current = nextSelection;
+    emodeSiteIdsRef.current = null;
+    setEmodeSelection(nextSelection);
     setEmodeSiteIds(null);
     selectedTargetKey.current = null;
     setTargetDevice(null);
@@ -279,12 +301,16 @@ export default function ProgrammingWorkspaceV2() {
     if (executionLocked) return;
     setEmodeSiteIds(current => {
       const values = current ?? [];
-      return values.includes(siteId) ? values.filter(id => id !== siteId) : [...values, siteId].sort((a, b) => a - b);
+      const next = values.includes(siteId)
+        ? values.filter(id => id !== siteId)
+        : [...values, siteId].sort((a, b) => a - b);
+      emodeSiteIdsRef.current = next;
+      return next;
     });
   }
 
   function toggleOperation(operation: Operation) {
-    if (batchRunning) return;
+    if (executionLocked) return;
     setEmodeOperations(current => current.includes(operation)
       ? current.filter(item => item !== operation)
       : operationOrder.filter(item => current.includes(item) || item === operation));
@@ -360,6 +386,7 @@ export default function ProgrammingWorkspaceV2() {
 
   async function runSingleSite(siteId: number, operation: Operation) {
     if (executionLocked) return;
+    setDirectBusy(true);
     setError(null);
     setBatchStartedAt(Date.now());
     setBatchFinishedAt(null);
@@ -372,6 +399,7 @@ export default function ProgrammingWorkspaceV2() {
       updateSite(siteId, site => ({ ...site, runtimeState: "error", error: message }));
       appendEvent(`${siteLabel(siteId)} ${operation.toUpperCase()} failed · ${message}.`, "error");
     } finally {
+      setDirectBusy(false);
       setBatchFinishedAt(Date.now());
     }
   }
@@ -563,7 +591,7 @@ export default function ProgrammingWorkspaceV2() {
                   <div className="operationChecks" role="group" aria-label="Engineering batch operations">
                     {operationOrder.map(operation => (
                       <label key={operation} title={operation}>
-                        <input aria-label={`Engineering batch ${operation}`} type="checkbox" disabled={batchRunning} checked={emodeOperations.includes(operation)} onChange={() => toggleOperation(operation)} />
+                        <input aria-label={`Engineering batch ${operation}`} type="checkbox" disabled={executionLocked} checked={emodeOperations.includes(operation)} onChange={() => toggleOperation(operation)} />
                         <span>{operationCodes[operation]}</span>
                       </label>
                     ))}
@@ -572,10 +600,10 @@ export default function ProgrammingWorkspaceV2() {
 
                 <div className="jobRow batchPolicyRow engineeringPolicyRow">
                   <strong>4. Batch Policy</strong>
-                  <label className="repeatField">Repeat: <input aria-label="Repeat" type="number" min="1" max="10000" disabled={batchRunning} value={repeatCount} onChange={event => setRepeatCount(event.target.value)} /></label>
-                  <label className="engineeringRetryField">Retry: <input aria-label="Site Retry Limit" type="number" min="0" max="20" disabled={batchRunning} value={retryLimit} onChange={event => setRetryLimit(event.target.value)} /></label>
+                  <label className="repeatField">Repeat: <input aria-label="Repeat" type="number" min="1" max="10000" disabled={executionLocked} value={repeatCount} onChange={event => setRepeatCount(event.target.value)} /></label>
+                  <label className="engineeringRetryField">Retry: <input aria-label="Site Retry Limit" type="number" min="0" max="20" disabled={executionLocked} value={retryLimit} onChange={event => setRetryLimit(event.target.value)} /></label>
                   <label className="stopPolicyField">Stop Policy:
-                    <select aria-label="Stop Policy" disabled={batchRunning || selectedSiteIds.length === 0} value={stopPolicyValue} onChange={event => setStopPolicy(event.target.value === "never" ? { kind: "never" } : { kind: "failed_sites", threshold: Number(event.target.value) })}>
+                    <select aria-label="Stop Policy" disabled={executionLocked || selectedSiteIds.length === 0} value={stopPolicyValue} onChange={event => setStopPolicy(event.target.value === "never" ? { kind: "never" } : { kind: "failed_sites", threshold: Number(event.target.value) })}>
                       <option value="never">Never</option>
                       {selectedSiteIds.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1} Fail</option>)}
                     </select>
@@ -585,8 +613,8 @@ export default function ProgrammingWorkspaceV2() {
                 {emodeOperations.includes("read") && (
                   <div className="jobRow engineeringReadRow">
                     <strong>READ Parameters</strong>
-                    <label>Offset <input aria-label="Engineering READ offset" type="number" min="0" value={emodeReadOffset} disabled={batchRunning} onChange={event => setEmodeReadOffset(event.target.value)} /></label>
-                    <label>Length <input aria-label="Engineering READ length" type="number" min="1" value={emodeReadLength} disabled={batchRunning} onChange={event => setEmodeReadLength(event.target.value)} /></label>
+                    <label>Offset <input aria-label="Engineering READ offset" type="number" min="0" value={emodeReadOffset} disabled={executionLocked} onChange={event => setEmodeReadOffset(event.target.value)} /></label>
+                    <label>Length <input aria-label="Engineering READ length" type="number" min="1" value={emodeReadLength} disabled={executionLocked} onChange={event => setEmodeReadLength(event.target.value)} /></label>
                   </div>
                 )}
 
@@ -599,7 +627,7 @@ export default function ProgrammingWorkspaceV2() {
                 )}
 
                 <div className="programmingActions">
-                  <button className="startProgramming" type="button" disabled={executionLocked || selectedSiteIds.length === 0 || emodeOperations.length === 0 || !policyValid || imageTooLarge || unsupportedImage} onClick={() => void runBatch()}>▶ START PROGRAMMING</button>
+                  <button className="startProgramming" type="button" disabled={executionLocked || selectedSiteIds.length === 0 || emodeOperations.length === 0 || !policyValid || imageTooLarge || unsupportedImage || (requiresImage && !programmingImage && !syntheticMockImageAvailable)} onClick={() => void runBatch()}>▶ START PROGRAMMING</button>
                   <button className="abortProgramming" type="button" disabled={!batchRunning || batchAborting} onClick={() => void abortBatch()}>■ ABORT</button>
                 </div>
               </div>
@@ -627,7 +655,7 @@ export default function ProgrammingWorkspaceV2() {
                     <td><b className="engineeringResult" data-result={resultLabel(site.runtimeState)}>{resultLabel(site.runtimeState)}</b></td>
                     <td><div className="rowActions engineeringV2Actions">
                       {operationOrder.map(operation => (
-                        <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.site_id} ${operation === "erase" ? "擦除" : operation === "program" ? "燒錄" : operation === "verify" ? "驗證" : "讀取"}`} title={`${operation} ${siteLabel(site.site_id)}`} disabled={executionLocked || !site.enabled || ((operation === "program" || operation === "verify") && (!programmingImage && !syntheticMockImageAvailable))} onClick={() => void runSingleSite(site.site_id, operation)}>{operationCodes[operation]}</button>
+                        <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.site_id} ${operation === "erase" ? "擦除" : operation === "program" ? "燒錄" : operation === "verify" ? "驗證" : "讀取"}`} title={`${operation} ${siteLabel(site.site_id)}`} disabled={executionLocked || !site.enabled || ((operation === "program" || operation === "verify") && ((!programmingImage && !syntheticMockImageAvailable) || imageTooLarge || unsupportedImage))} onClick={() => void runSingleSite(site.site_id, operation)}>{operationCodes[operation]}</button>
                       ))}
                       {site.jobId && site.outputFile && targetApiBase && <a className="rowDownload" aria-label={`Download SITE ${site.site_id} read file`} href={readDownloadUrl(targetApiBase, site.jobId, site.outputFile)}>↓</a>}
                     </div></td>
