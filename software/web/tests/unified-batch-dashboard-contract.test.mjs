@@ -15,6 +15,23 @@ test("Pmod and Emode share the same three upper Batch dashboard primitives", () 
   }
 });
 
+test("shared top summary prioritizes production KPIs while keeping topology context", () => {
+  assert.match(shared, /data-topology-context="facilities"/);
+  assert.match(shared, /data-topology-context="ppus"/);
+  assert.match(shared, /data-topology-context="sites"/);
+  assert.match(shared, /data-production-kpi="total"/);
+  assert.match(shared, /data-production-kpi="pass"/);
+  assert.match(shared, /data-production-kpi="fail"/);
+  assert.match(shared, /data-production-kpi="yield"/);
+  assert.match(shared, /const totalIc = counts\.selected/);
+  assert.match(shared, /const failedIc = counts\.faulted/);
+  assert.match(shared, /counts\.pass \/ totalIc/);
+  assert.match(shared, /<small>Total IC<\/small>/);
+  assert.match(shared, /<small>PASS<\/small>/);
+  assert.match(shared, /<small>FAIL<\/small>/);
+  assert.match(shared, /<small>Yield<\/small>/);
+});
+
 test("shared Active FPS summary keeps FAULTED and ERROR distinct without duplicate error state", () => {
   assert.match(shared, /\["faulted", copy\.faulted, counts\.faulted\]/);
   assert.match(shared, /\["error", copy\.error, counts\.error\]/);
