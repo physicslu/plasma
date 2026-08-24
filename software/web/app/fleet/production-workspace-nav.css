@@ -41,6 +41,15 @@
   color: #1d4ed8;
 }
 
+/*
+ * The Production-local workspace switch occupies vertical space above the
+ * Factory Console. Reserve that same budget for the sticky FPS selector so
+ * its lower edge stays inside the viewport on desktop and tablet layouts.
+ */
+.productionPrototypePage .fpsSelector {
+  max-height: calc(100dvh - 80px);
+}
+
 @media (max-width: 720px) {
   .productionWorkspaceNav {
     width: calc(100% - 16px);
