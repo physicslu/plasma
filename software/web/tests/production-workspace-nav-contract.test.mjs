@@ -26,9 +26,9 @@ test("both Production pages render the shared workspace navigation", async () =>
   assert.match(programmingPage, /ProductionWorkspaceNav/);
 });
 
-test("Production workspace navigation reserves viewport budget for the sticky FPS selector", async () => {
-  const css = await source("../app/fleet/production-workspace-nav.css");
+test("Production workspace navigation is included in the canonical FPS viewport budget", async () => {
+  const css = await source("../app/fleet/fps-selector-layout.css");
 
-  assert.match(css, /\.productionPrototypePage \.fpsSelector\s*\{/);
-  assert.match(css, /max-height:\s*calc\(100dvh - 80px\)/);
+  assert.match(css, /height:\s*min\(960px, calc\(100dvh - 200px\)\)/);
+  assert.match(css, /max-height:\s*min\(960px, calc\(100dvh - 200px\)\)/);
 });
