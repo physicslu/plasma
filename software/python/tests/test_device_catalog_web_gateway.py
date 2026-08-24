@@ -6,6 +6,7 @@ import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
+from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
 
@@ -60,6 +61,45 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
+
+    def test_engineering_job_target_device_resolves_to_canonical_job_target(self) -> None:
+        record = get_default_device_catalog().search("ADUC7019BCPZ62I", limit=1)[0]
+        handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
+
+        request = handler._job_request(
+            {
+                "site_id": 1,
+                "operation": "erase",
+                "target_device": {
+                    "vendor": record.vendor,
+                    "identifier": record.identifier,
+                },
+            },
+            client_id="plasma-web-engineering",
+            allow_inline_asset=False,
+        )
+
+        self.assertEqual(request.target, record.icpn or record.identifier)
+        self.assertEqual(request.metadata["target_device"]["vendor"], record.vendor)
+        self.assertEqual(request.metadata["target_device"]["identifier"], record.identifier)
+        self.assertEqual(request.metadata["target_device"]["identifier_kind"], record.identifier_kind)
+
+    def test_engineering_job_target_device_fails_closed_when_not_canonical(self) -> None:
+        handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
+
+        with self.assertRaisesRegex(ValueError, "canonical Device Catalog record"):
+            handler._job_request(
+                {
+                    "site_id": 1,
+                    "operation": "erase",
+                    "target_device": {
+                        "vendor": "UNKNOWN-VENDOR",
+                        "identifier": "NOT-A-REAL-DEVICE",
+                    },
+                },
+                client_id="plasma-web-engineering",
+                allow_inline_asset=False,
+            )
 
 
 if __name__ == "__main__":
