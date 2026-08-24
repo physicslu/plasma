@@ -29,18 +29,9 @@ export function ICPickerField({
   const resolvedApiBase = useMemo(() => apiBase ?? configuredDeviceApiBase(), [apiBase]);
 
   useEffect(() => {
-    const label = value?.icpn ?? value?.identifier ?? "";
-    if (label && label !== query) setQuery(label);
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
     const normalized = query.trim();
     const selectedLabel = value?.icpn ?? value?.identifier ?? "";
-    if (!normalized || normalized === selectedLabel) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
+    if (!normalized || normalized === selectedLabel) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -73,11 +64,14 @@ export function ICPickerField({
     setQuery(label);
     setResults([]);
     setOpen(false);
+    setLoading(false);
     onChange(device);
   }
 
   function update(valueText: string) {
     setQuery(valueText);
+    setResults([]);
+    setLoading(false);
     setOpen(true);
     const selectedLabel = value?.icpn ?? value?.identifier ?? "";
     if (valueText !== selectedLabel) onChange(null);
@@ -93,7 +87,6 @@ export function ICPickerField({
           autoComplete="off"
           placeholder={placeholder}
           aria-label="Target IC"
-          aria-expanded={open && results.length > 0}
           onFocus={() => setOpen(true)}
           onChange={event => update(event.target.value)}
         />
