@@ -10,17 +10,13 @@ const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace.
 const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
 
-test("Pmod owns the shared topology KPI summary while Emode keeps shared policy and live Site semantics", () => {
-  assert.match(pmod, /BatchTopologySummary/);
-  assert.match(pmod, /unifiedBatchControlStack/);
-  assert.match(pmod, /ActiveFpsSummary/);
-  assert.match(pmod, /BatchPolicyPanel/);
-
-  assert.doesNotMatch(emode, /BatchTopologySummary/);
-  assert.match(emode, /engineeringProgrammingKpis/);
-  assert.match(emode, /unifiedBatchControlStack/);
-  assert.match(emode, /ActiveFpsSummary/);
-  assert.match(emode, /BatchPolicyPanel/);
+test("Pmod and Emode share the same three upper Batch dashboard primitives", () => {
+  for (const source of [pmod, emode]) {
+    assert.match(source, /BatchTopologySummary/);
+    assert.match(source, /unifiedBatchControlStack/);
+    assert.match(source, /ActiveFpsSummary/);
+    assert.match(source, /BatchPolicyPanel/);
+  }
 });
 
 test("shared top summary prioritizes production KPIs while keeping topology context", () => {
@@ -76,10 +72,9 @@ test("policy controls expose hover/focus help, canonical ranges, and default Ret
   assert.match(shared, /aria-label="Repeat Count" type="number" min="1" max="10000"/);
   assert.match(shared, /aria-label="Site Retry Limit" type="number" min="0" max="20"/);
   assert.match(shared, /aria-label="Failed Site Stop Threshold"/);
-  assert.match(emode, /useState\("3"\)/);
 });
 
-test("shared Batch policy remains collapsible for legacy dashboard consumers", () => {
+test("Pmod and Emode share a collapsible Programming and Batch Control panel", () => {
   assert.match(shared, /const \[controlExpanded, setControlExpanded\] = useState\(true\)/);
   assert.match(shared, /PROGRAMMING \/ BATCH CONTROL/);
   assert.match(shared, /aria-expanded=\{controlExpanded\}/);
@@ -90,7 +85,7 @@ test("shared Batch policy remains collapsible for legacy dashboard consumers", (
   assert.match(sharedCss, /\.batchControlPanelToggle/);
 });
 
-test("Batch diagnostics stay off P Mode and are available to Engineering consumers", () => {
+test("Batch diagnostics stay off P Mode and are expandable in E Mode", () => {
   assert.match(pmodCss, /\.productionMainPanel\s*>\s*\.serverBatchStatistics\s*\{[^}]*display:\s*none;/s);
   assert.match(shared, /<details className="engineeringBatchDetails">/);
   assert.match(shared, /<summary>Batch Details<\/summary>/);
