@@ -137,10 +137,11 @@ test("PMode Programming v2 renders the approved single-PPU workflow and direct E
 
   const operationButtons = page.locator(".siteOperationButtons button");
   await expect(operationButtons).toHaveCount(8);
-  await expect(page.locator(".siteOperationButtons").first().getByRole("button", { name: "erase SITE-01" })).toHaveText("E");
-  await expect(page.locator(".siteOperationButtons").first().getByRole("button", { name: "program SITE-01" })).toHaveText("P");
-  await expect(page.locator(".siteOperationButtons").first().getByRole("button", { name: "verify SITE-01" })).toHaveText("V");
-  await expect(page.locator(".siteOperationButtons").first().getByRole("button", { name: "read SITE-01" })).toHaveText("R");
+  const firstSiteOperations = page.locator(".siteOperationButtons").first();
+  await expect(firstSiteOperations.locator('button[title="erase SITE-01"]')).toHaveText("E");
+  await expect(firstSiteOperations.locator('button[title="program SITE-01"]')).toHaveText("P");
+  await expect(firstSiteOperations.locator('button[title="verify SITE-01"]')).toHaveText("V");
+  await expect(firstSiteOperations.locator('button[title="read SITE-01"]')).toHaveText("R");
 });
 
 test("Stop Policy stays compact beside Repeat", async ({ page }) => {
