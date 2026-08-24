@@ -46,6 +46,60 @@ The Gateway Batch Runtime owns:
 - Batch terminal classification
 - Site/Operation/Attempt statistics
 
+## Server Batch snapshot is the Production runtime authority
+
+While a Production Batch exists, the latest `GET /api/batches/{batch_id}` snapshot is the authoritative runtime observation for both Site execution state and factory KPI projection.
+
+The browser may keep presentation caches, but those caches are not independent sources of truth. It must not derive PASS / FAIL / Yield from DOM state, stale local counters, or a second browser-owned Batch state machine.
+
+Current KPI projection uses fields already carried by the authoritative server Batch snapshot:
+
+```text
+PASS     = sum(Site.completed_rounds)
+FAIL     = sum(Site.final_failures)
+Total IC = PASS + FAIL
+Yield    = PASS / Total IC
+```
+
+`completed_rounds` represents complete successful manufacturing cycles. `final_failures` increments only when a trustworthy manufacturing operation has exhausted its retry budget and the Site becomes `FAULTED`.
+
+Therefore:
+
+- a retry-recovered IC contributes to PASS, not FAIL;
+- a retry-exhausted IC contributes to FAIL;
+- `ERROR`, `STOPPED`, and `CANCELLED` do not contribute to manufacturing Yield because they did not produce a trustworthy PASS/FAIL manufacturing result;
+- KPI values may increase while a Site is still `RUNNING`, because a Site can finish one successful round and immediately begin the next round.
+
+This is intentional. A Site state is the current execution state; factory KPIs are cumulative adjudicated IC results from the same server snapshot.
+
+## Manufacturing quantity terminology
+
+Production quantity and Batch execution policy are separate concepts.
+
+### Mock runtime
+
+Only Mock/simulation workflows may expose **Batch Count / Simulated IC Quantity** as a test-generation control. It represents how many simulated IC cycles should be exercised for validation and UI/statistics testing.
+
+The current Mock runtime uses repeated Batch rounds as the execution mechanism for those simulated cycles. That is an implementation detail of the current Mock path, not the long-term real-production quantity contract.
+
+### Real / non-Mock runtime
+
+A real PPU workflow must use an operator- or MES-provided **Planned IC Quantity** for the number of physical ICs intended to be programmed.
+
+`Repeat Count` must not be reused as the real IC quantity field. Repeating the same operation sequence on one loaded physical IC is not equivalent to loading and processing another IC.
+
+The intended production vocabulary is:
+
+```text
+Planned IC Quantity   planned physical quantity
+Total IC              actual adjudicated IC count
+PASS                  actual successful IC count
+FAIL                  actual retry-exhausted IC count
+Yield                 PASS / Total IC
+```
+
+The future real-quantity workflow must define the physical IC handoff / next-device boundary explicitly before Planned IC Quantity is wired into real PPU execution. Until then, Mock Batch Count and real Planned IC Quantity must remain distinct concepts.
+
 ## Execution state definitions
 
 These definitions are operator-facing contract and must later appear unchanged in the user/operator manual.
@@ -90,6 +144,8 @@ failed_site_stop_threshold
 - blank `failed_site_stop_threshold` means disabled
 - threshold semantics are inclusive: `faulted_site_count >= threshold`
 
+`repeat_count` is an execution-policy field. It must not be treated as the real-world Planned IC Quantity.
+
 ## Programming Asset
 
 Program/Verify use one immutable file snapshot per Batch. For the current Mock runtime, the Production UI accepts an image up to 4 MiB. The browser sends the Asset once when creating the Batch. The Gateway/Mock provider then uses the shared-image execution path added in PR #90; the browser never re-sends the image per Site or per round.
@@ -108,6 +164,7 @@ The active Production `batch_id` is stored in `sessionStorage` as a reconnect hi
 
 - real cross-host PPU/Manager execution adapter
 - persistent Batch database/restart recovery
+- dedicated real Planned IC Quantity execution handshake
 - Mock Profile settings UI
 - deterministic Mock profile/seed binding UI
 - final operator/user manual
