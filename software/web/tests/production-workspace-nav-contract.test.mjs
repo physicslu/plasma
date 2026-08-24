@@ -25,3 +25,10 @@ test("both Production pages render the shared workspace navigation", async () =>
   assert.match(factoryPage, /ProductionWorkspaceNav/);
   assert.match(programmingPage, /ProductionWorkspaceNav/);
 });
+
+test("Production workspace navigation reserves viewport budget for the sticky FPS selector", async () => {
+  const css = await source("../app/fleet/production-workspace-nav.css");
+
+  assert.match(css, /\.productionPrototypePage \.fpsSelector\s*\{/);
+  assert.match(css, /max-height:\s*calc\(100dvh - 80px\)/);
+});
