@@ -6,28 +6,33 @@ async function source(path) {
   return await fs.readFile(new URL(path, import.meta.url), "utf8");
 }
 
-test("IC Selector is a reusable global capability, not a product mode", async () => {
+test("IC Selector is a reusable lookup capability entered from the portal, not a product mode", async () => {
   const productMode = await source("../app/product-mode.ts");
   const globalNav = await source("../app/global-nav.tsx");
+  const demo = await source("../app/demo/page.tsx");
   const page = await source("../app/devices/page.tsx");
   const selector = await source("../app/devices/ic-selector.tsx");
 
   assert.doesNotMatch(productMode, /devices/);
-  assert.match(globalNav, /className="globalUtilityNav"/);
-  assert.match(globalNav, /href="\/devices"/);
+  assert.doesNotMatch(globalNav, /className="globalUtilityNav"/);
+  assert.doesNotMatch(globalNav, /href="\/devices"/);
+  assert.match(demo, /<span>03<\/span>/);
+  assert.match(demo, /href="\/devices"/);
+  assert.match(demo, /<h2>IC Selector<\/h2>/);
   assert.match(page, /<ICSelector usage="lookup"/);
   assert.match(selector, /ICSelectorUsage\s*=\s*"lookup"\s*\|\s*"picker"/);
   assert.match(selector, /onSelect\?:\s*\(device:\s*DeviceSearchResult\)\s*=>\s*void/);
 });
 
-test("global IC lookup remains outside execution mode-switch locking", async () => {
+test("IC lookup remains outside the canonical Product Mode navigation", async () => {
   const globalNav = await source("../app/global-nav.tsx");
-  const utilityNav = globalNav.match(/<nav className="globalUtilityNav"[\s\S]*?<\/nav>/)?.[0];
+  const demo = await source("../app/demo/page.tsx");
 
-  assert.ok(utilityNav, "global utility navigation must exist");
-  assert.match(utilityNav, /href="\/devices"/);
-  assert.doesNotMatch(utilityNav, /aria-disabled/);
-  assert.doesNotMatch(utilityNav, /blockLockedNavigation/);
+  const productNav = globalNav.match(/<nav className="globalProductNav"[\s\S]*?<\/nav>/)?.[0];
+  assert.ok(productNav, "canonical Product Mode navigation must exist");
+  assert.doesNotMatch(productNav, /\/devices/);
+  assert.match(demo, /className="demoCard utility" href="\/devices"/);
+  assert.doesNotMatch(demo, /blockLockedNavigation/);
 });
 
 test("IC Selector presents catalog evidence without inventing physical verification", async () => {
