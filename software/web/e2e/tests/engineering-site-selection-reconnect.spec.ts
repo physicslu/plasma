@@ -61,7 +61,7 @@ async function openProgramming(page: import("@playwright/test").Page) {
 }
 
 async function expectCheckedSites(page: import("@playwright/test").Page, expected: number[]) {
-  const checkboxes = page.getByLabel("Engineering Site selection").getByRole("checkbox");
+  const checkboxes = page.locator(".targetSitesSection").getByRole("checkbox");
   const count = await checkboxes.count();
   for (let index = 0; index < count; index += 1) {
     const siteId = index + 1;
@@ -147,7 +147,7 @@ test("operator reconnect keeps explicit Site selection and polling never turns e
 
   await facility.selectOption("mock-facility-01");
   await ppu.selectOption("mock-facility-01-ppu-03");
-  await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(6);
+  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(6);
 
   // Mirror the operator's manual pattern: keep SITE 1 / 5 / 6 only.
   await page.getByLabel("選取 SITE 2", { exact: true }).uncheck();
@@ -168,7 +168,7 @@ test("operator reconnect keeps explicit Site selection and polling never turns e
   await connect.click();
   await expect(facility).toHaveValue("mock-facility-01");
   await expect(ppu).toHaveValue("mock-facility-01-ppu-03");
-  await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(6);
+  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(6);
   await expectCheckedSites(page, [1, 5, 6]);
   await expect(log).toContainText("[SYS] [TARGET] RESTORED · mock-facility-01 / mock-facility-01-ppu-03");
   await expect(log).toContainText("[SYS] [SITE] RESTORED · SITE-01, SITE-05, SITE-06");
@@ -221,7 +221,7 @@ test("operator gateway outage round-trip restores the original PPU and Site subs
 
   await facility.selectOption("mock-facility-03");
   await ppu.selectOption("mock-facility-03-ppu-04");
-  await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(8);
+  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(8);
 
   // Mirror the uploaded operator log: keep SITE 2 / 4 / 6 / 7 on an 8-Site PPU.
   for (const siteId of [1, 3, 5, 8]) {
@@ -238,7 +238,7 @@ test("operator gateway outage round-trip restores the original PPU and Site subs
   await connect.click();
   await expect(facility).toHaveValue("mock-facility-03");
   await expect(ppu).toHaveValue("mock-facility-03-ppu-04");
-  await expect(page.getByLabel("Engineering Site selection").getByRole("checkbox")).toHaveCount(8);
+  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(8);
   await expectCheckedSites(page, [2, 4, 6, 7]);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(4);
   await expect(log).toContainText("[SYS] [TARGET] RESTORED · mock-facility-03 / mock-facility-03-ppu-04");
