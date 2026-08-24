@@ -162,7 +162,22 @@ export function ActiveFpsSummary({ counts, copy }: ActiveProps) {
 
   return (
     <section className="activeFpsSummary" aria-label={copy.title}>
-      <header><h2>{copy.title}</h2><span>{copy.hint}</span></header>
+      <header>
+        <h2>{copy.title}</h2>
+        <span>{copy.hint}</span>
+        <details className="engineeringBatchDetails">
+          <summary>Batch Details</summary>
+          <div className="engineeringBatchDetailsGrid">
+            <div><small>STATE</small><b>{batchState(counts)}</b></div>
+            <div><small>SELECTED</small><b>{counts.selected}</b></div>
+            <div><small>PASS</small><b>{counts.pass}</b></div>
+            <div><small>FAULTED</small><b>{counts.faulted}</b></div>
+            <div><small>ERROR</small><b>{counts.error}</b></div>
+            <div><small>STOPPED</small><b>{counts.stopped}</b></div>
+            <div><small>CANCELLED</small><b>{counts.cancelled}</b></div>
+          </div>
+        </details>
+      </header>
       <div className="activeFpsMetrics">
         {metrics.map(([state, label, value]) => (
           <article key={state} data-active-fps-state={state}>
@@ -170,18 +185,6 @@ export function ActiveFpsSummary({ counts, copy }: ActiveProps) {
           </article>
         ))}
       </div>
-      <details className="engineeringBatchDetails">
-        <summary>Batch Details</summary>
-        <div className="engineeringBatchDetailsGrid">
-          <div><small>STATE</small><b>{batchState(counts)}</b></div>
-          <div><small>SELECTED</small><b>{counts.selected}</b></div>
-          <div><small>PASS</small><b>{counts.pass}</b></div>
-          <div><small>FAULTED</small><b>{counts.faulted}</b></div>
-          <div><small>ERROR</small><b>{counts.error}</b></div>
-          <div><small>STOPPED</small><b>{counts.stopped}</b></div>
-          <div><small>CANCELLED</small><b>{counts.cancelled}</b></div>
-        </div>
-      </details>
     </section>
   );
 }
