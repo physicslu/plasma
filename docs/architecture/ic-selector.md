@@ -2,6 +2,8 @@
 
 Status: Phase 1 implementation contract
 
+Related evidence model: [`device-support-validation.md`](./device-support-validation.md).
+
 ## Purpose
 
 IC Selector is a shared Plasma capability for finding and inspecting IC catalog records. It is **not** a third Product Mode and does not belong to either Production Mode or Engineering Mode.
@@ -88,7 +90,7 @@ Phase 1 deliberately searches the normalized identifier field first. Vendor/fami
 
 ## Evidence and status boundary
 
-Catalog identity, programming-backend mapping, and physical validation are independent dimensions.
+Catalog identity, programming-backend mapping, and physical validation are independent dimensions. Detailed configuration fingerprints, PPU/Socket model-versus-instance identity, engineering validation, and field-use evidence remain governed by the shared device-support validation architecture rather than being redefined by the Selector.
 
 An OpenOCD relationship uses its actual backend mapping state, for example:
 
