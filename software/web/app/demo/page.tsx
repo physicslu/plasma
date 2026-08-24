@@ -5,7 +5,8 @@ import { useI18n } from "../i18n";
 import "./demo.css";
 
 export default function DemoLandingPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const zh = locale === "zh-TW";
 
   return (
     <main className="demoLanding" data-route-marker="Choose a Demo">
@@ -28,6 +29,17 @@ export default function DemoLandingPage() {
             <h2>{t("demo.engineering.title")}</h2>
             <p>{t("demo.engineering.description")}</p>
             <strong>{t("demo.engineering.open")}</strong>
+          </Link>
+
+          <Link className="demoCard utility" href="/devices">
+            <div className="demoCardHead"><span>03</span><b>{zh ? "料號查詢" : "IC LOOKUP"}</b></div>
+            <h2>IC Selector</h2>
+            <p>
+              {zh
+                ? "直接輸入 ICPN／IC identifier 查詢 Vendor、Family、OCD mapping 與目前可用的驗證證據。"
+                : "Search an ICPN or IC identifier directly for Vendor, Family, OCD mapping, and currently available validation evidence."}
+            </p>
+            <strong>{zh ? "查詢 IC 料號 →" : "Open IC Selector →"}</strong>
           </Link>
         </div>
 
