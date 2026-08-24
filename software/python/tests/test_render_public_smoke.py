@@ -8,6 +8,7 @@ import unittest
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -128,6 +129,65 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(report.observed_commit, expected)
         self.assertEqual(FakeRenderHandler.readiness_calls, 1)
+
+    @staticmethod
+    def contract_payload(path: str) -> dict[str, object]:
+        if path == "/api/status":
+            return {"ppu": {"ppu_id": "render-demo-ppu"}, "sites": [{} for _ in range(8)]}
+        if path == "/api/engineering/targets":
+            return {
+                "ok": True,
+                "rest_contract_version": "3",
+                "provider": "mock",
+                "facility_count": 3,
+                "ppu_count": 12,
+                "site_count": 60,
+            }
+        if path == "/api/mock/runtime":
+            return {
+                "ok": True,
+                "rest_contract_version": "3",
+                "mock_runtime": {
+                    "operations": {name: {} for name in ("erase", "program", "verify", "read")},
+                    "default_image_size_bytes": 1024,
+                },
+            }
+        if path == "/api/devices/search?q=stm32&limit=1":
+            return {
+                "ok": True,
+                "rest_contract_version": "3",
+                "catalog_size": 7657,
+                "results": [{"identifier": "STM32F103C8T6"}],
+            }
+        raise AssertionError(f"unexpected contract path: {path}")
+
+    def test_unpinned_pr_observation_skips_new_device_catalog_contract(self) -> None:
+        calls: list[str] = []
+
+        def request_json(_origin: str, path: str, *, timeout: float):
+            calls.append(path)
+            return self.contract_payload(path)
+
+        report = self.report(None)
+        with patch.object(SMOKE, "request_json", side_effect=request_json):
+            SMOKE.assert_contracts(self.origin, timeout=0.1, report=report)
+
+        self.assertEqual(report.checks["api:device-catalog-search"], "SKIP_UNPINNED")
+        self.assertNotIn("/api/devices/search?q=stm32&limit=1", calls)
+
+    def test_pinned_post_deployment_smoke_enforces_device_catalog_contract(self) -> None:
+        calls: list[str] = []
+
+        def request_json(_origin: str, path: str, *, timeout: float):
+            calls.append(path)
+            return self.contract_payload(path)
+
+        report = self.report("d" * 40)
+        with patch.object(SMOKE, "request_json", side_effect=request_json):
+            SMOKE.assert_contracts(self.origin, timeout=0.1, report=report)
+
+        self.assertEqual(report.checks["api:device-catalog-search"], "PASS")
+        self.assertIn("/api/devices/search?q=stm32&limit=1", calls)
 
 
 if __name__ == "__main__":
