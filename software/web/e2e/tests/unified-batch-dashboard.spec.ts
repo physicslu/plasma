@@ -93,8 +93,36 @@ async function installDashboardMock(page: Page) {
 }
 
 async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
-  await expect(root.locator(".batchTopologySummary")).toBeVisible();
+  const summary = root.locator(".batchTopologySummary");
+  await expect(summary).toBeVisible();
   await expect(root.locator(".unifiedBatchControlStack")).toBeVisible();
+
+  const typography = await summary.evaluate(element => {
+    const style = (selector: string) => getComputedStyle(element.querySelector<HTMLElement>(selector)!);
+    return {
+      contextLabelSize: Number.parseFloat(style(".batchTopologyContext small").fontSize),
+      contextValueSize: Number.parseFloat(style(".batchTopologyContext b").fontSize),
+      kpiLabelSize: Number.parseFloat(style(".batchTopologyPass small").fontSize),
+      kpiValueSize: Number.parseFloat(style(".batchTopologyPass b").fontSize),
+      passLabelWeight: Number(style(".batchTopologyPass small").fontWeight),
+      passValueWeight: Number(style(".batchTopologyPass b").fontWeight),
+      failLabelWeight: Number(style(".batchTopologyFail small").fontWeight),
+      failValueWeight: Number(style(".batchTopologyFail b").fontWeight),
+      yieldLabelWeight: Number(style(".batchTopologyYield small").fontWeight),
+      yieldValueWeight: Number(style(".batchTopologyYield b").fontWeight),
+    };
+  });
+  expect(typography.contextLabelSize).toBeLessThan(typography.kpiLabelSize);
+  expect(typography.contextValueSize).toBeLessThan(typography.kpiValueSize);
+  for (const weight of [
+    typography.passLabelWeight,
+    typography.passValueWeight,
+    typography.failLabelWeight,
+    typography.failValueWeight,
+    typography.yieldLabelWeight,
+    typography.yieldValueWeight,
+  ]) expect(weight).toBeGreaterThanOrEqual(800);
+
   const active = root.locator(".activeFpsSummary");
   await expect(active).toBeVisible();
   await expect(active.locator("[data-active-fps-state]")).toHaveCount(7);
