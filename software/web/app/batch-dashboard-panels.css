@@ -80,10 +80,18 @@
 
 .batchTopologySummary .batchTopologyPass small,
 .batchTopologySummary .batchTopologyFail small,
-.batchTopologySummary .batchTopologyYield small,
+.batchTopologySummary .batchTopologyYield small {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: .03em;
+}
+
 .batchTopologySummary .batchTopologyPass b,
 .batchTopologySummary .batchTopologyFail b,
 .batchTopologySummary .batchTopologyYield b {
+  margin-top: 3px;
+  font-size: 36px;
   font-weight: 800;
 }
 
