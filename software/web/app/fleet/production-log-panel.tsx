@@ -30,24 +30,34 @@ type ProductionLogPanelProps = {
   onClear: () => void;
 };
 
-function classifyProductionLog(message: string): EngineeringLogCategory {
+type ProductionLogClassification = {
+  category: EngineeringLogCategory;
+  message: string;
+};
+
+function productionLogClassification(message: string): ProductionLogClassification {
+  if (message.startsWith("[BAT]")) {
+    return { category: "BAT", message: message.slice("[BAT]".length).trimStart() };
+  }
+  if (message.startsWith("[PPU]")) {
+    return { category: "PPU", message: message.slice("[PPU]".length).trimStart() };
+  }
   if (
     message.startsWith("[IMG]")
     || message.startsWith("[ASSET]")
     || message.startsWith("[KEY]")
     || message.startsWith("[OPT]")
     || message.startsWith("[SERIAL]")
-  ) return "DAT";
+  ) return { category: "DAT", message };
   if (
     message.startsWith("[PROVIDER]")
     || message.startsWith("[SESSION]")
     || message.startsWith("[NET]")
     || message.startsWith("[CONNECTION]")
-  ) return "NET";
-  if (message.startsWith("[PPU]") || message.startsWith("[SITE-")) return "PPU";
-  if (message.startsWith("[BAT]")) return "BAT";
-  if (message.startsWith("[FPS]")) return "USR";
-  return "SYS";
+  ) return { category: "NET", message };
+  if (message.startsWith("[SITE-")) return { category: "PPU", message };
+  if (message.startsWith("[FPS]")) return { category: "USR", message };
+  return { category: "SYS", message };
 }
 
 function renderProductionLog(entry: NormalizedProductionLogEntry): string {
@@ -64,12 +74,12 @@ export default function ProductionLogPanel({ logs, title, clearLabel, onClear }:
   const [visibleCategories, setVisibleCategories] = useState<EngineeringLogCategory[]>(ENGINEERING_LOG_CATEGORIES);
   const allLogs = useMemo<NormalizedProductionLogEntry[]>(() => {
     const localLogs = logs.map(entry => {
-      const category = classifyProductionLog(entry.text);
+      const classification = productionLogClassification(entry.text);
       return {
         id: entry.id,
-        text: `${entry.time}  [${engineeringLogCategoryLabel(category)}] ${entry.text}`,
+        text: `${entry.time}  [${engineeringLogCategoryLabel(classification.category)}] ${classification.message}`,
         level: entry.level,
-        category,
+        category: classification.category,
       };
     });
     const sessionLogs: NormalizedProductionLogEntry[] = sessionAuditEntries.map(entry => ({
