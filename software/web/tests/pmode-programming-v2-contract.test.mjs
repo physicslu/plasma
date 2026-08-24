@@ -42,6 +42,7 @@ test("Stop Policy is a compact PMode control rather than a stretched field", asy
 
 test("PMode programming draft binds target IC, Image, EPVR and Batch policy before adapting to server Batch", async () => {
   const domain = await source("../app/production-programming-domain.ts");
+  const api = await source("../app/server-batch-api.ts");
 
   assert.match(domain, /ProductionProgrammingJobDraft/);
   assert.match(domain, /targetDevice:\s*DeviceSearchResult \| null/);
@@ -51,7 +52,19 @@ test("PMode programming draft binds target IC, Image, EPVR and Batch policy befo
   assert.match(domain, /stopPolicy:\s*ProductionStopPolicy/);
   assert.match(domain, /DEFAULT_PRODUCTION_SITE_RETRY_LIMIT = 3/);
   assert.match(domain, /buildServerBatchOptions/);
+  assert.match(domain, /targetDevice:\s*draft\.targetDevice/);
   assert.match(domain, /failed_site_stop_threshold/);
+  assert.match(api, /target_device:\s*BatchTargetDeviceSnapshot \| null/);
+  assert.match(api, /target_device:\s*options\.targetDevice/);
+});
+
+test("PMode advertises only the currently implemented binary Programming Image format", async () => {
+  const page = await source("../app/fleet/programming/production-programming-page.tsx");
+
+  assert.match(page, /accept="\.bin"/);
+  assert.match(page, /Select programming image \(\.bin\)/);
+  assert.match(page, /supports binary Programming Image \(\.bin\) only/);
+  assert.doesNotMatch(page, /accept="[^"]*\.hex/);
 });
 
 test("compact IC picker uses the shared device search service", async () => {
