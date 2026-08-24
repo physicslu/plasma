@@ -21,11 +21,11 @@ function humanizeStatus(value: string): string {
   return value.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
-function identifierKindLabel(kind: string, zh: boolean): string {
-  if (kind === "manufacturer_part_number") return zh ? "Exact ICPN" : "Exact ICPN";
-  if (kind === "cmsis_device_name") return zh ? "Device Name" : "Device Name";
-  if (kind === "ordering_pattern") return zh ? "Ordering Pattern" : "Ordering Pattern";
-  if (kind === "family_alias") return zh ? "Family Alias" : "Family Alias";
+function identifierKindLabel(kind: string): string {
+  if (kind === "manufacturer_part_number") return "Exact ICPN";
+  if (kind === "cmsis_device_name") return "Device Name";
+  if (kind === "ordering_pattern") return "Ordering Pattern";
+  if (kind === "family_alias") return "Family Alias";
   return humanizeStatus(kind);
 }
 
@@ -102,7 +102,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
         <div className="icSelectorSearchHead">
           <div>
             <p className="icSelectorEyebrow">DEVICE CATALOG · READ ONLY</p>
-            <h1>{zh ? "IC Selector" : "IC Selector"}</h1>
+            <h1>IC Selector</h1>
             <p>
               {zh
                 ? "直接輸入 ICPN／IC identifier。Exact match 優先，其次 Prefix、Partial match。"
@@ -110,9 +110,9 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
             </p>
           </div>
           <div className="icSelectorCatalogMeta">
-            <span>{zh ? "Catalog" : "Catalog"}</span>
-            <b>{catalogSize?.toLocaleString() ?? "7,657"}</b>
-            <small>{zh ? "目前 canonical identifiers" : "current canonical identifiers"}</small>
+            <span>Catalog</span>
+            <b>{catalogSize?.toLocaleString() ?? "—"}</b>
+            <small>{zh ? "Server 回報的 canonical identifiers" : "canonical identifiers reported by the server"}</small>
           </div>
         </div>
 
@@ -158,7 +158,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
               >
                 <div className="icSelectorIdentity">
                   <strong>{device.icpn ?? device.identifier}</strong>
-                  <span>{identifierKindLabel(device.identifier_kind, zh)}</span>
+                  <span>{identifierKindLabel(device.identifier_kind)}</span>
                 </div>
                 <div className="icSelectorTaxonomy">
                   <b>{device.vendor}</b>
@@ -181,7 +181,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
           <>
             <p className="icSelectorEyebrow">SELECTED DEVICE</p>
             <h2>{selected.icpn ?? selected.identifier}</h2>
-            <span className="icSelectorKind">{identifierKindLabel(selected.identifier_kind, zh)}</span>
+            <span className="icSelectorKind">{identifierKindLabel(selected.identifier_kind)}</span>
 
             <dl>
               <div><dt>Vendor</dt><dd>{selected.vendor}</dd></div>
