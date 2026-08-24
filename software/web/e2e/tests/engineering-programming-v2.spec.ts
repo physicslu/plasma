@@ -199,5 +199,8 @@ test("Engineering Programming renders the approved v2 workflow and binds Target 
     vendor: "STMicroelectronics",
     identifier: "STM32F103C8T6",
   });
-  await expect(page.getByLabel("Engineering job log")).toContainText("SITE-01 ERASE SUCCESS");
+
+  const siteOne = page.locator(".channelTable tbody tr").filter({ hasText: "SITE-01" });
+  await expect(siteOne.locator(".state")).toContainText("SUCCESS");
+  await expect(siteOne.locator(".engineeringResult")).toHaveText("PASS");
 });
