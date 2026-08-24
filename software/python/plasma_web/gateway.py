@@ -6,7 +6,7 @@ from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from plasma_core.assets import ProgrammingAsset
 from plasma_core.batch import BatchExecutionPolicy, BatchTarget
@@ -15,6 +15,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway_legacy as legacy
 from .batch_runtime import BatchRuntimeManager
+from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .engineering_targets import EngineeringPPUProvider
 from .mock_batch_runtime import MockAwareBatchRuntimeManager
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
@@ -38,6 +39,19 @@ def _mock_runtime_payload(settings: dict[str, Any]) -> dict[str, Any]:
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
         "mock_runtime": settings,
+    }
+
+
+def _device_search_payload(query: str, limit: int) -> dict[str, Any]:
+    catalog = get_default_device_catalog()
+    matches = catalog.search(query, limit=limit)
+    return {
+        "ok": True,
+        "rest_contract_version": WEB_REST_CONTRACT_VERSION,
+        "query": query,
+        "catalog_size": catalog.size,
+        "count": len(matches),
+        "results": [record.to_payload() for record in matches],
     }
 
 
@@ -157,6 +171,10 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
     def _is_mock_runtime_path(path: str) -> bool:
         return path.rstrip("/") == "/api/mock/runtime"
 
+    @staticmethod
+    def _is_device_search_path(path: str) -> bool:
+        return path.rstrip("/") == "/api/devices/search"
+
     @classmethod
     def _mock_provider(cls) -> SharedImageMockEngineeringPPUProvider | None:
         provider = cls.engineering_provider
@@ -226,6 +244,30 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if self._is_device_search_path(parsed.path):
+            try:
+                params = parse_qs(parsed.query, keep_blank_values=True)
+                query = params.get("q", [""])[0]
+                raw_limit = params.get("limit", [str(DEFAULT_SEARCH_LIMIT)])[0]
+                limit = int(raw_limit)
+                if limit < 1 or limit > MAX_SEARCH_LIMIT:
+                    raise ValueError(f"limit must be between 1 and {MAX_SEARCH_LIMIT}")
+                self._json(HTTPStatus.OK, _device_search_payload(query, limit))
+            except (TypeError, ValueError) as exc:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "ok": False,
+                        "error": {
+                            "error_type": "INVALID_DEVICE_SEARCH",
+                            "message": str(exc),
+                        },
+                    },
+                )
+            except Exception as exc:
+                self._error(exc)
+            return
+
         if self._is_mock_runtime_path(parsed.path):
             try:
                 provider = self._mock_provider()

@@ -37,6 +37,7 @@ export function GlobalNav() {
   const executionCount = ppuExecutionCount + batchExecutionCount;
   const activeMode = productModeForPath(pathname);
   const entryActive = pathname === "/demo";
+  const devicesActive = pathname === "/devices" || pathname.startsWith("/devices/");
   const navigationLocked = Boolean(activeMode) && executionCount > 0;
   const productionLocked = navigationLocked && activeMode !== "production";
   const engineeringLocked = navigationLocked && activeMode !== "engineering";
@@ -99,13 +100,19 @@ export function GlobalNav() {
           </Link>
         </nav>
 
+        <nav className="globalUtilityNav" aria-label={locale === "zh-TW" ? "全域工具" : "Global tools"}>
+          <Link href="/devices" aria-current={devicesActive ? "page" : undefined}>
+            IC Selector
+          </Link>
+        </nav>
+
         {navigationLocked && (
           <span className="globalExecutionGuard" role="status" aria-live="polite" title={lockReason}>
             EXECUTION BUSY · {executionCount}
           </span>
         )}
 
-        {activeMode && <ThemeSwitch className="globalThemeSwitch" />}
+        {(activeMode || devicesActive) && <ThemeSwitch className="globalThemeSwitch" />}
 
         <div className="globalLocale" role="group" aria-label="Language" aria-busy={!hydrated}>
           <button type="button" disabled={!hydrated} onClick={() => setLocale("zh-TW")} aria-pressed={locale === "zh-TW"}>{t("locale.zh")}</button>

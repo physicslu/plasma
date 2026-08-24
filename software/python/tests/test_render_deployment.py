@@ -52,7 +52,7 @@ class StaticGatewayTests(unittest.TestCase):
         return response.status, payload, headers
 
     def test_root_and_spa_routes_share_the_existing_gateway_origin(self) -> None:
-        for path in ("/", "/demo", "/fleet", "/engineering", "/ppu"):
+        for path in ("/", "/demo", "/fleet", "/engineering", "/devices", "/ppu"):
             with self.subTest(path=path):
                 status, payload, headers = self.request(path)
                 self.assertEqual(status, 200)

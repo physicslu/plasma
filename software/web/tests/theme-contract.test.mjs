@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import test from "node:test";
 
-test("Pmod and Emode expose one persistent Light Dark theme contract", async () => {
+test("Pmod, Emode and global IC Selector expose one persistent Light Dark theme contract", async () => {
   const themeSwitch = await fs.readFile(new URL("../app/theme-switch.tsx", import.meta.url), "utf8");
   const globalNav = await fs.readFile(new URL("../app/global-nav.tsx", import.meta.url), "utf8");
   const globals = await fs.readFile(new URL("../app/globals.css", import.meta.url), "utf8");
@@ -13,7 +13,7 @@ test("Pmod and Emode expose one persistent Light Dark theme contract", async () 
   assert.match(themeSwitch, /data-theme-choice="light"/);
   assert.match(themeSwitch, /data-theme-choice="dark"/);
   assert.match(themeSwitch, /document\.documentElement\.dataset\.theme\s*=\s*theme/);
-  assert.match(globalNav, /activeMode\s*&&\s*<ThemeSwitch/);
+  assert.match(globalNav, /\(activeMode \|\| devicesActive\)\s*&&\s*<ThemeSwitch/);
   assert.match(globals, /\[data-theme="dark"\]/);
   assert.match(globals, /color-scheme:\s*dark/);
   assert.match(productionTheme, /\[data-theme="dark"\]\s+\.productionPrototypePage/);
