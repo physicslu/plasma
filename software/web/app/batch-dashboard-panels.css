@@ -250,6 +250,7 @@
 }
 
 .activeFpsSummary {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(220px, .9fr) minmax(0, 2.1fr);
   align-items: center;
@@ -259,6 +260,7 @@
   border-radius: 10px;
   background: var(--panel, #fff);
   box-shadow: 0 3px 14px rgba(15, 23, 42, .035);
+  overflow: visible;
 }
 
 .activeFpsSummary header h2 {
@@ -327,10 +329,10 @@
 }
 
 .engineeringProgramming .engineeringBatchDetails {
+  position: relative;
   display: block;
-  grid-column: 1 / -1;
-  padding-top: 7px;
-  border-top: 1px solid var(--line, #dbe3ee);
+  width: max-content;
+  margin-top: 4px;
 }
 
 .engineeringBatchDetails summary {
@@ -338,15 +340,25 @@
   color: var(--text-soft, #334155);
   font-size: 9px;
   font-weight: 800;
+  line-height: 1.1;
   cursor: pointer;
   user-select: none;
 }
 
 .engineeringBatchDetailsGrid {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(720px, calc(100vw - 64px));
   display: grid;
-  grid-template-columns: repeat(7, minmax(72px, 1fr));
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
   gap: 6px;
-  margin-top: 7px;
+  padding: 8px;
+  border: 1px solid var(--line-strong, #cbd5e1);
+  border-radius: 8px;
+  background: var(--panel, #fff);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .16);
 }
 
 .engineeringBatchDetailsGrid > div {
@@ -379,6 +391,11 @@
   border-color: var(--line);
 }
 
+[data-theme="dark"] .engineeringBatchDetailsGrid {
+  border-color: var(--line-strong);
+  background: var(--panel);
+}
+
 [data-theme="dark"] .engineeringBatchDetailsGrid > div {
   border-color: var(--line-strong);
   background: var(--panel-2);
@@ -393,8 +410,7 @@
     grid-template-columns: 1fr;
   }
 
-  .activeFpsMetrics,
-  .engineeringBatchDetailsGrid {
+  .activeFpsMetrics {
     grid-template-columns: repeat(4, minmax(72px, 1fr));
   }
 }
@@ -408,6 +424,10 @@
   .activeFpsMetrics,
   .engineeringBatchDetailsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .engineeringBatchDetailsGrid {
+    width: min(420px, calc(100vw - 48px));
   }
 
   .batchPolicyField {
