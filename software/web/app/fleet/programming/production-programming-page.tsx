@@ -112,7 +112,6 @@ export default function ProductionProgrammingPage() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const facility = catalog?.facilities.find(item => item.facility_id === facilityId) ?? null;
-  const ppu = facility?.ppus.find(item => item.ppu_id === ppuId) ?? null;
   const executionLocked = busy || Boolean(activeBatch && !terminalServerBatchStates.has(activeBatch.state));
 
   const appendEvent = useCallback((text: string, level: EventEntry["level"] = "info") => {
@@ -132,7 +131,6 @@ export default function ProductionProgrammingPage() {
   useEffect(() => {
     if (!hydrated) return;
     let cancelled = false;
-    setError(null);
     getEngineeringTargets(apiBase)
       .then(nextCatalog => {
         if (cancelled) return;
@@ -153,7 +151,6 @@ export default function ProductionProgrammingPage() {
     if (!facilityId || !ppuId) return;
     let cancelled = false;
     const targetBase = engineeringTargetApiBase(apiBase, facilityId, ppuId);
-    setError(null);
     getPPUStatus(targetBase)
       .then(status => {
         if (cancelled) return;
@@ -222,8 +219,16 @@ export default function ProductionProgrammingPage() {
   function chooseFacility(nextFacilityId: string) {
     if (executionLocked || !catalog) return;
     const nextFacility = catalog.facilities.find(item => item.facility_id === nextFacilityId);
+    setError(null);
     setFacilityId(nextFacilityId);
     setPpuId(nextFacility?.ppus[0]?.ppu_id ?? "");
+    setActiveBatch(null);
+  }
+
+  function choosePpu(nextPpuId: string) {
+    if (executionLocked) return;
+    setError(null);
+    setPpuId(nextPpuId);
     setActiveBatch(null);
   }
 
@@ -320,7 +325,7 @@ export default function ProductionProgrammingPage() {
             </label>
             <label className="workflowField">
               <span>Select PPU:</span>
-              <select disabled={executionLocked || !facility} value={ppuId} onChange={event => { setPpuId(event.target.value); setActiveBatch(null); }}>
+              <select disabled={executionLocked || !facility} value={ppuId} onChange={event => choosePpu(event.target.value)}>
                 {(facility?.ppus ?? []).map(item => <option key={item.ppu_id} value={item.ppu_id}>{item.display_name} - {item.site_count} Sites</option>)}
               </select>
             </label>
