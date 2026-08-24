@@ -6,17 +6,22 @@ const shared = fs.readFileSync(new URL("../app/batch-dashboard-panels.tsx", impo
 const sharedCss = fs.readFileSync(new URL("../app/batch-dashboard-panels.css", import.meta.url), "utf8");
 const pmod = fs.readFileSync(new URL("../app/fleet/server-batch-page.tsx", import.meta.url), "utf8");
 const pmodCss = fs.readFileSync(new URL("../app/fleet/server-batch.css", import.meta.url), "utf8");
-const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace.tsx", import.meta.url), "utf8");
+const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
 const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
 
-test("Pmod and Emode share the same three upper Batch dashboard primitives", () => {
-  for (const source of [pmod, emode]) {
-    assert.match(source, /BatchTopologySummary/);
-    assert.match(source, /unifiedBatchControlStack/);
-    assert.match(source, /ActiveFpsSummary/);
-    assert.match(source, /BatchPolicyPanel/);
-  }
+test("Production keeps shared Batch dashboard primitives while Engineering owns its approved v2 workspace", () => {
+  assert.match(pmod, /BatchTopologySummary/);
+  assert.match(pmod, /unifiedBatchControlStack/);
+  assert.match(pmod, /ActiveFpsSummary/);
+  assert.match(pmod, /BatchPolicyPanel/);
+
+  assert.match(emode, /productionProgrammingKpis/);
+  assert.match(emode, /unifiedBatchControlStack/);
+  assert.match(emode, /PROGRAMMING JOB/);
+  assert.match(emode, /LIVE SITE STATUS/);
+  assert.doesNotMatch(emode, /BatchTopologySummary/);
+  assert.doesNotMatch(emode, /ActiveFpsSummary/);
 });
 
 test("shared top summary prioritizes production KPIs while keeping topology context", () => {
@@ -58,7 +63,7 @@ test("shared Active FPS summary exposes only selected, running and stopped Site 
   assert.equal((shared.match(/\["(?:selected|running|terminal)",/g) ?? []).length, 3);
 });
 
-test("Engineering Batch Details retain the full Site terminal breakdown", () => {
+test("shared diagnostic component retains the full Site terminal breakdown", () => {
   assert.match(shared, /<small>PASSED SITES<\/small>/);
   assert.match(shared, /<small>FAULTED SITES<\/small>/);
   assert.match(shared, /<small>ERROR SITES<\/small>/);
@@ -66,7 +71,7 @@ test("Engineering Batch Details retain the full Site terminal breakdown", () => 
   assert.match(shared, /<small>CANCELLED SITES<\/small>/);
 });
 
-test("policy controls expose hover/focus help, canonical ranges, and default Retry 3", () => {
+test("shared Production policy controls expose hover help, canonical ranges, and default Retry 3", () => {
   assert.match(shared, /role="tooltip"/);
   assert.match(shared, /DEFAULT_SITE_RETRY_LIMIT = "3"/);
   assert.match(shared, /aria-label="Repeat Count" type="number" min="1" max="10000"/);
@@ -74,26 +79,25 @@ test("policy controls expose hover/focus help, canonical ranges, and default Ret
   assert.match(shared, /aria-label="Failed Site Stop Threshold"/);
 });
 
-test("Pmod and Emode share a collapsible Programming and Batch Control panel", () => {
+test("Production retains collapsible Programming and Batch Control while Engineering v2 is always task-visible", () => {
   assert.match(shared, /const \[controlExpanded, setControlExpanded\] = useState\(true\)/);
   assert.match(shared, /PROGRAMMING \/ BATCH CONTROL/);
   assert.match(shared, /aria-expanded=\{controlExpanded\}/);
   assert.match(shared, /data-control-expanded=\{controlExpanded \? "true" : "false"\}/);
   assert.match(shared, /stack\.dataset\.collapsed = controlExpanded \? "false" : "true"/);
   assert.match(sharedCss, /\.unifiedBatchControlStack\[data-collapsed="true"\]\s*>\s*\.programmingBatchToolbar\s*\{[^}]*display:\s*none;/s);
-  assert.match(sharedCss, /\.batchControlPanelHeader/);
-  assert.match(sharedCss, /\.batchControlPanelToggle/);
+  assert.match(emode, /programmingJobCard unifiedBatchControlStack/);
+  assert.doesNotMatch(emode, /controlExpanded/);
 });
 
-test("Batch diagnostics stay off P Mode and are expandable in E Mode", () => {
+test("Production diagnostics remain hidden and Engineering v2 does not inherit legacy Batch details", () => {
   assert.match(pmodCss, /\.productionMainPanel\s*>\s*\.serverBatchStatistics\s*\{[^}]*display:\s*none;/s);
   assert.match(shared, /<details className="engineeringBatchDetails">/);
-  assert.match(shared, /<summary>Batch Details<\/summary>/);
   assert.match(sharedCss, /\.engineeringBatchDetails\s*\{\s*display:\s*none;/s);
-  assert.match(sharedCss, /\.engineeringProgramming\s+\.engineeringBatchDetails\s*\{[^}]*display:\s*block;/s);
+  assert.doesNotMatch(emode, /engineeringBatchDetails/);
 });
 
-test("Emode policy is behavioral rather than decorative", () => {
+test("Engineering v2 policy is behavioral rather than decorative", () => {
   assert.match(emode, /for \(let round = 1; round <= repeatValue; round \+= 1\)/);
   assert.match(emode, /for \(let attempt = 0; attempt <= retryValue; attempt \+= 1\)/);
   assert.match(emode, /terminalize\(siteId, "faulted"/);
