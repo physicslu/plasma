@@ -73,6 +73,16 @@ class DeviceCatalog:
 
     def __init__(self, records: Iterable[DeviceCatalogRecord]) -> None:
         self._records = tuple(records)
+        self._identity_index: dict[tuple[str, str], DeviceCatalogRecord] = {}
+        for record in self._records:
+            key = (record.vendor.casefold(), record.identifier.casefold())
+            existing = self._identity_index.get(key)
+            if existing is not None and existing != record:
+                raise ValueError(
+                    "device catalog identity must be unique by vendor + identifier: "
+                    f"{record.vendor} / {record.identifier}"
+                )
+            self._identity_index[key] = record
 
     @property
     def size(self) -> int:
@@ -111,6 +121,16 @@ class DeviceCatalog:
                     )
                 )
         return cls(records)
+
+    def resolve(self, vendor: str, identifier: str) -> DeviceCatalogRecord | None:
+        """Resolve one canonical catalog identity without trusting browser-supplied metadata."""
+        if not isinstance(vendor, str) or not isinstance(identifier, str):
+            return None
+        normalized_vendor = vendor.strip().casefold()
+        normalized_identifier = identifier.strip().casefold()
+        if not normalized_vendor or not normalized_identifier:
+            return None
+        return self._identity_index.get((normalized_vendor, normalized_identifier))
 
     def search(self, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT) -> list[DeviceCatalogRecord]:
         normalized = query.strip().casefold()
