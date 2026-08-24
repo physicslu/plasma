@@ -46,6 +46,19 @@ def test_search_ranks_exact_then_prefix_then_partial_case_insensitively(tmp_path
     assert [record.identifier for record in matches] == ["ABC123", "ABC1234", "XABC123X"]
 
 
+def test_resolve_uses_server_catalog_identity_case_insensitively(tmp_path: Path) -> None:
+    path = tmp_path / "catalog.csv"
+    _write_catalog(path)
+    catalog = DeviceCatalog.from_csv(path)
+
+    record = catalog.resolve("vendor a", "abc123")
+
+    assert record is not None
+    assert record.vendor == "Vendor A"
+    assert record.identifier == "ABC123"
+    assert catalog.resolve("Vendor A", "missing") is None
+
+
 def test_icpn_requires_authoritative_exact_part_number_kind(tmp_path: Path) -> None:
     path = tmp_path / "catalog.csv"
     _write_catalog(path)
