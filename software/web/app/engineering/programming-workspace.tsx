@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { BatchLifecycle } from "../batch-lifecycle";
 import { evaluateBatchReadiness } from "../batch-readiness";
+import { ActiveFpsSummary, BatchPolicyPanel } from "../batch-dashboard-panels";
+import type { DeviceSearchResult } from "../device-catalog-api";
+import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
 import {
   cancelJob,
@@ -24,15 +27,15 @@ import type {
   PPUSnapshot,
   SiteSnapshot,
 } from "../plasma-api";
-import { useWorkspaceSession, type TargetSelection } from "../workspace-session";
-import { ActiveFpsSummary, BatchPolicyPanel, BatchTopologySummary } from "../batch-dashboard-panels";
 import "../programming-batch-toolbar.css";
+import { useWorkspaceSession, type TargetSelection } from "../workspace-session";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
   engineeringLogCategoryLabel,
   type EngineeringLogCategory,
   type EngineeringLogEntry,
 } from "./engineering-log-panel";
+import "./engineering-programming-v2.css";
 
 type Stage =
   | "idle"
@@ -165,6 +168,19 @@ function parseNonNegativeInt(value: string): number | null {
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
+function targetDeviceLabel(device: DeviceSearchResult | null): string {
+  return device?.icpn ?? device?.identifier ?? "—";
+}
+
+function resultLabel(state: string): string {
+  if (state === "success") return "PASS";
+  if (state === "faulted" || state === "failed") return "FAIL";
+  if (state === "error" || state === "timeout" || state === "aborted") return "ERROR";
+  if (state === "cancelled") return "CANCELLED";
+  if (state === "stopped") return "STOPPED";
+  return "—";
+}
+
 export default function ProgrammingWorkspace() {
   const { locale, t } = useI18n();
   const {
@@ -194,15 +210,19 @@ export default function ProgrammingWorkspace() {
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [ppu, setPPU] = useState<PPUSnapshot | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
+  const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
   const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
   const [submittingSiteIds, setSubmittingSiteIds] = useState<number[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchCancelling, setBatchCancelling] = useState(false);
   const [batchSiteStates, setBatchSiteStates] = useState<Record<number, BatchSiteState>>({});
   const [repeatCount, setRepeatCount] = useState("1");
-  const [siteRetryLimit, setSiteRetryLimit] = useState("0");
+  const [siteRetryLimit, setSiteRetryLimit] = useState("3");
   const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
   const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);
+  const [batchStartedAt, setBatchStartedAt] = useState<number | null>(null);
+  const [lastCycleMs, setLastCycleMs] = useState<number | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
 
   const trackedJobs = useRef<Record<number, string>>({});
   const submissionGenerations = useRef<Record<number, number>>({});
@@ -257,7 +277,7 @@ export default function ProgrammingWorkspace() {
     ? "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。"
     : "No operation selected. Select at least one of Erase, Program, Verify, or Read.";
   const dismissWarning = locale === "zh-TW" ? "關閉警告" : "Dismiss warning";
-  const syntheticImageLabel = locale === "zh-TW" ? "Mock Synthetic Image" : "Mock Synthetic Image";
+  const syntheticImageLabel = "Mock Synthetic Image";
   const syntheticImageHint = locale === "zh-TW"
     ? "未選 Image 時由 Mock Settings 的 Default Image Size 自動產生 Synthetic Image；手動選檔時以選檔優先。"
     : "Without a selected Image, Mock generates a Synthetic Image from Default Image Size; a selected file takes precedence.";
@@ -338,6 +358,11 @@ export default function ProgrammingWorkspace() {
       cancelled: selectedSites.filter(site => site.stage === "cancelled").length,
     };
   })();
+  const completedIc = activeFpsCounts.pass + activeFpsCounts.faulted;
+  const yieldPercent = completedIc > 0 ? (activeFpsCounts.pass / completedIc) * 100 : 0;
+  const displayedTargetDevice = targetDeviceLabel(targetDevice);
+  const cycleMs = batchStartedAt !== null ? Math.max(0, clock - batchStartedAt) : lastCycleMs;
+  const cycleTimeLabel = cycleMs === null ? "--" : `${(cycleMs / 1000).toFixed(1)}s`;
 
   const appendLog = useCallback((
     message: string,
@@ -411,6 +436,11 @@ export default function ProgrammingWorkspace() {
       outputFile,
       error,
     } : site));
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 500);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -577,6 +607,11 @@ export default function ProgrammingWorkspace() {
     switchTarget({ facilityId: selection.facilityId, ppuId });
   }
 
+  function selectTargetDevice(device: DeviceSearchResult | null) {
+    setTargetDevice(device);
+    if (device) appendLog(`[TARGET IC] SELECT · ${device.vendor} / ${targetDeviceLabel(device)}`, false, "USR");
+  }
+
   function toggleSite(siteId: number) {
     if (batchRunning) return;
     setBatchSiteStates({});
@@ -735,6 +770,9 @@ export default function ProgrammingWorkspace() {
     const siteIds = [...selectedSiteIds];
     const operations = [...selectedOperations];
     const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
+    const cycleStart = Date.now();
+    setBatchStartedAt(cycleStart);
+    setLastCycleMs(null);
     appendLog(
       `[BATCH] EXECUTE · ${operationListLabel(operations)} · ${siteListLabel(siteIds)} · repeat ${repeatValue} · retry ${retryValue} · threshold ${thresholdValue ?? "off"}${readDetail}`,
       false,
@@ -779,64 +817,64 @@ export default function ProgrammingWorkspace() {
     try {
       await Promise.all(siteIds.map(async siteId => {
         for (let round = 1; round <= repeatValue; round += 1) {
-for (const operation of operations) {
-  let operationSucceeded = false;
-  for (let attempt = 0; attempt <= retryValue; attempt += 1) {
-    if (batchStopReason.current === "threshold") {
-      terminalize(siteId, cancellationState(siteId));
-      return;
-    }
-    if (!lifecycle.prepare(siteId, operation)) {
-      terminalize(siteId, cancellationState(siteId));
-      return;
-    }
-    await new Promise(resolve => window.setTimeout(resolve, 0));
-    if (!lifecycle.beginSubmit(siteId)) {
-      terminalize(siteId, cancellationState(siteId));
-      return;
-    }
-    const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
-    if (!job) {
-      if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
-      else terminalize(siteId, "error", "Job submission failed");
-      return;
-    }
-    if (lifecycle.accepted(siteId, job.job_id)) await requestCancel(siteId, job.job_id);
-    let finalJob: JobSnapshot;
-    try {
-      finalJob = await waitTerminal(job);
-    } catch (error) {
-      if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
-      else terminalize(siteId, "error", error instanceof Error ? error.message : "Batch polling failed");
-      return;
-    }
-    if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
-      terminalize(siteId, cancellationState(siteId));
-      return;
-    }
-    if (finalJob.state === "success") {
-      operationSucceeded = true;
-      break;
-    }
-    if (finalJob.state === "failed") {
-      if (attempt < retryValue) {
-        appendLog(`[${siteLabel(siteId)}] RETRY ${attempt + 1}/${retryValue} · Round ${round}/${repeatValue} · ${operation.toUpperCase()}`, false, "BAT");
-        continue;
-      }
-      faultedSites.add(siteId);
-      terminalize(siteId, "faulted", finalJob.result?.error?.message);
-      await triggerThresholdIfNeeded();
-      return;
-    }
-    if (finalJob.state === "cancelled") {
-      terminalize(siteId, cancellationState(siteId));
-      return;
-    }
-    terminalize(siteId, "error", finalJob.result?.error?.message ?? finalJob.state.toUpperCase());
-    return;
-  }
-  if (!operationSucceeded) return;
-}
+          for (const operation of operations) {
+            let operationSucceeded = false;
+            for (let attempt = 0; attempt <= retryValue; attempt += 1) {
+              if (batchStopReason.current === "threshold") {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              if (!lifecycle.prepare(siteId, operation)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              await new Promise(resolve => window.setTimeout(resolve, 0));
+              if (!lifecycle.beginSubmit(siteId)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
+              if (!job) {
+                if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+                else terminalize(siteId, "error", "Job submission failed");
+                return;
+              }
+              if (lifecycle.accepted(siteId, job.job_id)) await requestCancel(siteId, job.job_id);
+              let finalJob: JobSnapshot;
+              try {
+                finalJob = await waitTerminal(job);
+              } catch (error) {
+                if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
+                else terminalize(siteId, "error", error instanceof Error ? error.message : "Batch polling failed");
+                return;
+              }
+              if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              if (finalJob.state === "success") {
+                operationSucceeded = true;
+                break;
+              }
+              if (finalJob.state === "failed") {
+                if (attempt < retryValue) {
+                  appendLog(`[${siteLabel(siteId)}] RETRY ${attempt + 1}/${retryValue} · Round ${round}/${repeatValue} · ${operation.toUpperCase()}`, false, "BAT");
+                  continue;
+                }
+                faultedSites.add(siteId);
+                terminalize(siteId, "faulted", finalJob.result?.error?.message);
+                await triggerThresholdIfNeeded();
+                return;
+              }
+              if (finalJob.state === "cancelled") {
+                terminalize(siteId, cancellationState(siteId));
+                return;
+              }
+              terminalize(siteId, "error", finalJob.result?.error?.message ?? finalJob.state.toUpperCase());
+              return;
+            }
+            if (!operationSucceeded) return;
+          }
         }
         terminalize(siteId, "success");
       }));
@@ -855,15 +893,17 @@ for (const operation of operations) {
       const outcome = errors.length > 0 || stopped.length > 0
         ? "ERROR"
         : faulted.length > 0
-? "PARTIAL"
-: cancelled.length === siteIds.length
-  ? "CANCELLED"
-  : cancelled.length > 0
-    ? "PARTIAL"
-    : "COMPLETE";
+          ? "PARTIAL"
+          : cancelled.length === siteIds.length
+            ? "CANCELLED"
+            : cancelled.length > 0
+              ? "PARTIAL"
+              : "COMPLETE";
       appendLog(`${outcome} · ${groups.join(" · ")}`, errors.length > 0 || faulted.length > 0 || stopped.length > 0, "BAT");
     } finally {
       if (batchLifecycle.current === lifecycle) batchLifecycle.current = null;
+      setLastCycleMs(Date.now() - cycleStart);
+      setBatchStartedAt(null);
       setBatchRunning(false);
       setBatchCancelling(false);
     }
@@ -898,12 +938,12 @@ for (const operation of operations) {
   }
 
   return (
-    <section className="engineeringProgramming" aria-label={t("engineeringProgramming.workspace")}>
+    <section className="engineeringProgramming engineeringProgrammingV2" aria-label={t("engineeringProgramming.workspace")}>
       <div className="engineeringProgrammingHeader">
         <div>
           <p>ENGINEERING / PROGRAMMING</p>
-          <h2>{t("engineeringProgramming.title")}</h2>
-          <span>{t("engineeringProgramming.subtitle")}</span>
+          <h2>Single PPU Programming</h2>
+          <span>Facility → PPU → Site · E/P/V/R through the Engineering PPU Provider</span>
         </div>
         <form className={`engineeringGateway ${connection}`} onSubmit={connect}>
           <span className="pulse" />
@@ -915,162 +955,213 @@ for (const operation of operations) {
         </form>
       </div>
 
-      <BatchTopologySummary
-        facilityCount={catalog?.facility_count ?? 0}
-        ppuCount={catalog?.ppu_count ?? 0}
-        selectedSiteCount={selectedSiteIds.length}
-        selectedFacilityCount={selection.facilityId ? 1 : 0}
-        selectedPpuCount={selection.ppuId ? 1 : 0}
-        counts={activeFpsCounts}
-      />
+      <section className="engineeringProgrammingKpis" aria-label="Engineering programming KPIs">
+        <article><small>SITES</small><b>{selectedSiteIds.length}</b></article>
+        <article><small>TOTAL IC</small><b>{selectedSiteIds.length}</b></article>
+        <article><small>RUNNING</small><b>{activeFpsCounts.running}</b></article>
+        <article data-kpi="pass"><small>PASS</small><b>{activeFpsCounts.pass}</b></article>
+        <article data-kpi="fail"><small>FAIL</small><b>{activeFpsCounts.faulted}</b></article>
+        <article data-kpi="yield"><small>YIELD</small><b>{yieldPercent.toFixed(1)}%</b></article>
+        <article><small>CYCLE TIME</small><b>{cycleTimeLabel}</b></article>
+      </section>
 
-      <section className="unifiedBatchControlStack" data-dashboard-mode="engineering">
-      <section className="engineeringExecutionToolbar programmingBatchToolbar" aria-label="Engineering batch control">
-        <div className="programmingBatchFile">
-          <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>{t("engineeringProgramming.browse")}</button>
-          <input ref={imageInputRef} aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" hidden disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} />
-          <em
-            className="programmingFileName"
-            data-image-source={imageAsset ? "user" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none"}
-            title={imageAsset?.name}
-          >
-            {imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? syntheticImageLabel : "—")}
-          </em>
-          <small className="programmingFileHint">{syntheticMockImageAvailable ? syntheticImageHint : t("engineeringProgramming.imageAssetHint")}</small>
-        </div>
-        <div className="programmingBatchOperations" role="group" aria-label="Engineering batch operations">
-          <span>{t("engineeringProgramming.batchOperations")}</span>
-          {operationOrder.map(operation => {
-            const selected = selectedOperations.includes(operation);
-            return <label key={operation} className={selected ? "selected" : ""}>
-              <input type="checkbox" aria-label={`Engineering batch ${operation}`} checked={selected} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
-              <b>{operationCodes[operation]}</b>{t(`operation.${operation}`)}
-            </label>;
-          })}
-        </div>
-        <div className="programmingBatchActions">
-          <div className={`batchReadiness readiness-${batchReadiness.code}`} role="status" aria-label="Batch readiness">
-            <small>BATCH</small><b>{batchReadiness.label}</b>
+      <div className="engineeringProgrammingWorkflow">
+        <section className="engineeringProgrammingCard engineeringTargetingCard">
+          <header>SYSTEM SETUP &amp; TARGETING</header>
+          <div className="engineeringProgrammingCardBody">
+            <h3>SERVER TOPOLOGY</h3>
+            <label className="engineeringWorkflowField">
+              <span>Select Facility:</span>
+              <select
+                aria-label="Engineering Facility"
+                value={selection.facilityId}
+                disabled={!catalog || targetLocked}
+                onChange={event => selectFacility(event.target.value)}
+              >
+                {(catalog?.facilities ?? []).map(item => <option key={item.facility_id} value={item.facility_id}>{item.display_name}</option>)}
+              </select>
+            </label>
+            <label className="engineeringWorkflowField">
+              <span>Select PPU:</span>
+              <select
+                aria-label="Engineering PPU"
+                value={selection.ppuId}
+                disabled={!facility || targetLocked}
+                onChange={event => selectPPU(event.target.value)}
+              >
+                {(facility?.ppus ?? []).map(item => (
+                  <option key={item.ppu_id} value={item.ppu_id}>{item.display_name} — {item.site_count} Sites</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="engineeringTargetIdentity engineeringProgrammingIdentity" aria-label="Selected Engineering PPU">
+              <span className="simulationBadge">{selectedPPU?.provider?.toUpperCase() ?? "—"}</span>
+              <b>{facility?.display_name ?? t("engineeringProgramming.noFacility")} / {selectedPPU?.display_name ?? t("engineeringProgramming.noPpu")}</b>
+              <small>{ppu?.ppu_id ?? selectedPPU?.ppu_id ?? "—"} · {ppu?.site_count ?? selectedPPU?.site_count ?? 0} Sites · {ppu?.model ?? selectedPPU?.model ?? "—"}</small>
+            </div>
+
+            <div className="engineeringTargetSites">
+              <h3>TARGET SITES</h3>
+              <div className="channelChecks">
+                {sites.map(site => (
+                  <label key={site.id} className={`${selectedSiteIds.includes(site.id) ? "checked" : ""} ${!site.enabled ? "disabled" : ""}`}>
+                    <input
+                      type="checkbox"
+                      aria-label={`選取 SITE ${site.id}`}
+                      checked={selectedSiteIds.includes(site.id)}
+                      disabled={batchRunning || !site.enabled || isRunning(site)}
+                      onChange={() => toggleSite(site.id)}
+                    />
+                    <span>{siteLabel(site.id)}</span>
+                    <small>{site.enabled ? site.stage.toUpperCase() : "DISABLED"}</small>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="engineeringTopologyFoot">
+              ⓘ System Topology: {catalog?.facility_count ?? 0} Facilities | {catalog?.ppu_count ?? 0} PPUs | {catalog?.site_count ?? 0} Sites
+            </div>
           </div>
-          <button type="button" className="executeBatch" onClick={() => void runBatch()} disabled={!batchReadiness.ready}>{t("selection.execute")}</button>
-          <button type="button" className="cancelBatch" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}>{t("selection.cancel")}</button>
-        </div>
-      </section>
-      <BatchPolicyPanel
-        repeatCount={repeatCount}
-        retryLimit={siteRetryLimit}
-        stopThreshold={failedSiteThreshold}
-        maxThreshold={selectedSiteIds.length}
-        disabled={batchRunning}
-        valid={policyValid}
-        copy={dashboardCopy.policy}
-        onRepeatCount={setRepeatCount}
-        onRetryLimit={setSiteRetryLimit}
-        onStopThreshold={setFailedSiteThreshold}
-      />
-      </section>
-
-      <ActiveFpsSummary counts={activeFpsCounts} copy={dashboardCopy.active} />
-
-      {selectedOperations.includes("read") && (
-        <section className="engineeringReadParameters" aria-label="Engineering READ parameters">
-          <span>READ PARAMETERS</span>
-          <label>Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
-          <label>Length<input aria-label="Engineering READ length" type="number" min="1" step="1" value={readLength} disabled={batchRunning} onChange={event => setReadLength(event.target.value)} /></label>
         </section>
-      )}
 
-      {operatorWarning && (
-        <div className="warning engineeringOperationWarning" role="alert">
-          <span>{operatorWarning}</span>
-          <button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button>
-        </div>
-      )}
+        <div className="engineeringProgrammingRight">
+          <section className="engineeringProgrammingCard engineeringJobCard">
+            <header>PROGRAMMING JOB</header>
+            <div className="engineeringProgrammingCardBody engineeringJobBody">
+              <div className="engineeringJobRow engineeringTargetIcRow">
+                <strong>1. Target IC</strong>
+                <div>
+                  <ICPickerField
+                    apiBase={apiBase}
+                    value={targetDevice}
+                    onChange={selectTargetDevice}
+                    disabled={targetLocked}
+                    placeholder="Search ICPN / IC identifier..."
+                  />
+                  <small>Catalog identity only; PPU and Socket physical validation remain separate evidence.</small>
+                </div>
+              </div>
 
-      {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
-      {catalogError && <div className="engineeringBoundaryNote warning"><b>{t("engineeringProgramming.providerOffline")}</b><span>{catalogError}</span></div>}
+              <div className="engineeringJobRow">
+                <strong>2. Programming Image</strong>
+                <div className="engineeringImageField">
+                  <span title={imageAsset?.name}>{imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? syntheticImageLabel : "Select programming image (.bin)...")}</span>
+                  <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>{t("engineeringProgramming.browse")}</button>
+                  <input ref={imageInputRef} aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" hidden disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} />
+                </div>
+                <small className="engineeringImageHint">{syntheticMockImageAvailable ? syntheticImageHint : t("engineeringProgramming.imageAssetHint")}</small>
+              </div>
 
-      <div className="engineeringTargetSelector">
-        <label>
-          <span>Facility</span>
-          <select
-            aria-label="Engineering Facility"
-            value={selection.facilityId}
-            disabled={!catalog || targetLocked}
-            onChange={event => selectFacility(event.target.value)}
-          >
-            {(catalog?.facilities ?? []).map(item => <option key={item.facility_id} value={item.facility_id}>{item.display_name}</option>)}
-          </select>
-        </label>
-        <label>
-          <span>PPU</span>
-          <select
-            aria-label="Engineering PPU"
-            value={selection.ppuId}
-            disabled={!facility || targetLocked}
-            onChange={event => selectPPU(event.target.value)}
-          >
-            {(facility?.ppus ?? []).map(item => (
-              <option key={item.ppu_id} value={item.ppu_id}>{item.display_name} — {item.site_count} Sites</option>
-            ))}
-          </select>
-        </label>
-        <div className="engineeringTargetIdentity" aria-label="Selected Engineering PPU">
-          <span className="simulationBadge">{selectedPPU?.provider?.toUpperCase() ?? "—"}</span>
-          <b>{facility?.display_name ?? t("engineeringProgramming.noFacility")} / {selectedPPU?.display_name ?? t("engineeringProgramming.noPpu")}</b>
-          <small>{ppu?.ppu_id ?? selectedPPU?.ppu_id ?? "—"} · {ppu?.site_count ?? selectedPPU?.site_count ?? 0} Sites · {ppu?.model ?? selectedPPU?.model ?? "—"}</small>
+              <div className="engineeringJobRow engineeringOperationsRow">
+                <strong>3. Operations</strong>
+                <div className="engineeringOperationChoices" role="group" aria-label="Engineering batch operations">
+                  {operationOrder.map(operation => {
+                    const selected = selectedOperations.includes(operation);
+                    return (
+                      <label key={operation} className={selected ? "selected" : ""}>
+                        <input type="checkbox" aria-label={`Engineering batch ${operation}`} checked={selected} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
+                        <b>{operationCodes[operation]}</b>
+                        <span>{t(`operation.${operation}`)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {selectedOperations.includes("read") && (
+                <div className="engineeringReadParameters" aria-label="Engineering READ parameters">
+                  <span>READ PARAMETERS</span>
+                  <label>Offset<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
+                  <label>Length<input aria-label="Engineering READ length" type="number" min="1" step="1" value={readLength} disabled={batchRunning} onChange={event => setReadLength(event.target.value)} /></label>
+                </div>
+              )}
+
+              <section className="unifiedBatchControlStack engineeringJobPolicy" data-dashboard-mode="engineering">
+                <div className="engineeringPolicyOrdinal">4. Batch Policy</div>
+                <BatchPolicyPanel
+                  repeatCount={repeatCount}
+                  retryLimit={siteRetryLimit}
+                  stopThreshold={failedSiteThreshold}
+                  maxThreshold={selectedSiteIds.length}
+                  disabled={batchRunning}
+                  valid={policyValid}
+                  copy={dashboardCopy.policy}
+                  onRepeatCount={setRepeatCount}
+                  onRetryLimit={setSiteRetryLimit}
+                  onStopThreshold={setFailedSiteThreshold}
+                />
+              </section>
+
+              {operatorWarning && (
+                <div className="warning engineeringOperationWarning" role="alert">
+                  <span>{operatorWarning}</span>
+                  <button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button>
+                </div>
+              )}
+              {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
+
+              <div className="engineeringProgrammingActions">
+                <div className={`batchReadiness readiness-${batchReadiness.code}`} role="status" aria-label="Batch readiness">
+                  <small>BATCH</small><b>{batchReadiness.label}</b>
+                </div>
+                <button type="button" className="executeBatch" onClick={() => void runBatch()} disabled={!batchReadiness.ready}>▶ START PROGRAMMING</button>
+                <button type="button" className="cancelBatch" onClick={() => void cancelBatch()} disabled={!batchRunning || batchCancelling}>■ ABORT</button>
+              </div>
+            </div>
+          </section>
+
+          <section className="engineeringProgrammingCard engineeringLiveMonitor">
+            <header>LIVE PROGRESS MONITOR</header>
+            <div className="engineeringProgrammingCardBody">
+              <ActiveFpsSummary counts={activeFpsCounts} copy={dashboardCopy.active} />
+            </div>
+          </section>
         </div>
       </div>
 
-      {catalog && <div className="engineeringBoundaryNote">
-        <b>{t("engineeringProgramming.serverSource")}</b>
-        <span>{catalog.facility_count} Facilities · {catalog.ppu_count} PPUs · {catalog.site_count} Sites。{t("engineeringProgramming.serverSourceNote")}</span>
-      </div>}
+      {catalogError && <div className="engineeringBoundaryNote warning"><b>{t("engineeringProgramming.providerOffline")}</b><span>{catalogError}</span></div>}
 
-      <section className="selectorPanel engineeringSelectorPanel" aria-label="Engineering Site selection">
-        <div className="sectionHeading">
-          <div><p className="eyebrow">TARGET SITES</p><h2>{t("engineeringProgramming.siteSelection")}</h2></div>
-          <div className="statusSummary"><span>{t("engineeringProgramming.selected")} <b>{selectedSiteIds.length} / {sites.length}</b></span></div>
-        </div>
-        <div className="channelChecks">
-          {sites.map(site => (
-            <label key={site.id} className={`${selectedSiteIds.includes(site.id) ? "checked" : ""} ${!site.enabled ? "disabled" : ""}`}>
-              <input
-                type="checkbox"
-                aria-label={`選取 SITE ${site.id}`}
-                checked={selectedSiteIds.includes(site.id)}
-                disabled={batchRunning || !site.enabled || isRunning(site)}
-                onChange={() => toggleSite(site.id)}
-              />
-              <span>{siteLabel(site.id)}</span>
-              <small>{site.enabled ? site.stage.toUpperCase() : "DISABLED"}</small>
-            </label>
-          ))}
+      <section className="engineeringProgrammingCard engineeringLiveSiteStatus overviewCard" aria-label="Engineering Site status">
+        <header>
+          <span>LIVE SITE STATUS</span>
+          <small>{ppu?.display_name ?? selectedPPU?.display_name ?? t("engineeringProgramming.selectedPpu")} · REST polling 500 ms</small>
+        </header>
+        <div className="channelTableWrap">
+          <table className="channelTable">
+            <thead>
+              <tr><th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>OPERATIONS (E/P/V/R)</th></tr>
+            </thead>
+            <tbody>
+              {selectedSites.map(site => {
+                const runtimeState = batchSiteStates[site.id] ?? site.stage;
+                return (
+                  <tr key={site.id}>
+                    <td><b>{siteLabel(site.id)}</b></td>
+                    <td><b>{displayedTargetDevice !== "—" ? displayedTargetDevice : (site.target ?? "—")}</b><small>{site.interface ?? "—"}</small></td>
+                    <td><span className={`state ${runtimeState}`}>{runtimeState.toUpperCase()}</span>{site.error && <small className="errorText">{site.error}</small>}</td>
+                    <td><div className="tableProgress"><div className="track"><i style={{ width: `${site.progress}%` }} /></div><b>{Math.round(site.progress)}%</b></div></td>
+                    <td><b className={`engineeringResult result-${resultLabel(runtimeState).toLowerCase()}`}>{resultLabel(runtimeState)}</b></td>
+                    <td><div className="rowActions">
+                      {operationOrder.map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.id} ${t(`operation.${operation}`)}`} title={t(`operation.${operation}`)} disabled={operationDisabled(site, operation)} onClick={() => runSingleSite(site.id, operation)}>{operationCodes[operation]}</button>)}
+                      <button className="stop" aria-label={`Cancel SITE ${site.id}`} disabled={!isRunning(site)} onClick={() => void cancelSite(site.id)}>■</button>
+                      {site.stage === "success" && site.jobId && site.outputFile && targetApiBase && <a className="rowDownload" aria-label={`Download SITE ${site.id} read file`} href={readDownloadUrl(targetApiBase, site.jobId, site.outputFile)}>↓</a>}
+                    </div></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <section className="overviewCard" aria-label="Engineering Site status">
-        <div className="overviewHead"><div><p className="eyebrow">LIVE PPU STATUS</p><h2>{ppu?.display_name ?? selectedPPU?.display_name ?? t("engineeringProgramming.selectedPpu")}</h2></div><small>REST polling 500 ms</small></div>
-        <div className="channelTableWrap">
-          <table className="channelTable">
-            <thead><tr><th>Site</th><th>{t("engineeringProgramming.targetInterface")}</th><th>{t("engineeringProgramming.operation")}</th><th>{t("engineeringProgramming.state")}</th><th>{t("engineeringProgramming.progress")}</th><th>{t("engineeringProgramming.independent")}</th></tr></thead>
-            <tbody>
-              {selectedSites.map(site => (
-                <tr key={site.id}>
-                  <td><b>{siteLabel(site.id)}</b></td>
-                  <td><b>{site.target ?? "—"}</b><small>{site.interface ?? "—"}</small></td>
-                  <td>{site.operation?.toUpperCase() ?? "—"}{site.error && <small className="errorText">{site.error}</small>}</td>
-                  <td><span className={`state ${site.stage}`}>{site.stage.toUpperCase()}</span></td>
-                  <td><div className="tableProgress"><div className="track"><i style={{ width: `${site.progress}%` }} /></div><b>{Math.round(site.progress)}%</b></div></td>
-                  <td><div className="rowActions">
-                    {operationOrder.map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.id} ${t(`operation.${operation}`)}`} title={t(`operation.${operation}`)} disabled={operationDisabled(site, operation)} onClick={() => runSingleSite(site.id, operation)}>{operationCodes[operation]}</button>)}
-                    <button className="stop" aria-label={`Cancel SITE ${site.id}`} disabled={!isRunning(site)} onClick={() => void cancelSite(site.id)}>■</button>
-                    {site.stage === "success" && site.jobId && site.outputFile && targetApiBase && <a className="rowDownload" aria-label={`Download SITE ${site.id} read file`} href={readDownloadUrl(targetApiBase, site.jobId, site.outputFile)}>↓</a>}
-                  </div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section className="engineeringProgrammingCard engineeringRecentEvents" aria-label="Engineering recent events">
+        <header>RECENT EVENTS</header>
+        <div className="engineeringProgrammingCardBody">
+          {logs.length === 0 ? <p>No events yet.</p> : logs.slice(0, 5).map(entry => (
+            <div key={entry.id} data-level={entry.error ? "error" : "info"}>{entry.text}</div>
+          ))}
         </div>
       </section>
 
