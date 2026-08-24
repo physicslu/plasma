@@ -81,12 +81,19 @@ export function BatchTopologySummary({
   counts,
   ariaLabel = "Batch topology summary",
 }: TopologySummaryProps) {
+  const totalIc = counts.selected;
+  const failedIc = counts.faulted;
+  const yieldPercent = totalIc > 0 ? (counts.pass / totalIc) * 100 : 0;
+
   return (
     <section className="batchTopologySummary" aria-label={ariaLabel}>
-      <article><small>Facilities</small><b>{facilityCount}</b></article>
-      <article><small>PPUs</small><b>{ppuCount}</b></article>
-      <article><small>Sites</small><b>{selectedSiteCount}</b><span>{selectedFacilityCount} F / {selectedPpuCount} P</span></article>
-      <article className="batchTopologyPass"><small>PASS</small><b>{counts.pass}</b><span>FAULT {counts.faulted} · ERR {counts.error} · RUN {counts.running} · STOP {counts.stopped} · CAN {counts.cancelled}</span></article>
+      <article className="batchTopologyContext" data-topology-context="facilities"><small>Facilities</small><b>{facilityCount}</b></article>
+      <article className="batchTopologyContext" data-topology-context="ppus"><small>PPUs</small><b>{ppuCount}</b></article>
+      <article className="batchTopologyContext" data-topology-context="sites"><small>Sites</small><b>{selectedSiteCount}</b><span>{selectedFacilityCount} F / {selectedPpuCount} P</span></article>
+      <article className="batchTopologyKpi batchTopologyTotal" data-production-kpi="total"><small>Total IC</small><b>{totalIc}</b></article>
+      <article className="batchTopologyKpi batchTopologyPass" data-production-kpi="pass"><small>PASS</small><b>{counts.pass}</b></article>
+      <article className="batchTopologyKpi batchTopologyFail" data-production-kpi="fail"><small>FAIL</small><b>{failedIc}</b></article>
+      <article className="batchTopologyKpi batchTopologyYield" data-production-kpi="yield"><small>Yield</small><b>{yieldPercent.toFixed(1)}%</b></article>
     </section>
   );
 }

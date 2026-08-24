@@ -1,6 +1,6 @@
 .batchTopologySummary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(72px, .72fr)) repeat(4, minmax(112px, 1.18fr));
   gap: 7px;
 }
 
@@ -41,8 +41,54 @@
   white-space: nowrap;
 }
 
+.batchTopologySummary .batchTopologyContext {
+  padding-left: 9px;
+  padding-right: 9px;
+}
+
+.batchTopologySummary .batchTopologyKpi {
+  position: relative;
+  overflow: hidden;
+}
+
+.batchTopologySummary .batchTopologyKpi b {
+  margin-top: 5px;
+  font-size: 24px;
+}
+
+.batchTopologySummary .batchTopologyKpi::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--line-strong, #cbd5e1);
+}
+
 .batchTopologySummary .batchTopologyPass b {
   color: #15803d;
+}
+
+.batchTopologySummary .batchTopologyPass::after {
+  background: #22c55e;
+}
+
+.batchTopologySummary .batchTopologyFail b {
+  color: #dc2626;
+}
+
+.batchTopologySummary .batchTopologyFail::after {
+  background: #ef4444;
+}
+
+.batchTopologySummary .batchTopologyYield b {
+  color: #2563eb;
+}
+
+.batchTopologySummary .batchTopologyYield::after {
+  background: #3b82f6;
 }
 
 .unifiedBatchControlStack {
@@ -257,6 +303,10 @@
 }
 
 @media (max-width: 1080px) {
+  .batchTopologySummary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .activeFpsSummary {
     grid-template-columns: 1fr;
   }
