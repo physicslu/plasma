@@ -76,7 +76,17 @@ ProductionProgrammingJobDraft
 
 This draft is an operator-input model. Runtime execution remains server-owned Batch orchestration.
 
-The adapter to the existing Web REST Batch contract is implemented by `buildServerBatchOptions()`.
+The adapter to the Web REST Batch contract is implemented by `buildServerBatchOptions()`.
+
+## Programming Image support boundary
+
+The current implemented Normalized Image path supports binary Image input. Therefore PMode v2 exposes `.bin` only:
+
+```text
+Programming Image: *.bin
+```
+
+The UI must not advertise `.hex` until an Intel HEX parser/normalizer is actually implemented and tested. File-name support and parser capability must remain truthful rather than being inferred from a mockup placeholder.
 
 ## Batch policy presentation
 
@@ -148,21 +158,37 @@ Yield    = PASS / Total IC
 
 Before the first Batch snapshot exists, the v2 mockup keeps the selected Site count visible as the initial Total IC planning context. This is presentation fallback only; once execution begins, the server snapshot is authoritative.
 
-## Current REST boundary and next API increment
+## Target IC REST / Batch provenance contract
 
-The existing Web REST v3 Batch contract already carries:
+The Batch create request may carry a compact Device Catalog identity:
 
-```text
-targets
-operations
-execution_policy
-Programming Asset
-read parameters
+```json
+{
+  "target_device": {
+    "vendor": "...",
+    "identifier": "..."
+  }
+}
 ```
 
-The current Batch wire payload does **not yet persist the selected Target IC identity**. PMode v2 therefore requires Target IC in the browser draft and uses it for operator presentation/readiness, but the server Batch snapshot does not yet provide durable Target IC provenance.
+The Gateway does **not** trust browser-supplied family, ICPN, validation state, or backend evidence. It resolves `vendor + identifier` against the server-owned canonical Device Catalog. If the identity cannot resolve unambiguously, Batch creation fails closed.
 
-This is an explicit gap, not hidden behavior. A follow-up compatibility-safe server contract increment should bind an immutable `target_device` snapshot to the Batch, sourced from the Device Catalog selection. Until that is implemented, PMode v2 must not claim that Batch history itself is sufficient device traceability.
+The immutable server Batch snapshot then carries canonical provenance:
+
+```text
+target_device
+├── vendor
+├── family
+├── identifier
+├── identifier_kind
+└── icpn | null
+```
+
+This snapshot is bound to the Batch together with targets, operations, execution policy, and Programming Asset provenance. The same canonical Target IC snapshot is also inserted into underlying Job metadata so PPU-local execution evidence can retain the selected device identity.
+
+Existing Batch clients remain compatible because `target_device` is optional at the REST boundary. PMode Programming v2 requires a Target IC before execution and therefore always supplies it.
+
+This is device **identity provenance**, not proof that the selected PPU/Socket/Programming Configuration has been physically verified for that IC. Physical support evidence remains a separate contract.
 
 ## Non-goals of this phase
 
