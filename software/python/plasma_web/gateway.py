@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from dataclasses import replace
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -103,25 +104,29 @@ def _parse_targets(value: Any) -> tuple[BatchTarget, ...]:
     return tuple(targets)
 
 
-def _parse_target_device(value: Any) -> BatchTargetDeviceSnapshot | None:
+def _parse_target_device(
+    value: Any,
+    *,
+    label: str = "target_device",
+) -> BatchTargetDeviceSnapshot | None:
     if value is None:
         return None
-    raw = _require_object(value, "Batch target_device")
+    raw = _require_object(value, label)
     legacy._require_declared_keys(
         raw,
         allowed={"vendor", "identifier"},
         required={"vendor", "identifier"},
-        label="Batch target_device",
+        label=label,
     )
     vendor = raw["vendor"]
     identifier = raw["identifier"]
     if not isinstance(vendor, str) or not vendor.strip():
-        raise ValueError("Batch target_device vendor is required")
+        raise ValueError(f"{label} vendor is required")
     if not isinstance(identifier, str) or not identifier.strip():
-        raise ValueError("Batch target_device identifier is required")
+        raise ValueError(f"{label} identifier is required")
     record = get_default_device_catalog().resolve(vendor, identifier)
     if record is None:
-        raise ValueError("Batch target_device must resolve to one canonical Device Catalog record")
+        raise ValueError(f"{label} must resolve to one canonical Device Catalog record")
     return BatchTargetDeviceSnapshot(
         vendor=record.vendor,
         family=record.family,
@@ -220,10 +225,44 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
             # The legacy Engineering contract normally requires an Asset SHA.
             # Canonical Shared-Image Mock jobs may intentionally omit it so the
             # provider can generate one Synthetic Image from the immutable Mock
-            # execution profile.  The key is normalized to None only in this
+            # execution profile. The key is normalized to None only in this
             # Mock-specific handler; non-Mock providers remain fail-closed.
             body["asset_sha256"] = None
         return body
+
+    def _job_request(
+        self,
+        body: dict[str, Any],
+        *,
+        client_id: str,
+        default_timeout_s: float = 30.0,
+        allow_inline_asset: bool = True,
+    ):
+        normalized = dict(body)
+        raw_target_device = normalized.pop("target_device", None)
+        request = super()._job_request(
+            normalized,
+            client_id=client_id,
+            default_timeout_s=default_timeout_s,
+            allow_inline_asset=allow_inline_asset,
+        )
+        if raw_target_device is None:
+            return request
+        if client_id != "plasma-web-engineering":
+            raise ValueError("target_device is only valid for an Engineering PPU job")
+        target_device = _parse_target_device(
+            raw_target_device,
+            label="Engineering target_device",
+        )
+        assert target_device is not None
+        return replace(
+            request,
+            target=target_device.icpn or target_device.identifier,
+            metadata={
+                **request.metadata,
+                "target_device": target_device.to_dict(),
+            },
+        )
 
     def _mock_unavailable(self) -> None:
         self._json(
@@ -375,7 +414,10 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
                     operations=operations,
                     policy=_parse_policy(body),
                     session_id=session_id,
-                    target_device=_parse_target_device(body.get("target_device")),
+                    target_device=_parse_target_device(
+                        body.get("target_device"),
+                        label="Batch target_device",
+                    ),
                     asset=_parse_asset(body.get("asset")),
                     read_offset=read_offset,
                     read_length=read_length,
