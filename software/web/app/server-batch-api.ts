@@ -1,5 +1,6 @@
 import type { Operation } from "./plasma-api";
 import type { MockBatchRuntimeSnapshot } from "./mock-runtime-api";
+import { publishServerBatchSnapshot } from "./server-batch-snapshot-store";
 
 export type ServerBatchState =
   | "queued"
@@ -201,6 +202,11 @@ async function encodeProgrammingAsset(file: File) {
   };
 }
 
+function observeBatchSnapshot(snapshot: ServerBatchSnapshot): ServerBatchSnapshot {
+  publishServerBatchSnapshot(snapshot);
+  return snapshot;
+}
+
 export async function createServerBatch(
   apiBase: string,
   options: CreateServerBatchOptions,
@@ -234,7 +240,7 @@ export async function createServerBatch(
     },
     120_000,
   );
-  return payload.batch;
+  return observeBatchSnapshot(payload.batch);
 }
 
 export async function getServerBatch(apiBase: string, batchId: string): Promise<ServerBatchSnapshot> {
@@ -242,7 +248,7 @@ export async function getServerBatch(apiBase: string, batchId: string): Promise<
     apiBase,
     `/api/batches/${encodeURIComponent(batchId)}`,
   );
-  return payload.batch;
+  return observeBatchSnapshot(payload.batch);
 }
 
 export async function cancelServerBatch(apiBase: string, batchId: string): Promise<ServerBatchSnapshot> {
@@ -251,7 +257,7 @@ export async function cancelServerBatch(apiBase: string, batchId: string): Promi
     `/api/batches/${encodeURIComponent(batchId)}/cancel`,
     { method: "POST", body: JSON.stringify({}) },
   );
-  return payload.batch;
+  return observeBatchSnapshot(payload.batch);
 }
 
 export async function cancelServerBatchPPU(
@@ -265,5 +271,5 @@ export async function cancelServerBatchPPU(
     `/api/batches/${encodeURIComponent(batchId)}/targets/${encodeURIComponent(facilityId)}/${encodeURIComponent(ppuId)}/cancel`,
     { method: "POST", body: JSON.stringify({}) },
   );
-  return payload.batch;
+  return observeBatchSnapshot(payload.batch);
 }

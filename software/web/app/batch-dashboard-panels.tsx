@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import type { ServerBatchSnapshot } from "./server-batch-api";
+import {
+  getServerBatchServerSnapshot,
+  getServerBatchSnapshot,
+  subscribeServerBatchSnapshot,
+} from "./server-batch-snapshot-store";
 import "./batch-dashboard-panels.css";
 
 export const DEFAULT_SITE_RETRY_LIMIT = "3";
@@ -66,6 +72,13 @@ type ActiveProps = {
   copy: ActiveCopy;
 };
 
+type ManufacturingKpis = {
+  total: number;
+  pass: number;
+  fail: number;
+  yieldPercent: number;
+};
+
 function PolicyInfo({ ariaLabel, text }: { ariaLabel: string; text: string }) {
   return (
     <span className="batchPolicyInfo" tabIndex={0} aria-label={ariaLabel}>
@@ -73,6 +86,18 @@ function PolicyInfo({ ariaLabel, text }: { ariaLabel: string; text: string }) {
       <span role="tooltip">{text}</span>
     </span>
   );
+}
+
+function manufacturingKpisFromSnapshot(snapshot: ServerBatchSnapshot): ManufacturingKpis {
+  const pass = snapshot.sites.reduce((total, site) => total + Math.max(0, site.completed_rounds), 0);
+  const fail = snapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0);
+  const total = pass + fail;
+  return {
+    total,
+    pass,
+    fail,
+    yieldPercent: total > 0 ? (pass / total) * 100 : 0,
+  };
 }
 
 export function BatchTopologySummary({
@@ -84,17 +109,32 @@ export function BatchTopologySummary({
   counts,
   ariaLabel = "Batch topology summary",
 }: TopologySummaryProps) {
-  const totalIc = counts.selected;
-  const failedIc = counts.faulted;
-  const yieldPercent = totalIc > 0 ? (counts.pass / totalIc) * 100 : 0;
+  const observedBatch = useSyncExternalStore(
+    subscribeServerBatchSnapshot,
+    getServerBatchSnapshot,
+    getServerBatchServerSnapshot,
+  );
+  const productionBatch = typeof window !== "undefined" && window.location.pathname === "/fleet"
+    ? observedBatch
+    : null;
+  const manufacturingKpis = productionBatch ? manufacturingKpisFromSnapshot(productionBatch) : null;
+  const totalIc = manufacturingKpis?.total ?? counts.selected;
+  const passIc = manufacturingKpis?.pass ?? counts.pass;
+  const failedIc = manufacturingKpis?.fail ?? counts.faulted;
+  const yieldPercent = manufacturingKpis?.yieldPercent
+    ?? (totalIc > 0 ? (passIc / totalIc) * 100 : 0);
 
   return (
-    <section className="batchTopologySummary" aria-label={ariaLabel}>
+    <section
+      className="batchTopologySummary"
+      aria-label={ariaLabel}
+      data-kpi-source={productionBatch ? "server-batch-snapshot" : "local-projection"}
+    >
       <article className="batchTopologyContext" data-topology-context="facilities"><small>Facilities</small><b>{facilityCount}</b></article>
       <article className="batchTopologyContext" data-topology-context="ppus"><small>PPUs</small><b>{ppuCount}</b></article>
       <article className="batchTopologyContext" data-topology-context="sites"><small>Sites</small><b>{selectedSiteCount}</b><span>{selectedFacilityCount} F / {selectedPpuCount} P</span></article>
       <article className="batchTopologyKpi batchTopologyTotal" data-production-kpi="total"><small>Total IC</small><b>{totalIc}</b></article>
-      <article className="batchTopologyKpi batchTopologyPass" data-production-kpi="pass"><small>PASS</small><b>{counts.pass}</b></article>
+      <article className="batchTopologyKpi batchTopologyPass" data-production-kpi="pass"><small>PASS</small><b>{passIc}</b></article>
       <article className="batchTopologyKpi batchTopologyFail" data-production-kpi="fail"><small>FAIL</small><b>{failedIc}</b></article>
       <article className="batchTopologyKpi batchTopologyYield" data-production-kpi="yield"><small>Yield</small><b>{yieldPercent.toFixed(1)}%</b></article>
     </section>

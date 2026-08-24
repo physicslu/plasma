@@ -7,6 +7,8 @@ const sharedCss = fs.readFileSync(new URL("../app/batch-dashboard-panels.css", i
 const pmod = fs.readFileSync(new URL("../app/fleet/server-batch-page.tsx", import.meta.url), "utf8");
 const pmodCss = fs.readFileSync(new URL("../app/fleet/server-batch.css", import.meta.url), "utf8");
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace.tsx", import.meta.url), "utf8");
+const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
+const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
 
 test("Pmod and Emode share the same three upper Batch dashboard primitives", () => {
   for (const source of [pmod, emode]) {
@@ -25,13 +27,24 @@ test("shared top summary prioritizes production KPIs while keeping topology cont
   assert.match(shared, /data-production-kpi="pass"/);
   assert.match(shared, /data-production-kpi="fail"/);
   assert.match(shared, /data-production-kpi="yield"/);
-  assert.match(shared, /const totalIc = counts\.selected/);
-  assert.match(shared, /const failedIc = counts\.faulted/);
-  assert.match(shared, /counts\.pass \/ totalIc/);
   assert.match(shared, /<small>Total IC<\/small>/);
   assert.match(shared, /<small>PASS<\/small>/);
   assert.match(shared, /<small>FAIL<\/small>/);
   assert.match(shared, /<small>Yield<\/small>/);
+});
+
+test("Production KPI authority is the latest server Batch snapshot", () => {
+  assert.match(snapshotStore, /latestSnapshot/);
+  assert.match(snapshotStore, /publishServerBatchSnapshot/);
+  assert.match(snapshotStore, /subscribeServerBatchSnapshot/);
+  assert.match(serverBatchApi, /publishServerBatchSnapshot/);
+  assert.equal((serverBatchApi.match(/return observeBatchSnapshot\(payload\.batch\);/g) ?? []).length, 4);
+  assert.match(shared, /useSyncExternalStore/);
+  assert.match(shared, /window\.location\.pathname === "\/fleet"/);
+  assert.match(shared, /site\.completed_rounds/);
+  assert.match(shared, /site\.final_failures/);
+  assert.match(shared, /const total = pass \+ fail/);
+  assert.match(shared, /data-kpi-source=\{productionBatch \? "server-batch-snapshot" : "local-projection"\}/);
 });
 
 test("shared Active FPS summary keeps FAULTED and ERROR distinct without duplicate error state", () => {
