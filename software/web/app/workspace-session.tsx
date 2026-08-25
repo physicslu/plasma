@@ -55,6 +55,8 @@ type WorkspaceSessionContextValue = {
   setPmodDraftSelection: Dispatch<SetStateAction<SelectionMap>>;
   pmodActiveSelection: SelectionMap;
   setPmodActiveSelection: Dispatch<SetStateAction<SelectionMap>>;
+  pmodBatchSelection: SelectionMap;
+  setPmodBatchSelection: Dispatch<SetStateAction<SelectionMap>>;
   pmodOperations: Operation[];
   setPmodOperations: Dispatch<SetStateAction<Operation[]>>;
   pmodSelectorCollapsed: boolean;
@@ -92,8 +94,12 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
 
   const [programmingImage, setProgrammingImage] = useState<File | null>(null);
 
+  // Production deliberately owns three different scopes:
+  // draft = editable tree intent, active = committed Production Set,
+  // batch = Sites selected for the next/current immutable Batch snapshot.
   const [pmodDraftSelection, setPmodDraftSelection] = useState<SelectionMap>({});
   const [pmodActiveSelection, setPmodActiveSelection] = useState<SelectionMap>({});
+  const [pmodBatchSelection, setPmodBatchSelection] = useState<SelectionMap>({});
   const [pmodOperations, setPmodOperations] = useState<Operation[]>([]);
   const [pmodSelectorCollapsed, setPmodSelectorCollapsed] = useState(false);
 
@@ -195,6 +201,8 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     setPmodDraftSelection,
     pmodActiveSelection,
     setPmodActiveSelection,
+    pmodBatchSelection,
+    setPmodBatchSelection,
     pmodOperations,
     setPmodOperations,
     pmodSelectorCollapsed,
@@ -223,6 +231,7 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     programmingImage,
     pmodDraftSelection,
     pmodActiveSelection,
+    pmodBatchSelection,
     pmodOperations,
     pmodSelectorCollapsed,
     emodeSection,
