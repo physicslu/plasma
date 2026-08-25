@@ -218,9 +218,11 @@ test("Production Set stays visible while the operator changes next-Batch PPU/Sit
   await commitTwoSiteProductionSet(page);
 
   const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
+  const facility = live.getByRole("checkbox", { name: "Batch select Mock Facility 01", exact: true });
   const ppu = live.getByRole("checkbox", { name: "Batch select Mock PPU 01", exact: true });
   const site1 = live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01", exact: true });
   const site2 = live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02", exact: true });
+  await expect(facility).toBeChecked();
   await expect(ppu).toBeChecked();
   await expect(site1).toBeChecked();
   await expect(site2).toBeChecked();
@@ -229,11 +231,33 @@ test("Production Set stays visible while the operator changes next-Batch PPU/Sit
   await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
   await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("1");
   await expect.poll(() => ppu.evaluate((element: HTMLInputElement) => element.indeterminate)).toBe(true);
+  await expect.poll(() => facility.evaluate((element: HTMLInputElement) => element.indeterminate)).toBe(true);
   await expect(live.locator('[data-production-site="2"]')).toHaveAttribute("data-batch-selected", "false");
+
+  await facility.check();
+  await expect(site2).toBeChecked();
+  await facility.uncheck();
+  await expect(site1).not.toBeChecked();
+  await expect(site2).not.toBeChecked();
+  await facility.check();
 
   await page.getByRole("button", { name: /收起|Hide/ }).click();
   await expect(page.getByRole("region", { name: "PRODUCTION SITE SELECTION" }).locator(".operatorPanelBody")).toBeHidden();
   await expect(live.locator(".factorySiteLedCard")).toHaveCount(2);
+});
+
+test("Production Programming Job collapse preserves the complete Batch action row", async ({ page }) => {
+  await installFactoryMock(page);
+  await commitTwoSiteProductionSet(page);
+
+  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
+  await programming.getByRole("button", { name: "Collapse Production Programming Job" }).click();
+  await expect(programming.getByLabel("Target IC")).toBeHidden();
+  await expect(programming.getByRole("button", { name: /START PROGRAMMING/ })).toBeVisible();
+  await expect(programming.getByRole("status", { name: "BATCH STATUS" })).toBeVisible();
+  await expect(programming.getByRole("button", { name: /ABORT/ })).toBeVisible();
+  await programming.getByRole("button", { name: "Expand Production Programming Job" }).click();
+  await expect(programming.getByLabel("Target IC")).toBeVisible();
 });
 
 test("START snapshots Batch membership; running selection is locked and only whole-Batch ABORT is exposed", async ({ page }) => {
@@ -250,6 +274,7 @@ test("START snapshots Batch membership; running selection is locked and only who
   expect(mock.submissions[0].target_device).toEqual({ vendor: "STMicroelectronics", identifier: "STM32F103C8T6" });
 
   const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
+  await expect(live.getByRole("checkbox", { name: "Batch select Mock Facility 01", exact: true })).toBeDisabled();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01", exact: true })).toBeDisabled();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeDisabled();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).toBeDisabled();

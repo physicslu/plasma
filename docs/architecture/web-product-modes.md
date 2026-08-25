@@ -151,7 +151,7 @@ Engineering UI
          -> RealPPUProvider             (future)
 ```
 
-The current server-side Mock provider creates three Mock Facilities with four PPUs per Facility. Their Site counts are 2 / 4 / 6 / 8, for 12 PPUs and 60 Sites total. These are Python-owned targets, not React fixtures. Each Mock PPU is backed by a real in-process `PlasmaServer`, `SiteManager` / `SiteWorker`, Protocol v3.3 path and `MockInterface`.
+The current server-side Mock provider creates eight Mock Facilities with four PPUs per Facility. Their Site counts are 2 / 4 / 6 / 8, for 32 PPUs and 160 Sites total. These are Python-owned targets, not React fixtures. Each Mock PPU is backed by a real in-process `PlasmaServer`, `SiteManager` / `SiteWorker`, Protocol v3.3 path and `MockInterface`.
 
 Engineering Programming supports per-Site and batch E/P/V/R, Programming Image selection, Read ranges, Job progress/status, cancellation, Read download and engineering logs. Target switching is blocked while a selected PPU has an active/submitting Job so a running target cannot be silently orphaned by the UI.
 

@@ -57,6 +57,11 @@ Facility
 
 Facility and PPU checkboxes support all/none/indeterminate semantics. The tree can be collapsed or hidden after the Production Set is committed; hiding the tree changes presentation only and must not delete the committed Production Set.
 
+LIVE SITE STATUS repeats the same Facility / PPU / Site selection hierarchy for
+the next Batch. Facility and PPU master checkboxes select or clear all
+Production Set Sites below them, expose an indeterminate state for partial
+membership, and become immutable after START.
+
 ## LIVE SITE STATUS
 
 LIVE SITE STATUS remains LED-first rather than table-first because Production operators need to scan many Sites at once.
@@ -113,7 +118,7 @@ An ABORT never rewrites already established execution facts. Completed successfu
 
 ## Manufacturing KPI contract
 
-The top KPI strip separates equipment scope, planned IC quantity, current Site execution, and adjudicated IC results:
+The top KPI strip is named **BATCH SUMMARY** and separates equipment scope, planned IC quantity, current Site execution, and adjudicated IC results:
 
 ```text
 SITES       committed Production Set Site count
@@ -185,3 +190,9 @@ Engineering -> direct Engineering PPU Jobs, single PPU
 ```
 
 Visual consistency must not collapse these two execution domains into one scheduler.
+
+The PMode Programming Job panel is independently collapsible. Its collapsed
+form hides Target IC, Programming Image, Operations, and Batch Policy while
+keeping the complete START PROGRAMMING / BATCH STATUS / ABORT action row
+visible. Collapsing a panel changes presentation only and never mutates Batch
+selection, policy, execution, or server-owned runtime state.

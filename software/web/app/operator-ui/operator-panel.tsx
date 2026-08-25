@@ -8,15 +8,33 @@ export type OperatorKpi = {
   tone?: "neutral" | "info" | "pass" | "fail";
 };
 
-export function OperatorKpiStrip({ items, ariaLabel }: { items: OperatorKpi[]; ariaLabel: string }) {
+export function OperatorKpiStrip({
+  items,
+  ariaLabel,
+  title,
+  meta,
+}: {
+  items: OperatorKpi[];
+  ariaLabel: string;
+  title?: string;
+  meta?: ReactNode;
+}) {
   return (
-    <section className="operatorKpiStrip" aria-label={ariaLabel}>
-      {items.map(item => (
-        <article key={item.key} data-kpi={item.key} data-tone={item.tone ?? "neutral"}>
-          <small>{item.label}</small>
-          <b>{item.value}</b>
-        </article>
-      ))}
+    <section className={`operatorKpiSummary ${title ? "has-title" : ""}`.trim()} aria-label={ariaLabel}>
+      {title && (
+        <header className="operatorKpiSummaryHeader">
+          <strong>{title}</strong>
+          {meta && <small>{meta}</small>}
+        </header>
+      )}
+      <div className="operatorKpiStrip">
+        {items.map(item => (
+          <article key={item.key} data-kpi={item.key} data-tone={item.tone ?? "neutral"}>
+            <small>{item.label}</small>
+            <b>{item.value}</b>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

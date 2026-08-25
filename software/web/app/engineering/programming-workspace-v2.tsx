@@ -7,6 +7,7 @@ import { evaluateBatchReadiness } from "../batch-readiness";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
+import { OperatorKpiStrip } from "../operator-ui/operator-panel";
 import {
   cancelJob,
   engineeringTargetApiBase,
@@ -75,6 +76,12 @@ type PendingRestore = {
 };
 
 type StopPolicy = { kind: "never" } | { kind: "failed_sites"; threshold: number };
+type BatchManufacturingSummary = {
+  sites: number;
+  totalIc: number;
+  pass: number;
+  fail: number;
+};
 
 const MAX_IMAGE_ASSET_BYTES = 16 * 1024 * 1024;
 const MAX_LOG_ENTRIES = 1000;
@@ -182,6 +189,15 @@ function resultLabel(stage: Stage): string {
   return "—";
 }
 
+function formatElapsedTime(milliseconds: number | null): string {
+  if (milliseconds === null || !Number.isFinite(milliseconds) || milliseconds < 0) return "00:00:00";
+  const elapsedSeconds = Math.floor(milliseconds / 1000);
+  const hours = Math.floor(elapsedSeconds / 3600);
+  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+  const seconds = elapsedSeconds % 60;
+  return [hours, minutes, seconds].map(value => String(value).padStart(2, "0")).join(":");
+}
+
 export default function ProgrammingWorkspaceV2() {
   const { locale, t } = useI18n();
   const {
@@ -224,7 +240,10 @@ export default function ProgrammingWorkspaceV2() {
   const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);
   const [batchStartedAt, setBatchStartedAt] = useState<number | null>(null);
   const [lastCycleMs, setLastCycleMs] = useState<number | null>(null);
+  const [batchManufacturing, setBatchManufacturing] = useState<BatchManufacturingSummary | null>(null);
   const [clock, setClock] = useState(() => Date.now());
+  const [setupCollapsed, setSetupCollapsed] = useState(false);
+  const [programmingJobCollapsed, setProgrammingJobCollapsed] = useState(false);
 
   const trackedJobs = useRef<Record<number, string>>({});
   const submissionGenerations = useRef<Record<number, number>>({});
@@ -322,11 +341,27 @@ export default function ProgrammingWorkspaceV2() {
       cancelled: selectedSites.filter(site => site.stage === "cancelled").length,
     };
   })();
-  const completedIc = activeFpsCounts.pass + activeFpsCounts.faulted;
-  const yieldPercent = completedIc > 0 ? (activeFpsCounts.pass / completedIc) * 100 : 0;
+  const previewTotalIc = selectedSiteIds.length * (repeatValue ?? 0);
+  const displayedBatch = batchManufacturing ?? {
+    sites: selectedSiteIds.length,
+    totalIc: previewTotalIc,
+    pass: 0,
+    fail: 0,
+  };
+  const completedIc = displayedBatch.pass + displayedBatch.fail;
+  const yieldPercent = completedIc > 0 ? (displayedBatch.pass / completedIc) * 100 : 0;
   const displayedTargetDevice = targetDeviceLabel(targetDevice);
   const cycleMs = batchStartedAt !== null ? Math.max(0, clock - batchStartedAt) : lastCycleMs;
-  const cycleTimeLabel = cycleMs === null ? "--" : `${(cycleMs / 1000).toFixed(1)}s`;
+  const batchTimeLabel = formatElapsedTime(cycleMs);
+  const batchKpis = [
+    { key: "sites", label: "SITES", value: sites.length || ppu?.site_count || selectedPPU?.site_count || 0 },
+    { key: "total-ic", label: "TOTAL IC", value: displayedBatch.totalIc },
+    { key: "running", label: "RUNNING", value: activeFpsCounts.running },
+    { key: "pass", label: "PASS", value: displayedBatch.pass, tone: "pass" as const },
+    { key: "fail", label: "FAIL", value: displayedBatch.fail, tone: "fail" as const },
+    { key: "yield", label: "YIELD", value: `${yieldPercent.toFixed(1)}%`, tone: "info" as const },
+    { key: "batch-time", label: "BATCH TIME", value: batchTimeLabel },
+  ];
 
   const appendLog = useCallback((
     message: string,
@@ -378,6 +413,9 @@ export default function ProgrammingWorkspaceV2() {
     setSubmittingSiteIds([]);
     setBatchRunning(false);
     setBatchCancelling(false);
+    setBatchManufacturing(null);
+    setBatchStartedAt(null);
+    setLastCycleMs(null);
   }, [setSelectedSiteIdsState]);
 
   const switchTarget = useCallback((next: TargetSelection) => {
@@ -754,6 +792,7 @@ export default function ProgrammingWorkspaceV2() {
     const operations = [...selectedOperations];
     const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
     const cycleStart = Date.now();
+    setBatchManufacturing({ sites: siteIds.length, totalIc: siteIds.length * repeatValue, pass: 0, fail: 0 });
     setBatchStartedAt(cycleStart);
     setLastCycleMs(null);
     appendLog(
@@ -845,6 +884,7 @@ export default function ProgrammingWorkspaceV2() {
                   continue;
                 }
                 faultedSites.add(siteId);
+                setBatchManufacturing(current => current ? { ...current, fail: current.fail + 1 } : current);
                 terminalize(siteId, "faulted", finalJob.result?.error?.message);
                 await triggerThresholdIfNeeded();
                 return;
@@ -858,6 +898,7 @@ export default function ProgrammingWorkspaceV2() {
             }
             if (!operationSucceeded) return;
           }
+          setBatchManufacturing(current => current ? { ...current, pass: current.pass + 1 } : current);
         }
         terminalize(siteId, "success");
       }));
@@ -933,20 +974,26 @@ export default function ProgrammingWorkspaceV2() {
           </form>
         </header>
 
-        <section className="productionProgrammingKpis" aria-label="Engineering programming KPIs">
-          <article><small>PPU SITES</small><b>{sites.length || ppu?.site_count || selectedPPU?.site_count || 0}</b></article>
-          <article><small>SELECTED</small><b>{selectedSiteIds.length}</b></article>
-          <article><small>RUNNING</small><b>{activeFpsCounts.running}</b></article>
-          <article data-kpi="pass"><small>PASS</small><b>{activeFpsCounts.pass}</b></article>
-          <article data-kpi="fail"><small>FAIL</small><b>{activeFpsCounts.faulted}</b></article>
-          <article data-kpi="yield"><small>YIELD</small><b>{yieldPercent.toFixed(1)}%</b></article>
-          <article><small>CYCLE TIME</small><b>{cycleTimeLabel}</b></article>
-        </section>
+        <OperatorKpiStrip
+          items={batchKpis}
+          ariaLabel="Engineering Batch Summary"
+          title="BATCH SUMMARY"
+          meta={`${batchManufacturing ? "Current Batch" : "Batch Preview"} · ${displayedBatch.sites} Sites · ${displayedBatch.totalIc} ICs`}
+        />
 
         <div className="productionProgrammingWorkflow">
-          <section className="productionProgrammingCard targetingCard">
-            <header>SYSTEM SETUP &amp; TARGETING</header>
-            <div className="cardBody">
+          <section className={`productionProgrammingCard targetingCard ${setupCollapsed ? "is-collapsed" : ""}`}>
+            <header>
+              SYSTEM SETUP &amp; TARGETING
+              <button
+                type="button"
+                className="engineeringPanelToggle"
+                aria-label={`${setupCollapsed ? "Expand" : "Collapse"} System Setup`}
+                aria-expanded={!setupCollapsed}
+                onClick={() => setSetupCollapsed(current => !current)}
+              >{setupCollapsed ? "展開⌄" : "收合⌃"}</button>
+            </header>
+            <div className="cardBody" hidden={setupCollapsed}>
               <h2>SERVER TOPOLOGY</h2>
               <label className="workflowField">
                 <span>Select Facility:</span>
@@ -981,9 +1028,18 @@ export default function ProgrammingWorkspaceV2() {
           </section>
 
           <div className="productionProgrammingRight">
-            <section className="productionProgrammingCard programmingJobCard unifiedBatchControlStack" data-dashboard-mode="engineering">
-              <header>PROGRAMMING JOB</header>
-              <div className="cardBody programmingJobBody programmingBatchToolbar">
+            <section className={`productionProgrammingCard programmingJobCard unifiedBatchControlStack ${programmingJobCollapsed ? "is-collapsed" : ""}`} data-dashboard-mode="engineering">
+              <header>
+                PROGRAMMING JOB
+                <button
+                  type="button"
+                  className="engineeringPanelToggle"
+                  aria-label={`${programmingJobCollapsed ? "Expand" : "Collapse"} Programming Job`}
+                  aria-expanded={!programmingJobCollapsed}
+                  onClick={() => setProgrammingJobCollapsed(current => !current)}
+                >{programmingJobCollapsed ? "展開⌄" : "收合⌃"}</button>
+              </header>
+              <div className={`cardBody programmingJobBody programmingBatchToolbar ${programmingJobCollapsed ? "is-collapsed" : ""}`}>
                 <div className="jobRow">
                   <strong>1. Target IC</strong>
                   <ICPickerField apiBase={apiBase} value={targetDevice} onChange={selectTargetDevice} disabled={targetLocked} placeholder="Search ICPN / IC identifier..." />

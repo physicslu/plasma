@@ -100,6 +100,8 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.doesNotMatch(source, /setBatchState/);
   assert.match(source, /Batch select \$\{active\.target\.display_name\}/);
   assert.match(source, /Batch select \$\{active\.target\.display_name\} \$\{siteLabel\(site\.id\)\}/);
+  assert.match(source, /toggleBatchFacility/);
+  assert.match(source, /Batch select \$\{group\.facility\.display_name\}/);
   assert.match(source, /disabled=\{batchRunning \|\| !site\.enabled\}/);
   assert.match(source, /data-batch-selected=\{selected \? "true" : "false"\}/);
 
@@ -136,6 +138,9 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /label: "FAIL"/);
   assert.match(source, /label: "YIELD"/);
   assert.match(source, /label: "BATCH TIME"/);
+  assert.match(source, /programmingJobCollapsed/);
+  assert.match(source, /Collapse"\} Production Programming Job/);
+  assert.match(source, /!programmingJobCollapsed && <div className="factoryJobGrid">/);
 
   assert.match(css, /--site-card-w/);
   assert.match(css, /density-dense/);

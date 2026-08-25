@@ -462,8 +462,8 @@ Stop the sampler with `Ctrl-C` after the Batch and post-Batch idle measurement a
 
 In Production:
 
-1. Select all 3 Facilities.
-2. Select all 12 PPUs.
+1. Select all 8 Facilities.
+2. Select all 32 PPUs.
 3. Confirm total selected Sites = 60.
 4. Select the same 4 MiB BIN.
 5. Select `Erase + Program + Verify`.
@@ -476,7 +476,7 @@ In Production:
 Required functional result for this zero-error profile:
 
 ```text
-60 Sites SUCCESS
+160 Sites SUCCESS
 0 FAULTED
 0 ERROR
 0 STOPPED
@@ -487,7 +487,7 @@ Batch SUCCESS
 Expected logical operation counts:
 
 ```text
-Erase   = 60 Sites x 3 rounds = 180
+Erase   = 160 Sites x 3 rounds = 480
 Program = 180
 Verify  = 180
 ```
@@ -526,7 +526,7 @@ PASS requires all of the following:
 - no process OOM or restart;
 - no Gateway/Provider/Server crash;
 - no deadlock or permanently RUNNING Site;
-- all 60 Sites complete with the zero-error expected result;
+- all 160 Sites complete with the zero-error expected result;
 - one 4 MiB Programming Asset is reused through the shared-image path;
 - peak/current memory is measured and retained;
 - post-Batch RSS returns toward a stable level rather than growing without bound across the three rounds;

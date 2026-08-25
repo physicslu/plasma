@@ -54,7 +54,7 @@ For Browser Runtime Acceptance, PPU A's REST Gateway additionally enables the se
   x 4 Mock PPUs per Facility
     -> 2 / 4 / 6 / 8 Sites
 
-Total: 12 Mock PPUs / 60 Sites
+Total: 32 Mock PPUs / 160 Sites
 ```
 
 Each Engineering Mock PPU is a real in-process `PlasmaServer` runtime backed by `MockInterface`. It is not added to the Production Manager registry and does not change the baseline Production/Fleet capacity counts.
@@ -145,7 +145,7 @@ The acceptance scenarios are:
    - require the resulting dispatch multiset to equal `selected Sites × selected operations` exactly, which also proves unselected Sites and unselected operations receive no jobs.
 
 4. **Engineering server catalog and selected-PUU execution**
-   - require the Gateway's real `/api/engineering/targets` catalog to report 3 Facilities / 12 PPUs / 60 Sites;
+   - require the Gateway's real `/api/engineering/targets` catalog to report 8 Facilities / 32 PPUs / 160 Sites;
    - enter `Engineering -> Programming` through the actual Web UI;
    - select the runtime-provided representative Facility and 6-Site PPU;
    - require the rendered Site topology to come from that selected PPU STATUS and contain no `SITE 0`;

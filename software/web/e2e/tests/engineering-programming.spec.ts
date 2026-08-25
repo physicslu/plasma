@@ -6,11 +6,11 @@ function catalog() {
   return {
     ok: true,
     provider: "mock",
-    facility_count: 3,
-    ppu_count: 12,
-    site_count: 60,
+    facility_count: 8,
+    ppu_count: 32,
+    site_count: 160,
     programming_asset_scope: "connection-session-and-ppu",
-    facilities: Array.from({ length: 3 }, (_, facilityIndex) => {
+    facilities: Array.from({ length: 8 }, (_, facilityIndex) => {
       const facilityNumber = facilityIndex + 1;
       const facilityId = `mock-facility-${String(facilityNumber).padStart(2, "0")}`;
       return {
@@ -117,7 +117,7 @@ test("Engineering Programming topology comes from the Python target catalog", as
   });
 
   await openProgramming(page);
-  await expect(page.locator(".topologyFoot")).toContainText("System Topology: 3 Facilities | 12 PPUs | 60 Sites");
+  await expect(page.locator(".topologyFoot")).toContainText("System Topology: 8 Facilities | 32 PPUs | 160 Sites");
 
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });

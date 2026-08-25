@@ -107,7 +107,7 @@ class MockFlashStateTests(unittest.TestCase):
             store = SharedImageStore(directory)
             image = bytes(range(256)) * (4 * 1024 * 1024 // 256)
             ref = store.put(image)
-            sites = [MockFlashState(4 * 1024 * 1024) for _ in range(60)]
+            sites = [MockFlashState(4 * 1024 * 1024) for _ in range(160)]
             for site in sites:
                 site.program_shared(image_sha256=ref.sha256, image_size_bytes=ref.size_bytes)
             self.assertEqual(ref.size_bytes, 4 * 1024 * 1024)

@@ -48,6 +48,26 @@
   }
 }
 
+/* A collapsed Programming Job remains an operational control surface: only
+ * Batch readiness and the two Batch actions stay visible. */
+.engineeringProgrammingV2 .programmingJobBody.is-collapsed > .jobRow,
+.engineeringProgrammingV2 .programmingJobBody.is-collapsed > .warning,
+.engineeringProgrammingV2 .programmingJobBody.is-collapsed > .engineeringOperationWarning {
+  display: none !important;
+}
+
+.engineeringProgrammingV2 .programmingJobBody.is-collapsed {
+  min-height: 0;
+  padding-block: 8px;
+}
+
+@container engineering-programming (min-width: 981px) {
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar.is-collapsed > .batchReadiness,
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar.is-collapsed > .programmingActions {
+    grid-row: 1;
+  }
+}
+
 /* Once the workspace stacks vertically, right-aligned labels no longer help
  * scanning. Restore the natural left alignment for the mobile layout. */
 @media (max-width: 760px) {

@@ -385,6 +385,7 @@ export default function FactoryConsoleV2() {
   const [siteRetryLimit, setSiteRetryLimit] = useState("3");
   const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [programmingJobCollapsed, setProgrammingJobCollapsed] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
@@ -804,6 +805,24 @@ export default function FactoryConsoleV2() {
     setBatchPpuSites(active.facility.facility_id, active.target.ppu_id, current.length === active.siteIds.length ? [] : active.siteIds);
   }
 
+  function toggleBatchFacility(facilityId: string, targets: ProductionTarget[]) {
+    if (batchRunning) {
+      setOperatorWarning(text.batchSelectionLocked);
+      return;
+    }
+    const totalSites = targets.reduce((total, active) => total + active.siteIds.length, 0);
+    const selectedSites = targets.reduce(
+      (total, active) => total + (batchSelection[facilityId]?.[active.target.ppu_id] ?? []).length,
+      0,
+    );
+    setBatchSelection(current => {
+      const next = cloneSelection(current);
+      if (totalSites > 0 && selectedSites === totalSites) delete next[facilityId];
+      else next[facilityId] = Object.fromEntries(targets.map(active => [active.target.ppu_id, [...active.siteIds]]));
+      return normalizeSelection(next);
+    });
+  }
+
   function toggleBatchSite(active: ProductionTarget, siteId: number) {
     const current = batchSelection[active.facility.facility_id]?.[active.target.ppu_id] ?? [];
     setBatchPpuSites(active.facility.facility_id, active.target.ppu_id, current.includes(siteId) ? current.filter(id => id !== siteId) : [...current, siteId]);
@@ -922,7 +941,12 @@ export default function FactoryConsoleV2() {
 
         {catalog && (
           <>
-            <OperatorKpiStrip items={kpis} ariaLabel="Production KPI" />
+            <OperatorKpiStrip
+              items={kpis}
+              ariaLabel="Production Batch Summary"
+              title="BATCH SUMMARY"
+              meta={`${batchSnapshot ? "Current Batch" : "Batch Preview"} · ${batchSnapshot?.sites.length ?? batchCounts.sites} Sites · ${plannedIcCount} ICs`}
+            />
 
             <OperatorPanel
               number={1}
@@ -1013,8 +1037,23 @@ export default function FactoryConsoleV2() {
               </div>
             </OperatorPanel>
 
-            <OperatorPanel number={2} title={text.programmingJob} className="factoryProgrammingJob">
-              <div className="factoryJobGrid">
+            <OperatorPanel
+              number={2}
+              title={text.programmingJob}
+              className={`factoryProgrammingJob ${programmingJobCollapsed ? "is-collapsed" : ""}`}
+              actions={(
+                <button
+                  type="button"
+                  className="selectionVisibilityButton"
+                  aria-label={`${programmingJobCollapsed ? "Expand" : "Collapse"} Production Programming Job`}
+                  aria-expanded={!programmingJobCollapsed}
+                  onClick={() => setProgrammingJobCollapsed(current => !current)}
+                >
+                  {programmingJobCollapsed ? text.showSelection : text.hideSelection} {programmingJobCollapsed ? "⌄" : "⌃"}
+                </button>
+              )}
+            >
+              {!programmingJobCollapsed && <div className="factoryJobGrid">
                 <label className="factoryField targetField">
                   <strong>1. {text.targetIc}</strong>
                   <ICPickerField apiBase={apiBase} value={targetDevice} onChange={setTargetDevice} disabled={batchRunning} />
@@ -1073,7 +1112,7 @@ export default function FactoryConsoleV2() {
                     </label>
                   </div>
                 </div>
-              </div>
+              </div>}
 
               <div className="factoryActionBar">
                 <button type="button" className="factoryStartButton" onClick={() => void executeBatch()} disabled={!batchReadiness.ready || !policyValid}>▶ {text.start}</button>
@@ -1105,10 +1144,32 @@ export default function FactoryConsoleV2() {
 
               {!productionSetCounts.sites ? <div className="factoryEmptySet">{text.noProductionSet}</div> : (
                 <div className="factoryFacilityStack">
-                  {groupedProductionTargets.map(group => (
-                    <section className="factoryFacilityGroup" key={group.facility.facility_id} data-production-facility={group.facility.facility_id}>
-                      <header><b>{group.facility.display_name}</b><span>{group.targets.length} PPUs</span></header>
-                      <div className="factoryPpuRows">
+                  {groupedProductionTargets.map(group => {
+                    const facilityId = group.facility.facility_id;
+                    const totalSites = group.targets.reduce((total, active) => total + active.siteIds.length, 0);
+                    const selectedSites = group.targets.reduce(
+                      (total, active) => total + (displayedBatchSelection[facilityId]?.[active.target.ppu_id] ?? []).length,
+                      0,
+                    );
+                    const allSelected = totalSites > 0 && selectedSites === totalSites;
+                    const partiallySelected = selectedSites > 0 && selectedSites < totalSites;
+                    return (
+                      <section className="factoryFacilityGroup" key={facilityId} data-production-facility={facilityId}>
+                        <header>
+                          <div className="factoryFacilitySelection">
+                            <input
+                              type="checkbox"
+                              aria-label={`Batch select ${group.facility.display_name}`}
+                              checked={allSelected}
+                              disabled={batchRunning}
+                              ref={element => { if (element) element.indeterminate = partiallySelected; }}
+                              onChange={() => toggleBatchFacility(facilityId, group.targets)}
+                            />
+                            <b>{group.facility.display_name}</b>
+                          </div>
+                          <span>{group.targets.length} PPUs · {selectedSites}/{totalSites} Sites selected</span>
+                        </header>
+                        <div className="factoryPpuRows">
                         {group.targets.map(active => {
                           const runtime = runtimes[active.key];
                           const selectedSiteIds = displayedBatchSelection[active.facility.facility_id]?.[active.target.ppu_id] ?? [];
@@ -1164,9 +1225,10 @@ export default function FactoryConsoleV2() {
                             </section>
                           );
                         })}
-                      </div>
-                    </section>
-                  ))}
+                        </div>
+                      </section>
+                    );
+                  })}
                 </div>
               )}
             </OperatorPanel>

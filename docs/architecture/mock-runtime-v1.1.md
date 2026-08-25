@@ -43,11 +43,11 @@ The Engineering Mock Provider is implemented by `MockEngineeringPPUProvider` and
 
 Topology:
 
-- 3 Facilities.
+- 8 Facilities.
 - 4 PPUs per Facility.
 - PPU Site counts: 2, 4, 6, 8.
-- 12 PPUs total.
-- 60 Sites total.
+- 32 PPUs total.
+- 160 Sites total.
 - Site IDs are one-based.
 
 Each virtual PPU is an in-process `PlasmaServer` runtime backed by `MockInterface`.

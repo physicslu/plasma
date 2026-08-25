@@ -86,7 +86,7 @@ one Synthetic Programming Asset/Image snapshot
   -> per-Site logical Mock Flash backing/overlay
 ```
 
-A 4 MiB Synthetic Image used by 60 Sites is therefore intended to exercise the same shared-image memory model as one uploaded 4 MiB Programming Image.
+A 4 MiB Synthetic Image used by 160 Sites is therefore intended to exercise the same shared-image memory model as one uploaded 4 MiB Programming Image.
 
 This does not by itself prove the SWPC memory acceptance gate; actual RSS/high-water measurement remains a separate deployment acceptance step.
 

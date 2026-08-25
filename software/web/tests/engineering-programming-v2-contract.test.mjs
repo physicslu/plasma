@@ -19,6 +19,9 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.match(workspace, /Programming Image/);
   assert.match(workspace, /START PROGRAMMING/);
   assert.match(workspace, /LIVE SITE STATUS/);
+  assert.match(workspace, /aria-label=\{`\$\{setupCollapsed \? "Expand" : "Collapse"\} System Setup`\}/);
+  assert.match(workspace, /aria-label=\{`\$\{programmingJobCollapsed \? "Expand" : "Collapse"\} Programming Job`\}/);
+  assert.match(workspace, /programmingJobCollapsed \? "is-collapsed" : ""/);
   assert.doesNotMatch(workspace, /TARGET SITES/);
   assert.doesNotMatch(workspace, /LIVE PROGRESS MONITOR/);
 
@@ -54,12 +57,29 @@ test("LIVE SITE STATUS owns Batch Site selection while keeping every PPU Site vi
   assert.match(workspace, /disabled=\{batchRunning \|\| !site\.enabled \|\| isRunning\(site\)\}/);
 });
 
-test("Engineering KPI separates PPU topology from Batch membership", async () => {
+test("Engineering Batch Summary uses the Production KPI vocabulary and IC outcome semantics", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
 
-  assert.match(workspace, /<small>PPU SITES<\/small>/);
-  assert.match(workspace, /<small>SELECTED<\/small>/);
-  assert.doesNotMatch(workspace, /<small>TOTAL IC<\/small>/);
+  assert.match(workspace, /title="BATCH SUMMARY"/);
+  for (const label of ["SITES", "TOTAL IC", "RUNNING", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
+    assert.match(workspace, new RegExp(`label: "${label}"`));
+  }
+  assert.match(workspace, /totalIc: siteIds\.length \* repeatValue/);
+  assert.match(workspace, /pass: current\.pass \+ 1/);
+  assert.match(workspace, /fail: current\.fail \+ 1/);
+  assert.doesNotMatch(workspace, /CYCLE TIME/);
+});
+
+test("Production and Engineering use the same named Batch Summary primitive", async () => {
+  const production = await source("../app/fleet/factory-console-v2.tsx");
+  const engineering = await source("../app/engineering/programming-workspace-v2.tsx");
+  const operatorPanel = await source("../app/operator-ui/operator-panel.tsx");
+
+  assert.match(operatorPanel, /operatorKpiSummaryHeader/);
+  assert.match(production, /ariaLabel="Production Batch Summary"/);
+  assert.match(production, /title="BATCH SUMMARY"/);
+  assert.match(engineering, /ariaLabel="Engineering Batch Summary"/);
+  assert.match(engineering, /title="BATCH SUMMARY"/);
 });
 
 test("Engineering Programming keeps direct PPU jobs rather than borrowing Production server Batch ownership", async () => {

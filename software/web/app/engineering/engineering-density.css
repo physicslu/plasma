@@ -148,29 +148,29 @@
 /* PASS / FAIL are operator-decision KPIs, not topology metadata. Keep their
  * footprint unchanged but give them a stronger semantic field than a single
  * edge line so they remain identifiable in peripheral vision. */
-.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"],
-.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] {
+.engineeringProgrammingV2 .operatorKpiStrip [data-kpi="pass"],
+.engineeringProgrammingV2 .operatorKpiStrip [data-kpi="fail"] {
   border-left-width: 4px;
 }
 
-.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"] {
+.engineeringProgrammingV2 .operatorKpiStrip [data-kpi="pass"] {
   border-left-color: #15803d;
   background: color-mix(in srgb, #15803d 7%, var(--panel));
 }
 
-.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] {
+.engineeringProgrammingV2 .operatorKpiStrip [data-kpi="fail"] {
   border-left-color: #dc2626;
   background: color-mix(in srgb, #dc2626 7%, var(--panel));
 }
 
-.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"] small,
-.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] small {
+.engineeringProgrammingV2 .operatorKpiStrip [data-kpi="pass"] small,
+.engineeringProgrammingV2 .operatorKpiStrip [data-kpi="fail"] small {
   font-size: 10px;
   font-weight: 900;
 }
 
-.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"] b,
-.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] b {
+.engineeringProgrammingV2 .operatorKpiStrip [data-kpi="pass"] b,
+.engineeringProgrammingV2 .operatorKpiStrip [data-kpi="fail"] b {
   margin-top: 2px;
   font-size: 30px;
   font-weight: 900;

@@ -139,9 +139,9 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
                 "ok": True,
                 "rest_contract_version": "3",
                 "provider": "mock",
-                "facility_count": 3,
-                "ppu_count": 12,
-                "site_count": 60,
+                "facility_count": 8,
+                "ppu_count": 32,
+                "site_count": 160,
             }
         if path == "/api/mock/runtime":
             return {

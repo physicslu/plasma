@@ -18,7 +18,7 @@ from plasma_core.models import JobRequest, validate_job_id
 from plasma_server.server import PlasmaServer
 
 
-MOCK_FACILITY_COUNT = 3
+MOCK_FACILITY_COUNT = 8
 MOCK_SITE_COUNTS = (2, 4, 6, 8)
 MOCK_FLASH_SIZE_BYTES = 4 * 1024 * 1024
 MOCK_MAX_CACHED_ASSET_BYTES = 16 * 1024 * 1024

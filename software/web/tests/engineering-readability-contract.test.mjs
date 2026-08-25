@@ -14,7 +14,7 @@ test("Engineering readability layer raises the approved operator font floor", as
   const css = await source(readabilityPath);
 
   for (const contract of [
-    ".productionProgrammingKpis small {\n  font-size: 10px;",
+    ".operatorKpiStrip article small {\n  font-size: 10px;",
     ".liveSiteStatus > header > span::before {\n  font-size: 12px;",
     ".workflowField select,\n.engineeringProgrammingV2 .jobRow,",
     ".workflowField > span {\n  font-size: 12px;",
