@@ -122,7 +122,7 @@ test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR
   expect(headingColor).toBe("rgb(233, 243, 248)");
 });
 
-test("Emode v2 stays dense with the approved sidebar, image picker and dark operator palette", async ({ page }) => {
+test("Emode v2 stays dense with centered Batch status and target-owned READ", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
   const theme = page.getByRole("group", { name: "Theme" });
@@ -192,13 +192,20 @@ test("Emode v2 stays dense with the approved sidebar, image picker and dark oper
   const policyControlY = [repeat!.y, retry!.y, stopPolicy!.y];
   expect(Math.max(...policyControlY) - Math.min(...policyControlY)).toBeLessThanOrEqual(2);
   expect(Math.abs(operations!.y - policy!.y)).toBeLessThanOrEqual(6);
-  expect(readiness!.y).toBeGreaterThanOrEqual(policy!.y + policy!.height - 2);
-  expect(actions!.y).toBeGreaterThanOrEqual(readiness!.y + readiness!.height - 2);
-  expect(actions!.y - (readiness!.y + readiness!.height)).toBeLessThanOrEqual(24);
+  const actionCenterY = actions!.y + actions!.height / 2;
+  const readinessCenterY = readiness!.y + readiness!.height / 2;
+  expect(Math.abs(actionCenterY - readinessCenterY)).toBeLessThanOrEqual(3);
   expect(actions!.width).toBeGreaterThanOrEqual(jobBody!.width - 40);
   expect(Math.abs(startButton!.width - abortButton!.width)).toBeLessThanOrEqual(2);
   expect(Math.abs(startButton!.x - actions!.x)).toBeLessThanOrEqual(2);
   expect(Math.abs((abortButton!.x + abortButton!.width) - (actions!.x + actions!.width))).toBeLessThanOrEqual(2);
+  expect(startButton!.x + startButton!.width).toBeLessThan(readiness!.x);
+  expect(readiness!.x + readiness!.width).toBeLessThan(abortButton!.x);
+
+  await page.getByLabel("Engineering batch read").check();
+  await expect(page.locator(".engineeringReadRow")).toBeHidden();
+  await expect(page.getByLabel("Engineering READ offset")).toBeHidden();
+  await expect(page.getByLabel("Engineering READ length")).toBeHidden();
 
   const passKpi = await page.locator('[data-kpi="pass"]').evaluate(element => {
     const style = getComputedStyle(element);
