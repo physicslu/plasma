@@ -9,6 +9,7 @@ import "./engineering.css";
 import "./engineering-density.css";
 import "./engineering-log.css";
 import "./engineering-workspace-refresh.css";
+import "./engineering-readability.css";
 
 const sections = [
   ["overview", "engineering.overview", "⌂"],
