@@ -73,11 +73,44 @@ Batch, Site and Job states are separate layers.
 | operation succeeds | `SUCCESS` | continues | continues |
 | recoverable operation failure succeeds after retry | `SUCCESS` | continues | continues |
 | retry exhausted | `FAILED` / `TIMEOUT` | `FAULTED` | continues until threshold |
-| infrastructure failure | `ERROR` / `ABORTED` | `ERROR` | controlled stop, Batch `ERROR` |
+| PPU infrastructure failure | `ERROR` / `ABORTED` | `ERROR` | failed PPU stops; other PPUs continue |
+| mixed PPU infrastructure failure and healthy PPU completion | mixed | `ERROR` / `SUCCESS` | Batch `PARTIAL` |
 | operator Batch cancel | `CANCELLED` | `CANCELLED` or already-terminal state | Batch `CANCELLED` |
 | threshold stop reaches another running Site | cancelled Job | `STOPPED` | Batch `ERROR` |
 
 Infrastructure errors are not counted as IC/Site yield failures and do not increment `faulted_site_count`.
+
+### Gateway communication policy and PPU fault containment
+
+`GET /api/settings/gateway` exposes the server-owned communication policy and
+`POST /api/settings/gateway` updates it atomically. Production and Engineering
+share the same persisted settings. Defaults are:
+
+```text
+ppu_request_timeout_ms = 10000
+ppu_retry_count        = 3
+retry backoff          = 1 s, 2 s, 4 s, then capped at 4 s
+```
+
+Each Batch records one immutable `gateway_settings` snapshot containing the
+settings revision, request timeout, and retry count. Changing Gateway settings
+during execution cannot mutate a running Batch.
+
+Read-only PPU status and idempotent Job cancellation may retry transient
+transport failures. Job submission is never blindly retried because a timed-out
+accept response does not prove that the PPU failed to enqueue the Job.
+
+During retry, a Site exposes `communication_state = reconnecting` and
+`communication_attempt`. Exhausting retry isolates the canonical
+`(facility_id, ppu_id)` failure domain: the failed Site becomes `ERROR`,
+unfinished sibling Sites become `STOPPED`, and only active Jobs owned by the
+same Batch and PPU receive cancellation. Other PPUs continue.
+
+A Batch containing both successful and infrastructure-error Sites ends as
+`PARTIAL`; a Batch with infrastructure error and no successful Sites ends as
+`ERROR`. Explicit operator Batch cancellation remains the only normal
+whole-Batch stop action, apart from the separately configured manufacturing
+failure-threshold circuit breaker.
 
 ## Programming Asset invariant
 
@@ -131,6 +164,8 @@ final_failures
 faulted_round
 faulted_operation
 last_failure_source
+communication_state
+communication_attempt
 ```
 
 ## REST contract

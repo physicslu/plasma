@@ -57,6 +57,8 @@ type SiteRuntime = {
   retries: number;
   finalFailures: number;
   failureSource?: string | null;
+  communicationState?: "connected" | "reconnecting" | "failed";
+  communicationAttempt?: number;
 };
 
 type PPURuntime = {
@@ -278,6 +280,8 @@ function runtimeFromBatchSite(site: BatchSiteSnapshot, previous?: SiteRuntime): 
     retries: site.retry_count,
     finalFailures: site.final_failures,
     failureSource: site.last_failure_source,
+    communicationState: site.communication_state,
+    communicationAttempt: site.communication_attempt,
   };
 }
 
@@ -718,12 +722,12 @@ export default function FactoryConsoleV2() {
     : batchCounts.sites * (repeatValue ?? 0);
 
   const kpis = [
-    { key: "production-sites", label: "SITES", value: productionSetCounts.sites },
+    { key: "production-sites", label: "SITES", value: batchSnapshot?.sites.length ?? batchCounts.sites },
     { key: "total-ic", label: "TOTAL IC", value: plannedIcCount },
-    { key: "running", label: "RUNNING", value: batchSnapshot?.site_counts.running ?? 0 },
+    { key: "processed-ic", label: "PROCESSED IC", value: manufacturing.total },
     { key: "pass", label: "PASS", value: manufacturing.pass, tone: "pass" as const },
     { key: "fail", label: "FAIL", value: manufacturing.fail, tone: "fail" as const },
-    { key: "yield", label: "YIELD", value: `${manufacturing.yieldPercent.toFixed(1)}%`, tone: "info" as const },
+    { key: "yield", label: "YIELD", value: manufacturing.total > 0 ? `${manufacturing.yieldPercent.toFixed(1)}%` : "—", tone: "info" as const },
     { key: "batch-time", label: "BATCH TIME", value: formatBatchTime(batchSnapshot, clockNow) },
   ];
 
@@ -919,6 +923,7 @@ export default function FactoryConsoleV2() {
 
   function stateText(site: SiteRuntime): string {
     if (!site.enabled) return text.disabled;
+    if (site.communicationState === "reconnecting") return "RECONNECTING";
     return text[site.state];
   }
 
@@ -1217,7 +1222,11 @@ export default function FactoryConsoleV2() {
                                         <b>{siteLabel(site.id)}</b>
                                       </div>
                                       <div className="factorySiteLed" data-state={displayState}><i /></div>
-                                      <small>{displayState === "running" && site.currentRound ? `IC ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : stateText(site)}</small>
+                                      <small>{site.communicationState === "reconnecting"
+                                        ? `RETRY ${site.communicationAttempt ?? 1}`
+                                        : displayState === "running" && site.currentRound
+                                          ? `IC ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}`
+                                          : stateText(site)}</small>
                                     </article>
                                   );
                                 })}

@@ -228,7 +228,7 @@ test("Production Set stays visible while the operator changes next-Batch PPU/Sit
   await expect(site2).toBeChecked();
 
   await site2.uncheck();
-  await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
+  await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("1");
   await expect.poll(() => ppu.evaluate((element: HTMLInputElement) => element.indeterminate)).toBe(true);
   await expect.poll(() => facility.evaluate((element: HTMLInputElement) => element.indeterminate)).toBe(true);
@@ -324,7 +324,7 @@ test("Mock Batch accepts no Target IC and exposes planned IC quantity, 1 Hz acti
   await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("20");
 });
 
-test("active membership and RUNNING KPI follow Server Batch Runtime instead of operator Batch Selection", async ({ page }) => {
+test("active membership follows Server Batch Runtime while PROCESSED IC follows manufacturing outcomes", async ({ page }) => {
   const mock = await installFactoryMock(page, { runtimeSiteIds: [1] });
   await commitTwoSiteProductionSet(page);
   await chooseTarget(page);
@@ -337,9 +337,9 @@ test("active membership and RUNNING KPI follow Server Batch Runtime instead of o
   expect(mock.submissions[0].targets).toEqual([{ facility_id: facilityId, ppu_id: ppuId, site_ids: [1, 2] }]);
 
   const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
-  await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
+  await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("1");
-  await expect(page.locator('[data-kpi="running"] b')).toHaveText("1");
+  await expect(page.locator('[data-kpi="processed-ic"] b')).toHaveText("0");
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeChecked();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).not.toBeChecked();
   await expect(live.locator('[data-production-site="1"]')).toHaveAttribute("data-batch-selected", "true");

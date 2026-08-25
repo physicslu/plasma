@@ -4,6 +4,7 @@ import asyncio
 import threading
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,6 +21,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest, iso_now
 
 from .engineering_targets import EngineeringPPUProvider
+from .gateway_settings import GatewayCommunicationPolicy, GatewaySettingsController
 
 
 BATCH_POLL_INTERVAL_S = 0.05
@@ -158,6 +160,8 @@ class BatchSiteRuntime:
     faulted_round: int | None = None
     faulted_operation: Operation | None = None
     last_failure_source: str | None = None
+    communication_state: str = "connected"
+    communication_attempt: int = 0
     error: dict[str, Any] | None = None
     operation_stats: dict[Operation, OperationAccumulator] = field(default_factory=dict)
 
@@ -177,6 +181,8 @@ class BatchSiteRuntime:
             "faulted_round": self.faulted_round,
             "faulted_operation": self.faulted_operation.value if self.faulted_operation else None,
             "last_failure_source": self.last_failure_source,
+            "communication_state": self.communication_state,
+            "communication_attempt": self.communication_attempt,
             "error": dict(self.error) if self.error else None,
             "operation_statistics": {
                 operation.value: statistics.to_dict()
@@ -190,6 +196,7 @@ class BatchRecord:
     batch_id: str
     operations: tuple[Operation, ...]
     policy: BatchExecutionPolicy
+    gateway_policy: GatewayCommunicationPolicy
     targets: tuple[BatchTarget, ...]
     sites: dict[str, BatchSiteRuntime]
     session_id: str | None
@@ -205,6 +212,7 @@ class BatchRecord:
     error: dict[str, Any] | None = None
     cancel_requested: bool = False
     cancelled_ppus: set[str] = field(default_factory=set)
+    failed_ppus: set[str] = field(default_factory=set)
     active_jobs: dict[str, tuple[BatchTarget, str]] = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
     loop: asyncio.AbstractEventLoop | None = field(default=None, repr=False)
@@ -244,6 +252,7 @@ class BatchRecord:
                 "finished_at": self.finished_at,
                 "operations": [operation.value for operation in self.operations],
                 "execution_policy": self.policy.to_dict(),
+                "gateway_settings": self.gateway_policy.to_dict(),
                 "target_device": self.target_device.to_dict() if self.target_device else None,
                 "asset": self.asset.to_dict() if self.asset else None,
                 "read": {"offset": self.read_offset, "length": self.read_length},
@@ -268,9 +277,18 @@ class BatchRuntimeManager:
     completes E/P/V/R for one round and immediately advances to its next round.
     """
 
-    def __init__(self, provider: EngineeringPPUProvider, *, poll_interval_s: float = BATCH_POLL_INTERVAL_S) -> None:
+    def __init__(
+        self,
+        provider: EngineeringPPUProvider,
+        *,
+        poll_interval_s: float = BATCH_POLL_INTERVAL_S,
+        gateway_settings: GatewaySettingsController | None = None,
+        retry_backoff_s: float = 1.0,
+    ) -> None:
         self.provider = provider
         self.poll_interval_s = poll_interval_s
+        self.gateway_settings = gateway_settings or GatewaySettingsController()
+        self.retry_backoff_s = retry_backoff_s
         self._batches: dict[str, BatchRecord] = {}
         self._lock = threading.RLock()
 
@@ -342,6 +360,7 @@ class BatchRuntimeManager:
             batch_id=batch_id,
             operations=ordered_operations,
             policy=policy,
+            gateway_policy=self.gateway_settings.snapshot(),
             targets=targets,
             sites=site_runtimes,
             session_id=session_id,
@@ -380,7 +399,7 @@ class BatchRuntimeManager:
             if batch.state.terminal:
                 return batch.snapshot()
             batch.cancel_requested = True
-            batch.stop_reason = batch.stop_reason or "operator_cancel"
+            batch.stop_reason = "operator_cancel"
             batch.state = BatchState.STOPPING
             loop = batch.loop
         if loop is not None and loop.is_running():
@@ -446,7 +465,7 @@ class BatchRuntimeManager:
         with batch.lock:
             if batch.stop_reason == "operator_cancel":
                 batch.state = BatchState.CANCELLED
-            elif batch.stop_reason in {"failed_site_threshold", "infrastructure_error", "runtime_exception"}:
+            elif batch.stop_reason in {"failed_site_threshold", "runtime_exception"}:
                 batch.state = BatchState.ERROR
             else:
                 states = [site.state for site in batch.sites.values()]
@@ -455,7 +474,11 @@ class BatchRuntimeManager:
                 elif states and all(state is BatchSiteState.CANCELLED for state in states):
                     batch.state = BatchState.CANCELLED
                 elif any(state is BatchSiteState.ERROR for state in states):
-                    batch.state = BatchState.ERROR
+                    batch.state = (
+                        BatchState.PARTIAL
+                        if any(state is BatchSiteState.SUCCESS for state in states)
+                        else BatchState.ERROR
+                    )
                 else:
                     batch.state = BatchState.PARTIAL
             batch.finished_at = iso_now()
@@ -464,9 +487,11 @@ class BatchRuntimeManager:
         with batch.lock:
             if site.target.ppu_key in batch.cancelled_ppus:
                 return BatchSiteState.CANCELLED
+            if site.target.ppu_key in batch.failed_ppus:
+                return BatchSiteState.STOPPED
             if batch.stop_reason == "operator_cancel" or batch.cancel_requested:
                 return BatchSiteState.CANCELLED
-            if batch.stop_reason in {"failed_site_threshold", "infrastructure_error", "runtime_exception"}:
+            if batch.stop_reason in {"failed_site_threshold", "runtime_exception"}:
                 return BatchSiteState.STOPPED
         return None
 
@@ -504,6 +529,8 @@ class BatchRuntimeManager:
                         site.operation_stats[operation].record_submission_error()
                         site.total_attempts += 1
                         site.state = BatchSiteState.ERROR
+                        site.last_failure_source = "infrastructure"
+                        site.communication_state = "failed"
                         site.error = {
                             "error_code": BATCH_INFRASTRUCTURE_ERROR,
                             "message": f"{type(exc).__name__}: {exc}",
@@ -604,12 +631,18 @@ class BatchRuntimeManager:
         )
         asset_sha256 = batch.asset.sha256 if batch.asset and operation in {Operation.PROGRAM, Operation.VERIFY} else None
         session_id = batch.session_id if asset_sha256 is not None else None
-        accepted = await self.provider.start_job(
-            site.target.facility_id,
-            site.target.ppu_id,
-            request,
-            session_id=session_id,
-            asset_sha256=asset_sha256,
+        accepted = await self._provider_request(
+            batch,
+            site,
+            "start",
+            lambda: self.provider.start_job(
+                site.target.facility_id,
+                site.target.ppu_id,
+                request,
+                session_id=session_id,
+                asset_sha256=asset_sha256,
+            ),
+            retryable=False,
         )
         job = accepted.get("job") if isinstance(accepted, dict) else None
         if not isinstance(job, dict) or not isinstance(job.get("job_id"), str):
@@ -620,13 +653,19 @@ class BatchRuntimeManager:
             batch.active_jobs[site.target.key] = (site.target, job_id)
 
         terminal_states = {"success", "failed", "error", "cancelled", "timeout", "aborted"}
+        observed_terminal = False
         try:
             while True:
-                response = await self.provider.status(
-                    site.target.facility_id,
-                    site.target.ppu_id,
-                    site_id=site.target.site_id,
-                    job_id=job_id,
+                response = await self._provider_request(
+                    batch,
+                    site,
+                    "status",
+                    lambda: self.provider.status(
+                        site.target.facility_id,
+                        site.target.ppu_id,
+                        site_id=site.target.site_id,
+                        job_id=job_id,
+                    ),
                 )
                 current = response.get("job") if isinstance(response, dict) else None
                 if not isinstance(current, dict):
@@ -634,11 +673,56 @@ class BatchRuntimeManager:
                 with batch.lock:
                     site.progress_percent = float(current.get("progress_percent", site.progress_percent) or 0.0)
                 if str(current.get("state", "")) in terminal_states:
+                    observed_terminal = True
                     return current
                 await asyncio.sleep(self.poll_interval_s)
         finally:
+            if observed_terminal:
+                with batch.lock:
+                    batch.active_jobs.pop(site.target.key, None)
+
+    async def _provider_request(
+        self,
+        batch: BatchRecord,
+        site: BatchSiteRuntime,
+        action: str,
+        operation: Callable[[], Awaitable[dict[str, Any]]],
+        *,
+        retryable: bool = True,
+    ) -> dict[str, Any]:
+        retries = batch.gateway_policy.ppu_retry_count if retryable else 0
+        for attempt in range(retries + 1):
+            try:
+                response = await asyncio.wait_for(
+                    operation(),
+                    timeout=batch.gateway_policy.request_timeout_s,
+                )
+            except Exception as exc:
+                transient = isinstance(exc, (TimeoutError, OSError, ConnectionError)) or (
+                    isinstance(exc, PlasmaError)
+                    and exc.code in {ErrorCode.CONNECTION_TIMEOUT, ErrorCode.CONNECTION_FAILED}
+                )
+                if not transient or attempt >= retries:
+                    raise
+                with batch.lock:
+                    site.communication_state = "reconnecting"
+                    site.communication_attempt = attempt + 1
+                    site.error = {
+                        "error_code": BATCH_INFRASTRUCTURE_ERROR,
+                        "message": (
+                            f"PPU {action} retry {attempt + 1}/{retries}: "
+                            f"{type(exc).__name__}: {exc}"
+                        ),
+                    }
+                await asyncio.sleep(self.retry_backoff_s * min(2 ** attempt, 4))
+                continue
             with batch.lock:
-                batch.active_jobs.pop(site.target.key, None)
+                if site.state is not BatchSiteState.ERROR:
+                    site.communication_state = "connected"
+                    site.communication_attempt = 0
+                    site.error = None
+            return response
+        raise RuntimeError("PPU provider request retry loop terminated unexpectedly")
 
     async def _register_faulted_site(self, batch: BatchRecord, site: BatchSiteRuntime) -> None:
         with batch.lock:
@@ -671,19 +755,21 @@ class BatchRuntimeManager:
         failure: Exception,
     ) -> None:
         with batch.lock:
-            if batch.stop_reason is None:
-                batch.stop_reason = "infrastructure_error"
-                batch.state = BatchState.STOPPING
+            ppu_key = site.target.ppu_key
+            if ppu_key not in batch.failed_ppus:
+                batch.failed_ppus.add(ppu_key)
+                batch.stop_reason = batch.stop_reason or "infrastructure_error"
                 batch.error = {
                     "error_code": BATCH_INFRASTRUCTURE_ERROR,
                     "message": str(failure),
                     "trigger_site": site.target.to_dict(),
+                    "failed_ppus": sorted(batch.failed_ppus),
                 }
                 should_cancel = True
             else:
                 should_cancel = False
         if should_cancel:
-            await self._cancel_active_jobs(batch)
+            await self._cancel_active_jobs(batch, ppu_key=ppu_key)
 
     async def _cancel_active_jobs(self, batch: BatchRecord, *, ppu_key: str | None = None) -> None:
         with batch.lock:
@@ -694,10 +780,17 @@ class BatchRuntimeManager:
             ]
         if not active:
             return
-        await asyncio.gather(
-            *(
-                self.provider.cancel_job(target.facility_id, target.ppu_id, job_id)
-                for target, job_id in active
-            ),
-            return_exceptions=True,
-        )
+        async def cancel_one(target: BatchTarget, job_id: str) -> None:
+            site = batch.sites[target.key]
+            try:
+                await self._provider_request(
+                    batch,
+                    site,
+                    "cancel",
+                    lambda: self.provider.cancel_job(target.facility_id, target.ppu_id, job_id),
+                )
+            finally:
+                with batch.lock:
+                    batch.active_jobs.pop(target.key, None)
+
+        await asyncio.gather(*(cancel_one(target, job_id) for target, job_id in active), return_exceptions=True)

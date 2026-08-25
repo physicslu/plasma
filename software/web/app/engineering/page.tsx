@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { useI18n } from "../i18n";
 import { useWorkspaceSession } from "../workspace-session";
+import GatewaySettingsPanel from "./gateway-settings";
 import MockRuntimeSettingsPanel from "./mock-runtime-settings";
 import ProgrammingWorkspaceV2 from "./programming-workspace-v2";
 import "./engineering.css";
@@ -92,6 +93,8 @@ export default function EngineeringPage() {
               <ProgrammingWorkspaceV2 />
             ) : active === "mock" ? (
               <MockRuntimeSettingsPanel />
+            ) : active === "settings" ? (
+              <GatewaySettingsPanel />
             ) : (
               <div className="engineeringPlaceholder">
                 <small>EXTENSION SLOT</small>

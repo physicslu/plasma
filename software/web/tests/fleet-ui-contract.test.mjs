@@ -96,7 +96,7 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /productionSet\[facilityId\]\?\.\[ppuId\]/);
   assert.match(source, /const serverBatchState = batchSnapshot\?\.state \?\? null/);
   assert.match(source, /displayedBatchSelection = serverBatchRunning \? serverBatchMembership : batchSelection/);
-  assert.match(source, /batchSnapshot\?\.site_counts\.running \?\? 0/);
+  assert.match(source, /label: "PROCESSED IC", value: manufacturing\.total/);
   assert.doesNotMatch(source, /setBatchState/);
   assert.match(source, /Batch select \$\{active\.target\.display_name\}/);
   assert.match(source, /Batch select \$\{active\.target\.display_name\} \$\{siteLabel\(site\.id\)\}/);
@@ -133,7 +133,8 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.doesNotMatch(source.slice(source.indexOf("const manufacturing = useMemo"), source.indexOf("const repeatValue")), /cancelled/);
   assert.match(source, /label: "SITES"/);
   assert.match(source, /label: "TOTAL IC"/);
-  assert.match(source, /label: "RUNNING"/);
+  assert.match(source, /label: "PROCESSED IC"/);
+  assert.match(source, /value: manufacturing\.total/);
   assert.match(source, /label: "PASS"/);
   assert.match(source, /label: "FAIL"/);
   assert.match(source, /label: "YIELD"/);
