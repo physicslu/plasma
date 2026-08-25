@@ -51,3 +51,10 @@
 .engineeringSelectorPanel .channelChecks label {
   padding: 6px 7px;
 }
+
+/* Batch Policy is one compact desktop control row. Spanning the complete
+ * Programming Job grid prevents Repeat / Retry / Stop Policy from splitting
+ * across two visual rows while narrow layouts can still stack responsively. */
+.engineeringProgrammingV2 .engineeringPolicyRow {
+  grid-column: 1 / -1;
+}
