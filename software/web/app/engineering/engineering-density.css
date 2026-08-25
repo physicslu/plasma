@@ -55,29 +55,30 @@
 /* The shared Programming toolbar owns a file/operations/actions grid-area
  * contract for PMode. Engineering Programming is a different workspace and
  * must explicitly neutralize that grid-area contract. Otherwise the generic
- * toolbar areas override the Engineering 2x2 job layout and create the large
- * empty column seen after PR #124. */
+ * toolbar areas override the Engineering job layout. The six-column desktop
+ * grid keeps the two control halves equal while allowing the final action row
+ * to place Batch readiness between the two operator actions. */
 @container engineering-programming (min-width: 981px) {
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     grid-template-areas: none;
     grid-auto-flow: row;
     align-content: start;
   }
 
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .jobRow:first-child {
-    grid-column: 1;
+    grid-column: 1 / 4;
     grid-row: 1;
   }
 
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .jobRow:nth-child(2) {
-    grid-column: 2;
+    grid-column: 4 / 7;
     grid-row: 1;
   }
 
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingBatchOperations {
     grid-area: auto;
-    grid-column: 1;
+    grid-column: 1 / 4;
     grid-row: 2;
     display: grid;
     grid-template-columns: 126px minmax(0, 1fr);
@@ -86,7 +87,7 @@
 
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringPolicyRow {
     grid-area: auto;
-    grid-column: 2;
+    grid-column: 4 / 7;
     grid-row: 2;
     display: grid;
     grid-template-columns: 112px max-content max-content minmax(118px, max-content);
@@ -94,42 +95,53 @@
     align-items: center;
   }
 
+  /* Canonical READ has no operator-entered range. The execution layer resolves
+   * the complete Main Programmable Flash geometry from the target support
+   * implementation. Keep the legacy DOM node non-visible until its state fields
+   * are removed from the compatibility workspace session contract. */
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringReadRow {
-    grid-column: 1 / -1;
-    grid-row: 3;
+    display: none;
   }
 
-  /* Readiness is a compact status line. The destructive/execute controls own
-   * the complete row below it so both operator actions can use the maximum
-   * available width without competing with status chrome. */
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .batchReadiness {
-    grid-column: 1 / -1;
+    grid-column: 3 / 5;
     grid-row: 3;
-    justify-self: start;
+    justify-self: center;
     align-self: center;
+    min-width: 132px;
+    max-width: calc(100% - 24px);
+    text-align: center;
+    z-index: 1;
   }
 
+  /* START and ABORT still own the full measurable action row. The middle track
+   * is reserved for Batch status, leaving the two operator actions equal and as
+   * wide as the remaining space permits. */
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions {
     grid-column: 1 / -1;
-    grid-row: 4;
+    grid-row: 3;
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr);
     gap: 12px;
     align-self: center;
   }
 
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions > button {
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions > button:first-child {
+    grid-column: 1;
     width: 100%;
     min-width: 0;
   }
 
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar:has(> .engineeringReadRow) > .batchReadiness {
-    grid-row: 4;
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions > button:last-child {
+    grid-column: 3;
+    width: 100%;
+    min-width: 0;
   }
 
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar:has(> .engineeringReadRow) > .programmingActions {
-    grid-row: 5;
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .warning {
+    grid-column: 1 / -1;
+    grid-row: 4;
   }
 }
 

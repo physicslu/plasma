@@ -19,6 +19,10 @@ class MockAwareBatchRuntimeManager(BatchRuntimeManager):
     before any Site thread can submit a Job. Program/Verify Batches without a
     user Programming Image receive one deterministic Synthetic Image derived
     from that same frozen profile snapshot.
+
+    The public Mock Batch contract also normalizes READ provenance to the
+    canonical target-owned `main_flash` scope. Legacy internal offset/length
+    compatibility fields are intentionally not exposed as operator semantics.
     """
 
     provider: SharedImageMockEngineeringPPUProvider
@@ -29,9 +33,12 @@ class MockAwareBatchRuntimeManager(BatchRuntimeManager):
 
     @staticmethod
     def _mock_payload(snapshot: dict[str, Any], context: dict[str, Any] | None) -> dict[str, Any]:
-        if context is None:
-            return snapshot
-        return {**snapshot, "mock_runtime": context}
+        normalized = dict(snapshot)
+        if Operation.READ.value in normalized.get("operations", []):
+            normalized["read"] = {"scope": "main_flash"}
+        if context is not None:
+            normalized["mock_runtime"] = context
+        return normalized
 
     def _new_batch_id(self) -> str:
         pending = getattr(self._creation_local, "batch_id", None)

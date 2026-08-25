@@ -41,6 +41,7 @@ The Provider boundary owns:
 - E/P/V/R Job submission;
 - job status/progress and cancellation;
 - Read output retrieval;
+- target memory geometry required by canonical Read;
 - PPU-wide shared-resource invariants.
 
 ## Current server-side Mock topology
@@ -126,6 +127,41 @@ Normalized Image              data actually programmed to or verified
 Asset semantics and file serialization are independent. Declared formats include binary, Intel HEX, S-Record, ELF, CSV, text, JSON and PEM.
 
 Only `Image + binary` normalization is implemented today. The other types/formats exist in the domain model but are rejected at execution boundaries until a real parser/consumer is implemented and validated.
+
+## Canonical Read semantics
+
+The stable display code `R` means **Read Entire Main Flash**.
+
+The operator does not enter an offset or length. The browser must not guess memory geometry and must not silently substitute a convenience default such as 256 bytes.
+
+```text
+Target IC / Device Support
+        |
+        v
+Main Programmable Flash geometry
+(base address + size)
+        |
+        v
+READ complete Main Flash
+        |
+        v
+Read output file
+```
+
+`Main Flash` is deliberately narrow. It means the normal programmable code/data Flash region supported by the selected target. It does **not** implicitly include:
+
+- Option Bytes;
+- OTP / one-time-programmable memory;
+- EEPROM or separate Data Flash;
+- Security, secure, protected or vendor-reserved regions;
+- Configuration Words / fuses;
+- any other special memory region.
+
+Those regions require future explicit memory-region features and separate validation. They must never be silently folded into `R`.
+
+Memory geometry is execution-provider / Device Support evidence, not presentation state. A real target implementation must resolve the Main Flash base and size before dispatch. If it cannot resolve that geometry with adequate evidence, Read must fail closed rather than perform a partial or guessed read.
+
+For the current Mock Provider, Main Flash is the configured Mock flash (`flash_size_bytes`), so canonical Read resolves to address `0` and the complete configured size. The provider overrides any legacy compatibility range that may still arrive from an older client.
 
 ## Serial Number
 
@@ -235,12 +271,12 @@ estimated_time = fixed_operation_overhead + bytes / throughput_bytes_per_second
 
 Current profile:
 
-| Operation | Size basis | Throughput | Fixed overhead | Approx. 100 KiB |
+| Operation | Size basis | Throughput | Fixed overhead | Example |
 |---|---|---:|---:|---:|
 | Erase | full 4 MiB mock flash | 2 MiB/s | 1.0 s | 3.0 s full-chip erase |
-| Program | normalized Image bytes | 96 KiB/s | 4.0 s | 5.04 s |
-| Verify | normalized Image bytes | 192 KiB/s | 1.0 s | 1.52 s |
-| Read | requested read bytes | 192 KiB/s | 1.0 s | 1.52 s for 100 KiB |
+| Program | normalized Image bytes | 96 KiB/s | 4.0 s | 5.04 s for 100 KiB |
+| Verify | normalized Image bytes | 192 KiB/s | 1.0 s | 1.52 s for 100 KiB |
+| Read | complete Main Flash | 192 KiB/s | 1.0 s | ~22.3 s for 4 MiB |
 
 Engineering Mock operation timeout is currently 90 seconds. These values are simulation parameters, not real PPU/IC performance specifications.
 
@@ -282,6 +318,8 @@ GET  .../api/jobs/{job_id}/files/{filename}
 
 Engineering Program/Verify Job bodies reference `session_id + asset_sha256`; they do not carry source Asset bytes again.
 
+Canonical Read intent is `main_flash`; concrete address/length are provider-resolved execution details. Legacy offset/length request fields may remain temporarily for compatibility, but they are not operator semantics and the canonical Mock Provider does not use them to narrow Read.
+
 There is no legacy REST alias layer in the canonical development contract.
 
 ## Site execution invariants
@@ -291,6 +329,7 @@ There is no legacy REST alias layer in the canonical development contract.
 - per-Site cancellation does not cancel unrelated Sites;
 - batch cancellation controls batch classification without rewriting truthful underlying Job results;
 - Program means write only;
+- Read means the complete Main Programmable Flash and does not implicitly include special memory regions;
 - a complete flow such as Erase -> Program -> Verify is composed explicitly;
 - batch operation selection may contain any subset of Erase / Program / Verify / Read.
 

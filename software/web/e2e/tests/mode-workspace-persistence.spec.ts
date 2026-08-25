@@ -130,8 +130,9 @@ test("Pmod and Emode keep configuration while runtime is re-read from the backen
   await page.getByLabel("Batch select SITE 2").uncheck();
   await page.getByLabel("Engineering batch erase").check();
   await page.getByLabel("Engineering batch read").check();
-  await page.getByLabel("Engineering READ offset").fill("32");
-  await page.getByLabel("Engineering READ length").fill("128");
+  await expect(page.locator(".engineeringReadRow")).toBeHidden();
+  await expect(page.getByLabel("Engineering READ offset")).toBeHidden();
+  await expect(page.getByLabel("Engineering READ length")).toBeHidden();
 
   await page.getByRole("link", { name: "量產模式", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
@@ -151,8 +152,9 @@ test("Pmod and Emode keep configuration while runtime is re-read from the backen
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(4);
   await expect(page.getByLabel("Engineering batch erase")).toBeChecked();
   await expect(page.getByLabel("Engineering batch read")).toBeChecked();
-  await expect(page.getByLabel("Engineering READ offset")).toHaveValue("32");
-  await expect(page.getByLabel("Engineering READ length")).toHaveValue("128");
+  await expect(page.locator(".engineeringReadRow")).toBeHidden();
+  await expect(page.getByLabel("Engineering READ offset")).toBeHidden();
+  await expect(page.getByLabel("Engineering READ length")).toBeHidden();
 
   expect(runtime.sessionCalls()).toBe(1);
   expect(runtime.statusCalls(ppu1Id)).toBeGreaterThanOrEqual(2);

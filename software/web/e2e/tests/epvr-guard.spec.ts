@@ -154,7 +154,7 @@ test("Pmod Mock readiness uses Synthetic Image when no file is selected", async 
   expect(api.jobRequests).toBe(0);
 });
 
-test("Emode Mock uses Synthetic Image and keeps READ validation", async ({ page }) => {
+test("Emode Mock uses Synthetic Image and target-owned Main Flash READ", async ({ page }) => {
   const api = await installEngineeringApi(page);
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
@@ -170,12 +170,9 @@ test("Emode Mock uses Synthetic Image and keeps READ validation", async ({ page 
   await operations.nth(3).check();
   await expect(readiness).toContainText("BATCH READY");
   await expect(execute).toBeEnabled();
-  await expect(page.locator(".engineeringReadRow")).toBeVisible();
-  await page.getByLabel("Engineering READ length").fill("0");
-  await expect(readiness).toContainText("INVALID READ");
-  await expect(execute).toBeDisabled();
-  await page.getByLabel("Engineering READ length").fill("256");
-  await expect(readiness).toContainText("BATCH READY");
+  await expect(page.locator(".engineeringReadRow")).toBeHidden();
+  await expect(page.getByLabel("Engineering READ offset")).toBeHidden();
+  await expect(page.getByLabel("Engineering READ length")).toBeHidden();
   await operations.nth(3).uncheck();
   await operations.nth(1).check();
   await expect(fileName).toHaveText("Mock Synthetic Image");

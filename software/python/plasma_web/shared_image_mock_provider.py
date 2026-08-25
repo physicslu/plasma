@@ -23,6 +23,11 @@ class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
     receives a Mock execution context. Server-side Batches freeze that context
     by Batch ID so a later settings edit cannot change an already-running Batch.
     Direct Engineering Jobs freeze the current settings at submission time.
+
+    Canonical READ owns no operator-entered range. For the Mock target the
+    provider is the source of truth for Main Programmable Flash geometry, so a
+    READ always resolves to the configured full Mock flash and never to a Web
+    default such as 256 bytes.
     """
 
     def __init__(
@@ -105,6 +110,29 @@ class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
             },
         )
 
+    def _resolve_main_flash_read(self, request: JobRequest) -> JobRequest:
+        """Bind canonical READ to the complete Mock Main Programmable Flash."""
+        if request.operation is not Operation.READ:
+            return request
+        return replace(
+            request,
+            map_data={
+                "scope": "main_flash",
+                "sections": [
+                    {
+                        "name": "main_flash",
+                        "address": 0,
+                        "length": self.flash_size_bytes,
+                    }
+                ],
+            },
+            metadata={
+                **request.metadata,
+                "read_scope": "main_flash",
+                "read_size_bytes": self.flash_size_bytes,
+            },
+        )
+
     def cache_asset(
         self,
         session_id: str,
@@ -140,7 +168,9 @@ class SharedImageMockEngineeringPPUProvider(MockEngineeringPPUProvider):
         session_id: str | None = None,
         asset_sha256: str | None = None,
     ) -> dict[str, object]:
-        request = self._decorate_mock_request(facility_id, ppu_id, request)
+        request = self._resolve_main_flash_read(
+            self._decorate_mock_request(facility_id, ppu_id, request)
+        )
         lease_key: tuple[str, str] | None = None
         if request.operation in {Operation.PROGRAM, Operation.VERIFY}:
             if request.image or request.image_ref is not None:

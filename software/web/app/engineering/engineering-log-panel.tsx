@@ -46,7 +46,12 @@ export function engineeringLogCategoryLabel(category: EngineeringLogCategory): s
 }
 
 function engineeringLogText(entry: EngineeringLogEntry): string {
-  return entry.text;
+  // Compatibility normalization: older Engineering workspace state still
+  // carries offset/length fields. Canonical R means Read Entire Main Flash, so
+  // operator-facing audit text must not present those legacy values as intent.
+  return entry.text
+    .replace(/ · read offset \d+ · length \d+/gi, " · read MAIN FLASH")
+    .replace(/ · offset \d+ · length \d+/gi, " · MAIN FLASH");
 }
 
 function logDownloadTimestamp(date: Date): string {
