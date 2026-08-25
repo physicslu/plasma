@@ -61,8 +61,9 @@ test("Emode shell density protects the Programming viewport with the full-height
   assert.match(css, /\.engineeringCanvas\.programmingActive\s*\{[\s\S]*padding:\s*10px 12px 18px/);
   assert.match(css, /\.programmingJobBody\.programmingBatchToolbar\s*\{[\s\S]*grid-template-areas:\s*none/);
   assert.match(css, /> \.engineeringPolicyRow\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*2/);
-  assert.match(css, /> \.batchReadiness\s*\{[\s\S]*grid-column:\s*1;[\s\S]*grid-row:\s*3/);
-  assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*3/);
+  assert.match(css, /> \.batchReadiness\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*3/);
+  assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*4;[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(css, /> \.programmingActions > button\s*\{[\s\S]*width:\s*100%/);
   assert.match(css, /\[data-kpi="pass"\][\s\S]*border-left-color:\s*#15803d[\s\S]*background:\s*color-mix/);
   assert.match(css, /\[data-kpi="fail"\][\s\S]*border-left-color:\s*#dc2626[\s\S]*background:\s*color-mix/);
   assert.match(css, /\[data-kpi="pass"\] b,[\s\S]*\[data-kpi="fail"\] b[\s\S]*font-size:\s*30px/);
