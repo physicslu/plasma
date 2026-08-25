@@ -52,11 +52,16 @@ test("Production and Engineering v2 share programming control vocabulary without
   assert.doesNotMatch(emode, /BatchTopologySummary/);
 });
 
-test("Emode shell density still protects the Programming v2 viewport", async () => {
+test("Emode shell density protects the Programming viewport with the full-height sidebar", async () => {
   const css = await read("engineering/engineering-density.css");
   const v2Css = await read("engineering/programming-workspace-v2.css");
-  assert.match(css, /\.engineeringShell\s*\{[\s\S]*padding:\s*18px clamp\(12px, 1\.8vw, 28px\) 36px/);
-  assert.match(css, /\.engineeringHeading\s*\{[\s\S]*min-height:\s*54px/);
+  const refreshCss = await read("engineering/engineering-workspace-refresh.css");
+
+  assert.match(css, /\.engineeringShell\s*\{[\s\S]*padding:\s*0;[\s\S]*gap:\s*0/);
+  assert.match(css, /\.engineeringCanvas\.programmingActive\s*\{[\s\S]*padding:\s*10px 12px 18px/);
+  assert.match(refreshCss, /\.engineeringWorkspace\s*\{[\s\S]*grid-template-columns:\s*224px minmax\(0, 1fr\)/);
+  assert.match(refreshCss, /min-height:\s*calc\(100vh - 64px\)/);
+  assert.match(refreshCss, /\.engineeringProgrammingV2 \.productionProgrammingWorkflow\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);
   assert.match(v2Css, /\.engineeringProgrammingV2/);
   assert.match(v2Css, /\.productionProgrammingWorkflow/);
 });
