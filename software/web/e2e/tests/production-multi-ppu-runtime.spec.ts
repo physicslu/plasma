@@ -207,7 +207,10 @@ test("real Production Mock exposes only whole-Batch ABORT for multi-PPU runtime"
       erase: {
         ...original.operations.erase,
         error_rate_per_mille: 0,
-        base_time_ms: 800,
+        // Keep the real-stack cancellation window independent of busy-runner
+        // browser/actionability latency; the already-terminal ABORT race has
+        // its own dedicated mode-guard regression coverage.
+        base_time_ms: 3000,
         jitter_ms: 0,
       },
     },
