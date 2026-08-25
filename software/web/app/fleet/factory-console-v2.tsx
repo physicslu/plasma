@@ -968,6 +968,7 @@ export default function FactoryConsoleV2() {
                     <input
                       ref={imageInputRef}
                       type="file"
+                      aria-label="Production Programming Image file"
                       accept=".bin,application/octet-stream"
                       hidden
                       disabled={batchRunning}
