@@ -8,6 +8,7 @@ import ProgrammingWorkspaceV2 from "./programming-workspace-v2";
 import "./engineering.css";
 import "./engineering-density.css";
 import "./engineering-log.css";
+import "./engineering-workspace-refresh.css";
 
 const sections = [
   ["overview", "engineering.overview", "⌂"],
