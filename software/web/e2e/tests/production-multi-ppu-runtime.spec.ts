@@ -61,6 +61,20 @@ async function chooseTarget(page: Page) {
 async function openTwoPpuProductionSet(page: Page) {
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
+
+  const facility = page.locator(".productionTreeFacility").first();
+  if (!await facility.evaluate((element: HTMLDetailsElement) => element.open)) {
+    await facility.locator(":scope > summary").click();
+  }
+  const ppus = facility.locator(".productionTreePpu");
+  await expect(ppus).toHaveCount(4);
+  for (const index of [0, 1]) {
+    const ppu = ppus.nth(index);
+    if (!await ppu.evaluate((element: HTMLDetailsElement) => element.open)) {
+      await ppu.locator(":scope > summary").click();
+    }
+  }
+
   await expect(fpsCheckbox(page, ppuOne)).toBeVisible();
   await expect(fpsCheckbox(page, ppuTwo)).toBeVisible();
 
