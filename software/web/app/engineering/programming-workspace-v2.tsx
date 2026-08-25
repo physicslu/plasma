@@ -972,7 +972,11 @@ export default function ProgrammingWorkspaceV2() {
                   ))}
                 </select>
               </label>
-              <div className="topologyFoot">ⓘ System Topology: {catalog?.facility_count ?? 0} Facilities | {catalog?.ppu_count ?? 0} PPUs | {catalog?.site_count ?? 0} Sites</div>
+              <div className="topologyFoot" aria-label="Selected Engineering PPU">
+                <b>{facility?.display_name ?? "No Facility"} / {selectedPPU?.display_name ?? "No PPU"}</b>
+                {' · '}{ppu?.ppu_id ?? selectedPPU?.ppu_id ?? "—"}{' · '}{ppu?.site_count ?? selectedPPU?.site_count ?? 0} Sites
+                {' · '}System Topology: {catalog?.facility_count ?? 0} Facilities | {catalog?.ppu_count ?? 0} PPUs | {catalog?.site_count ?? 0} Sites
+              </div>
             </div>
           </section>
 
@@ -1076,7 +1080,7 @@ export default function ProgrammingWorkspaceV2() {
                   <th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>OPERATIONS (E/P/V/R)</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="targetSitesSection">
                 {sites.map(site => {
                   const batchState = batchSiteStates[site.id];
                   const displayStage: Stage = batchState === "running" || batchState === "cancelling" ? "queued" : (batchState ?? site.stage);
