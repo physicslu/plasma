@@ -1,6 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-
-const facilityId = "mock-facility-01";
+import { factoryConsoleHeading } from "./production-console-helpers";
 
 function catalog() {
   const siteCounts = [2, 4, 6, 8];
@@ -20,21 +19,13 @@ function catalog() {
     };
   });
 
-  return {
-    ok: true,
-    provider: "mock",
-    facility_count: 3,
-    ppu_count: 12,
-    site_count: 60,
-    facilities,
-  };
+  return { ok: true, provider: "mock", facility_count: 3, ppu_count: 12, site_count: 60, facilities };
 }
 
 async function installProductionCatalog(page: Page) {
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-
     if (path === "/api/engineering/session" && request.method() === "POST") {
       await route.fulfill({
         status: 201,
@@ -50,93 +41,43 @@ async function installProductionCatalog(page: Page) {
       });
       return;
     }
-
     if (path === "/api/engineering/targets" && request.method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
       return;
     }
-
-    const targetMatch = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/status$/.exec(path);
-    if (targetMatch && request.method() === "GET") {
-      const ppuId = decodeURIComponent(targetMatch[2]);
-      const ppuNumber = Number(/-ppu-(\d+)$/.exec(ppuId)?.[1] ?? 1);
-      const siteCount = [2, 4, 6, 8][ppuNumber - 1] ?? 2;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          ppu: {
-            ppu_id: ppuId,
-            facility_id: decodeURIComponent(targetMatch[1]),
-            model: "MOCK-PPU",
-            display_name: `Mock PPU ${String(ppuNumber).padStart(2, "0")}`,
-            site_count: siteCount,
-            enabled_site_count: siteCount,
-            capabilities: { max_supported_sites: siteCount, operations: ["erase", "program", "verify", "read"] },
-          },
-          sites: Array.from({ length: siteCount }, (_, index) => ({
-            site_id: index + 1,
-            enabled: true,
-            state: "idle",
-            current_job_id: null,
-            queued_jobs: 0,
-            interface: "mock",
-            target: "MOCK-IC",
-          })),
-        }),
-      });
-      return;
-    }
-
     await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
   });
 }
 
-async function expectConstrainedToolbar(page: Page) {
-  const toolbar = page.getByRole("region", { name: "Batch operation toolbar" });
-  await expect(toolbar).toBeVisible();
+async function expectConstrainedProgrammingJob(page: Page) {
+  const job = page.getByRole("region", { name: "PROGRAMMING JOB" });
+  await expect(job).toBeVisible();
 
-  const layout = await toolbar.evaluate(element => {
-    const toolbarRect = element.getBoundingClientRect();
-    const image = element.querySelector<HTMLElement>(".programmingBatchFile")!;
-    const operations = element.querySelector<HTMLElement>(".programmingBatchOperations")!;
-    const actions = element.querySelector<HTMLElement>(".programmingBatchActions")!;
-    const imageRect = image.getBoundingClientRect();
-    const operationsRect = operations.getBoundingClientRect();
-    const actionsRect = actions.getBoundingClientRect();
+  const layout = await job.evaluate(element => {
+    const panel = element.getBoundingClientRect();
+    const grid = element.querySelector<HTMLElement>(".factoryJobGrid")!;
+    const operations = element.querySelector<HTMLElement>(".factoryOperationChecks")!;
+    const actionBar = element.querySelector<HTMLElement>(".factoryActionBar")!;
     const operationTops = [...operations.querySelectorAll<HTMLElement>("label")].map(label => label.getBoundingClientRect().top);
-    const actionRects = [...actions.querySelectorAll<HTMLElement>("button")].map(button => button.getBoundingClientRect());
-
+    const actions = [...actionBar.querySelectorAll<HTMLElement>("button")].map(button => button.getBoundingClientRect());
     return {
-      areas: getComputedStyle(element).gridTemplateAreas,
+      gridColumns: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
       operationWrap: getComputedStyle(operations).flexWrap,
       operationTopSpread: Math.max(...operationTops) - Math.min(...operationTops),
-      toolbarLeft: toolbarRect.left,
-      toolbarRight: toolbarRect.right,
-      imageBottom: imageRect.bottom,
-      operationsTop: operationsRect.top,
-      operationsBottom: operationsRect.bottom,
-      actionsTop: actionsRect.top,
-      actionsBottom: actionsRect.bottom,
-      actionsRight: actionsRect.right,
-      actionLefts: actionRects.map(rect => rect.left),
-      actionRights: actionRects.map(rect => rect.right),
+      panelLeft: panel.left,
+      panelRight: panel.right,
+      actionLefts: actions.map(rect => rect.left),
+      actionRights: actions.map(rect => rect.right),
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
     };
   });
 
-  expect(layout.areas).toBe('"file file" "operations actions"');
+  expect(layout.gridColumns).toBeGreaterThanOrEqual(1);
   expect(layout.operationWrap).toBe("nowrap");
   expect(layout.operationTopSpread).toBeLessThanOrEqual(1);
-  expect(layout.operationsTop).toBeGreaterThanOrEqual(layout.imageBottom - 1);
-  expect(layout.actionsTop).toBeGreaterThanOrEqual(layout.imageBottom - 1);
-  expect(layout.actionsTop).toBeLessThan(layout.operationsBottom + 1);
-  expect(layout.operationsTop).toBeLessThan(layout.actionsBottom + 1);
-  expect(layout.actionsRight).toBeLessThanOrEqual(layout.toolbarRight + 1);
-  expect(Math.min(...layout.actionLefts)).toBeGreaterThanOrEqual(layout.toolbarLeft - 1);
-  expect(Math.max(...layout.actionRights)).toBeLessThanOrEqual(layout.toolbarRight + 1);
+  expect(Math.min(...layout.actionLefts)).toBeGreaterThanOrEqual(layout.panelLeft - 1);
+  expect(Math.max(...layout.actionRights)).toBeLessThanOrEqual(layout.panelRight + 1);
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
 }
 
@@ -144,43 +85,30 @@ async function openProduction(page: Page, viewport: { width: number; height: num
   await page.setViewportSize(viewport);
   await installProductionCatalog(page);
   await page.goto("/fleet");
-  await expect(page.getByRole("checkbox", { name: `${facilityId} ${facilityId}-ppu-01 SITE-01` })).toBeVisible();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
 }
 
-test("Production batch toolbar follows its available width on iPad landscape", async ({ page }) => {
+test("Production Programming Job stays contained on iPad landscape", async ({ page }) => {
   await openProduction(page, { width: 1194, height: 834 });
-  await expectConstrainedToolbar(page);
+  await expectConstrainedProgrammingJob(page);
 
-  const toolbar = page.getByRole("region", { name: "Batch operation toolbar" });
-  await page.getByRole("button", { name: "收起選擇器" }).click();
-  await expect(page.getByRole("button", { name: "展開選擇器" })).toBeVisible();
-  await page.waitForTimeout(220);
-
-  const collapsed = await toolbar.evaluate(element => ({
-    areas: getComputedStyle(element).gridTemplateAreas,
-    scrollWidth: element.scrollWidth,
-    clientWidth: element.clientWidth,
-  }));
-
-  expect(collapsed.areas).toBe('"file file" "operations actions"');
-  expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
+  const selection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
+  await selection.getByRole("button", { name: /收起|Hide/ }).click();
+  await expect(selection.locator(".operatorPanelBody")).toBeHidden();
+  await expectConstrainedProgrammingJob(page);
 });
 
-test("Production batch toolbar follows a constrained content column at a wide viewport", async ({ page }) => {
+test("Production Programming Job follows a constrained content column at a wide viewport", async ({ page }) => {
   await openProduction(page, { width: 1440, height: 900 });
 
-  const workspace = page.locator(".productionWorkspace");
-  const mainPanel = page.locator(".productionMainPanel");
-  await workspace.evaluate(element => {
-    (element as HTMLElement).style.gridTemplateColumns = "286px minmax(0, 1040px)";
-  });
-  await mainPanel.evaluate(element => {
+  const shell = page.locator(".factoryConsoleShell");
+  await shell.evaluate(element => {
     const node = element as HTMLElement;
     node.style.width = "1040px";
     node.style.maxWidth = "1040px";
-    node.style.justifySelf = "start";
+    node.style.marginLeft = "0";
   });
 
-  await expect.poll(() => mainPanel.evaluate(element => element.clientWidth)).toBeLessThanOrEqual(1060);
-  await expectConstrainedToolbar(page);
+  await expect.poll(() => shell.evaluate(element => element.clientWidth)).toBeLessThanOrEqual(1040);
+  await expectConstrainedProgrammingJob(page);
 });

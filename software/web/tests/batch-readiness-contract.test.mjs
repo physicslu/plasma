@@ -11,7 +11,7 @@ async function read(path) {
 test("Pmod and Engineering Programming v2 share one batch readiness source of truth", async () => {
   const readiness = await read("batch-readiness.ts");
   const pmodRoute = await read("fleet/page.tsx");
-  const pmod = await read("fleet/server-batch-page.tsx");
+  const pmod = await read("fleet/factory-console-v2.tsx");
   const emode = await read("engineering/programming-workspace-v2.tsx");
 
   for (const label of [
@@ -29,23 +29,27 @@ test("Pmod and Engineering Programming v2 share one batch readiness source of tr
   ]) assert.match(readiness, new RegExp(label.replace(/ /g, "\\s")));
 
   assert.match(readiness, /export function evaluateBatchReadiness/);
-  assert.match(pmodRoute, /server-batch-page/);
+  assert.match(pmodRoute, /factory-console-v2/);
   assert.match(pmod, /evaluateBatchReadiness\(/);
   assert.match(emode, /evaluateBatchReadiness\(/);
   assert.match(pmod, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
   assert.match(emode, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
 });
 
-test("Production and Engineering v2 share programming control vocabulary without sharing layout ownership", async () => {
-  const pmod = await read("fleet/server-batch-page.tsx");
+test("Production and Engineering share operator programming vocabulary while keeping mode-specific ownership", async () => {
+  const pmod = await read("fleet/factory-console-v2.tsx");
   const emode = await read("engineering/programming-workspace-v2.tsx");
+  const sharedPanel = await read("operator-ui/operator-panel.tsx");
 
-  assert.match(pmod, /programmingBatchToolbar/);
-  assert.match(emode, /programmingBatchToolbar/);
-  assert.match(pmod, /programmingFileName/);
-  assert.match(emode, /programmingFileName/);
-  assert.match(pmod, /programmingBatchOperations/);
-  assert.match(emode, /programmingBatchOperations/);
+  assert.match(pmod, /OperatorPanel/);
+  assert.match(pmod, /PROGRAMMING JOB/);
+  assert.match(pmod, /START PROGRAMMING/);
+  assert.match(pmod, /LIVE SITE STATUS/);
+  assert.match(pmod, /ICPickerField/);
+  assert.match(pmod, /Programming Image/);
+  assert.match(sharedPanel, /operatorKpiStrip/);
+  assert.match(sharedPanel, /operatorPanel/);
+
   assert.match(emode, /PROGRAMMING JOB/);
   assert.match(emode, /START PROGRAMMING/);
   assert.match(emode, /Site Retry Limit/);

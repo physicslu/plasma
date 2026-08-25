@@ -12,7 +12,7 @@ test("Production Mode exposes one Factory Console surface without a local worksp
 
   assert.doesNotMatch(globalNav, /href="\/fleet\/programming"/);
   assert.doesNotMatch(fleetPage, /ProductionWorkspaceNav/);
-  assert.match(fleetPage, /ServerBatchFleetPage/);
+  assert.match(fleetPage, /FactoryConsoleV2/);
 });
 
 test("retired Production Single PPU route redirects to the Factory Console", async () => {

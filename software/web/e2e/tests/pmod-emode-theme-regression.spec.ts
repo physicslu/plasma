@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { commitProductionSites, factoryConsoleHeading, programmingJob } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppu1Id = `${facilityId}-ppu-01`;
@@ -84,42 +85,44 @@ async function background(page: Page, selector: string) {
 test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
-  await page.getByRole("checkbox", { name: `${facilityId} ${ppu1Id} SITE-01` }).check();
-  await page.getByRole("button", { name: "確定選取", exact: true }).click();
-  await expect(page.locator(`[data-production-target="${facilityId}::${ppu1Id}"]`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
+  await commitProductionSites(page, facilityId, ppu1Id, [1]);
+  await expect(page.locator(`[data-production-ppu="${ppu1Id}"]`)).toBeVisible();
 
-  const toolbarOrder = await page.locator(".productionBatchToolbar").evaluate(element => (
+  const fieldOrder = await programmingJob(page).locator(".factoryJobGrid").evaluate(element => (
     Array.from(element.children).map(child => child.className)
   ));
-  expect(toolbarOrder.slice(0, 3)).toEqual([
-    "productionImagePicker programmingBatchFile",
-    "batchOperations programmingBatchOperations",
-    "productionBatchActions programmingBatchActions",
+  expect(fieldOrder).toEqual([
+    "factoryField targetField",
+    "factoryField imageFieldV2",
+    "factoryField operationField",
+    "factoryField policyField",
   ]);
 
-  const toolbarBox = await page.locator(".productionBatchToolbar").boundingBox();
-  const imageBox = await page.locator(".programmingBatchFile").boundingBox();
-  const operationsBox = await page.locator(".programmingBatchOperations").boundingBox();
-  const actionsBox = await page.locator(".programmingBatchActions").boundingBox();
-  expect(toolbarBox).not.toBeNull();
+  const targetBox = await page.locator(".targetField").boundingBox();
+  const imageBox = await page.locator(".imageFieldV2").boundingBox();
+  const operationsBox = await page.locator(".operationField").boundingBox();
+  const policyBox = await page.locator(".policyField").boundingBox();
+  const actionsBox = await page.locator(".factoryActionBar").boundingBox();
+  expect(targetBox).not.toBeNull();
   expect(imageBox).not.toBeNull();
   expect(operationsBox).not.toBeNull();
+  expect(policyBox).not.toBeNull();
   expect(actionsBox).not.toBeNull();
-  expect(imageBox!.x).toBeLessThanOrEqual(toolbarBox!.x + 12);
-  expect(imageBox!.x + imageBox!.width).toBeGreaterThanOrEqual(toolbarBox!.x + toolbarBox!.width - 12);
-  expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(Math.min(operationsBox!.y, actionsBox!.y));
-  expect(actionsBox!.x).toBeGreaterThanOrEqual(operationsBox!.x + operationsBox!.width);
+  expect(Math.abs(targetBox!.y - imageBox!.y)).toBeLessThanOrEqual(2);
+  expect(operationsBox!.y).toBeGreaterThanOrEqual(imageBox!.y + imageBox!.height - 1);
+  expect(Math.abs(operationsBox!.y - policyBox!.y)).toBeLessThanOrEqual(2);
+  expect(actionsBox!.y).toBeGreaterThanOrEqual(operationsBox!.y + operationsBox!.height - 1);
 
   const theme = page.getByRole("group", { name: "Theme" });
   await theme.getByRole("button", { name: "Dark", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect.poll(() => background(page, ".productionPrototypePage")).toBe("rgb(7, 17, 29)");
-  for (const selector of [".fpsSelector", ".productionBatchToolbar", ".productionRuntimeBoard", ".productionPpuPrototype", ".productionSitePrototype"]) {
+  await expect.poll(() => background(page, ".factoryConsoleV2")).toBe("rgb(7, 17, 29)");
+  for (const selector of [".operatorPanel", ".factoryImageControl", ".factoryOperationChecks label", ".factoryPpuRow", ".factorySiteLedCard"]) {
     await expect.poll(() => background(page, selector)).toBe("rgb(12, 25, 39)");
   }
-  const headingColor = await page.locator(".productionPrototypeHeading h1").evaluate(element => getComputedStyle(element).color);
-  expect(headingColor).toBe("rgb(233, 243, 248)");
+  const headingColor = await page.locator(".factoryConsoleHeader h1").evaluate(element => getComputedStyle(element).color);
+  expect(headingColor).toBe("rgb(255, 255, 255)");
 });
 
 test("Emode v2 stays dense with centered Batch status and target-owned READ", async ({ page }) => {

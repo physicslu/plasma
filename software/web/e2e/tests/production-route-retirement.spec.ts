@@ -4,7 +4,7 @@ test("retired Production Single PPU route returns the operator to Factory Consol
   await page.goto("/fleet/programming");
 
   await expect(page).toHaveURL(/\/fleet$/);
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Production workspaces" })).toHaveCount(0);
   await expect(page.getByText("Single PPU Programming", { exact: true })).toHaveCount(0);
 });
