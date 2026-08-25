@@ -6,32 +6,42 @@
 
 Production `/fleet/programming` remains available, but it is a separate Production workspace and is not the implementation authority for Engineering execution.
 
-The Engineering v2 UI is status-first. Setup and programming intent stay compact at the top; the selected PPU's complete Site runtime view owns the main screen area.
+The Engineering v2 UI is status-first. The approved desktop layout is now a strict vertical hierarchy so the Programming controls do not compete for horizontal space and `LIVE SITE STATUS` remains the primary runtime surface.
 
 ```text
-SINGLE PPU PROGRAMMING
-
-KPI
-PPU Sites | Selected | Running | Pass | Fail | Yield | Cycle Time
-
-+----------------------------+--------------------------------+
-| SYSTEM SETUP & TARGETING   | PROGRAMMING JOB                |
-| Facility                   | Target IC                      |
-| PPU                        | Programming Image              |
-| Topology summary           | E / P / V / R                  |
-|                            | Repeat / Retry / Stop Policy   |
-|                            | START / ABORT                  |
-+----------------------------+--------------------------------+
-
-LIVE SITE STATUS — all Sites on the selected PPU
-Batch ✓ | Site | Target IC | State | Progress | Result | E/P/V/R
-
-Recent Events
+EMode sidebar | SINGLE PPU PROGRAMMING
+              |
+              | KPI
+              | PPU Sites | Selected | Running | Pass | Fail | Yield | Cycle Time
+              |
+              | 1. SYSTEM SETUP
+              | Facility | PPU
+              | topology summary
+              |
+              | 2. PROGRAMMING JOB
+              | Target IC          | Programming Image
+              | Operations E/P/V/R | Repeat / Retry / Stop Policy
+              | Batch Ready        | START / ABORT
+              |
+              | 3. LIVE SITE STATUS — all Sites on selected PPU
+              | Batch ✓ | Site | Target IC | State | Progress | Result | E/P/V/R
 ```
 
-There is no separate `TARGET SITES` panel and no separate `LIVE PROGRESS MONITOR`. Both would duplicate state already represented by the primary Site table.
+There is no separate `TARGET SITES` panel and no separate `LIVE PROGRESS MONITOR`. Both duplicate information already represented by the primary Site table.
 
-The outer Engineering Mode navigation remains unchanged.
+`RECENT EVENTS` is also removed from the Programming workspace because it duplicates detailed Engineering log evidence while consuming the viewport needed by Site runtime status. The detailed Engineering log capability remains available as Engineering evidence and is not replaced by a five-line summary.
+
+## Engineering navigation
+
+Engineering uses a persistent dark EMode sidebar for workspace navigation:
+
+- EMode / Plasma / Engineering Mode identity at the top;
+- Overview, PPU / Sites, Programming, Mock, Diagnostics, Logs, Tools and Settings as one vertical menu;
+- the active section uses the blue operator-selection treatment;
+- the desktop sidebar may collapse to a narrow icon rail without changing the active Engineering section;
+- narrow/mobile layouts may switch to a horizontal scrollable navigation bar.
+
+This is navigation presentation only. It does not create a new Product Mode. ProductMode remains only `production` and `engineering`.
 
 ## Site visibility versus Batch membership
 
@@ -84,9 +94,7 @@ Engineering deliberately keeps controls that Production may hide:
 - READ offset and length;
 - direct per-Site E/P/V/R;
 - Gateway reconnect control;
-- detailed Recent Events suitable for development and diagnosis.
-
-This is not a third Product Mode. ProductMode remains only `production` and `engineering`.
+- detailed Engineering log evidence suitable for development and diagnosis.
 
 ## Target IC contract
 
