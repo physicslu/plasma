@@ -211,7 +211,7 @@ async function assertBatchControlCollapses(root: ReturnType<Page["locator"]>) {
   await expect(control.getByRole("region", { name: "Batch execution policy" }).getByLabel("Site Retry Limit")).toHaveValue("3");
 }
 
-test("Production keeps its compact Batch dashboard while Engineering uses the approved v2 programming workflow", async ({ page }) => {
+test("Production keeps its compact Batch dashboard while Engineering uses the status-first programming workflow", async ({ page }) => {
   await installDashboardMock(page);
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -230,8 +230,12 @@ test("Production keeps its compact Batch dashboard while Engineering uses the ap
   await expect(page.locator(".engineeringProgrammingV2 .productionProgrammingKpis")).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .targetingCard")).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .programmingJobCard")).toBeVisible();
-  await expect(page.locator(".engineeringProgrammingV2 .liveProgressCard")).toBeVisible();
+  await expect(page.locator(".engineeringProgrammingV2 .liveProgressCard")).toHaveCount(0);
+  await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
   await expect(page.locator(".engineeringProgrammingV2 .liveSiteStatus")).toBeVisible();
+  await expect(page.getByLabel("Engineering Site selection").locator("tbody tr")).toHaveCount(2);
+  await expect(page.getByLabel("Select all Engineering batch Sites")).toBeChecked();
   await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
   await expect(page.locator(".engineeringProgrammingV2 .batchTopologySummary")).toHaveCount(0);
   await expect(page.locator(".engineeringProgrammingV2 .engineeringBatchDetails")).toHaveCount(0);

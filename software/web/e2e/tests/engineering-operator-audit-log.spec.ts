@@ -146,15 +146,17 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   await openProgramming(page);
   const log = page.getByLabel("Engineering job log");
   await expect(log).toContainText("[NET] [SESSION] NEW · fresh connection");
-  await expect(page.locator(".channelChecks label").first()).toContainText("SITE-01");
-  await expect(page.locator(".channelChecks label").nth(1)).toContainText("SITE-02");
+  await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
+  await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
+  await expect(page.locator(".channelTable tbody tr").first()).toContainText("SITE-01");
+  await expect(page.locator(".channelTable tbody tr").nth(1)).toContainText("SITE-02");
 
   await page.getByLabel("Engineering PPU", { exact: true }).selectOption(ppu2);
   await expect(log).toContainText(`[USR] [TARGET] SELECT · ${facilityId} / ${ppu2}`);
   await expect(log).toContainText(`[SYS] [TARGET] ${facilityId} / ${ppu2}`);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
-  await page.getByLabel("選取 SITE 2").uncheck();
+  await page.getByLabel("Batch select SITE 2").uncheck();
   await expect(log).toContainText("[USR] [SITE] SELECTION · SITE-01");
 
   await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({

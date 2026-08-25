@@ -127,7 +127,7 @@ test("Pmod and Emode keep configuration while runtime is re-read from the backen
   await expect(ppu).toBeVisible();
   await ppu.selectOption(ppu2Id);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(4, { timeout: 15_000 });
-  await page.getByRole("checkbox", { name: "選取 SITE 2" }).uncheck();
+  await page.getByLabel("Batch select SITE 2").uncheck();
   await page.getByLabel("Engineering batch erase").check();
   await page.getByLabel("Engineering batch read").check();
   await page.getByLabel("Engineering READ offset").fill("32");
@@ -147,7 +147,8 @@ test("Pmod and Emode keep configuration while runtime is re-read from the backen
   await expect(page.getByRole("button", { name: "Programming", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".engineeringProgramming .programmingFileName")).toHaveText("shared-mode-state.bin");
   await expect(page.getByLabel("Engineering PPU", { exact: true })).toHaveValue(ppu2Id);
-  await expect(page.getByRole("checkbox", { name: "選取 SITE 2" })).not.toBeChecked();
+  await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(4);
   await expect(page.getByLabel("Engineering batch erase")).toBeChecked();
   await expect(page.getByLabel("Engineering batch read")).toBeChecked();
   await expect(page.getByLabel("Engineering READ offset")).toHaveValue("32");

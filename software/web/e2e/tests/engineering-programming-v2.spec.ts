@@ -81,15 +81,17 @@ async function installApi(page: Page, submissions: Array<Record<string, unknown>
     if (path === `/api/engineering/targets/${facilityId}/${ppuId}/api/jobs` && request.method() === "POST") {
       const body = request.postDataJSON() as Record<string, unknown>;
       submissions.push(body);
+      const siteId = Number(body.site_id);
+      const operation = String(body.operation);
       await route.fulfill({
         status: 202,
         contentType: "application/json",
         body: JSON.stringify({
           ok: true,
           job: {
-            job_id: "engineering-v2-erase-1",
-            site_id: body.site_id,
-            operation: body.operation,
+            job_id: `engineering-v2-${operation}-${siteId}`,
+            site_id: siteId,
+            operation,
             state: "queued",
             cancel_requested: false,
             stage: null,
@@ -103,19 +105,23 @@ async function installApi(page: Page, submissions: Array<Record<string, unknown>
       });
       return;
     }
-    if (path === `/api/engineering/targets/${facilityId}/${ppuId}/api/status` && request.method() === "GET" && url.searchParams.get("job") === "engineering-v2-erase-1") {
+    if (path === `/api/engineering/targets/${facilityId}/${ppuId}/api/status` && request.method() === "GET" && url.searchParams.has("job")) {
+      const jobId = url.searchParams.get("job") ?? "";
+      const parts = jobId.split("-");
+      const siteId = Number(parts.at(-1));
+      const operation = parts.at(-2) ?? "erase";
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           ok: true,
           job: {
-            job_id: "engineering-v2-erase-1",
-            site_id: 1,
-            operation: "erase",
+            job_id: jobId,
+            site_id: siteId,
+            operation,
             state: "success",
             cancel_requested: false,
-            stage: "erase",
+            stage: operation,
             stage_state: "done",
             stage_progress_percent: 100,
             progress_percent: 100,
@@ -169,7 +175,7 @@ async function installApi(page: Page, submissions: Array<Record<string, unknown>
   });
 }
 
-test("Engineering Programming renders the approved v2 workflow and binds Target IC to a direct PPU job", async ({ page }) => {
+test("Engineering Programming renders the status-first v2 workflow and binds Target IC to a direct PPU job", async ({ page }) => {
   const submissions: Array<Record<string, unknown>> = [];
   await installApi(page, submissions);
   await page.setViewportSize({ width: 1536, height: 1000 });
@@ -179,11 +185,14 @@ test("Engineering Programming renders the approved v2 workflow and binds Target 
   await expect(page.getByRole("heading", { name: "SINGLE PPU PROGRAMMING" })).toBeVisible();
   await expect(page.getByText("SYSTEM SETUP & TARGETING", { exact: true })).toBeVisible();
   await expect(page.getByText("PROGRAMMING JOB", { exact: true })).toBeVisible();
-  await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toBeVisible();
+  await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("LIVE SITE STATUS", { exact: true })).toBeVisible();
   await expect(page.getByText("RECENT EVENTS", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
+  await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
 
   const target = page.getByLabel("Target IC");
   await target.fill("STM32F103C8T6");
@@ -203,4 +212,26 @@ test("Engineering Programming renders the approved v2 workflow and binds Target 
   const siteOne = page.locator(".channelTable tbody tr").filter({ hasText: "SITE-01" });
   await expect(siteOne.locator(".state")).toContainText("SUCCESS");
   await expect(siteOne.locator(".engineeringResult")).toHaveText("PASS");
+});
+
+test("unselected Sites stay visible and START PROGRAMMING snapshots only checked Sites", async ({ page }) => {
+  const submissions: Array<Record<string, unknown>> = [];
+  await installApi(page, submissions);
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await page.getByLabel("Batch select SITE 2").uncheck();
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
+  await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
+
+  await page.getByLabel("Engineering batch erase").check();
+  await expect(page.getByRole("button", { name: "START PROGRAMMING" })).toBeEnabled();
+  await page.getByRole("button", { name: "START PROGRAMMING" }).click();
+
+  await expect.poll(() => submissions.length).toBe(1);
+  expect(submissions.map(item => item.site_id)).toEqual([1]);
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
 });

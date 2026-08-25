@@ -7,7 +7,7 @@
 .engineeringProgrammingV2 .productionProgrammingV2 {
   width: 100%;
   min-width: 0;
-  padding: 0 0 18px;
+  padding: 0 0 14px;
 }
 
 .engineeringProgrammingV2 .productionProgrammingWorkflow,
@@ -19,7 +19,7 @@
 }
 
 .engineeringProgrammingV2Header {
-  min-height: 50px;
+  min-height: 46px;
 }
 
 .engineeringProgrammingV2Header .engineeringGateway {
@@ -32,7 +32,7 @@
 
 .engineeringProgrammingV2Header .engineeringGateway input {
   min-width: 0;
-  height: 30px;
+  height: 28px;
   border: 1px solid rgba(255, 255, 255, .28);
   border-radius: 5px;
   background: rgba(255, 255, 255, .1);
@@ -42,7 +42,7 @@
 }
 
 .engineeringProgrammingV2Header .engineeringGateway button {
-  min-height: 30px;
+  min-height: 28px;
   border: 1px solid rgba(255, 255, 255, .32);
   border-radius: 5px;
   background: rgba(255, 255, 255, .14);
@@ -78,50 +78,69 @@
   color: var(--text, #172033);
 }
 
-.engineeringPpuIdentityV2 {
-  display: grid;
-  gap: 2px;
-  margin-top: 18px;
-  padding: 9px 11px;
-  border: 1px solid var(--line, #d6dde6);
-  border-radius: 7px;
-  background: var(--panel-2, #f6f8fa);
+/* Engineering Programming is status-first: keep setup dense so the Site table
+   owns the majority of the vertical viewport. */
+.engineeringProgrammingV2 .productionProgrammingKpis {
+  gap: 7px;
+  margin-top: 7px;
 }
 
-.engineeringPpuIdentityV2 b {
+.engineeringProgrammingV2 .productionProgrammingKpis article {
+  min-height: 58px;
+  padding: 8px 10px;
+}
+
+.engineeringProgrammingV2 .productionProgrammingKpis small {
+  font-size: 9px;
+}
+
+.engineeringProgrammingV2 .productionProgrammingKpis b {
+  margin-top: 3px;
+  font-size: 24px;
+}
+
+.engineeringProgrammingV2 .productionProgrammingWorkflow {
+  grid-template-columns: minmax(300px, .82fr) minmax(0, 1.18fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.engineeringProgrammingV2 .productionProgrammingRight {
+  gap: 0;
+}
+
+.engineeringProgrammingV2 .productionProgrammingCard > header {
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: 11px;
+}
+
+.engineeringProgrammingV2 .cardBody {
+  padding: 10px 12px;
+}
+
+.engineeringProgrammingV2 .cardBody h2 {
+  margin: 0 0 7px;
   font-size: 10px;
 }
 
-.engineeringPpuIdentityV2 small {
-  color: var(--muted, #64748b);
-  font-size: 8px;
-}
-
-.engineeringProgrammingV2 .channelChecks {
-  display: grid;
+.engineeringProgrammingV2 .workflowField {
+  grid-template-columns: 112px minmax(0, 1fr);
   gap: 7px;
-  min-width: 0;
+  margin-top: 7px;
+  font-size: 10px;
 }
 
-.engineeringProgrammingV2 .channelChecks label {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  min-height: 38px;
-  padding: 7px 8px;
-  border: 1px solid var(--line, #d6dde6);
-  border-radius: 7px;
-  background: var(--panel-2, #f6f8fa);
+.engineeringProgrammingV2 .workflowField select,
+.engineeringProgrammingV2 .jobRow select,
+.engineeringProgrammingV2 .jobRow input[type="number"] {
+  min-height: 32px;
 }
 
-.engineeringProgrammingV2 .channelChecks label.checked {
-  border-color: var(--cyan, #0891b2);
-}
-
-.engineeringProgrammingV2 .channelChecks label.disabled {
-  opacity: .5;
+.engineeringProgrammingV2 .topologyFoot {
+  margin-top: 12px;
+  padding: 7px 9px;
+  font-size: 9px;
 }
 
 .engineeringProgrammingV2 .programmingBatchToolbar {
@@ -129,12 +148,25 @@
   min-width: 0;
 }
 
+.engineeringProgrammingV2 .programmingJobBody {
+  gap: 8px;
+}
+
+.engineeringProgrammingV2 .jobRow {
+  grid-template-columns: 145px minmax(0, 1fr);
+  gap: 9px;
+}
+
+.engineeringProgrammingV2 .jobRow > strong {
+  font-size: 10px;
+}
+
 /* Engineering v2 owns this picker. Pin its grid explicitly so legacy
    Programming Image toolbar rules cannot reorder the filename and Browse button. */
 .engineeringProgrammingV2 .imageField {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 92px;
-  grid-template-rows: minmax(38px, auto);
+  grid-template-columns: minmax(0, 1fr) 82px;
+  grid-template-rows: minmax(32px, auto);
   min-width: 0;
 }
 
@@ -146,7 +178,7 @@
   align-items: center;
   min-width: 0;
   max-width: none;
-  padding: 0 10px;
+  padding: 0 9px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -157,32 +189,44 @@
 .engineeringProgrammingV2 .imageField .engineeringBrowseButton {
   grid-column: 2;
   grid-row: 1;
-  width: 92px;
-  min-width: 92px;
-  min-height: 38px;
-  padding: 0 10px;
+  width: 82px;
+  min-width: 82px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.engineeringProgrammingV2 .engineeringImageHint {
+  font-size: 8px;
+  line-height: 1.25;
 }
 
 .engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .engineeringProgrammingV2 .programmingBatchOperations .operationChecks label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+  font-size: 9px;
+}
+
+.engineeringProgrammingV2 .programmingBatchOperations .operationChecks input {
+  width: 15px;
+  height: 15px;
 }
 
 .engineeringProgrammingV2 .batchReadiness {
-  min-height: 32px;
+  min-height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
   justify-self: start;
-  padding: 0 10px;
+  padding: 0 8px;
   border: 1px solid var(--line, #d6dde6);
   border-radius: 6px;
   background: var(--panel-2, #f6f8fa);
@@ -195,36 +239,69 @@
 }
 
 .engineeringPolicyRow {
-  grid-template-columns: 165px max-content max-content max-content;
+  grid-template-columns: 145px max-content max-content max-content;
 }
 
+.engineeringPolicyRow > label,
 .engineeringRetryField {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: 9px;
   white-space: nowrap;
 }
 
+.engineeringPolicyRow input,
 .engineeringRetryField input {
-  width: 62px;
-  min-width: 62px;
-  max-width: 62px;
+  width: 58px;
+  min-width: 58px;
+  max-width: 58px;
+}
+
+.engineeringPolicyRow select {
+  width: 108px;
+  min-width: 108px;
 }
 
 .engineeringReadRow {
-  grid-template-columns: 165px max-content max-content;
+  grid-template-columns: 145px max-content max-content;
 }
 
 .engineeringReadRow label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 9px;
 }
 
 .engineeringReadRow input {
-  width: 86px;
+  width: 80px;
+}
+
+.engineeringProgrammingV2 .programmingActions {
+  gap: 9px;
+  margin-top: 0;
+}
+
+.engineeringProgrammingV2 .programmingActions button {
+  min-height: 38px;
+  font-size: 11px;
+}
+
+.engineeringProgrammingV2 .liveSiteStatus {
+  margin-top: 8px;
+}
+
+.engineeringProgrammingV2 .liveSiteStatus > header {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.engineeringProgrammingV2 .liveSiteStatus > header small {
+  margin-left: auto;
+  color: var(--muted, #64748b);
+  font-size: 8px;
+  font-weight: 650;
 }
 
 .engineeringV2TableWrap {
@@ -232,15 +309,43 @@
 }
 
 .engineeringProgrammingV2 .channelTable {
-  min-width: 840px;
+  min-width: 920px;
 }
 
-.engineeringProgrammingV2 .channelTable th:nth-child(1) { width: 12%; }
-.engineeringProgrammingV2 .channelTable th:nth-child(2) { width: 20%; }
-.engineeringProgrammingV2 .channelTable th:nth-child(3) { width: 14%; }
-.engineeringProgrammingV2 .channelTable th:nth-child(4) { width: 24%; }
-.engineeringProgrammingV2 .channelTable th:nth-child(5) { width: 10%; }
-.engineeringProgrammingV2 .channelTable th:nth-child(6) { width: 20%; }
+.engineeringProgrammingV2 .channelTable th,
+.engineeringProgrammingV2 .channelTable td {
+  padding: 6px 8px;
+}
+
+.engineeringProgrammingV2 .channelTable th:nth-child(1) { width: 7%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(2) { width: 10%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(3) { width: 18%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(4) { width: 12%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(5) { width: 20%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(6) { width: 9%; }
+.engineeringProgrammingV2 .channelTable th:nth-child(7) { width: 24%; }
+
+.engineeringBatchSelectHead label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.engineeringBatchSelectHead input,
+.engineeringBatchSelectCell input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+.engineeringBatchSelectCell {
+  text-align: center;
+}
+
+.engineeringProgrammingV2 .channelTable tr[data-site-enabled="false"] {
+  opacity: .58;
+}
 
 .engineeringV2Actions {
   flex-wrap: nowrap;
@@ -256,22 +361,25 @@
 .engineeringResult[data-result="CANCELLED"],
 .engineeringResult[data-result="STOPPED"] { color: #64748b; }
 
-.engineeringProgrammingV2 .engineeringLogCard {
-  margin-top: 10px;
+.engineeringProgrammingV2 .recentEvents {
+  margin-top: 8px;
 }
 
-/* The Engineering sidebar consumes part of the viewport before this workspace.
-   Decide two-column versus stacked layout from the actual workspace canvas,
-   not from the browser viewport. */
-@container engineering-programming (max-width: 1400px) {
-  .engineeringProgrammingV2 .productionProgrammingWorkflow {
-    grid-template-columns: minmax(0, 1fr);
+.engineeringProgrammingV2 .engineeringLogCard {
+  margin-top: 8px;
+}
+
+/* Target Sites moved into LIVE SITE STATUS, so the desktop cards can remain
+   side-by-side at substantially narrower content widths without overlap. */
+@container engineering-programming (max-width: 1050px) {
+  .engineeringProgrammingV2 .productionProgrammingKpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 1320px) {
-  .engineeringProgrammingV2 .productionProgrammingKpis {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+@container engineering-programming (max-width: 920px) {
+  .engineeringProgrammingV2 .productionProgrammingWorkflow {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .engineeringPolicyRow {
@@ -283,7 +391,7 @@
   .engineeringProgrammingV2Header {
     align-items: flex-start;
     flex-direction: column;
-    padding-block: 10px;
+    padding-block: 8px;
   }
 
   .engineeringProgrammingV2Header .engineeringGateway {
@@ -293,8 +401,23 @@
 }
 
 @media (max-width: 760px) {
+  .engineeringProgrammingV2 .productionProgrammingKpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .engineeringProgrammingV2 .jobRow,
   .engineeringPolicyRow,
   .engineeringReadRow {
     grid-template-columns: 1fr;
+  }
+
+  .engineeringProgrammingV2 .liveSiteStatus > header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: 6px;
+  }
+
+  .engineeringProgrammingV2 .liveSiteStatus > header small {
+    margin-left: 0;
   }
 }
