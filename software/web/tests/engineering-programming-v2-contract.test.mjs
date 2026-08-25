@@ -6,7 +6,7 @@ async function source(path) {
   return await fs.readFile(new URL(path, import.meta.url), "utf8");
 }
 
-test("Engineering Programming uses the approved single-PPU v2 workflow", async () => {
+test("Engineering Programming uses the approved status-first single-PPU workflow", async () => {
   const page = await source("../app/engineering/page.tsx");
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
 
@@ -17,9 +17,30 @@ test("Engineering Programming uses the approved single-PPU v2 workflow", async (
   assert.match(workspace, /Target IC/);
   assert.match(workspace, /Programming Image/);
   assert.match(workspace, /START PROGRAMMING/);
-  assert.match(workspace, /LIVE PROGRESS MONITOR/);
   assert.match(workspace, /LIVE SITE STATUS/);
   assert.match(workspace, /RECENT EVENTS/);
+  assert.doesNotMatch(workspace, /TARGET SITES/);
+  assert.doesNotMatch(workspace, /LIVE PROGRESS MONITOR/);
+});
+
+test("LIVE SITE STATUS owns Batch Site selection while keeping every PPU Site visible", async () => {
+  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+
+  assert.match(workspace, /aria-label="Engineering Site selection"/);
+  assert.match(workspace, /aria-label="Select all Engineering batch Sites"/);
+  assert.match(workspace, /aria-label=\{`Batch select SITE \$\{site\.id\}`\}/);
+  assert.match(workspace, /\{sites\.map\(site => \{/);
+  assert.doesNotMatch(workspace, /\{selectedSites\.map\(site => \{/);
+  assert.match(workspace, /const siteIds = \[\.\.\.selectedSiteIds\];/);
+  assert.match(workspace, /disabled=\{batchRunning \|\| !site\.enabled \|\| isRunning\(site\)\}/);
+});
+
+test("Engineering KPI separates PPU topology from Batch membership", async () => {
+  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+
+  assert.match(workspace, /<small>PPU SITES<\/small>/);
+  assert.match(workspace, /<small>SELECTED<\/small>/);
+  assert.doesNotMatch(workspace, /<small>TOTAL IC<\/small>/);
 });
 
 test("Engineering Programming keeps direct PPU jobs rather than borrowing Production server Batch ownership", async () => {
