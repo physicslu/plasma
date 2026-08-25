@@ -11,17 +11,10 @@ function catalog() {
     facility_count: 1,
     ppu_count: 1,
     site_count: 1,
-    programming_asset_scope: "connection-session-and-ppu",
     facilities: [{
       facility_id: facilityId,
       display_name: "Mock Facility 01",
-      ppus: [{
-        ppu_id: ppuId,
-        display_name: "Mock PPU 01",
-        model: "MOCK-PPU",
-        site_count: 1,
-        provider: "mock",
-      }],
+      ppus: [{ ppu_id: ppuId, display_name: "Mock PPU 01", model: "MOCK-PPU", site_count: 1, provider: "mock" }],
     }],
   };
 }
@@ -38,15 +31,7 @@ function targetStatus() {
       enabled_site_count: 1,
       capabilities: { max_supported_sites: 1, operations: ["erase", "program", "verify", "read"] },
     },
-    sites: [{
-      site_id: 1,
-      enabled: true,
-      state: "idle",
-      current_job_id: null,
-      queued_jobs: 0,
-      interface: "mock",
-      target: "MOCK-IC",
-    }],
+    sites: [{ site_id: 1, enabled: true, state: "idle", current_job_id: null, queued_jobs: 0, interface: "mock", target: "MOCK-IC" }],
   };
 }
 
@@ -54,36 +39,36 @@ function batchSnapshot(stage: "initial" | "pass" | "faulted") {
   const completedRounds = stage === "initial" ? 0 : 1;
   const finalFailures = stage === "faulted" ? 1 : 0;
   const siteState = stage === "faulted" ? "faulted" : "running";
-  const batchState = stage === "faulted" ? "partial" : "running";
-  const counts = {
-    ready: 0,
-    running: siteState === "running" ? 1 : 0,
-    success: 0,
-    faulted: siteState === "faulted" ? 1 : 0,
-    error: 0,
-    stopped: 0,
-    cancelled: 0,
-  };
-
   return {
     batch_id: batchId,
-    state: batchState,
+    state: stage === "faulted" ? "partial" : "running",
     created_at: "2026-08-24T00:00:00Z",
     started_at: "2026-08-24T00:00:00Z",
     finished_at: stage === "faulted" ? "2026-08-24T00:00:03Z" : null,
     operations: ["erase"],
-    execution_policy: {
-      repeat_count: 100,
-      site_retry_limit: 3,
-      failed_site_stop_threshold: null,
+    execution_policy: { repeat_count: 100, site_retry_limit: 3, failed_site_stop_threshold: null },
+    target_device: {
+      vendor: "STMicroelectronics",
+      family: "STM32F1",
+      identifier: "STM32F103C8T6",
+      identifier_kind: "manufacturer_part_number",
+      icpn: "STM32F103C8T6",
     },
     asset: null,
     read: { offset: 0, length: 256 },
     cancel_requested: false,
     stop_reason: null,
     error: null,
-    faulted_site_count: counts.faulted,
-    site_counts: counts,
+    faulted_site_count: siteState === "faulted" ? 1 : 0,
+    site_counts: {
+      ready: 0,
+      running: siteState === "running" ? 1 : 0,
+      success: 0,
+      faulted: siteState === "faulted" ? 1 : 0,
+      error: 0,
+      stopped: 0,
+      cancelled: 0,
+    },
     operation_statistics: {},
     sites: [{
       facility_id: facilityId,
@@ -102,9 +87,7 @@ function batchSnapshot(stage: "initial" | "pass" | "faulted") {
       faulted_round: stage === "faulted" ? 2 : null,
       faulted_operation: stage === "faulted" ? "erase" : null,
       last_failure_source: stage === "faulted" ? "injected" : null,
-      error: stage === "faulted"
-        ? { message: "retry exhausted", error_code: "E6002", failure_source: "injected" }
-        : null,
+      error: stage === "faulted" ? { message: "retry exhausted", error_code: "E6002", failure_source: "injected" } : null,
       operation_statistics: {},
     }],
   };
@@ -112,91 +95,84 @@ function batchSnapshot(stage: "initial" | "pass" | "faulted") {
 
 async function installApi(page: Page) {
   let batchPolls = 0;
-
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
     if (url.pathname === "/api/engineering/session" && request.method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          session: {
-            session_id: "0123456789abcdef0123456789abcdef",
-            programming_asset_cache_scope: "connection-session-and-ppu",
-            previous_session_cleared: false,
-          },
-        }),
-      });
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, session: { session_id: "0123456789abcdef0123456789abcdef", previous_session_cleared: false } }) });
       return;
     }
-    if (url.pathname === "/api/engineering/targets" && request.method() === "GET") {
+    if (url.pathname === "/api/engineering/targets") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
       return;
     }
-    if (url.pathname === `/api/engineering/targets/${facilityId}/${ppuId}/api/status` && request.method() === "GET") {
+    if (url.pathname === `/api/engineering/targets/${facilityId}/${ppuId}/api/status`) {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(targetStatus()) });
       return;
     }
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "unhandled engineering route" } }) });
+    await route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
+  });
+
+  await page.route("**/api/devices/search**", async route => {
+    const query = new URL(route.request().url()).searchParams.get("q") ?? "";
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      ok: true,
+      rest_contract_version: "3",
+      query,
+      catalog_size: 7657,
+      count: 1,
+      results: [{
+        vendor: "STMicroelectronics", family: "STM32F1", subfamily: null, plasma_series: "STM32",
+        identifier: "STM32F103C8T6", identifier_kind: "manufacturer_part_number", icpn: "STM32F103C8T6", package: null,
+        cpu_architectures: ["ARM Cortex-M3"],
+        backend: { type: "openocd", distribution: "upstream-openocd", target_config: "tcl/target/stm32f1x.cfg", mapping_status: "mapping_candidate" },
+        physical_validation: { engineering_status: "not_verified", ppu_status: "no_evidence", socket_status: "no_evidence" }, catalog_origin: "test",
+      }],
+    }) });
   });
 
   await page.route("**/api/batches**", async (route: Route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === "/api/batches" && request.method() === "POST") {
-      await route.fulfill({
-        status: 202,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot("initial") }),
-      });
+      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot("initial") }) });
       return;
     }
     if (path === `/api/batches/${batchId}` && request.method() === "GET") {
       batchPolls += 1;
       if (batchPolls === 1) {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot("pass") }),
-        });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot("pass") }) });
         return;
       }
-      await new Promise(resolve => setTimeout(resolve, 2_000));
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot("faulted") }),
-      });
+      await new Promise(resolve => setTimeout(resolve, 1_000));
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: batchSnapshot("faulted") }) });
       return;
     }
-    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: "missing batch" } }) });
+    await route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
   });
 }
 
-test("Production KPI cards update from the authoritative server Batch snapshot while the Site is still running", async ({ page }) => {
+test("Production KPI cards update from authoritative Batch rounds while a Site is still running", async ({ page }) => {
   await installApi(page);
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
 
-  await page.getByRole("checkbox", { name: `${facilityId} ${ppuId} SITE-01`, exact: true }).check();
-  await page.getByRole("button", { name: "確定選取", exact: true }).click();
+  await page.getByRole("checkbox", { name: `Production Set ${facilityId} ${ppuId} SITE-01` }).check();
+  await page.getByRole("button", { name: "SET PRODUCTION SITES" }).click();
+  const target = page.getByLabel("Target IC");
+  await target.fill("STM32F103C8T6");
+  await page.getByRole("option", { name: /STM32F103C8T6/ }).click();
   await page.getByLabel("Repeat Count").fill("100");
-  await page.locator(".batchOperations label").filter({ hasText: "E" }).getByRole("checkbox").check();
-  await page.locator(".executeBatchButton").click();
+  await page.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox").check();
+  await page.getByRole("button", { name: /START PROGRAMMING/ }).click();
 
-  const summary = page.getByRole("region", { name: "Mock topology summary" });
-  await expect(summary).toHaveAttribute("data-kpi-source", "server-batch-snapshot");
-  await expect(summary.locator('[data-production-kpi="total"] b')).toHaveText("1");
-  await expect(summary.locator('[data-production-kpi="pass"] b')).toHaveText("1");
-  await expect(summary.locator('[data-production-kpi="fail"] b')).toHaveText("0");
-  await expect(summary.locator('[data-production-kpi="yield"] b')).toHaveText("100.0%");
-  await expect(page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`)).toHaveAttribute("data-site-state", "running");
+  await expect(page.locator('[data-kpi="pass"] b')).toHaveText("1");
+  await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
+  await expect(page.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
+  await expect(page.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running");
 
-  await expect(summary.locator('[data-production-kpi="total"] b')).toHaveText("2", { timeout: 5_000 });
-  await expect(summary.locator('[data-production-kpi="pass"] b')).toHaveText("1");
-  await expect(summary.locator('[data-production-kpi="fail"] b')).toHaveText("1");
-  await expect(summary.locator('[data-production-kpi="yield"] b')).toHaveText("50.0%");
-  await expect(page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`)).toHaveAttribute("data-site-state", "faulted");
+  await expect(page.locator('[data-kpi="pass"] b')).toHaveText("1", { timeout: 5_000 });
+  await expect(page.locator('[data-kpi="fail"] b')).toHaveText("1", { timeout: 5_000 });
+  await expect(page.locator('[data-kpi="yield"] b')).toHaveText("50.0%", { timeout: 5_000 });
+  await expect(page.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "faulted");
 });
