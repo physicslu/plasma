@@ -60,13 +60,17 @@ async function openProgramming(page: import("@playwright/test").Page) {
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
 }
 
-async function expectCheckedSites(page: import("@playwright/test").Page, expected: number[]) {
-  const checkboxes = page.locator(".targetSitesSection").getByRole("checkbox");
-  const count = await checkboxes.count();
-  for (let index = 0; index < count; index += 1) {
-    const siteId = index + 1;
-    if (expected.includes(siteId)) await expect(checkboxes.nth(index)).toBeChecked();
-    else await expect(checkboxes.nth(index)).not.toBeChecked();
+function siteSelectionRegion(page: import("@playwright/test").Page) {
+  return page.getByLabel("Engineering Site selection");
+}
+
+async function expectCheckedSites(page: import("@playwright/test").Page, siteCount: number, expected: number[]) {
+  const region = siteSelectionRegion(page);
+  await expect(region.locator("tbody tr")).toHaveCount(siteCount);
+  for (let siteId = 1; siteId <= siteCount; siteId += 1) {
+    const checkbox = page.getByLabel(`Batch select SITE ${siteId}`, { exact: true });
+    if (expected.includes(siteId)) await expect(checkbox).toBeChecked();
+    else await expect(checkbox).not.toBeChecked();
   }
 }
 
@@ -147,17 +151,17 @@ test("operator reconnect keeps explicit Site selection and polling never turns e
 
   await facility.selectOption("mock-facility-01");
   await ppu.selectOption("mock-facility-01-ppu-03");
-  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(6);
+  await expectCheckedSites(page, 6, [1, 2, 3, 4, 5, 6]);
 
   // Mirror the operator's manual pattern: keep SITE 1 / 5 / 6 only.
-  await page.getByLabel("選取 SITE 2", { exact: true }).uncheck();
-  await page.getByLabel("選取 SITE 3", { exact: true }).uncheck();
-  await page.getByLabel("選取 SITE 4", { exact: true }).uncheck();
-  await expectCheckedSites(page, [1, 5, 6]);
+  await page.getByLabel("Batch select SITE 2", { exact: true }).uncheck();
+  await page.getByLabel("Batch select SITE 3", { exact: true }).uncheck();
+  await page.getByLabel("Batch select SITE 4", { exact: true }).uncheck();
+  await expectCheckedSites(page, 6, [1, 5, 6]);
 
   const pollsBeforeOutage = counters.statuses;
   await expect.poll(() => counters.statuses).toBeGreaterThan(pollsBeforeOutage);
-  await expectCheckedSites(page, [1, 5, 6]);
+  await expectCheckedSites(page, 6, [1, 5, 6]);
 
   // Simulate a Provider failure while staying on the same Gateway URL.
   providerOnline = false;
@@ -168,31 +172,27 @@ test("operator reconnect keeps explicit Site selection and polling never turns e
   await connect.click();
   await expect(facility).toHaveValue("mock-facility-01");
   await expect(ppu).toHaveValue("mock-facility-01-ppu-03");
-  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(6);
-  await expectCheckedSites(page, [1, 5, 6]);
+  await expectCheckedSites(page, 6, [1, 5, 6]);
   await expect(log).toContainText("[SYS] [TARGET] RESTORED · mock-facility-01 / mock-facility-01-ppu-03");
   await expect(log).toContainText("[SYS] [SITE] RESTORED · SITE-01, SITE-05, SITE-06");
 
-  // Explicitly select zero Sites. This is a real user state, not "uninitialized".
-  await page.getByLabel("選取 SITE 1", { exact: true }).uncheck();
-  await page.getByLabel("選取 SITE 5", { exact: true }).uncheck();
-  await page.getByLabel("選取 SITE 6", { exact: true }).uncheck();
-  await expectCheckedSites(page, []);
-  await expect(page.locator(".channelTable tbody tr")).toHaveCount(0);
+  // Explicitly select zero Sites. The live status table must remain complete.
+  await page.getByLabel("Batch select SITE 1", { exact: true }).uncheck();
+  await page.getByLabel("Batch select SITE 5", { exact: true }).uncheck();
+  await page.getByLabel("Batch select SITE 6", { exact: true }).uncheck();
+  await expectCheckedSites(page, 6, []);
 
   // Let multiple status polls happen; zero must stay zero instead of becoming all selected.
   const pollsBeforeZeroHold = counters.statuses;
   await expect.poll(() => counters.statuses).toBeGreaterThanOrEqual(pollsBeforeZeroHold + 2);
-  await expectCheckedSites(page, []);
-  await expect(page.locator(".channelTable tbody tr")).toHaveCount(0);
+  await expectCheckedSites(page, 6, []);
 
   // A same-Gateway reconnect must also preserve an explicit empty Site selection.
   const sessionsBeforeReconnect = counters.sessions;
   await connect.click();
   await expect.poll(() => counters.sessions).toBeGreaterThan(sessionsBeforeReconnect);
   await expect(ppu).toHaveValue("mock-facility-01-ppu-03");
-  await expectCheckedSites(page, []);
-  await expect(page.locator(".channelTable tbody tr")).toHaveCount(0);
+  await expectCheckedSites(page, 6, []);
   await expect(log).toContainText("[SYS] [SITE] RESTORED · none");
 });
 
@@ -221,14 +221,13 @@ test("operator gateway outage round-trip restores the original PPU and Site subs
 
   await facility.selectOption("mock-facility-03");
   await ppu.selectOption("mock-facility-03-ppu-04");
-  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(8);
+  await expectCheckedSites(page, 8, [1, 2, 3, 4, 5, 6, 7, 8]);
 
   // Mirror the uploaded operator log: keep SITE 2 / 4 / 6 / 7 on an 8-Site PPU.
   for (const siteId of [1, 3, 5, 8]) {
-    await page.getByLabel(`選取 SITE ${siteId}`, { exact: true }).uncheck();
+    await page.getByLabel(`Batch select SITE ${siteId}`, { exact: true }).uncheck();
   }
-  await expectCheckedSites(page, [2, 4, 6, 7]);
-  await expect(page.locator(".channelTable tbody tr")).toHaveCount(4);
+  await expectCheckedSites(page, 8, [2, 4, 6, 7]);
 
   await gateway.fill(badGateway);
   await connect.click();
@@ -238,9 +237,7 @@ test("operator gateway outage round-trip restores the original PPU and Site subs
   await connect.click();
   await expect(facility).toHaveValue("mock-facility-03");
   await expect(ppu).toHaveValue("mock-facility-03-ppu-04");
-  await expect(page.locator(".targetSitesSection").getByRole("checkbox")).toHaveCount(8);
-  await expectCheckedSites(page, [2, 4, 6, 7]);
-  await expect(page.locator(".channelTable tbody tr")).toHaveCount(4);
+  await expectCheckedSites(page, 8, [2, 4, 6, 7]);
   await expect(log).toContainText("[SYS] [TARGET] RESTORED · mock-facility-03 / mock-facility-03-ppu-04");
   await expect(log).toContainText("[SYS] [SITE] RESTORED · SITE-02, SITE-04, SITE-06, SITE-07");
 });
