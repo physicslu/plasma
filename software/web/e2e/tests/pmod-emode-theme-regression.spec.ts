@@ -177,6 +177,35 @@ test("Emode v2 stays dense with the approved sidebar, image picker and dark oper
   expect(imageText!.x).toBeLessThan(browse!.x);
   expect(Math.abs(browse!.x - (imageText!.x + imageText!.width))).toBeLessThanOrEqual(2);
 
+  const repeat = await page.getByLabel("Repeat Count").boundingBox();
+  const retry = await page.getByLabel("Site Retry Limit").boundingBox();
+  const stopPolicy = await page.getByLabel("Engineering Stop Policy").boundingBox();
+  const operations = await page.locator(".programmingBatchOperations").boundingBox();
+  const policy = await page.locator(".engineeringPolicyRow").boundingBox();
+  const readiness = await page.locator(".batchReadiness").boundingBox();
+  const actions = await page.locator(".programmingActions").boundingBox();
+  for (const box of [repeat, retry, stopPolicy, operations, policy, readiness, actions]) expect(box).not.toBeNull();
+
+  const policyControlY = [repeat!.y, retry!.y, stopPolicy!.y];
+  expect(Math.max(...policyControlY) - Math.min(...policyControlY)).toBeLessThanOrEqual(2);
+  expect(Math.abs(operations!.y - policy!.y)).toBeLessThanOrEqual(6);
+  const readinessCenter = readiness!.y + readiness!.height / 2;
+  const actionsCenter = actions!.y + actions!.height / 2;
+  expect(Math.abs(readinessCenter - actionsCenter)).toBeLessThanOrEqual(3);
+  expect(actions!.y - (policy!.y + policy!.height)).toBeLessThanOrEqual(32);
+
+  const passKpi = await page.locator('[data-kpi="pass"]').evaluate(element => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, edge: style.borderLeftColor };
+  });
+  const failKpi = await page.locator('[data-kpi="fail"]').evaluate(element => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, edge: style.borderLeftColor };
+  });
+  expect(passKpi.edge).toBe("rgb(21, 128, 61)");
+  expect(failKpi.edge).toBe("rgb(220, 38, 38)");
+  expect(passKpi.background).not.toBe(failKpi.background);
+
   const header = await page.locator(".engineeringProgrammingV2Header").boundingBox();
   const kpis = await page.locator(".productionProgrammingKpis").boundingBox();
   const workflow = await page.locator(".productionProgrammingWorkflow").boundingBox();
@@ -186,7 +215,7 @@ test("Emode v2 stays dense with the approved sidebar, image picker and dark oper
   for (const box of [header, kpis, workflow, setup, job, liveStatus]) expect(box).not.toBeNull();
   expect(header!.height).toBeLessThanOrEqual(90);
   expect(kpis!.height).toBeLessThanOrEqual(180);
-  expect(job!.height).toBeLessThanOrEqual(520);
+  expect(job!.height).toBeLessThanOrEqual(360);
   expect(setup!.y + setup!.height).toBeLessThanOrEqual(job!.y);
   expect(job!.y + job!.height).toBeLessThanOrEqual(liveStatus!.y);
   await expect(page.locator(".recentEvents")).toBeHidden();
