@@ -281,7 +281,7 @@ test("Emode v2 stays dense with centered Batch status and target-owned READ", as
   expect(passKpi.background).not.toBe(failKpi.background);
 
   const header = await page.locator(".engineeringProgrammingV2Header").boundingBox();
-  const kpis = await page.locator(".productionProgrammingKpis").boundingBox();
+  const kpis = await page.getByRole("region", { name: "Engineering Batch Summary" }).boundingBox();
   const workflow = await page.locator(".productionProgrammingWorkflow").boundingBox();
   const setup = await page.locator(".targetingCard").boundingBox();
   const job = await page.locator(".programmingJobCard").boundingBox();

@@ -186,7 +186,7 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "SINGLE PPU PROGRAMMING" })).toBeVisible();
-  await expect(page.getByText("SYSTEM SETUP & TARGETING", { exact: true })).toBeVisible();
+  await expect(page.locator(".targetingCard > header")).toContainText("SYSTEM SETUP & TARGETING");
   await expect(page.getByText("PROGRAMMING JOB", { exact: true })).toBeVisible();
   await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
   await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);

@@ -124,7 +124,7 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
   await page.goto("/fleet");
 
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
-  const kpis = page.getByRole("region", { name: "Production KPI" });
+  const kpis = page.getByRole("region", { name: "Production Batch Summary" });
   await expect(kpis.locator("article")).toHaveCount(7);
   await expect(kpis.getByText("SITES", { exact: true })).toBeVisible();
   await expect(kpis.getByText("TOTAL IC", { exact: true })).toBeVisible();
@@ -173,7 +173,7 @@ test("Engineering Programming remains the status-first single-PPU workspace", as
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
-  await expect(page.locator(".engineeringProgrammingV2 .productionProgrammingKpis")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Engineering Batch Summary" })).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .targetingCard")).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .programmingJobCard")).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .liveSiteStatus")).toBeVisible();
