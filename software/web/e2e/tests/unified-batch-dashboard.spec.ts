@@ -125,6 +125,7 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
 
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
   const kpis = page.getByRole("region", { name: "Production Batch Summary" });
+  await expect(kpis.getByText("BATCH SUMMARY", { exact: true })).toBeVisible();
   await expect(kpis.locator("article")).toHaveCount(7);
   await expect(kpis.getByText("SITES", { exact: true })).toBeVisible();
   await expect(kpis.getByText("TOTAL IC", { exact: true })).toBeVisible();
