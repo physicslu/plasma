@@ -43,7 +43,7 @@ The durable Site identity remains `(facility_id, ppu_id, site_id)`.
 
 The Batch Selection is always constrained to the committed Production Set. A Site outside the Production Set cannot be inserted into a Batch by browser state. Server Batch snapshots may reconstruct missing browser context after reconnection, but normal runtime updates must not rewrite the operator's Batch Selection or the committed Production Set.
 
-While a Batch is active, LIVE SITE STATUS and the `SELECTED` KPI display the membership returned by Server Batch Runtime. After the Batch reaches a terminal state, those controls return to the retained operator Batch Selection for preparation of the next Batch.
+While a Batch is active, LIVE SITE STATUS displays the membership returned by Server Batch Runtime. After the Batch reaches a terminal state, its selection controls return to the retained operator Batch Selection for preparation of the next Batch. The section header exposes the selected-versus-production Site count without conflating Site membership with manufacturing IC quantities.
 
 ## Production Site Selection
 
@@ -62,6 +62,8 @@ Facility and PPU checkboxes support all/none/indeterminate semantics. The tree c
 LIVE SITE STATUS remains LED-first rather than table-first because Production operators need to scan many Sites at once.
 
 Every Site in the Production Set remains visible even when excluded from the next Batch. PPU and Site checkboxes in this surface control the **next Batch membership**, not the Production Set.
+
+Each Facility contains compact, intrinsically sized PPU cards laid out in topology order and wrapped responsively. A two-Site PPU therefore does not reserve an entire Facility-width row. Site card and LED dimensions are chosen once from the complete Production Set density and remain identical across every PPU.
 
 A PPU checkbox is the master for the currently committed Sites of that PPU:
 
@@ -88,6 +90,8 @@ DISABLED    gray
 
 READY must not be presented as PASS green.
 
+An active `RUNNING` LED pulses at 1 Hz. Its Site card exposes `IC current/total` so an operator can distinguish an in-progress IC from a completed or failed manufacturing result.
+
 ## Immutable Batch membership and cancellation
 
 Before START, the operator may change PPU and Site Batch Selection freely within the Production Set.
@@ -109,26 +113,32 @@ An ABORT never rewrites already established execution facts. Completed successfu
 
 ## Manufacturing KPI contract
 
-The top KPI strip separates equipment scope from Batch intent:
+The top KPI strip separates equipment scope, planned IC quantity, current Site execution, and adjudicated IC results:
 
 ```text
-PRODUCTION SITES  committed Production Set Site count
-SELECTED          operator Batch Selection before START; Server Batch membership while active
-RUNNING           Server Batch Runtime `site_counts.running`
-PASS              sum(Site.completed_rounds)
-FAIL              sum(Site.final_failures)
-YIELD             PASS / (PASS + FAIL)
-CYCLE TIME        observed Batch elapsed time
+SITES       committed Production Set Site count
+TOTAL IC    current Mock Batch planned quantity = accepted Batch Sites * repeat_count
+RUNNING     Server Batch Runtime `site_counts.running`
+PASS        sum(Site.completed_rounds), counted as successful ICs
+FAIL        sum(Site.final_failures), counted as retry-exhausted ICs
+YIELD       PASS / (PASS + FAIL)
+BATCH TIME  observed Batch elapsed time, formatted HH:MM:SS
 ```
+
+`TOTAL IC` is the planned quantity for the displayed Batch. Before START, its preview uses the current Batch Selection and valid Mock repeat count. After START, its value is derived from the authoritative accepted server snapshot and does not change when the operator later prepares another selection.
 
 For Yield, only credible completed manufacturing outcomes are counted:
 
 ```text
-Total IC = PASS + FAIL
-Yield    = PASS / Total IC
+Completed IC = PASS + FAIL
+Yield        = PASS / Completed IC
 ```
 
-`ERROR`, `STOPPED`, and `CANCELLED` are excluded.
+`ERROR`, `STOPPED`, and `CANCELLED` are excluded. Retry attempts are not additional ICs. On an uninterrupted completed Batch, `PASS + FAIL` equals `TOTAL IC`; cancellation, infrastructure error, or early stop may leave planned ICs unfinished.
+
+The current repeated-round quantity mechanism is Mock-only. Future real production must use an explicit operator/MES Planned IC Quantity and physical next-device handoff rather than assume that rerunning operations on one loaded IC produces another IC.
+
+Batch Time uses server `started_at` and `finished_at`, updates once per second during execution, starts at `00:00:00`, and freezes at the authoritative terminal duration.
 
 ## Programming Job
 
@@ -140,7 +150,13 @@ The Production Programming Job panel contains:
 - Repeat, Retry, and Stop Policy;
 - `START PROGRAMMING | BATCH STATUS | ABORT`.
 
-Target IC is required for a Production Batch. The browser sends the compact canonical identity `{vendor, identifier}`; the server remains responsible for canonical catalog resolution and provenance.
+Target IC is optional when the active Provider is Mock and required for real/non-Mock Production execution. When supplied, the browser sends the compact canonical identity `{vendor, identifier}`; the server remains responsible for canonical catalog resolution and provenance.
+
+## Batch observation and global mode lock
+
+The Production mode-switch guard is fail-closed while a non-terminal Batch lease remains in browser session storage. Temporary REST polling failures transition the operator status to `RECONNECTING` and retry observation with bounded backoff instead of abandoning the server-owned Batch.
+
+Every path that receives a terminal Batch snapshot, including ordinary polling, reconnect/restore, immediately terminal creation, and ABORT against an already-finished Batch, performs the same terminal cleanup: clear the stored Batch lease, release execution activity, notify the global navigation store, and stop the old observation generation. `SUCCESS`, `PARTIAL`, `ERROR`, and `CANCELLED` must all restore Production/Engineering mode switching.
 
 Program continues to mean write only. Verify remains an explicit operation.
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { evaluateBatchReadiness } from "../batch-readiness";
-import { beginBatchExecutionActivity } from "../batch-execution-activity";
+import { beginBatchExecutionActivity, notifyBatchExecutionActivityChanged } from "../batch-execution-activity";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
@@ -38,6 +38,7 @@ import "./factory-console-v2.css";
 
 type SiteRunState = ServerBatchSiteState;
 type BatchCommandState = "idle" | "submitting" | "aborting";
+type BatchObservationState = "connected" | "reconnecting";
 type LogEntry = ProductionLogEntry;
 
 type SiteRuntime = {
@@ -312,20 +313,29 @@ function readStoredBatch(): StoredBatch | null {
 }
 
 function writeStoredBatch(apiBase: string, batchId: string): void {
-  try { window.sessionStorage.setItem(ACTIVE_BATCH_STORAGE_KEY, JSON.stringify({ apiBase, batchId } satisfies StoredBatch)); } catch { /* optional */ }
+  try {
+    window.sessionStorage.setItem(ACTIVE_BATCH_STORAGE_KEY, JSON.stringify({ apiBase, batchId } satisfies StoredBatch));
+    notifyBatchExecutionActivityChanged();
+  } catch { /* optional */ }
 }
 
 function clearStoredBatch(): void {
-  try { window.sessionStorage.removeItem(ACTIVE_BATCH_STORAGE_KEY); } catch { /* optional */ }
+  try {
+    window.sessionStorage.removeItem(ACTIVE_BATCH_STORAGE_KEY);
+    notifyBatchExecutionActivityChanged();
+  } catch { /* optional */ }
 }
 
-function formatCycleTime(snapshot: ServerBatchSnapshot | null): string {
-  if (!snapshot?.started_at) return "--";
+function formatBatchTime(snapshot: ServerBatchSnapshot | null, now: number): string {
+  if (!snapshot?.started_at) return "00:00:00";
   const start = Date.parse(snapshot.started_at);
-  const end = snapshot.finished_at ? Date.parse(snapshot.finished_at) : Date.now();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "--";
-  const seconds = (end - start) / 1000;
-  return seconds < 60 ? `${seconds.toFixed(1)} s` : `${(seconds / 60).toFixed(1)} min`;
+  const end = snapshot.finished_at ? Date.parse(snapshot.finished_at) : now;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "00:00:00";
+  const elapsedSeconds = Math.floor((end - start) / 1000);
+  const hours = Math.floor(elapsedSeconds / 3600);
+  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+  const seconds = elapsedSeconds % 60;
+  return [hours, minutes, seconds].map(value => String(value).padStart(2, "0")).join(":");
 }
 
 function ppuState(sites: SiteRuntime[]): SiteRunState | "partial" {
@@ -368,7 +378,9 @@ export default function FactoryConsoleV2() {
   const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
   const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
   const [batchCommandState, setBatchCommandState] = useState<BatchCommandState>("idle");
+  const [batchObservationState, setBatchObservationState] = useState<BatchObservationState>("connected");
   const [batchSnapshot, setBatchSnapshot] = useState<ServerBatchSnapshot | null>(null);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [repeatCount, setRepeatCount] = useState("1");
   const [siteRetryLimit, setSiteRetryLimit] = useState("3");
   const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
@@ -378,6 +390,7 @@ export default function FactoryConsoleV2() {
   const logSequence = useRef(0);
   const activityReleaseRef = useRef<(() => void) | null>(null);
   const pollGenerationRef = useRef(0);
+  const terminalBatchRef = useRef<string | null>(null);
   const initialProductionSet = useRef(productionSet);
   const initialBatchSelection = useRef(batchSelection);
 
@@ -400,8 +413,21 @@ export default function FactoryConsoleV2() {
     activityReleaseRef.current = null;
   }, []);
 
+  const finalizeBatch = useCallback((snapshot: ServerBatchSnapshot) => {
+    if (!terminalServerBatchStates.has(snapshot.state)) return;
+    clearStoredBatch();
+    endActivity();
+    setBatchObservationState("connected");
+    if (terminalBatchRef.current === snapshot.batch_id) return;
+    terminalBatchRef.current = snapshot.batch_id;
+    pollGenerationRef.current += 1;
+    appendLog(`[BAT] TERMINAL · ${snapshot.state.toUpperCase()} · PASS ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.completed_rounds), 0)} · FAIL ${snapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0)} · ERROR ${snapshot.site_counts.error ?? 0} · CANCELLED ${snapshot.site_counts.cancelled ?? 0}`,
+      snapshot.state === "error" ? "ERROR" : snapshot.state === "cancelled" || snapshot.state === "partial" ? "WARN" : "INFO");
+  }, [appendLog, endActivity]);
+
   const applyBatchSnapshot = useCallback((next: ServerBatchSnapshot, sourceCatalog: EngineeringTargetCatalog) => {
     setBatchSnapshot(next);
+    if (terminalServerBatchStates.has(next.state)) finalizeBatch(next);
     const snapshotMembership = selectionFromBatch(next);
     // Server Batch Runtime is execution truth. It must not rewrite operator
     // Batch Selection. These fallbacks only reconstruct browser context when a
@@ -438,23 +464,37 @@ export default function FactoryConsoleV2() {
       }
       return merged;
     });
-  }, [setBatchSelection, setDraftSelection, setProductionSet]);
+  }, [finalizeBatch, setBatchSelection, setDraftSelection, setProductionSet]);
 
   const pollServerBatch = useCallback(async (batchId: string, sourceCatalog: EngineeringTargetCatalog, generation: number) => {
     let previousState: ServerBatchState | null = null;
+    let consecutiveFailures = 0;
     for (let attempt = 0; attempt < POLL_LIMIT; attempt += 1) {
       if (pollGenerationRef.current !== generation) return;
-      const next = await getServerBatch(apiBase, batchId);
+      let next: ServerBatchSnapshot;
+      try {
+        next = await getServerBatch(apiBase, batchId);
+      } catch (error) {
+        if (pollGenerationRef.current !== generation) return;
+        consecutiveFailures += 1;
+        setBatchObservationState("reconnecting");
+        const detail = error instanceof Error ? error.message : "unknown error";
+        appendLog(`[BAT] OBSERVATION ERROR · ${detail} · RECONNECTING ${consecutiveFailures}`, "WARN");
+        await delay(Math.min(POLL_INTERVAL_MS * 2 ** Math.min(consecutiveFailures, 5), 5000));
+        continue;
+      }
+      if (pollGenerationRef.current !== generation) return;
+      if (consecutiveFailures > 0) {
+        appendLog(`[BAT] OBSERVATION RESTORED · ${batchId}`);
+        consecutiveFailures = 0;
+      }
+      setBatchObservationState("connected");
       applyBatchSnapshot(next, sourceCatalog);
       if (next.state !== previousState) {
         appendLog(`[BAT] ${next.state.toUpperCase()} · ${next.batch_id}`, next.state === "error" ? "ERROR" : next.state === "cancelled" || next.state === "stopping" ? "WARN" : "INFO");
         previousState = next.state;
       }
       if (terminalServerBatchStates.has(next.state)) {
-        clearStoredBatch();
-        endActivity();
-        appendLog(`[BAT] TERMINAL · ${next.state.toUpperCase()} · PASS ${next.site_counts.success ?? 0} · FAIL ${next.site_counts.faulted ?? 0} · ERROR ${next.site_counts.error ?? 0} · CANCELLED ${next.site_counts.cancelled ?? 0}`,
-          next.state === "error" ? "ERROR" : next.state === "cancelled" || next.state === "partial" ? "WARN" : "INFO");
         return;
       }
       await delay(POLL_INTERVAL_MS);
@@ -568,6 +608,13 @@ export default function FactoryConsoleV2() {
   const batchSubmitting = batchCommandState === "submitting";
   const batchAborting = batchCommandState === "aborting";
   const batchRunning = serverBatchRunning || batchSubmitting || batchAborting;
+
+  useEffect(() => {
+    if (!serverBatchRunning || !batchSnapshot?.started_at) return;
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [batchSnapshot?.batch_id, batchSnapshot?.started_at, serverBatchRunning]);
+
   const draftCounts = useMemo(() => selectionCounts(draftSelection), [draftSelection]);
   const productionSetCounts = useMemo(() => selectionCounts(productionSet), [productionSet]);
   const batchCounts = useMemo(() => selectionCounts(batchSelection), [batchSelection]);
@@ -636,7 +683,7 @@ export default function FactoryConsoleV2() {
   const syntheticMockImageAvailable = catalog?.provider === "mock";
   const batchReadiness = evaluateBatchReadiness({
     providerOnline: Boolean(catalog && !providerError),
-    targetValid: Boolean(targetDevice),
+    targetValid: syntheticMockImageAvailable || Boolean(targetDevice),
     selectedSiteCount: batchCounts.sites,
     selectedOperationCount: selectedOperations.length,
     requiresImage,
@@ -652,23 +699,31 @@ export default function FactoryConsoleV2() {
     ? "submitting"
     : batchAborting
       ? "aborting"
-      : serverBatchState ?? "idle";
+      : serverBatchRunning && batchObservationState === "reconnecting"
+        ? "reconnecting"
+        : serverBatchState ?? "idle";
   const batchStatusLabel = batchSubmitting
     ? "SUBMITTING"
     : batchAborting
       ? "ABORTING"
+      : serverBatchRunning && batchObservationState === "reconnecting"
+        ? "RECONNECTING"
       : serverBatchState
         ? serverBatchState.toUpperCase()
         : batchReadiness.label;
 
+  const plannedIcCount = batchSnapshot
+    ? batchSnapshot.sites.length * batchSnapshot.execution_policy.repeat_count
+    : batchCounts.sites * (repeatValue ?? 0);
+
   const kpis = [
-    { key: "production-sites", label: "PRODUCTION SITES", value: productionSetCounts.sites },
-    { key: "selected", label: "SELECTED", value: displayedBatchCounts.sites },
+    { key: "production-sites", label: "SITES", value: productionSetCounts.sites },
+    { key: "total-ic", label: "TOTAL IC", value: plannedIcCount },
     { key: "running", label: "RUNNING", value: batchSnapshot?.site_counts.running ?? 0 },
     { key: "pass", label: "PASS", value: manufacturing.pass, tone: "pass" as const },
     { key: "fail", label: "FAIL", value: manufacturing.fail, tone: "fail" as const },
     { key: "yield", label: "YIELD", value: `${manufacturing.yieldPercent.toFixed(1)}%`, tone: "info" as const },
-    { key: "cycle", label: "CYCLE TIME", value: formatCycleTime(batchSnapshot) },
+    { key: "batch-time", label: "BATCH TIME", value: formatBatchTime(batchSnapshot, clockNow) },
   ];
 
   function productionTreeSiteIds(facilityId: string, ppuId: string): number[] {
@@ -725,6 +780,7 @@ export default function FactoryConsoleV2() {
     setBatchCommandState("idle");
     setBatchSnapshot(null);
     setOperatorWarning(null);
+    setClockNow(Date.now());
     clearStoredBatch();
     appendLog(`[SET] COMMIT · ${selectionCounts(snapshot).facilities} Facilities · ${selectionCounts(snapshot).ppus} PPUs · ${selectionCounts(snapshot).sites} Sites`);
     await loadSelectionRuntimes(catalog, snapshot);
@@ -760,7 +816,7 @@ export default function FactoryConsoleV2() {
 
   async function executeBatch() {
     if (!catalog || batchRunning) return;
-    if (!targetDevice) {
+    if (!targetDevice && !syntheticMockImageAvailable) {
       setOperatorWarning(text.chooseTarget);
       return;
     }
@@ -790,16 +846,19 @@ export default function FactoryConsoleV2() {
     if (!targets.length) return;
 
     setOperatorWarning(null);
+    setClockNow(Date.now());
+    terminalBatchRef.current = null;
+    setBatchObservationState("connected");
     beginActivity();
     setBatchCommandState("submitting");
-    appendLog(`[BAT] SUBMIT · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")} · Target ${targetDevice.icpn ?? targetDevice.identifier}`);
+    appendLog(`[BAT] SUBMIT · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")} · Target ${targetDevice ? targetDevice.icpn ?? targetDevice.identifier : "MOCK"}`);
     try {
       const accepted = await createServerBatch(apiBase, {
         sessionId,
         targets,
         operations,
         executionPolicy,
-        targetDevice: { vendor: targetDevice.vendor, identifier: targetDevice.identifier },
+        targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : null,
         assetFile: imageAsset,
         allowSyntheticMockImage: syntheticMockImageAvailable,
         readOffset: 0,
@@ -807,6 +866,7 @@ export default function FactoryConsoleV2() {
       });
       applyBatchSnapshot(accepted, catalog);
       setBatchCommandState("idle");
+      if (terminalServerBatchStates.has(accepted.state)) return;
       writeStoredBatch(apiBase, accepted.batch_id);
       const generation = ++pollGenerationRef.current;
       appendLog(`[BAT] ACCEPTED · ${accepted.batch_id}`);
@@ -1081,8 +1141,8 @@ export default function FactoryConsoleV2() {
                                       data-production-site={site.id}
                                       data-site-state={displayState}
                                       data-batch-selected={selected ? "true" : "false"}
-                                      aria-label={`${active.target.display_name} ${siteLabel(site.id)} ${stateText(site)} ${selected ? "selected for Batch" : "excluded from Batch"}`}
-                                      title={`${group.facility.display_name} / ${active.target.display_name} / ${siteLabel(site.id)} · ${stateText(site)}${site.operation ? ` · ${operationCodes[site.operation]} ${site.progress}%` : ""}`}
+                                      aria-label={`${active.target.display_name} ${siteLabel(site.id)} ${stateText(site)}${site.currentRound ? ` IC ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""} ${selected ? "selected for Batch" : "excluded from Batch"}`}
+                                      title={`${group.facility.display_name} / ${active.target.display_name} / ${siteLabel(site.id)} · ${stateText(site)}${site.currentRound ? ` · IC ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : ""}${site.operation ? ` · ${operationCodes[site.operation]} ${site.progress}%` : ""}`}
                                       key={site.id}
                                     >
                                       <div className="factorySiteLedCardTop">
@@ -1096,7 +1156,7 @@ export default function FactoryConsoleV2() {
                                         <b>{siteLabel(site.id)}</b>
                                       </div>
                                       <div className="factorySiteLed" data-state={displayState}><i /></div>
-                                      <small>{displayState === "running" ? `${site.progress}%` : stateText(site)}</small>
+                                      <small>{displayState === "running" && site.currentRound ? `IC ${site.currentRound}/${batchSnapshot?.execution_policy.repeat_count ?? repeatValue ?? 1}` : stateText(site)}</small>
                                     </article>
                                   );
                                 })}

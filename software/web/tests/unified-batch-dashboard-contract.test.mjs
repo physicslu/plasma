@@ -26,12 +26,14 @@ test("Production uses neutral operator panel primitives while Engineering retain
   assert.doesNotMatch(emode, /ActiveFpsSummary/);
 });
 
-test("Production KPI row separates equipment scope, Batch intent, and server execution truth", () => {
-  for (const label of ["PRODUCTION SITES", "SELECTED", "RUNNING", "PASS", "FAIL", "YIELD", "CYCLE TIME"]) {
+test("Production KPI row separates equipment scope, planned IC quantity, and server execution truth", () => {
+  for (const label of ["SITES", "TOTAL IC", "RUNNING", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
     assert.match(pmod, new RegExp(`label: \\\"${label}\\\"`));
   }
   assert.match(pmod, /value:\s*productionSetCounts\.sites/);
-  assert.match(pmod, /value:\s*displayedBatchCounts\.sites/);
+  assert.match(pmod, /batchSnapshot\.sites\.length \* batchSnapshot\.execution_policy\.repeat_count/);
+  assert.match(pmod, /value:\s*plannedIcCount/);
+  assert.match(pmod, /formatBatchTime\(batchSnapshot, clockNow\)/);
   assert.match(pmod, /value:\s*batchSnapshot\?\.site_counts\.running \?\? 0/);
   assert.match(pmod, /displayedBatchSelection = serverBatchRunning \? serverBatchMembership : batchSelection/);
   assert.match(operatorCss, /grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\)/);
@@ -79,7 +81,8 @@ test("Production LED board remains the primary high-density runtime surface", ()
   assert.match(pmod, /factorySiteLedCard/);
   assert.match(pmod, /densityFor\(productionSetCounts\.sites\)/);
   assert.match(pmodCss, /--site-card-w/);
-  assert.match(pmodCss, /grid-template-columns:\s*repeat\(auto-fill, var\(--site-card-w\)\)/);
+  assert.match(pmodCss, /\.factoryPpuRows\s*\{[^}]*flex-wrap:\s*wrap/s);
+  assert.match(pmodCss, /factoryRunningPulse 1s/);
   assert.match(pmodCss, /factorySiteLed\[data-state="ready"\]/);
   assert.match(pmodCss, /factorySiteLed\[data-state="running"\]/);
   assert.match(pmodCss, /factorySiteLed\[data-state="success"\]/);

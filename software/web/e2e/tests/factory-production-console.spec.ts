@@ -227,7 +227,7 @@ test("Production Set stays visible while the operator changes next-Batch PPU/Sit
 
   await site2.uncheck();
   await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
-  await expect(page.locator('[data-kpi="selected"] b')).toHaveText("1");
+  await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("1");
   await expect.poll(() => ppu.evaluate((element: HTMLInputElement) => element.indeterminate)).toBe(true);
   await expect(live.locator('[data-production-site="2"]')).toHaveAttribute("data-batch-selected", "false");
 
@@ -269,6 +269,36 @@ test("START snapshots Batch membership; running selection is locked and only who
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).toBeEnabled();
 });
 
+test("Mock Batch accepts no Target IC and exposes planned IC quantity, 1 Hz activity, and Batch time", async ({ page }) => {
+  const mock = await installFactoryMock(page);
+  await commitTwoSiteProductionSet(page);
+
+  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
+  await programming.getByLabel("Repeat Count").fill("10");
+  await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("20");
+  await expect(page.locator('[data-kpi="batch-time"] b')).toHaveText("00:00:00");
+  await programming.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox").check();
+  await expect(programming.locator(".factoryStartButton")).toBeEnabled();
+  await programming.locator(".factoryStartButton").click();
+
+  await expect.poll(() => mock.submissions.length).toBe(1);
+  expect(mock.submissions[0].target_device).toBeUndefined();
+  expect(mock.submissions[0].execution_policy.repeat_count).toBe(10);
+  await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("20");
+  const activeSite = page.locator('[data-production-site="1"]');
+  await expect(activeSite).toHaveAttribute("data-site-state", "running");
+  await expect(activeSite.locator(":scope > small")).toHaveText("IC 1/10");
+  const animation = await activeSite.locator(".factorySiteLed i").evaluate(element => {
+    const style = getComputedStyle(element);
+    return { name: style.animationName, duration: style.animationDuration };
+  });
+  expect(animation).toEqual({ name: "factoryRunningPulse", duration: "1s" });
+
+  await programming.locator(".factoryAbortButton").click();
+  await expect(page.locator('[data-kpi="batch-time"] b')).toHaveText("00:00:01");
+  await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("20");
+});
+
 test("active membership and RUNNING KPI follow Server Batch Runtime instead of operator Batch Selection", async ({ page }) => {
   const mock = await installFactoryMock(page, { runtimeSiteIds: [1] });
   await commitTwoSiteProductionSet(page);
@@ -283,7 +313,7 @@ test("active membership and RUNNING KPI follow Server Batch Runtime instead of o
 
   const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
   await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
-  await expect(page.locator('[data-kpi="selected"] b')).toHaveText("1");
+  await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="running"] b')).toHaveText("1");
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeChecked();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).not.toBeChecked();
@@ -292,7 +322,7 @@ test("active membership and RUNNING KPI follow Server Batch Runtime instead of o
 
   await programming.getByRole("button", { name: /ABORT/ }).click();
   await expect(page.locator(".factoryBatchStatus b")).toHaveText("CANCELLED");
-  await expect(page.locator('[data-kpi="selected"] b')).toHaveText("2");
+  await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("1");
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeChecked();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).toBeChecked();
 });

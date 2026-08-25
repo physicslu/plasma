@@ -125,6 +125,64 @@ test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR
   expect(headingColor).toBe("rgb(255, 255, 255)");
 });
 
+test("Pmod Facility packs different-width PPU cards without changing Site card dimensions", async ({ page }) => {
+  await installMockProvider(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/fleet");
+  await page.getByRole("button", { name: /全選|Select All/ }).click();
+  await page.getByRole("button", { name: "SET PRODUCTION SITES" }).click();
+
+  const cards = page.locator(".factoryPpuRow");
+  await expect(cards).toHaveCount(2);
+  const boxes = await cards.evaluateAll(elements => elements.map(element => {
+    const rect = element.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width };
+  }));
+  expect(Math.abs(boxes[0].y - boxes[1].y)).toBeLessThanOrEqual(2);
+  expect(boxes[1].x).toBeGreaterThan(boxes[0].x + boxes[0].width);
+  expect(boxes[1].width).toBeGreaterThan(boxes[0].width);
+  const siteSizes = await page.locator(".factorySiteLedCard").evaluateAll(elements => elements.map(element => {
+    const rect = element.getBoundingClientRect();
+    return `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+  }));
+  expect(new Set(siteSizes).size).toBe(1);
+});
+
+test("Emode Gateway URL, Connect, and EMode label retain readable Light and Dark theme colors", async ({ page }) => {
+  await installMockProvider(page);
+  await page.goto("/engineering");
+  await page.locator(".engineeringWorkspace nav button").nth(2).click();
+  const gateway = page.locator(".engineeringProgrammingV2Header .engineeringGateway");
+  await expect(gateway).toBeVisible();
+
+  const readGatewayColors = () => gateway.evaluate(element => {
+    const input = element.querySelector("input")!;
+    const button = element.querySelector("button")!;
+    const label = element.querySelector("b")!;
+    return {
+      input: getComputedStyle(input).color,
+      button: getComputedStyle(button).color,
+      label: getComputedStyle(label).color,
+      inputOpacity: getComputedStyle(input).opacity,
+    };
+  });
+
+  expect(await readGatewayColors()).toMatchObject({
+    input: "rgb(17, 38, 49)",
+    button: "rgb(17, 38, 49)",
+    label: "rgb(17, 38, 49)",
+    inputOpacity: "1",
+  });
+
+  await page.getByRole("group", { name: "Theme" }).getByRole("button", { name: "Dark", exact: true }).click();
+  expect(await readGatewayColors()).toMatchObject({
+    input: "rgb(233, 243, 248)",
+    button: "rgb(233, 243, 248)",
+    label: "rgb(233, 243, 248)",
+    inputOpacity: "1",
+  });
+});
+
 test("Emode v2 stays dense with centered Batch status and target-owned READ", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");

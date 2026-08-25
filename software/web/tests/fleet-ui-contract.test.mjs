@@ -109,8 +109,8 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(css, /\.productionSiteSelection\.is-collapsed \.operatorPanelBody\s*\{\s*display:\s*none;/s);
 
   assert.match(source, /ICPickerField/);
-  assert.match(source, /if \(!targetDevice\)/);
-  assert.match(source, /targetDevice:\s*\{ vendor: targetDevice\.vendor, identifier: targetDevice\.identifier \}/);
+  assert.match(source, /if \(!targetDevice && !syntheticMockImageAvailable\)/);
+  assert.match(source, /targetDevice:\s*targetDevice \? \{ vendor: targetDevice\.vendor, identifier: targetDevice\.identifier \} : null/);
   assert.match(source, /allowSyntheticMockImage:\s*syntheticMockImageAvailable/);
 
   assert.match(source, /createServerBatch/);
@@ -129,17 +129,17 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /site\.final_failures/);
   assert.match(source, /const total = pass \+ fail/);
   assert.doesNotMatch(source.slice(source.indexOf("const manufacturing = useMemo"), source.indexOf("const repeatValue")), /cancelled/);
-  assert.match(source, /label: "PRODUCTION SITES"/);
-  assert.match(source, /label: "SELECTED"/);
+  assert.match(source, /label: "SITES"/);
+  assert.match(source, /label: "TOTAL IC"/);
   assert.match(source, /label: "RUNNING"/);
   assert.match(source, /label: "PASS"/);
   assert.match(source, /label: "FAIL"/);
   assert.match(source, /label: "YIELD"/);
-  assert.match(source, /label: "CYCLE TIME"/);
+  assert.match(source, /label: "BATCH TIME"/);
 
   assert.match(css, /--site-card-w/);
   assert.match(css, /density-dense/);
-  assert.match(css, /grid-template-columns:\s*repeat\(auto-fill, var\(--site-card-w\)\)/);
+  assert.match(css, /\.factorySiteLedGrid\s*\{[^}]*flex-wrap:\s*wrap/s);
   assert.match(css, /factorySiteLed\[data-state="ready"\]/);
   assert.match(css, /factorySiteLed\[data-state="running"\]/);
   assert.match(css, /factorySiteLed\[data-state="success"\]/);

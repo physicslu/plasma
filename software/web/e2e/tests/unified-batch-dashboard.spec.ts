@@ -126,8 +126,9 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
   const kpis = page.getByRole("region", { name: "Production KPI" });
   await expect(kpis.locator("article")).toHaveCount(7);
-  await expect(kpis.getByText("PRODUCTION SITES", { exact: true })).toBeVisible();
-  await expect(kpis.getByText("SELECTED", { exact: true })).toBeVisible();
+  await expect(kpis.getByText("SITES", { exact: true })).toBeVisible();
+  await expect(kpis.getByText("TOTAL IC", { exact: true })).toBeVisible();
+  await expect(kpis.getByText("BATCH TIME", { exact: true })).toBeVisible();
 
   const productionSelection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
   await expect(productionSelection).toBeVisible();
@@ -153,7 +154,7 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
   await site2.uncheck();
   await expect(site2).not.toBeChecked();
   await expect.poll(() => ppuMaster.evaluate((element: HTMLInputElement) => element.indeterminate)).toBe(true);
-  await expect(kpis.locator('[data-kpi="selected"] b')).toHaveText("1");
+  await expect(kpis.locator('[data-kpi="total-ic"] b')).toHaveText("1");
   await expect(kpis.locator('[data-kpi="production-sites"] b')).toHaveText("2");
 
   const hide = productionSelection.getByRole("button", { name: /收起|Hide/ });

@@ -358,6 +358,7 @@
 .factoryBatchStatus.state-running,
 .factoryBatchStatus.state-queued,
 .factoryBatchStatus.state-stopping,
+.factoryBatchStatus.state-reconnecting,
 .factoryBatchStatus.state-submitting,
 .factoryBatchStatus.state-aborting { border-color: #f3ba55; background: #fff9e9; }
 .factoryBatchStatus.state-success { border-color: #78d69a; background: #f1fbf4; }
@@ -407,6 +408,11 @@
 .factoryLegend i { width: 8px; height: 8px; }
 .factoryLegend i[data-state="ready"], .factorySiteLed[data-state="ready"] i { background: #38bdf8; }
 .factoryLegend i[data-state="running"], .factorySiteLed[data-state="running"] i { background: #f59e0b; box-shadow: 0 0 7px rgba(245,158,11,.5); }
+.factorySiteLed[data-state="running"] i { animation: factoryRunningPulse 1s ease-in-out infinite; }
+@keyframes factoryRunningPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(245,158,11,.72); }
+  50% { opacity: .2; box-shadow: none; }
+}
 .factoryLegend i[data-state="success"], .factorySiteLed[data-state="success"] i { background: #22c55e; box-shadow: 0 0 7px rgba(34,197,94,.45); }
 .factoryLegend i[data-state="faulted"], .factorySiteLed[data-state="faulted"] i { background: #ef4444; box-shadow: 0 0 7px rgba(239,68,68,.5); }
 .factoryLegend i[data-state="error"], .factorySiteLed[data-state="error"] i { background: #b91c1c; box-shadow: 0 0 7px rgba(185,28,28,.48); }
@@ -433,18 +439,27 @@
 }
 .factoryFacilityGroup > header b { color: #1d4ed8; font-size: 10px; }
 .factoryFacilityGroup > header span { color: #607080; font-size: 8px; }
-.factoryPpuRows { display: grid; }
+.factoryPpuRows {
+  padding: 7px;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 7px;
+}
 .factoryPpuRow {
   min-width: 0;
-  min-height: calc(var(--site-card-h) + 10px);
-  padding: 5px 7px;
-  border-bottom: 1px solid #e4ebf1;
+  max-width: 100%;
+  width: max-content;
+  min-height: calc(var(--site-card-h) + 42px);
+  padding: 6px 7px 7px;
+  border: 1px solid #dce5ed;
+  border-radius: 6px;
+  background: #fff;
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 6px;
 }
-.factoryPpuRow:last-child { border-bottom: 0; }
 .factoryPpuRowHeader {
   min-width: 0;
   display: grid;
@@ -461,8 +476,8 @@
 .factoryPpuMessage.error { color: #b91c1c; }
 .factorySiteLedGrid {
   min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, var(--site-card-w));
+  display: flex;
+  flex-wrap: wrap;
   gap: 5px;
   align-items: center;
   justify-content: start;
@@ -527,7 +542,6 @@
   font-size: 6px;
   line-height: 1;
 }
-.factoryLiveStatus.density-dense .factorySiteLedCard > small { display: none; }
 
 .factoryConsoleV2 .productionLogCard { margin-top: 0; }
 
@@ -615,6 +629,7 @@
 [data-theme="dark"] .factoryBatchStatus.state-running,
 [data-theme="dark"] .factoryBatchStatus.state-queued,
 [data-theme="dark"] .factoryBatchStatus.state-stopping,
+[data-theme="dark"] .factoryBatchStatus.state-reconnecting,
 [data-theme="dark"] .factoryBatchStatus.state-submitting,
 [data-theme="dark"] .factoryBatchStatus.state-aborting { background: #2c2617; }
 [data-theme="dark"] .factorySiteLedCard.state-success,
@@ -629,7 +644,6 @@
 @media (max-width: 1120px) {
   .factoryJobGrid { grid-template-columns: 1fr; }
   .factoryField { grid-template-columns: 128px minmax(0, 1fr); }
-  .factoryPpuRow { grid-template-columns: 120px minmax(0, 1fr); }
 }
 
 @media (max-width: 760px) {
@@ -644,6 +658,5 @@
   .factoryOperationChecks,
   .factoryPolicyControls { flex-wrap: wrap; }
   .factoryActionBar { grid-template-columns: 1fr; }
-  .factoryPpuRow { grid-template-columns: 1fr; align-items: start; }
-  .factorySiteLedGrid { overflow-x: auto; grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: var(--site-card-w); }
+  .factoryPpuRow { width: min(max-content, 100%); }
 }

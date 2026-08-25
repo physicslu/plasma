@@ -28,34 +28,43 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
+  color: var(--text, #172033);
 }
 
 .engineeringProgrammingV2Header .engineeringGateway input {
   min-width: 0;
   height: 28px;
-  border: 1px solid rgba(255, 255, 255, .28);
+  border: 1px solid var(--line-strong, #bdccd9);
   border-radius: 5px;
-  background: rgba(255, 255, 255, .1);
-  color: #fff;
+  background: var(--panel, #fff);
+  color: var(--text, #172033);
   padding: 0 8px;
   font-size: 9px;
 }
 
 .engineeringProgrammingV2Header .engineeringGateway button {
   min-height: 28px;
-  border: 1px solid rgba(255, 255, 255, .32);
+  border: 1px solid var(--line-strong, #bdccd9);
   border-radius: 5px;
-  background: rgba(255, 255, 255, .14);
-  color: #fff;
+  background: var(--panel, #fff);
+  color: var(--text, #172033);
   padding: 0 10px;
   font-size: 9px;
   font-weight: 800;
   cursor: pointer;
 }
 
-.engineeringProgrammingV2Header .engineeringGateway button:disabled,
+.engineeringProgrammingV2Header .engineeringGateway > b {
+  color: var(--text, #172033);
+}
+
+.engineeringProgrammingV2Header .engineeringGateway button:disabled {
+  opacity: .78;
+}
+
 .engineeringProgrammingV2Header .engineeringGateway input:disabled {
-  opacity: .55;
+  opacity: 1;
+  color: var(--text-soft, #425466);
 }
 
 .engineeringProgrammingV2Header .engineeringGateway.offline .onlineDot {
