@@ -151,7 +151,7 @@ def assert_contracts(origin: str, *, timeout: float, report: SmokeReport) -> Non
     report.checks["api:status"] = "PASS"
 
     catalog = request_json(origin, "/api/engineering/targets", timeout=timeout)
-    expected_counts = (3, 12, 60)
+    expected_counts = (8, 32, 160)
     actual_counts = (
         catalog.get("facility_count"),
         catalog.get("ppu_count"),
