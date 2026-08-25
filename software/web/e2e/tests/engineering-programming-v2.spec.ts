@@ -175,11 +175,14 @@ async function installApi(page: Page, submissions: Array<Record<string, unknown>
   });
 }
 
-test("Engineering Programming renders the status-first v2 workflow and binds Target IC to a direct PPU job", async ({ page }) => {
+test("Engineering Programming renders the approved three-row workflow and binds Target IC to a direct PPU job", async ({ page }) => {
   const submissions: Array<Record<string, unknown>> = [];
   await installApi(page, submissions);
   await page.setViewportSize({ width: 1536, height: 1000 });
   await page.goto("/engineering");
+
+  await expect(page.getByRole("heading", { name: "Engineering Mode" })).toBeVisible();
+  await expect(page.locator(".engineeringSidebar")).toBeVisible();
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "SINGLE PPU PROGRAMMING" })).toBeVisible();
@@ -188,11 +191,34 @@ test("Engineering Programming renders the status-first v2 workflow and binds Tar
   await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
   await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("LIVE SITE STATUS", { exact: true })).toBeVisible();
-  await expect(page.getByText("RECENT EVENTS", { exact: true })).toBeVisible();
+  await expect(page.locator(".engineeringProgrammingV2 .recentEvents")).toBeHidden();
   await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
   await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
+
+  const layout = await page.locator(".engineeringProgrammingV2").evaluate(root => {
+    const box = (selector: string) => root.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+    const setup = box(".targetingCard");
+    const job = box(".programmingJobCard");
+    const status = box(".liveSiteStatus");
+    return {
+      setupTop: setup.top,
+      setupBottom: setup.bottom,
+      jobTop: job.top,
+      jobBottom: job.bottom,
+      statusTop: status.top,
+    };
+  });
+  expect(layout.setupTop).toBeLessThan(layout.jobTop);
+  expect(layout.setupBottom).toBeLessThanOrEqual(layout.jobTop);
+  expect(layout.jobBottom).toBeLessThanOrEqual(layout.statusTop);
+
+  const sidebarWidth = await page.locator(".engineeringSidebar").evaluate(element => element.getBoundingClientRect().width);
+  await page.getByRole("button", { name: "Collapse Engineering menu" }).click();
+  const collapsedWidth = await page.locator(".engineeringSidebar").evaluate(element => element.getBoundingClientRect().width);
+  expect(collapsedWidth).toBeLessThan(sidebarWidth);
+  await page.getByRole("button", { name: "Expand Engineering menu" }).click();
 
   const target = page.getByLabel("Target IC");
   await target.fill("STM32F103C8T6");

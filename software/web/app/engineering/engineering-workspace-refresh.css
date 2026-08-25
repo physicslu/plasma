@@ -1,0 +1,430 @@
+/* Engineering workspace refresh approved after PR #122.
+ * The operator flow is deliberately vertical:
+ *   SYSTEM SETUP -> PROGRAMMING JOB -> LIVE SITE STATUS.
+ * The Site table remains the primary runtime surface. */
+
+.engineeringPage {
+  min-height: 100vh;
+  background: var(--panel-3);
+}
+
+.engineeringShell {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100vh - 64px);
+  margin: 0;
+}
+
+.engineeringWorkspace {
+  grid-template-columns: 224px minmax(0, 1fr);
+  min-height: calc(100vh - 64px);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--panel-3);
+}
+
+.engineeringSidebar {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  color: #dbe7f4;
+  background: linear-gradient(180deg, #17283a 0%, #1c3044 58%, #182a3c 100%);
+  border-right: 1px solid rgba(148, 163, 184, .2);
+  transition: width .18s ease;
+}
+
+.engineeringBrand {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-height: 96px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, .14);
+}
+
+.engineeringBrandMark {
+  color: #eef6ff;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -8px;
+  transform: translateX(-2px);
+}
+
+.engineeringBrand strong {
+  display: block;
+  margin: -1px 0 5px;
+  color: #f8fbff;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+
+.engineeringBrand span:not(.engineeringBrandMark) {
+  display: block;
+  color: #aebed0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.engineeringBrand h1 {
+  margin: 3px 0 0;
+  color: #dbe7f4;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.engineeringWorkspace .engineeringSidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 8px;
+  border: 0;
+  background: transparent;
+}
+
+.engineeringWorkspace .engineeringSidebar nav button {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  min-height: 52px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #d6e2ee;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.engineeringWorkspace .engineeringSidebar nav button:hover {
+  border-color: rgba(96, 165, 250, .22);
+  background: rgba(59, 130, 246, .1);
+  color: #f7fbff;
+}
+
+.engineeringWorkspace .engineeringSidebar nav button.active {
+  border-color: rgba(96, 165, 250, .24);
+  background: linear-gradient(90deg, rgba(36, 103, 168, .95), rgba(38, 101, 161, .82));
+  color: #fff;
+  box-shadow: inset 3px 0 0 #69b4ff;
+}
+
+.engineeringNavIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  color: #b9c9d9;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.engineeringSidebar nav button.active .engineeringNavIcon {
+  color: #fff;
+}
+
+.engineeringNavLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.engineeringSidebarCollapse {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 17px;
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, .16);
+  background: rgba(9, 20, 31, .16);
+  color: #cbd8e5;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.engineeringSidebarCollapse:hover {
+  color: #fff;
+  background: rgba(59, 130, 246, .1);
+}
+
+.engineeringSidebarCollapse > span:first-child {
+  font-size: 22px;
+}
+
+.engineeringPage.sidebarCollapsed .engineeringWorkspace {
+  grid-template-columns: 66px minmax(0, 1fr);
+}
+
+.engineeringPage.sidebarCollapsed .engineeringBrand {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  min-height: 72px;
+  padding: 18px 8px 12px;
+}
+
+.engineeringPage.sidebarCollapsed .engineeringBrand > div,
+.engineeringPage.sidebarCollapsed .engineeringNavLabel {
+  display: none;
+}
+
+.engineeringPage.sidebarCollapsed .engineeringWorkspace .engineeringSidebar nav button,
+.engineeringPage.sidebarCollapsed .engineeringSidebarCollapse {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding-inline: 8px;
+}
+
+.engineeringPage.sidebarCollapsed .engineeringWorkspace .engineeringSidebar nav button.active {
+  box-shadow: inset 3px 0 0 #69b4ff;
+}
+
+.engineeringCanvas {
+  min-width: 0;
+  background: var(--panel-3);
+}
+
+.engineeringCanvas.programmingActive {
+  place-items: stretch;
+  background: var(--panel-3);
+}
+
+/* Three-row Programming hierarchy. */
+.engineeringProgrammingV2 .productionProgrammingWorkflow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.engineeringProgrammingV2 .productionProgrammingRight {
+  display: block;
+  width: 100%;
+}
+
+.engineeringProgrammingV2 .targetingCard,
+.engineeringProgrammingV2 .programmingJobCard {
+  width: 100%;
+}
+
+.engineeringProgrammingV2 .targetingCard > header,
+.engineeringProgrammingV2 .programmingJobCard > header {
+  font-size: 0;
+}
+
+.engineeringProgrammingV2 .targetingCard > header::before {
+  content: "1. SYSTEM SETUP";
+  font-size: 11px;
+}
+
+.engineeringProgrammingV2 .programmingJobCard > header::before {
+  content: "2. PROGRAMMING JOB";
+  font-size: 11px;
+}
+
+.engineeringProgrammingV2 .targetingCard .cardBody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 28px;
+  padding: 12px 16px;
+}
+
+.engineeringProgrammingV2 .targetingCard .cardBody h2 {
+  display: none;
+}
+
+.engineeringProgrammingV2 .targetingCard .workflowField {
+  grid-template-columns: 128px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.engineeringProgrammingV2 .targetingCard .topologyFoot {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+}
+
+.engineeringProgrammingV2 .programmingJobBody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px 24px;
+  padding: 14px 16px;
+}
+
+.engineeringProgrammingV2 .programmingJobBody > .jobRow {
+  min-width: 0;
+  grid-template-columns: 126px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.engineeringProgrammingV2 .programmingJobBody > .programmingBatchOperations {
+  align-items: start;
+}
+
+.engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(78px, 1fr));
+  gap: 8px;
+}
+
+.engineeringProgrammingV2 .programmingBatchOperations .operationChecks label {
+  justify-content: center;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  padding: 4px 8px;
+}
+
+.engineeringProgrammingV2 .engineeringPolicyRow {
+  grid-template-columns: 126px repeat(3, max-content);
+  gap: 10px 18px;
+  align-items: center;
+}
+
+.engineeringProgrammingV2 .engineeringReadRow {
+  grid-column: 1 / -1;
+  grid-template-columns: 126px max-content max-content;
+}
+
+.engineeringProgrammingV2 .programmingJobBody .engineeringImageHint {
+  grid-column: 2;
+  margin-top: -4px;
+}
+
+.engineeringProgrammingV2 .programmingJobBody > .batchReadiness {
+  grid-column: 1;
+  align-self: center;
+  min-height: 34px;
+  padding-inline: 12px;
+}
+
+.engineeringProgrammingV2 .programmingJobBody > .warning,
+.engineeringProgrammingV2 .programmingJobBody > .engineeringOperationWarning {
+  grid-column: 1 / -1;
+}
+
+.engineeringProgrammingV2 .programmingJobBody > .programmingActions {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(150px, .8fr);
+  gap: 12px;
+  margin: 0;
+}
+
+.engineeringProgrammingV2 .programmingActions button {
+  min-height: 44px;
+  font-size: 12px;
+}
+
+.engineeringProgrammingV2 .liveSiteStatus {
+  margin-top: 10px;
+}
+
+.engineeringProgrammingV2 .liveSiteStatus > header > span {
+  font-size: 0;
+}
+
+.engineeringProgrammingV2 .liveSiteStatus > header > span::before {
+  content: "3. LIVE SITE STATUS";
+  font-size: 11px;
+}
+
+/* Recent Events duplicated the detailed Engineering log and consumed the
+ * Site-runtime viewport. It is intentionally removed from Programming. */
+.engineeringProgrammingV2 .recentEvents {
+  display: none !important;
+}
+
+.engineeringProgrammingV2 .engineeringLogCard {
+  margin-top: 10px;
+}
+
+@container engineering-programming (max-width: 980px) {
+  .engineeringProgrammingV2 .targetingCard .cardBody,
+  .engineeringProgrammingV2 .programmingJobBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .engineeringProgrammingV2 .targetingCard .topologyFoot,
+  .engineeringProgrammingV2 .engineeringReadRow,
+  .engineeringProgrammingV2 .programmingJobBody > .warning,
+  .engineeringProgrammingV2 .programmingJobBody > .engineeringOperationWarning,
+  .engineeringProgrammingV2 .programmingJobBody > .programmingActions,
+  .engineeringProgrammingV2 .programmingJobBody > .batchReadiness {
+    grid-column: 1;
+  }
+
+  .engineeringProgrammingV2 .programmingJobBody > .programmingActions {
+    grid-template-columns: minmax(0, 1fr) minmax(140px, .55fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .engineeringWorkspace,
+  .engineeringPage.sidebarCollapsed .engineeringWorkspace {
+    grid-template-columns: 1fr;
+  }
+
+  .engineeringSidebar {
+    grid-template-rows: auto auto;
+  }
+
+  .engineeringBrand,
+  .engineeringSidebarCollapse {
+    display: none;
+  }
+
+  .engineeringWorkspace .engineeringSidebar nav {
+    flex-direction: row;
+    gap: 5px;
+    overflow-x: auto;
+    padding: 7px;
+    border-bottom: 1px solid rgba(148, 163, 184, .2);
+  }
+
+  .engineeringWorkspace .engineeringSidebar nav button,
+  .engineeringPage.sidebarCollapsed .engineeringWorkspace .engineeringSidebar nav button {
+    display: inline-grid;
+    grid-template-columns: 22px auto;
+    min-width: max-content;
+    min-height: 42px;
+    padding: 0 10px;
+  }
+
+  .engineeringPage.sidebarCollapsed .engineeringNavLabel {
+    display: inline;
+  }
+
+  .engineeringNavIcon {
+    width: 20px;
+    font-size: 16px;
+  }
+
+  .engineeringProgrammingV2 .targetingCard .workflowField,
+  .engineeringProgrammingV2 .programmingJobBody > .jobRow,
+  .engineeringProgrammingV2 .engineeringPolicyRow,
+  .engineeringProgrammingV2 .engineeringReadRow {
+    grid-template-columns: 1fr;
+  }
+
+  .engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -64,7 +64,8 @@ test("Pmod image controls precede EPVR and Pmod Emode share persistent Light Dar
   const engineeringTheme = page.getByRole("group", { name: "Theme" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(engineeringTheme.getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect.poll(() => page.locator(".engineeringPage").evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgb(7, 17, 29)");
+  await expect.poll(() => page.locator(".engineeringPage").evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgb(9, 22, 34)");
+  await expect(page.locator(".engineeringSidebar")).toBeVisible();
 
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

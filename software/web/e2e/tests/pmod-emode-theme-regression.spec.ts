@@ -122,7 +122,7 @@ test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR
   expect(headingColor).toBe("rgb(233, 243, 248)");
 });
 
-test("Emode v2 stays dense and keeps its approved image picker and dark operator palette", async ({ page }) => {
+test("Emode v2 stays dense with the approved sidebar, image picker and dark operator palette", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
   const theme = page.getByRole("group", { name: "Theme" });
@@ -134,6 +134,7 @@ test("Emode v2 stays dense and keeps its approved image picker and dark operator
 
   await page.goto("/engineering");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator(".engineeringSidebar")).toBeVisible();
   await page.locator(".engineeringWorkspace nav button").nth(2).click();
   const ppuSelect = page.getByLabel("Engineering PPU", { exact: true });
   await expect(ppuSelect).toBeVisible();
@@ -179,13 +180,14 @@ test("Emode v2 stays dense and keeps its approved image picker and dark operator
   const header = await page.locator(".engineeringProgrammingV2Header").boundingBox();
   const kpis = await page.locator(".productionProgrammingKpis").boundingBox();
   const workflow = await page.locator(".productionProgrammingWorkflow").boundingBox();
+  const setup = await page.locator(".targetingCard").boundingBox();
   const job = await page.locator(".programmingJobCard").boundingBox();
   const liveStatus = await page.locator(".liveSiteStatus").boundingBox();
-  const recent = await page.locator(".recentEvents").boundingBox();
-  for (const box of [header, kpis, workflow, job, liveStatus, recent]) expect(box).not.toBeNull();
+  for (const box of [header, kpis, workflow, setup, job, liveStatus]) expect(box).not.toBeNull();
   expect(header!.height).toBeLessThanOrEqual(90);
   expect(kpis!.height).toBeLessThanOrEqual(180);
   expect(job!.height).toBeLessThanOrEqual(520);
-  expect(liveStatus!.y).toBeGreaterThan(workflow!.y);
-  expect(recent!.y).toBeGreaterThan(liveStatus!.y);
+  expect(setup!.y + setup!.height).toBeLessThanOrEqual(job!.y);
+  expect(job!.y + job!.height).toBeLessThanOrEqual(liveStatus!.y);
+  await expect(page.locator(".recentEvents")).toBeHidden();
 });

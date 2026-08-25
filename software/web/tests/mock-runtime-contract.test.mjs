@@ -11,7 +11,7 @@ test("Mock runtime settings are server-owned and exposed under Engineering", () 
   assert.match(apiSource, /\/api\/mock\/runtime/);
   assert.match(apiSource, /method: "POST"/);
   assert.match(pageSource, /MockRuntimeSettingsPanel/);
-  assert.match(pageSource, /\["mock", "engineering\.settings"\]/);
+  assert.match(pageSource, /\["mock", "engineering\.settings",\s*"◇"\]/);
 });
 
 test("Mock UI preserves the 0.1 percent and 4 MiB configuration contract", () => {
