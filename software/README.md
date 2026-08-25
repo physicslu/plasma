@@ -80,7 +80,7 @@ Programming Asset types可擴充 Image、Key、Option、Serial Number、Calibrat
 
 Web 會提交 one-based `site_id` 工作到 Plasma Web REST Gateway，並輪詢真實 Site / Job state。Batch operation 可對選定 Sites 並行執行 Erase / Program / Verify / Read；不同 Site 的 pipeline 必須保持獨立。
 
-目前 repository 尚未實作 Fleet Web UI；不要把 Plasma PPU Console 當成多 PPU Manager UI。
+Production Mode 的 `/fleet` Factory Console 已提供多 PPU operator UI；其 topology/observation 可由 optional read-only Manager 與 Gateway provider 提供，但執行命令仍由 server-owned Batch Runtime 負責。Manager 本身尚未提供 command routing 或 central scheduling。
 
 ```bash
 cd software/web

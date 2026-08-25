@@ -168,7 +168,7 @@ Returns the stable fleet-facing node descriptor. The contract includes `manager_
 
 ## What is intentionally not implemented
 
-The current fleet Web slice does not add Manager registration, mDNS discovery, authentication/authorization, remote firmware rollout, central audit storage, fleet scheduling, job routing, PPU restart controls or programming commands. Those capabilities require separate architecture/security decisions.
+The current fleet Web slice does not add Manager registration, mDNS discovery, authentication/authorization, remote Programming Image rollout, central audit storage, fleet scheduling, job routing, PPU restart controls or programming commands. Those capabilities require separate architecture/security decisions.
 
 In particular, a future Manager write path must not be created merely by adding buttons to Fleet UI. Authentication, authorization, auditability, replay/idempotency and failure semantics must be defined first.
 

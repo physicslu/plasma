@@ -101,7 +101,7 @@ mock memory to `60 × 1 MiB = 60 MiB`. The separate eight-Site local PPU adds
 the deployed service.
 
 Each demo Site therefore accepts target Images up to its 1 MiB mock Flash
-capacity. Avoid uploading real customer firmware, credentials, keys, or other
+capacity. Avoid uploading real customer Programming Images, credentials, keys, or other
 confidential production data: the service is public, unauthenticated, and uses
 only simulated targets. All uploaded data, generated readback files, in-memory
 Job state, and logs are ephemeral and disappear when Render restarts,

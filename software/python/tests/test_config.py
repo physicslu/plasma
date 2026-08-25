@@ -57,13 +57,30 @@ class ConfigTests(unittest.TestCase):
             path = Path(temporary) / "plasma.yaml"
             path.write_text(
                 "programmer:\n  id: old-node\n"
-                "server:\n  max_supported_channels: 4\n  max_concurrent_jobs: 1\n"
+                "server:\n  max_supported_sites: 4\n  max_concurrent_jobs: 1\n"
                 "channels:\n  - {id: 0, enabled: true, interface: mock}\n",
                 encoding="utf-8",
             )
             with self.assertRaises(PlasmaError) as caught:
                 load_config(path)
             self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
+            self.assertEqual(
+                caught.exception.context["unknown_fields"],
+                ["channels", "programmer"],
+            )
+
+    def test_unknown_configuration_root_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "plasma.yaml"
+            path.write_text(
+                "server:\n  max_supported_sites: 2\n  max_concurrent_jobs: 1\n"
+                "unexpected: true\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(PlasmaError) as caught:
+                load_config(path)
+            self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
+            self.assertEqual(caught.exception.context["unknown_fields"], ["unexpected"])
 
     def test_invalid_ppu_identity_rejected(self) -> None:
         config = PlasmaConfig(

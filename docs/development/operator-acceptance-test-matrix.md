@@ -28,7 +28,7 @@ The Operator Acceptance Test (OAT) matrix therefore records both automated evide
 - `OAT-TGT-*` — Facility / PPU / Site target selection.
 - `OAT-JOB-*` — Erase / Program / Verify / Read execution semantics.
 - `OAT-BATCH-*` — multi-Site batch behavior and cancellation.
-- `OAT-FW-*` — firmware fingerprint, cache, upload, and PPU firmware ownership.
+- `OAT-FW-*` — Programming Image fingerprint, cache, upload, and PPU Image ownership. `FW` remains only as a stable historical scenario-ID prefix.
 - `OAT-LOG-*` — operator observability and downloadable logs.
 - `OAT-DATA-*` — Read/download/data-integrity checks.
 - `OAT-HW-*` — Z2 / PL / physical interface / real IC acceptance.
@@ -70,16 +70,16 @@ Scenario IDs are stable contracts. Tests may move between files, but the scenari
 | `OAT-BATCH-003` | Batch Cancel | All participating Sites stop; no later operation may dispatch after the batch cancel barrier; aggregate result is `CANCELLED`. | Browser regression / BatchLifecycle coverage | Verify during a long-enough Mock Program/Erase. |
 | `OAT-BATCH-004` | Independent Site Cancel inside batch | Cancelled Site stops while unaffected Sites continue; aggregate result is `PARTIAL` with correct success/cancelled sets. | Browser regression | Reproduce once with at least 3 Sites. |
 | `OAT-BATCH-005` | Mixed terminal results | Aggregate log distinguishes `COMPLETE`, `PARTIAL`, `CANCELLED`, and `FAILED`; it must not label a partial result as complete. | Browser regression | Inspect Job Log after cancellation/failure tests. |
-| `OAT-FW-001` | First Program/Verify using a firmware image | Browser sends SHA-256 fingerprint check; cache miss is reported; binary firmware is uploaded once per PPU/session. | `AUTO-MOCK`, `AUTO-STACK`, `AUTO-PY` | Confirm log shows CHECK -> MISS -> UPLOAD START -> UPLOAD COMPLETE. |
-| `OAT-FW-002` | Concurrent selected Sites use same firmware | One binary upload is shared; Site jobs carry session/SHA references rather than duplicate Base64 firmware. | `AUTO-MOCK`, `AUTO-STACK`, `AUTO-PY` | Inspect Job Log / browser Network once if needed. |
-| `OAT-FW-003` | Repeat same firmware in same session/PPU | Fingerprint check occurs; cache hit is reported; no additional binary upload occurs. | `AUTO-MOCK`, `AUTO-STACK`, `AUTO-PY` | Confirm `CACHE HIT · reference only · no binary upload`. |
-| `OAT-FW-004` | Change firmware contents | Different SHA-256 produces cache miss and replacement upload. | `AUTO-MOCK`, `AUTO-PY` | Optional manual check with a second BIN. |
-| `OAT-FW-005` | Reconnect then use same firmware | New session clears previous firmware cache; first Program/Verify after reconnect must upload binary again. | `AUTO-MOCK`, `AUTO-STACK`, `AUTO-PY` | Confirm reconnect log and new upload. |
-| `OAT-FW-006` | Same PPU, same active firmware across Sites/sessions | Same SHA may run concurrently on multiple Sites. | `AUTO-PY` | Future multi-browser SWPC acceptance when needed. |
-| `OAT-FW-007` | Same PPU, different active firmware while jobs are running | Server rejects conflicting firmware with recoverable busy semantics until active lease is released. | `AUTO-PY` | Future multi-browser SWPC acceptance when needed. |
-| `OAT-FW-008` | Size-aware Mock timing | Mock duration scales with firmware size; Program of the operator test image must be long enough to exercise cancellation. | `AUTO-PY`; runtime acceptance indirectly exercises it | Human timing is diagnostic only; do not treat Mock timing as hardware performance. |
+| `OAT-FW-001` | First Program/Verify using a Programming Image | Browser sends SHA-256 fingerprint check; cache miss is reported; binary Image Asset is uploaded once per PPU/session. | `AUTO-MOCK`, `AUTO-STACK`, `AUTO-PY` | Confirm log shows CHECK -> MISS -> UPLOAD START -> UPLOAD COMPLETE. |
+| `OAT-FW-002` | Concurrent selected Sites use the same Programming Image | One binary upload is shared; Site jobs carry session/SHA references rather than duplicate Base64 Image data. | `AUTO-MOCK`, `AUTO-STACK`, `AUTO-PY` | Inspect Job Log / browser Network once if needed. |
+| `OAT-FW-003` | Repeat the same Programming Image in one session/PPU | Fingerprint check occurs; cache hit is reported; no additional binary upload occurs. | `AUTO-MOCK`, `AUTO-STACK`, `AUTO-PY` | Confirm `CACHE HIT · reference only · no binary upload`. |
+| `OAT-FW-004` | Change Programming Image contents | Different SHA-256 produces cache miss and replacement upload. | `AUTO-MOCK`, `AUTO-PY` | Optional manual check with a second BIN. |
+| `OAT-FW-005` | Reconnect then use the same Programming Image | New session clears the previous Asset cache; first Program/Verify after reconnect uploads the binary Image again. | `AUTO-MOCK`, `AUTO-STACK`, `AUTO-PY` | Confirm reconnect log and new upload. |
+| `OAT-FW-006` | Same PPU, same active Image across Sites/sessions | Same SHA may run concurrently on multiple Sites. | `AUTO-PY` | Future multi-browser SWPC acceptance when needed. |
+| `OAT-FW-007` | Same PPU, different active Images while jobs are running | Server rejects the conflicting Image with recoverable busy semantics until the active lease is released. | `AUTO-PY` | Future multi-browser SWPC acceptance when needed. |
+| `OAT-FW-008` | Size-aware Mock timing | Mock duration scales with Image size; Program of the operator test Image must be long enough to exercise cancellation. | `AUTO-PY`; runtime acceptance indirectly exercises it | Human timing is diagnostic only; do not treat Mock timing as hardware performance. |
 | `OAT-LOG-001` | Job Log ordering | Newest event is at the top. | `AUTO-MOCK` | Visual confirmation. |
-| `OAT-LOG-002` | Firmware transfer observability | Log distinguishes fingerprint-only check, hit/miss, binary upload start/complete, and new session/cache clear. Network request count remains source of truth. | `AUTO-MOCK`, `AUTO-STACK` | Compare Log with browser Network only when diagnosing. |
+| `OAT-LOG-002` | Programming Image transfer observability | Log distinguishes fingerprint-only check, hit/miss, binary upload start/complete, and new session/cache clear. Network request count remains source of truth. | `AUTO-MOCK`, `AUTO-STACK` | Compare Log with browser Network only when diagnosing. |
 | `OAT-LOG-003` | Batch result observability | Final aggregate lists success/cancelled/failed Sites explicitly. | Browser regression | Inspect operator log after batch tests. |
 | `OAT-LOG-004` | Download `.log` | Browser exposes visible `Download .log`; exported file uses same newest-first order as UI. | `AUTO-MOCK` using real Playwright download event and file-content comparison | Download once on SWPC for release acceptance. |
 | `OAT-DATA-001` | Program -> Verify -> Read deterministic bytes | Read result length and bytes match programmed deterministic input for tested range. | `AUTO-STACK` | Repeat on SWPC Mock before real hardware validation. |
@@ -106,8 +106,8 @@ This sequence is the preferred human acceptance flow because one continuous sess
 ```text
 1. Fresh Connect.
 2. Select a non-default 6-Site PPU.
-3. Select all Sites and run E -> P -> V with deterministic firmware.
-4. Confirm first firmware use is CACHE MISS + one binary upload.
+3. Select all Sites and run E -> P -> V with a deterministic Programming Image.
+4. Confirm first Image use is CACHE MISS + one binary upload.
 5. Run same batch again and confirm CACHE HIT + no binary upload.
 6. Select a subset and perform Batch Cancel.
 7. Select another non-contiguous subset; independently cancel one or more Sites.
@@ -116,7 +116,7 @@ This sequence is the preferred human acceptance flow because one continuous sess
 10. Perform a same-Gateway Provider outage/reconnect and confirm the same PPU and Site subset return.
 11. Change the Gateway URL to a deliberately unreachable endpoint; confirm the UI reports the transport failure.
 12. Restore the original Gateway URL; confirm the same PPU and same Site subset return.
-13. Confirm first firmware use after reconnect is CACHE MISS + binary upload again.
+13. Confirm first Image use after reconnect is CACHE MISS + binary upload again.
 14. Explicitly unselect every Site; wait through several polls; confirm 0 / N remains.
 15. Reconnect again; confirm explicit 0 / N remains.
 16. Download the newest-first `.log` and retain it as acceptance evidence.
@@ -139,14 +139,14 @@ Current primary test owners:
 |---|---|
 | Engineering target selection, E/P/V/R routing, browser behavior | `software/web/e2e/tests/engineering-programming.spec.ts` |
 | Operator Site selection / same-Gateway reconnect / bad-Gateway round trip / explicit zero selection | `software/web/e2e/tests/engineering-site-selection-reconnect.spec.ts` |
-| Firmware cache behavior through real browser + real Gateway/Provider/Server | `software/web/e2e/tests/engineering-firmware-cache-runtime.spec.ts` |
+| Programming Image cache behavior through real browser + real Gateway/Provider/Server | `software/web/e2e/tests/engineering-programming-asset-cache-runtime.spec.ts` |
 | Baseline real-stack PPU operator and batch acceptance | `software/web/e2e/tests/mock-cd-runtime.spec.ts` |
 | Browser regression CI | `.github/workflows/web-tests.yml` |
 | Full software-stack acceptance | `.github/workflows/mock-cd.yml` |
 | Real browser + persistent Mock CD stack | `.github/workflows/mock-cd-browser.yml` |
-| Provider/server firmware cache and PPU lease | `software/python/tests/test_engineering_targets.py` and Gateway tests |
+| Provider/server Programming Asset cache and PPU Image lease | `software/python/tests/test_engineering_targets.py` and Gateway tests |
 
-`docs/development/mock-cd.md` remains the authoritative document for Mock CD layer boundaries. `docs/development/engineering-firmware-observability-test-plan.md` remains the focused firmware/log observability specification. This OAT matrix is the cross-layer operator contract tying those tests together.
+`docs/development/mock-cd.md` remains the authoritative document for Mock CD layer boundaries. `docs/development/programming-image-observability-test-plan.md` remains the focused Programming Image/log observability specification. This OAT matrix is the cross-layer operator contract tying those tests together.
 
 ## 7. Release gate policy
 
@@ -177,7 +177,7 @@ For release-relevant human acceptance, retain enough evidence to reconstruct wha
 - commit / release identifier;
 - Facility / PPU identity;
 - selected Site set;
-- firmware filename, size, and SHA-256 prefix/full digest where appropriate;
+- Programming Image filename, size, and SHA-256 prefix/full digest where appropriate;
 - downloadable Engineering `.log`;
 - relevant Read output/hash when data integrity is tested;
 - PASS/FAIL for OAT scenario IDs executed;

@@ -102,7 +102,7 @@ class SharedImageStoreTests(unittest.TestCase):
 
 
 class MockFlashStateTests(unittest.TestCase):
-    def test_sixty_sites_reference_one_4_mib_blob_without_flash_arrays(self) -> None:
+    def test_one_hundred_sixty_sites_reference_one_4_mib_blob_without_flash_arrays(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SharedImageStore(directory)
             image = bytes(range(256)) * (4 * 1024 * 1024 // 256)

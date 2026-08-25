@@ -31,7 +31,7 @@ Facility -> PPU -> Site
 SITE 1 .. SITE N
 ```
 
-Protocol v3.2 is canonical (`PLASMA32`, one-based `site_id`). Protocol v3.1 `channel_id` is zero-based legacy compatibility only. New code and current-guidance documentation must not invent `SITE 0` or treat `site_id == channel_id` as an invariant.
+Protocol v3.3 is canonical (`PLASMA33`, one-based `site_id`). Retired zero-based Channel identity is not accepted by the current runtime. New code and current-guidance documentation must not invent `SITE 0`.
 
 ## 3. Recommended AI role separation
 
@@ -197,7 +197,7 @@ AI-generated changes must preserve the same engineering constraints as human-gen
 - preserve independent **Site** execution unless a real shared resource requires synchronization;
 - scope cancellation to the intended job/Site;
 - keep canonical Site identity one-based;
-- keep v3.1 `channel_id` inside explicit compatibility boundaries;
+- do not reintroduce retired Programmer/Channel identity or zero-based Site compatibility;
 - recognize the current Web boundary as **Plasma Web REST Gateway**, implemented with standard-library HTTP and REST polling;
 - do not invent FastAPI/WebSocket behavior that is not implemented;
 - do not invent hardware register addresses, timing, pin mappings, protocols, or API behavior;

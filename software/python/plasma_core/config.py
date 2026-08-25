@@ -157,6 +157,14 @@ def load_config(path: str | Path) -> PlasmaConfig:
         ) from exc
     if not isinstance(raw, dict):
         raise PlasmaError(ErrorCode.CONFIG_INVALID, "configuration root must be a mapping")
+    declared_root_fields = {"ppu", "server", "sites"}
+    unknown_root_fields = set(raw) - declared_root_fields
+    if unknown_root_fields:
+        raise PlasmaError(
+            ErrorCode.CONFIG_INVALID,
+            "configuration contains unknown root fields",
+            context={"unknown_fields": sorted(str(field) for field in unknown_root_fields)},
+        )
     try:
         server = _server_from_dict(raw.get("server", {}), config_path.parent.parent)
         ppu = _ppu_from_dict(raw.get("ppu", {}))

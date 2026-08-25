@@ -1,6 +1,6 @@
 # Plasma Configuration Architecture
 
-> Status: baseline for the current single-PPU prototype and the future multi-PPU / Plasma Manager phase.
+> Status: current baseline for standalone PPU deployment, optional read-only Plasma Manager, Engineering Mock Provider, and shared Gateway communication policy.
 
 This document defines ownership, source-of-truth, precedence, persistence, migration, and reconciliation rules for Plasma configuration. It intentionally avoids private account names, private hostnames, and workstation-specific absolute paths.
 
@@ -43,7 +43,8 @@ The word **Facility** is used for a factory/lab/deployment location. **Site** is
 | Product defaults | timeout, size limit | Source code | Checked-in code/config |
 | Facility/deployment | service ports, repository path, public API URL | Deployment operator | Persistent deployment config |
 | PPU identity | PPU ID, model, serial identity, facility association | Device provisioning | Device-local persistent identity |
-| PPU capability | Site count, supported operations/interfaces, FPGA/firmware capability | PPU runtime/hardware | Device-reported capability |
+| PPU capability | Site count, supported operations/interfaces, FPGA/Image capability | PPU runtime/hardware | Device-reported capability |
+| Gateway communication policy | PPU request timeout and retry count | Plasma Web REST Gateway | Persistent Gateway settings YAML |
 | Site configuration | Site enablement, interface binding, per-Site limits | PPU configuration | Canonical PPU config |
 | Target profile | IC family, memory geometry, interface | Target-definition layer | Checked-in target/profile data |
 | Job configuration | operation, target, file, offset, read length | Job request/server | Accepted server-side job record |
@@ -64,7 +65,7 @@ $HOME/.config/plasma/plasmactl.env
 The current deployment schema version is:
 
 ```bash
-PLASMA_CONFIG_VERSION=2
+PLASMA_CONFIG_VERSION=4
 ```
 
 Generic example:
@@ -80,6 +81,10 @@ PLASMA_CORS_ORIGIN='*'
 PLASMA_VITE_HOST=127.0.0.1
 PLASMA_VITE_PORT=5173
 PLASMA_PUBLIC_API_URL=https://example.invalid
+PLASMA_MANAGER_ENABLED=0
+PLASMA_MANAGER_CONFIG=/path/to/manager.yaml
+PLASMA_ENGINEERING_MOCK_ENABLED=0
+PLASMA_ENGINEERING_MOCK_ROOT=/path/to/runtime-state/engineering-mock
 ```
 
 Ownership chain:
@@ -123,14 +128,7 @@ sites:
 
 `max_supported_sites` defines the valid one-based Site ID space `1..N`. `max_concurrent_jobs` limits how many jobs may actually execute concurrently. These are different constraints.
 
-Legacy configuration rooted at `programmer` / `channels` may still be read only through the explicit compatibility loader. Legacy Channel IDs are zero-based and translated once at load time:
-
-```text
-channel_id 0 -> site_id 1
-channel_id 1 -> site_id 2
-```
-
-Canonical and legacy forms for the same concept must not be mixed inside one configuration block.
+The current loader accepts canonical `ppu`, `server`, and `sites` fields only. Retired `programmer` / `channels` configuration and zero-based identity are rejected rather than silently translated.
 
 ## 6. Precedence rules
 
@@ -174,6 +172,16 @@ This value is not topology truth and must not evolve into a browser-owned PPU re
 
 Once a job is accepted, the server-side job record is authoritative for that execution.
 
+### Gateway communication policy
+
+```text
+1. persistent Gateway settings selected by --gateway-settings
+2. <output-root>/gateway-settings.yaml
+3. code defaults: 10-second PPU request timeout and 3 retries
+```
+
+The resource is edited through `EMode -> Settings -> Gateway` and shared by PMode and EMode. Each Batch freezes a policy revision at START; updates affect only future Batches.
+
 ## 7. Schema versioning and migration
 
 Configuration that survives a software upgrade requires an explicit schema/version strategy.
@@ -204,7 +212,7 @@ reconcile derived runtime state
 
 Known historical defaults may migrate to the current canonical default. Unknown/custom values remain explicit operator overrides. Already-versioned values are not repeatedly reinterpreted.
 
-Protocol v3.1 identity migration is separate from deployment-config schema versioning. Protocol v3.1 uses zero-based `channel_id`; canonical Protocol v3.2 uses one-based `site_id`.
+Wire-protocol evolution is separate from deployment-config schema versioning. Protocol v3.3 / `PLASMA33` uses one-based `site_id`; retired zero-based Channel identity is not a current migration input.
 
 ## 8. Runtime reconciliation
 
@@ -282,24 +290,22 @@ Conceptual status/capability shape:
 
 The exact capability schema may evolve, but ownership does not: PPU identity and capability originate from the PPU/device side.
 
-## 11. Future multi-PPU topology
+## 11. Optional multi-PPU observation
 
-The current implemented path is one PPU Web Console communicating with one Plasma Web REST Gateway, which communicates with one local Plasma Server.
-
-Target direction:
+The standalone path remains one PPU Console communicating with one local Gateway and Plasma Server. The repository also implements an optional read-only Plasma Manager and the PMode Factory Console:
 
 ```text
-Browser / Fleet UI
+PMode Factory Console
         |
         v
-Plasma Manager
+Plasma Manager (optional read-only registry / aggregation)
         |
-        +-- PPU A (2 Sites)
-        +-- PPU B (4 Sites)
-        +-- PPU C (8 Sites)
+        +-- PPU A Gateway -> local execution
+        +-- PPU B Gateway -> local execution
+        +-- PPU C Gateway -> local execution
 ```
 
-Plasma Manager is a future logical fleet control plane; it is not currently implemented. It should eventually own PPU registration/discovery, health aggregation, routing, authentication/audit and fleet-level coordination. Each PPU remains locally autonomous and owns Site scheduling, protocol timing, safety and recovery.
+Current Manager behavior is manual registry plus read-only liveness/readiness/topology aggregation. It does not own command routing, scheduling, discovery, authentication policy, audit persistence, or PPU execution. Each PPU remains locally autonomous and owns Site scheduling, protocol timing, safety and recovery.
 
 The browser must not fan out directly to a stored list of PPU URLs as the long-term fleet architecture.
 
@@ -344,7 +350,12 @@ A future structured read-only effective-configuration/status endpoint may reduce
 | `PLASMA_VITE_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Development/demo Web binding |
 | `PLASMA_VITE_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current default 5173 |
 | `PLASMA_PUBLIC_API_URL` | Facility/deployment | Deployment | `plasmactl.env` | Public API Base configuration |
+| `PLASMA_MANAGER_ENABLED` | Facility/deployment | Deployment | `plasmactl.env` | Optional; default `0` |
+| `PLASMA_MANAGER_CONFIG` | Fleet observation | Deployment | Operator-local YAML path | Required only when Manager is enabled |
+| `PLASMA_ENGINEERING_MOCK_ENABLED` | Test runtime | Deployment | `plasmactl.env` | Optional; default `0` |
+| `PLASMA_ENGINEERING_MOCK_ROOT` | Test runtime | Deployment | Operator-local state path | Must remain outside the Git worktree |
 | `NEXT_PUBLIC_PLASMA_API_URL` | Derived runtime | Deployment generator | Generated systemd environment | Not independent truth |
+| Gateway PPU timeout/retry | Gateway policy | Gateway | Persistent Gateway settings YAML | Frozen into each Batch snapshot |
 | Browser theme/layout | User preference | Browser/user | Browser storage | User-local only |
 | PPU ID | PPU identity | PPU provisioning | Device-local identity | Stable resource identity |
 | Site count | PPU capability | PPU/device | Device capability report | Support 1–8 in current software |
@@ -358,7 +369,7 @@ A future structured read-only effective-configuration/status endpoint may reduce
 2. Keep deployment configuration versioned and reconcilable
 3. Keep topology/capability truth out of browser storage
 4. Keep canonical Site identity one-based across new layers
-5. Define Plasma Manager registry/trust model before multi-PPU UI implementation
+5. Keep Manager observation separate from Batch command ownership
 6. Add effective-config observability where ambiguity remains operationally costly
 ```
 

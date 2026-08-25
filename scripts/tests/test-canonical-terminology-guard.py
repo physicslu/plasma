@@ -10,6 +10,7 @@ so there is no legacy compatibility exception in canonical production code.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -27,6 +28,14 @@ EXCLUDED_PREFIXES = (
     "software/web/e2e/",
 )
 
+GENERATED_SEGMENTS = {
+    ".next",
+    ".sites-runtime",
+    ".venv",
+    "dist",
+    "node_modules",
+}
+
 PRODUCTION_PREFIXES = (
     "software/python/",
     "software/web/",
@@ -38,6 +47,8 @@ CODE_SUFFIXES = {".py", ".js", ".jsx", ".ts", ".tsx"}
 def checked_path(path: str) -> bool:
     if path.startswith(EXCLUDED_PREFIXES):
         return False
+    if GENERATED_SEGMENTS.intersection(Path(path).parts):
+        return False
     if Path(path).suffix not in CODE_SUFFIXES:
         return False
     return path.startswith(PRODUCTION_PREFIXES)
@@ -45,21 +56,34 @@ def checked_path(path: str) -> bool:
 
 def current_tree_findings() -> list[tuple[str, int, str]]:
     findings: list[tuple[str, int, str]] = []
-    for prefix in PRODUCTION_PREFIXES:
-        root = ROOT / prefix
-        if not root.exists():
+    result = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            *PRODUCTION_PREFIXES,
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for relative in sorted(result.stdout.splitlines()):
+        if not checked_path(relative):
             continue
-        for path in sorted(item for item in root.rglob("*") if item.is_file()):
-            relative = path.relative_to(ROOT).as_posix()
-            if not checked_path(relative):
-                continue
-            try:
-                lines = path.read_text(encoding="utf-8").splitlines()
-            except UnicodeDecodeError:
-                continue
-            for line_no, text in enumerate(lines, start=1):
-                if FORBIDDEN.search(text):
-                    findings.append((relative, line_no, text))
+        path = ROOT / relative
+        if not path.is_file():
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        for line_no, text in enumerate(lines, start=1):
+            if FORBIDDEN.search(text):
+                findings.append((relative, line_no, text))
     return findings
 
 
@@ -69,6 +93,9 @@ def self_test() -> None:
     assert not checked_path("software/web/package-lock.json")
     assert not checked_path("software/python/tests/test_protocol.py")
     assert not checked_path("software/web/e2e/tests/engineering-programming.spec.ts")
+    assert not checked_path("software/python/.venv/lib/example.py")
+    assert not checked_path("software/web/node_modules/example/index.js")
+    assert not checked_path("software/web/dist/server/index.js")
     assert FORBIDDEN.search("programmer")
     assert FORBIDDEN.search("channel_id")
     assert FORBIDDEN.search("ChannelManager")

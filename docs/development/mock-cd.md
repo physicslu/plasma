@@ -131,7 +131,7 @@ The acceptance scenarios are:
    - for every enabled Site, click the individual `Erase`, `Program`, `Verify`, and `Read` controls;
    - inspect the browser's real outbound `POST /api/jobs` request and require each click to dispatch exactly to the intended Site and operation;
    - require every operation to be accepted by the real Gateway/Server path and reach `SUCCESS`;
-   - program a deterministic 256-byte firmware pattern, verify it, then Read the same range;
+   - program a deterministic 256-byte Image pattern, verify it, then Read the same range;
    - capture the real browser download event for every Site;
    - require the download name `read_SITE<n>_flash.bin`, exact byte length, and exact byte-for-byte content match.
 
@@ -149,10 +149,10 @@ The acceptance scenarios are:
    - enter `Engineering -> Programming` through the actual Web UI;
    - select the runtime-provided representative Facility and 6-Site PPU;
    - require the rendered Site topology to come from that selected PPU STATUS and contain no `SITE 0`;
-   - load deterministic firmware and execute `Erase -> Program -> Verify -> Read` on the last Site of that selected PPU;
+   - load a deterministic Programming Image and execute `Erase -> Program -> Verify -> Read` on the last Site of that selected PPU;
    - observe real outbound requests scoped to `/api/engineering/targets/{facility_id}/{ppu_id}/api/jobs`;
    - require every operation to reach `SUCCESS` through the Python Provider and selected virtual `PlasmaServer`;
-   - download the Read result and require exact byte length and byte-for-byte firmware match.
+   - download the Read result and require exact byte length and byte-for-byte Image match.
 
 This fourth scenario specifically proves that Engineering Facility/PPU selection is not a React-only mock and that changing the target identity changes the Python execution target.
 

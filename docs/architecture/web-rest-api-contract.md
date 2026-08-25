@@ -21,6 +21,28 @@ rest_contract_version = "3"
 
 `GET /api/node` publishes `rest_contract_version` independently from the fleet `contract_version`.
 
+## Gateway communication settings
+
+PMode and EMode share one persistent Gateway policy resource:
+
+```text
+GET  /api/settings/gateway
+POST /api/settings/gateway
+```
+
+The POST body contains exactly `ppu_request_timeout_ms` and `ppu_retry_count`; `revision` is server-owned. Each server-side Batch freezes the current revision at START. Defaults, validation ranges, retry boundaries and failure containment are defined in [Gateway Communication and Recovery](gateway-communication-recovery.md).
+
+## Server-side Batch routes
+
+```text
+POST /api/batches
+GET  /api/batches/{batch_id}
+POST /api/batches/{batch_id}/cancel
+POST /api/batches/{batch_id}/targets/{facility_id}/{ppu_id}/cancel
+```
+
+The browser-facing PMode and EMode action is whole-Batch ABORT. The PPU-target cancel route supports server/runtime containment and diagnostics; it must not be presented as permission to mutate Batch membership after START.
+
 ## Programming data model
 
 Plasma separates source inputs from execution data.
