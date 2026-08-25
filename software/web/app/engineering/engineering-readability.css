@@ -1,0 +1,81 @@
+/* Engineering Programming readability layer.
+ *
+ * The approved desktop geometry is intentionally unchanged. This file only
+ * raises the typography floor for operator-facing controls and runtime status.
+ * Compact secondary evidence remains one step smaller so LIVE SITE STATUS can
+ * stay in the same viewport budget.
+ */
+
+.engineeringProgrammingV2 .productionProgrammingKpis small {
+  font-size: 10px;
+}
+
+.engineeringProgrammingV2 .productionProgrammingCard > header,
+.engineeringProgrammingV2 .targetingCard > header::before,
+.engineeringProgrammingV2 .programmingJobCard > header::before,
+.engineeringProgrammingV2 .liveSiteStatus > header > span::before {
+  font-size: 12px;
+}
+
+.engineeringProgrammingV2 .workflowField,
+.engineeringProgrammingV2 .workflowField select,
+.engineeringProgrammingV2 .jobRow,
+.engineeringProgrammingV2 .jobRow select {
+  font-size: 11px;
+}
+
+.engineeringProgrammingV2 .jobRow > strong {
+  font-size: 11px;
+}
+
+.engineeringProgrammingV2 .topologyFoot {
+  font-size: 10px;
+}
+
+.engineeringProgrammingV2 .imageField .engineeringBrowseButton {
+  font-size: 10px;
+}
+
+.engineeringProgrammingV2 .engineeringImageHint {
+  font-size: 9px;
+}
+
+.engineeringProgrammingV2 .programmingBatchOperations .operationChecks label,
+.engineeringProgrammingV2 .engineeringPolicyRow > label,
+.engineeringProgrammingV2 .engineeringRetryField {
+  font-size: 10px;
+}
+
+.engineeringProgrammingV2 .batchReadiness {
+  font-size: 10px;
+}
+
+.engineeringProgrammingV2 .programmingActions button {
+  font-size: 12px;
+}
+
+.engineeringProgrammingV2 .liveSiteStatus > header small {
+  font-size: 9px;
+}
+
+/* LIVE SITE STATUS is the primary runtime surface. Raise its smallest text one
+ * step without changing cell padding, row height contracts, or column widths. */
+.engineeringProgrammingV2 .channelTable {
+  font-size: 12px;
+}
+
+.engineeringProgrammingV2 .channelTable th {
+  font-size: 10px;
+}
+
+.engineeringProgrammingV2 .channelTable td:nth-child(2) b {
+  font-size: 11px;
+}
+
+.engineeringProgrammingV2 .channelTable td small {
+  font-size: 9px;
+}
+
+.engineeringProgrammingV2 .channelTable .state {
+  font-size: 10px;
+}
