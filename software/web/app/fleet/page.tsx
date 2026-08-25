@@ -1,5 +1,5 @@
-import ServerBatchFleetPage from "./server-batch-page";
+import FactoryConsoleV2 from "./factory-console-v2";
 
 export default function Page() {
-  return <ServerBatchFleetPage />;
+  return <FactoryConsoleV2 />;
 }
