@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const readabilityPath = new URL("../app/engineering/engineering-readability.css", import.meta.url);
+const refreshPath = new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url);
 const pagePath = new URL("../app/engineering/page.tsx", import.meta.url);
 
 async function source(url) {
@@ -16,7 +17,8 @@ test("Engineering readability layer raises the approved operator font floor", as
     ".productionProgrammingKpis small {\n  font-size: 10px;",
     ".liveSiteStatus > header > span::before {\n  font-size: 12px;",
     ".workflowField select,\n.engineeringProgrammingV2 .jobRow,",
-    ".jobRow > strong {\n  font-size: 11px;",
+    ".workflowField > span {\n  font-size: 12px;",
+    ".jobRow > strong {\n  font-size: 12px;",
     ".engineeringImageHint {\n  font-size: 9px;",
     ".programmingBatchOperations .operationChecks label,",
     ".engineeringRetryField {\n  font-size: 10px;",
@@ -24,10 +26,27 @@ test("Engineering readability layer raises the approved operator font floor", as
     ".programmingActions button {\n  font-size: 12px;",
     ".channelTable {\n  font-size: 12px;",
     ".channelTable th {\n  font-size: 10px;",
+    ".channelTable td:nth-child(2) b {\n  font-size: 13px;",
     ".channelTable .state {\n  font-size: 10px;",
   ]) {
     assert.ok(css.includes(contract), `missing readability contract: ${contract}`);
   }
+});
+
+test("Engineering canonical card headers do not render their legacy text twice", async () => {
+  const [css, refresh] = await Promise.all([source(readabilityPath), source(refreshPath)]);
+
+  assert.equal(
+    css.includes(".engineeringProgrammingV2 .productionProgrammingCard > header,"),
+    false,
+    "readability CSS must not revive raw card header text",
+  );
+  assert.ok(
+    refresh.includes(".engineeringProgrammingV2 .targetingCard > header,\n.engineeringProgrammingV2 .programmingJobCard > header {\n  font-size: 0;"),
+    "raw SYSTEM SETUP / PROGRAMMING JOB header text must remain hidden",
+  );
+  assert.ok(css.includes(".targetingCard > header::before,"));
+  assert.ok(css.includes(".programmingJobCard > header::before,"));
 });
 
 test("Engineering readability layer is typography-only and loads after layout CSS", async () => {

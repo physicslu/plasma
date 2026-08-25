@@ -4,13 +4,16 @@
  * raises the typography floor for operator-facing controls and runtime status.
  * Compact secondary evidence remains one step smaller so LIVE SITE STATUS can
  * stay in the same viewport budget.
+ *
+ * Important: the raw SYSTEM SETUP / PROGRAMMING JOB card header text stays at
+ * font-size: 0 in engineering-workspace-refresh.css. Only the canonical
+ * ::before labels are enlarged here; otherwise both strings render at once.
  */
 
 .engineeringProgrammingV2 .productionProgrammingKpis small {
   font-size: 10px;
 }
 
-.engineeringProgrammingV2 .productionProgrammingCard > header,
 .engineeringProgrammingV2 .targetingCard > header::before,
 .engineeringProgrammingV2 .programmingJobCard > header::before,
 .engineeringProgrammingV2 .liveSiteStatus > header > span::before {
@@ -24,8 +27,15 @@
   font-size: 11px;
 }
 
+/* Facility / PPU selectors are primary setup decisions, so their visible text
+ * labels get the same 12 px floor as the primary Programming Job labels. */
+.engineeringProgrammingV2 .workflowField > span {
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .engineeringProgrammingV2 .jobRow > strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .engineeringProgrammingV2 .topologyFoot {
@@ -68,8 +78,11 @@
   font-size: 10px;
 }
 
+/* SITE-01 / SITE-02 are primary physical-location identifiers. They must be
+ * easier to scan than the secondary target/provider evidence below them. */
 .engineeringProgrammingV2 .channelTable td:nth-child(2) b {
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .engineeringProgrammingV2 .channelTable td small {
