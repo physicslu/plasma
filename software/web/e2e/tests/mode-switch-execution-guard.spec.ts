@@ -439,7 +439,7 @@ test("Emode retries transient PPU communication errors and restores its mode gua
   api.failNextJobPolls(1);
   await page.getByRole("button", { name: /START PROGRAMMING/ }).click();
 
-  await expect(page.getByText(/RECONNECTING.*retry 1\/1/)).toBeVisible();
+  await expect(page.getByLabel("Engineering job log").getByText(/RECONNECTING.*retry 1\/1/)).toBeVisible();
   api.finishJob("success");
   await expect(page.getByRole("region", { name: "Engineering Batch Summary" }).locator('[data-kpi="pass"] b')).toHaveText("1");
   await expectModeUnlocked(page, "量產模式");
@@ -456,7 +456,7 @@ test("Emode exhausted PPU communication retry cancels accepted Jobs and releases
   await page.getByRole("button", { name: /START PROGRAMMING/ }).click();
 
   await expect.poll(() => api.jobCancelRequested, { timeout: 10_000 }).toBe(true);
-  await expect(page.getByText(/\[PPU\] ISOLATED/)).toBeVisible();
+  await expect(page.getByLabel("Engineering job log").getByText(/\[PPU\] ISOLATED/)).toBeVisible();
   await expect(page.locator(".channelTable tbody tr").first().locator(".engineeringResult")).toHaveText("ERROR");
   await expectModeUnlocked(page, "量產模式");
 });
@@ -472,7 +472,7 @@ test("Emode Gateway outage preserves accepted Jobs until authoritative observati
   await expectModeLocked(page, "量產模式");
 
   api.setGatewayOffline(true);
-  await expect(page.getByText(/\[NET\] GATEWAY RECONNECTING/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByLabel("Engineering job log").getByText(/\[NET\] GATEWAY RECONNECTING/)).toBeVisible({ timeout: 10_000 });
   await expectModeLocked(page, "量產模式");
   expect(api.jobCancelRequested).toBe(false);
 

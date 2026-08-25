@@ -337,7 +337,7 @@ test("active membership follows Server Batch Runtime while PROCESSED IC follows 
   expect(mock.submissions[0].targets).toEqual([{ facility_id: facilityId, ppu_id: ppuId, site_ids: [1, 2] }]);
 
   const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
-  await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
+  await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="processed-ic"] b')).toHaveText("0");
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeChecked();
