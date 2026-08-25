@@ -27,6 +27,12 @@ export function subscribeBatchExecutionActivity(listener: Listener): () => void 
   return () => listeners.delete(listener);
 }
 
+// sessionStorage does not dispatch a storage event in the same document that
+// changes it. Lease writers must explicitly wake the global navigation store.
+export function notifyBatchExecutionActivityChanged(): void {
+  emit();
+}
+
 export function getBatchExecutionActivityCount(): number {
   // A stored non-terminal Batch ID is a fail-closed execution lease. During
   // normal observation activeBatchExecutions is already 1, so max() avoids

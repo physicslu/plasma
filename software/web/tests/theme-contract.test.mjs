@@ -8,6 +8,7 @@ test("Pmod, Emode and global IC Selector expose one persistent Light Dark theme 
   const globals = await fs.readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const productionTheme = await fs.readFile(new URL("../app/fleet/operator-feedback.css", import.meta.url), "utf8");
   const engineering = await fs.readFile(new URL("../app/engineering/engineering.css", import.meta.url), "utf8");
+  const engineeringProgramming = await fs.readFile(new URL("../app/engineering/programming-workspace-v2.css", import.meta.url), "utf8");
 
   assert.match(themeSwitch, /THEME_STORAGE_KEY\s*=\s*"plasma-theme"/);
   assert.match(themeSwitch, /data-theme-choice="light"/);
@@ -23,4 +24,7 @@ test("Pmod, Emode and global IC Selector expose one persistent Light Dark theme 
   assert.match(productionTheme, /\[data-theme="dark"\]\s+\.productionSitePrototype\.site-failed/);
   assert.match(engineering, /background:\s*var\(--navy\)/);
   assert.match(engineering, /background:\s*var\(--panel\)/);
+  assert.match(engineeringProgramming, /\.engineeringProgrammingV2Header \.engineeringGateway input\s*\{[^}]*color:\s*var\(--text,/s);
+  assert.match(engineeringProgramming, /\.engineeringProgrammingV2Header \.engineeringGateway > b\s*\{[^}]*color:\s*var\(--text,/s);
+  assert.match(engineeringProgramming, /\.engineeringProgrammingV2Header \.engineeringGateway input:disabled\s*\{[^}]*opacity:\s*1/s);
 });

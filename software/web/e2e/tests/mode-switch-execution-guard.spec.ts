@@ -157,6 +157,8 @@ async function installExecutionApi(page: Page) {
   let activeJobId = "";
   let batchState: MutableBatchState = "running";
   let batchCancelRequested = false;
+  let remainingBatchPollFailures = 0;
+  let returnSuccessOnBatchCancel = false;
   await installTestDeviceCatalog(page);
 
   await page.route("**/api/engineering/**", async (route: Route) => {
@@ -231,11 +233,21 @@ async function installExecutionApi(page: Page) {
       return;
     }
     if (path === "/api/batches/batch-mode-guard" && request.method() === "GET") {
+      if (remainingBatchPollFailures > 0) {
+        remainingBatchPollFailures -= 1;
+        await route.abort("timedout");
+        return;
+      }
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(batchPayload(batchState, batchCancelRequested)) });
       return;
     }
     if (path === "/api/batches/batch-mode-guard/cancel" && request.method() === "POST") {
       batchCancelRequested = true;
+      if (returnSuccessOnBatchCancel) {
+        batchState = "success";
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(batchPayload("success")) });
+        return;
+      }
       batchState = "stopping";
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(batchPayload("stopping", true)) });
       return;
@@ -245,6 +257,8 @@ async function installExecutionApi(page: Page) {
 
   return {
     finishBatch(state: "cancelled" | "success") { batchState = state; },
+    failNextBatchPolls(count: number) { remainingBatchPollFailures = count; },
+    finishOnBatchAbort() { returnSuccessOnBatchCancel = true; },
     finishJob(state: "cancelled" | "success") { jobState = state; },
     get batchCancelRequested() { return batchCancelRequested; },
     get jobCancelRequested() { return jobCancelRequested; },
@@ -285,6 +299,69 @@ test("Pmod server Batch locks Emode through running and stopping until terminal"
 
   api.finishBatch("cancelled");
   await expectModeUnlocked(page, "工程模式");
+});
+
+test("successful Pmod Batch releases its execution lease and restores Engineering mode", async ({ page }) => {
+  const api = await installExecutionApi(page);
+  await page.goto("/fleet");
+  await commitProductionSites(page, facilityId, ppuId, [1]);
+  const job = programmingJob(page);
+  await productionOperation(page, "E").check();
+  await job.locator(".factoryStartButton").click();
+  await expectModeLocked(page, "工程模式");
+
+  api.finishBatch("success");
+  await expect(job.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expectModeUnlocked(page, "工程模式");
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("plasma-production-active-batch-v1"))).toBeNull();
+});
+
+test("temporary Batch observation failures reconnect and still release the terminal mode guard", async ({ page }) => {
+  const api = await installExecutionApi(page);
+  await page.goto("/fleet");
+  await commitProductionSites(page, facilityId, ppuId, [1]);
+  const job = programmingJob(page);
+  await productionOperation(page, "E").check();
+  await job.locator(".factoryStartButton").click();
+  await expectModeLocked(page, "工程模式");
+
+  api.failNextBatchPolls(2);
+  await expect(job.locator(".factoryBatchStatus b")).toHaveText("RECONNECTING");
+  api.finishBatch("success");
+  await expect(job.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expectModeUnlocked(page, "工程模式");
+  await expect(page.getByText(/OBSERVATION RESTORED/)).toBeVisible();
+});
+
+test("ABORT receiving an already successful Batch performs terminal cleanup immediately", async ({ page }) => {
+  const api = await installExecutionApi(page);
+  await page.goto("/fleet");
+  await commitProductionSites(page, facilityId, ppuId, [1]);
+  const job = programmingJob(page);
+  await productionOperation(page, "E").check();
+  await job.locator(".factoryStartButton").click();
+  await expectModeLocked(page, "工程模式");
+
+  api.finishOnBatchAbort();
+  await job.locator(".factoryAbortButton").click();
+  await expect(job.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expectModeUnlocked(page, "工程模式");
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("plasma-production-active-batch-v1"))).toBeNull();
+});
+
+test("restoring an already successful Batch clears its stale execution lease", async ({ page }) => {
+  const api = await installExecutionApi(page);
+  api.finishBatch("success");
+  await page.addInitScript(() => {
+    sessionStorage.setItem("plasma-production-active-batch-v1", JSON.stringify({
+      apiBase: "https://plasma.open4th.com",
+      batchId: "batch-mode-guard",
+    }));
+  });
+  await page.goto("/fleet");
+  await expect(programmingJob(page).locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expectModeUnlocked(page, "工程模式");
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("plasma-production-active-batch-v1"))).toBeNull();
 });
 
 test("Emode single-Site PPU action still locks Pmod through cancel until terminal", async ({ page }) => {
