@@ -61,12 +61,14 @@ test("Engineering Batch Summary uses the Production KPI vocabulary and IC outcom
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
 
   assert.match(workspace, /title="BATCH SUMMARY"/);
-  for (const label of ["SITES", "TOTAL IC", "RUNNING", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
+  for (const label of ["SITES", "TOTAL IC", "PROCESSED IC", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
     assert.match(workspace, new RegExp(`label: "${label}"`));
   }
   assert.match(workspace, /totalIc: siteIds\.length \* repeatValue/);
   assert.match(workspace, /pass: current\.pass \+ 1/);
   assert.match(workspace, /fail: current\.fail \+ 1/);
+  assert.match(workspace, /const completedIc = displayedBatch\.pass \+ displayedBatch\.fail/);
+  assert.match(workspace, /label: "PROCESSED IC", value: completedIc/);
   assert.doesNotMatch(workspace, /CYCLE TIME/);
 });
 

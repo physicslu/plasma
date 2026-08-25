@@ -158,8 +158,35 @@ async function installExecutionApi(page: Page) {
   let batchState: MutableBatchState = "running";
   let batchCancelRequested = false;
   let remainingBatchPollFailures = 0;
+  let remainingJobPollFailures = 0;
+  let failJobPollsUntilCancel = false;
+  let completeJobOnCancel = false;
   let returnSuccessOnBatchCancel = false;
+  let gatewayOffline = false;
   await installTestDeviceCatalog(page);
+
+  await page.route("**/api/settings/gateway", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        gateway_settings: { revision: 1, ppu_request_timeout_ms: 1_000, ppu_retry_count: 1 },
+      }),
+    });
+  });
+
+  await page.route("**/api/health/live", async route => {
+    if (gatewayOffline) {
+      await route.abort("failed");
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, gateway: "alive" }),
+    });
+  });
 
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
@@ -193,6 +220,10 @@ async function installExecutionApi(page: Page) {
     }
 
     const tail = targetMatch[3];
+    if (gatewayOffline && request.method() === "GET" && tail === "status") {
+      await route.abort("failed");
+      return;
+    }
     if (request.method() === "GET" && tail === "status" && !url.searchParams.has("job")) {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(targetStatus()) });
       return;
@@ -208,6 +239,15 @@ async function installExecutionApi(page: Page) {
     }
 
     if (request.method() === "GET" && tail === "status" && url.searchParams.has("job")) {
+      if ((failJobPollsUntilCancel && !jobCancelRequested) || remainingJobPollFailures > 0) {
+        if (remainingJobPollFailures > 0) remainingJobPollFailures -= 1;
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ error: { error_code: "E2002", message: "simulated PPU communication timeout" } }),
+        });
+        return;
+      }
       const jobId = url.searchParams.get("job") ?? activeJobId;
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(jobPayload(jobId, jobState, jobCancelRequested)) });
       return;
@@ -216,6 +256,7 @@ async function installExecutionApi(page: Page) {
     const cancelMatch = /^jobs\/([^/]+)\/cancel$/.exec(tail);
     if (request.method() === "POST" && cancelMatch) {
       jobCancelRequested = true;
+      if (completeJobOnCancel) jobState = "cancelled";
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, job: { job_id: cancelMatch[1], cancel_requested: true } }) });
       return;
     }
@@ -259,7 +300,13 @@ async function installExecutionApi(page: Page) {
     finishBatch(state: "cancelled" | "success") { batchState = state; },
     failNextBatchPolls(count: number) { remainingBatchPollFailures = count; },
     finishOnBatchAbort() { returnSuccessOnBatchCancel = true; },
+    failNextJobPolls(count: number) { remainingJobPollFailures = count; },
+    failJobPollsUntilCancelled() {
+      failJobPollsUntilCancel = true;
+      completeJobOnCancel = true;
+    },
     finishJob(state: "cancelled" | "success") { jobState = state; },
+    setGatewayOffline(offline: boolean) { gatewayOffline = offline; },
     get batchCancelRequested() { return batchCancelRequested; },
     get jobCancelRequested() { return jobCancelRequested; },
   };
@@ -380,4 +427,58 @@ test("Emode single-Site PPU action still locks Pmod through cancel until termina
 
   api.finishJob("cancelled");
   await expectModeUnlocked(page, "量產模式");
+});
+
+test("Emode retries transient PPU communication errors and restores its mode guard", async ({ page }) => {
+  const api = await installExecutionApi(page);
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await page.getByLabel("Batch select SITE 2").uncheck();
+  await page.getByLabel("Engineering batch erase").check();
+  api.failNextJobPolls(1);
+  await page.getByRole("button", { name: /START PROGRAMMING/ }).click();
+
+  await expect(page.getByText(/RECONNECTING.*retry 1\/1/)).toBeVisible();
+  api.finishJob("success");
+  await expect(page.getByRole("region", { name: "Engineering Batch Summary" }).locator('[data-kpi="pass"] b')).toHaveText("1");
+  await expectModeUnlocked(page, "量產模式");
+});
+
+test("Emode exhausted PPU communication retry cancels accepted Jobs and releases its mode guard", async ({ page }) => {
+  const api = await installExecutionApi(page);
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await page.getByLabel("Batch select SITE 2").uncheck();
+  await page.getByLabel("Engineering batch erase").check();
+  api.failJobPollsUntilCancelled();
+  await page.getByRole("button", { name: /START PROGRAMMING/ }).click();
+
+  await expect.poll(() => api.jobCancelRequested, { timeout: 10_000 }).toBe(true);
+  await expect(page.getByText(/\[PPU\] ISOLATED/)).toBeVisible();
+  await expect(page.locator(".channelTable tbody tr").first().locator(".engineeringResult")).toHaveText("ERROR");
+  await expectModeUnlocked(page, "量產模式");
+});
+
+test("Emode Gateway outage preserves accepted Jobs until authoritative observation returns", async ({ page }) => {
+  const api = await installExecutionApi(page);
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await page.getByLabel("Batch select SITE 2").uncheck();
+  await page.getByLabel("Engineering batch erase").check();
+  await page.getByRole("button", { name: /START PROGRAMMING/ }).click();
+  await expectModeLocked(page, "量產模式");
+
+  api.setGatewayOffline(true);
+  await expect(page.getByText(/\[NET\] GATEWAY RECONNECTING/)).toBeVisible({ timeout: 10_000 });
+  await expectModeLocked(page, "量產模式");
+  expect(api.jobCancelRequested).toBe(false);
+
+  api.finishJob("success");
+  api.setGatewayOffline(false);
+  await expect(page.getByRole("region", { name: "Engineering Batch Summary" }).locator('[data-kpi="pass"] b')).toHaveText("1", { timeout: 10_000 });
+  await expectModeUnlocked(page, "量產模式");
+  expect(api.jobCancelRequested).toBe(false);
 });

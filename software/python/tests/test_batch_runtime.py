@@ -8,8 +8,9 @@ from typing import Any
 
 from plasma_core.assets import ProgrammingAsset
 from plasma_core.batch import BatchExecutionPolicy, BatchTarget
-from plasma_core.errors import PlasmaError
+from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_web.batch_runtime import BatchRuntimeManager
+from plasma_web.gateway_settings import GatewaySettingsController
 
 
 class FakeBatchProvider:
@@ -18,15 +19,20 @@ class FakeBatchProvider:
         *,
         fail_sites: set[int] | None = None,
         error_sites: set[int] | None = None,
+        error_targets: set[tuple[str, int]] | None = None,
+        transport_failures: dict[tuple[str, int], int] | None = None,
         status_delays: dict[int, float] | None = None,
     ) -> None:
         self.fail_sites = set(fail_sites or set())
         self.error_sites = set(error_sites or set())
+        self.error_targets = set(error_targets or set())
+        self.transport_failures = dict(transport_failures or {})
         self.status_delays = dict(status_delays or {})
         self.jobs: dict[str, dict[str, Any]] = {}
         self.start_log: list[tuple[str, str, int, str, int, int]] = []
         self.cache_log: list[tuple[str, str, str, int]] = []
         self.cancel_log: list[tuple[str, str, str]] = []
+        self.status_log: list[tuple[str, str, int, str]] = []
         self._sequence = 0
         self._lock = threading.Lock()
 
@@ -81,7 +87,7 @@ class FakeBatchProvider:
                 )
             )
             attempts = request.max_retries + 1
-            if request.site_id in self.error_sites:
+            if request.site_id in self.error_sites or (ppu_id, request.site_id) in self.error_targets:
                 state = "error"
                 history = [
                     {
@@ -153,6 +159,14 @@ class FakeBatchProvider:
     async def status(self, facility_id, ppu_id, *, site_id=None, job_id=None):
         if job_id is None:
             return {"ok": True, "sites": []}
+        key = (ppu_id, int(site_id or 0))
+        with self._lock:
+            self.status_log.append((facility_id, ppu_id, int(site_id or 0), str(job_id)))
+            remaining_failures = self.transport_failures.get(key, 0)
+            if remaining_failures > 0:
+                self.transport_failures[key] = remaining_failures - 1
+        if remaining_failures > 0:
+            raise PlasmaError(ErrorCode.CONNECTION_TIMEOUT, f"fake PPU timeout: {ppu_id}", recoverable=True)
         delay = self.status_delays.get(int(site_id or 0), 0.0)
         if delay:
             import asyncio
@@ -298,6 +312,95 @@ class BatchRuntimeTests(unittest.TestCase):
         self.assertEqual(final["faulted_site_count"], 0)
         self.assertEqual(by_site[1]["state"], "error")
         self.assertEqual(by_site[1]["last_failure_source"], "infrastructure")
+
+    def test_infrastructure_error_stops_only_failed_ppu(self):
+        provider = FakeBatchProvider(
+            error_targets={("ppu-1", 1)},
+            status_delays={2: 0.03},
+        )
+        manager = BatchRuntimeManager(provider, poll_interval_s=0.001)
+        self.addCleanup(manager.close)
+        started = manager.create_batch(
+            targets=(
+                BatchTarget("facility-1", "ppu-1", 1),
+                BatchTarget("facility-1", "ppu-1", 2),
+                BatchTarget("facility-1", "ppu-2", 1),
+            ),
+            operations=["erase"],
+            policy=BatchExecutionPolicy(repeat_count=2),
+        )
+
+        final = self.wait_terminal(manager, started["batch_id"])
+        by_target = {(site["ppu_id"], site["site_id"]): site for site in final["sites"]}
+        self.assertEqual(final["state"], "partial")
+        self.assertEqual(final["stop_reason"], "infrastructure_error")
+        self.assertEqual(by_target[("ppu-1", 1)]["state"], "error")
+        self.assertIn(by_target[("ppu-1", 2)]["state"], {"stopped", "success"})
+        self.assertEqual(by_target[("ppu-2", 1)]["state"], "success")
+        self.assertEqual(by_target[("ppu-2", 1)]["completed_rounds"], 2)
+        self.assertTrue(all(ppu_id == "ppu-1" for _, ppu_id, _ in provider.cancel_log))
+
+    def test_transient_ppu_timeout_retries_without_failing_ic(self):
+        provider = FakeBatchProvider(transport_failures={("ppu-1", 1): 2})
+        manager = BatchRuntimeManager(provider, poll_interval_s=0.001, retry_backoff_s=0.001)
+        self.addCleanup(manager.close)
+        started = manager.create_batch(
+            targets=(BatchTarget("facility-1", "ppu-1", 1),),
+            operations=["erase"],
+            policy=BatchExecutionPolicy(),
+        )
+
+        final = self.wait_terminal(manager, started["batch_id"])
+        self.assertEqual(final["state"], "success")
+        self.assertEqual(len(provider.status_log), 3)
+        self.assertEqual(final["sites"][0]["communication_state"], "connected")
+        self.assertEqual(final["faulted_site_count"], 0)
+
+    def test_exhausted_ppu_retries_are_isolated_from_healthy_ppu(self):
+        settings = GatewaySettingsController()
+        settings.update({"ppu_request_timeout_ms": 1_000, "ppu_retry_count": 1})
+        provider = FakeBatchProvider(transport_failures={("ppu-1", 1): 5})
+        manager = BatchRuntimeManager(
+            provider,
+            poll_interval_s=0.001,
+            gateway_settings=settings,
+            retry_backoff_s=0.001,
+        )
+        self.addCleanup(manager.close)
+        started = manager.create_batch(
+            targets=(
+                BatchTarget("facility-1", "ppu-1", 1),
+                BatchTarget("facility-1", "ppu-2", 1),
+            ),
+            operations=["erase"],
+            policy=BatchExecutionPolicy(),
+        )
+
+        final = self.wait_terminal(manager, started["batch_id"])
+        by_ppu = {site["ppu_id"]: site for site in final["sites"]}
+        self.assertEqual(final["state"], "partial")
+        self.assertEqual(by_ppu["ppu-1"]["state"], "error")
+        self.assertEqual(by_ppu["ppu-1"]["last_failure_source"], "infrastructure")
+        self.assertEqual(by_ppu["ppu-2"]["state"], "success")
+        self.assertEqual(len([entry for entry in provider.status_log if entry[1] == "ppu-1"]), 2)
+        self.assertTrue(any(ppu_id == "ppu-1" for _, ppu_id, _ in provider.cancel_log))
+
+    def test_batch_freezes_gateway_settings_revision(self):
+        settings = GatewaySettingsController()
+        provider = FakeBatchProvider(status_delays={1: 0.05})
+        manager = BatchRuntimeManager(provider, poll_interval_s=0.001, gateway_settings=settings)
+        self.addCleanup(manager.close)
+        started = manager.create_batch(
+            targets=(BatchTarget("facility-1", "ppu-1", 1),),
+            operations=["erase"],
+            policy=BatchExecutionPolicy(),
+        )
+        frozen = started["gateway_settings"]
+        settings.update({"ppu_request_timeout_ms": 20_000, "ppu_retry_count": 1})
+
+        final = self.wait_terminal(manager, started["batch_id"])
+        self.assertEqual(final["gateway_settings"], frozen)
+        self.assertEqual(final["gateway_settings"]["revision"], 1)
 
 
 if __name__ == "__main__":

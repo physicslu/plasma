@@ -46,7 +46,7 @@ The Provider boundary owns:
 
 ## Current server-side Mock topology
 
-Each of three Facilities contains four PPUs with heterogeneous Site counts:
+Each of eight Facilities contains four PPUs with heterogeneous Site counts:
 
 ```text
 Facility 01..08
@@ -65,14 +65,61 @@ Total:
 ```
 
 The EMode Batch KPI surface is named **BATCH SUMMARY** and uses the same visible
-SITES / TOTAL IC / RUNNING / PASS / FAIL / YIELD / BATCH TIME vocabulary as
-PMode. PASS and FAIL count IC outcomes, not Sites, and BATCH TIME uses
-`HH:MM:SS`.
+SITES / TOTAL IC / PROCESSED IC / PASS / FAIL / YIELD / BATCH TIME vocabulary
+as PMode. SITES is the checked Batch Site count before START and the immutable
+accepted membership during execution. TOTAL IC is selected Sites multiplied by
+the Mock repeat count. PROCESSED IC is PASS + FAIL; PASS and FAIL count IC
+outcomes, not Sites. YIELD is undefined and displayed as `—` until the first
+IC has a PASS or FAIL result. BATCH TIME uses `HH:MM:SS`.
 
 SYSTEM SETUP and PROGRAMMING JOB are independently collapsible. Collapsing
 SYSTEM SETUP leaves its header only. Collapsing PROGRAMMING JOB hides setup
 fields while preserving START PROGRAMMING / BATCH STATUS / ABORT so an operator
 can still observe or abort active work.
+
+## Shared Gateway communication settings
+
+The operator edits communication policy at:
+
+```text
+EMode -> Settings -> Gateway
+```
+
+The server-owned REST resource is shared by Engineering and Production:
+
+```text
+GET  /api/settings/gateway
+POST /api/settings/gateway
+```
+
+Its authoritative snapshot contains:
+
+```text
+revision
+ppu_request_timeout_ms   default 10000; range 1000..120000
+ppu_retry_count          default 3; range 0..10
+```
+
+The edit surface displays timeout in seconds. Retry delay is 1, 2, then 4
+seconds, with later intervals capped at 4 seconds. A retry count of 3 means one
+original request plus three retries. The default worst-case observation budget
+is approximately `4 * 10 + 1 + 2 + 4 = 47 seconds`.
+
+Gateway settings are persisted under `<output-root>/gateway-settings.yaml`
+unless the service selects another path with `--gateway-settings`. A Production
+Batch freezes the server policy before its first Site Job; Engineering freezes
+its current server-provided policy when START is pressed. Changes apply to
+future Batches and never mutate running execution.
+
+A PPU-specific timeout first reports `RECONNECTING`. When retries are exhausted
+while Gateway liveness remains healthy, only the current Batch Jobs belonging
+to that PPU are cancelled and reconciled. An Engineering workspace targets one
+PPU, so only its selected Jobs are affected. A whole-Gateway outage remains
+`RECONNECTING` and does not infer Job termination or manufacturing FAIL.
+
+Accepted Jobs release the global mode-switch guard only after an authoritative
+terminal Job snapshot. Concurrent status observers share one in-flight request
+per Job to avoid doubling PPU traffic.
 
 Topology exists in Python, not React. Canonical identity is:
 

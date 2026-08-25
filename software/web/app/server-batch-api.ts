@@ -1,5 +1,6 @@
 import type { Operation } from "./plasma-api";
 import type { MockBatchRuntimeSnapshot } from "./mock-runtime-api";
+import type { GatewaySettings } from "./gateway-settings-api";
 import { publishServerBatchSnapshot } from "./server-batch-snapshot-store";
 
 export type ServerBatchState =
@@ -70,6 +71,8 @@ export type BatchSiteSnapshot = {
   faulted_round: number | null;
   faulted_operation: Operation | null;
   last_failure_source: string | null;
+  communication_state?: "connected" | "reconnecting" | "failed";
+  communication_attempt?: number;
   error: { message?: string; error_code?: string; failure_source?: string | null } | null;
   operation_statistics: Partial<Record<Operation, BatchOperationStatistics>>;
 };
@@ -82,6 +85,7 @@ export type ServerBatchSnapshot = {
   finished_at: string | null;
   operations: Operation[];
   execution_policy: BatchExecutionPolicy;
+  gateway_settings?: GatewaySettings;
   target_device: BatchTargetDeviceSnapshot | null;
   asset: {
     name: string;

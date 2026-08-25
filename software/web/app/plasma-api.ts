@@ -159,6 +159,8 @@ export class PlasmaApiError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    readonly errorCode?: string,
+    readonly transient = false,
   ) {
     super(message);
     this.name = "PlasmaApiError";
@@ -182,6 +184,7 @@ const terminalJobStates = new Set<JobState>([
 ]);
 const ppuExecutionListeners = new Set<() => void>();
 const activeExecutionJobs = new Set<string>();
+const inFlightJobSnapshots = new Map<string, Promise<JobSnapshot>>();
 let pendingJobSubmissions = 0;
 let lastExecutionActivityCount = 0;
 
@@ -269,6 +272,8 @@ async function requestJson<T>(
 ): Promise<T> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  const startedAt = Date.now();
+  const method = init?.method ?? "GET";
   try {
     const response = await fetch(`${apiBase}${path}`, {
       ...init,
@@ -285,16 +290,30 @@ async function requestJson<T>(
       const detail = payload.error?.error_code
         ? `${payload.error.error_code}: ${payload.error.message ?? "Plasma REST error"}`
         : payload.error?.message ?? `Plasma REST HTTP ${response.status}`;
-      throw new PlasmaApiError(detail, response.status);
+      const errorCode = payload.error?.error_code;
+      throw new PlasmaApiError(
+        detail,
+        response.status,
+        errorCode,
+        response.status >= 500 || errorCode === "E2001" || errorCode === "E2002",
+      );
     }
     return payload;
   } catch (error) {
     if (error instanceof PlasmaApiError) throw error;
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new PlasmaApiError("Plasma Web REST Gateway 連線逾時");
+      throw new PlasmaApiError(
+        `Plasma Web REST Gateway request timed out · ${method} ${path} · ${Date.now() - startedAt} ms`,
+        undefined,
+        undefined,
+        true,
+      );
     }
     throw new PlasmaApiError(
-      error instanceof Error ? error.message : "無法連接 Plasma Web REST Gateway",
+      `${error instanceof Error ? error.message : "Plasma Web REST Gateway connection failed"} · ${method} ${path} · ${Date.now() - startedAt} ms`,
+      undefined,
+      undefined,
+      true,
     );
   } finally {
     window.clearTimeout(timer);
@@ -303,6 +322,10 @@ async function requestJson<T>(
 
 export async function getEngineeringTargets(apiBase: string): Promise<EngineeringTargetCatalog> {
   return await requestJson<EngineeringTargetCatalog>(apiBase, "/api/engineering/targets");
+}
+
+export async function getGatewayLiveness(apiBase: string, timeoutMs?: number): Promise<void> {
+  await requestJson<{ ok: boolean; gateway: string }>(apiBase, "/api/health/live", undefined, timeoutMs);
 }
 
 export async function beginEngineeringSession(
@@ -406,8 +429,8 @@ async function ensureEngineeringAsset(
   }
 }
 
-export async function getPPUStatus(apiBase: string): Promise<PPUStatus> {
-  const payload = await requestJson<StatusPayload>(apiBase, "/api/status");
+export async function getPPUStatus(apiBase: string, timeoutMs?: number): Promise<PPUStatus> {
+  const payload = await requestJson<StatusPayload>(apiBase, "/api/status", undefined, timeoutMs);
   return {
     ppu: payload.ppu,
     sites: payload.sites ?? [],
@@ -421,14 +444,28 @@ export async function getSites(apiBase: string): Promise<SiteSnapshot[]> {
 export async function getJob(
   apiBase: string,
   jobId: string,
+  timeoutMs?: number,
 ): Promise<JobSnapshot> {
-  const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
-    apiBase,
-    `/api/status?job=${encodeURIComponent(jobId)}`,
-  );
-  const job = normalizeJobSnapshot(payload.job);
-  syncExecutionJob(apiBase, job);
-  return job;
+  const key = executionJobKey(apiBase, jobId);
+  const existing = inFlightJobSnapshots.get(key);
+  if (existing) return await existing;
+  const request = (async () => {
+    const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
+      apiBase,
+      `/api/status?job=${encodeURIComponent(jobId)}`,
+      undefined,
+      timeoutMs,
+    );
+    const job = normalizeJobSnapshot(payload.job);
+    syncExecutionJob(apiBase, job);
+    return job;
+  })();
+  inFlightJobSnapshots.set(key, request);
+  try {
+    return await request;
+  } finally {
+    inFlightJobSnapshots.delete(key);
+  }
 }
 
 export async function startJob(
@@ -442,6 +479,7 @@ export async function startJob(
     offset?: number;
     length?: number;
     targetDevice?: JobTargetDeviceRequest;
+    requestTimeoutMs?: number;
     submissionGuard?: () => boolean;
     onAssetEvent?: (event: AssetTransferEvent) => void;
   },
@@ -511,6 +549,7 @@ export async function startJob(
       apiBase,
       "/api/jobs",
       { method: "POST", body: JSON.stringify(body) },
+      options.requestTimeoutMs,
     );
     const job = normalizeJobSnapshot(payload.job);
     syncExecutionJob(apiBase, job);
@@ -523,6 +562,7 @@ export async function startJob(
 export async function cancelJob(
   apiBase: string,
   jobId: string,
+  timeoutMs?: number,
 ): Promise<void> {
   const key = executionJobKey(apiBase, jobId);
   const wasTracked = activeExecutionJobs.has(key);
@@ -532,6 +572,7 @@ export async function cancelJob(
       apiBase,
       `/api/jobs/${encodeURIComponent(jobId)}/cancel`,
       { method: "POST", body: "{}" },
+      timeoutMs,
     );
   } catch (error) {
     if (!wasTracked) {

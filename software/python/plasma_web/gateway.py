@@ -18,6 +18,7 @@ from . import gateway_legacy as legacy
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .engineering_targets import EngineeringPPUProvider
+from .gateway_settings import GatewaySettingsController
 from .mock_batch_runtime import MockAwareBatchRuntimeManager
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
@@ -40,6 +41,14 @@ def _mock_runtime_payload(settings: dict[str, Any]) -> dict[str, Any]:
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
         "mock_runtime": settings,
+    }
+
+
+def _gateway_settings_payload(settings: dict[str, int]) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "rest_contract_version": WEB_REST_CONTRACT_VERSION,
+        "gateway_settings": settings,
     }
 
 
@@ -192,6 +201,7 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
     """Canonical Plasma Web REST Gateway with server-side Batch orchestration."""
 
     batch_runtime: BatchRuntimeManager | None = None
+    gateway_settings = GatewaySettingsController()
 
     @staticmethod
     def _batch_path(path: str) -> list[str] | None:
@@ -203,6 +213,10 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
     @staticmethod
     def _is_mock_runtime_path(path: str) -> bool:
         return path.rstrip("/") == "/api/mock/runtime"
+
+    @staticmethod
+    def _is_gateway_settings_path(path: str) -> bool:
+        return path.rstrip("/") == "/api/settings/gateway"
 
     @staticmethod
     def _is_device_search_path(path: str) -> bool:
@@ -311,6 +325,13 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if self._is_gateway_settings_path(parsed.path):
+            try:
+                self._json(HTTPStatus.OK, _gateway_settings_payload(self.gateway_settings.current()))
+            except Exception as exc:
+                self._error(exc)
+            return
+
         if self._is_device_search_path(parsed.path):
             try:
                 params = parse_qs(parsed.query, keep_blank_values=True)
@@ -363,6 +384,16 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if self._is_gateway_settings_path(parsed.path):
+            try:
+                self._json(
+                    HTTPStatus.OK,
+                    _gateway_settings_payload(self.gateway_settings.update(self._body())),
+                )
+            except Exception as exc:
+                self._error(exc)
+            return
+
         if self._is_mock_runtime_path(parsed.path):
             try:
                 provider = self._mock_provider()
@@ -457,14 +488,19 @@ def serve(
     output_root: Path = Path("output"),
     engineering_provider: EngineeringPPUProvider | None = None,
     static_root: Path | None = None,
+    gateway_settings_path: Path | None = None,
 ) -> None:
+    settings = GatewaySettingsController(gateway_settings_path or (output_root / "gateway-settings.yaml"))
     PlasmaWebHandler.client_factory = staticmethod(lambda: legacy.PlasmaClient(plasma_host, plasma_port))
     PlasmaWebHandler.engineering_provider = engineering_provider
+    PlasmaWebHandler.gateway_settings = settings
     if isinstance(engineering_provider, SharedImageMockEngineeringPPUProvider):
-        PlasmaWebHandler.batch_runtime = MockAwareBatchRuntimeManager(engineering_provider)
+        PlasmaWebHandler.batch_runtime = MockAwareBatchRuntimeManager(engineering_provider, gateway_settings=settings)
     else:
         PlasmaWebHandler.batch_runtime = (
-            BatchRuntimeManager(engineering_provider) if engineering_provider is not None else None
+            BatchRuntimeManager(engineering_provider, gateway_settings=settings)
+            if engineering_provider is not None
+            else None
         )
     PlasmaWebHandler.allowed_origins = frozenset(cors_origins)
     PlasmaWebHandler.output_root = output_root.resolve()
@@ -490,6 +526,11 @@ def main() -> None:
     parser.add_argument("--plasma-host", default="127.0.0.1")
     parser.add_argument("--plasma-port", type=int, default=9900)
     parser.add_argument("--output-root", type=Path, default=Path("output"))
+    parser.add_argument(
+        "--gateway-settings",
+        type=Path,
+        help="Persistent Gateway communication settings YAML (default: <output-root>/gateway-settings.yaml)",
+    )
     parser.add_argument(
         "--static-root",
         type=Path,
@@ -553,6 +594,7 @@ def main() -> None:
             args.output_root,
             provider,
             args.static_root,
+            args.gateway_settings,
         )
     finally:
         if provider is not None:

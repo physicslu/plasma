@@ -270,8 +270,9 @@ test("unselected Sites stay visible and START PROGRAMMING snapshots only checked
   await page.getByLabel("Repeat Count").fill("2");
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary.getByText("BATCH SUMMARY", { exact: true })).toBeVisible();
-  await expect(summary.locator('[data-kpi="sites"] b')).toHaveText("2");
+  await expect(summary.locator('[data-kpi="sites"] b')).toHaveText("1");
   await expect(summary.locator('[data-kpi="total-ic"] b')).toHaveText("2");
+  await expect(summary.locator('[data-kpi="yield"] b')).toHaveText("—");
   await expect(summary.locator('[data-kpi="batch-time"] b')).toHaveText("00:00:00");
   await expect(page.getByRole("button", { name: "START PROGRAMMING" })).toBeEnabled();
   await page.getByRole("button", { name: "START PROGRAMMING" }).click();
@@ -280,6 +281,7 @@ test("unselected Sites stay visible and START PROGRAMMING snapshots only checked
   expect(submissions.map(item => item.site_id)).toEqual([1, 1]);
   await expect(summary.locator('[data-kpi="pass"] b')).toHaveText("2");
   await expect(summary.locator('[data-kpi="fail"] b')).toHaveText("0");
+  await expect(summary.locator('[data-kpi="processed-ic"] b')).toHaveText("2");
   await expect(summary.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();

@@ -156,7 +156,7 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
   await expect(site2).not.toBeChecked();
   await expect.poll(() => ppuMaster.evaluate((element: HTMLInputElement) => element.indeterminate)).toBe(true);
   await expect(kpis.locator('[data-kpi="total-ic"] b')).toHaveText("1");
-  await expect(kpis.locator('[data-kpi="production-sites"] b')).toHaveText("2");
+  await expect(kpis.locator('[data-kpi="production-sites"] b')).toHaveText("1");
 
   const hide = productionSelection.getByRole("button", { name: /收起|Hide/ });
   await hide.click();

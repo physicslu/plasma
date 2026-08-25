@@ -19,9 +19,11 @@ class BatchWebGatewayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.previous_runtime = PlasmaWebHandler.batch_runtime
+        cls.previous_settings = PlasmaWebHandler.gateway_settings
         cls.provider = FakeBatchProvider()
         cls.runtime = BatchRuntimeManager(cls.provider, poll_interval_s=0.001)
         PlasmaWebHandler.batch_runtime = cls.runtime
+        PlasmaWebHandler.gateway_settings = cls.runtime.gateway_settings
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -33,6 +35,7 @@ class BatchWebGatewayTests(unittest.TestCase):
         cls.thread.join()
         cls.runtime.close()
         PlasmaWebHandler.batch_runtime = cls.previous_runtime
+        PlasmaWebHandler.gateway_settings = cls.previous_settings
 
     def request(self, method: str, path: str, body=None):
         connection = HTTPConnection("127.0.0.1", self.server.server_port)
@@ -81,6 +84,31 @@ class BatchWebGatewayTests(unittest.TestCase):
         self.assertEqual(final["execution_policy"]["repeat_count"], 3)
         self.assertEqual(final["execution_policy"]["site_retry_limit"], 2)
         self.assertEqual(final["site_counts"]["success"], 2)
+        self.assertEqual(final["gateway_settings"]["ppu_request_timeout_ms"], 10_000)
+
+    def test_gateway_settings_endpoint_updates_shared_batch_policy(self):
+        status, payload = self.request("GET", "/api/settings/gateway")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["gateway_settings"]["ppu_retry_count"], 3)
+
+        status, payload = self.request(
+            "POST",
+            "/api/settings/gateway",
+            {"ppu_request_timeout_ms": 15_000, "ppu_retry_count": 2},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["gateway_settings"]["ppu_request_timeout_ms"], 15_000)
+        self.assertEqual(self.runtime.gateway_settings.current()["ppu_retry_count"], 2)
+
+        status, invalid = self.request(
+            "POST",
+            "/api/settings/gateway",
+            {"ppu_request_timeout_ms": 0, "ppu_retry_count": 2},
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(invalid["error"]["error_code"], "E1002")
+
+        self.runtime.gateway_settings.update({"ppu_request_timeout_ms": 10_000, "ppu_retry_count": 3})
 
     def test_batch_resolves_and_freezes_canonical_target_device(self):
         record = get_default_device_catalog().search("ADUC7019BCPZ62I", limit=1)[0]

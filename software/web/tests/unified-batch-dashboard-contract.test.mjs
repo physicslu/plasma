@@ -27,15 +27,15 @@ test("Production and Engineering share neutral operator summary primitives", () 
   assert.doesNotMatch(emode, /ActiveFpsSummary/);
 });
 
-test("Production KPI row separates equipment scope, planned IC quantity, and server execution truth", () => {
-  for (const label of ["SITES", "TOTAL IC", "RUNNING", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
+test("Production KPI row separates equipment scope, planned IC quantity, and processed IC outcomes", () => {
+  for (const label of ["SITES", "TOTAL IC", "PROCESSED IC", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
     assert.match(pmod, new RegExp(`label: \\\"${label}\\\"`));
   }
-  assert.match(pmod, /value:\s*productionSetCounts\.sites/);
+  assert.match(pmod, /value:\s*batchSnapshot\?\.sites\.length \?\? batchCounts\.sites/);
   assert.match(pmod, /batchSnapshot\.sites\.length \* batchSnapshot\.execution_policy\.repeat_count/);
   assert.match(pmod, /value:\s*plannedIcCount/);
   assert.match(pmod, /formatBatchTime\(batchSnapshot, clockNow\)/);
-  assert.match(pmod, /value:\s*batchSnapshot\?\.site_counts\.running \?\? 0/);
+  assert.match(pmod, /label: \"PROCESSED IC\", value: manufacturing\.total/);
   assert.match(pmod, /displayedBatchSelection = serverBatchRunning \? serverBatchMembership : batchSelection/);
   assert.match(operatorCss, /grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\)/);
 });

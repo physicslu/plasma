@@ -168,11 +168,13 @@ test("Production KPI cards update from authoritative Batch rounds while a Site i
 
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
+  await expect(page.locator('[data-kpi="processed-ic"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
   await expect(page.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running");
 
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("1", { timeout: 5_000 });
   await expect(page.locator('[data-kpi="fail"] b')).toHaveText("1", { timeout: 5_000 });
+  await expect(page.locator('[data-kpi="processed-ic"] b')).toHaveText("2", { timeout: 5_000 });
   await expect(page.locator('[data-kpi="yield"] b')).toHaveText("50.0%", { timeout: 5_000 });
   await expect(page.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "faulted");
 });

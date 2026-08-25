@@ -118,12 +118,12 @@ An ABORT never rewrites already established execution facts. Completed successfu
 
 ## Manufacturing KPI contract
 
-The top KPI strip is named **BATCH SUMMARY** and separates equipment scope, planned IC quantity, current Site execution, and adjudicated IC results:
+The top KPI strip is named **BATCH SUMMARY** and separates equipment scope, planned IC quantity, and adjudicated IC results:
 
 ```text
-SITES       committed Production Set Site count
+SITES       accepted current Batch Site count, or current checked Batch Selection before START
 TOTAL IC    current Mock Batch planned quantity = accepted Batch Sites * repeat_count
-RUNNING     Server Batch Runtime `site_counts.running`
+PROCESSED IC  PASS + FAIL, the IC count with an adjudicated manufacturing result
 PASS        sum(Site.completed_rounds), counted as successful ICs
 FAIL        sum(Site.final_failures), counted as retry-exhausted ICs
 YIELD       PASS / (PASS + FAIL)
@@ -140,6 +140,9 @@ Yield        = PASS / Completed IC
 ```
 
 `ERROR`, `STOPPED`, and `CANCELLED` are excluded. Retry attempts are not additional ICs. On an uninterrupted completed Batch, `PASS + FAIL` equals `TOTAL IC`; cancellation, infrastructure error, or early stop may leave planned ICs unfinished.
+
+Before the first PASS or FAIL, Yield is mathematically undefined and the KPI
+displays `—`; neither `0%` nor `100%` is a credible manufacturing result.
 
 The current repeated-round quantity mechanism is Mock-only. Future real production must use an explicit operator/MES Planned IC Quantity and physical next-device handoff rather than assume that rerunning operations on one loaded IC produces another IC.
 
@@ -162,6 +165,20 @@ Target IC is optional when the active Provider is Mock and required for real/non
 The Production mode-switch guard is fail-closed while a non-terminal Batch lease remains in browser session storage. Temporary REST polling failures transition the operator status to `RECONNECTING` and retry observation with bounded backoff instead of abandoning the server-owned Batch.
 
 Every path that receives a terminal Batch snapshot, including ordinary polling, reconnect/restore, immediately terminal creation, and ABORT against an already-finished Batch, performs the same terminal cleanup: clear the stored Batch lease, release execution activity, notify the global navigation store, and stop the old observation generation. `SUCCESS`, `PARTIAL`, `ERROR`, and `CANCELLED` must all restore Production/Engineering mode switching.
+
+The communication policy is configured under `EMode -> Settings -> Gateway`,
+persisted by the Gateway, and frozen into each server Batch snapshot as
+`gateway_settings`. Defaults are a 10-second PPU request timeout and three
+retries with 1/2/4-second backoff. A retrying Site exposes `RECONNECTING` and
+its current retry number without being counted as an IC failure.
+
+Infrastructure faults are isolated to the affected PPU. Its current Batch Jobs
+receive scoped cancellation and unfinished sibling Sites stop, while healthy
+PPUs continue independently. A mixed successful/error outcome terminates as
+`PARTIAL`; if no unaffected PPU completes, the Batch terminates as `ERROR`.
+Only an explicit operator ABORT cancels the complete Batch. Failure to observe
+the Gateway itself remains a reconnecting observation state and cannot be used
+to infer Site failure or Job termination.
 
 Program continues to mean write only. Verify remains an explicit operation.
 

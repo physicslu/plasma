@@ -1,0 +1,133 @@
+.engineeringGatewaySettings {
+  width: min(920px, 100%);
+  display: grid;
+  gap: 18px;
+  color: var(--text);
+}
+
+.gatewaySettingsHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gatewaySettingsHeading small {
+  color: var(--cyan);
+  font: 700 10px var(--font-mono);
+  letter-spacing: .12em;
+}
+
+.gatewaySettingsHeading h1,
+.gatewaySettingsCard h2 {
+  margin: 5px 0 0;
+}
+
+.gatewaySettingsHeading > span {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 10px;
+  color: var(--text-soft);
+  font: 700 10px var(--font-mono);
+}
+
+.engineeringGatewaySettings .gatewaySettingsTabs {
+  display: flex;
+  flex-direction: row;
+  padding: 0;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+
+.engineeringGatewaySettings .gatewaySettingsTabs button {
+  width: auto;
+  border: 0;
+  border-bottom: 2px solid var(--cyan);
+  background: transparent;
+  color: var(--cyan);
+  padding: 10px 16px;
+  font: 700 13px var(--font-sans);
+}
+
+.gatewaySettingsCard {
+  display: grid;
+  gap: 20px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.gatewaySettingsCard header p,
+.gatewaySettingsHint {
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.gatewaySettingsFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.gatewaySettingsFields label {
+  display: grid;
+  gap: 8px;
+}
+
+.gatewaySettingsFields label > span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gatewaySettingsFields label > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gatewaySettingsFields input {
+  width: min(180px, 100%);
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: 600 14px var(--font-mono);
+}
+
+.gatewaySettingsFields small,
+.gatewaySettingsFields label > div > b {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.gatewaySettingsError {
+  color: var(--red, #dc2626);
+}
+
+.gatewaySettingsSaved {
+  color: var(--green, #16a34a);
+}
+
+.gatewaySettingsActions button {
+  padding: 10px 16px;
+  border: 1px solid var(--cyan);
+  border-radius: 7px;
+  background: var(--cyan);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gatewaySettingsActions button:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+@media (max-width: 640px) {
+  .gatewaySettingsFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
