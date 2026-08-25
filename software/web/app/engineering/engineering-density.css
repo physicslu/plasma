@@ -58,3 +58,32 @@
 .engineeringProgrammingV2 .engineeringPolicyRow {
   grid-column: 1 / -1;
 }
+
+/* PASS / FAIL are operator-decision KPIs, not topology metadata. Give them a
+ * stronger label-to-value ratio and a subtle semantic edge so they can be
+ * distinguished at a glance without increasing the KPI strip height. */
+.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"],
+.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] {
+  border-left-width: 4px;
+}
+
+.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"] {
+  border-left-color: #15803d;
+}
+
+.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] {
+  border-left-color: #dc2626;
+}
+
+.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"] small,
+.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] small {
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"] b,
+.engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] b {
+  margin-top: 2px;
+  font-size: 30px;
+  font-weight: 900;
+}
