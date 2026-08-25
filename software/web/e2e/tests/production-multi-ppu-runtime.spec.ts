@@ -4,6 +4,7 @@ const facilityId = process.env.MOCK_CD_PRODUCTION_FACILITY_ID ?? "mock-facility-
 const ppuOne = process.env.MOCK_CD_PRODUCTION_PPU_ONE ?? `${facilityId}-ppu-01`;
 const ppuTwo = process.env.MOCK_CD_PRODUCTION_PPU_TWO ?? `${facilityId}-ppu-02`;
 const gateway = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
+const targetIc = "ADUC7019BCPZ62I";
 const browserJobPath = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/jobs$/;
 
 type RuntimeOperationSettings = {
@@ -53,9 +54,9 @@ function operationCheckbox(page: Page, index: number) {
 
 async function chooseTarget(page: Page) {
   const target = page.getByLabel("Target IC");
-  await target.fill("STM32F103C8T6");
+  await target.fill(targetIc);
   await expect(page.getByRole("listbox", { name: "Target IC search results" })).toBeVisible();
-  await page.getByRole("option", { name: /STM32F103C8T6/ }).click();
+  await page.getByRole("option", { name: new RegExp(targetIc) }).click();
 }
 
 async function openTwoPpuProductionSet(page: Page) {
