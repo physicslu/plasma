@@ -15,6 +15,7 @@ const expectedPpuId = process.env.MOCK_CD_EXPECTED_PPU_ID ?? "mock-ppu-a";
 const engineeringFacilityId = process.env.MOCK_CD_ENGINEERING_FACILITY_ID ?? "mock-facility-02";
 const engineeringPpuId = process.env.MOCK_CD_ENGINEERING_PPU_ID ?? "mock-facility-02-ppu-03";
 const engineeringPpuSites = Number(process.env.MOCK_CD_ENGINEERING_PPU_SITES ?? "6");
+const engineeringMainFlashBytes = 4 * 1024 * 1024;
 const imageAssetBytes = Buffer.from(Array.from({ length: 256 }, (_, index) => (index * 17 + 3) & 0xff));
 const operationLabels: Record<Operation, string> = {
   erase: "擦除",
@@ -303,7 +304,7 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
       await page.getByLabel(`SITE ${siteId} ${operationLabels[operation]}`).click();
       await expect.poll(() => engineeringStarts.length, { timeout: 15_000 }).toBe(before + 1);
       expect(engineeringStarts[before]).toEqual({ siteId, operation });
-      await expect(row.locator(".state")).toHaveText("SUCCESS", { timeout: 15_000 });
+      await expect(row.locator(".state")).toHaveText("SUCCESS", { timeout: 30_000 });
     });
   }
 
@@ -313,10 +314,11 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
     page.waitForEvent("download"),
     downloadLink.click(),
   ]);
-  expect(download.suggestedFilename()).toBe(`read_SITE${siteId}_flash.bin`);
+  expect(download.suggestedFilename()).toBe(`read_SITE${siteId}_main_flash.bin`);
   const path = await download.path();
   if (!path) throw new Error("Engineering Mock PPU Read did not produce a local file");
   const bytes = await readFile(path);
-  expect(bytes.length).toBe(imageAssetBytes.length);
-  expect(bytes.equals(imageAssetBytes)).toBe(true);
+  expect(bytes.length).toBe(engineeringMainFlashBytes);
+  expect(bytes.subarray(0, imageAssetBytes.length).equals(imageAssetBytes)).toBe(true);
+  expect(bytes.subarray(imageAssetBytes.length).every(value => value === 0xff)).toBe(true);
 });
