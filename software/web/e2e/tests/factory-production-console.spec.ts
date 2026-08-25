@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { commitProductionSites } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -201,9 +202,7 @@ async function installFactoryMock(page: Page, options: { runtimeSiteIds?: number
 async function commitTwoSiteProductionSet(page: Page) {
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
-  await page.getByRole("checkbox", { name: `Production Set ${facilityId} ${ppuId} SITE-01` }).check();
-  await page.getByRole("checkbox", { name: `Production Set ${facilityId} ${ppuId} SITE-02` }).check();
-  await page.getByRole("button", { name: "SET PRODUCTION SITES" }).click();
+  await commitProductionSites(page, facilityId, ppuId, [1, 2]);
   await expect(page.getByRole("region", { name: "LIVE SITE STATUS" }).locator(".factorySiteLedCard")).toHaveCount(2);
 }
 

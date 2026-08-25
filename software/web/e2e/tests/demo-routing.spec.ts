@@ -43,7 +43,7 @@ test("demo entry exposes only canonical Product Modes in top-level navigation", 
 
   await production.click();
   await expect(page).toHaveURL(/\/fleet$/);
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
   await expectProductNavigation(page, "量產模式");
 
   // Standard browser CI intentionally does not start the Python Mock PPU

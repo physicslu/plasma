@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { commitProductionSites } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -157,8 +158,7 @@ test("Production KPI cards update from authoritative Batch rounds while a Site i
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
 
-  await page.getByRole("checkbox", { name: `Production Set ${facilityId} ${ppuId} SITE-01` }).check();
-  await page.getByRole("button", { name: "SET PRODUCTION SITES" }).click();
+  await commitProductionSites(page, facilityId, ppuId, [1]);
   const target = page.getByLabel("Target IC");
   await target.fill("STM32F103C8T6");
   await page.getByRole("option", { name: /STM32F103C8T6/ }).click();

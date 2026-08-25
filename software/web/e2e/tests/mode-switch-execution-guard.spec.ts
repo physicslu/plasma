@@ -1,4 +1,12 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  chooseTestTarget,
+  commitProductionSites,
+  factoryConsoleHeading,
+  installTestDeviceCatalog,
+  productionOperation,
+  programmingJob,
+} from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -149,6 +157,7 @@ async function installExecutionApi(page: Page) {
   let activeJobId = "";
   let batchState: MutableBatchState = "running";
   let batchCancelRequested = false;
+  await installTestDeviceCatalog(page);
 
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
@@ -260,19 +269,17 @@ async function expectModeUnlocked(page: Page, linkName: string) {
 test("Pmod server Batch locks Emode through running and stopping until terminal", async ({ page }) => {
   const api = await installExecutionApi(page);
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
+  await commitProductionSites(page, facilityId, ppuId, [1]);
+  await chooseTestTarget(page);
 
-  await page.getByRole("checkbox", { name: `${facilityId} ${ppuId} SITE-01`, exact: true }).check();
-  await page.getByRole("button", { name: "確定選取", exact: true }).click();
-  await expect(page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`)).toBeVisible();
-
-  const toolbar = page.locator(".programmingBatchToolbar");
-  await toolbar.locator(".programmingBatchOperations input").first().check();
-  await expect(toolbar.getByRole("status", { name: "Batch readiness" })).toContainText("BATCH READY");
-  await toolbar.locator(".executeBatchButton").click();
+  const job = programmingJob(page);
+  await productionOperation(page, "E").check();
+  await expect(job.locator(".factoryBatchStatus b")).toHaveText("BATCH READY");
+  await job.locator(".factoryStartButton").click();
 
   await expectModeLocked(page, "工程模式");
-  await toolbar.locator(".cancelBatchButton").click();
+  await job.locator(".factoryAbortButton").click();
   await expect.poll(() => api.batchCancelRequested).toBe(true);
   await expectModeLocked(page, "工程模式");
 

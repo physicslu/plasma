@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { expandProductionTree } from "./production-console-helpers";
 
 const siteCounts = [2, 4, 6, 8] as const;
 
@@ -130,6 +131,7 @@ test("Production Factory Console v2 keeps tree selection, LED status and separat
 
   const productionSelection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
   await expect(productionSelection).toBeVisible();
+  await expandProductionTree(page);
   const ppu1site1 = page.getByRole("checkbox", { name: "Production Set mock-facility-01 mock-facility-01-ppu-01 SITE-01" });
   const ppu1site2 = page.getByRole("checkbox", { name: "Production Set mock-facility-01 mock-facility-01-ppu-01 SITE-02" });
   await ppu1site1.check();

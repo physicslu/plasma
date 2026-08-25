@@ -42,10 +42,19 @@ async function installEmptyEngineeringCatalog(page: import("@playwright/test").P
 test("Pmod image controls precede EPVR and Pmod Emode share persistent Light Dark preference", async ({ page }) => {
   await installEmptyEngineeringCatalog(page);
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
 
-  const imageBox = await page.locator(".productionImagePicker").boundingBox();
-  const operationsBox = await page.locator(".batchOperations").boundingBox();
+  const fieldOrder = await page.locator(".factoryJobGrid").evaluate(element => (
+    Array.from(element.children).map(child => child.className)
+  ));
+  expect(fieldOrder).toEqual([
+    "factoryField targetField",
+    "factoryField imageFieldV2",
+    "factoryField operationField",
+    "factoryField policyField",
+  ]);
+  const imageBox = await page.locator(".imageFieldV2").boundingBox();
+  const operationsBox = await page.locator(".operationField").boundingBox();
   expect(imageBox).not.toBeNull();
   expect(operationsBox).not.toBeNull();
   expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(operationsBox!.y);
@@ -57,7 +66,7 @@ test("Pmod image controls precede EPVR and Pmod Emode share persistent Light Dar
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(theme.getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => page.evaluate(() => localStorage.getItem("plasma-theme"))).toBe("dark");
-  await expect.poll(() => page.locator(".productionPrototypePage").evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgb(7, 17, 29)");
+  await expect.poll(() => page.locator(".factoryConsoleV2").evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgb(7, 17, 29)");
 
   await page.goto("/engineering");
   await expect(page.getByRole("heading", { name: /Engineering/i })).toBeVisible();

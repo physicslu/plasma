@@ -1,4 +1,10 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  commitProductionSites,
+  factoryConsoleHeading,
+  productionOperation,
+  programmingJob,
+} from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppu1Id = `${facilityId}-ppu-01`;
@@ -95,28 +101,23 @@ async function installMockProvider(page: Page) {
   };
 }
 
-function pmodOperation(page: Page, code: "E" | "P" | "V" | "R") {
-  return page.locator(".batchOperations label").filter({ hasText: code }).getByRole("checkbox");
-}
-
 test("Pmod and Emode keep configuration while runtime is re-read from the backend", async ({ page }) => {
   const runtime = await installMockProvider(page);
 
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
-  await page.getByRole("checkbox", { name: `${facilityId} ${ppu1Id} SITE-01` }).check();
-  await page.getByRole("button", { name: "確定選取", exact: true }).click();
-  await expect(page.locator(`[data-production-target="${facilityId}::${ppu1Id}"]`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
+  await commitProductionSites(page, facilityId, ppu1Id, [1]);
+  await expect(page.locator(`[data-production-ppu="${ppu1Id}"]`)).toBeVisible();
 
   await page.getByLabel("Production Programming Image file").setInputFiles({
     name: "shared-mode-state.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]),
   });
-  await pmodOperation(page, "P").check();
-  await pmodOperation(page, "R").check();
-  await page.getByRole("button", { name: "收起選擇器", exact: true }).click();
-  await expect(page.locator(".productionWorkspace")).toHaveClass(/selector-collapsed/);
+  await productionOperation(page, "P").check();
+  await productionOperation(page, "R").check();
+  await page.getByRole("button", { name: /收起|Hide/ }).click();
+  await expect(page.getByRole("region", { name: "PRODUCTION SITE SELECTION" }).locator(".operatorPanelBody")).toBeHidden();
 
   await page.getByRole("link", { name: "工程模式", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Engineering Mode" })).toBeVisible();
@@ -135,14 +136,14 @@ test("Pmod and Emode keep configuration while runtime is re-read from the backen
   await expect(page.getByLabel("Engineering READ length")).toBeHidden();
 
   await page.getByRole("link", { name: "量產模式", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
-  await expect(page.locator(`[data-production-target="${facilityId}::${ppu1Id}"]`)).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator(".productionWorkspace")).toHaveClass(/selector-collapsed/);
-  await expect(page.locator(".productionBatchToolbar .programmingFileName")).toHaveText("shared-mode-state.bin");
-  await expect(pmodOperation(page, "P")).toBeChecked();
-  await expect(pmodOperation(page, "R")).toBeChecked();
-  await expect(pmodOperation(page, "E")).not.toBeChecked();
-  await expect(pmodOperation(page, "V")).not.toBeChecked();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
+  await expect(page.locator(`[data-production-ppu="${ppu1Id}"]`)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("region", { name: "PRODUCTION SITE SELECTION" }).locator(".operatorPanelBody")).toBeHidden();
+  await expect(programmingJob(page).locator(".factoryImageControl span")).toHaveText("shared-mode-state.bin");
+  await expect(productionOperation(page, "P")).toBeChecked();
+  await expect(productionOperation(page, "R")).toBeChecked();
+  await expect(productionOperation(page, "E")).not.toBeChecked();
+  await expect(productionOperation(page, "V")).not.toBeChecked();
 
   await page.getByRole("link", { name: "工程模式", exact: true }).click();
   await expect(page.getByRole("button", { name: "Programming", exact: true })).toHaveAttribute("aria-pressed", "true");

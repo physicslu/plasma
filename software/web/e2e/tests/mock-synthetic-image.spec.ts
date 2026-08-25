@@ -1,4 +1,12 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  chooseTestTarget,
+  commitProductionSites,
+  factoryConsoleHeading,
+  installTestDeviceCatalog,
+  productionOperation,
+  programmingJob,
+} from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -123,6 +131,7 @@ function terminalBatch() {
 
 async function installApi(page: Page) {
   let submittedBatch: Record<string, unknown> | null = null;
+  await installTestDeviceCatalog(page);
 
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
@@ -183,17 +192,15 @@ async function installApi(page: Page) {
 test("Production Mock submits Synthetic Image intent without browser-generated asset bytes", async ({ page }) => {
   const api = await installApi(page);
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
+  await commitProductionSites(page, facilityId, ppuId, [1]);
+  await chooseTestTarget(page);
 
-  await page.getByRole("checkbox", { name: `${facilityId} ${ppuId} SITE-01`, exact: true }).check();
-  await page.getByRole("button", { name: "確定選取", exact: true }).click();
-
-  const toolbar = page.locator(".programmingBatchToolbar");
-  await toolbar.locator(".programmingBatchOperations input").nth(1).check();
-  await expect(toolbar.locator(".programmingFileName")).toHaveText("Mock Synthetic Image");
-  await expect(toolbar.locator(".programmingFileName")).toHaveAttribute("data-image-source", "mock_synthetic");
-  await expect(toolbar.getByRole("status", { name: "Batch readiness" })).toContainText("BATCH READY");
-  await toolbar.locator(".executeBatchButton").click();
+  const job = programmingJob(page);
+  await productionOperation(page, "P").check();
+  await expect(job.locator(".factoryImageControl span")).toHaveText("Mock Synthetic Image");
+  await expect(job.locator(".factoryBatchStatus b")).toHaveText("BATCH READY");
+  await job.locator(".factoryStartButton").click();
 
   await expect.poll(() => api.submittedBatch).not.toBeNull();
   const submitted = api.submittedBatch!;
@@ -201,8 +208,6 @@ test("Production Mock submits Synthetic Image intent without browser-generated a
   expect(submitted.session_id).toBe("0123456789abcdef0123456789abcdef");
   expect(submitted).not.toHaveProperty("asset");
 
-  const hiddenBatchStatistics = page.locator(".serverBatchStatistics");
-  await expect(hiddenBatchStatistics).toHaveAttribute("data-batch-state", "success");
-  await expect(hiddenBatchStatistics).toBeHidden();
-  await expect(page.locator(".programmingFileName")).toHaveAttribute("data-image-source", "mock_synthetic");
+  await expect(job.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expect(job.locator(".factoryImageControl span")).toHaveText("Mock Synthetic Image");
 });
