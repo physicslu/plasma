@@ -21,3 +21,10 @@ export function navigate(href: string): void {
     window.dispatchEvent(new Event(ROUTE_CHANGE_EVENT));
   }
 }
+
+export function replaceRoute(href: string): void {
+  if (href !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+    window.history.replaceState({}, "", href);
+    window.dispatchEvent(new Event(ROUTE_CHANGE_EVENT));
+  }
+}
