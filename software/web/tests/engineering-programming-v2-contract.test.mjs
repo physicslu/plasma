@@ -82,13 +82,13 @@ test("Engineering Target IC is optional but a selected catalog record is sent to
   assert.match(api, /engineeringTarget\s*&&\s*options\.targetDevice/);
 });
 
-test("Engineering policy preserves explicit Retry while Production remains compact", async () => {
+test("Engineering retains explicit Retry while the former Production single-PPU route is retired", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
-  const production = await source("../app/fleet/programming/production-programming-page.tsx");
+  const retiredProductionRoute = await source("../app/fleet/programming/page.tsx");
 
   assert.match(workspace, /Site Retry Limit/);
   assert.match(workspace, /useState\("3"\)/);
-  assert.doesNotMatch(production, /Site Retry Limit/);
+  assert.match(retiredProductionRoute, /redirect\("\/fleet"\)/);
 });
 
 test("Engineering v2 advertises only the implemented binary Programming Image normalizer", async () => {
