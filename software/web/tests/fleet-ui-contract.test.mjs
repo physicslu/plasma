@@ -53,94 +53,98 @@ test("Web source defines ProductMode rather than Fleet as a product-mode value",
   assert.doesNotMatch(nav, /nav\.singlePpu/);
 });
 
-test("Production implementation keeps FPS layout but delegates execution ownership to server Batch", async () => {
+test("Factory Console v2 separates Production Set from next Batch membership", async () => {
   const worker = await workerFor("fleet-page");
   const page = await worker.fetch(new Request("http://localhost/fleet", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(page.status, 200);
   const html = await page.text();
-  assert.match(html, />Factory Production Console</);
-  assert.match(html, /PRODUCTION MODE · SERVER BATCH/);
+  assert.match(html, /PMODE · FACTORY CONSOLE/);
 
   const route = await fs.readFile(new URL("../app/fleet/page.tsx", import.meta.url), "utf8");
-  const source = await fs.readFile(new URL("../app/fleet/server-batch-page.tsx", import.meta.url), "utf8");
-  const dashboardPanels = await fs.readFile(new URL("../app/batch-dashboard-panels.tsx", import.meta.url), "utf8");
-  const dashboardCss = await fs.readFile(new URL("../app/batch-dashboard-panels.css", import.meta.url), "utf8");
+  const source = await fs.readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
+  const workspace = await fs.readFile(new URL("../app/workspace-session.tsx", import.meta.url), "utf8");
+  const css = await fs.readFile(new URL("../app/fleet/factory-console-v2.css", import.meta.url), "utf8");
+  const sharedPanel = await fs.readFile(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
+  const sharedPanelCss = await fs.readFile(new URL("../app/operator-ui/operator-panel.css", import.meta.url), "utf8");
   const batchApi = await fs.readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
-  const css = await fs.readFile(new URL("../app/fleet/production-prototype.css", import.meta.url), "utf8");
-  const serverBatchCss = await fs.readFile(new URL("../app/fleet/server-batch.css", import.meta.url), "utf8");
-  const operatorFeedback = await fs.readFile(new URL("../app/fleet/operator-feedback.css", import.meta.url), "utf8");
-  const batchToolbar = await fs.readFile(new URL("../app/programming-batch-toolbar.css", import.meta.url), "utf8");
 
-  assert.match(route, /server-batch-page/);
-  assert.match(source, /type SelectionMap/);
-  assert.match(source, /draftSelection/);
-  assert.match(source, /activeSelection/);
-  assert.match(source, /clearAll:\s*"全部取消"/);
-  assert.match(source, /apply:\s*"確定選取"/);
-  assert.match(source, /browse:\s*"選擇燒錄檔"/);
-  assert.match(source, /liveStatus:\s*"Active FPS : 即時執行狀態"/);
-  assert.match(source, /fpsSelectorCommandGroup/);
-  assert.match(source, /applyFpsSelection/);
-  assert.match(source, /groupedActiveTargets/);
-  assert.match(source, /data-production-facility/);
-  assert.match(source, /densityFor/);
-  assert.doesNotMatch(source, /setSelectorCollapsed\(true\)/);
-  assert.match(source, /Promise\.allSettled/);
+  assert.match(route, /factory-console-v2/);
+  assert.match(source, /PRODUCTION SITE SELECTION/);
+  assert.match(source, /PROGRAMMING JOB/);
+  assert.match(source, /LIVE SITE STATUS/);
+  assert.match(source, /FACTORY LOG/);
+  assert.match(source, /OperatorKpiStrip/);
+  assert.match(source, /OperatorPanel/);
+  assert.match(sharedPanel, /operatorKpiStrip/);
+  assert.match(sharedPanel, /operatorPanel/);
+  assert.match(sharedPanelCss, /\.operatorPanel/);
+
+  assert.match(workspace, /pmodDraftSelection/);
+  assert.match(workspace, /pmodActiveSelection/);
+  assert.match(workspace, /pmodBatchSelection/);
+  assert.match(workspace, /draft = editable tree intent/);
+  assert.match(workspace, /active = committed Production Set/);
+  assert.match(workspace, /batch = Sites selected for the next\/current immutable Batch snapshot/);
+
+  assert.match(source, /applyProductionSet/);
+  assert.match(source, /setActiveSelection\(snapshot\)/);
+  assert.match(source, /setBatchSelection\(snapshot\)/);
+  assert.match(source, /const batchTargets = useMemo/);
+  assert.match(source, /activeSelection\[facilityId\]\?\.\[ppuId\]/);
+  assert.match(source, /Batch select \$\{active\.target\.display_name\}/);
+  assert.match(source, /Batch select \$\{active\.target\.display_name\} \$\{siteLabel\(site\.id\)\}/);
+  assert.match(source, /disabled=\{batchRunning \|\| !site\.enabled\}/);
+  assert.match(source, /data-batch-selected=\{selected \? "true" : "false"\}/);
+
+  assert.match(source, /<details className="productionTreeFacility"/);
+  assert.match(source, /<details className="productionTreePpu"/);
+  assert.match(source, /aria-expanded=\{!selectorCollapsed\}/);
+  assert.match(css, /\.productionSiteSelection\.is-collapsed \.operatorPanelBody\s*\{\s*display:\s*none;/s);
+
+  assert.match(source, /ICPickerField/);
+  assert.match(source, /if \(!targetDevice\)/);
+  assert.match(source, /targetDevice:\s*\{ vendor: targetDevice\.vendor, identifier: targetDevice\.identifier \}/);
+  assert.match(source, /allowSyntheticMockImage:\s*syntheticMockImageAvailable/);
 
   assert.match(source, /createServerBatch/);
   assert.match(source, /getServerBatch/);
   assert.match(source, /cancelServerBatch/);
-  assert.match(source, /cancelServerBatchPPU/);
-  assert.match(source, /beginBatchExecutionActivity/);
-  assert.match(source, /ACTIVE_BATCH_STORAGE_KEY/);
-  assert.doesNotMatch(source, /runSiteSequence/);
-  assert.doesNotMatch(source, /waitForTerminal/);
-  assert.doesNotMatch(source, /startJob\s*\(/);
-  assert.doesNotMatch(source, /currentJobs/);
+  assert.doesNotMatch(source, /cancelServerBatchPPU/);
+  assert.doesNotMatch(source, /Cancel PPU/);
+  assert.match(source, /only whole-Batch ABORT is allowed/);
+  assert.match(source, /batchSelectionLocked/);
 
-  assert.match(source, /BatchPolicyPanel/);
-  assert.match(dashboardPanels, /aria-label="Repeat Count"/);
-  assert.match(dashboardPanels, /aria-label="Site Retry Limit"/);
-  assert.match(dashboardPanels, /aria-label="Failed Site Stop Threshold"/);
-  assert.match(dashboardPanels, /role="tooltip"/);
-  assert.match(source, /FAULTED — Retry Exhausted/);
-  assert.match(source, /ERROR — Infrastructure/);
-  assert.match(source, /STOPPED — Batch Policy/);
-  assert.match(source, /data-completed-rounds/);
-  assert.match(source, /data-total-attempts/);
-  assert.match(source, /operation_statistics/);
-  assert.match(source, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
-  assert.match(source, /<div className="productionImagePicker programmingBatchFile">[\s\S]*<\/div>\s*\n\s*<div className="batchOperations programmingBatchOperations">/);
-  assert.match(source, /productionBatchActions programmingBatchActions/);
+  const abortFunction = source.slice(source.indexOf("async function abortBatch"), source.indexOf("function stateText"));
+  assert.match(abortFunction, /cancelServerBatch\(/);
+  assert.doesNotMatch(abortFunction, /ppu_id|site_id|cancelServerBatchPPU/);
 
-  assert.match(batchApi, /POST|method:\s*"POST"/);
-  assert.match(batchApi, /"\/api\/batches"/);
-  assert.match(batchApi, /failed_site_stop_threshold/);
-  assert.match(batchApi, /terminalServerBatchStates/);
+  assert.match(source, /site\.completed_rounds/);
+  assert.match(source, /site\.final_failures/);
+  assert.match(source, /const total = pass \+ fail/);
+  assert.doesNotMatch(source.slice(source.indexOf("const manufacturing = useMemo"), source.indexOf("const repeatValue")), /cancelled/);
+  assert.match(source, /label: "PRODUCTION SITES"/);
+  assert.match(source, /label: "SELECTED"/);
+  assert.match(source, /label: "RUNNING"/);
+  assert.match(source, /label: "PASS"/);
+  assert.match(source, /label: "FAIL"/);
+  assert.match(source, /label: "YIELD"/);
+  assert.match(source, /label: "CYCLE TIME"/);
 
-  assert.match(css, /background:\s*#f5f8fc/);
-  assert.match(css, /--site-tile-w/);
+  assert.match(css, /--site-card-w/);
   assert.match(css, /density-dense/);
-  assert.match(css, /width:\s*var\(--site-tile-w\)/);
-  assert.match(css, /height:\s*var\(--site-tile-h\)/);
-  assert.match(operatorFeedback, /grid-template-columns:\s*repeat\(4,\s*var\(--site-tile-w\)\)/);
-  assert.match(operatorFeedback, /--ppu-card-w/);
-  assert.match(operatorFeedback, /production-site-running-pulse/);
-  assert.match(operatorFeedback, /\.prototypeSiteLamp\.running i/);
-  assert.match(operatorFeedback, /\.fpsSelectionSummary\s*\{\s*display:\s*none;/s);
-  assert.match(operatorFeedback, /content:\s*"Cancel All"/);
-  assert.match(operatorFeedback, /content:\s*"Confirm"/);
-  assert.match(batchToolbar, /grid-template-areas:\s*"file file"\s*"operations actions"/);
-  assert.match(batchToolbar, /\.programmingBatchOperations\s*\{[\s\S]*justify-self:\s*start/);
-  assert.match(batchToolbar, /\.programmingFileName\s*\{[\s\S]*font-size:\s*13px/);
-  assert.match(batchToolbar, /\.programmingBatchFile::before\s*\{[\s\S]*content:\s*"Programming Image"/);
-  assert.match(operatorFeedback, /\.facilityRuntimeIdentity h3\s*\{[^}]*font-weight:\s*800;/s);
-  assert.match(dashboardCss, /\.unifiedBatchPolicyPanel/);
-  assert.match(dashboardCss, /\.unifiedBatchPolicyPanel::before\s*\{[\s\S]*content:\s*"Batch Policy"/);
-  assert.match(serverBatchCss, /\.serverBatchStatistics/);
-  assert.match(serverBatchCss, /\.prototypeSiteLamp\.faulted i/);
-  assert.match(serverBatchCss, /\.prototypeSiteLamp\.error i/);
-  assert.match(serverBatchCss, /\.prototypeSiteLamp\.stopped i/);
+  assert.match(css, /grid-template-columns:\s*repeat\(auto-fill, var\(--site-card-w\)\)/);
+  assert.match(css, /factorySiteLed\[data-state="ready"\]/);
+  assert.match(css, /factorySiteLed\[data-state="running"\]/);
+  assert.match(css, /factorySiteLed\[data-state="success"\]/);
+  assert.match(css, /factorySiteLed\[data-state="faulted"\]/);
+  assert.match(css, /factorySiteLed\[data-state="disabled"\]/);
+  assert.match(css, /background:\s*#38bdf8/); // READY is not PASS green.
+  assert.match(css, /background:\s*#f59e0b/); // RUNNING amber.
+  assert.match(css, /background:\s*#22c55e/); // PASS green.
+  assert.match(css, /background:\s*#ef4444/); // FAIL red.
+
+  assert.match(batchApi, /"\/api\/batches"/);
+  assert.match(batchApi, /terminalServerBatchStates/);
 
   const api = await worker.fetch(new Request("http://localhost/api/fleet", { headers: { accept: "application/json" } }), env, ctx);
   assert.equal(api.status, 404);
