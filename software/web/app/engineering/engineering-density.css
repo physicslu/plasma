@@ -52,16 +52,74 @@
   padding: 6px 7px;
 }
 
-/* Batch Policy is one compact desktop control row. Spanning the complete
- * Programming Job grid prevents Repeat / Retry / Stop Policy from splitting
- * across two visual rows while narrow layouts can still stack responsively. */
-.engineeringProgrammingV2 .engineeringPolicyRow {
-  grid-column: 1 / -1;
+/* The shared Programming toolbar owns a file/operations/actions grid-area
+ * contract for PMode. Engineering Programming is a different workspace and
+ * must explicitly neutralize that grid-area contract. Otherwise the generic
+ * toolbar areas override the Engineering 2x2 job layout and create the large
+ * empty column seen after PR #124. */
+@container engineering-programming (min-width: 981px) {
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: none;
+    grid-auto-flow: row;
+    align-content: start;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .jobRow:first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .jobRow:nth-child(2) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingBatchOperations {
+    grid-area: auto;
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 126px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringPolicyRow {
+    grid-area: auto;
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 112px max-content max-content minmax(118px, max-content);
+    gap: 10px 12px;
+    align-items: center;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringReadRow {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .batchReadiness {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: center;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: center;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar:has(> .engineeringReadRow) > .batchReadiness,
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar:has(> .engineeringReadRow) > .programmingActions {
+    grid-row: 4;
+  }
 }
 
-/* PASS / FAIL are operator-decision KPIs, not topology metadata. Give them a
- * stronger label-to-value ratio and a subtle semantic edge so they can be
- * distinguished at a glance without increasing the KPI strip height. */
+/* PASS / FAIL are operator-decision KPIs, not topology metadata. Keep their
+ * footprint unchanged but give them a stronger semantic field than a single
+ * edge line so they remain identifiable in peripheral vision. */
 .engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"],
 .engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] {
   border-left-width: 4px;
@@ -69,10 +127,12 @@
 
 .engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"] {
   border-left-color: #15803d;
+  background: color-mix(in srgb, #15803d 7%, var(--panel));
 }
 
 .engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="fail"] {
   border-left-color: #dc2626;
+  background: color-mix(in srgb, #dc2626 7%, var(--panel));
 }
 
 .engineeringProgrammingV2 .productionProgrammingKpis [data-kpi="pass"] small,
