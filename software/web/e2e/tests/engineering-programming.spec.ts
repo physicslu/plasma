@@ -121,7 +121,7 @@ test("Engineering Programming topology comes from the Python target catalog", as
 
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });
-  await expect(facility.locator("option")).toHaveCount(3);
+  await expect(facility.locator("option")).toHaveCount(8);
   await expect(ppu.locator("option")).toHaveCount(4);
   await expect(facility.locator("option").first()).toHaveText("Server Facility 01");
 
@@ -184,7 +184,7 @@ test("same-URL Connect creates a new session and restores Facility PPU Site topo
   });
 
   await openProgramming(page);
-  await expect(page.getByLabel("Engineering Facility", { exact: true }).locator("option")).toHaveCount(3);
+  await expect(page.getByLabel("Engineering Facility", { exact: true }).locator("option")).toHaveCount(8);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
   const sessionsBefore = sessionRequests;
@@ -195,7 +195,7 @@ test("same-URL Connect creates a new session and restores Facility PPU Site topo
   await expect.poll(() => sessionRequests).toBeGreaterThan(sessionsBefore);
   await expect.poll(() => catalogRequests).toBeGreaterThan(catalogsBefore);
   await expect.poll(() => statusRequests).toBeGreaterThan(statusesBefore);
-  await expect(page.getByLabel("Engineering Facility", { exact: true }).locator("option")).toHaveCount(3);
+  await expect(page.getByLabel("Engineering Facility", { exact: true }).locator("option")).toHaveCount(8);
   await expect(page.getByLabel("Engineering PPU", { exact: true }).locator("option")).toHaveCount(4);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   expect(previousSessionIds.at(-1)).toBe(String(sessionsBefore).padStart(32, "0"));
