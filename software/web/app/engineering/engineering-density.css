@@ -99,21 +99,37 @@
     grid-row: 3;
   }
 
+  /* Readiness is a compact status line. The destructive/execute controls own
+   * the complete row below it so both operator actions can use the maximum
+   * available width without competing with status chrome. */
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .batchReadiness {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 3;
+    justify-self: start;
     align-self: center;
   }
 
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions {
-    grid-column: 2;
-    grid-row: 3;
+    grid-column: 1 / -1;
+    grid-row: 4;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
     align-self: center;
   }
 
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar:has(> .engineeringReadRow) > .batchReadiness,
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar:has(> .engineeringReadRow) > .programmingActions {
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions > button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar:has(> .engineeringReadRow) > .batchReadiness {
     grid-row: 4;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar:has(> .engineeringReadRow) > .programmingActions {
+    grid-row: 5;
   }
 }
 
