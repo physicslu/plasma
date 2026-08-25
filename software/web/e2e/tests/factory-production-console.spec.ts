@@ -250,7 +250,7 @@ test("START snapshots Batch membership; running selection is locked and only who
   expect(mock.submissions[0].target_device).toEqual({ vendor: "STMicroelectronics", identifier: "STM32F103C8T6" });
 
   const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
-  await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01" })).toBeDisabled();
+  await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01", exact: true })).toBeDisabled();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeDisabled();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).toBeDisabled();
   await expect(page.getByText("Cancel PPU", { exact: true })).toHaveCount(0);

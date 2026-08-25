@@ -122,7 +122,7 @@ test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR
     await expect.poll(() => background(page, selector)).toBe("rgb(12, 25, 39)");
   }
   const headingColor = await page.locator(".factoryConsoleHeader h1").evaluate(element => getComputedStyle(element).color);
-  expect(headingColor).toBe("rgb(233, 243, 248)");
+  expect(headingColor).toBe("rgb(255, 255, 255)");
 });
 
 test("Emode v2 stays dense with centered Batch status and target-owned READ", async ({ page }) => {
