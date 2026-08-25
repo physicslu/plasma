@@ -6,9 +6,20 @@ Production Mode owns one Factory Console at `/fleet`. The console uses the same 
 
 The browser remains a client of the server-owned Batch runtime. This redesign does not move Batch scheduling, retry, cancellation, or terminal truth into React.
 
-## Three distinct selection scopes
+## Responsibility model
 
-Production must not use one checkbox state for three different meanings.
+Production uses three authoritative responsibility domains:
+
+```text
+Equipment Scope         -> Production Set
+Operator's Batch Intent -> Batch Selection
+Execution Truth         -> Server Batch Runtime
+```
+
+`Draft Selection` is only transient browser edit state used to prepare a
+Production Set. It is not an authoritative production or execution domain.
+
+The browser must not use one checkbox state for different meanings:
 
 ```text
 Draft Selection
@@ -21,13 +32,18 @@ Production Set
 
 Batch Selection
     -> operator selects a subset of the Production Set
-    -> START snapshots this membership once
-    -> immutable for the active Batch
+
+Server Batch Runtime
+    -> START submits a Batch Selection snapshot
+    -> accepted Server Batch snapshot owns active membership and state
+    -> immutable execution truth for the active Batch
 ```
 
 The durable Site identity remains `(facility_id, ppu_id, site_id)`.
 
-The Batch Selection is always constrained to the committed Production Set. A Site outside the Production Set cannot be inserted into a Batch by browser state.
+The Batch Selection is always constrained to the committed Production Set. A Site outside the Production Set cannot be inserted into a Batch by browser state. Server Batch snapshots may reconstruct missing browser context after reconnection, but normal runtime updates must not rewrite the operator's Batch Selection or the committed Production Set.
+
+While a Batch is active, LIVE SITE STATUS and the `SELECTED` KPI display the membership returned by Server Batch Runtime. After the Batch reaches a terminal state, those controls return to the retained operator Batch Selection for preparation of the next Batch.
 
 ## Production Site Selection
 
@@ -76,7 +92,7 @@ READY must not be presented as PASS green.
 
 Before START, the operator may change PPU and Site Batch Selection freely within the Production Set.
 
-`START PROGRAMMING` snapshots the selected membership exactly once and submits that immutable target set to the server Batch runtime.
+`START PROGRAMMING` snapshots the selected membership exactly once and submits that target set to the server. After acceptance, membership, lifecycle state, counters, cancellation state, and terminal result come only from the Server Batch Runtime snapshot.
 
 While Batch state is `QUEUED`, `RUNNING`, or `STOPPING`:
 
@@ -97,8 +113,8 @@ The top KPI strip separates equipment scope from Batch intent:
 
 ```text
 PRODUCTION SITES  committed Production Set Site count
-SELECTED          next/current Batch membership count
-RUNNING           currently running Site count
+SELECTED          operator Batch Selection before START; Server Batch membership while active
+RUNNING           Server Batch Runtime `site_counts.running`
 PASS              sum(Site.completed_rounds)
 FAIL              sum(Site.final_failures)
 YIELD             PASS / (PASS + FAIL)

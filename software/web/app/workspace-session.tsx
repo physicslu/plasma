@@ -20,6 +20,8 @@ import {
 } from "./plasma-api";
 
 export type SelectionMap = Record<string, Record<string, number[]>>;
+export type ProductionSet = SelectionMap;
+export type BatchSelection = SelectionMap;
 export type TargetSelection = { facilityId: string; ppuId: string };
 export type EngineeringSection =
   | "overview"
@@ -53,10 +55,10 @@ type WorkspaceSessionContextValue = {
 
   pmodDraftSelection: SelectionMap;
   setPmodDraftSelection: Dispatch<SetStateAction<SelectionMap>>;
-  pmodActiveSelection: SelectionMap;
-  setPmodActiveSelection: Dispatch<SetStateAction<SelectionMap>>;
-  pmodBatchSelection: SelectionMap;
-  setPmodBatchSelection: Dispatch<SetStateAction<SelectionMap>>;
+  pmodProductionSet: ProductionSet;
+  setPmodProductionSet: Dispatch<SetStateAction<ProductionSet>>;
+  pmodBatchSelection: BatchSelection;
+  setPmodBatchSelection: Dispatch<SetStateAction<BatchSelection>>;
   pmodOperations: Operation[];
   setPmodOperations: Dispatch<SetStateAction<Operation[]>>;
   pmodSelectorCollapsed: boolean;
@@ -94,12 +96,12 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
 
   const [programmingImage, setProgrammingImage] = useState<File | null>(null);
 
-  // Production deliberately owns three different scopes:
-  // draft = editable tree intent, active = committed Production Set,
-  // batch = Sites selected for the next/current immutable Batch snapshot.
+  // Production deliberately keeps the three responsibility domains separate:
+  // draft = transient tree edit state, Production Set = committed equipment scope,
+  // Batch Selection = operator intent. Server Batch Runtime remains server-owned.
   const [pmodDraftSelection, setPmodDraftSelection] = useState<SelectionMap>({});
-  const [pmodActiveSelection, setPmodActiveSelection] = useState<SelectionMap>({});
-  const [pmodBatchSelection, setPmodBatchSelection] = useState<SelectionMap>({});
+  const [pmodProductionSet, setPmodProductionSet] = useState<ProductionSet>({});
+  const [pmodBatchSelection, setPmodBatchSelection] = useState<BatchSelection>({});
   const [pmodOperations, setPmodOperations] = useState<Operation[]>([]);
   const [pmodSelectorCollapsed, setPmodSelectorCollapsed] = useState(false);
 
@@ -199,8 +201,8 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     setProgrammingImage,
     pmodDraftSelection,
     setPmodDraftSelection,
-    pmodActiveSelection,
-    setPmodActiveSelection,
+    pmodProductionSet,
+    setPmodProductionSet,
     pmodBatchSelection,
     setPmodBatchSelection,
     pmodOperations,
@@ -230,7 +232,7 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     clearSessionAuditEntries,
     programmingImage,
     pmodDraftSelection,
-    pmodActiveSelection,
+    pmodProductionSet,
     pmodBatchSelection,
     pmodOperations,
     pmodSelectorCollapsed,

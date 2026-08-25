@@ -357,7 +357,9 @@
 .factoryBatchStatus b { color: #172033; font-size: 9px; }
 .factoryBatchStatus.state-running,
 .factoryBatchStatus.state-queued,
-.factoryBatchStatus.state-stopping { border-color: #f3ba55; background: #fff9e9; }
+.factoryBatchStatus.state-stopping,
+.factoryBatchStatus.state-submitting,
+.factoryBatchStatus.state-aborting { border-color: #f3ba55; background: #fff9e9; }
 .factoryBatchStatus.state-success { border-color: #78d69a; background: #f1fbf4; }
 .factoryBatchStatus.state-error,
 .factoryBatchStatus.state-partial { border-color: #f0a0a0; background: #fff4f4; }

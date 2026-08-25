@@ -80,17 +80,24 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(sharedPanelCss, /\.operatorPanel/);
 
   assert.match(workspace, /pmodDraftSelection/);
-  assert.match(workspace, /pmodActiveSelection/);
+  assert.match(workspace, /pmodProductionSet/);
   assert.match(workspace, /pmodBatchSelection/);
-  assert.match(workspace, /draft = editable tree intent/);
-  assert.match(workspace, /active = committed Production Set/);
-  assert.match(workspace, /batch = Sites selected for the next\/current immutable Batch snapshot/);
+  assert.match(workspace, /ProductionSet = SelectionMap/);
+  assert.match(workspace, /BatchSelection = SelectionMap/);
+  assert.match(workspace, /draft = transient tree edit state/);
+  assert.match(workspace, /Production Set = committed equipment scope/);
+  assert.match(workspace, /Batch Selection = operator intent/);
+  assert.match(workspace, /Server Batch Runtime remains server-owned/);
 
   assert.match(source, /applyProductionSet/);
-  assert.match(source, /setActiveSelection\(snapshot\)/);
+  assert.match(source, /setProductionSet\(snapshot\)/);
   assert.match(source, /setBatchSelection\(snapshot\)/);
   assert.match(source, /const batchTargets = useMemo/);
-  assert.match(source, /activeSelection\[facilityId\]\?\.\[ppuId\]/);
+  assert.match(source, /productionSet\[facilityId\]\?\.\[ppuId\]/);
+  assert.match(source, /const serverBatchState = batchSnapshot\?\.state \?\? null/);
+  assert.match(source, /displayedBatchSelection = serverBatchRunning \? serverBatchMembership : batchSelection/);
+  assert.match(source, /batchSnapshot\?\.site_counts\.running \?\? 0/);
+  assert.doesNotMatch(source, /setBatchState/);
   assert.match(source, /Batch select \$\{active\.target\.display_name\}/);
   assert.match(source, /Batch select \$\{active\.target\.display_name\} \$\{siteLabel\(site\.id\)\}/);
   assert.match(source, /disabled=\{batchRunning \|\| !site\.enabled\}/);

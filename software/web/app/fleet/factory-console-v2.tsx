@@ -37,7 +37,7 @@ import ProductionLogPanel, { type ProductionLogEntry } from "./production-log-pa
 import "./factory-console-v2.css";
 
 type SiteRunState = ServerBatchSiteState;
-type BatchUiState = "idle" | ServerBatchState;
+type BatchCommandState = "idle" | "submitting" | "aborting";
 type LogEntry = ProductionLogEntry;
 
 type SiteRuntime = {
@@ -66,7 +66,7 @@ type PPURuntime = {
   error?: string;
 };
 
-type ActiveTarget = {
+type ProductionTarget = {
   key: string;
   facility: EngineeringFacilityTarget;
   target: EngineeringPPUTarget;
@@ -352,8 +352,8 @@ export default function FactoryConsoleV2() {
     setProgrammingImage: setImageAsset,
     pmodDraftSelection: draftSelection,
     setPmodDraftSelection: setDraftSelection,
-    pmodActiveSelection: activeSelection,
-    setPmodActiveSelection: setActiveSelection,
+    pmodProductionSet: productionSet,
+    setPmodProductionSet: setProductionSet,
     pmodBatchSelection: batchSelection,
     setPmodBatchSelection: setBatchSelection,
     pmodOperations: selectedOperations,
@@ -367,9 +367,8 @@ export default function FactoryConsoleV2() {
   const [runtimes, setRuntimes] = useState<Record<string, PPURuntime>>({});
   const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
   const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
-  const [batchState, setBatchState] = useState<BatchUiState>("idle");
+  const [batchCommandState, setBatchCommandState] = useState<BatchCommandState>("idle");
   const [batchSnapshot, setBatchSnapshot] = useState<ServerBatchSnapshot | null>(null);
-  const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [repeatCount, setRepeatCount] = useState("1");
   const [siteRetryLimit, setSiteRetryLimit] = useState("3");
   const [failedSiteThreshold, setFailedSiteThreshold] = useState("");
@@ -379,7 +378,7 @@ export default function FactoryConsoleV2() {
   const logSequence = useRef(0);
   const activityReleaseRef = useRef<(() => void) | null>(null);
   const pollGenerationRef = useRef(0);
-  const initialActiveSelection = useRef(activeSelection);
+  const initialProductionSet = useRef(productionSet);
   const initialBatchSelection = useRef(batchSelection);
 
   const appendLog = useCallback((message: string, level: LogEntry["level"] = "INFO") => {
@@ -403,13 +402,12 @@ export default function FactoryConsoleV2() {
 
   const applyBatchSnapshot = useCallback((next: ServerBatchSnapshot, sourceCatalog: EngineeringTargetCatalog) => {
     setBatchSnapshot(next);
-    setBatchState(next.state);
-    setActiveBatchId(next.batch_id);
     const snapshotMembership = selectionFromBatch(next);
-    setBatchSelection(snapshotMembership);
-    // A normal Batch never rewrites the committed Production Set. The fallback
-    // only reconstructs a minimal Set when reconnecting in a fresh browser session.
-    setActiveSelection(current => selectionCounts(current).sites > 0 ? current : snapshotMembership);
+    // Server Batch Runtime is execution truth. It must not rewrite operator
+    // Batch Selection. These fallbacks only reconstruct browser context when a
+    // fresh tab reconnects to an already-active server Batch.
+    setBatchSelection(current => selectionCounts(current).sites > 0 ? current : snapshotMembership);
+    setProductionSet(current => selectionCounts(current).sites > 0 ? current : snapshotMembership);
     setDraftSelection(current => selectionCounts(current).sites > 0 ? current : snapshotMembership);
 
     setRuntimes(current => {
@@ -440,7 +438,7 @@ export default function FactoryConsoleV2() {
       }
       return merged;
     });
-  }, [setActiveSelection, setBatchSelection, setDraftSelection]);
+  }, [setBatchSelection, setDraftSelection, setProductionSet]);
 
   const pollServerBatch = useCallback(async (batchId: string, sourceCatalog: EngineeringTargetCatalog, generation: number) => {
     let previousState: ServerBatchState | null = null;
@@ -544,7 +542,7 @@ export default function FactoryConsoleV2() {
           }
         }
 
-        const restoredSet = normalizeSelection(cloneSelection(initialActiveSelection.current));
+        const restoredSet = normalizeSelection(cloneSelection(initialProductionSet.current));
         if (selectionCounts(restoredSet).sites > 0) {
           await loadSelectionRuntimes(nextCatalog, restoredSet);
           if (selectionCounts(initialBatchSelection.current).sites === 0) setBatchSelection(restoredSet);
@@ -565,45 +563,45 @@ export default function FactoryConsoleV2() {
     };
   }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, ensureEngineeringSession, loadSelectionRuntimes, pollServerBatch, setBatchSelection, workspaceHydrated]);
 
-  const batchRunning = batchState === "queued" || batchState === "running" || batchState === "stopping";
+  const serverBatchState = batchSnapshot?.state ?? null;
+  const serverBatchRunning = serverBatchState === "queued" || serverBatchState === "running" || serverBatchState === "stopping";
+  const batchSubmitting = batchCommandState === "submitting";
+  const batchAborting = batchCommandState === "aborting";
+  const batchRunning = serverBatchRunning || batchSubmitting || batchAborting;
   const draftCounts = useMemo(() => selectionCounts(draftSelection), [draftSelection]);
-  const activeCounts = useMemo(() => selectionCounts(activeSelection), [activeSelection]);
+  const productionSetCounts = useMemo(() => selectionCounts(productionSet), [productionSet]);
   const batchCounts = useMemo(() => selectionCounts(batchSelection), [batchSelection]);
+  const serverBatchMembership = useMemo(
+    () => batchSnapshot ? selectionFromBatch(batchSnapshot) : {},
+    [batchSnapshot],
+  );
+  const displayedBatchSelection = serverBatchRunning ? serverBatchMembership : batchSelection;
+  const displayedBatchCounts = useMemo(
+    () => selectionCounts(displayedBatchSelection),
+    [displayedBatchSelection],
+  );
 
-  const activeTargets = useMemo<ActiveTarget[]>(() => {
+  const productionTargets = useMemo<ProductionTarget[]>(() => {
     if (!catalog) return [];
     return catalog.facilities.flatMap(facility => facility.ppus.flatMap(target => {
-      const siteIds = activeSelection[facility.facility_id]?.[target.ppu_id] ?? [];
+      const siteIds = productionSet[facility.facility_id]?.[target.ppu_id] ?? [];
       return siteIds.length ? [{ key: targetKey(facility.facility_id, target.ppu_id), facility, target, siteIds }] : [];
     }));
-  }, [activeSelection, catalog]);
+  }, [catalog, productionSet]);
 
-  const batchTargets = useMemo<ActiveTarget[]>(() => activeTargets.flatMap(active => {
+  const batchTargets = useMemo<ProductionTarget[]>(() => productionTargets.flatMap(active => {
     const allowed = new Set(active.siteIds);
     const selected = (batchSelection[active.facility.facility_id]?.[active.target.ppu_id] ?? []).filter(siteId => allowed.has(siteId));
     return selected.length ? [{ ...active, siteIds: selected }] : [];
-  }), [activeTargets, batchSelection]);
+  }), [batchSelection, productionTargets]);
 
-  const groupedActiveTargets = useMemo(() => {
+  const groupedProductionTargets = useMemo(() => {
     if (!catalog) return [];
     return catalog.facilities.map(facility => ({
       facility,
-      targets: activeTargets.filter(active => active.facility.facility_id === facility.facility_id),
+      targets: productionTargets.filter(active => active.facility.facility_id === facility.facility_id),
     })).filter(group => group.targets.length > 0);
-  }, [activeTargets, catalog]);
-
-  const runtimeSummary = useMemo(() => {
-    const sites = Object.values(runtimes).flatMap(runtime => runtime.sites);
-    const count = (state: SiteRunState) => sites.filter(site => site.state === state).length;
-    return {
-      running: count("running"),
-      success: count("success"),
-      faulted: count("faulted"),
-      error: count("error"),
-      stopped: count("stopped"),
-      cancelled: count("cancelled"),
-    };
-  }, [runtimes]);
+  }, [catalog, productionTargets]);
 
   const manufacturing = useMemo(() => {
     if (!batchSnapshot) return { pass: 0, fail: 0, total: 0, yieldPercent: 0 };
@@ -647,14 +645,26 @@ export default function FactoryConsoleV2() {
     readSelected: selectedOperations.includes("read"),
     readParamsValid: true,
     allSitesExecutable,
-    batchRunning: batchState === "queued" || batchState === "running",
-    batchCancelling: batchState === "stopping",
+    batchRunning: serverBatchState === "queued" || serverBatchState === "running" || batchSubmitting,
+    batchCancelling: serverBatchState === "stopping" || batchAborting,
   });
+  const batchStatusState = batchSubmitting
+    ? "submitting"
+    : batchAborting
+      ? "aborting"
+      : serverBatchState ?? "idle";
+  const batchStatusLabel = batchSubmitting
+    ? "SUBMITTING"
+    : batchAborting
+      ? "ABORTING"
+      : serverBatchState
+        ? serverBatchState.toUpperCase()
+        : batchReadiness.label;
 
   const kpis = [
-    { key: "production-sites", label: "PRODUCTION SITES", value: activeCounts.sites },
-    { key: "selected", label: "SELECTED", value: batchCounts.sites },
-    { key: "running", label: "RUNNING", value: runtimeSummary.running },
+    { key: "production-sites", label: "PRODUCTION SITES", value: productionSetCounts.sites },
+    { key: "selected", label: "SELECTED", value: displayedBatchCounts.sites },
+    { key: "running", label: "RUNNING", value: batchSnapshot?.site_counts.running ?? 0 },
     { key: "pass", label: "PASS", value: manufacturing.pass, tone: "pass" as const },
     { key: "fail", label: "FAIL", value: manufacturing.fail, tone: "fail" as const },
     { key: "yield", label: "YIELD", value: `${manufacturing.yieldPercent.toFixed(1)}%`, tone: "info" as const },
@@ -710,11 +720,10 @@ export default function FactoryConsoleV2() {
   async function applyProductionSet() {
     if (!catalog || !draftCounts.sites || batchRunning) return;
     const snapshot = normalizeSelection(cloneSelection(draftSelection));
-    setActiveSelection(snapshot);
+    setProductionSet(snapshot);
     setBatchSelection(snapshot);
-    setBatchState("idle");
+    setBatchCommandState("idle");
     setBatchSnapshot(null);
-    setActiveBatchId(null);
     setOperatorWarning(null);
     clearStoredBatch();
     appendLog(`[SET] COMMIT · ${selectionCounts(snapshot).facilities} Facilities · ${selectionCounts(snapshot).ppus} PPUs · ${selectionCounts(snapshot).sites} Sites`);
@@ -726,7 +735,7 @@ export default function FactoryConsoleV2() {
       setOperatorWarning(text.batchSelectionLocked);
       return;
     }
-    const allowed = new Set(activeSelection[facilityId]?.[ppuId] ?? []);
+    const allowed = new Set(productionSet[facilityId]?.[ppuId] ?? []);
     const filtered = siteIds.filter(siteId => allowed.has(siteId));
     setBatchSelection(current => normalizeSelection({
       ...current,
@@ -734,12 +743,12 @@ export default function FactoryConsoleV2() {
     }));
   }
 
-  function toggleBatchPpu(active: ActiveTarget) {
+  function toggleBatchPpu(active: ProductionTarget) {
     const current = batchSelection[active.facility.facility_id]?.[active.target.ppu_id] ?? [];
     setBatchPpuSites(active.facility.facility_id, active.target.ppu_id, current.length === active.siteIds.length ? [] : active.siteIds);
   }
 
-  function toggleBatchSite(active: ActiveTarget, siteId: number) {
+  function toggleBatchSite(active: ProductionTarget, siteId: number) {
     const current = batchSelection[active.facility.facility_id]?.[active.target.ppu_id] ?? [];
     setBatchPpuSites(active.facility.facility_id, active.target.ppu_id, current.includes(siteId) ? current.filter(id => id !== siteId) : [...current, siteId]);
   }
@@ -782,7 +791,7 @@ export default function FactoryConsoleV2() {
 
     setOperatorWarning(null);
     beginActivity();
-    setBatchState("queued");
+    setBatchCommandState("submitting");
     appendLog(`[BAT] SUBMIT · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")} · Target ${targetDevice.icpn ?? targetDevice.identifier}`);
     try {
       const accepted = await createServerBatch(apiBase, {
@@ -797,6 +806,7 @@ export default function FactoryConsoleV2() {
         readLength: 256,
       });
       applyBatchSnapshot(accepted, catalog);
+      setBatchCommandState("idle");
       writeStoredBatch(apiBase, accepted.batch_id);
       const generation = ++pollGenerationRef.current;
       appendLog(`[BAT] ACCEPTED · ${accepted.batch_id}`);
@@ -806,7 +816,7 @@ export default function FactoryConsoleV2() {
       });
     } catch (error) {
       endActivity();
-      setBatchState("idle");
+      setBatchCommandState("idle");
       const detail = error instanceof Error ? error.message : "Batch submission failed";
       setOperatorWarning(detail);
       appendLog(`[BAT] SUBMISSION ERROR · ${detail}`, "ERROR");
@@ -814,14 +824,17 @@ export default function FactoryConsoleV2() {
   }
 
   async function abortBatch() {
-    if (!activeBatchId || !batchRunning || batchState === "stopping") return;
-    setBatchState("stopping");
+    const activeBatchId = batchSnapshot?.batch_id;
+    if (!activeBatchId || !serverBatchRunning || serverBatchState === "stopping" || batchAborting) return;
+    setBatchCommandState("aborting");
     appendLog(`[BAT] ABORT REQUESTED · ${activeBatchId}`, "WARN");
     try {
       const next = await cancelServerBatch(apiBase, activeBatchId);
       if (catalog) applyBatchSnapshot(next, catalog);
     } catch (error) {
       appendLog(`[BAT] ABORT ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
+    } finally {
+      setBatchCommandState("idle");
     }
   }
 
@@ -855,7 +868,7 @@ export default function FactoryConsoleV2() {
               number={1}
               title={text.productionSelection}
               className={`productionSiteSelection ${selectorCollapsed ? "is-collapsed" : ""}`}
-              meta={`${text.productionSet}: ${activeCounts.sites} Sites / ${activeCounts.ppus} PPUs`}
+              meta={`${text.productionSet}: ${productionSetCounts.sites} Sites / ${productionSetCounts.ppus} PPUs`}
               actions={(
                 <button
                   type="button"
@@ -1003,11 +1016,11 @@ export default function FactoryConsoleV2() {
 
               <div className="factoryActionBar">
                 <button type="button" className="factoryStartButton" onClick={() => void executeBatch()} disabled={!batchReadiness.ready || !policyValid}>▶ {text.start}</button>
-                <div className={`factoryBatchStatus state-${batchState}`} role="status" aria-label={text.batchStatus}>
+                <div className={`factoryBatchStatus state-${batchStatusState}`} role="status" aria-label={text.batchStatus}>
                   <small>{text.batchStatus}</small>
-                  <b>{batchRunning ? String(batchState).toUpperCase() : batchReadiness.label}</b>
+                  <b>{batchStatusLabel}</b>
                 </div>
-                <button type="button" className="factoryAbortButton" onClick={() => void abortBatch()} disabled={!batchRunning || batchState === "stopping"}>■ {text.abort}</button>
+                <button type="button" className="factoryAbortButton" onClick={() => void abortBatch()} disabled={!serverBatchRunning || serverBatchState === "stopping" || batchAborting}>■ {text.abort}</button>
               </div>
             </OperatorPanel>
 
@@ -1016,8 +1029,8 @@ export default function FactoryConsoleV2() {
             <OperatorPanel
               number={3}
               title={text.liveStatus}
-              className={`factoryLiveStatus density-${densityFor(activeCounts.sites)}`}
-              meta={`${text.liveHint} · Selected ${batchCounts.sites}/${activeCounts.sites}`}
+              className={`factoryLiveStatus density-${densityFor(productionSetCounts.sites)}`}
+              meta={`${text.liveHint} · Selected ${displayedBatchCounts.sites}/${productionSetCounts.sites}`}
             >
               <div className="factoryLegend" aria-label="Site status legend">
                 <span><i data-state="ready" /> READY</span>
@@ -1029,15 +1042,15 @@ export default function FactoryConsoleV2() {
                 <span><i data-state="disabled" /> DISABLED</span>
               </div>
 
-              {!activeCounts.sites ? <div className="factoryEmptySet">{text.noProductionSet}</div> : (
+              {!productionSetCounts.sites ? <div className="factoryEmptySet">{text.noProductionSet}</div> : (
                 <div className="factoryFacilityStack">
-                  {groupedActiveTargets.map(group => (
+                  {groupedProductionTargets.map(group => (
                     <section className="factoryFacilityGroup" key={group.facility.facility_id} data-production-facility={group.facility.facility_id}>
                       <header><b>{group.facility.display_name}</b><span>{group.targets.length} PPUs</span></header>
                       <div className="factoryPpuRows">
                         {group.targets.map(active => {
                           const runtime = runtimes[active.key];
-                          const selectedSiteIds = batchSelection[active.facility.facility_id]?.[active.target.ppu_id] ?? [];
+                          const selectedSiteIds = displayedBatchSelection[active.facility.facility_id]?.[active.target.ppu_id] ?? [];
                           const selectedSet = new Set(selectedSiteIds);
                           const allSelected = active.siteIds.length > 0 && selectedSiteIds.length === active.siteIds.length;
                           const partialSelected = selectedSiteIds.length > 0 && selectedSiteIds.length < active.siteIds.length;

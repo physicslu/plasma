@@ -60,7 +60,7 @@ function siteCounts(sites: Array<{ state: string }>) {
   return Object.fromEntries(states.map(state => [state, sites.filter(site => site.state === state).length]));
 }
 
-async function installFactoryMock(page: Page) {
+async function installFactoryMock(page: Page, options: { runtimeSiteIds?: number[] } = {}) {
   const submissions: BatchRequest[] = [];
   let request: BatchRequest | null = null;
   let cancelled = false;
@@ -68,7 +68,9 @@ async function installFactoryMock(page: Page) {
 
   function snapshot() {
     if (!request) throw new Error("Batch not submitted");
-    const membership = request.targets.flatMap(target => target.site_ids.map(siteId => ({
+    const membership = request.targets.flatMap(target => target.site_ids
+      .filter(siteId => !options.runtimeSiteIds || options.runtimeSiteIds.includes(siteId))
+      .map(siteId => ({
       facility_id: target.facility_id,
       ppu_id: target.ppu_id,
       site_id: siteId,
@@ -266,4 +268,32 @@ test("START snapshots Batch membership; running selection is locked and only who
 
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeEnabled();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).toBeEnabled();
+});
+
+test("active membership and RUNNING KPI follow Server Batch Runtime instead of operator Batch Selection", async ({ page }) => {
+  const mock = await installFactoryMock(page, { runtimeSiteIds: [1] });
+  await commitTwoSiteProductionSet(page);
+  await chooseTarget(page);
+
+  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
+  await programming.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox").check();
+  await programming.getByRole("button", { name: /START PROGRAMMING/ }).click();
+
+  await expect.poll(() => mock.submissions.length).toBe(1);
+  expect(mock.submissions[0].targets).toEqual([{ facility_id: facilityId, ppu_id: ppuId, site_ids: [1, 2] }]);
+
+  const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
+  await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
+  await expect(page.locator('[data-kpi="selected"] b')).toHaveText("1");
+  await expect(page.locator('[data-kpi="running"] b')).toHaveText("1");
+  await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeChecked();
+  await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).not.toBeChecked();
+  await expect(live.locator('[data-production-site="1"]')).toHaveAttribute("data-batch-selected", "true");
+  await expect(live.locator('[data-production-site="2"]')).toHaveAttribute("data-batch-selected", "false");
+
+  await programming.getByRole("button", { name: /ABORT/ }).click();
+  await expect(page.locator(".factoryBatchStatus b")).toHaveText("CANCELLED");
+  await expect(page.locator('[data-kpi="selected"] b')).toHaveText("2");
+  await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeChecked();
+  await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).toBeChecked();
 });

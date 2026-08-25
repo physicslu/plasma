@@ -403,8 +403,8 @@ const dashboardCopy = locale === "zh-TW" ? {
     setProgrammingImage: setImageAsset,
     pmodDraftSelection: draftSelection,
     setPmodDraftSelection: setDraftSelection,
-    pmodActiveSelection: activeSelection,
-    setPmodActiveSelection: setActiveSelection,
+    pmodProductionSet: productionSet,
+    setPmodProductionSet: setProductionSet,
     pmodOperations: selectedOperations,
     setPmodOperations: setSelectedOperations,
     pmodSelectorCollapsed: selectorCollapsed,
@@ -425,7 +425,7 @@ const dashboardCopy = locale === "zh-TW" ? {
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
-  const initialActiveSelection = useRef(activeSelection);
+  const initialProductionSet = useRef(productionSet);
   const activityReleaseRef = useRef<(() => void) | null>(null);
   const pollGenerationRef = useRef(0);
 
@@ -453,7 +453,7 @@ const dashboardCopy = locale === "zh-TW" ? {
     setBatchState(next.state);
     setActiveBatchId(next.batch_id);
     const nextSelection = selectionFromBatch(next);
-    setActiveSelection(nextSelection);
+    setProductionSet(current => selectionCounts(current).sites > 0 ? current : nextSelection);
     setDraftSelection(nextSelection);
 
     setRuntimes(current => {
@@ -475,7 +475,7 @@ const dashboardCopy = locale === "zh-TW" ? {
       }
       return nextRuntimes;
     });
-  }, [setActiveSelection, setDraftSelection]);
+  }, [setDraftSelection, setProductionSet]);
 
   const pollServerBatch = useCallback(async (
     batchId: string,
@@ -590,7 +590,7 @@ const dashboardCopy = locale === "zh-TW" ? {
           }
         }
 
-        const restoredSelection = normalizeSelection(cloneSelection(initialActiveSelection.current));
+        const restoredSelection = normalizeSelection(cloneSelection(initialProductionSet.current));
         if (selectionCounts(restoredSelection).sites > 0) {
           await loadSelectionRuntimes(nextCatalog, restoredSelection);
           if (!stopped) appendLog(`[FPS] RESTORED · ${selectionCounts(restoredSelection).facilities} Facilities · ${selectionCounts(restoredSelection).ppus} PPUs · ${selectionCounts(restoredSelection).sites} Sites`);
@@ -612,16 +612,16 @@ const dashboardCopy = locale === "zh-TW" ? {
 
   const batchRunning = batchState === "queued" || batchState === "running" || batchState === "stopping";
   const draftCounts = useMemo(() => selectionCounts(draftSelection), [draftSelection]);
-  const activeCounts = useMemo(() => selectionCounts(activeSelection), [activeSelection]);
+  const activeCounts = useMemo(() => selectionCounts(productionSet), [productionSet]);
 
   const activeTargets = useMemo<ActiveTarget[]>(() => {
     if (!catalog) return [];
     return catalog.facilities.flatMap(facility => facility.ppus.flatMap(target => {
-      const siteIds = activeSelection[facility.facility_id]?.[target.ppu_id] ?? [];
+      const siteIds = productionSet[facility.facility_id]?.[target.ppu_id] ?? [];
       if (siteIds.length === 0) return [];
       return [{ key: targetKey(facility.facility_id, target.ppu_id), facility, target, siteIds }];
     }));
-  }, [activeSelection, catalog]);
+  }, [catalog, productionSet]);
 
   const groupedActiveTargets = useMemo(() => {
     if (!catalog) return [];
@@ -739,7 +739,7 @@ const dashboardCopy = locale === "zh-TW" ? {
   async function applyFpsSelection() {
     if (!catalog || draftCounts.sites === 0 || batchRunning) return;
     const snapshot = normalizeSelection(cloneSelection(draftSelection));
-    setActiveSelection(snapshot);
+    setProductionSet(snapshot);
     setBatchState("idle");
     setBatchSnapshot(null);
     setActiveBatchId(null);
