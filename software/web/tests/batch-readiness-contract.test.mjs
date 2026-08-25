@@ -52,18 +52,20 @@ test("Production and Engineering v2 share programming control vocabulary without
   assert.doesNotMatch(emode, /BatchTopologySummary/);
 });
 
-test("Emode shell density protects the Programming viewport with the full-height sidebar", async () => {
+test("Emode shell density protects the Programming viewport with centered Batch status", async () => {
   const css = await read("engineering/engineering-density.css");
   const v2Css = await read("engineering/programming-workspace-v2.css");
   const refreshCss = await read("engineering/engineering-workspace-refresh.css");
 
   assert.match(css, /\.engineeringShell\s*\{[\s\S]*padding:\s*0;[\s\S]*gap:\s*0/);
   assert.match(css, /\.engineeringCanvas\.programmingActive\s*\{[\s\S]*padding:\s*10px 12px 18px/);
-  assert.match(css, /\.programmingJobBody\.programmingBatchToolbar\s*\{[\s\S]*grid-template-areas:\s*none/);
-  assert.match(css, /> \.engineeringPolicyRow\s*\{[\s\S]*grid-column:\s*2;[\s\S]*grid-row:\s*2/);
-  assert.match(css, /> \.batchReadiness\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*3/);
-  assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*4;[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(css, /> \.programmingActions > button\s*\{[\s\S]*width:\s*100%/);
+  assert.match(css, /\.programmingJobBody\.programmingBatchToolbar\s*\{[\s\S]*grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)[\s\S]*grid-template-areas:\s*none/);
+  assert.match(css, /> \.engineeringPolicyRow\s*\{[\s\S]*grid-column:\s*4\s*\/\s*7;[\s\S]*grid-row:\s*2/);
+  assert.match(css, /> \.engineeringReadRow\s*\{[\s\S]*display:\s*none/);
+  assert.match(css, /> \.batchReadiness\s*\{[\s\S]*grid-column:\s*3\s*\/\s*5;[\s\S]*grid-row:\s*3/);
+  assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*3;[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*180px\s*minmax\(0,\s*1fr\)/);
+  assert.match(css, /> \.programmingActions > button:first-child\s*\{[\s\S]*grid-column:\s*1;[\s\S]*width:\s*100%/);
+  assert.match(css, /> \.programmingActions > button:last-child\s*\{[\s\S]*grid-column:\s*3;[\s\S]*width:\s*100%/);
   assert.match(css, /\[data-kpi="pass"\][\s\S]*border-left-color:\s*#15803d[\s\S]*background:\s*color-mix/);
   assert.match(css, /\[data-kpi="fail"\][\s\S]*border-left-color:\s*#dc2626[\s\S]*background:\s*color-mix/);
   assert.match(css, /\[data-kpi="pass"\] b,[\s\S]*\[data-kpi="fail"\] b[\s\S]*font-size:\s*30px/);
