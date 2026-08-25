@@ -1,0 +1,106 @@
+.operatorKpiStrip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.operatorKpiStrip article {
+  min-width: 0;
+  min-height: 54px;
+  padding: 7px 9px;
+  border: 1px solid var(--line, #d4dee8);
+  border-radius: 7px;
+  background: var(--panel, #fff);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .04);
+}
+
+.operatorKpiStrip small,
+.operatorKpiStrip b {
+  display: block;
+}
+
+.operatorKpiStrip small {
+  color: var(--text-soft, #425466);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .035em;
+}
+
+.operatorKpiStrip b {
+  margin-top: 4px;
+  color: var(--text, #172033);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.operatorKpiStrip article[data-tone="info"] b { color: #2563eb; }
+.operatorKpiStrip article[data-tone="pass"] { background: #f2fbf5; }
+.operatorKpiStrip article[data-tone="pass"] b { color: #16803a; }
+.operatorKpiStrip article[data-tone="fail"] { background: #fff4f4; }
+.operatorKpiStrip article[data-tone="fail"] b { color: #dc2626; }
+
+.operatorPanel {
+  min-width: 0;
+  border: 1px solid var(--line, #d4dee8);
+  border-radius: 7px;
+  background: var(--panel, #fff);
+  overflow: visible;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, .04);
+}
+
+.operatorPanelHeader {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line, #d4dee8);
+  border-radius: 7px 7px 0 0;
+  background: linear-gradient(180deg, #f4f7f9, #eaf0f4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.operatorPanelTitle {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.operatorPanelTitle > span,
+.operatorPanelTitle > strong {
+  color: var(--text, #172033);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.operatorPanelTitle > small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft, #51606f);
+  font-size: 8px;
+}
+
+.operatorPanelActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.operatorPanelBody {
+  min-width: 0;
+  padding: 9px;
+}
+
+@media (max-width: 1050px) {
+  .operatorKpiStrip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .operatorKpiStrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operatorPanelHeader { align-items: flex-start; }
+  .operatorPanelTitle { flex-wrap: wrap; }
+}
