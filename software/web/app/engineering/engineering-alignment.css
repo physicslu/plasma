@@ -4,13 +4,14 @@
  * engineering-readability.css and the approved desktop structure remains in
  * engineering-workspace-refresh.css / engineering-density.css.
  *
- * Desktop/tablet rule: keep a stable 128 px label rail, right-align the label,
- * and reduce the visual hand-off to the control to 8 px. This produces a clear
- * vertical control baseline without adding rows or changing the action layout.
+ * Desktop/tablet rule: keep a compact 112 px label rail, right-align the label,
+ * and keep the visual hand-off to the control at 8 px. The shorter rail pulls
+ * the entire field group 16 px toward the left edge of each section column
+ * without adding rows or changing the action layout.
  */
 @container engineering-programming (min-width: 761px) {
   html .engineeringProgrammingV2 .targetingCard .workflowField {
-    grid-template-columns: 128px minmax(0, 1fr);
+    grid-template-columns: 112px minmax(0, 1fr);
     gap: 8px;
   }
 
@@ -21,7 +22,7 @@
   }
 
   html .engineeringProgrammingV2 .programmingJobBody > .jobRow {
-    grid-template-columns: 128px minmax(0, 1fr);
+    grid-template-columns: 112px minmax(0, 1fr);
     gap: 8px;
   }
 
@@ -33,16 +34,16 @@
 }
 
 /* The desktop density layer has higher-specificity grid ownership for these
- * two rows, so repeat the same 128 px / 8 px alignment contract here after it
+ * two rows, so repeat the same 112 px / 8 px alignment contract here after it
  * in the cascade. */
 @container engineering-programming (min-width: 981px) {
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingBatchOperations {
-    grid-template-columns: 128px minmax(0, 1fr);
+    grid-template-columns: 112px minmax(0, 1fr);
     gap: 8px;
   }
 
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringPolicyRow {
-    grid-template-columns: 128px max-content max-content minmax(118px, max-content);
+    grid-template-columns: 112px max-content max-content minmax(118px, max-content);
     gap: 8px;
   }
 }

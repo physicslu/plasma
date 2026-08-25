@@ -80,19 +80,21 @@ async function rowMetrics(page: Page, selector: string, index: number) {
     const children = Array.from(row.children);
     const label = children[0] as HTMLElement;
     const control = children[1] as HTMLElement;
+    const rowBox = row.getBoundingClientRect();
     const labelBox = label.getBoundingClientRect();
     const controlBox = control.getBoundingClientRect();
     const style = getComputedStyle(label);
     return {
       gap: controlBox.left - labelBox.right,
       controlX: controlBox.left,
+      controlOffset: controlBox.left - rowBox.left,
       textAlign: style.textAlign,
       justifySelf: style.justifySelf,
     };
   });
 }
 
-test("Engineering labels sit close to controls on a shared desktop baseline", async ({ page }) => {
+test("Engineering labels sit close to controls and field groups stay near section edges", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await installMockProvider(page);
   await page.goto("/engineering");
@@ -109,6 +111,8 @@ test("Engineering labels sit close to controls on a shared desktop baseline", as
   for (const metric of [facility, ppu, target, image, operations, policy]) {
     expect(metric.gap).toBeGreaterThanOrEqual(6);
     expect(metric.gap).toBeLessThanOrEqual(10);
+    expect(metric.controlOffset).toBeGreaterThanOrEqual(118);
+    expect(metric.controlOffset).toBeLessThanOrEqual(122);
     expect(metric.textAlign).toBe("right");
     expect(metric.justifySelf).toBe("end");
   }

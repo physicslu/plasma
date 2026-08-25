@@ -14,12 +14,12 @@ test("Engineering desktop labels use a compact right-aligned control rail", asyn
 
   for (const contract of [
     "@container engineering-programming (min-width: 761px)",
-    ".targetingCard .workflowField {\n    grid-template-columns: 128px minmax(0, 1fr);\n    gap: 8px;",
+    ".targetingCard .workflowField {\n    grid-template-columns: 112px minmax(0, 1fr);\n    gap: 8px;",
     ".targetingCard .workflowField > span {\n    justify-self: end;\n    text-align: right;",
-    ".programmingJobBody > .jobRow {\n    grid-template-columns: 128px minmax(0, 1fr);\n    gap: 8px;",
+    ".programmingJobBody > .jobRow {\n    grid-template-columns: 112px minmax(0, 1fr);\n    gap: 8px;",
     ".programmingJobBody > .jobRow > strong {\n    justify-self: end;\n    text-align: right;",
-    ".programmingBatchOperations {\n    grid-template-columns: 128px minmax(0, 1fr);\n    gap: 8px;",
-    ".engineeringPolicyRow {\n    grid-template-columns: 128px max-content max-content minmax(118px, max-content);\n    gap: 8px;",
+    ".programmingBatchOperations {\n    grid-template-columns: 112px minmax(0, 1fr);\n    gap: 8px;",
+    ".engineeringPolicyRow {\n    grid-template-columns: 112px max-content max-content minmax(118px, max-content);\n    gap: 8px;",
   ]) {
     assert.ok(css.includes(contract), `missing alignment contract: ${contract}`);
   }
