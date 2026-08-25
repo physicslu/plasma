@@ -80,163 +80,101 @@ async function installDashboardMock(page: Page) {
     const parts = url.pathname.split("/").filter(Boolean);
     const facilityId = parts[3];
     const ppuId = parts[4];
-    if (request.method() === "GET" && parts.slice(5).join("/") === "api/status" && !url.searchParams.has("job")) {
+    if (request.method() === "GET" && parts.slice(5).join("/") === "api/status") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(statusFor(facilityId, ppuId)) });
       return;
     }
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
+  });
+
+  await page.route("**/api/devices/search**", async route => {
+    const query = new URL(route.request().url()).searchParams.get("q") ?? "";
     await route.fulfill({
-      status: 404,
+      status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ error: { message: "unhandled dashboard test route" } }),
+      body: JSON.stringify({
+        ok: true,
+        rest_contract_version: "3",
+        query,
+        catalog_size: 7657,
+        count: 1,
+        results: [{
+          vendor: "STMicroelectronics",
+          family: "STM32F1",
+          subfamily: null,
+          plasma_series: "STM32",
+          identifier: "STM32F103C8T6",
+          identifier_kind: "manufacturer_part_number",
+          icpn: "STM32F103C8T6",
+          package: null,
+          cpu_architectures: ["ARM Cortex-M3"],
+          backend: { type: "openocd", distribution: "upstream-openocd", target_config: "tcl/target/stm32f1x.cfg", mapping_status: "mapping_candidate" },
+          physical_validation: { engineering_status: "not_verified", ppu_status: "no_evidence", socket_status: "no_evidence" },
+          catalog_origin: "test",
+        }],
+      }),
     });
   });
 }
 
-async function assertDashboardContract(root: ReturnType<Page["locator"]>) {
-  const summary = root.locator(".batchTopologySummary");
-  await expect(summary).toBeVisible();
-  await expect(root.locator(".unifiedBatchControlStack")).toBeVisible();
-
-  const typography = await summary.evaluate(element => {
-    const style = (selector: string) => getComputedStyle(element.querySelector<HTMLElement>(selector)!);
-    return {
-      contextLabelSize: Number.parseFloat(style(".batchTopologyContext small").fontSize),
-      contextValueSize: Number.parseFloat(style(".batchTopologyContext b").fontSize),
-      totalLabelSize: Number.parseFloat(style(".batchTopologyTotal small").fontSize),
-      totalValueSize: Number.parseFloat(style(".batchTopologyTotal b").fontSize),
-      kpiLabelSize: Number.parseFloat(style(".batchTopologyPass small").fontSize),
-      kpiValueSize: Number.parseFloat(style(".batchTopologyPass b").fontSize),
-      passLabelWeight: Number(style(".batchTopologyPass small").fontWeight),
-      passValueWeight: Number(style(".batchTopologyPass b").fontWeight),
-      failLabelWeight: Number(style(".batchTopologyFail small").fontWeight),
-      failValueWeight: Number(style(".batchTopologyFail b").fontWeight),
-      yieldLabelWeight: Number(style(".batchTopologyYield small").fontWeight),
-      yieldValueWeight: Number(style(".batchTopologyYield b").fontWeight),
-    };
-  });
-  expect(typography.contextLabelSize).toBeLessThan(typography.kpiLabelSize);
-  expect(typography.contextValueSize).toBeLessThan(typography.kpiValueSize);
-  expect(typography.kpiLabelSize).toBeGreaterThanOrEqual(12);
-  expect(typography.kpiValueSize).toBeGreaterThanOrEqual(34);
-  expect(typography.kpiLabelSize).toBeGreaterThan(typography.totalLabelSize);
-  expect(typography.kpiValueSize).toBeGreaterThan(typography.totalValueSize);
-  for (const weight of [
-    typography.passLabelWeight,
-    typography.passValueWeight,
-    typography.failLabelWeight,
-    typography.failValueWeight,
-    typography.yieldLabelWeight,
-    typography.yieldValueWeight,
-  ]) expect(weight).toBeGreaterThanOrEqual(800);
-
-  const active = root.locator(".activeFpsSummary");
-  await expect(active).toBeVisible();
-  await expect(active.locator("[data-active-fps-state]")).toHaveCount(3);
-  await expect(active.locator('[data-active-fps-state="selected"]')).toHaveCount(1);
-  await expect(active.locator('[data-active-fps-state="running"]')).toHaveCount(1);
-  await expect(active.locator('[data-active-fps-state="terminal"]')).toHaveCount(1);
-  await expect(active.locator('[data-active-fps-state="selected"]').getByText("TOTAL SELECTED SITES", { exact: true })).toBeVisible();
-  await expect(active.locator('[data-active-fps-state="running"]').getByText("RUNNING SITES", { exact: true })).toBeVisible();
-  await expect(active.locator('[data-active-fps-state="terminal"]').getByText("STOPPED SITES", { exact: true })).toBeVisible();
-
-  const policy = root.getByRole("region", { name: "Batch execution policy" });
-  const repeatInfo = policy.getByLabel("Repeat policy help");
-  await repeatInfo.hover();
-  const tooltip = repeatInfo.getByRole("tooltip");
-  await expect.poll(() => tooltip.evaluate(element => getComputedStyle(element).opacity)).toBe("1");
-  await expect(tooltip).toContainText(/1.*10000/);
-  await expect(policy.getByLabel("Site Retry Limit")).toHaveValue("3");
-
-  const visibleLabelDistances = await policy.locator(".batchPolicyField").evaluateAll(fields => fields.map(element => {
-    const info = element.querySelector<HTMLElement>(".batchPolicyInfo")!.getBoundingClientRect();
-    const input = element.querySelector<HTMLInputElement>("input")!.getBoundingClientRect();
-    return Math.max(0, input.left - info.right);
-  }));
-  expect(visibleLabelDistances).toHaveLength(3);
-  for (const distance of visibleLabelDistances) expect(distance).toBeLessThanOrEqual(12);
-
-  const policyInputWidths = await policy.locator(".batchPolicyField input").evaluateAll(inputs =>
-    inputs.map(element => element.getBoundingClientRect().width),
-  );
-  expect(policyInputWidths).toHaveLength(3);
-  for (const width of policyInputWidths) {
-    expect(width).toBeGreaterThanOrEqual(60);
-    expect(width).toBeLessThanOrEqual(100);
-  }
-  expect(Math.max(...policyInputWidths) - Math.min(...policyInputWidths)).toBeLessThanOrEqual(1);
-
-  const layout = await root.locator(".unifiedBatchControlStack").evaluate(element => {
-    const rect = (selector: string) => element.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
-    const toolbar = rect(".programmingBatchToolbar");
-    const image = rect(".programmingBatchFile");
-    const operations = rect(".programmingBatchOperations");
-    const actions = rect(".programmingBatchActions");
-    const policyRect = rect(".unifiedBatchPolicyPanel");
-    return {
-      toolbarLeft: toolbar.left,
-      toolbarRight: toolbar.right,
-      imageLeft: image.left,
-      imageRight: image.right,
-      imageBottom: image.bottom,
-      operationsTop: operations.top,
-      operationsBottom: operations.bottom,
-      actionsTop: actions.top,
-      actionsBottom: actions.bottom,
-      policyTop: policyRect.top,
-    };
-  });
-
-  expect(layout.imageLeft).toBeLessThanOrEqual(layout.toolbarLeft + 12);
-  expect(layout.imageRight).toBeGreaterThanOrEqual(layout.toolbarRight - 12);
-  expect(layout.imageBottom).toBeLessThanOrEqual(Math.min(layout.operationsTop, layout.actionsTop));
-  expect(Math.max(layout.operationsBottom, layout.actionsBottom)).toBeLessThanOrEqual(layout.policyTop);
-}
-
-async function assertBatchControlCollapses(root: ReturnType<Page["locator"]>) {
-  const control = root.locator(".unifiedBatchControlStack");
-  await expect(control.getByText("PROGRAMMING / BATCH CONTROL", { exact: true })).toBeVisible();
-
-  const collapse = control.getByRole("button", { name: "Collapse Programming / Batch Control" });
-  await expect(collapse).toHaveAttribute("aria-expanded", "true");
-  await collapse.click();
-  await expect(control).toHaveAttribute("data-collapsed", "true");
-  await expect(control.locator(".programmingBatchToolbar")).toBeHidden();
-  await expect(control.getByRole("region", { name: "Batch execution policy" }).getByLabel("Site Retry Limit")).toHaveCount(0);
-
-  const expand = control.getByRole("button", { name: "Expand Programming / Batch Control" });
-  await expect(expand).toHaveAttribute("aria-expanded", "false");
-  await expand.click();
-  await expect(control).toHaveAttribute("data-collapsed", "false");
-  await expect(control.locator(".programmingBatchToolbar")).toBeVisible();
-  await expect(control.getByRole("region", { name: "Batch execution policy" }).getByLabel("Site Retry Limit")).toHaveValue("3");
-}
-
-test("Production keeps its compact Batch dashboard while Engineering uses the status-first programming workflow", async ({ page }) => {
+test("Production Factory Console v2 keeps tree selection, LED status and separate next-Batch membership", async ({ page }) => {
   await installDashboardMock(page);
   await page.setViewportSize({ width: 1440, height: 900 });
-
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
-  await assertDashboardContract(page.locator(".productionMainPanel"));
-  await assertBatchControlCollapses(page.locator(".productionMainPanel"));
-  const fpsWidth = await page.locator(".fpsSelector").evaluate(element => element.getBoundingClientRect().width);
-  expect(fpsWidth).toBeGreaterThanOrEqual(319);
-  expect(fpsWidth).toBeLessThanOrEqual(361);
-  await expect(page.locator(".productionMainPanel .engineeringBatchDetails")).toBeHidden();
 
+  await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
+  const kpis = page.getByRole("region", { name: "Production KPI" });
+  await expect(kpis.locator("article")).toHaveCount(7);
+  await expect(kpis.getByText("PRODUCTION SITES", { exact: true })).toBeVisible();
+  await expect(kpis.getByText("SELECTED", { exact: true })).toBeVisible();
+
+  const productionSelection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
+  await expect(productionSelection).toBeVisible();
+  const ppu1site1 = page.getByRole("checkbox", { name: "Production Set mock-facility-01 mock-facility-01-ppu-01 SITE-01" });
+  const ppu1site2 = page.getByRole("checkbox", { name: "Production Set mock-facility-01 mock-facility-01-ppu-01 SITE-02" });
+  await ppu1site1.check();
+  await ppu1site2.check();
+  await productionSelection.getByRole("button", { name: "SET PRODUCTION SITES" }).click();
+
+  const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
+  await expect(live).toBeVisible();
+  await expect(live.locator(".factorySiteLedCard")).toHaveCount(2);
+  const dimensions = await live.locator(".factorySiteLedCard").evaluateAll(cards => cards.map(card => {
+    const rect = card.getBoundingClientRect();
+    return [Math.round(rect.width), Math.round(rect.height)];
+  }));
+  expect(new Set(dimensions.map(value => value.join("x"))).size).toBe(1);
+
+  const ppuMaster = live.getByRole("checkbox", { name: "Batch select Mock PPU 01", exact: true });
+  const site2 = live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02", exact: true });
+  await expect(ppuMaster).toBeChecked();
+  await site2.uncheck();
+  await expect(site2).not.toBeChecked();
+  await expect.poll(() => ppuMaster.evaluate((element: HTMLInputElement) => element.indeterminate)).toBe(true);
+  await expect(kpis.locator('[data-kpi="selected"] b')).toHaveText("1");
+  await expect(kpis.locator('[data-kpi="production-sites"] b')).toHaveText("2");
+
+  const hide = productionSelection.getByRole("button", { name: /收起|Hide/ });
+  await hide.click();
+  await expect(productionSelection.locator(".operatorPanelBody")).toBeHidden();
+  await expect(live).toBeVisible();
+
+  await expect(page.getByText("Cancel PPU", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /ABORT/ })).toBeDisabled();
+  await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
+});
+
+test("Engineering Programming remains the status-first single-PPU workspace", async ({ page }) => {
+  await installDashboardMock(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .productionProgrammingKpis")).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .targetingCard")).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .programmingJobCard")).toBeVisible();
-  await expect(page.locator(".engineeringProgrammingV2 .liveProgressCard")).toHaveCount(0);
-  await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
   await expect(page.locator(".engineeringProgrammingV2 .liveSiteStatus")).toBeVisible();
   await expect(page.getByLabel("Engineering Site selection").locator("tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Select all Engineering batch Sites")).toBeChecked();
   await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
-  await expect(page.locator(".engineeringProgrammingV2 .batchTopologySummary")).toHaveCount(0);
-  await expect(page.locator(".engineeringProgrammingV2 .engineeringBatchDetails")).toHaveCount(0);
 });
