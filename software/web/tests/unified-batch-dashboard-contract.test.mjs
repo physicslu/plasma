@@ -2,99 +2,95 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const shared = fs.readFileSync(new URL("../app/batch-dashboard-panels.tsx", import.meta.url), "utf8");
-const sharedCss = fs.readFileSync(new URL("../app/batch-dashboard-panels.css", import.meta.url), "utf8");
-const pmod = fs.readFileSync(new URL("../app/fleet/server-batch-page.tsx", import.meta.url), "utf8");
-const pmodCss = fs.readFileSync(new URL("../app/fleet/server-batch.css", import.meta.url), "utf8");
+const legacyShared = fs.readFileSync(new URL("../app/batch-dashboard-panels.tsx", import.meta.url), "utf8");
+const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
+const pmodCss = fs.readFileSync(new URL("../app/fleet/factory-console-v2.css", import.meta.url), "utf8");
+const operatorPanel = fs.readFileSync(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
+const operatorCss = fs.readFileSync(new URL("../app/operator-ui/operator-panel.css", import.meta.url), "utf8");
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
 const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
 
-test("Production keeps shared Batch dashboard primitives while Engineering owns its approved v2 workspace", () => {
-  assert.match(pmod, /BatchTopologySummary/);
-  assert.match(pmod, /unifiedBatchControlStack/);
-  assert.match(pmod, /ActiveFpsSummary/);
-  assert.match(pmod, /BatchPolicyPanel/);
+test("Production uses neutral operator panel primitives while Engineering retains its approved v2 workspace", () => {
+  assert.match(pmod, /OperatorKpiStrip/);
+  assert.match(pmod, /OperatorPanel/);
+  assert.match(operatorPanel, /export function OperatorKpiStrip/);
+  assert.match(operatorPanel, /export function OperatorPanel/);
+  assert.match(operatorCss, /\.operatorKpiStrip/);
+  assert.match(operatorCss, /\.operatorPanel/);
 
   assert.match(emode, /productionProgrammingKpis/);
-  assert.match(emode, /unifiedBatchControlStack/);
   assert.match(emode, /PROGRAMMING JOB/);
   assert.match(emode, /LIVE SITE STATUS/);
   assert.doesNotMatch(emode, /BatchTopologySummary/);
   assert.doesNotMatch(emode, /ActiveFpsSummary/);
 });
 
-test("shared top summary prioritizes production KPIs while keeping topology context", () => {
-  assert.match(shared, /data-topology-context="facilities"/);
-  assert.match(shared, /data-topology-context="ppus"/);
-  assert.match(shared, /data-topology-context="sites"/);
-  assert.match(shared, /data-production-kpi="total"/);
-  assert.match(shared, /data-production-kpi="pass"/);
-  assert.match(shared, /data-production-kpi="fail"/);
-  assert.match(shared, /data-production-kpi="yield"/);
-  assert.match(shared, /<small>Total IC<\/small>/);
-  assert.match(shared, /<small>PASS<\/small>/);
-  assert.match(shared, /<small>FAIL<\/small>/);
-  assert.match(shared, /<small>Yield<\/small>/);
+test("Production KPI row distinguishes Production Set capacity from next Batch selection", () => {
+  for (const label of ["PRODUCTION SITES", "SELECTED", "RUNNING", "PASS", "FAIL", "YIELD", "CYCLE TIME"]) {
+    assert.match(pmod, new RegExp(`label: \\\"${label}\\\"`));
+  }
+  assert.match(pmod, /value:\s*activeCounts\.sites/);
+  assert.match(pmod, /value:\s*batchCounts\.sites/);
+  assert.match(operatorCss, /grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\)/);
 });
 
-test("Production KPI authority is the latest server Batch snapshot", () => {
+test("Production manufacturing KPIs use server Batch truth and exclude cancelled work from Yield", () => {
   assert.match(snapshotStore, /latestSnapshot/);
-  assert.match(snapshotStore, /publishServerBatchSnapshot/);
-  assert.match(snapshotStore, /subscribeServerBatchSnapshot/);
   assert.match(serverBatchApi, /publishServerBatchSnapshot/);
   assert.equal((serverBatchApi.match(/return observeBatchSnapshot\(payload\.batch\);/g) ?? []).length, 4);
-  assert.match(shared, /useSyncExternalStore/);
-  assert.match(shared, /window\.location\.pathname === "\/fleet"/);
-  assert.match(shared, /site\.completed_rounds/);
-  assert.match(shared, /site\.final_failures/);
-  assert.match(shared, /const total = pass \+ fail/);
-  assert.match(shared, /data-kpi-source=\{productionBatch \? "server-batch-snapshot" : "local-projection"\}/);
+  assert.match(pmod, /site\.completed_rounds/);
+  assert.match(pmod, /site\.final_failures/);
+  assert.match(pmod, /const total = pass \+ fail/);
+  const manufacturing = pmod.slice(pmod.indexOf("const manufacturing = useMemo"), pmod.indexOf("const repeatValue"));
+  assert.doesNotMatch(manufacturing, /cancelled/);
 });
 
-test("shared Active FPS summary exposes only selected, running and stopped Site counts", () => {
-  assert.match(shared, /data-summary-unit="site"/);
-  assert.match(shared, /Active FPS · SITE STATUS/);
-  assert.match(shared, /const stoppedSiteCount = counts\.pass \+ counts\.faulted \+ counts\.error \+ counts\.stopped \+ counts\.cancelled/);
-  assert.match(shared, /\["selected", "TOTAL SELECTED SITES", counts\.selected\]/);
-  assert.match(shared, /\["running", "RUNNING SITES", counts\.running\]/);
-  assert.match(shared, /\["terminal", "STOPPED SITES", stoppedSiteCount\]/);
-  assert.match(shared, /repeat\(auto-fit, minmax\(110px, 1fr\)\)/);
-  assert.equal((shared.match(/\["(?:selected|running|terminal)",/g) ?? []).length, 3);
+test("Production Site Selection stays tree-based and can be hidden without deleting the Production Set", () => {
+  assert.match(pmod, /<details className="productionTreeFacility"/);
+  assert.match(pmod, /<details className="productionTreePpu"/);
+  assert.match(pmod, /pmodSelectorCollapsed/);
+  assert.match(pmod, /aria-expanded=\{!selectorCollapsed\}/);
+  assert.match(pmodCss, /\.productionSiteSelection\.is-collapsed \.operatorPanelBody\s*\{\s*display:\s*none;/s);
 });
 
-test("shared diagnostic component retains the full Site terminal breakdown", () => {
-  assert.match(shared, /<small>PASSED SITES<\/small>/);
-  assert.match(shared, /<small>FAULTED SITES<\/small>/);
-  assert.match(shared, /<small>ERROR SITES<\/small>/);
-  assert.match(shared, /<small>STOPPED SITES<\/small>/);
-  assert.match(shared, /<small>CANCELLED SITES<\/small>/);
+test("Production next-Batch membership is independently selectable at PPU and Site level before START", () => {
+  assert.match(pmod, /pmodBatchSelection/);
+  assert.match(pmod, /toggleBatchPpu/);
+  assert.match(pmod, /toggleBatchSite/);
+  assert.match(pmod, /Batch select \$\{active\.target\.display_name\}/);
+  assert.match(pmod, /data-batch-selected/);
+  assert.match(pmod, /disabled=\{batchRunning \|\| !site\.enabled\}/);
 });
 
-test("shared Production policy controls expose hover help, canonical ranges, and default Retry 3", () => {
-  assert.match(shared, /role="tooltip"/);
-  assert.match(shared, /DEFAULT_SITE_RETRY_LIMIT = "3"/);
-  assert.match(shared, /aria-label="Repeat Count" type="number" min="1" max="10000"/);
-  assert.match(shared, /aria-label="Site Retry Limit" type="number" min="0" max="20"/);
-  assert.match(shared, /aria-label="Failed Site Stop Threshold"/);
+test("Production running Batch exposes only whole-Batch ABORT", () => {
+  assert.match(pmod, /async function abortBatch/);
+  assert.match(pmod, /cancelServerBatch\(/);
+  assert.doesNotMatch(pmod, /cancelServerBatchPPU/);
+  assert.doesNotMatch(pmod, /Cancel PPU/);
+  assert.match(pmod, /membership is immutable after START/);
+  assert.match(pmod, /only whole-Batch ABORT/);
 });
 
-test("Production retains collapsible Programming and Batch Control while Engineering v2 is always task-visible", () => {
-  assert.match(shared, /const \[controlExpanded, setControlExpanded\] = useState\(true\)/);
-  assert.match(shared, /PROGRAMMING \/ BATCH CONTROL/);
-  assert.match(shared, /aria-expanded=\{controlExpanded\}/);
-  assert.match(shared, /data-control-expanded=\{controlExpanded \? "true" : "false"\}/);
-  assert.match(shared, /stack\.dataset\.collapsed = controlExpanded \? "false" : "true"/);
-  assert.match(sharedCss, /\.unifiedBatchControlStack\[data-collapsed="true"\]\s*>\s*\.programmingBatchToolbar\s*\{[^}]*display:\s*none;/s);
-  assert.match(emode, /programmingJobCard unifiedBatchControlStack/);
-  assert.doesNotMatch(emode, /controlExpanded/);
+test("Production LED board remains the primary high-density runtime surface", () => {
+  assert.match(pmod, /factorySiteLedGrid/);
+  assert.match(pmod, /factorySiteLedCard/);
+  assert.match(pmod, /densityFor\(activeCounts\.sites\)/);
+  assert.match(pmodCss, /--site-card-w/);
+  assert.match(pmodCss, /grid-template-columns:\s*repeat\(auto-fill, var\(--site-card-w\)\)/);
+  assert.match(pmodCss, /factorySiteLed\[data-state="ready"\]/);
+  assert.match(pmodCss, /factorySiteLed\[data-state="running"\]/);
+  assert.match(pmodCss, /factorySiteLed\[data-state="success"\]/);
+  assert.match(pmodCss, /factorySiteLed\[data-state="faulted"\]/);
 });
 
-test("Production diagnostics remain hidden and Engineering v2 does not inherit legacy Batch details", () => {
-  assert.match(pmodCss, /\.productionMainPanel\s*>\s*\.serverBatchStatistics\s*\{[^}]*display:\s*none;/s);
-  assert.match(shared, /<details className="engineeringBatchDetails">/);
-  assert.match(sharedCss, /\.engineeringBatchDetails\s*\{\s*display:\s*none;/s);
-  assert.doesNotMatch(emode, /engineeringBatchDetails/);
+test("legacy shared Batch diagnostics remain available to older surfaces without controlling Factory Console v2", () => {
+  assert.match(legacyShared, /BatchTopologySummary/);
+  assert.match(legacyShared, /ActiveFpsSummary/);
+  assert.match(legacyShared, /BatchPolicyPanel/);
+  assert.doesNotMatch(pmod, /BatchTopologySummary/);
+  assert.doesNotMatch(pmod, /ActiveFpsSummary/);
+  assert.doesNotMatch(pmod, /BatchPolicyPanel/);
 });
 
 test("Engineering v2 policy is behavioral rather than decorative", () => {
