@@ -1,11 +1,5 @@
-import ProductionWorkspaceNav from "../production-workspace-nav";
-import ProductionProgrammingPage from "./production-programming-page";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return (
-    <>
-      <ProductionWorkspaceNav />
-      <ProductionProgrammingPage />
-    </>
-  );
+  redirect("/fleet");
 }

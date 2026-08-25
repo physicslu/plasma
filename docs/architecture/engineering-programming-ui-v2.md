@@ -2,9 +2,9 @@
 
 ## Decision
 
-`Engineering Mode -> Programming` is the primary single-PPU engineering workbench.
+`Engineering Mode -> Programming` is the primary and only dedicated single-PPU programming workbench.
 
-Production `/fleet/programming` remains available, but it is a separate Production workspace and is not the implementation authority for Engineering execution.
+The former Production `/fleet/programming` workspace is retired. That route redirects to `/fleet`, and Production Mode exposes only the Factory Console as its primary operator surface. This keeps single-PPU engineering/maintenance controls out of PMode while preserving the canonical two-mode product model.
 
 The Engineering v2 UI is status-first. The approved desktop layout is now a strict vertical hierarchy so the Programming controls do not compete for horizontal space and `LIVE SITE STATUS` remains the primary runtime surface.
 
@@ -91,10 +91,11 @@ The browser may coordinate a selected-Site Engineering batch, but every actual o
 Engineering deliberately keeps controls that Production may hide:
 
 - explicit Site Retry Limit, default 3;
-- READ offset and length;
 - direct per-Site E/P/V/R;
 - Gateway reconnect control;
 - detailed Engineering log evidence suitable for development and diagnosis.
+
+Canonical `R` reads the complete Main Programmable Flash. Special memory regions remain separate explicit engineering features rather than operator-entered generic READ ranges.
 
 ## Target IC contract
 
@@ -142,14 +143,19 @@ DISABLED         unavailable Site
 
 ## Production boundary
 
-Production Single PPU Programming remains intact:
+Production has one canonical operator surface:
 
 ```text
-Production / Single PPU Programming
+Production / Factory Console (/fleet)
     -> server Batch runtime
+
+/fleet/programming
+    -> redirect to /fleet
 
 Engineering / Programming
     -> direct Engineering PPU Jobs
 ```
 
-The two workspaces may share visual primitives and the IC Selector, but they must not be coupled by execution ownership or hidden cross-mode state.
+There is no Production-local workspace navigation switch and no dedicated Production Single PPU Programming page. Selecting one PPU inside the Factory Console remains a topology choice inside Production, not a second programming workbench.
+
+Production and Engineering may share visual primitives, the Device Catalog and server contracts where appropriate, but they must not be coupled by execution ownership or hidden cross-mode state.
