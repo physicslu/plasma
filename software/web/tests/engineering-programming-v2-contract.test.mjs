@@ -9,6 +9,7 @@ async function source(path) {
 test("Engineering Programming uses the approved status-first single-PPU workflow", async () => {
   const page = await source("../app/engineering/page.tsx");
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const refresh = await source("../app/engineering/engineering-workspace-refresh.css");
 
   assert.match(page, /ProgrammingWorkspaceV2/);
   assert.match(workspace, /SINGLE PPU PROGRAMMING/);
@@ -18,9 +19,27 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.match(workspace, /Programming Image/);
   assert.match(workspace, /START PROGRAMMING/);
   assert.match(workspace, /LIVE SITE STATUS/);
-  assert.match(workspace, /RECENT EVENTS/);
   assert.doesNotMatch(workspace, /TARGET SITES/);
   assert.doesNotMatch(workspace, /LIVE PROGRESS MONITOR/);
+
+  assert.match(refresh, /grid-template-columns:\s*minmax\(0, 1fr\)/);
+  assert.match(refresh, /1\. SYSTEM SETUP/);
+  assert.match(refresh, /2\. PROGRAMMING JOB/);
+  assert.match(refresh, /3\. LIVE SITE STATUS/);
+  assert.match(refresh, /\.engineeringProgrammingV2 \.recentEvents\s*\{[\s\S]*display:\s*none !important/);
+});
+
+test("Engineering shell uses the approved dark EMode sidebar and supports collapse", async () => {
+  const page = await source("../app/engineering/page.tsx");
+  const refresh = await source("../app/engineering/engineering-workspace-refresh.css");
+
+  assert.match(page, /engineeringSidebar/);
+  assert.match(page, />EMode</);
+  assert.match(page, /Collapse Engineering menu/);
+  assert.match(page, /Expand Engineering menu/);
+  assert.match(page, /sidebarCollapsed/);
+  assert.match(refresh, /linear-gradient\(180deg, #17283a/);
+  assert.match(refresh, /\.engineeringPage\.sidebarCollapsed \.engineeringWorkspace/);
 });
 
 test("LIVE SITE STATUS owns Batch Site selection while keeping every PPU Site visible", async () => {
