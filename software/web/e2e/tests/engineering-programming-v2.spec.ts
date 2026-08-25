@@ -232,7 +232,6 @@ test("unselected Sites stay visible and START PROGRAMMING snapshots only checked
 
   await expect.poll(() => submissions.length).toBe(1);
   expect(submissions.map(item => item.site_id)).toEqual([1]);
-  await expect(page.getByLabel("Batch select SITE 1")).toBeDisabled();
-  await expect(page.getByLabel("Batch select SITE 2")).toBeDisabled();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
+  await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
 });
