@@ -1,0 +1,58 @@
+/* Engineering Programming label/control alignment.
+ *
+ * This layer owns alignment only. Typography remains in
+ * engineering-readability.css and the approved desktop structure remains in
+ * engineering-workspace-refresh.css / engineering-density.css.
+ *
+ * Desktop/tablet rule: keep a stable 128 px label rail, right-align the label,
+ * and reduce the visual hand-off to the control to 8 px. This produces a clear
+ * vertical control baseline without adding rows or changing the action layout.
+ */
+@container engineering-programming (min-width: 761px) {
+  html .engineeringProgrammingV2 .targetingCard .workflowField {
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  html .engineeringProgrammingV2 .targetingCard .workflowField > span {
+    justify-self: end;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody > .jobRow {
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody > .jobRow > strong {
+    justify-self: end;
+    text-align: right;
+    white-space: nowrap;
+  }
+}
+
+/* The desktop density layer has higher-specificity grid ownership for these
+ * two rows, so repeat the same 128 px / 8 px alignment contract here after it
+ * in the cascade. */
+@container engineering-programming (min-width: 981px) {
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingBatchOperations {
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringPolicyRow {
+    grid-template-columns: 128px max-content max-content minmax(118px, max-content);
+    gap: 8px;
+  }
+}
+
+/* Once the workspace stacks vertically, right-aligned labels no longer help
+ * scanning. Restore the natural left alignment for the mobile layout. */
+@media (max-width: 760px) {
+  .engineeringProgrammingV2 .targetingCard .workflowField > span,
+  .engineeringProgrammingV2 .programmingJobBody > .jobRow > strong {
+    justify-self: start;
+    text-align: left;
+  }
+}
