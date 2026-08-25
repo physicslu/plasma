@@ -10,7 +10,7 @@ async function read(path) {
 
 test("Production Batch mode guard stays fail-closed while an unresolved batch_id is stored", async () => {
   const activity = await read("batch-execution-activity.ts");
-  const production = await read("fleet/server-batch-page.tsx");
+  const production = await read("fleet/factory-console-v2.tsx");
 
   const storageKey = "plasma-production-active-batch-v1";
   assert.match(activity, new RegExp(storageKey));
