@@ -139,9 +139,9 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
                 "ok": True,
                 "rest_contract_version": "3",
                 "provider": "mock",
-                "facility_count": 3,
-                "ppu_count": 12,
-                "site_count": 60,
+                "facility_count": 8,
+                "ppu_count": 32,
+                "site_count": 160,
             }
         if path == "/api/mock/runtime":
             return {
@@ -174,6 +174,19 @@ class RenderPublicSmokePinningTests(unittest.TestCase):
 
         self.assertEqual(report.checks["api:device-catalog-search"], "SKIP_UNPINNED")
         self.assertNotIn("/api/devices/search?q=stm32&limit=1", calls)
+
+    def test_unpinned_pr_observation_accepts_the_current_main_topology(self) -> None:
+        def request_json(_origin: str, path: str, *, timeout: float):
+            payload = self.contract_payload(path)
+            if path == "/api/engineering/targets":
+                return {**payload, "facility_count": 3, "ppu_count": 12, "site_count": 60}
+            return payload
+
+        report = self.report(None)
+        with patch.object(SMOKE, "request_json", side_effect=request_json):
+            SMOKE.assert_contracts(self.origin, timeout=0.1, report=report)
+
+        self.assertEqual(report.checks["api:engineering-targets"], "PASS")
 
     def test_pinned_post_deployment_smoke_enforces_device_catalog_contract(self) -> None:
         calls: list[str] = []

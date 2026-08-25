@@ -89,21 +89,21 @@
 
 /* Engineering Programming is status-first: keep setup dense so the Site table
    owns the majority of the vertical viewport. */
-.engineeringProgrammingV2 .productionProgrammingKpis {
+.engineeringProgrammingV2 .operatorKpiSummary {
   gap: 7px;
   margin-top: 7px;
 }
 
-.engineeringProgrammingV2 .productionProgrammingKpis article {
+.engineeringProgrammingV2 .operatorKpiStrip article {
   min-height: 58px;
   padding: 8px 10px;
 }
 
-.engineeringProgrammingV2 .productionProgrammingKpis small {
+.engineeringProgrammingV2 .operatorKpiStrip article small {
   font-size: 9px;
 }
 
-.engineeringProgrammingV2 .productionProgrammingKpis b {
+.engineeringProgrammingV2 .operatorKpiStrip article b {
   margin-top: 3px;
   font-size: 24px;
 }
@@ -122,6 +122,26 @@
   min-height: 30px;
   padding: 0 11px;
   font-size: 11px;
+  justify-content: space-between;
+}
+
+.engineeringProgrammingV2 .engineeringPanelToggle {
+  min-width: 58px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong, #bdccd9);
+  border-radius: 5px;
+  background: var(--panel, #fff);
+  color: var(--text, #172033);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.engineeringProgrammingV2 .targetingCard.is-collapsed > header,
+.engineeringProgrammingV2 .programmingJobCard.is-collapsed > header {
+  border-bottom: 0;
+  border-radius: 8px;
 }
 
 .engineeringProgrammingV2 .cardBody {
@@ -381,7 +401,7 @@
 /* Target Sites moved into LIVE SITE STATUS, so the desktop cards can remain
    side-by-side at substantially narrower content widths without overlap. */
 @container engineering-programming (max-width: 1050px) {
-  .engineeringProgrammingV2 .productionProgrammingKpis {
+  .engineeringProgrammingV2 .operatorKpiStrip {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
@@ -410,7 +430,7 @@
 }
 
 @media (max-width: 760px) {
-  .engineeringProgrammingV2 .productionProgrammingKpis {
+  .engineeringProgrammingV2 .operatorKpiStrip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

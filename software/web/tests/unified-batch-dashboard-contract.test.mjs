@@ -11,7 +11,7 @@ const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-
 const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
 
-test("Production uses neutral operator panel primitives while Engineering retains its approved v2 workspace", () => {
+test("Production and Engineering share neutral operator summary primitives", () => {
   assert.match(pmod, /OperatorKpiStrip/);
   assert.match(pmod, /OperatorPanel/);
   assert.match(operatorPanel, /export function OperatorKpiStrip/);
@@ -19,7 +19,8 @@ test("Production uses neutral operator panel primitives while Engineering retain
   assert.match(operatorCss, /\.operatorKpiStrip/);
   assert.match(operatorCss, /\.operatorPanel/);
 
-  assert.match(emode, /productionProgrammingKpis/);
+  assert.match(emode, /OperatorKpiStrip/);
+  assert.match(emode, /ariaLabel="Engineering Batch Summary"/);
   assert.match(emode, /PROGRAMMING JOB/);
   assert.match(emode, /LIVE SITE STATUS/);
   assert.doesNotMatch(emode, /BatchTopologySummary/);

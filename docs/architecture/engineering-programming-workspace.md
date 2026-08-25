@@ -49,7 +49,7 @@ The Provider boundary owns:
 Each of three Facilities contains four PPUs with heterogeneous Site counts:
 
 ```text
-Facility 01/02/03
+Facility 01..08
 ├── PPU 01 -> 2 Sites
 ├── PPU 02 -> 4 Sites
 ├── PPU 03 -> 6 Sites
@@ -59,10 +59,20 @@ Facility 01/02/03
 Total:
 
 ```text
-3 Facilities
-12 PPUs
-60 Sites
+8 Facilities
+32 PPUs
+160 Sites
 ```
+
+The EMode Batch KPI surface is named **BATCH SUMMARY** and uses the same visible
+SITES / TOTAL IC / RUNNING / PASS / FAIL / YIELD / BATCH TIME vocabulary as
+PMode. PASS and FAIL count IC outcomes, not Sites, and BATCH TIME uses
+`HH:MM:SS`.
+
+SYSTEM SETUP and PROGRAMMING JOB are independently collapsible. Collapsing
+SYSTEM SETUP leaves its header only. Collapsing PROGRAMMING JOB hides setup
+fields while preserving START PROGRAMMING / BATCH STATUS / ABORT so an operator
+can still observe or abort active work.
 
 Topology exists in Python, not React. Canonical identity is:
 
@@ -342,7 +352,7 @@ The server-side Engineering Mock Provider is opt-in:
 --engineering-mock-root <path>
 ```
 
-A standalone PPU Gateway does not need to instantiate the 12 Mock PPUs.
+A standalone PPU Gateway does not need to instantiate the 32 Mock PPUs.
 
 ## Manager boundary
 

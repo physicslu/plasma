@@ -105,7 +105,7 @@ Programming Recipe 是「PPU 要做什麼」的 control-plane concept，不屬�
 - `job_state.json` / `result.json` / read-back binary。
 - Server startup recovery 將不完整 Job 標記為 `ABORTED`。
 - Plasma Web REST Gateway 提供 status、Job、cancel、read-back download 與 Engineering Programming Asset routes。
-- Engineering Mock Provider 支援 3 Facilities × 4 PPUs，Site 數 2/4/6/8。
+- Engineering Mock Provider 支援 8 Facilities × 4 PPUs，Site 數 2/4/6/8。
 - Engineering session/PPU 可 cache 多個 Programming Assets。
 - Program/Verify 以 **Normalized Image SHA** 建立 PPU-wide active Image lease。
 - Optional `plasma_manager` 提供手動 PPU registry 與 read-only fleet aggregation；Manager 不參與 PPU 本地 Job execution。

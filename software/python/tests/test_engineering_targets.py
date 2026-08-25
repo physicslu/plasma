@@ -55,13 +55,13 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         return session_id, sha256
 
-    def test_catalog_is_three_facilities_four_ppus_each_and_sixty_sites(self) -> None:
+    def test_catalog_is_eight_facilities_four_ppus_each_and_one_hundred_sixty_sites(self) -> None:
         catalog = self.provider.catalog()
         self.assertTrue(catalog["ok"])
         self.assertEqual(catalog["provider"], "mock")
-        self.assertEqual(catalog["facility_count"], 3)
-        self.assertEqual(catalog["ppu_count"], 12)
-        self.assertEqual(catalog["site_count"], 60)
+        self.assertEqual(catalog["facility_count"], 8)
+        self.assertEqual(catalog["ppu_count"], 32)
+        self.assertEqual(catalog["site_count"], 160)
         self.assertEqual(catalog["programming_asset_scope"], "connection-session-and-ppu")
         self.assertIn("serial_number", catalog["supported_asset_types"])
         self.assertIn("intel_hex", catalog["supported_asset_formats"])
@@ -69,7 +69,7 @@ class EngineeringMockPPUProviderTests(unittest.IsolatedAsyncioTestCase):
             catalog["implemented_normalizers"],
             [{"asset_type": "image", "asset_format": "binary", "output": "normalized_image"}],
         )
-        self.assertEqual(len(catalog["facilities"]), 3)
+        self.assertEqual(len(catalog["facilities"]), 8)
         for facility in catalog["facilities"]:
             self.assertEqual(len(facility["ppus"]), 4)
             self.assertEqual([ppu["site_count"] for ppu in facility["ppus"]], [2, 4, 6, 8])

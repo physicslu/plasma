@@ -176,6 +176,8 @@
 
 /* Programming Job */
 .factoryProgrammingJob .operatorPanelBody { padding: 9px 11px 10px; }
+.factoryProgrammingJob.is-collapsed .operatorPanelBody { padding-top: 8px; }
+.factoryProgrammingJob.is-collapsed .factoryActionBar { margin-top: 0; }
 .factoryJobGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -439,6 +441,13 @@
 }
 .factoryFacilityGroup > header b { color: #1d4ed8; font-size: 10px; }
 .factoryFacilityGroup > header span { color: #607080; font-size: 8px; }
+.factoryFacilitySelection {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.factoryFacilitySelection input { margin: 0; }
 .factoryPpuRows {
   padding: 7px;
   display: flex;

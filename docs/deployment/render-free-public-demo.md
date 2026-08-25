@@ -14,7 +14,7 @@ Browser
        |-> existing React pages built once as static assets
        |-> canonical Web REST v3 endpoints and REST polling
        |-> local Plasma Server on 127.0.0.1:9900 -> 8 Mock Sites
-       `-> existing Engineering mock provider -> 3 Facilities / 12 PPUs / 60 Sites
+       `-> existing Engineering mock provider -> 8 Facilities / 32 PPUs / 160 Sites
 ```
 
 `software/web/render/` only supplies a static build entry and small navigation

@@ -51,7 +51,7 @@ No Render API key, deploy hook, service ID, credential, or customer data is expo
 After readiness, the smoke test performs read-only checks only:
 
 - `/api/status` -> `render-demo-ppu` and 8 local Mock Sites;
-- `/api/engineering/targets` -> Web REST v3, Mock provider, 3 Facilities / 12 PPUs / 60 Sites;
+- `/api/engineering/targets` -> Web REST v3, Mock provider, 8 Facilities / 32 PPUs / 160 Sites;
 - `/api/mock/runtime` -> Web REST v3 and canonical Erase / Program / Verify / Read settings structure;
 - `/`, `/demo`, `/fleet`, `/engineering`, `/ppu` -> HTTP 200 HTML containing the Plasma PPU Console shell.
 

@@ -1,3 +1,46 @@
+.operatorKpiSummary.has-title {
+  overflow: hidden;
+  border: 1px solid var(--line, #d4dee8);
+  border-radius: 7px;
+  background: var(--panel, #fff);
+  box-shadow: 0 1px 5px rgba(15, 23, 42, .04);
+}
+
+.operatorKpiSummaryHeader {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line, #d4dee8);
+  background: linear-gradient(180deg, #f4f7f9, #eaf0f4);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.operatorKpiSummaryHeader strong {
+  color: var(--text, #172033);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.operatorKpiSummaryHeader small {
+  color: var(--text-soft, #51606f);
+  font-size: 8px;
+}
+
+.operatorKpiSummary.has-title .operatorKpiStrip {
+  padding: 6px;
+}
+
+[data-theme="dark"] .operatorKpiSummary.has-title,
+[data-theme="dark"] .operatorKpiSummaryHeader {
+  border-color: var(--line);
+  background: var(--panel);
+}
+
+[data-theme="dark"] .operatorKpiSummaryHeader {
+  background: var(--panel-2);
+}
+
 .operatorKpiStrip {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

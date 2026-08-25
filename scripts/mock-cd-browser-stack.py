@@ -141,9 +141,9 @@ def main() -> None:
             f"http://127.0.0.1:{cd.PPUS[0]['gateway_port']}/api/engineering/targets",
             lambda value: (
                 value.get("ok") is True
-                and value.get("facility_count") == 3
-                and value.get("ppu_count") == 12
-                and value.get("site_count") == 60
+                and value.get("facility_count") == 8
+                and value.get("ppu_count") == 32
+                and value.get("site_count") == 160
             ),
             timeout_s=20.0,
             label="Engineering server-side mock PPU catalog",

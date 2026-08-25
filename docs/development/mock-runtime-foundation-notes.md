@@ -8,7 +8,7 @@ This temporary implementation note tracks the first code phase of the Mock Runti
 - Stable deterministic seed derivation for per-attempt Mock behavior.
 - Content-addressed shared image Blob store with atomic creation and read-only mmap access.
 - Sparse Site Flash state backed by immutable shared image references.
-- Unit coverage proving identical content creates one Blob and 60 Sites can reference one image without materializing one full Flash `bytearray` per Site.
+- Unit coverage proving identical content creates one Blob and 160 Sites can reference one image without materializing one full Flash `bytearray` per Site.
 
 ## Explicitly deferred
 

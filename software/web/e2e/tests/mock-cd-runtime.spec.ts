@@ -277,8 +277,8 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
 
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });
-  await expect(facility.locator("option")).toHaveCount(3, { timeout: 15_000 });
-  await expect(page.locator(".topologyFoot")).toContainText("System Topology: 3 Facilities | 12 PPUs | 60 Sites");
+  await expect(facility.locator("option")).toHaveCount(8, { timeout: 15_000 });
+  await expect(page.locator(".topologyFoot")).toContainText("System Topology: 8 Facilities | 32 PPUs | 160 Sites");
 
   await facility.selectOption(engineeringFacilityId);
   await ppu.selectOption(engineeringPpuId);

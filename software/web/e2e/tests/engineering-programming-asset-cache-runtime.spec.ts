@@ -61,7 +61,7 @@ test("1 MiB Engineering Image Asset uploads once per PPU session and reloads aft
 
   const facility = page.getByLabel("Engineering Facility", { exact: true });
   const ppu = page.getByLabel("Engineering PPU", { exact: true });
-  await expect(facility.locator("option")).toHaveCount(3, { timeout: 15_000 });
+  await expect(facility.locator("option")).toHaveCount(8, { timeout: 15_000 });
   await facility.selectOption(engineeringFacilityId);
   await ppu.selectOption(engineeringPpuId);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
@@ -91,7 +91,7 @@ test("1 MiB Engineering Image Asset uploads once per PPU session and reloads aft
   const sessionsBeforeReconnect = counters.sessions;
   await page.locator(".engineeringGateway button[type=submit]").click();
   await expect.poll(() => counters.sessions).toBeGreaterThan(sessionsBeforeReconnect);
-  await expect(facility.locator("option")).toHaveCount(3, { timeout: 15_000 });
+  await expect(facility.locator("option")).toHaveCount(8, { timeout: 15_000 });
   await expect(facility).toHaveValue(engineeringFacilityId);
   await expect(ppu).toHaveValue(engineeringPpuId);
   await expect(page.getByLabel("Engineering Site selection").locator("tbody input[type=checkbox]:checked")).toHaveCount(2);

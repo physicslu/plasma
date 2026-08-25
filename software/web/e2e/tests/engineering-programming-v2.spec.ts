@@ -186,8 +186,8 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "SINGLE PPU PROGRAMMING" })).toBeVisible();
-  await expect(page.getByText("SYSTEM SETUP & TARGETING", { exact: true })).toBeVisible();
-  await expect(page.getByText("PROGRAMMING JOB", { exact: true })).toBeVisible();
+  await expect(page.locator(".targetingCard > header")).toContainText("SYSTEM SETUP & TARGETING");
+  await expect(page.locator(".programmingJobCard > header")).toContainText("PROGRAMMING JOB");
   await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
   await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("LIVE SITE STATUS", { exact: true })).toBeVisible();
@@ -213,6 +213,20 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   expect(layout.setupTop).toBeLessThan(layout.jobTop);
   expect(layout.setupBottom).toBeLessThanOrEqual(layout.jobTop);
   expect(layout.jobBottom).toBeLessThanOrEqual(layout.statusTop);
+
+  await page.getByRole("button", { name: "Collapse System Setup" }).click();
+  await expect(page.getByLabel("Engineering Facility")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Expand System Setup" })).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "Expand System Setup" }).click();
+  await expect(page.getByLabel("Engineering Facility")).toBeVisible();
+
+  await page.getByRole("button", { name: "Collapse Programming Job" }).click();
+  await expect(page.getByLabel("Target IC")).toBeHidden();
+  await expect(page.getByRole("button", { name: /START PROGRAMMING/ })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Batch readiness" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /ABORT/ })).toBeVisible();
+  await page.getByRole("button", { name: "Expand Programming Job" }).click();
+  await expect(page.getByLabel("Target IC")).toBeVisible();
 
   const sidebarWidth = await page.locator(".engineeringSidebar").evaluate(element => element.getBoundingClientRect().width);
   await page.getByRole("button", { name: "Collapse Engineering menu" }).click();
@@ -253,11 +267,20 @@ test("unselected Sites stay visible and START PROGRAMMING snapshots only checked
   await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
 
   await page.getByLabel("Engineering batch erase").check();
+  await page.getByLabel("Repeat Count").fill("2");
+  const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
+  await expect(summary.getByText("BATCH SUMMARY", { exact: true })).toBeVisible();
+  await expect(summary.locator('[data-kpi="sites"] b')).toHaveText("2");
+  await expect(summary.locator('[data-kpi="total-ic"] b')).toHaveText("2");
+  await expect(summary.locator('[data-kpi="batch-time"] b')).toHaveText("00:00:00");
   await expect(page.getByRole("button", { name: "START PROGRAMMING" })).toBeEnabled();
   await page.getByRole("button", { name: "START PROGRAMMING" }).click();
 
-  await expect.poll(() => submissions.length).toBe(1);
-  expect(submissions.map(item => item.site_id)).toEqual([1]);
+  await expect.poll(() => submissions.length).toBe(2);
+  expect(submissions.map(item => item.site_id)).toEqual([1, 1]);
+  await expect(summary.locator('[data-kpi="pass"] b')).toHaveText("2");
+  await expect(summary.locator('[data-kpi="fail"] b')).toHaveText("0");
+  await expect(summary.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
 });

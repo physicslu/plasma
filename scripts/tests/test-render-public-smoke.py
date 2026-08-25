@@ -151,7 +151,12 @@ def assert_contracts(origin: str, *, timeout: float, report: SmokeReport) -> Non
     report.checks["api:status"] = "PASS"
 
     catalog = request_json(origin, "/api/engineering/targets", timeout=timeout)
-    expected_counts = (3, 12, 60)
+    expected_counts = {(8, 32, 160)}
+    # Pull-request smoke observes the currently deployed main commit without
+    # pinning it to the PR. Accept the previous topology until this change is
+    # deployed; pinned post-deployment smoke remains strict for 8/32/160.
+    if report.expected_commit is None:
+        expected_counts.add((3, 12, 60))
     actual_counts = (
         catalog.get("facility_count"),
         catalog.get("ppu_count"),
@@ -159,7 +164,7 @@ def assert_contracts(origin: str, *, timeout: float, report: SmokeReport) -> Non
     )
     if catalog.get("ok") is not True or catalog.get("rest_contract_version") != "3":
         raise RuntimeError("Engineering target catalog is not Web REST v3 ready")
-    if catalog.get("provider") != "mock" or actual_counts != expected_counts:
+    if catalog.get("provider") != "mock" or actual_counts not in expected_counts:
         raise RuntimeError(
             f"Engineering target catalog mismatch: provider={catalog.get('provider')!r}, "
             f"counts={actual_counts!r}"

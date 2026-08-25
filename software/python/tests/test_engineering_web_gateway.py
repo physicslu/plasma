@@ -21,9 +21,9 @@ class FakeEngineeringProvider:
         return {
             "ok": True,
             "provider": "mock",
-            "facility_count": 3,
-            "ppu_count": 12,
-            "site_count": 60,
+            "facility_count": 8,
+            "ppu_count": 32,
+            "site_count": 160,
             "programming_asset_scope": "connection-session-and-ppu",
             "supported_asset_types": ["image", "key", "option", "serial_number", "calibration"],
             "supported_asset_formats": ["binary", "intel_hex", "csv", "text"],
@@ -206,9 +206,9 @@ class EngineeringWebGatewayTests(unittest.TestCase):
     def test_catalog_comes_from_server_side_provider(self):
         status, payload = self.request("GET", "/api/engineering/targets")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["facility_count"], 3)
-        self.assertEqual(payload["ppu_count"], 12)
-        self.assertEqual(payload["site_count"], 60)
+        self.assertEqual(payload["facility_count"], 8)
+        self.assertEqual(payload["ppu_count"], 32)
+        self.assertEqual(payload["site_count"], 160)
         self.assertEqual(payload["programming_asset_scope"], "connection-session-and-ppu")
         self.assertIn("serial_number", payload["supported_asset_types"])
 
