@@ -252,6 +252,11 @@ export default function ProgrammingWorkspaceV2() {
     : null;
   const selectedSiteIds = selectedSiteIdsState ?? [];
   const selectedSites = sites.filter(site => selectedSiteIds.includes(site.id));
+  const selectableSiteIds = sites
+    .filter(site => site.enabled && !isRunning(site))
+    .map(site => site.id);
+  const allSelectableSitesSelected = selectableSiteIds.length > 0
+    && selectableSiteIds.every(siteId => selectedSiteIds.includes(siteId));
   const readRangeValid = Number.isInteger(Number(readOffset))
     && Number(readOffset) >= 0
     && Number.isInteger(Number(readLength))
@@ -576,15 +581,26 @@ export default function ProgrammingWorkspaceV2() {
     if (device) appendLog(`[TARGET IC] SELECT · ${device.vendor} / ${targetDeviceLabel(device)}`, false, "USR");
   }
 
-  function toggleSite(siteId: number) {
+  function applySiteSelection(next: number[]) {
     if (batchRunning) return;
     setBatchSiteStates({});
     if (targetSelectionKey) siteSelectionTarget.current = targetSelectionKey;
+    setSelectedSiteIdsState(next);
+    if (stopPolicy.kind === "failed_sites" && stopPolicy.threshold > next.length) {
+      setStopPolicy(next.length > 0 ? { kind: "failed_sites", threshold: next.length } : { kind: "never" });
+    }
+    appendLog(`[SITE] SELECTION · ${siteListLabel(next)}`, false, "USR");
+  }
+
+  function toggleSite(siteId: number) {
     const next = selectedSiteIds.includes(siteId)
       ? selectedSiteIds.filter(id => id !== siteId)
       : [...selectedSiteIds, siteId].sort((left, right) => left - right);
-    setSelectedSiteIdsState(next);
-    appendLog(`[SITE] SELECTION · ${siteListLabel(next)}`, false, "USR");
+    applySiteSelection(next);
+  }
+
+  function toggleAllSites() {
+    applySiteSelection(allSelectableSitesSelected ? [] : selectableSiteIds);
   }
 
   function toggleOperation(operation: Operation) {
@@ -732,6 +748,8 @@ export default function ProgrammingWorkspaceV2() {
       return;
     }
     setOperatorWarning(null);
+    // Snapshot Batch membership once. Changes to the live selector are disabled
+    // while this Batch is active and therefore apply only to the next Batch.
     const siteIds = [...selectedSiteIds];
     const operations = [...selectedOperations];
     const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
@@ -916,8 +934,8 @@ export default function ProgrammingWorkspaceV2() {
         </header>
 
         <section className="productionProgrammingKpis" aria-label="Engineering programming KPIs">
-          <article><small>SITES</small><b>{selectedSiteIds.length}</b></article>
-          <article><small>TOTAL IC</small><b>{selectedSiteIds.length}</b></article>
+          <article><small>PPU SITES</small><b>{sites.length || ppu?.site_count || selectedPPU?.site_count || 0}</b></article>
+          <article><small>SELECTED</small><b>{selectedSiteIds.length}</b></article>
           <article><small>RUNNING</small><b>{activeFpsCounts.running}</b></article>
           <article data-kpi="pass"><small>PASS</small><b>{activeFpsCounts.pass}</b></article>
           <article data-kpi="fail"><small>FAIL</small><b>{activeFpsCounts.faulted}</b></article>
@@ -954,31 +972,6 @@ export default function ProgrammingWorkspaceV2() {
                   ))}
                 </select>
               </label>
-
-              <div className="targetSitesSection">
-                <h2>TARGET SITES</h2>
-                <div className="channelChecks">
-                  {sites.map(site => (
-                    <label key={site.id} className={`${selectedSiteIds.includes(site.id) ? "checked" : ""} ${!site.enabled ? "disabled" : ""}`}>
-                      <input
-                        type="checkbox"
-                        aria-label={`選取 SITE ${site.id}`}
-                        checked={selectedSiteIds.includes(site.id)}
-                        disabled={batchRunning || !site.enabled || isRunning(site)}
-                        onChange={() => toggleSite(site.id)}
-                      />
-                      <b>{siteLabel(site.id)}</b>
-                      <span className="siteStatePill" data-state={site.stage}>{site.enabled ? site.stage.toUpperCase() : "DISABLED"}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="engineeringPpuIdentityV2" aria-label="Selected Engineering PPU">
-                <b>{facility?.display_name ?? "No Facility"} / {selectedPPU?.display_name ?? "No PPU"}</b>
-                <small>{ppu?.ppu_id ?? selectedPPU?.ppu_id ?? "—"} · {ppu?.site_count ?? selectedPPU?.site_count ?? 0} Sites · {ppu?.model ?? selectedPPU?.model ?? "—"}</small>
-              </div>
-
               <div className="topologyFoot">ⓘ System Topology: {catalog?.facility_count ?? 0} Facilities | {catalog?.ppu_count ?? 0} PPUs | {catalog?.site_count ?? 0} Sites</div>
             </div>
           </section>
@@ -1054,32 +1047,54 @@ export default function ProgrammingWorkspaceV2() {
                 </div>
               </div>
             </section>
-
-            <section className="productionProgrammingCard liveProgressCard">
-              <header>LIVE PROGRESS MONITOR</header>
-              <div className="cardBody liveProgressBody">
-                <div>Total selected: <b>{selectedSiteIds.length}</b> | Running: <b>{activeFpsCounts.running}</b> | Aborted/Stopped: <b>{activeFpsCounts.cancelled + activeFpsCounts.stopped}</b></div>
-              </div>
-            </section>
           </div>
         </div>
 
         {catalogError && <div className="engineeringBoundaryNote warning"><b>{t("engineeringProgramming.providerOffline")}</b><span>{catalogError}</span></div>}
 
         <section className="productionProgrammingCard liveSiteStatus overviewCard" aria-label="Engineering Site status">
-          <header><span>LIVE SITE STATUS</span><small>{ppu?.display_name ?? selectedPPU?.display_name ?? "Selected PPU"} · REST polling 500 ms</small></header>
-          <div className="channelTableWrap engineeringV2TableWrap">
+          <header>
+            <span>LIVE SITE STATUS</span>
+            <small>{ppu?.display_name ?? selectedPPU?.display_name ?? "Selected PPU"} · {sites.length} Sites · Batch selected {selectedSiteIds.length} · REST polling 500 ms</small>
+          </header>
+          <div className="channelTableWrap engineeringV2TableWrap" role="region" aria-label="Engineering Site selection">
             <table className="channelTable">
-              <thead><tr><th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>OPERATIONS (E/P/V/R)</th></tr></thead>
+              <thead>
+                <tr>
+                  <th className="engineeringBatchSelectHead">
+                    <label>
+                      <input
+                        type="checkbox"
+                        aria-label="Select all Engineering batch Sites"
+                        checked={allSelectableSitesSelected}
+                        disabled={batchRunning || selectableSiteIds.length === 0}
+                        onChange={toggleAllSites}
+                      />
+                      <span>BATCH</span>
+                    </label>
+                  </th>
+                  <th>SITE</th><th>TARGET IC</th><th>STATE</th><th>PROGRESS</th><th>RESULT</th><th>OPERATIONS (E/P/V/R)</th>
+                </tr>
+              </thead>
               <tbody>
-                {selectedSites.map(site => {
+                {sites.map(site => {
                   const batchState = batchSiteStates[site.id];
                   const displayStage: Stage = batchState === "running" || batchState === "cancelling" ? "queued" : (batchState ?? site.stage);
+                  const selectedForBatch = selectedSiteIds.includes(site.id);
                   return (
-                    <tr key={site.id}>
+                    <tr key={site.id} data-batch-selected={selectedForBatch ? "true" : "false"} data-site-enabled={site.enabled ? "true" : "false"}>
+                      <td className="engineeringBatchSelectCell">
+                        <input
+                          type="checkbox"
+                          aria-label={`Batch select SITE ${site.id}`}
+                          checked={selectedForBatch}
+                          disabled={batchRunning || !site.enabled || isRunning(site)}
+                          onChange={() => toggleSite(site.id)}
+                        />
+                      </td>
                       <td><b>{siteLabel(site.id)}</b></td>
                       <td><b>{displayedTargetDevice !== "—" ? displayedTargetDevice : (site.target ?? "—")}</b><small>{site.interface ?? "—"}</small></td>
-                      <td><span className={`state ${displayStage}`}>{batchState?.toUpperCase() ?? site.stage.toUpperCase()}</span>{site.error && <small className="errorText">{site.error}</small>}</td>
+                      <td><span className={`state ${displayStage}`}>{site.enabled ? (batchState?.toUpperCase() ?? site.stage.toUpperCase()) : "DISABLED"}</span>{site.error && <small className="errorText">{site.error}</small>}</td>
                       <td><div className="tableProgress"><div className="track"><i style={{ width: `${site.progress}%` }} /></div><b>{Math.round(site.progress)}%</b></div></td>
                       <td><b className="engineeringResult" data-result={resultLabel(displayStage)}>{resultLabel(displayStage)}</b></td>
                       <td><div className="rowActions engineeringV2Actions">
