@@ -197,10 +197,26 @@
 }
 
 .gatewaySettingsGuide ol {
+  counter-reset: gateway-test-step;
   display: grid;
   gap: 7px;
   margin: 10px 0 0;
-  padding-left: 20px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.gatewaySettingsGuide li {
+  counter-increment: gateway-test-step;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.gatewaySettingsGuide li::before {
+  content: counter(gateway-test-step) "：";
+  flex: none;
+  color: var(--text);
+  font-weight: 800;
 }
 
 .gatewaySettingsCaution {

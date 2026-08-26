@@ -5,6 +5,7 @@ import test from "node:test";
 const apiSource = await readFile(new URL("../app/mock-runtime-api.ts", import.meta.url), "utf8");
 const pageSource = await readFile(new URL("../app/engineering/page.tsx", import.meta.url), "utf8");
 const panelSource = await readFile(new URL("../app/engineering/mock-runtime-settings.tsx", import.meta.url), "utf8");
+const mockRuntimeCss = await readFile(new URL("../app/engineering/mock-runtime-settings.css", import.meta.url), "utf8");
 const batchSource = await readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 
 test("Mock runtime settings are server-owned and exposed under Engineering", () => {
@@ -27,6 +28,13 @@ test("Mock settings page includes operator explanation and test methods", () => 
   assert.match(panelSource, /基本 PASS 測試/);
   assert.match(panelSource, /Program Error Rate 設為 100\.0%/);
   assert.match(panelSource, /不能宣稱 Z2、FPGA、socket、OpenOCD 或真實 IC programming 已驗證/);
+});
+
+test("Mock test method renders explicit full-width-colon step numbers", () => {
+  assert.match(mockRuntimeCss, /counter-reset:\s*mock-test-step/);
+  assert.match(mockRuntimeCss, /counter-increment:\s*mock-test-step/);
+  assert.match(mockRuntimeCss, /content:\s*counter\(mock-test-step\)\s*"："/);
+  assert.match(mockRuntimeCss, /list-style:\s*none/);
 });
 
 test("server Batch snapshots expose immutable Mock execution provenance", () => {
