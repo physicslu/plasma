@@ -8,11 +8,10 @@
  * Important: the raw SYSTEM SETUP / PROGRAMMING JOB card header text stays at
  * font-size: 0 in engineering-workspace-refresh.css. Only the canonical
  * ::before labels are enlarged here; otherwise both strings render at once.
+ *
+ * Batch Summary typography is intentionally excluded. The shared
+ * operator-ui/batch-summary.css contract is its sole visual owner.
  */
-
-.engineeringProgrammingV2 .operatorKpiStrip article small {
-  font-size: 10px;
-}
 
 .engineeringProgrammingV2 .targetingCard > header::before,
 .engineeringProgrammingV2 .programmingJobCard > header::before,
