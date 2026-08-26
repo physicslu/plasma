@@ -3,6 +3,13 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const facilityId = "mock-facility-01";
 const ppuId = "mock-facility-01-ppu-01";
 
+type BatchTarget = { facility_id: string; ppu_id: string; site_ids: number[] };
+type BatchExecutionPolicy = {
+  repeat_count: number;
+  site_retry_limit: number;
+  failed_site_stop_threshold: number | null;
+};
+
 function catalog() {
   return {
     ok: true,
@@ -49,7 +56,83 @@ function ppuStatus() {
   };
 }
 
-async function installApi(page: Page, submissions: Array<Record<string, unknown>>) {
+function completedBatch(body: Record<string, unknown>) {
+  const targets = body.targets as BatchTarget[];
+  const operations = body.operations as string[];
+  const executionPolicy = body.execution_policy as BatchExecutionPolicy;
+  const now = "2026-08-26T08:00:00Z";
+  const sites = targets.flatMap(target => target.site_ids.map(siteId => ({
+    facility_id: target.facility_id,
+    ppu_id: target.ppu_id,
+    site_id: siteId,
+    key: `${target.facility_id}/${target.ppu_id}/${siteId}`,
+    state: "success",
+    current_round: executionPolicy.repeat_count,
+    completed_rounds: executionPolicy.repeat_count,
+    current_operation: null,
+    current_job_id: null,
+    progress_percent: 100,
+    total_attempts: executionPolicy.repeat_count * operations.length,
+    retry_count: 0,
+    final_failures: 0,
+    faulted_round: null,
+    faulted_operation: null,
+    last_failure_source: null,
+    communication_state: "connected",
+    communication_attempt: 0,
+    error: null,
+    operation_statistics: {},
+  })));
+  return {
+    batch_id: "engineering-v2-batch-0001",
+    state: "success",
+    created_at: now,
+    started_at: now,
+    finished_at: now,
+    operations,
+    execution_policy: executionPolicy,
+    target_device: body.target_device ?? null,
+    asset: null,
+    read: body.read ?? { offset: 0, length: 256 },
+    cancel_requested: false,
+    stop_reason: null,
+    error: null,
+    faulted_site_count: 0,
+    site_counts: {
+      ready: 0,
+      running: 0,
+      success: sites.length,
+      faulted: 0,
+      error: 0,
+      stopped: 0,
+      cancelled: 0,
+    },
+    operation_statistics: {},
+    sites,
+  };
+}
+
+async function installApi(
+  page: Page,
+  submissions: Array<Record<string, unknown>>,
+  batchSubmissions: Array<Record<string, unknown>> = [],
+) {
+  await page.route("**/api/batches**", async (route: Route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname === "/api/batches" && request.method() === "POST") {
+      const body = request.postDataJSON() as Record<string, unknown>;
+      batchSubmissions.push(body);
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, rest_contract_version: "3", batch: completedBatch(body) }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { message: `unhandled ${url.pathname}` } }) });
+  });
+
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -254,9 +337,10 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   await expect(siteOne.locator(".engineeringResult")).toHaveText("PASS");
 });
 
-test("unselected Sites stay visible and START PROGRAMMING snapshots only checked Sites", async ({ page }) => {
-  const submissions: Array<Record<string, unknown>> = [];
-  await installApi(page, submissions);
+test("unselected Sites stay visible and START PROGRAMMING snapshots only checked Sites into one server Batch", async ({ page }) => {
+  const directSubmissions: Array<Record<string, unknown>> = [];
+  const batchSubmissions: Array<Record<string, unknown>> = [];
+  await installApi(page, directSubmissions, batchSubmissions);
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
@@ -277,8 +361,19 @@ test("unselected Sites stay visible and START PROGRAMMING snapshots only checked
   await expect(page.getByRole("button", { name: "START PROGRAMMING" })).toBeEnabled();
   await page.getByRole("button", { name: "START PROGRAMMING" }).click();
 
-  await expect.poll(() => submissions.length).toBe(2);
-  expect(submissions.map(item => item.site_id)).toEqual([1, 1]);
+  await expect.poll(() => batchSubmissions.length).toBe(1);
+  expect(directSubmissions).toHaveLength(0);
+  expect(batchSubmissions[0].targets).toEqual([{
+    facility_id: facilityId,
+    ppu_id: ppuId,
+    site_ids: [1],
+  }]);
+  expect(batchSubmissions[0].operations).toEqual(["erase"]);
+  expect(batchSubmissions[0].execution_policy).toEqual({
+    repeat_count: 2,
+    site_retry_limit: 3,
+    failed_site_stop_threshold: null,
+  });
   await expect(summary.locator('[data-kpi="pass"] b')).toHaveText("2");
   await expect(summary.locator('[data-kpi="fail"] b')).toHaveText("0");
   await expect(summary.locator('[data-kpi="processed-ic"] b')).toHaveText("2");
