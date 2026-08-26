@@ -6,6 +6,7 @@ import {
   searchDevices,
   type DeviceSearchResult,
 } from "../device-catalog-api";
+import "./ic-picker-field.css";
 
 export type ICPickerFieldProps = {
   apiBase?: string;
@@ -78,8 +79,8 @@ export function ICPickerField({
   }
 
   return (
-    <div className="productionIcPicker" data-selected={value ? "true" : "false"}>
-      <div className="productionIcPickerInput">
+    <div className="icPicker" data-selected={value ? "true" : "false"}>
+      <div className="icPickerInput">
         <input
           type="text"
           value={query}
@@ -93,7 +94,7 @@ export function ICPickerField({
         <span aria-hidden="true">{loading ? "…" : "⌄"}</span>
       </div>
       {open && results.length > 0 && (
-        <div className="productionIcPickerMenu" role="listbox" aria-label="Target IC search results">
+        <div className="icPickerMenu" role="listbox" aria-label="Target IC search results">
           {results.map(device => (
             <button
               type="button"
