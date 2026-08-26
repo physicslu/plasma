@@ -404,16 +404,6 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                     on_retry=on_retry,
                 )
             )
-            if ppu_level_observation:
-                sites = payload.get("sites") if isinstance(payload, dict) else None
-                base._gateway_diagnostic(
-                    "engineering_ppu_status_ok",
-                    facility_id=facility_id,
-                    ppu_id=ppu_id,
-                    elapsed_ms=round((time.monotonic() - started_at) * 1000, 3),
-                    site_count=len(sites) if isinstance(sites, list) else None,
-                )
-            self._json(HTTPStatus.OK, payload)
         except Exception as exc:
             if ppu_level_observation:
                 base._gateway_diagnostic(
@@ -430,6 +420,46 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 self._communication_unavailable(exc)
             else:
                 self._error(exc)
+            return True
+
+        provider_elapsed_ms = round((time.monotonic() - started_at) * 1000, 3)
+        if ppu_level_observation:
+            sites = payload.get("sites") if isinstance(payload, dict) else None
+            base._gateway_diagnostic(
+                "engineering_ppu_status_ok",
+                facility_id=facility_id,
+                ppu_id=ppu_id,
+                elapsed_ms=provider_elapsed_ms,
+                provider_elapsed_ms=provider_elapsed_ms,
+                site_count=len(sites) if isinstance(sites, list) else None,
+            )
+
+        response_started_at = time.monotonic()
+        try:
+            self._json(HTTPStatus.OK, payload)
+        except Exception as exc:
+            if ppu_level_observation:
+                base._gateway_diagnostic(
+                    "engineering_ppu_status_response_error",
+                    facility_id=facility_id,
+                    ppu_id=ppu_id,
+                    provider_elapsed_ms=provider_elapsed_ms,
+                    response_write_elapsed_ms=round((time.monotonic() - response_started_at) * 1000, 3),
+                    total_elapsed_ms=round((time.monotonic() - started_at) * 1000, 3),
+                    error_type=type(exc).__name__,
+                )
+            self._error(exc)
+            return True
+
+        if ppu_level_observation:
+            base._gateway_diagnostic(
+                "engineering_ppu_status_response_sent",
+                facility_id=facility_id,
+                ppu_id=ppu_id,
+                provider_elapsed_ms=provider_elapsed_ms,
+                response_write_elapsed_ms=round((time.monotonic() - response_started_at) * 1000, 3),
+                total_elapsed_ms=round((time.monotonic() - started_at) * 1000, 3),
+            )
         return True
 
     def do_GET(self) -> None:
