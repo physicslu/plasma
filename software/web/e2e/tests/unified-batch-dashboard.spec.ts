@@ -165,6 +165,25 @@ async function batchSummaryComputedStyle(page: Page, ariaLabel: string) {
   });
 }
 
+async function icPickerComputedStyle(page: Page) {
+  const picker = page.locator(".icPicker").first();
+  await expect(picker).toBeVisible();
+  return picker.evaluate(element => {
+    const inputShell = element.querySelector<HTMLElement>(".icPickerInput")!;
+    const input = inputShell.querySelector<HTMLInputElement>("input")!;
+    const pickerStyle = getComputedStyle(element);
+    const shellStyle = getComputedStyle(inputShell);
+    const inputStyle = getComputedStyle(input);
+    return {
+      fontFamily: pickerStyle.fontFamily,
+      minHeight: shellStyle.minHeight,
+      radius: shellStyle.borderRadius,
+      inputHeight: inputStyle.height,
+      inputSize: inputStyle.fontSize,
+    };
+  });
+}
+
 test("Production Factory Console v2 keeps tree selection, LED status and separate next-Batch membership", async ({ page }) => {
   await installDashboardMock(page);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -258,4 +277,36 @@ test("PMode and EMode Batch Summary share identical PASS FAIL computed styles", 
   expect(productionStyle.pass.valueWeight).toBe("900");
   expect(productionStyle.fail.valueWeight).toBe("900");
   expect(productionStyle.pass.background).not.toBe(productionStyle.fail.background);
+});
+
+test("PMode and EMode share one IC picker style owner while preserving approved density", async ({ page }) => {
+  await installDashboardMock(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.goto("/fleet");
+  const productionPicker = page.locator(".icPicker").first();
+  await expect(productionPicker).toBeVisible();
+  await expect(page.locator(".productionIcPicker")).toHaveCount(0);
+  const productionStyle = await icPickerComputedStyle(page);
+
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+  const engineeringPicker = page.locator(".engineeringProgrammingV2 .icPicker").first();
+  await expect(engineeringPicker).toBeVisible();
+  await expect(page.locator(".productionIcPicker")).toHaveCount(0);
+  const engineeringStyle = await icPickerComputedStyle(page);
+
+  expect(engineeringStyle.fontFamily).toBe(productionStyle.fontFamily);
+  expect(productionStyle).toMatchObject({
+    minHeight: "34px",
+    radius: "6px",
+    inputHeight: "32px",
+    inputSize: "10px",
+  });
+  expect(engineeringStyle).toMatchObject({
+    minHeight: "40px",
+    radius: "7px",
+    inputHeight: "38px",
+    inputSize: "12px",
+  });
 });

@@ -118,18 +118,6 @@
 .programmingJobBody { display: grid; gap: 14px; }
 .jobRow { display: grid; grid-template-columns: 165px minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; }
 .jobRow > strong { font-size: 12px; }
-
-.productionIcPicker { position: relative; min-width: 0; }
-.productionIcPickerInput { display: grid; grid-template-columns: minmax(0, 1fr) 26px; align-items: center; min-height: 40px; border: 1px solid var(--line-strong, #b7c1cb); border-radius: 7px; background: var(--panel, #fff); }
-.productionIcPickerInput input { width: 100%; min-width: 0; height: 38px; border: 0; outline: 0; background: transparent; color: var(--text, #172033); padding: 0 10px; font-size: 12px; }
-.productionIcPickerInput span { color: var(--muted, #64748b); text-align: center; }
-.productionIcPickerMenu { position: absolute; z-index: 80; top: calc(100% + 4px); left: 0; right: 0; display: grid; gap: 3px; padding: 5px; border: 1px solid var(--line-strong, #b7c1cb); border-radius: 7px; background: var(--panel, #fff); box-shadow: 0 12px 28px rgba(15, 23, 42, .16); }
-.productionIcPickerMenu button { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1fr) max-content; gap: 8px; align-items: center; padding: 8px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--text, #172033); text-align: left; cursor: pointer; }
-.productionIcPickerMenu button:hover { background: var(--panel-2, #f3f6f8); }
-.productionIcPickerMenu b { font-size: 11px; }
-.productionIcPickerMenu span { color: var(--text-soft, #46515b); font-size: 9px; }
-.productionIcPickerMenu small { color: var(--muted, #64748b); font-size: 8px; text-transform: uppercase; }
-
 .imageField { display: grid; grid-template-columns: minmax(0, 1fr) 92px; min-width: 0; border: 1px solid var(--line-strong, #b7c1cb); border-radius: 7px; overflow: hidden; }
 .imageField > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 10px; color: var(--text-soft, #46515b); font-size: 11px; }
 .imageField button { border: 0; border-left: 1px solid var(--line-strong, #b7c1cb); background: var(--panel-2, #eef2f5); color: var(--text, #172033); font-weight: 700; cursor: pointer; }
@@ -203,7 +191,6 @@
   .jobRow,
   .batchPolicyRow { grid-template-columns: 1fr; }
   .programmingActions { grid-template-columns: 1fr; }
-  .productionIcPickerMenu button { grid-template-columns: 1fr; }
   .liveSiteStatus { overflow-x: auto; }
   .siteTable { min-width: 850px; }
 }
