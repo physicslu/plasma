@@ -54,6 +54,13 @@ test("Engineering Mock settings apply per-mille error, timing, seed and show ser
   await expect(page.getByLabel("Program error rate percent")).toHaveValue("5");
   await expect(page.getByLabel("Program throughput KiB per second")).toHaveValue("512");
 
+  const guide = page.getByRole("region", { name: "Mock Settings Guide" });
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText("Mock 設定說明");
+  await expect(guide).toContainText("基本 PASS 測試");
+  await expect(guide).toContainText("Program Error Rate 設為 100.0%");
+  await expect(guide).toContainText("不能宣稱 Z2、FPGA、socket、OpenOCD 或真實 IC programming 已驗證");
+
   await page.getByLabel("Program error rate percent").fill("7.5");
   await page.getByLabel("Default Image Size (KiB)").fill("4096");
   await page.getByLabel("Seed Mode").selectOption("fixed");
