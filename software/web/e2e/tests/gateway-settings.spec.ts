@@ -6,19 +6,29 @@ async function settingsVisualContract(page: import("@playwright/test").Page) {
       const element = document.querySelector(selector);
       if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
       const computed = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
       return {
         borderRadius: computed.borderRadius,
         padding: computed.padding,
         backgroundColor: computed.backgroundColor,
         fontSize: computed.fontSize,
         fontWeight: computed.fontWeight,
+        lineHeight: computed.lineHeight,
+        height: rect.height,
       };
+    }
+    function geometry(selector: string) {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
     }
     return {
       card: style(".settingsCard"),
       guide: style(".settingsGuide"),
       primaryAction: style('.settingsActions button[data-variant="primary"]'),
       field: style(".settingsField input, .settingsField select"),
+      fieldCell: geometry(".settingsField"),
     };
   });
 }
@@ -41,8 +51,8 @@ test("EMode Settings > Gateway edits shared server-owned timeout and retry setti
 
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Gateway", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gateway 設定", exact: true })).toBeVisible();
+  await expect(page.getByText("GATEWAY COMMUNICATION CONFIGURATION", { exact: true })).toBeVisible();
   await expect(page.getByLabel("PPU Request Timeout seconds")).toHaveValue("10");
   await expect(page.getByLabel("PPU Retry Count")).toHaveValue("3");
   await expect(page.getByText("REV 1", { exact: true })).toBeVisible();
@@ -60,7 +70,7 @@ test("EMode Settings > Gateway edits shared server-owned timeout and retry setti
   expect((panelBox?.y ?? 0) - (canvasBox?.y ?? 0)).toBeLessThanOrEqual(24);
 
   await page.getByLabel("PPU Request Timeout seconds").fill("20");
-  await page.getByLabel("PPU Retry Count").fill("5");
+  await page.getByLabel("PPU Retry Count")).fill("5");
   await page.getByRole("button", { name: "Apply Settings", exact: true }).click();
 
   await expect.poll(() => submitted).toEqual({ ppu_request_timeout_ms: 20_000, ppu_retry_count: 5 });
@@ -109,6 +119,8 @@ test("Gateway and Mock share the same Settings visual contract", async ({ page }
   const mockPage = await page.locator(".settingsPage").boundingBox();
 
   expect(mockVisual).toEqual(gatewayVisual);
+  expect(gatewayVisual.field.height).toBe(40);
+  expect(gatewayVisual.primaryAction.height).toBe(40);
   expect(gatewayCanvas).not.toBeNull();
   expect(gatewayPage).not.toBeNull();
   expect(mockCanvas).not.toBeNull();
