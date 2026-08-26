@@ -12,6 +12,7 @@ const engineeringWorkspace = await readFile(new URL("../app/engineering/programm
 const productionWorkspace = await readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 const plasmaApi = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 const serverBatchApi = await readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
+const serverBatchRuntime = await readFile(new URL("../../python/plasma_web/batch_runtime.py", import.meta.url), "utf8");
 
 test("EMode Settings owns the server-backed shared Gateway communication policy", () => {
   assert.match(engineeringPage, /active === "settings"/);
@@ -51,15 +52,22 @@ test("Shared Settings Guide renders explicit full-width-colon step numbers", () 
   assert.match(sharedSettingsCss, /list-style:\s*none/);
 });
 
-test("Engineering freezes communication policy and reconciles only accepted PPU Jobs", () => {
-  assert.match(engineeringWorkspace, /const gatewayPolicy = \{ \.\.\.configuredGatewayPolicy\.current \}/);
+test("Engineering direct Jobs use client Gateway policy while server Batch freezes authoritative Gateway policy", () => {
+  assert.match(engineeringWorkspace, /configuredGatewayPolicy\.current = cachedGatewaySettings\(apiBase\)/);
+  assert.match(engineeringWorkspace, /requestTimeoutMs:\s*configuredGatewayPolicy\.current\.ppu_request_timeout_ms/);
+  assert.match(engineeringWorkspace, /const policy = configuredGatewayPolicy\.current/);
   assert.match(engineeringWorkspace, /withCommunicationRetry/);
   assert.match(engineeringWorkspace, /getGatewayLiveness/);
   assert.match(engineeringWorkspace, /GatewayUnavailableError/);
-  assert.match(engineeringWorkspace, /isolateFailedPpu/);
-  assert.match(engineeringWorkspace, /CANCEL RECONCILIATION PENDING/);
+  assert.match(engineeringWorkspace, /Server Batch Runtime freezes its own authoritative Gateway policy at START/);
   assert.match(plasmaApi, /inFlightJobSnapshots/);
   assert.match(plasmaApi, /readonly transient = false/);
+
+  assert.match(serverBatchRuntime, /gateway_policy=self\.gateway_settings\.snapshot\(\)/);
+  assert.match(serverBatchRuntime, /retries = batch\.gateway_policy\.ppu_retry_count if retryable else 0/);
+  assert.match(serverBatchRuntime, /timeout=batch\.gateway_policy\.request_timeout_s/);
+  assert.match(serverBatchRuntime, /batch\.failed_ppus\.add\(ppu_key\)/);
+  assert.match(serverBatchRuntime, /_cancel_active_jobs\(batch, ppu_key=ppu_key\)/);
 });
 
 test("manufacturing Yield is undefined until an IC has a PASS or FAIL outcome", () => {

@@ -10,6 +10,7 @@ const batchSummaryCss = fs.readFileSync(new URL("../app/operator-ui/batch-summar
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
 const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
+const serverBatchRuntime = fs.readFileSync(new URL("../../python/plasma_web/batch_runtime.py", import.meta.url), "utf8");
 
 test("Production and Engineering share neutral operator summary primitives", () => {
   assert.match(pmod, /OperatorKpiStrip/);
@@ -91,10 +92,22 @@ test("Production LED board remains the primary high-density runtime surface", ()
   assert.match(pmodCss, /factorySiteLed\[data-state="faulted"\]/);
 });
 
-test("Engineering v2 policy is behavioral rather than decorative", () => {
-  assert.match(emode, /for \(let round = 1; round <= repeatValue; round \+= 1\)/);
-  assert.match(emode, /for \(let attempt = 0; attempt <= retryValue; attempt \+= 1\)/);
-  assert.match(emode, /terminalize\(siteId, "faulted"/);
-  assert.match(emode, /terminalize\(siteId, "error"/);
-  assert.match(emode, /batchStopReason\.current = "threshold"/);
+test("Engineering v2 submits Batch policy once and the server runtime owns repeat, retry, and stop behavior", () => {
+  const runBatchStart = emode.indexOf("async function runBatch()");
+  const cancelBatchStart = emode.indexOf("async function cancelBatch()", runBatchStart);
+  assert.ok(runBatchStart >= 0 && cancelBatchStart > runBatchStart);
+  const runBatch = emode.slice(runBatchStart, cancelBatchStart);
+
+  assert.match(runBatch, /startEngineeringServerBatch\(apiBase/);
+  assert.match(runBatch, /repeat_count:\s*repeatValue/);
+  assert.match(runBatch, /site_retry_limit:\s*retryValue/);
+  assert.match(runBatch, /failed_site_stop_threshold:\s*thresholdValue/);
+  assert.doesNotMatch(runBatch, /for \(let round/);
+  assert.doesNotMatch(runBatch, /for \(let attempt/);
+  assert.doesNotMatch(runBatch, /startJob\(/);
+
+  assert.match(serverBatchRuntime, /for round_index in range\(1, batch\.policy\.repeat_count \+ 1\):/);
+  assert.match(serverBatchRuntime, /max_retries=batch\.policy\.site_retry_limit/);
+  assert.match(serverBatchRuntime, /threshold = batch\.policy\.failed_site_stop_threshold/);
+  assert.match(serverBatchRuntime, /batch\.stop_reason = "failed_site_threshold"/);
 });
