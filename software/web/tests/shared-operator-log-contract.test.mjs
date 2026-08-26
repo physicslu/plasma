@@ -17,12 +17,17 @@ test("PMode and EMode adapt domain logs into one OperatorLogPanel primitive", as
   assert.match(shared, /className={`logCard operatorLogCard/);
   assert.match(shared, /className="operatorLogFilters"/);
   assert.match(shared, /import "\.\/operator-log-panel\.css"/);
+  assert.match(shared, /filterItemAriaLabelPrefix/);
+  assert.match(shared, /aria-label={`\$\{filterItemAriaLabelPrefix\} \$\{category\}`}/);
+  assert.doesNotMatch(shared, /<section[^>]*aria-label=\{title\}/);
 
   for (const adapter of [production, engineering]) {
     assert.match(adapter, /OperatorLogPanel/);
     assert.match(adapter, /OperatorLogEntry/);
     assert.doesNotMatch(adapter, /engineeringLogHead|engineeringLogFilters|engineeringLogTitle|engineeringLogActions/);
   }
+  assert.match(production, /filterItemAriaLabelPrefix="Production log filter"/);
+  assert.match(engineering, /filterItemAriaLabelPrefix="Engineering log filter"/);
   assert.doesNotMatch(production, /\.\.\/engineering\/engineering-log-panel/);
 });
 
