@@ -1,26 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useWorkspaceSession } from "../workspace-session";
+import { useMemo } from "react";
 import {
-  ENGINEERING_LOG_CATEGORIES,
-  engineeringLogCategoryLabel,
-  type EngineeringLogCategory,
-} from "../engineering/engineering-log-panel";
-import "./production-log.css";
+  OperatorLogPanel,
+  operatorLogCategoryLabel,
+  type OperatorLogCategory,
+  type OperatorLogEntry,
+} from "../operator-ui/operator-log-panel";
+import { useWorkspaceSession } from "../workspace-session";
 
 export type ProductionLogEntry = {
   id: number;
   time: string;
   level: "INFO" | "WARN" | "ERROR";
   text: string;
-};
-
-type NormalizedProductionLogEntry = {
-  id: number;
-  text: string;
-  level: ProductionLogEntry["level"];
-  category: EngineeringLogCategory;
 };
 
 type ProductionLogPanelProps = {
@@ -31,7 +24,7 @@ type ProductionLogPanelProps = {
 };
 
 type ProductionLogClassification = {
-  category: EngineeringLogCategory;
+  category: OperatorLogCategory;
   message: string;
 };
 
@@ -60,32 +53,22 @@ function productionLogClassification(message: string): ProductionLogClassificati
   return { category: "SYS", message };
 }
 
-function renderProductionLog(entry: NormalizedProductionLogEntry): string {
-  return entry.text;
-}
-
-function logDownloadTimestamp(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-}
-
 export default function ProductionLogPanel({ logs, title, clearLabel, onClear }: ProductionLogPanelProps) {
   const { sessionAuditEntries, clearSessionAuditEntries } = useWorkspaceSession();
-  const [visibleCategories, setVisibleCategories] = useState<EngineeringLogCategory[]>(ENGINEERING_LOG_CATEGORIES);
-  const allLogs = useMemo<NormalizedProductionLogEntry[]>(() => {
+  const allLogs = useMemo<OperatorLogEntry[]>(() => {
     const localLogs = logs.map(entry => {
       const classification = productionLogClassification(entry.text);
       return {
         id: entry.id,
-        text: `${entry.time}  [${engineeringLogCategoryLabel(classification.category)}] ${classification.message}`,
-        level: entry.level,
+        text: `${entry.time}  [${operatorLogCategoryLabel(classification.category)}] ${classification.message}`,
+        level: entry.level.toLowerCase() as OperatorLogEntry["level"],
         category: classification.category,
       };
     });
-    const sessionLogs: NormalizedProductionLogEntry[] = sessionAuditEntries.map(entry => ({
+    const sessionLogs: OperatorLogEntry[] = sessionAuditEntries.map(entry => ({
       id: -entry.id,
       text: `${entry.time}  [NET] ${entry.message}`,
-      level: "INFO",
+      level: "info",
       category: "NET",
     }));
     return [...localLogs, ...sessionLogs].sort((left, right) => {
@@ -93,31 +76,6 @@ export default function ProductionLogPanel({ logs, title, clearLabel, onClear }:
       return timeOrder || right.id - left.id;
     });
   }, [logs, sessionAuditEntries]);
-  const visibleLogs = useMemo(
-    () => allLogs.filter(log => visibleCategories.includes(log.category)),
-    [allLogs, visibleCategories],
-  );
-  const allVisible = visibleCategories.length === ENGINEERING_LOG_CATEGORIES.length;
-
-  function toggleCategory(category: EngineeringLogCategory) {
-    setVisibleCategories(current => current.includes(category)
-      ? current.filter(item => item !== category)
-      : ENGINEERING_LOG_CATEGORIES.filter(item => current.includes(item) || item === category));
-  }
-
-  function downloadLog() {
-    if (!allLogs.length) return;
-    const content = `${allLogs.map(renderProductionLog).join("\n")}\n`;
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `plasma-production-${logDownloadTimestamp(new Date())}.log`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
-  }
 
   function clearLog() {
     onClear();
@@ -125,48 +83,15 @@ export default function ProductionLogPanel({ logs, title, clearLabel, onClear }:
   }
 
   return (
-    <section className="logCard engineeringLogCard productionLogCard">
-      <div className="logHead engineeringLogHead">
-        <div className="engineeringLogTitle"><span />{title}</div>
-        <div className="engineeringLogActions">
-          <button type="button" onClick={downloadLog} disabled={!allLogs.length}>Download .log</button>
-          <button type="button" onClick={clearLog}>{clearLabel}</button>
-        </div>
-      </div>
-      <div className="engineeringLogFilters" role="group" aria-label="Production log filters">
-        <button
-          type="button"
-          className={allVisible ? "active" : ""}
-          aria-pressed={allVisible}
-          onClick={() => setVisibleCategories(ENGINEERING_LOG_CATEGORIES)}
-        >
-          ALL
-        </button>
-        {ENGINEERING_LOG_CATEGORIES.map(category => (
-          <label key={category} className={visibleCategories.includes(category) ? "active" : ""}>
-            <input
-              type="checkbox"
-              aria-label={`Production log filter ${category}`}
-              checked={visibleCategories.includes(category)}
-              onChange={() => toggleCategory(category)}
-            />
-            <span>{engineeringLogCategoryLabel(category)}</span>
-          </label>
-        ))}
-      </div>
-      <pre aria-label="Production batch log">
-        {visibleLogs.length
-          ? visibleLogs.map(log => (
-            <span
-              key={`${log.category}-${log.id}`}
-              data-level={log.level.toLowerCase()}
-              data-category={log.category}
-            >
-              {renderProductionLog(log)}
-            </span>
-          ))
-          : "No log entries for selected filters."}
-      </pre>
-    </section>
+    <OperatorLogPanel
+      entries={allLogs}
+      title={title}
+      clearLabel={clearLabel}
+      onClear={clearLog}
+      downloadFilenamePrefix="plasma-production"
+      filterAriaLabel="Production log filters"
+      logAriaLabel="Production batch log"
+      className="productionOperatorLog"
+    />
   );
 }
