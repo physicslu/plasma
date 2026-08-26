@@ -13,12 +13,14 @@ Canonical implementation：
 
 Gateway Settings 與 Mock Settings 必須使用這套 shared Settings UI。未來新增的 Engineering Settings surface 也必須優先使用這些 primitives，不得自行複製一套 Card、Field、Action、Revision badge 或 Operator Guide 樣式。
 
+Mock Settings 是目前批准的 **visual reference surface**。它不是另一套 CSS ownership；實際 canonical implementation 仍在 shared Settings UI。Gateway 與其他 EMode Settings 頁面應以 Mock 的 control density、page composition 與 operator hierarchy 為基準，透過 shared primitives 實現。
+
 ## 2. Shared primitives
 
 目前共用 primitives：
 
 - `SettingsPage`：頁面標題、subtitle、revision badge 與頁面寬度。
-- `SettingsTabs`：設定分類切換。
+- `SettingsTabs`：只有在同一個 Settings surface 真的存在兩個以上可切換分類時才使用；不得為單一分類建立裝飾性 tab。
 - `SettingsCard`：設定區塊與 server-authoritative summary 的共同容器。
 - `SettingsGrid`：1–4 欄 responsive settings layout。
 - `SettingsField`：label、control、unit、hint。
@@ -29,18 +31,22 @@ Gateway Settings 與 Mock Settings 必須使用這套 shared Settings UI。未�
 
 ## 3. Canonical visual contract
 
-目前 Gateway Settings 的成熟視覺語言是 shared Settings UI 的基準，包含：
+目前 Mock Settings 的批准視覺語言是 shared Settings UI 的 reference，包含：
 
 - top-aligned settings canvas；
+- page header 承擔 eyebrow、title、subtitle 與 revision，主要 control card 不重複一層 page title；
 - 10 px radius 的主要 Settings Card；
 - 22 px card padding；
+- 桌面版基準 control row 使用 3-column density；Gateway 即使只有兩個欄位，也沿用同一欄寬節奏，而不是把兩個 input 拉滿整張卡；
 - 13 px field label；
-- 14 px control text；
+- input / select 使用 40 px 固定 control height、7 px radius、14 px monospaced control text；
+- Apply / Reset 使用 40 px canonical action height、7 px radius、14 px action text；
+- disabled action 只改變 state treatment，不改變 control geometry；
 - 14 px / 1.7 line-height Operator Guide body；
 - primary action 使用 shared cyan treatment；
 - revision badge、guide、caution、responsive breakpoints 全由 shared stylesheet 管理。
 
-Gateway 與 Mock 不得再透過 mode-local CSS 覆寫這些共同屬性。
+Gateway 與 Mock 不得再透過 mode-local CSS 覆寫這些共同屬性。Gateway 不再保留只有單一 `Gateway` 項目的 Settings tab，避免同一 Design System 出現不同 page composition。
 
 ## 4. Domain-specific CSS boundary
 
@@ -79,7 +85,7 @@ Settings UI 共用只處理 presentation 與 interaction pattern，不改變設�
 3. Playwright E2E。
 4. Mock CD Browser Runtime Acceptance（若相關 workflow 被觸發）。
 
-Browser regression 必須至少驗證 Gateway / Mock 的 shared Card、Guide、primary action 與 Field computed style 一致，並確認兩頁都使用 `settingsActive` top-aligned canvas。
+Browser regression 必須至少驗證 Gateway / Mock 的 shared Card、Guide、primary action 與 Field computed style 一致，並額外比較 input/select 與 primary action 的實際高度，避免「CSS property 名義共用、實際 control geometry 已漂移」的 regression。Field column density 由各 surface 使用 shared `SettingsGrid` 的 source contract 保護；Card / Guide 高度與實際欄寬可因 domain content 與可用畫布寬度不同，不應誤設為跨頁完全相等的 invariant。兩頁也必須維持 `settingsActive` top-aligned canvas。
 
 ## 7. Review rule
 

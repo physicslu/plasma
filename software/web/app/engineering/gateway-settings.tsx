@@ -15,9 +15,21 @@ import {
   SettingsGuide,
   SettingsMessage,
   SettingsPage,
-  SettingsTabs,
 } from "../operator-ui/settings-ui";
 import { useWorkspaceSession } from "../workspace-session";
+
+const pageCopy = {
+  "zh-TW": {
+    eyebrow: "GATEWAY COMMUNICATION CONFIGURATION",
+    title: "Gateway 設定",
+    subtitle: "設定 Plasma Web REST Gateway 與 PPU 的通訊逾時及重試規則；PMode 與 EMode 共用。",
+  },
+  "en-US": {
+    eyebrow: "GATEWAY COMMUNICATION CONFIGURATION",
+    title: "Gateway Settings",
+    subtitle: "Configure the shared Plasma Web REST Gateway to PPU communication timeout and retry policy for PMode and EMode.",
+  },
+} as const;
 
 const guideCopy = {
   "zh-TW": {
@@ -70,6 +82,7 @@ const guideCopy = {
 
 export default function GatewaySettingsPanel() {
   const { locale } = useI18n();
+  const text = pageCopy[locale];
   const guide = guideCopy[locale];
   const { apiBase, hydrated } = useWorkspaceSession();
   const [applied, setApplied] = useState<GatewaySettings | null>(null);
@@ -133,23 +146,14 @@ export default function GatewaySettingsPanel() {
   return (
     <SettingsPage
       className="engineeringGatewaySettings"
-      ariaLabel="Engineering Settings"
-      eyebrow="ENGINEERING MODE"
-      title="Settings"
+      ariaLabel="Gateway Settings"
+      eyebrow={text.eyebrow}
+      title={text.title}
+      subtitle={text.subtitle}
       revision={applied?.revision}
     >
-      <SettingsTabs ariaLabel="Engineering settings categories">
-        <button type="button" aria-current="page">Gateway</button>
-      </SettingsTabs>
-
-      <SettingsCard
-        ariaLabel="Gateway Communication Settings"
-        title="Gateway"
-        description={locale === "zh-TW"
-          ? "設定 Plasma Web REST Gateway 與 PPU 的通訊逾時及重試規則；PMode 與 EMode 共用。"
-          : "Configure shared Plasma Web REST Gateway to PPU communication timeout and retry policy."}
-      >
-        <SettingsGrid columns={2}>
+      <SettingsCard ariaLabel="Gateway Communication Settings">
+        <SettingsGrid columns={3}>
           <SettingsField label="Request Timeout" hint="1–120 seconds" unit="sec">
             <input
               aria-label="PPU Request Timeout seconds"

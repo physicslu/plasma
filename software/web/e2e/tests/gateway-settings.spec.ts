@@ -12,13 +12,21 @@ async function settingsVisualContract(page: import("@playwright/test").Page) {
         backgroundColor: computed.backgroundColor,
         fontSize: computed.fontSize,
         fontWeight: computed.fontWeight,
+        lineHeight: computed.lineHeight,
       };
+    }
+    function height(selector: string) {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
+      return element.getBoundingClientRect().height;
     }
     return {
       card: style(".settingsCard"),
       guide: style(".settingsGuide"),
       primaryAction: style('.settingsActions button[data-variant="primary"]'),
       field: style(".settingsField input, .settingsField select"),
+      fieldHeight: height(".settingsField input, .settingsField select"),
+      primaryActionHeight: height('.settingsActions button[data-variant="primary"]'),
     };
   });
 }
@@ -41,8 +49,8 @@ test("EMode Settings > Gateway edits shared server-owned timeout and retry setti
 
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Gateway", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gateway 設定", exact: true })).toBeVisible();
+  await expect(page.getByText("GATEWAY COMMUNICATION CONFIGURATION", { exact: true })).toBeVisible();
   await expect(page.getByLabel("PPU Request Timeout seconds")).toHaveValue("10");
   await expect(page.getByLabel("PPU Retry Count")).toHaveValue("3");
   await expect(page.getByText("REV 1", { exact: true })).toBeVisible();
@@ -109,6 +117,8 @@ test("Gateway and Mock share the same Settings visual contract", async ({ page }
   const mockPage = await page.locator(".settingsPage").boundingBox();
 
   expect(mockVisual).toEqual(gatewayVisual);
+  expect(gatewayVisual.fieldHeight).toBe(40);
+  expect(gatewayVisual.primaryActionHeight).toBe(40);
   expect(gatewayCanvas).not.toBeNull();
   expect(gatewayPage).not.toBeNull();
   expect(mockCanvas).not.toBeNull();
