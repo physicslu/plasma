@@ -8,6 +8,16 @@ import {
   type MockOperationProfile,
   type MockRuntimeSettings,
 } from "../mock-runtime-api";
+import {
+  SettingsActions,
+  SettingsCard,
+  SettingsField,
+  SettingsGrid,
+  SettingsGuide,
+  SettingsMessage,
+  SettingsMetaGrid,
+  SettingsPage,
+} from "../operator-ui/settings-ui";
 import { useWorkspaceSession } from "../workspace-session";
 import "./mock-runtime-settings.css";
 
@@ -227,18 +237,16 @@ export default function MockRuntimeSettingsPanel() {
   }
 
   return (
-    <div className="mockRuntimePanel">
-      <header className="mockRuntimeHeader">
-        <div>
-          <small>{text.eyebrow}</small>
-          <h2>{text.title}</h2>
-          <p>{text.subtitle}</p>
-        </div>
-        <div className="mockRevisionBadge">REV {applied.revision}</div>
-      </header>
-
-      <section className="mockRuntimeControls" aria-label="Mock runtime controls">
-        <label className="mockRuntimeToggle">
+    <SettingsPage
+      className="mockRuntimePanel"
+      ariaLabel="Mock Runtime Settings"
+      eyebrow={text.eyebrow}
+      title={text.title}
+      subtitle={text.subtitle}
+      revision={applied.revision}
+    >
+      <SettingsCard ariaLabel="Mock runtime controls">
+        <label className="settingsToggle">
           <input
             type="checkbox"
             checked={draft.enabled}
@@ -247,9 +255,8 @@ export default function MockRuntimeSettingsPanel() {
           <span>{text.profileEnabled}</span>
         </label>
 
-        <div className="mockRuntimeMetaGrid">
-          <label>
-            <span>{text.imageSize}</span>
+        <SettingsGrid columns={3}>
+          <SettingsField label={text.imageSize}>
             <input
               type="number"
               min={64}
@@ -261,9 +268,8 @@ export default function MockRuntimeSettingsPanel() {
                 default_image_size_bytes: Number(event.target.value) * 1024,
               })}
             />
-          </label>
-          <label>
-            <span>{text.seedMode}</span>
+          </SettingsField>
+          <SettingsField label={text.seedMode}>
             <select
               value={draft.seed.mode}
               onChange={event => {
@@ -280,9 +286,8 @@ export default function MockRuntimeSettingsPanel() {
               <option value="auto">{text.auto}</option>
               <option value="fixed">{text.fixed}</option>
             </select>
-          </label>
-          <label>
-            <span>{text.fixedSeed}</span>
+          </SettingsField>
+          <SettingsField label={text.fixedSeed}>
             <input
               type="number"
               min={0}
@@ -294,8 +299,8 @@ export default function MockRuntimeSettingsPanel() {
                 seed: { ...draft.seed, fixed_seed: Number(event.target.value) },
               })}
             />
-          </label>
-        </div>
+          </SettingsField>
+        </SettingsGrid>
 
         <div className="mockOperationTableWrap">
           <table className="mockOperationTable">
@@ -366,15 +371,15 @@ export default function MockRuntimeSettingsPanel() {
           </table>
         </div>
 
-        <p className="mockRuntimeHint">{text.probabilityHint}</p>
-        {!valid && <p className="mockRuntimeValidation" role="alert">{text.validation}</p>}
-        {error && <p className="mockRuntimeValidation" role="alert">{error}</p>}
-        {notice && <p className="mockRuntimeNotice" role="status">{notice}</p>}
+        <p className="settingsHint">{text.probabilityHint}</p>
+        {!valid && <SettingsMessage tone="error" role="alert">{text.validation}</SettingsMessage>}
+        {error && <SettingsMessage tone="error" role="alert">{error}</SettingsMessage>}
+        {notice && <SettingsMessage tone="success" role="status">{notice}</SettingsMessage>}
 
-        <div className="mockRuntimeActions">
+        <SettingsActions>
           <button
             type="button"
-            className="mockApplyButton"
+            data-variant="primary"
             disabled={!valid || saving}
             onClick={applySettings}
           >
@@ -391,76 +396,63 @@ export default function MockRuntimeSettingsPanel() {
           >
             {text.reset}
           </button>
-        </div>
-      </section>
+        </SettingsActions>
+      </SettingsCard>
 
-      <section className="mockAppliedSummary" aria-label={text.applied}>
-        <div className="mockAppliedHeader">
-          <div>
-            <small>SERVER-AUTHORITATIVE SNAPSHOT SOURCE</small>
-            <h3>{text.applied}</h3>
-          </div>
-          <p>{text.persistenceHint}</p>
+      <SettingsCard
+        ariaLabel={text.applied}
+        eyebrow="SERVER-AUTHORITATIVE SNAPSHOT SOURCE"
+        title={text.applied}
+        description={text.persistenceHint}
+      >
+        <SettingsMetaGrid
+          items={[
+            { key: "profile", label: text.profileId, value: applied.profile_id },
+            { key: "revision", label: text.revision, value: applied.revision },
+            { key: "seed", label: text.seed, value: applied.seed.mode === "fixed" ? `fixed · ${applied.seed.fixed_seed}` : "auto" },
+            { key: "image", label: text.imageSize, value: `${applied.default_image_size_bytes / 1024} KiB` },
+          ]}
+        />
+        <div className="mockOperationTableWrap">
+          <table className="mockAppliedTable">
+            <thead>
+              <tr>
+                <th>{text.operation}</th>
+                <th>{text.errorRate}</th>
+                <th>{text.baseTime}</th>
+                <th>{text.throughput}</th>
+                <th>{text.jitter}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operationOrder.map(operation => {
+                const profile = applied.operations[operation];
+                return (
+                  <tr key={operation}>
+                    <th scope="row">{operationLabel(operation)}</th>
+                    <td>{(profile.error_rate_per_mille / 10).toFixed(1)}%</td>
+                    <td>{profile.base_time_ms} ms</td>
+                    <td>{Math.round(profile.throughput_bytes_per_second / 1024)} KiB/s</td>
+                    <td>±{profile.jitter_ms} ms</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-        <dl className="mockAppliedMeta">
-          <div><dt>{text.profileId}</dt><dd>{applied.profile_id}</dd></div>
-          <div><dt>{text.revision}</dt><dd>{applied.revision}</dd></div>
-          <div><dt>{text.seed}</dt><dd>{applied.seed.mode === "fixed" ? `fixed · ${applied.seed.fixed_seed}` : "auto"}</dd></div>
-          <div><dt>{text.imageSize}</dt><dd>{applied.default_image_size_bytes / 1024} KiB</dd></div>
-        </dl>
-        <table className="mockAppliedTable">
-          <thead>
-            <tr>
-              <th>{text.operation}</th>
-              <th>{text.errorRate}</th>
-              <th>{text.baseTime}</th>
-              <th>{text.throughput}</th>
-              <th>{text.jitter}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {operationOrder.map(operation => {
-              const profile = applied.operations[operation];
-              return (
-                <tr key={operation}>
-                  <th scope="row">{operationLabel(operation)}</th>
-                  <td>{(profile.error_rate_per_mille / 10).toFixed(1)}%</td>
-                  <td>{profile.base_time_ms} ms</td>
-                  <td>{Math.round(profile.throughput_bytes_per_second / 1024)} KiB/s</td>
-                  <td>±{profile.jitter_ms} ms</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </section>
+      </SettingsCard>
 
-      <section className="mockRuntimeGuide" aria-label="Mock Settings Guide">
-        <header>
-          <small>{guide.eyebrow}</small>
-          <h3>{guide.title}</h3>
-          <p>{guide.intro}</p>
-        </header>
-        <div className="mockRuntimeGuideGrid">
-          <article>
-            <dl>
-              {guide.items.map(([term, description]) => (
-                <div key={term}><dt>{term}</dt><dd>{description}</dd></div>
-              ))}
-            </dl>
-          </article>
-          <article>
-            <h4>{guide.testTitle}</h4>
-            <p>{guide.testIntro}</p>
-            <ol>
-              {guide.tests.map(([name, description]) => (
-                <li key={name}><b>{name}</b><span>{description}</span></li>
-              ))}
-            </ol>
-          </article>
-        </div>
-        <p className="mockRuntimeCaution">{guide.caution}</p>
-      </section>
-    </div>
+      <SettingsGuide
+        ariaLabel="Mock Settings Guide"
+        eyebrow={guide.eyebrow}
+        title={guide.title}
+        intro={guide.intro}
+        items={guide.items.map(([term, description]) => ({ term, description }))}
+        testTitle={guide.testTitle}
+        testIntro={guide.testIntro}
+        tests={guide.tests.map(([title, description]) => ({ title, description }))}
+        caution={guide.caution}
+      />
+    </SettingsPage>
   );
 }
