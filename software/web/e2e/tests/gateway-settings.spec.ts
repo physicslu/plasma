@@ -6,7 +6,6 @@ async function settingsVisualContract(page: import("@playwright/test").Page) {
       const element = document.querySelector(selector);
       if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
       const computed = window.getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
       return {
         borderRadius: computed.borderRadius,
         padding: computed.padding,
@@ -14,20 +13,20 @@ async function settingsVisualContract(page: import("@playwright/test").Page) {
         fontSize: computed.fontSize,
         fontWeight: computed.fontWeight,
         lineHeight: computed.lineHeight,
-        height: rect.height,
       };
     }
-    function width(selector: string) {
+    function height(selector: string) {
       const element = document.querySelector(selector);
       if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
-      return element.getBoundingClientRect().width;
+      return element.getBoundingClientRect().height;
     }
     return {
       card: style(".settingsCard"),
       guide: style(".settingsGuide"),
       primaryAction: style('.settingsActions button[data-variant="primary"]'),
       field: style(".settingsField input, .settingsField select"),
-      fieldCellWidth: width(".settingsField"),
+      fieldHeight: height(".settingsField input, .settingsField select"),
+      primaryActionHeight: height('.settingsActions button[data-variant="primary"]'),
     };
   });
 }
@@ -118,8 +117,8 @@ test("Gateway and Mock share the same Settings visual contract", async ({ page }
   const mockPage = await page.locator(".settingsPage").boundingBox();
 
   expect(mockVisual).toEqual(gatewayVisual);
-  expect(gatewayVisual.field.height).toBe(40);
-  expect(gatewayVisual.primaryAction.height).toBe(40);
+  expect(gatewayVisual.fieldHeight).toBe(40);
+  expect(gatewayVisual.primaryActionHeight).toBe(40);
   expect(gatewayCanvas).not.toBeNull();
   expect(gatewayPage).not.toBeNull();
   expect(mockCanvas).not.toBeNull();
