@@ -13,17 +13,18 @@ const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-stor
 const serverBatchRuntime = fs.readFileSync(new URL("../../python/plasma_web/batch_runtime.py", import.meta.url), "utf8");
 
 test("Production and Engineering share neutral operator summary primitives", () => {
-  assert.match(pmod, /OperatorKpiStrip/);
+  assert.match(pmod, /BatchSummary/);
   assert.match(pmod, /OperatorPanel/);
-  assert.match(operatorPanel, /BatchSummary as OperatorKpiStrip/);
-  assert.doesNotMatch(operatorPanel, /export function OperatorKpiStrip/);
+  assert.doesNotMatch(pmod, /OperatorKpiStrip/);
   assert.match(operatorPanel, /export function OperatorPanel/);
+  assert.doesNotMatch(operatorPanel, /BatchSummary|OperatorKpiStrip|operatorKpiStrip/);
   assert.match(batchSummaryCss, /\.batchSummaryGrid/);
   assert.doesNotMatch(batchSummaryCss, /\.operatorKpiStrip/);
   assert.match(operatorCss, /\.operatorPanel/);
   assert.doesNotMatch(operatorCss, /\.operatorKpiStrip|\.batchSummaryGrid/);
 
-  assert.match(emode, /OperatorKpiStrip/);
+  assert.match(emode, /BatchSummary/);
+  assert.doesNotMatch(emode, /OperatorKpiStrip/);
   assert.match(emode, /ariaLabel="Engineering Batch Summary"/);
   assert.match(emode, /PROGRAMMING JOB/);
   assert.match(emode, /LIVE SITE STATUS/);
