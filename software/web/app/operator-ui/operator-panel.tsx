@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import "./operator-panel.css";
+import "./batch-summary.css";
 
 export type OperatorKpi = {
   key: string;
@@ -8,19 +9,21 @@ export type OperatorKpi = {
   tone?: "neutral" | "info" | "pass" | "fail";
 };
 
-export function OperatorKpiStrip({
-  items,
-  ariaLabel,
-  title,
-  meta,
-}: {
+export type BatchSummaryProps = {
   items: OperatorKpi[];
   ariaLabel: string;
   title?: string;
   meta?: ReactNode;
-}) {
+};
+
+export function BatchSummary({
+  items,
+  ariaLabel,
+  title,
+  meta,
+}: BatchSummaryProps) {
   return (
-    <section className={`operatorKpiSummary ${title ? "has-title" : ""}`.trim()} aria-label={ariaLabel}>
+    <section className={`batchSummary operatorKpiSummary ${title ? "has-title" : ""}`.trim()} aria-label={ariaLabel}>
       {title && (
         <header className="operatorKpiSummaryHeader">
           <strong>{title}</strong>
@@ -37,6 +40,13 @@ export function OperatorKpiStrip({
       </div>
     </section>
   );
+}
+
+/* Compatibility entry point for existing PMode / EMode call sites. Both now
+ * render the canonical shared BatchSummary component and therefore cannot
+ * drift visually through separate markup implementations. */
+export function OperatorKpiStrip(props: BatchSummaryProps) {
+  return <BatchSummary {...props} />;
 }
 
 export function OperatorPanel({
