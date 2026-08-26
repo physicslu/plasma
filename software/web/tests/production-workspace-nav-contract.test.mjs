@@ -28,10 +28,10 @@ test("retired Production Single PPU route redirects to the Factory Console", asy
   assert.match(renderNavigation, /window\.history\.replaceState/);
 });
 
-test("Production reclaims the viewport budget previously consumed by the removed workspace navigation", async () => {
-  const css = await source("../app/fleet/fps-selector-layout.css");
+test("Factory Console v2 owns the Production viewport without retired selector layout CSS", async () => {
+  const css = await source("../app/fleet/factory-console-v2.css");
 
-  assert.match(css, /height:\s*min\(960px, calc\(100dvh - 150px\)\)/);
-  assert.match(css, /max-height:\s*min\(960px, calc\(100dvh - 150px\)\)/);
-  assert.doesNotMatch(css, /100dvh - 200px/);
+  assert.match(css, /\.factoryConsoleV2\s*\{[\s\S]*min-height:\s*100vh/);
+  assert.match(css, /\.factoryConsoleV2\s*\{[\s\S]*padding:\s*10px 12px 22px/);
+  assert.doesNotMatch(css, /productionPrototypePage|fpsSelector/);
 });
