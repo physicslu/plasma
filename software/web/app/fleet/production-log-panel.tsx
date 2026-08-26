@@ -8,6 +8,7 @@ import {
   type OperatorLogEntry,
 } from "../operator-ui/operator-log-panel";
 import { useWorkspaceSession } from "../workspace-session";
+import "./production-log-placement.css";
 
 export type ProductionLogEntry = {
   id: number;
@@ -91,7 +92,7 @@ export default function ProductionLogPanel({ logs, title, clearLabel, onClear }:
       downloadFilenamePrefix="plasma-production"
       filterAriaLabel="Production log filters"
       logAriaLabel="Production batch log"
-      className="productionLogCard productionOperatorLog"
+      className="productionOperatorLog"
     />
   );
 }
