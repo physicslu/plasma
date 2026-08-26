@@ -59,8 +59,6 @@ test("Engineering direct Jobs use client Gateway policy while server Batch freez
   assert.match(engineeringWorkspace, /withCommunicationRetry/);
   assert.match(engineeringWorkspace, /getGatewayLiveness/);
   assert.match(engineeringWorkspace, /GatewayUnavailableError/);
-  assert.match(engineeringWorkspace, /isolateFailedPpu/);
-  assert.match(engineeringWorkspace, /CANCEL RECONCILIATION PENDING/);
   assert.match(engineeringWorkspace, /Server Batch Runtime freezes its own authoritative Gateway policy at START/);
   assert.match(plasmaApi, /inFlightJobSnapshots/);
   assert.match(plasmaApi, /readonly transient = false/);
@@ -68,6 +66,8 @@ test("Engineering direct Jobs use client Gateway policy while server Batch freez
   assert.match(serverBatchRuntime, /gateway_policy=self\.gateway_settings\.snapshot\(\)/);
   assert.match(serverBatchRuntime, /retries = batch\.gateway_policy\.ppu_retry_count if retryable else 0/);
   assert.match(serverBatchRuntime, /timeout=batch\.gateway_policy\.request_timeout_s/);
+  assert.match(serverBatchRuntime, /batch\.failed_ppus\.add\(ppu_key\)/);
+  assert.match(serverBatchRuntime, /_cancel_active_jobs\(batch, ppu_key=ppu_key\)/);
 });
 
 test("manufacturing Yield is undefined until an IC has a PASS or FAIL outcome", () => {
