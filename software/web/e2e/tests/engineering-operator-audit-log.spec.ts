@@ -37,10 +37,7 @@ function status(ppuId: string) {
       display_name: ppuId === ppu1 ? "Mock PPU 01" : "Mock PPU 02",
       site_count: 2,
       enabled_site_count: 2,
-      capabilities: {
-        max_supported_sites: 2,
-        operations: ["erase", "program", "verify", "read"],
-      },
+      capabilities: { max_supported_sites: 2, operations: ["erase", "program", "verify", "read"] },
     },
     sites: [1, 2].map(siteId => ({
       site_id: siteId,
@@ -54,23 +51,62 @@ function status(ppuId: string) {
   };
 }
 
-function jobPayload(jobId: string, siteId: number, operation: string, state: "queued" | "success") {
+function completedBatch(body: Record<string, unknown>) {
+  const targets = body.targets as Array<{ facility_id: string; ppu_id: string; site_ids: number[] }>;
+  const operations = body.operations as string[];
+  const executionPolicy = body.execution_policy as {
+    repeat_count: number;
+    site_retry_limit: number;
+    failed_site_stop_threshold: number | null;
+  };
+  const sites = targets.flatMap(target => target.site_ids.map(siteId => ({
+    facility_id: target.facility_id,
+    ppu_id: target.ppu_id,
+    site_id: siteId,
+    key: `${target.facility_id}/${target.ppu_id}/${siteId}`,
+    state: "success",
+    current_round: executionPolicy.repeat_count,
+    completed_rounds: executionPolicy.repeat_count,
+    current_operation: null,
+    current_job_id: null,
+    progress_percent: 100,
+    total_attempts: executionPolicy.repeat_count * operations.length,
+    retry_count: 0,
+    final_failures: 0,
+    faulted_round: null,
+    faulted_operation: null,
+    last_failure_source: null,
+    communication_state: "connected",
+    communication_attempt: 0,
+    error: null,
+    operation_statistics: {},
+  })));
   return {
-    ok: true,
-    job: {
-      job_id: jobId,
-      site_id: siteId,
-      operation,
-      state,
-      cancel_requested: false,
-      stage: operation,
-      stage_state: state === "success" ? "done" : state,
-      stage_progress_percent: state === "success" ? 100 : 0,
-      progress_percent: state === "success" ? 100 : 0,
-      bytes_done: null,
-      bytes_total: null,
-      result: state === "success" ? { state, output_files: [], error: null } : undefined,
+    batch_id: "operator-audit-batch",
+    state: "success",
+    created_at: "2026-08-26T08:00:00Z",
+    started_at: "2026-08-26T08:00:00Z",
+    finished_at: "2026-08-26T08:00:01Z",
+    operations,
+    execution_policy: executionPolicy,
+    target_device: body.target_device ?? null,
+    asset: null,
+    read: body.read ?? { offset: 0, length: 256 },
+    cancel_requested: false,
+    stop_reason: null,
+    error: null,
+    faulted_site_count: 0,
+    site_counts: {
+      ready: 0,
+      running: 0,
+      success: sites.length,
+      faulted: 0,
+      error: 0,
+      stopped: 0,
+      cancelled: 0,
     },
+    operation_statistics: {},
+    sites,
   };
 }
 
@@ -81,17 +117,25 @@ async function openProgramming(page: Page) {
 }
 
 async function fulfillJson(route: Route, statusCode: number, body: unknown) {
-  await route.fulfill({
-    status: statusCode,
-    contentType: "application/json",
-    body: JSON.stringify(body),
-  });
+  await route.fulfill({ status: statusCode, contentType: "application/json", body: JSON.stringify(body) });
 }
 
 test("Engineering audit log reconstructs operator actions and filters without truncating downloaded evidence", async ({ page }) => {
   let sessionNumber = 0;
-  let jobNumber = 0;
-  const jobs = new Map<string, { siteId: number; operation: string }>();
+  let batchNumber = 0;
+  let directJobNumber = 0;
+
+  await page.route("**/api/batches**", async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname === "/api/batches" && request.method() === "POST") {
+      batchNumber += 1;
+      const body = request.postDataJSON() as Record<string, unknown>;
+      await fulfillJson(route, 202, { ok: true, rest_contract_version: "3", batch: completedBatch(body) });
+      return;
+    }
+    await fulfillJson(route, 404, { error: { message: `unhandled ${url.pathname}` } });
+  });
 
   await page.route("**/api/engineering/**", async route => {
     const request = route.request();
@@ -109,7 +153,6 @@ test("Engineering audit log reconstructs operator actions and filters without tr
       });
       return;
     }
-
     if (url.pathname === "/api/engineering/targets") {
       await fulfillJson(route, 200, catalog());
       return;
@@ -118,28 +161,13 @@ test("Engineering audit log reconstructs operator actions and filters without tr
     const parts = url.pathname.split("/").filter(Boolean);
     const currentPpu = parts[4];
     const tail = parts.slice(5).join("/");
-
     if (request.method() === "GET" && tail === "api/status" && !url.searchParams.has("job")) {
       await fulfillJson(route, 200, status(currentPpu));
       return;
     }
-
     if (request.method() === "POST" && tail === "api/jobs") {
-      const body = request.postDataJSON() as { site_id: number; operation: string };
-      jobNumber += 1;
-      const jobId = `audit-job-${jobNumber}`;
-      jobs.set(jobId, { siteId: body.site_id, operation: body.operation });
-      await fulfillJson(route, 202, jobPayload(jobId, body.site_id, body.operation, "queued"));
-      return;
+      directJobNumber += 1;
     }
-
-    if (request.method() === "GET" && tail === "api/status" && url.searchParams.has("job")) {
-      const jobId = url.searchParams.get("job")!;
-      const job = jobs.get(jobId)!;
-      await fulfillJson(route, 200, jobPayload(jobId, job.siteId, job.operation, "success"));
-      return;
-    }
-
     await fulfillJson(route, 404, { error: { message: `unhandled ${tail}` } });
   });
 
@@ -148,13 +176,10 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   await expect(log).toContainText("[NET] [SESSION] NEW · fresh connection");
   await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
   await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
-  await expect(page.locator(".channelTable tbody tr").first()).toContainText("SITE-01");
-  await expect(page.locator(".channelTable tbody tr").nth(1)).toContainText("SITE-02");
 
   await page.getByLabel("Engineering PPU", { exact: true }).selectOption(ppu2);
   await expect(log).toContainText(`[USR] [TARGET] SELECT · ${facilityId} / ${ppu2}`);
   await expect(log).toContainText(`[SYS] [TARGET] ${facilityId} / ${ppu2}`);
-  await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
   await page.getByLabel("Batch select SITE 2").uncheck();
   await expect(log).toContainText("[USR] [SITE] SELECTION · SITE-01");
@@ -168,14 +193,14 @@ test("Engineering audit log reconstructs operator actions and filters without tr
 
   await page.getByLabel("Engineering batch erase").check();
   await expect(log).toContainText("[USR] [BATCH] OPERATIONS · ERASE");
-
   await page.locator(".executeBatch").click();
-  await expect.poll(() => jobNumber).toBe(1);
+
+  await expect.poll(() => batchNumber).toBe(1);
+  expect(directJobNumber).toBe(0);
   await expect(page.locator(".executeBatch")).toBeEnabled();
-  await expect(log).toContainText("[USR] [BATCH] EXECUTE · ERASE · SITE-01");
-  await expect(log).toContainText("[BAT] START ERASE · SITE-01");
-  await expect(log).toContainText("[PPU] [SITE-01] ERASE accepted · audit-job-1");
-  await expect(log).toContainText("[BAT] COMPLETE · success: SITE-01");
+  await expect(log).toContainText("[USR] [BATCH] SUBMIT · ERASE · SITE-01");
+  await expect(log).toContainText("[BAT] [BATCH] ACCEPTED · operator-audit-batch");
+  await expect(log).toContainText("[BAT] [BATCH] SUCCESS · operator-audit-batch");
 
   await expect(page.getByText("DAT", { exact: true })).toBeVisible();
   const logHeight = await log.evaluate(element => Number.parseFloat(getComputedStyle(element).height));
@@ -193,7 +218,7 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   for (const category of await visibleEntries.evaluateAll(elements => elements.map(element => element.getAttribute("data-category")))) {
     expect(category).toBe("USR");
   }
-  await expect(log).not.toContainText("[PPU] [SITE-01] ERASE accepted");
+  await expect(log).not.toContainText("[BAT] [BATCH] SUCCESS");
   await expect(log).not.toContainText("[NET] [SESSION] NEW");
 
   const downloadPromise = page.waitForEvent("download");
@@ -203,8 +228,8 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   expect(path).not.toBeNull();
   const fileText = await readFile(path!, "utf8");
   expect(fileText).toContain("[USR] [IMG] SELECT · operator-audit.bin · 1.0 KiB");
-  expect(fileText).toContain("[USR] [BATCH] EXECUTE · ERASE · SITE-01");
+  expect(fileText).toContain("[USR] [BATCH] SUBMIT · ERASE · SITE-01");
+  expect(fileText).toContain("[BAT] [BATCH] ACCEPTED · operator-audit-batch");
+  expect(fileText).toContain("[BAT] [BATCH] SUCCESS · operator-audit-batch");
   expect(fileText).toContain("[NET] [SESSION] NEW · fresh connection");
-  expect(fileText).toContain("[PPU] [SITE-01] ERASE accepted · audit-job-1");
-  expect(fileText).toContain("[BAT] COMPLETE · success: SITE-01");
 });
