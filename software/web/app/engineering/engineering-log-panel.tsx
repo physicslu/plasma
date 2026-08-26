@@ -1,10 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useI18n } from "../i18n";
+import {
+  OPERATOR_LOG_CATEGORIES,
+  OperatorLogPanel,
+  operatorLogCategoryLabel,
+  type OperatorLogCategory,
+  type OperatorLogEntry,
+} from "../operator-ui/operator-log-panel";
 import { useWorkspaceSession } from "../workspace-session";
 
-export type EngineeringLogCategory = "USR" | "NET" | "PPU" | "DAT" | "BAT" | "SYS";
+export type EngineeringLogCategory = OperatorLogCategory;
 
 export type EngineeringLogEntry = {
   id: number;
@@ -13,14 +20,7 @@ export type EngineeringLogEntry = {
   category: EngineeringLogCategory;
 };
 
-export const ENGINEERING_LOG_CATEGORIES: EngineeringLogCategory[] = [
-  "USR",
-  "NET",
-  "PPU",
-  "DAT",
-  "BAT",
-  "SYS",
-];
+export const ENGINEERING_LOG_CATEGORIES: EngineeringLogCategory[] = OPERATOR_LOG_CATEGORIES;
 
 export function classifyEngineeringLog(message: string): EngineeringLogCategory {
   if (
@@ -42,7 +42,7 @@ export function classifyEngineeringLog(message: string): EngineeringLogCategory 
 }
 
 export function engineeringLogCategoryLabel(category: EngineeringLogCategory): string {
-  return category.padEnd(3, " ");
+  return operatorLogCategoryLabel(category);
 }
 
 function engineeringLogText(entry: EngineeringLogEntry): string {
@@ -54,11 +54,6 @@ function engineeringLogText(entry: EngineeringLogEntry): string {
     .replace(/ · offset \d+ · length \d+/gi, " · MAIN FLASH");
 }
 
-function logDownloadTimestamp(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-}
-
 type EngineeringLogPanelProps = {
   logs: EngineeringLogEntry[];
   onClear: () => void;
@@ -67,13 +62,19 @@ type EngineeringLogPanelProps = {
 export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPanelProps) {
   const { t } = useI18n();
   const { sessionAuditEntries, clearSessionAuditEntries } = useWorkspaceSession();
-  const [visibleCategories, setVisibleCategories] = useState<EngineeringLogCategory[]>(ENGINEERING_LOG_CATEGORIES);
-  const allLogs = useMemo<EngineeringLogEntry[]>(() => {
-    const localLogs = logs.filter(log => !log.text.includes("[SESSION] ACTIVE ·"));
-    const sessionLogs: EngineeringLogEntry[] = sessionAuditEntries.map(entry => ({
+  const allLogs = useMemo<OperatorLogEntry[]>(() => {
+    const localLogs = logs
+      .filter(log => !log.text.includes("[SESSION] ACTIVE ·"))
+      .map(log => ({
+        id: log.id,
+        text: engineeringLogText(log),
+        level: log.error ? "error" as const : "info" as const,
+        category: log.category,
+      }));
+    const sessionLogs: OperatorLogEntry[] = sessionAuditEntries.map(entry => ({
       id: -entry.id,
       text: `${entry.time}  [NET] ${entry.message}`,
-      error: false,
+      level: "info",
       category: "NET",
     }));
     return [...localLogs, ...sessionLogs].sort((left, right) => {
@@ -81,31 +82,6 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
       return timeOrder || right.id - left.id;
     });
   }, [logs, sessionAuditEntries]);
-  const visibleLogs = useMemo(
-    () => allLogs.filter(log => visibleCategories.includes(log.category)),
-    [allLogs, visibleCategories],
-  );
-  const allVisible = visibleCategories.length === ENGINEERING_LOG_CATEGORIES.length;
-
-  function toggleCategory(category: EngineeringLogCategory) {
-    setVisibleCategories(current => current.includes(category)
-      ? current.filter(item => item !== category)
-      : ENGINEERING_LOG_CATEGORIES.filter(item => current.includes(item) || item === category));
-  }
-
-  function downloadLog() {
-    if (!allLogs.length) return;
-    const content = `${allLogs.map(engineeringLogText).join("\n")}\n`;
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `plasma-engineering-${logDownloadTimestamp(new Date())}.log`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
-  }
 
   function clearLog() {
     onClear();
@@ -113,48 +89,15 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
   }
 
   return (
-    <section className="logCard engineeringLogCard">
-      <div className="logHead engineeringLogHead">
-        <div className="engineeringLogTitle"><span />{t("engineeringProgramming.jobLog")}</div>
-        <div className="engineeringLogActions">
-          <button type="button" onClick={downloadLog} disabled={!allLogs.length}>Download .log</button>
-          <button type="button" onClick={clearLog}>{t("engineeringProgramming.clear")}</button>
-        </div>
-      </div>
-      <div className="engineeringLogFilters" role="group" aria-label="Engineering log filters">
-        <button
-          type="button"
-          className={allVisible ? "active" : ""}
-          aria-pressed={allVisible}
-          onClick={() => setVisibleCategories(ENGINEERING_LOG_CATEGORIES)}
-        >
-          ALL
-        </button>
-        {ENGINEERING_LOG_CATEGORIES.map(category => (
-          <label key={category} className={visibleCategories.includes(category) ? "active" : ""}>
-            <input
-              type="checkbox"
-              aria-label={`Engineering log filter ${category}`}
-              checked={visibleCategories.includes(category)}
-              onChange={() => toggleCategory(category)}
-            />
-            <span>{engineeringLogCategoryLabel(category)}</span>
-          </label>
-        ))}
-      </div>
-      <pre aria-label="Engineering job log">
-        {visibleLogs.length
-          ? visibleLogs.map(log => (
-            <span
-              key={`${log.category}-${log.id}`}
-              data-level={log.error ? "error" : "info"}
-              data-category={log.category}
-            >
-              {engineeringLogText(log)}
-            </span>
-          ))
-          : "No log entries for selected filters."}
-      </pre>
-    </section>
+    <OperatorLogPanel
+      entries={allLogs}
+      title={t("engineeringProgramming.jobLog")}
+      clearLabel={t("engineeringProgramming.clear")}
+      onClear={clearLog}
+      downloadFilenamePrefix="plasma-engineering"
+      filterAriaLabel="Engineering log filters"
+      logAriaLabel="Engineering job log"
+      className="engineeringOperatorLog"
+    />
   );
 }
