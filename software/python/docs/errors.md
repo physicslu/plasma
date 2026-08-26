@@ -1,6 +1,6 @@
 # Plasma 錯誤碼
 
-| Code | v3.2 Type | 說明 |
+| Code | Protocol v3.3 Type | 說明 |
 |---|---|---|
 | E1001 | INVALID_ARGUMENT | CLI、map、timeout、Site ID 或其他參數錯誤 |
 | E1002 | CONFIG_INVALID | YAML 或 Site 設定不合法 |
@@ -18,6 +18,9 @@
 | E4004 | JOB_NOT_FOUND | Job ID 不存在 |
 | E4005 | OPERATION_UNSUPPORTED | 操作不支援 |
 | E4006 | DUPLICATE_JOB | Job ID 重複 |
+| E4007 | BATCH_NOT_FOUND | Batch ID 不存在 |
+| E4008 | BATCH_SITE_FAILURE_THRESHOLD_EXCEEDED | FAULTED Site 數達到 Batch stop threshold |
+| E4009 | BATCH_INFRASTRUCTURE_ERROR | Batch runtime、Gateway 或 PPU 通訊基礎設施異常 |
 | E5001 | TARGET_NOT_FOUND | 找不到 target（預留實機） |
 | E5002 | INTERFACE_FAILURE | OpenOCD／FPGA 介面錯誤，或無法完成安全關閉 |
 | E5003 | INTERFACE_NOT_CONFIGURED | 硬體介面尚未配置或實作 |
@@ -31,15 +34,7 @@
 | E9001 | INTERNAL_ERROR | 未預期的軟體錯誤 |
 | E9002 | JOB_ABORTED | Server 重啟時發現未完成 Job |
 
-Protocol v3.1 compatibility response 仍以相同數值 E4001/E4002/E4003 序列化 legacy 名稱：
-
-```text
-v3.2 SITE_INVALID   <-> v3.1 CHANNEL_INVALID
-v3.2 SITE_DISABLED  <-> v3.1 CHANNEL_DISABLED
-v3.2 SITE_BUSY      <-> v3.1 CHANNEL_BUSY
-```
-
-錯誤碼數值沒有因 domain rename 重新編號；差異只在 protocol-version-specific `error_type` 字串。
+Protocol v3.3 是唯一 canonical runtime wire contract。Current runtime 只序列化 `SITE_INVALID`、`SITE_DISABLED` 與 `SITE_BUSY`；不提供退休的 Channel error aliases。
 
 `recoverable=true` 只表示軟體允許依政策重試，不代表重試必然安全。對於不確定 target 是否已部分寫入的操作，handler 必須先執行明確的復原流程，例如 reset、重新 halt 與完整 erase。
 

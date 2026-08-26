@@ -38,7 +38,7 @@ Facility -> PPU -> Site
 SITE 1 .. SITE N
 ```
 
-The canonical TCP wire contract is Plasma Protocol v3.2 (`PLASMA32`, one-based `site_id`). Protocol v3.1 zero-based `channel_id` exists only in explicit compatibility code/tests.
+The canonical TCP wire contract is Plasma Protocol v3.3 (`PLASMA33`, one-based `site_id`). Retired zero-based Channel identity is not accepted by the current runtime.
 
 ## 3. Role boundaries
 
@@ -174,7 +174,7 @@ cd "$PLASMA_REPO/software/python"
 .venv/bin/python -m pytest -q
 ```
 
-The Python domain is canonical PPU/Site. New code must not introduce `SITE 0` or treat v3.1 `channel_id` as numerically identical to v3.2 `site_id`.
+The Python domain is canonical PPU/Site. New code must not introduce `SITE 0` or restore retired zero-based Channel identity.
 
 ## 9. Web development
 
@@ -193,7 +193,7 @@ The current UI is the **Plasma PPU Console**. It discovers PPU/Site topology dyn
 
 | Service | Default port | Role |
 |---|---:|---|
-| Plasma PPU Programming Server | 9900 | Plasma Protocol v3.2 TCP Server |
+| Plasma PPU Programming Server | 9900 | Plasma Protocol v3.3 TCP Server |
 | Plasma Web REST Gateway | 18080 | HTTP REST boundary for the Web Console |
 | Plasma PPU Console development/demo service | 5173 | Vite/Vinext Web runtime |
 
@@ -221,7 +221,7 @@ Keep these out of the public repository:
 - personal usernames and email addresses in public documentation
 - private DNS/VPN hostnames
 - workstation-specific absolute home paths
-- customer firmware and customer credentials
+- customer Programming Images and customer credentials
 - production certificates/tokens
 
 Generic architecture, service contracts, port assignments, target manifests, tests, and public API behavior may remain documented when intentionally part of the project interface.

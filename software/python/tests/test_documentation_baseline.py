@@ -20,6 +20,7 @@ CURRENT_GUIDANCE = (
     "docs/architecture/domain-naming-migration.md",
     "docs/architecture/ppu-facility-sites.md",
     "docs/architecture/configuration-architecture.md",
+    "docs/architecture/gateway-communication-recovery.md",
     "docs/architecture/manager-readonly-fleet-aggregation.md",
     "docs/deployment/README.md",
     "docs/deployment/web-runtime-hygiene.md",
@@ -28,6 +29,7 @@ CURRENT_GUIDANCE = (
     "docs/development/fpga-verification-guide.md",
     "docs/development/local-ai-development-guide.md",
     "docs/development/multi-machine-development-guide.md",
+    "docs/operator/plasma-console-guide.md",
     "docs/development/swpc-deployment.md",
     "docs/development/vscode-remote-workspace.md",
     "pl/AGENTS.md",
@@ -61,6 +63,8 @@ CANONICAL_V33_GUIDANCE = (
     "software/web/README.md",
     "docs/architecture/domain-naming-migration.md",
     "docs/architecture/ppu-facility-sites.md",
+    "docs/architecture/configuration-architecture.md",
+    "docs/architecture/gateway-communication-recovery.md",
     "docs/development/swpc-deployment.md",
 )
 

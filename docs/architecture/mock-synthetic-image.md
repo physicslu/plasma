@@ -8,7 +8,7 @@ Canonical parent specification: `docs/architecture/mock-runtime-v1.1.md`.
 
 Mock Runtime must be able to exercise Program and Verify without requiring an operator to prepare an arbitrary BIN file first. The server may therefore create one deterministic **Mock Synthetic Image** when a Mock execution needs an Image and the operator did not select one.
 
-This is test infrastructure, not firmware generation and not a substitute for a real customer Programming Image.
+This is test infrastructure, not customer Image generation and not a substitute for a real customer Programming Image.
 
 ## 2. Selection precedence
 
@@ -148,7 +148,7 @@ Merge-ready validation must cover at least:
 
 Synthetic Image support does not mean:
 
-- Plasma can generate customer firmware;
+- Plasma can generate a customer Programming Image;
 - a real PPU may omit its Programming Image;
 - a real IC algorithm is validated;
 - Synthetic data models real application contents;

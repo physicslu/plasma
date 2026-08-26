@@ -14,7 +14,7 @@ from plasma_core.batch import BatchExecutionPolicy, BatchTarget
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 
-from . import gateway_legacy as legacy
+from . import gateway_base as base
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .engineering_targets import EngineeringPPUProvider
@@ -23,9 +23,9 @@ from .mock_batch_runtime import MockAwareBatchRuntimeManager
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
-FLEET_CONTRACT_VERSION = legacy.FLEET_CONTRACT_VERSION
-WEB_REST_CONTRACT_VERSION = legacy.WEB_REST_CONTRACT_VERSION
-GATEWAY_SERVICE_NAME = legacy.GATEWAY_SERVICE_NAME
+FLEET_CONTRACT_VERSION = base.FLEET_CONTRACT_VERSION
+WEB_REST_CONTRACT_VERSION = base.WEB_REST_CONTRACT_VERSION
+GATEWAY_SERVICE_NAME = base.GATEWAY_SERVICE_NAME
 
 
 def _batch_payload(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -73,7 +73,7 @@ def _require_object(value: Any, label: str) -> dict[str, Any]:
 
 def _parse_policy(body: dict[str, Any]) -> BatchExecutionPolicy:
     raw = _require_object(body.get("execution_policy", {}), "execution_policy")
-    legacy._require_declared_keys(
+    base._require_declared_keys(
         raw,
         allowed={"repeat_count", "site_retry_limit", "failed_site_stop_threshold"},
         label="Batch execution_policy",
@@ -92,7 +92,7 @@ def _parse_targets(value: Any) -> tuple[BatchTarget, ...]:
     targets: list[BatchTarget] = []
     for index, raw in enumerate(value):
         item = _require_object(raw, f"Batch target {index}")
-        legacy._require_declared_keys(
+        base._require_declared_keys(
             item,
             allowed={"facility_id", "ppu_id", "site_ids"},
             required={"facility_id", "ppu_id", "site_ids"},
@@ -102,7 +102,7 @@ def _parse_targets(value: Any) -> tuple[BatchTarget, ...]:
         if not isinstance(site_ids, list) or not site_ids:
             raise ValueError(f"Batch target {index} site_ids must be a non-empty array")
         for raw_site_id in site_ids:
-            site_id = legacy._parse_site_id(raw_site_id)
+            site_id = base._parse_site_id(raw_site_id)
             targets.append(
                 BatchTarget(
                     facility_id=str(item["facility_id"]),
@@ -121,7 +121,7 @@ def _parse_target_device(
     if value is None:
         return None
     raw = _require_object(value, label)
-    legacy._require_declared_keys(
+    base._require_declared_keys(
         raw,
         allowed={"vendor", "identifier"},
         required={"vendor", "identifier"},
@@ -157,7 +157,7 @@ def _parse_asset(value: Any) -> ProgrammingAsset | None:
         "asset_sha256",
         "asset_base64",
     }
-    legacy._require_declared_keys(raw, allowed=required, required=required, label="Batch asset")
+    base._require_declared_keys(raw, allowed=required, required=required, label="Batch asset")
     encoded = raw["asset_base64"]
     if not isinstance(encoded, str) or not encoded:
         raise ValueError("Batch asset_base64 is required")
@@ -182,7 +182,7 @@ def _parse_read(value: Any) -> tuple[int, int]:
     if value is None:
         return 0, 256
     raw = _require_object(value, "Batch read")
-    legacy._require_declared_keys(raw, allowed={"offset", "length"}, label="Batch read")
+    base._require_declared_keys(raw, allowed={"offset", "length"}, label="Batch read")
     offset = raw.get("offset", 0)
     length = raw.get("length", 256)
     if (
@@ -197,7 +197,7 @@ def _parse_read(value: Any) -> tuple[int, int]:
     return offset, length
 
 
-class PlasmaWebHandler(legacy.PlasmaWebHandler):
+class PlasmaWebHandler(base.PlasmaWebHandler):
     """Canonical Plasma Web REST Gateway with server-side Batch orchestration."""
 
     batch_runtime: BatchRuntimeManager | None = None
@@ -236,7 +236,7 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
             return body
         operation = body.get("operation")
         if operation in {Operation.PROGRAM.value, Operation.VERIFY.value} and "asset_sha256" not in body:
-            # The legacy Engineering contract normally requires an Asset SHA.
+            # The Engineering Asset contract normally requires an Asset SHA.
             # Canonical Shared-Image Mock jobs may intentionally omit it so the
             # provider can generate one Synthetic Image from the immutable Mock
             # execution profile. The key is normalized to None only in this
@@ -419,7 +419,7 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
                 return
             if not tail:
                 body = self._body()
-                legacy._require_declared_keys(
+                base._require_declared_keys(
                     body,
                     allowed={
                         "session_id",
@@ -457,12 +457,12 @@ class PlasmaWebHandler(legacy.PlasmaWebHandler):
                 return
             if len(tail) == 2 and tail[1] == "cancel":
                 body = self._body()
-                legacy._require_declared_keys(body, allowed=set(), label="Batch cancel request")
+                base._require_declared_keys(body, allowed=set(), label="Batch cancel request")
                 self._json(HTTPStatus.OK, _batch_payload(self.batch_runtime.cancel(tail[0])))
                 return
             if len(tail) == 5 and tail[1] == "targets" and tail[4] == "cancel":
                 body = self._body()
-                legacy._require_declared_keys(body, allowed=set(), label="Batch PPU cancel request")
+                base._require_declared_keys(body, allowed=set(), label="Batch PPU cancel request")
                 self._json(
                     HTTPStatus.OK,
                     _batch_payload(
@@ -491,7 +491,7 @@ def serve(
     gateway_settings_path: Path | None = None,
 ) -> None:
     settings = GatewaySettingsController(gateway_settings_path or (output_root / "gateway-settings.yaml"))
-    PlasmaWebHandler.client_factory = staticmethod(lambda: legacy.PlasmaClient(plasma_host, plasma_port))
+    PlasmaWebHandler.client_factory = staticmethod(lambda: base.PlasmaClient(plasma_host, plasma_port))
     PlasmaWebHandler.engineering_provider = engineering_provider
     PlasmaWebHandler.gateway_settings = settings
     if isinstance(engineering_provider, SharedImageMockEngineeringPPUProvider):

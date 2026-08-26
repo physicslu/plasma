@@ -172,6 +172,11 @@ GET  /api/status
 POST /api/jobs
 POST /api/jobs/{job_id}/cancel
 GET  /api/jobs/{job_id}/files/{filename}
+GET  /api/settings/gateway
+POST /api/settings/gateway
+POST /api/batches
+GET  /api/batches/{batch_id}
+POST /api/batches/{batch_id}/cancel
 ```
 
 Engineering Programming 使用 REST v3 Programming Asset routes，詳見：
@@ -199,7 +204,7 @@ GET /api/registry
 GET /api/fleet
 ```
 
-Manager 不提供 Job command routing、central scheduling、automatic discovery、authentication policy 或 Fleet Web UI。
+Manager 不提供 Job command routing、central scheduling、automatic discovery 或 authentication policy。Web Console 的 PMode `/fleet` 可顯示多 PPU topology 並透過 Gateway 的 server-side Batch runtime 執行 Mock Batch；這不會把 read-only Manager 變成 write proxy。
 
 ## CLI
 

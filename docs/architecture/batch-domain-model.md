@@ -11,7 +11,7 @@ The authoritative sources remain:
 1. [`ppu-facility-sites.md`](ppu-facility-sites.md) for Facility / PPU / Site identity and ownership.
 2. [`engineering-programming-workspace.md`](engineering-programming-workspace.md) for Engineering provider, Programming Asset and Normalized Image semantics.
 3. [`server-side-batch-runtime.md`](server-side-batch-runtime.md) for Batch state, policy, concurrency, statistics and REST execution contract.
-4. [`production-server-batch-ui.md`](production-server-batch-ui.md) for Production UI ownership and operator-facing state semantics.
+4. [`pmode-factory-console-v2.md`](pmode-factory-console-v2.md) for Production UI ownership, Batch selection, KPI, and operator-facing state semantics.
 5. `software/python/plasma_core/batch.py` and `software/python/plasma_web/batch_runtime.py` for the current executable model.
 
 If this document conflicts with executable code or those canonical contracts, follow the repository source-of-truth priority in `AGENTS.md` and fix this document.
@@ -386,7 +386,7 @@ A future real fleet execution adapter may implement the same provider boundary, 
 | Underlying execution | `JobRequest` -> `PlasmaServer` -> `SiteManager` / `SiteWorker` |
 | Programming source data | `ProgrammingAsset` |
 | Target-memory execution data | `NormalizedImage` |
-| Production client contract | `docs/architecture/production-server-batch-ui.md` |
+| Production client contract | `docs/architecture/pmode-factory-console-v2.md` |
 | Batch execution contract | `docs/architecture/server-side-batch-runtime.md` |
 
 ## Explicit non-models

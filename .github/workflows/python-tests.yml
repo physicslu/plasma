@@ -52,6 +52,8 @@ jobs:
         run: bash scripts/tests/test-repository-secret-safety.sh
       - name: Test public documentation sanitization
         run: bash scripts/tests/test-public-doc-sanitization.sh
+      - name: Test documentation integrity
+        run: python scripts/tests/test-documentation-integrity.py
       - name: Test deployment config migration
         run: bash scripts/tests/test-plasmactl-config.sh
       - name: Test Engineering Mock deployment wiring

@@ -17,6 +17,12 @@ fi
 printf '[codex-cloud] Running repository secret-file safety test\n'
 bash "$repo/scripts/tests/test-repository-secret-safety.sh"
 
+printf '[codex-cloud] Running documentation integrity test\n'
+"$python_bin" "$repo/scripts/tests/test-documentation-integrity.py"
+
+printf '[codex-cloud] Running canonical terminology guard\n'
+"$python_bin" "$repo/scripts/tests/test-canonical-terminology-guard.py"
+
 printf '[codex-cloud] Running deployment config migration test\n'
 bash "$repo/scripts/tests/test-plasmactl-config.sh"
 

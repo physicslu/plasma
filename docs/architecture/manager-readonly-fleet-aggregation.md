@@ -170,7 +170,7 @@ Durable persistence is intentionally narrow. SQLite stores **one latest trusted 
 endpoint -> observed_at + canonical PPU object + canonical Sites
 ```
 
-It does not store a time series, job history, audit trail, credentials, firmware state, scheduling state, or authoritative execution state. The PPU remains the source of truth whenever a new trusted observation succeeds.
+It does not store a time series, job history, audit trail, credentials, Programming Image state, scheduling state, or authoritative execution state. The PPU remains the source of truth whenever a new trusted observation succeeds.
 
 The database uses SQLite `PRAGMA user_version = 1`. Manager creates schema v1 only when the configured database is genuinely empty. It refuses to claim or mutate an unknown unversioned database that already contains user tables. Unsupported future schema versions or a v1 database missing its required table are rejected by the persistence layer.
 
@@ -270,7 +270,7 @@ The Manager systemd unit depends on network availability only; it does not make 
 
 ## Read-only boundary
 
-This release still rejects Manager POST/PUT/PATCH/DELETE fleet commands. It does not implement job routing, central scheduling, mandatory registration, mDNS discovery, authentication/authorization policy, central audit persistence, firmware rollout, or a Fleet Web UI.
+This release still rejects Manager POST/PUT/PATCH/DELETE fleet commands. It does not implement job routing, central scheduling, mandatory registration, mDNS discovery, authentication/authorization policy, central audit persistence, or Programming Image rollout. PMode provides a Factory Console, but Manager remains an observation-only provider rather than its command scheduler.
 
 Durable observation persistence must not be confused with those control-plane responsibilities. Future command routing must use an existing PPU REST contract rather than bypassing the PPU and invoking internal `SiteManager`/`SiteWorker` APIs directly.
 

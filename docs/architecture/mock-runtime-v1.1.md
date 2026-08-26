@@ -349,8 +349,8 @@ These definitions are contractual and must be reused by the UI, statistics, logs
 |---|---|---|
 | `READY` | Selected Site has not started Batch work. | Not counted. |
 | `RUNNING` | Site is executing a Batch operation. | Not terminal. |
-| `SUCCESS` | All required rounds and operations completed successfully. | Pass. |
-| `FAULTED` | An operation reached terminal failed/timeout after its allowed retries. The Site is removed from later rounds. | Product/Site failure; counts in yield denominator and fault threshold. |
+| `SUCCESS` | All required rounds and operations completed successfully. | Every completed round contributes one PASS IC. |
+| `FAULTED` | An operation reached terminal failed/timeout after its allowed retries. The Site is removed from later rounds. | The failed round contributes one FAIL IC; earlier completed rounds remain PASS. The Site also counts toward the fault threshold. |
 | `ERROR` | Infrastructure/control-plane/runtime failure prevents a trustworthy DUT result. | Excluded from programmed yield failure. Batch enters ERROR. |
 | `STOPPED` | Site was prevented from continuing because Batch policy stopped future work, for example after the FAULTED-Site circuit breaker or infrastructure error. | Not a DUT failure by itself. |
 | `CANCELLED` | Operator Batch/PPU cancellation stopped this Site. | Not a programmed DUT failure. |
@@ -400,13 +400,14 @@ Example: threshold `3` tolerates two FAULTED Sites; the third FAULTED Site trips
 
 ## 16. Infrastructure failure behavior
 
-An infrastructure or control-plane failure causes:
+An infrastructure or control-plane failure is contained to the affected PPU:
 
 ```text
 trigger Site -> ERROR
-Batch -> STOPPING
-other unfinished Sites -> STOPPED when the stop disposition is observed
-Batch -> ERROR
+affected PPU -> cancel active Batch Jobs
+other unfinished Sites on that PPU -> STOPPED
+healthy PPUs -> continue
+Batch -> PARTIAL when a healthy Site succeeds, otherwise ERROR
 ```
 
 Canonical Batch infrastructure error code:
@@ -450,25 +451,26 @@ Statistics must distinguish logical operation executions from physical attempts.
 
 ## 18. Yield semantics
 
-For Mock production statistics, infrastructure/cancellation outcomes are not programmed DUT failures.
+For Mock production statistics, PASS and FAIL count completed/failed IC rounds, not terminal Site cards. Infrastructure/cancellation outcomes are not programmed DUT failures.
 
 A basic programmed yield is therefore:
 
 ```text
-Yield = SUCCESS Sites / (SUCCESS Sites + FAULTED Sites)
+PROCESSED IC = PASS IC + FAIL IC
+Yield = PASS IC / PROCESSED IC
 ```
 
 Example:
 
 ```text
-SUCCESS  970
-FAULTED   25
-ERROR      5
+PASS IC    970
+FAIL IC     25
+ERROR Sites  5
 
 Yield = 970 / (970 + 25) = 97.49%
 ```
 
-The 5 ERROR Sites must be reported separately as system/infrastructure quality, not hidden inside DUT yield.
+The 5 ERROR Sites must be reported separately as system/infrastructure quality, not hidden inside DUT yield. Before the first PASS or FAIL, Yield is undefined and displayed as `—`.
 
 Production reporting should eventually show both product yield and system availability/error quality instead of compressing them into one percentage.
 
@@ -480,7 +482,7 @@ If an operation has already reached terminal SUCCESS before the cancellation is 
 
 If cancellation reaches an active Job first, the affected Site may become CANCELLED.
 
-PPU-scoped cancellation affects only the selected PPU inside the Batch. Other PPUs continue independently.
+PPU-scoped cancellation is a lower-level runtime containment mechanism and affects only the selected PPU. PMode's supported operator action is whole-Batch ABORT; other PPUs continue only for automatic single-PPU infrastructure containment, not after operator ABORT.
 
 This race is covered by persistent real-stack browser acceptance using deterministic timing so the cancellation is deliberately issued while the target Site is RUNNING.
 
@@ -501,20 +503,20 @@ The v1.1 software contract requires all relevant layers to PASS before merge-rea
 These layers do not replace:
 
 - SWPC deployment acceptance;
-- 4 MiB x 60 Site capacity measurement;
+- 4 MiB x 160 Site capacity measurement;
 - human operator acceptance;
 - Z2/FPGA/electrical validation;
 - real IC validation.
 
 ## 21. SWPC capacity gate
 
-The release acceptance procedure for the 4 MiB x 60 Site case is defined in:
+The release acceptance procedure for the 4 MiB x 160 Site case is defined in:
 
 `docs/development/mock-runtime-operator-guide.md`
 
 The purpose is to measure actual RSS/peak RSS on SWPC after explicit deployment approval. No GitHub/Mock CI result may be substituted for that measurement.
 
-The architectural objective is to demonstrate that one 4 MiB Programming Asset is shared rather than retained as sixty independent persistent 4 MiB Flash/image copies.
+The architectural objective is to demonstrate that one 4 MiB Programming Asset is shared rather than retained as 160 independent persistent 4 MiB Flash/image copies.
 
 ## 22. Deferred items
 

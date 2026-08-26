@@ -2,7 +2,7 @@
 
 Status: operator-facing software guide for Mock Runtime v1.1. SWPC deployment and capacity measurements require explicit deployment approval before execution.
 
-This guide defines what an operator sees, how to configure Mock Runtime, how to interpret Production Batch states, and how to perform the 4 MiB x 60 Site SWPC acceptance after approval.
+This guide defines what an operator sees, how to configure Mock Runtime, how to interpret Production Batch states, and how to perform the 4 MiB x 160 Site SWPC acceptance after approval.
 
 Canonical architecture/specification: `docs/architecture/mock-runtime-v1.1.md`.
 
@@ -153,8 +153,8 @@ These definitions are canonical. UI wording, logs, reports, User Manual, trainin
 |---|---|---|
 | `READY` | Site is selected but has not started. | No action unless it remains READY unexpectedly after Batch start. |
 | `RUNNING` | Site is executing an operation/round. | Observe operation, progress, round, and attempts. |
-| `SUCCESS` / `PASS` | All required work for this Site completed successfully. | Normal pass result. |
-| `FAULTED` | A real operation result failed/timeout and all configured retries were exhausted. | Treat as DUT/Site process failure. Inspect operation, round, failure source, socket/contact/target assumptions when using real hardware later. |
+| `SUCCESS` / `PASS` | All required work for this Site completed successfully. | Each completed round is one PASS IC. |
+| `FAULTED` | A real operation result failed/timeout and all configured retries were exhausted. | The failed round is one FAIL IC; earlier completed rounds remain PASS. Inspect operation, round and failure source. |
 | `ERROR` | Plasma infrastructure/control path failed, so a trustworthy DUT pass/fail result is unavailable. | Investigate PPU/Gateway/Server/interface/runtime/network/software path. Do not classify the IC as failed from this state alone. |
 | `STOPPED` | Batch policy prevented this unfinished Site from continuing after a Batch-wide stop condition. | Inspect the Batch error/stop reason and the Site that triggered it. STOPPED alone is not a DUT failure. |
 | `CANCELLED` | Operator Batch/PPU cancellation stopped the Site before completion. | Normal operator-controlled termination; rerun if required. |
@@ -215,7 +215,7 @@ If the cancel request reaches an active Job first, the affected Site can become 
 
 Therefore do not diagnose a cancellation issue from button-click timing alone. Inspect the final Job/Site timestamps and state.
 
-PPU Cancel affects only the selected PPU inside the server Batch. Other PPUs continue independently.
+PPU-scoped cancellation exists as a server/runtime containment mechanism. The supported PMode operator stop action is whole-Batch ABORT. Automatic containment after a single-PPU infrastructure error cancels only that PPU; healthy PPUs continue.
 
 ## 8. FAULTED, ERROR, STOPPED, CANCELLED examples
 
@@ -251,9 +251,10 @@ Third Site becomes FAULTED
 ### CANCELLED
 
 ```text
-Operator clicks Cancel PPU while Job is active
--> affected PPU Sites CANCELLED
--> unrelated PPU continues
+One PPU exhausts Gateway communication retry
+-> runtime cancels active Jobs on that PPU
+-> affected sibling Sites ERROR/STOPPED
+-> healthy PPUs continue
 -> Batch may become PARTIAL
 ```
 
@@ -261,23 +262,24 @@ Operator clicks Cancel PPU while Job is active
 
 Do not mix product/DUT yield with infrastructure errors.
 
-Basic programmed yield:
+PASS and FAIL count IC rounds, not terminal Site cards:
 
 ```text
-Yield = SUCCESS / (SUCCESS + FAULTED)
+PROCESSED IC = PASS IC + FAIL IC
+Yield = PASS IC / PROCESSED IC
 ```
 
 Example:
 
 ```text
-SUCCESS  970
-FAULTED   25
-ERROR      5
+PASS IC     970
+FAIL IC      25
+ERROR Sites   5
 
 Yield = 970 / 995 = 97.49%
 ```
 
-The 5 ERROR Sites must be reported separately as infrastructure/system quality.
+The 5 ERROR Sites must be reported separately as infrastructure/system quality. Before the first PASS or FAIL, Yield is undefined and the UI displays `—`.
 
 A production dashboard should therefore preserve at least two views:
 
@@ -323,13 +325,13 @@ Choose timing long enough for any intended cancellation test. Do not set timing 
 
 For failure/retry testing, deliberately set the target operation error rate and seed required by the scenario. Record the applied revision and seed with the evidence.
 
-## 12. SWPC 4 MiB x 60 Site acceptance gate
+## 12. SWPC 4 MiB x 160 Site acceptance gate
 
 Do not execute this section until explicit deployment/restart approval has been given.
 
 Purpose:
 
-- validate the 3 Facility / 12 PPU / 60 Site topology on SWPC;
+- validate the 8 Facilities / 32 PPUs / 160 Sites topology on SWPC;
 - validate one shared 4 MiB Programming Asset under concurrent server-side Batch execution;
 - measure actual RSS and high-water RSS;
 - detect accidental `60 x 4 MiB` persistent image/Flash duplication;
@@ -388,7 +390,7 @@ grep -E '^(Rss|Pss|Shared_Clean|Shared_Dirty|Private_Clean|Private_Dirty):' "/pr
 grep -E '^(MemTotal|MemAvailable):' /proc/meminfo
 ```
 
-Record the values before starting the 60-Site Batch.
+Record the values before starting the 160-Site Batch.
 
 `VmRSS` is current resident memory. `VmHWM` is the process resident high-water mark since process start. Because `VmHWM` does not reset without process restart, the cleanest release measurement is after the approved service restart and before unrelated heavy workloads.
 
@@ -458,13 +460,13 @@ done
 
 Stop the sampler with `Ctrl-C` after the Batch and post-Batch idle measurement are complete.
 
-### 12.6 Execute the 60-Site Batch
+### 12.6 Execute the 160-Site Batch
 
 In Production:
 
 1. Select all 8 Facilities.
 2. Select all 32 PPUs.
-3. Confirm total selected Sites = 60.
+3. Confirm total selected Sites = 160.
 4. Select the same 4 MiB BIN.
 5. Select `Erase + Program + Verify`.
 6. Set `Repeat Count = 3`.
@@ -488,11 +490,11 @@ Expected logical operation counts:
 
 ```text
 Erase   = 160 Sites x 3 rounds = 480
-Program = 180
-Verify  = 180
+Program = 480
+Verify  = 480
 ```
 
-There should be one immutable Programming Asset snapshot for the Batch and one content-addressed image payload reused by the Mock execution path, not sixty persistent 4 MiB Job images.
+There should be one immutable Programming Asset snapshot for the Batch and one content-addressed image payload reused by the Mock execution path, not 160 persistent 4 MiB Job images.
 
 ### 12.7 Post-Batch evidence
 
@@ -514,7 +516,7 @@ Retain:
 - Programming Asset filename, size, and SHA-256;
 - Batch ID;
 - Batch statistics;
-- final 60-Site state counts;
+- final 160-Site state counts;
 - any server/Gateway log anomaly.
 
 ### 12.8 Memory acceptance decision
@@ -530,7 +532,7 @@ PASS requires all of the following:
 - one 4 MiB Programming Asset is reused through the shared-image path;
 - peak/current memory is measured and retained;
 - post-Batch RSS returns toward a stable level rather than growing without bound across the three rounds;
-- evidence does not indicate sixty independent persistent 4 MiB image/Flash copies.
+- evidence does not indicate 160 independent persistent 4 MiB image/Flash copies.
 
 FAIL or investigate if any of these occur:
 
@@ -573,7 +575,7 @@ Mock Runtime v1.1 software validation passed.
 Acceptable statement after approved SWPC test:
 
 ```text
-Mock Runtime v1.1 SWPC deployment and 4 MiB x 60 Site capacity acceptance passed,
+Mock Runtime v1.1 SWPC deployment and 4 MiB x 160 Site capacity acceptance passed,
 with recorded memory evidence.
 ```
 
