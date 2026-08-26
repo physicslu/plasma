@@ -24,6 +24,18 @@ test("EMode Settings > Gateway edits shared server-owned timeout and retry setti
   await expect(page.getByLabel("PPU Retry Count")).toHaveValue("3");
   await expect(page.getByText("REV 1", { exact: true })).toBeVisible();
 
+  const guide = page.getByRole("region", { name: "Gateway Settings Guide" });
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText("Gateway 設定說明");
+  await expect(guide).toContainText("測試方法");
+  await expect(guide).toContainText("Mock 的 E/P/V/R Error Rate");
+
+  const canvasBox = await page.locator(".engineeringCanvas.settingsActive").boundingBox();
+  const panelBox = await page.locator(".engineeringGatewaySettings").boundingBox();
+  expect(canvasBox).not.toBeNull();
+  expect(panelBox).not.toBeNull();
+  expect((panelBox?.y ?? 0) - (canvasBox?.y ?? 0)).toBeLessThanOrEqual(24);
+
   await page.getByLabel("PPU Request Timeout seconds").fill("20");
   await page.getByLabel("PPU Retry Count").fill("5");
   await page.getByRole("button", { name: "Apply Settings", exact: true }).click();

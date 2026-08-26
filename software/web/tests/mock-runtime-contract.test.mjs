@@ -21,6 +21,14 @@ test("Mock UI preserves the 0.1 percent and 4 MiB configuration contract", () =>
   assert.match(panelSource, /error_rate_per_mille: Math\.round\(Number\(event\.target\.value\) \* 10\)/);
 });
 
+test("Mock settings page includes operator explanation and test methods", () => {
+  assert.match(panelSource, /aria-label="Mock Settings Guide"/);
+  assert.match(panelSource, /Mock 設定說明/);
+  assert.match(panelSource, /基本 PASS 測試/);
+  assert.match(panelSource, /Program Error Rate 設為 100\.0%/);
+  assert.match(panelSource, /不能宣稱 Z2、FPGA、socket、OpenOCD 或真實 IC programming 已驗證/);
+});
+
 test("server Batch snapshots expose immutable Mock execution provenance", () => {
   assert.match(batchSource, /mock_runtime\?: MockBatchRuntimeSnapshot/);
   assert.match(apiSource, /resolved_seed: number/);

@@ -87,6 +87,13 @@
   background: var(--panel-3);
 }
 
+/* Settings is an operator configuration surface. Keep it near the top of the
+ * workspace rather than vertically centering a short panel in the 620 px shell. */
+.engineeringCanvas.settingsActive {
+  place-items: start stretch;
+  padding: 18px clamp(24px, 5vw, 72px) 48px;
+}
+
 .engineeringPlaceholder {
   width: min(760px, 100%);
   border: 1px dashed var(--line-strong);
@@ -462,6 +469,10 @@
 
   .engineeringCanvas.programmingActive {
     padding: 8px;
+  }
+
+  .engineeringCanvas.settingsActive {
+    padding: 12px;
   }
 
   .engineeringGateway {
