@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import "./operator-panel.css";
 import "./batch-summary.css";
 
 export type OperatorKpi = {
@@ -23,14 +22,14 @@ export function BatchSummary({
   meta,
 }: BatchSummaryProps) {
   return (
-    <section className={`batchSummary operatorKpiSummary ${title ? "has-title" : ""}`.trim()} aria-label={ariaLabel}>
+    <section className={`batchSummary ${title ? "has-title" : ""}`.trim()} aria-label={ariaLabel}>
       {title && (
-        <header className="operatorKpiSummaryHeader">
+        <header className="batchSummaryHeader">
           <strong>{title}</strong>
           {meta && <small>{meta}</small>}
         </header>
       )}
-      <div className="operatorKpiStrip">
+      <div className="batchSummaryGrid">
         {items.map(item => (
           <article key={item.key} data-kpi={item.key} data-tone={item.tone ?? "neutral"}>
             <small>{item.label}</small>
