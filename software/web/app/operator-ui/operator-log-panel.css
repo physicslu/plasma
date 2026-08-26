@@ -1,0 +1,106 @@
+.operatorLogCard {
+  font-family: var(--font-sans), Arial, sans-serif;
+}
+
+.operatorLogHead {
+  height: auto;
+  min-height: 38px;
+  padding-block: 8px;
+  gap: 12px;
+}
+
+.operatorLogTitle,
+.operatorLogActions {
+  flex: 0 0 auto;
+}
+
+.operatorLogFilters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.operatorLogFilters button,
+.operatorLogFilters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 4px 8px;
+  font: 800 8px var(--font-mono);
+  letter-spacing: .06em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.operatorLogFilters label span {
+  display: inline-block;
+  min-width: 3ch;
+  white-space: pre;
+}
+
+.operatorLogFilters button.active,
+.operatorLogFilters label.active {
+  border-color: color-mix(in srgb, var(--cyan) 60%, var(--line));
+  background: color-mix(in srgb, var(--cyan) 9%, var(--panel));
+  color: var(--cyan);
+}
+
+.operatorLogFilters input {
+  margin: 0;
+  accent-color: var(--cyan);
+}
+
+.operatorLogCard pre {
+  height: 270px;
+  min-height: 270px;
+}
+
+.operatorLogCard pre > span {
+  display: block;
+}
+
+.operatorLogCard pre span[data-category="USR"] {
+  font-weight: 700;
+}
+
+.operatorLogCard pre span[data-level="warn"] {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.operatorLogCard pre span[data-level="error"] {
+  color: var(--red);
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .operatorLogHead {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .operatorLogFilters {
+    align-items: stretch;
+  }
+
+  .operatorLogFilters button,
+  .operatorLogFilters label {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .operatorLogCard pre {
+    height: 220px;
+    min-height: 220px;
+  }
+}
