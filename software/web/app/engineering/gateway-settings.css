@@ -60,14 +60,19 @@
 }
 
 .gatewaySettingsCard header p,
-.gatewaySettingsHint,
+.gatewaySettingsHint {
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
 .gatewaySettingsGuide header p,
 .gatewaySettingsGuide article > p,
 .gatewaySettingsGuide dd,
 .gatewaySettingsGuide li {
   color: var(--text-soft);
-  font-size: 12px;
-  line-height: 1.65;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .gatewaySettingsFields {
@@ -183,7 +188,7 @@
 
 .gatewaySettingsGuide dt {
   color: var(--text);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -205,8 +210,8 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--amber) 8%, var(--panel));
   color: var(--text-soft);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 @media (max-width: 760px) {
