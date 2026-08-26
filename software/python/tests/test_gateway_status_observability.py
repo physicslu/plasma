@@ -32,6 +32,20 @@ class DiagnosticEngineeringProvider:
         }
 
 
+class FailOnceResponseHandler(PlasmaWebHandler):
+    fail_next_status_response = True
+
+    def _json(self, status, payload):
+        if (
+            self.__class__.fail_next_status_response
+            and status == 200
+            and self.path.endswith("/api/status")
+        ):
+            self.__class__.fail_next_status_response = False
+            raise BrokenPipeError("simulated response write failure")
+        return super()._json(status, payload)
+
+
 class GatewayStatusObservabilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -49,14 +63,18 @@ class GatewayStatusObservabilityTests(unittest.TestCase):
         cls.thread.join()
         PlasmaWebHandler.engineering_provider = cls.previous_provider
 
-    def request(self, path: str):
-        conn = HTTPConnection("127.0.0.1", self.server.server_port)
+    @staticmethod
+    def request_from(server: ThreadingHTTPServer, path: str):
+        conn = HTTPConnection("127.0.0.1", server.server_port)
         conn.request("GET", path)
         response = conn.getresponse()
         payload = json.loads(response.read())
         status = response.status
         conn.close()
         return status, payload
+
+    def request(self, path: str):
+        return self.request_from(self.server, path)
 
     @staticmethod
     def diagnostic_events(output: str):
@@ -70,7 +88,7 @@ class GatewayStatusObservabilityTests(unittest.TestCase):
                 events.append(payload)
         return events
 
-    def test_ppu_level_status_logs_start_and_completion_latency(self):
+    def test_ppu_level_status_logs_provider_and_response_boundary_latency(self):
         self.provider.fail = False
         capture = io.StringIO()
         with redirect_stdout(capture):
@@ -83,13 +101,25 @@ class GatewayStatusObservabilityTests(unittest.TestCase):
         events = self.diagnostic_events(capture.getvalue())
         self.assertEqual(
             [event["event"] for event in events],
-            ["engineering_ppu_status_start", "engineering_ppu_status_ok"],
+            [
+                "engineering_ppu_status_start",
+                "engineering_ppu_status_ok",
+                "engineering_ppu_status_response_sent",
+            ],
         )
         completed = events[1]
         self.assertEqual(completed["facility_id"], "mock-facility-01")
         self.assertEqual(completed["ppu_id"], "mock-facility-01-ppu-01")
         self.assertEqual(completed["site_count"], 2)
         self.assertGreaterEqual(completed["elapsed_ms"], 0)
+        self.assertEqual(completed["provider_elapsed_ms"], completed["elapsed_ms"])
+
+        response = events[2]
+        self.assertEqual(response["facility_id"], "mock-facility-01")
+        self.assertEqual(response["ppu_id"], "mock-facility-01-ppu-01")
+        self.assertGreaterEqual(response["provider_elapsed_ms"], 0)
+        self.assertGreaterEqual(response["response_write_elapsed_ms"], 0)
+        self.assertGreaterEqual(response["total_elapsed_ms"], response["provider_elapsed_ms"])
 
     def test_job_specific_status_does_not_emit_ppu_level_noise(self):
         self.provider.fail = False
@@ -129,6 +159,45 @@ class GatewayStatusObservabilityTests(unittest.TestCase):
             boundary["path"],
             "/api/engineering/targets/mock-facility-02/mock-facility-02-ppu-03/api/status",
         )
+
+    def test_ppu_level_response_write_failure_has_distinct_boundary_event(self):
+        self.provider.fail = False
+        FailOnceResponseHandler.engineering_provider = self.provider
+        FailOnceResponseHandler.fail_next_status_response = True
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FailOnceResponseHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        capture = io.StringIO()
+        try:
+            with redirect_stdout(capture):
+                status, payload = self.request_from(
+                    server,
+                    "/api/engineering/targets/mock-facility-03/mock-facility-03-ppu-02/api/status",
+                )
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+
+        self.assertEqual(status, 400)
+        self.assertIn("simulated response write failure", payload["error"]["message"])
+        events = self.diagnostic_events(capture.getvalue())
+        self.assertEqual(
+            [event["event"] for event in events],
+            [
+                "engineering_ppu_status_start",
+                "engineering_ppu_status_ok",
+                "engineering_ppu_status_response_error",
+                "request_error",
+            ],
+        )
+        boundary = events[2]
+        self.assertEqual(boundary["facility_id"], "mock-facility-03")
+        self.assertEqual(boundary["ppu_id"], "mock-facility-03-ppu-02")
+        self.assertEqual(boundary["error_type"], "BrokenPipeError")
+        self.assertGreaterEqual(boundary["provider_elapsed_ms"], 0)
+        self.assertGreaterEqual(boundary["response_write_elapsed_ms"], 0)
+        self.assertGreaterEqual(boundary["total_elapsed_ms"], boundary["provider_elapsed_ms"])
 
 
 if __name__ == "__main__":
