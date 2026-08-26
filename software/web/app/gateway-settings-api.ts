@@ -2,13 +2,17 @@ export type GatewaySettings = {
   revision: number;
   ppu_request_timeout_ms: number;
   ppu_retry_count: number;
+  ppu_response_budget_ms?: number;
 };
 
 export const DEFAULT_GATEWAY_SETTINGS: GatewaySettings = {
   revision: 1,
   ppu_request_timeout_ms: 10_000,
   ppu_retry_count: 3,
+  ppu_response_budget_ms: 47_000,
 };
+
+const GATEWAY_STATUS_TRANSPORT_MARGIN_MS = 5_000;
 
 type GatewaySettingsPayload = {
   ok: boolean;
@@ -26,8 +30,29 @@ function publishGatewaySettings(apiBase: string, settings: GatewaySettings): Gat
   return settings;
 }
 
+function compatibilityResponseBudgetMs(settings: GatewaySettings): number {
+  const attempts = settings.ppu_retry_count + 1;
+  let backoffMs = 0;
+  for (let retry = 0; retry < settings.ppu_retry_count; retry += 1) {
+    backoffMs += Math.min(2 ** retry, 4) * 1000;
+  }
+  return settings.ppu_request_timeout_ms * attempts + backoffMs;
+}
+
+export function gatewayStatusObservationTimeoutMs(settings: GatewaySettings): number {
+  const serverBudget = settings.ppu_response_budget_ms;
+  const responseBudget = typeof serverBudget === "number" && Number.isFinite(serverBudget) && serverBudget > 0
+    ? serverBudget
+    : compatibilityResponseBudgetMs(settings);
+  return responseBudget + GATEWAY_STATUS_TRANSPORT_MARGIN_MS;
+}
+
 export function cachedGatewaySettings(apiBase: string): GatewaySettings {
   return cachedSettings.get(apiBase) ?? DEFAULT_GATEWAY_SETTINGS;
+}
+
+export async function ensureGatewaySettings(apiBase: string): Promise<GatewaySettings> {
+  return cachedSettings.get(apiBase) ?? await getGatewaySettings(apiBase);
 }
 
 export function subscribeGatewaySettings(
