@@ -88,7 +88,7 @@ export default function EngineeringPage() {
             </button>
           </aside>
 
-          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : ""}`}>
+          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : active === "settings" ? "settingsActive" : ""}`}>
             {active === "programming" ? (
               <ProgrammingWorkspaceV2 />
             ) : active === "mock" ? (
