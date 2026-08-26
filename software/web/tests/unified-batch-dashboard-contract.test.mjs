@@ -15,7 +15,8 @@ const serverBatchRuntime = fs.readFileSync(new URL("../../python/plasma_web/batc
 test("Production and Engineering share neutral operator summary primitives", () => {
   assert.match(pmod, /OperatorKpiStrip/);
   assert.match(pmod, /OperatorPanel/);
-  assert.match(operatorPanel, /export function OperatorKpiStrip/);
+  assert.match(operatorPanel, /BatchSummary as OperatorKpiStrip/);
+  assert.doesNotMatch(operatorPanel, /export function OperatorKpiStrip/);
   assert.match(operatorPanel, /export function OperatorPanel/);
   assert.match(batchSummaryCss, /\.batchSummaryGrid/);
   assert.doesNotMatch(batchSummaryCss, /\.operatorKpiStrip/);

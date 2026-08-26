@@ -23,11 +23,12 @@ test("PMode and EMode share the canonical BatchSummary component", () => {
   assert.doesNotMatch(batchSummary, /import "\.\/operator-panel\.css"/);
   assert.doesNotMatch(batchSummary, /operatorKpiSummary|operatorKpiStrip/);
 
-  // The old component name is temporarily an API-only migration shim. It must
-  // delegate to BatchSummary without bringing legacy markup or CSS ownership back.
-  assert.match(operatorPanel, /import \{ BatchSummary, type BatchSummaryProps \} from "\.\/batch-summary"/);
-  assert.match(operatorPanel, /export function OperatorKpiStrip\(props: BatchSummaryProps\)/);
-  assert.match(operatorPanel, /return <BatchSummary \{\.\.\.props\} \/>/);
+  // The old public name is temporarily an API-only export alias. There must be
+  // no wrapper function, local BatchSummary import, markup, or style ownership.
+  assert.match(operatorPanel, /BatchSummary as OperatorKpiStrip/);
+  assert.doesNotMatch(operatorPanel, /export function OperatorKpiStrip/);
+  assert.doesNotMatch(operatorPanel, /return <BatchSummary/);
+  assert.doesNotMatch(operatorPanel, /import \{ BatchSummary/);
 });
 
 test("BatchSummary owns its complete internal visual contract", () => {
