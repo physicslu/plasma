@@ -1,4 +1,4 @@
-import { expect, test, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 import { commitProductionSites, factoryConsoleHeading } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
@@ -49,8 +49,28 @@ function status() {
   };
 }
 
+async function installGatewaySettings(page: Page) {
+  await page.route("**/api/settings/gateway", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        rest_contract_version: "3",
+        gateway_settings: {
+          revision: 1,
+          ppu_request_timeout_ms: 3_000,
+          ppu_retry_count: 1,
+          ppu_response_budget_ms: 7_000,
+        },
+      }),
+    });
+  });
+}
+
 test("transient PPU status failure auto-recovers without reselecting FPS", async ({ page }) => {
   let statusRequests = 0;
+  await installGatewaySettings(page);
 
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
@@ -98,8 +118,9 @@ test("transient PPU status failure auto-recovers without reselecting FPS", async
   await expect(page.getByText(/STATUS RESTORED · Mock PPU 01/)).toBeVisible();
 });
 
-test("12 second PPU status stall times out, auto-recovers, and re-enables START without reselecting FPS", async ({ page }) => {
+test("Gateway-owned status window can exceed 5 seconds and PMode still recovers without reselecting FPS", async ({ page }) => {
   let statusRequests = 0;
+  await installGatewaySettings(page);
 
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
@@ -122,13 +143,14 @@ test("12 second PPU status stall times out, auto-recovers, and re-enables START 
     if (path === `/api/engineering/targets/${facilityId}/${ppuId}/api/status`) {
       statusRequests += 1;
       if (statusRequests === 1) {
-        await new Promise(resolve => setTimeout(resolve, 12_000));
-        try {
-          await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(status()) });
-        } catch {
-          // The browser is expected to abort this intercepted request at the
-          // Production PPU observation deadline before the 12 s stall ends.
-        }
+        await new Promise(resolve => setTimeout(resolve, 6_000));
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: { error_code: "E2002", message: "Gateway PPU status retries exhausted" },
+          }),
+        });
         return;
       }
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(status()) });
@@ -148,9 +170,10 @@ test("12 second PPU status stall times out, auto-recovers, and re-enables START 
 
   await erase.check();
   await expect(start).toBeDisabled();
-  await expect(live.getByText(/request timed out/i)).toBeVisible({ timeout: 7_000 });
-  await expect.poll(() => statusRequests, { timeout: 9_000 }).toBeGreaterThanOrEqual(2);
+  await expect(live.getByText(/Gateway PPU status retries exhausted/i)).toBeVisible({ timeout: 8_000 });
   await expect(live.getByText(/request timed out/i)).toHaveCount(0);
+  await expect.poll(() => statusRequests, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+  await expect(live.getByText(/Gateway PPU status retries exhausted/i)).toHaveCount(0);
   await expect(live.locator(".factorySiteLedCard")).toHaveCount(2);
   await expect(page.getByText(/STATUS RESTORED · Mock PPU 01/)).toBeVisible();
   await expect(start).toBeEnabled();

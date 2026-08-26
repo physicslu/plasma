@@ -2,13 +2,18 @@ export type GatewaySettings = {
   revision: number;
   ppu_request_timeout_ms: number;
   ppu_retry_count: number;
+  ppu_response_budget_ms?: number;
 };
 
 export const DEFAULT_GATEWAY_SETTINGS: GatewaySettings = {
   revision: 1,
   ppu_request_timeout_ms: 10_000,
   ppu_retry_count: 3,
+  ppu_response_budget_ms: 47_000,
 };
+
+const GATEWAY_STATUS_TRANSPORT_MARGIN_MS = 5_000;
+const GATEWAY_SETTINGS_FALLBACK_TTL_MS = 5_000;
 
 type GatewaySettingsPayload = {
   ok: boolean;
@@ -18,16 +23,47 @@ type GatewaySettingsPayload = {
 
 const cachedSettings = new Map<string, GatewaySettings>();
 const inFlightSettings = new Map<string, Promise<GatewaySettings>>();
+const fallbackSettingsUntil = new Map<string, number>();
 const settingsListeners = new Set<(apiBase: string, settings: GatewaySettings) => void>();
 
 function publishGatewaySettings(apiBase: string, settings: GatewaySettings): GatewaySettings {
   cachedSettings.set(apiBase, settings);
+  fallbackSettingsUntil.delete(apiBase);
   settingsListeners.forEach(listener => listener(apiBase, settings));
   return settings;
 }
 
+function compatibilityResponseBudgetMs(settings: GatewaySettings): number {
+  const attempts = settings.ppu_retry_count + 1;
+  let backoffMs = 0;
+  for (let retry = 0; retry < settings.ppu_retry_count; retry += 1) {
+    backoffMs += Math.min(2 ** retry, 4) * 1000;
+  }
+  return settings.ppu_request_timeout_ms * attempts + backoffMs;
+}
+
+export function gatewayStatusObservationTimeoutMs(settings: GatewaySettings): number {
+  const serverBudget = settings.ppu_response_budget_ms;
+  const responseBudget = typeof serverBudget === "number" && Number.isFinite(serverBudget) && serverBudget > 0
+    ? serverBudget
+    : compatibilityResponseBudgetMs(settings);
+  return responseBudget + GATEWAY_STATUS_TRANSPORT_MARGIN_MS;
+}
+
 export function cachedGatewaySettings(apiBase: string): GatewaySettings {
   return cachedSettings.get(apiBase) ?? DEFAULT_GATEWAY_SETTINGS;
+}
+
+export async function ensureGatewaySettings(apiBase: string): Promise<GatewaySettings> {
+  const cached = cachedSettings.get(apiBase);
+  if (cached) return cached;
+  if ((fallbackSettingsUntil.get(apiBase) ?? 0) > Date.now()) return DEFAULT_GATEWAY_SETTINGS;
+  try {
+    return await getGatewaySettings(apiBase);
+  } catch {
+    fallbackSettingsUntil.set(apiBase, Date.now() + GATEWAY_SETTINGS_FALLBACK_TTL_MS);
+    return DEFAULT_GATEWAY_SETTINGS;
+  }
 }
 
 export function subscribeGatewaySettings(

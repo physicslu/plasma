@@ -134,6 +134,7 @@ test("Pmod Facility packs different-width PPU cards without changing Site card d
 
   const cards = page.locator(".factoryPpuRow");
   await expect(cards).toHaveCount(2);
+  await expect(page.locator(".factorySiteLedCard")).toHaveCount(6);
   const boxes = await cards.evaluateAll(elements => elements.map(element => {
     const rect = element.getBoundingClientRect();
     return { x: rect.x, y: rect.y, width: rect.width };

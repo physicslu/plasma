@@ -5,6 +5,8 @@ import test from "node:test";
 test("PMode retries transient PPU status failures without requiring Production Set reselection", async () => {
   const consoleSource = await fs.readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
   const recoverySource = await fs.readFile(new URL("../app/fleet/ppu-status-recovery.ts", import.meta.url), "utf8");
+  const plasmaApi = await fs.readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
+  const gatewaySettingsApi = await fs.readFile(new URL("../app/gateway-settings-api.ts", import.meta.url), "utf8");
 
   assert.match(consoleSource, /runtimeRecoveryGenerationRef/);
   assert.match(consoleSource, /isRecoverablePPUStatusError/);
@@ -15,6 +17,13 @@ test("PMode retries transient PPU status failures without requiring Production S
   assert.match(consoleSource, /runtimeRecoveryGenerationRef\.current \+= 1/);
 
   assert.match(recoverySource, /PPU_STATUS_RETRY_DELAYS_MS = \[1_000, 2_000, 4_000, 5_000\]/);
-  assert.match(recoverySource, /PPU_STATUS_REQUEST_TIMEOUT_MS = 5_000/);
+  assert.match(recoverySource, /PPU_STATUS_REQUEST_TIMEOUT_MS = undefined/);
+  assert.doesNotMatch(recoverySource, /PPU_STATUS_REQUEST_TIMEOUT_MS = 5_000/);
   assert.match(recoverySource, /error instanceof PlasmaApiError && error\.transient/);
+
+  assert.match(plasmaApi, /ensureGatewaySettings/);
+  assert.match(plasmaApi, /statusObservationTimeoutMs/);
+  assert.match(plasmaApi, /gatewayStatusObservationTimeoutMs/);
+  assert.match(gatewaySettingsApi, /ppu_response_budget_ms/);
+  assert.match(gatewaySettingsApi, /GATEWAY_STATUS_TRANSPORT_MARGIN_MS = 5_000/);
 });

@@ -1,3 +1,5 @@
+import { ensureGatewaySettings, gatewayStatusObservationTimeoutMs } from "./gateway-settings-api";
+
 export type JobState =
   | "queued"
   | "running"
@@ -250,6 +252,28 @@ export function engineeringTargetApiBase(
   return `${apiBase}/api/engineering/targets/${encodeURIComponent(facilityId)}/${encodeURIComponent(ppuId)}`;
 }
 
+function engineeringGatewayApiBase(apiBase: string): string | null {
+  const marker = "/api/engineering/targets/";
+  const index = apiBase.indexOf(marker);
+  return index >= 0 ? apiBase.slice(0, index) : null;
+}
+
+async function statusObservationTimeoutMs(apiBase: string, requestedTimeoutMs?: number): Promise<number | undefined> {
+  const gatewayBase = engineeringGatewayApiBase(apiBase);
+  if (gatewayBase === null) return requestedTimeoutMs;
+  try {
+    const settings = await ensureGatewaySettings(gatewayBase);
+    return gatewayStatusObservationTimeoutMs(settings);
+  } catch (error) {
+    throw new PlasmaApiError(
+      `Gateway communication policy unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+      undefined,
+      undefined,
+      true,
+    );
+  }
+}
+
 function normalizeJobSnapshot(job: JobSnapshot): JobSnapshot {
   if (!Number.isInteger(job.site_id) || job.site_id < 1) {
     throw new PlasmaApiError("Job snapshot is missing a valid site_id");
@@ -430,7 +454,8 @@ async function ensureEngineeringAsset(
 }
 
 export async function getPPUStatus(apiBase: string, timeoutMs?: number): Promise<PPUStatus> {
-  const payload = await requestJson<StatusPayload>(apiBase, "/api/status", undefined, timeoutMs);
+  const observationTimeout = await statusObservationTimeoutMs(apiBase, timeoutMs);
+  const payload = await requestJson<StatusPayload>(apiBase, "/api/status", undefined, observationTimeout);
   return {
     ppu: payload.ppu,
     sites: payload.sites ?? [],
@@ -450,11 +475,12 @@ export async function getJob(
   const existing = inFlightJobSnapshots.get(key);
   if (existing) return await existing;
   const request = (async () => {
+    const observationTimeout = await statusObservationTimeoutMs(apiBase, timeoutMs);
     const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(
       apiBase,
       `/api/status?job=${encodeURIComponent(jobId)}`,
       undefined,
-      timeoutMs,
+      observationTimeout,
     );
     const job = normalizeJobSnapshot(payload.job);
     syncExecutionJob(apiBase, job);
