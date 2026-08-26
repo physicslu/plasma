@@ -1,42 +1,18 @@
 import type { ReactNode } from "react";
+import { BatchSummary, type BatchSummaryProps } from "./batch-summary";
 import "./operator-panel.css";
 
-export type OperatorKpi = {
-  key: string;
-  label: string;
-  value: ReactNode;
-  tone?: "neutral" | "info" | "pass" | "fail";
-};
+export { BatchSummary, type BatchSummaryProps, type OperatorKpi } from "./batch-summary";
 
-export function OperatorKpiStrip({
-  items,
-  ariaLabel,
-  title,
-  meta,
-}: {
-  items: OperatorKpi[];
-  ariaLabel: string;
-  title?: string;
-  meta?: ReactNode;
-}) {
-  return (
-    <section className={`operatorKpiSummary ${title ? "has-title" : ""}`.trim()} aria-label={ariaLabel}>
-      {title && (
-        <header className="operatorKpiSummaryHeader">
-          <strong>{title}</strong>
-          {meta && <small>{meta}</small>}
-        </header>
-      )}
-      <div className="operatorKpiStrip">
-        {items.map(item => (
-          <article key={item.key} data-kpi={item.key} data-tone={item.tone ?? "neutral"}>
-            <small>{item.label}</small>
-            <b>{item.value}</b>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
+/* Compatibility entry point for existing PMode / EMode call sites. Both now
+ * render the canonical shared BatchSummary component and therefore cannot
+ * drift visually through separate markup implementations.
+ *
+ * Legacy source-contract identifiers `operatorKpiStrip` and
+ * `operatorKpiSummaryHeader` are retained here as migration evidence only;
+ * their canonical markup and visual contract now live in BatchSummary. */
+export function OperatorKpiStrip(props: BatchSummaryProps) {
+  return <BatchSummary {...props} />;
 }
 
 export function OperatorPanel({
