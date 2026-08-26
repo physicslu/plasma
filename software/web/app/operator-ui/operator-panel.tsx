@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import "./operator-panel.css";
 
-export { BatchSummary, type BatchSummaryProps, type OperatorKpi } from "./batch-summary";
-
 export function OperatorPanel({
   number,
   title,
