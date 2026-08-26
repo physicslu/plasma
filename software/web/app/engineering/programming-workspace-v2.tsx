@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { BatchLifecycle } from "../batch-lifecycle";
 import { evaluateBatchReadiness } from "../batch-readiness";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
@@ -35,7 +34,14 @@ import type {
   PPUSnapshot,
   SiteSnapshot,
 } from "../plasma-api";
+import type { BatchSiteSnapshot } from "../server-batch-api";
 import { useWorkspaceSession, type TargetSelection } from "../workspace-session";
+import {
+  abortEngineeringServerBatch,
+  restoreEngineeringServerBatch,
+  startEngineeringServerBatch,
+  useEngineeringServerBatchState,
+} from "./engineering-server-batch";
 import "./programming-workspace-base.css";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
@@ -75,9 +81,6 @@ type Site = {
 };
 
 type ConnectionState = "connecting" | "online" | "offline";
-type BatchObservationState = "connected" | "reconnecting";
-type BatchSiteState = "running" | "cancelling" | "success" | "cancelled" | "faulted" | "error" | "stopped";
-type BatchTerminalState = "success" | "cancelled" | "faulted" | "error" | "stopped";
 type PendingRestore = {
   target: TargetSelection;
   siteIds: number[] | null;
@@ -85,17 +88,10 @@ type PendingRestore = {
 };
 
 type StopPolicy = { kind: "never" } | { kind: "failed_sites"; threshold: number };
-type BatchManufacturingSummary = {
-  sites: number;
-  totalIc: number;
-  pass: number;
-  fail: number;
-};
 
 const MAX_IMAGE_ASSET_BYTES = 16 * 1024 * 1024;
 const MAX_LOG_ENTRIES = 1000;
 const POLL_INTERVAL_MS = 500;
-const POLL_ATTEMPTS = 600;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
 const terminalStates = new Set<JobState>(["success", "failed", "error", "cancelled", "timeout", "aborted"]);
 const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
@@ -214,6 +210,20 @@ function formatElapsedTime(milliseconds: number | null): string {
   return [hours, minutes, seconds].map(value => String(value).padStart(2, "0")).join(":");
 }
 
+function serverBatchElapsedMs(startedAt: string | null, finishedAt: string | null, now: number): number | null {
+  if (!startedAt) return null;
+  const start = Date.parse(startedAt);
+  const end = finishedAt ? Date.parse(finishedAt) : now;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return end - start;
+}
+
+function serverSiteStage(site: BatchSiteSnapshot, stopping: boolean): Stage {
+  if (site.state === "ready") return stopping ? "stopped" : "idle";
+  if (site.state === "running") return site.current_operation ?? "queued";
+  return site.state;
+}
+
 export default function ProgrammingWorkspaceV2() {
   const { locale, t } = useI18n();
   const {
@@ -236,6 +246,8 @@ export default function ProgrammingWorkspaceV2() {
     emodeReadLength: readLength,
     setEmodeReadLength: setReadLength,
   } = useWorkspaceSession();
+  const engineeringBatch = useEngineeringServerBatchState();
+  const batchSnapshot = engineeringBatch.snapshot;
 
   const [apiDraft, setApiDraft] = useState(apiBase);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
@@ -247,37 +259,37 @@ export default function ProgrammingWorkspaceV2() {
   const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
   const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
   const [submittingSiteIds, setSubmittingSiteIds] = useState<number[]>([]);
-  const [batchRunning, setBatchRunning] = useState(false);
-  const [batchCancelling, setBatchCancelling] = useState(false);
-  const [batchObservationState, setBatchObservationState] = useState<BatchObservationState>("connected");
-  const [batchSiteStates, setBatchSiteStates] = useState<Record<number, BatchSiteState>>({});
   const [repeatCount, setRepeatCount] = useState("1");
   const [siteRetryLimit, setSiteRetryLimit] = useState("3");
   const [stopPolicy, setStopPolicy] = useState<StopPolicy>({ kind: "never" });
   const [logs, setLogs] = useState<EngineeringLogEntry[]>([]);
-  const [batchStartedAt, setBatchStartedAt] = useState<number | null>(null);
-  const [lastCycleMs, setLastCycleMs] = useState<number | null>(null);
-  const [batchManufacturing, setBatchManufacturing] = useState<BatchManufacturingSummary | null>(null);
   const [clock, setClock] = useState(() => Date.now());
   const [setupCollapsed, setSetupCollapsed] = useState(false);
   const [programmingJobCollapsed, setProgrammingJobCollapsed] = useState(false);
 
   const trackedJobs = useRef<Record<number, string>>({});
   const submissionGenerations = useRef<Record<number, number>>({});
-  const batchLifecycle = useRef<BatchLifecycle | null>(null);
-  const batchStopReason = useRef<"operator" | "threshold" | "infrastructure" | null>(null);
   const configuredGatewayPolicy = useRef<GatewaySettings>(cachedGatewaySettings(apiBase));
-  const activeGatewayPolicy = useRef<GatewaySettings | null>(null);
-  const operatorCancelledSites = useRef<Set<number>>(new Set());
   const cancelRequests = useRef<Set<string>>(new Set());
   const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
+  const lastObservedBatchState = useRef<string | null>(null);
+  const syncedBatchId = useRef<string | null>(null);
   const initialSelectionKey = selection.facilityId && selection.ppuId
     ? `${selection.facilityId}/${selection.ppuId}`
     : null;
   const siteSelectionTarget = useRef<string | null>(selectedSiteIdsState !== null ? initialSelectionKey : null);
   const pendingRestore = useRef<PendingRestore | null>(null);
   const restartSessionRequested = useRef(false);
+
+  const serverBatchActive = batchSnapshot?.state === "queued"
+    || batchSnapshot?.state === "running"
+    || batchSnapshot?.state === "stopping";
+  const batchRunning = serverBatchActive
+    || engineeringBatch.commandState === "submitting"
+    || engineeringBatch.commandState === "aborting";
+  const batchCancelling = batchSnapshot?.state === "stopping" || engineeringBatch.commandState === "aborting";
+  const batchObservationState = engineeringBatch.observationState;
 
   const facility = catalog?.facilities.find(item => item.facility_id === selection.facilityId) ?? null;
   const selectedPPU = facility?.ppus.find(item => item.ppu_id === selection.ppuId) ?? null;
@@ -310,7 +322,7 @@ export default function ProgrammingWorkspaceV2() {
     selectedSiteCount: selectedSiteIds.length,
     selectedOperationCount: selectedOperations.length,
     requiresImage,
-    imagePresent: Boolean(imageAsset) || syntheticMockImageAvailable,
+    imagePresent: Boolean(imageAsset) || syntheticMockImageAvailable || Boolean(batchSnapshot?.asset),
     imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_ASSET_BYTES,
     readSelected: selectedOperations.includes("read"),
     readParamsValid: readRangeValid,
@@ -337,6 +349,17 @@ export default function ProgrammingWorkspaceV2() {
   const stopPolicyValue = stopPolicy.kind === "never" ? "never" : String(stopPolicy.threshold);
 
   const previewTotalIc = selectedSiteIds.length * (repeatValue ?? 0);
+  const batchManufacturing = useMemo(() => {
+    if (!batchSnapshot) return null;
+    const pass = batchSnapshot.sites.reduce((total, site) => total + Math.max(0, site.completed_rounds), 0);
+    const fail = batchSnapshot.sites.reduce((total, site) => total + Math.max(0, site.final_failures), 0);
+    return {
+      sites: batchSnapshot.sites.length,
+      totalIc: batchSnapshot.sites.length * batchSnapshot.execution_policy.repeat_count,
+      pass,
+      fail,
+    };
+  }, [batchSnapshot]);
   const displayedBatch = batchManufacturing ?? {
     sites: selectedSiteIds.length,
     totalIc: previewTotalIc,
@@ -348,7 +371,9 @@ export default function ProgrammingWorkspaceV2() {
     ? `${((displayedBatch.pass / completedIc) * 100).toFixed(1)}%`
     : "—";
   const displayedTargetDevice = targetDeviceLabel(targetDevice);
-  const cycleMs = batchStartedAt !== null ? Math.max(0, clock - batchStartedAt) : lastCycleMs;
+  const cycleMs = batchSnapshot
+    ? serverBatchElapsedMs(batchSnapshot.started_at, batchSnapshot.finished_at, clock)
+    : null;
   const batchTimeLabel = formatElapsedTime(cycleMs);
   const batchKpis = [
     { key: "sites", label: "SITES", value: displayedBatch.sites },
@@ -359,6 +384,12 @@ export default function ProgrammingWorkspaceV2() {
     { key: "yield", label: "YIELD", value: yieldLabel, tone: "info" as const },
     { key: "batch-time", label: "BATCH TIME", value: batchTimeLabel },
   ];
+  const batchSitesById = useMemo(
+    () => new Map((batchSnapshot?.sites ?? [])
+      .filter(site => site.facility_id === selection.facilityId && site.ppu_id === selection.ppuId)
+      .map(site => [site.site_id, site] as const)),
+    [batchSnapshot, selection.facilityId, selection.ppuId],
+  );
 
   const appendLog = useCallback((
     message: string,
@@ -397,24 +428,13 @@ export default function ProgrammingWorkspaceV2() {
     trackedJobs.current = {};
     submissionGenerations.current = {};
     cancelRequests.current.clear();
-    batchLifecycle.current = null;
-    batchStopReason.current = null;
-    activeGatewayPolicy.current = null;
-    operatorCancelledSites.current.clear();
     setPPU(null);
     setSites([]);
     if (!preserveSiteSelection) {
       siteSelectionTarget.current = null;
       setSelectedSiteIdsState(null);
     }
-    setBatchSiteStates({});
     setSubmittingSiteIds([]);
-    setBatchRunning(false);
-    setBatchCancelling(false);
-    setBatchObservationState("connected");
-    setBatchManufacturing(null);
-    setBatchStartedAt(null);
-    setLastCycleMs(null);
   }, [setSelectedSiteIdsState]);
 
   const switchTarget = useCallback((next: TargetSelection) => {
@@ -461,13 +481,54 @@ export default function ProgrammingWorkspaceV2() {
         if (!disposed) configuredGatewayPolicy.current = settings;
       })
       .catch(() => {
-        // Older Gateways keep the explicit safe default until settings are available.
+        // Direct Engineering Jobs retain the safe client default until settings are available.
+        // Server Batch Runtime freezes its own authoritative Gateway policy at START.
       });
     return () => {
       disposed = true;
       unsubscribe();
     };
   }, [apiBase, workspaceHydrated]);
+
+  useEffect(() => {
+    if (!batchSnapshot || syncedBatchId.current === batchSnapshot.batch_id) return;
+    syncedBatchId.current = batchSnapshot.batch_id;
+    const snapshot = batchSnapshot;
+    queueMicrotask(() => {
+      const first = snapshot.sites[0];
+      if (first) {
+        const batchTarget = { facilityId: first.facility_id, ppuId: first.ppu_id };
+        if (!sameTarget(selection, batchTarget)) setSelection(batchTarget);
+        const ids = snapshot.sites
+          .filter(site => site.facility_id === first.facility_id && site.ppu_id === first.ppu_id)
+          .map(site => site.site_id)
+          .sort((left, right) => left - right);
+        siteSelectionTarget.current = `${first.facility_id}/${first.ppu_id}`;
+        setSelectedSiteIdsState(ids);
+      }
+      setSelectedOperations([...snapshot.operations]);
+      setRepeatCount(String(snapshot.execution_policy.repeat_count));
+      setSiteRetryLimit(String(snapshot.execution_policy.site_retry_limit));
+      setStopPolicy(snapshot.execution_policy.failed_site_stop_threshold === null
+        ? { kind: "never" }
+        : { kind: "failed_sites", threshold: snapshot.execution_policy.failed_site_stop_threshold });
+      setReadOffset(String(snapshot.read.offset));
+      setReadLength(String(snapshot.read.length));
+    });
+  }, [batchSnapshot, selection, setReadLength, setReadOffset, setSelectedOperations, setSelectedSiteIdsState, setSelection]);
+
+  useEffect(() => {
+    if (!batchSnapshot) return;
+    const marker = `${batchSnapshot.batch_id}:${batchSnapshot.state}`;
+    if (lastObservedBatchState.current === marker) return;
+    lastObservedBatchState.current = marker;
+    const mockRevision = batchSnapshot.mock_runtime?.profile_revision;
+    appendLog(
+      `[BATCH] ${batchSnapshot.state.toUpperCase()} · ${batchSnapshot.batch_id}${mockRevision ? ` · Mock rev ${mockRevision}` : ""}`,
+      batchSnapshot.state === "error",
+      "BAT",
+    );
+  }, [appendLog, batchSnapshot]);
 
   useEffect(() => {
     if (!workspaceHydrated) return;
@@ -485,18 +546,33 @@ export default function ProgrammingWorkspaceV2() {
         setCatalog(next);
         setCatalogError(null);
         setConnection("online");
-        const restore = pendingRestore.current;
-        if (restore) {
-          const resolved = validSelection(next, restore.target);
-          setSelection(resolved);
-          restore.targetRestored = sameTarget(resolved, restore.target);
-          if (restore.targetRestored) {
-            appendLog(`[TARGET] RESTORED · ${restore.target.facilityId} / ${restore.target.ppuId}`, false, "SYS");
-          } else {
-            pendingRestore.current = null;
+
+        const restoredBatch = await restoreEngineeringServerBatch(apiBase);
+        if (cancelled) return;
+        if (restoredBatch) {
+          const first = restoredBatch.sites[0];
+          if (first) {
+            setSelection({ facilityId: first.facility_id, ppuId: first.ppu_id });
+            setSelectedSiteIdsState(restoredBatch.sites
+              .filter(site => site.facility_id === first.facility_id && site.ppu_id === first.ppu_id)
+              .map(site => site.site_id)
+              .sort((left, right) => left - right));
           }
+          appendLog(`[BATCH] RESTORED · ${restoredBatch.batch_id} · ${restoredBatch.state.toUpperCase()}`, false, "BAT");
         } else {
-          setSelection(current => validSelection(next, current));
+          const restore = pendingRestore.current;
+          if (restore) {
+            const resolved = validSelection(next, restore.target);
+            setSelection(resolved);
+            restore.targetRestored = sameTarget(resolved, restore.target);
+            if (restore.targetRestored) {
+              appendLog(`[TARGET] RESTORED · ${restore.target.facilityId} / ${restore.target.ppuId}`, false, "SYS");
+            } else {
+              pendingRestore.current = null;
+            }
+          } else {
+            setSelection(current => validSelection(next, current));
+          }
         }
         appendLog(`[ENGINEERING] Provider ${next.provider.toUpperCase()} · ${next.facility_count} Facilities · ${next.ppu_count} PPUs · ${next.site_count} Sites`);
       } catch (loadError) {
@@ -513,7 +589,7 @@ export default function ProgrammingWorkspaceV2() {
     return () => {
       cancelled = true;
     };
-  }, [apiBase, connectionGeneration, appendLog, ensureEngineeringSession, resetTargetRuntime, restartEngineeringSession, setSelection, workspaceHydrated]);
+  }, [apiBase, connectionGeneration, appendLog, ensureEngineeringSession, resetTargetRuntime, restartEngineeringSession, setSelectedSiteIdsState, setSelection, workspaceHydrated]);
 
   useEffect(() => {
     if (!targetApiBase || !targetSelectionKey) return;
@@ -523,7 +599,7 @@ export default function ProgrammingWorkspaceV2() {
     async function poll() {
       try {
         const submissionSnapshot = { ...submissionGenerations.current };
-        const requestTimeoutMs = (activeGatewayPolicy.current ?? configuredGatewayPolicy.current).ppu_request_timeout_ms;
+        const requestTimeoutMs = configuredGatewayPolicy.current.ppu_request_timeout_ms;
         const status = await getPPUStatus(targetApiBase!, requestTimeoutMs);
         if (stopped) return;
         setPPU(status.ppu ?? null);
@@ -531,17 +607,19 @@ export default function ProgrammingWorkspaceV2() {
         Object.keys(trackedJobs.current).forEach(siteId => {
           if (!availableIds.has(Number(siteId))) delete trackedJobs.current[Number(siteId)];
         });
-        status.sites.forEach(site => {
-          const changed = (submissionGenerations.current[site.site_id] ?? 0)
-            !== (submissionSnapshot[site.site_id] ?? 0);
-          if (site.current_job_id && !changed) trackedJobs.current[site.site_id] = site.current_job_id;
-        });
+        if (!batchRunning) {
+          status.sites.forEach(site => {
+            const changed = (submissionGenerations.current[site.site_id] ?? 0)
+              !== (submissionSnapshot[site.site_id] ?? 0);
+            if (site.current_job_id && !changed) trackedJobs.current[site.site_id] = site.current_job_id;
+          });
+        }
         setSites(current => status.sites.map(snapshot => (
           siteFromStatus(snapshot, current.find(site => site.id === snapshot.site_id))
         )));
         const enabledIds = status.sites.filter(site => site.enabled).map(site => site.site_id);
         const restore = pendingRestore.current;
-        if (restore?.targetRestored && sameTarget(restore.target, selection)) {
+        if (!batchRunning && restore?.targetRestored && sameTarget(restore.target, selection)) {
           siteSelectionTarget.current = targetSelectionKey;
           if (restore.siteIds === null) {
             setSelectedSiteIdsState(enabledIds);
@@ -551,7 +629,7 @@ export default function ProgrammingWorkspaceV2() {
             appendLog(`[SITE] RESTORED · ${siteListLabel(restoredIds)}`, false, "SYS");
           }
           pendingRestore.current = null;
-        } else {
+        } else if (!batchRunning) {
           setSelectedSiteIdsState(current => {
             if (siteSelectionTarget.current !== targetSelectionKey) {
               siteSelectionTarget.current = targetSelectionKey;
@@ -562,7 +640,7 @@ export default function ProgrammingWorkspaceV2() {
           });
         }
 
-        const jobIds = [...new Set(Object.values(trackedJobs.current))];
+        const jobIds = batchRunning ? [] : [...new Set(Object.values(trackedJobs.current))];
         const jobs = await Promise.all(jobIds.map(jobId => getJob(targetApiBase!, jobId, requestTimeoutMs)));
         if (stopped) return;
         jobs.forEach(job => {
@@ -571,12 +649,10 @@ export default function ProgrammingWorkspaceV2() {
           if (terminalStates.has(job.state)) delete trackedJobs.current[job.site_id];
         });
         setCatalogError(null);
-        if (batchLifecycle.current) setBatchObservationState("connected");
       } catch (pollError) {
         if (!stopped) {
           const message = pollError instanceof Error ? pollError.message : "unknown error";
           setCatalogError(message);
-          if (batchLifecycle.current) setBatchObservationState("reconnecting");
           appendLog(`[TARGET] Status failed · ${selection.facilityId}/${selection.ppuId} · ${message}`, true, "PPU");
         }
       } finally {
@@ -589,13 +665,13 @@ export default function ProgrammingWorkspaceV2() {
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [targetApiBase, targetSelectionKey, connectionGeneration, selection, applyJob, appendLog, setSelectedSiteIdsState]);
+  }, [targetApiBase, targetSelectionKey, connectionGeneration, selection, applyJob, appendLog, batchRunning, setSelectedSiteIdsState]);
 
   function connect(event: FormEvent) {
     event.preventDefault();
     appendLog(`[CONNECTION] CONNECT · ${apiDraft}`, false, "USR");
     if (targetLocked) {
-      appendLog("[NET] Gateway change blocked while a target Job is active", true);
+      appendLog("[NET] Gateway change blocked while a target Job or Batch is active", true);
       return;
     }
     try {
@@ -643,7 +719,6 @@ export default function ProgrammingWorkspaceV2() {
 
   function applySiteSelection(next: number[]) {
     if (batchRunning) return;
-    setBatchSiteStates({});
     if (targetSelectionKey) siteSelectionTarget.current = targetSelectionKey;
     setSelectedSiteIdsState(next);
     if (stopPolicy.kind === "failed_sites" && stopPolicy.threshold > next.length) {
@@ -674,6 +749,7 @@ export default function ProgrammingWorkspaceV2() {
   }
 
   function selectImageAsset(file: File | null) {
+    if (batchRunning) return;
     setImageAsset(file);
     appendLog(
       file
@@ -684,9 +760,9 @@ export default function ProgrammingWorkspaceV2() {
     );
   }
 
-  function operationDisabled(site: Site, operation: Operation, forBatch = false): boolean {
+  function operationDisabled(site: Site, operation: Operation): boolean {
     if (!targetApiBase || connection !== "online" || !site.enabled || isRunning(site)) return true;
-    if (!forBatch && batchRunning) return true;
+    if (batchRunning) return true;
     if (submittingSiteIds.includes(site.id)) return true;
     if ((operation === "program" || operation === "verify") && !imageAsset && !syntheticMockImageAvailable) return true;
     if ((operation === "program" || operation === "verify") && Boolean(imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES)) return true;
@@ -694,29 +770,10 @@ export default function ProgrammingWorkspaceV2() {
     return false;
   }
 
-  function setBatchSiteState(siteId: number, state: BatchSiteState) {
-    setBatchSiteStates(current => ({ ...current, [siteId]: state }));
-  }
-
-  function clearBatchSiteState(siteId: number) {
-    setBatchSiteStates(current => {
-      if (!(siteId in current)) return current;
-      const next = { ...current };
-      delete next[siteId];
-      return next;
-    });
-  }
-
-  async function runSite(
-    siteId: number,
-    operation: Operation,
-    forBatch = false,
-    submissionGuard?: () => boolean,
-  ): Promise<JobSnapshot | undefined> {
-    if (!targetApiBase) return;
+  async function runSite(siteId: number, operation: Operation): Promise<JobSnapshot | undefined> {
+    if (!targetApiBase || batchRunning) return;
     const site = sites.find(item => item.id === siteId);
-    if (!site || operationDisabled(site, operation, forBatch)) return;
-    if (!forBatch) clearBatchSiteState(siteId);
+    if (!site || operationDisabled(site, operation)) return;
     submissionGenerations.current[siteId] = (submissionGenerations.current[siteId] ?? 0) + 1;
     setSubmittingSiteIds(current => current.includes(siteId) ? current : [...current, siteId]);
     try {
@@ -735,8 +792,7 @@ export default function ProgrammingWorkspaceV2() {
         offset: operation === "read" ? Number(readOffset) : undefined,
         length: operation === "read" ? Number(readLength) : undefined,
         targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : undefined,
-        requestTimeoutMs: (activeGatewayPolicy.current ?? configuredGatewayPolicy.current).ppu_request_timeout_ms,
-        submissionGuard,
+        requestTimeoutMs: configuredGatewayPolicy.current.ppu_request_timeout_ms,
         onAssetEvent: logAssetEvent,
       });
       trackedJobs.current[siteId] = job.job_id;
@@ -767,7 +823,6 @@ export default function ProgrammingWorkspaceV2() {
   }
 
   function runSingleSite(siteId: number, operation: Operation) {
-    setBatchSiteStates({});
     const readDetail = operation === "read" ? ` · offset ${readOffset} · length ${readLength}` : "";
     appendLog(`[${siteLabel(siteId)}] EXECUTE ${operation.toUpperCase()}${readDetail}`, false, "USR");
     void runSite(siteId, operation);
@@ -784,7 +839,6 @@ export default function ProgrammingWorkspaceV2() {
         if (retry > 0) {
           appendLog(`[PPU] CONNECTION RESTORED · ${selection.facilityId}/${selection.ppuId} · ${label}`, false, "PPU");
         }
-        setBatchObservationState("connected");
         return result;
       } catch (error) {
         const transient = error instanceof PlasmaApiError && error.transient;
@@ -799,7 +853,6 @@ export default function ProgrammingWorkspaceV2() {
           throw error;
         }
         const attempt = retry + 1;
-        setBatchObservationState("reconnecting");
         appendLog(
           `[PPU] RECONNECTING · ${selection.facilityId}/${selection.ppuId} · ${label} · retry ${attempt}/${policy.ppu_retry_count} · ${error.message}`,
           true,
@@ -811,40 +864,10 @@ export default function ProgrammingWorkspaceV2() {
     throw new Error("PPU communication retry loop terminated unexpectedly");
   }
 
-  async function waitTerminal(jobId: string, policy: GatewaySettings): Promise<JobSnapshot> {
-    if (!targetApiBase) throw new Error("No Engineering PPU target selected");
-    for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
-      let current: JobSnapshot;
-      try {
-        current = await withCommunicationRetry(
-          `STATUS ${jobId}`,
-          policy,
-          () => getJob(targetApiBase, jobId, policy.ppu_request_timeout_ms),
-        );
-      } catch (error) {
-        if (error instanceof GatewayUnavailableError) {
-          setBatchObservationState("reconnecting");
-          appendLog(`[NET] GATEWAY RECONNECTING · ${apiBase} · ${error.message}`, true, "NET");
-          await new Promise(resolve => window.setTimeout(resolve, 4000));
-          attempt -= 1;
-          continue;
-        }
-        throw error;
-      }
-      applyJob(current);
-      if (terminalStates.has(current.state)) {
-        delete trackedJobs.current[current.site_id];
-        return current;
-      }
-      await new Promise(resolve => window.setTimeout(resolve, POLL_INTERVAL_MS));
-    }
-    throw new Error(`${jobId} timed out waiting for completion`);
-  }
-
   async function requestCancel(siteId: number, jobId: string): Promise<boolean> {
-    if (!targetApiBase || cancelRequests.current.has(jobId)) return false;
+    if (!targetApiBase || cancelRequests.current.has(jobId) || batchRunning) return false;
     cancelRequests.current.add(jobId);
-    const policy = activeGatewayPolicy.current ?? configuredGatewayPolicy.current;
+    const policy = configuredGatewayPolicy.current;
     try {
       await withCommunicationRetry(
         `CANCEL ${jobId}`,
@@ -867,233 +890,79 @@ export default function ProgrammingWorkspaceV2() {
       appendLog(`[BATCH] BLOCKED · ${batchReadiness.label}`, false, "USR");
       return;
     }
-    if (!policyValid || repeatValue === null || retryValue === null) {
-      setOperatorWarning("Batch Execution Policy is invalid.");
-      appendLog("[BATCH] BLOCKED · Batch Execution Policy is invalid.", false, "USR");
+    if (!policyValid || repeatValue === null || retryValue === null || !selection.facilityId || !selection.ppuId) {
+      setOperatorWarning("Batch Execution Policy or target is invalid.");
+      appendLog("[BATCH] BLOCKED · Batch Execution Policy or target is invalid.", false, "USR");
       return;
     }
-    setOperatorWarning(null);
-    // Snapshot Batch membership once. Changes to the live selector are disabled
-    // while this Batch is active and therefore apply only to the next Batch.
+
     const siteIds = [...selectedSiteIds];
-    const operations = [...selectedOperations];
-    const gatewayPolicy = { ...configuredGatewayPolicy.current };
+    const operations = operationOrder.filter(operation => selectedOperations.includes(operation));
     const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
-    const cycleStart = Date.now();
-    setBatchManufacturing({ sites: siteIds.length, totalIc: siteIds.length * repeatValue, pass: 0, fail: 0 });
-    setBatchStartedAt(cycleStart);
-    setLastCycleMs(null);
+    setOperatorWarning(null);
+    trackedJobs.current = {};
     appendLog(
-      `[BATCH] EXECUTE · ${operationListLabel(operations)} · ${siteListLabel(siteIds)} · repeat ${repeatValue} · retry ${retryValue} · threshold ${thresholdValue ?? "off"}${readDetail}`,
+      `[BATCH] SUBMIT · ${operationListLabel(operations)} · ${siteListLabel(siteIds)} · repeat ${repeatValue} · retry ${retryValue} · threshold ${thresholdValue ?? "off"}${readDetail}`,
       false,
       "USR",
     );
-    const lifecycle = new BatchLifecycle(siteIds);
-    const results: Partial<Record<number, BatchTerminalState>> = {};
-    const faultedSites = new Set<number>();
-    batchLifecycle.current = lifecycle;
-    activeGatewayPolicy.current = gatewayPolicy;
-    batchStopReason.current = null;
-    operatorCancelledSites.current.clear();
-    setBatchRunning(true);
-    setBatchCancelling(false);
-    setBatchObservationState("connected");
-    setBatchSiteStates(Object.fromEntries(siteIds.map(id => [id, "running"])) as Record<number, BatchSiteState>);
-    appendLog(`START ${operations.map(item => item.toUpperCase()).join(" → ")} · ${siteListLabel(siteIds)}`, false, "BAT");
-
-    const terminalize = (siteId: number, state: BatchTerminalState, error?: string) => {
-      results[siteId] = state;
-      setBatchSiteState(siteId, state);
-      if (state === "faulted" || state === "error" || state === "stopped") {
-        setSites(current => current.map(site => site.id === siteId ? { ...site, stage: state, error: error ?? site.error } : site));
-      }
-      lifecycle.finish(siteId);
-    };
-    const cancellationState = (siteId: number): BatchTerminalState => {
-      if (operatorCancelledSites.current.has(siteId)) return "cancelled";
-      return batchStopReason.current === "threshold" || batchStopReason.current === "infrastructure"
-        ? "stopped"
-        : "cancelled";
-    };
-    const triggerThresholdIfNeeded = async () => {
-      if (thresholdValue === null || faultedSites.size < thresholdValue || batchStopReason.current) return;
-      batchStopReason.current = "threshold";
-      setBatchCancelling(true);
-      setBatchSiteStates(current => Object.fromEntries(Object.entries(current).map(([siteId, state]) => [
-        siteId,
-        state === "running" ? "cancelling" : state,
-      ])) as Record<number, BatchSiteState>);
-      const { activeJobs } = lifecycle.cancel();
-      appendLog(`[BATCH] THRESHOLD · ${faultedSites.size}/${thresholdValue} FAULTED · stopping unfinished Sites`, true, "BAT");
-      await Promise.all(activeJobs.map(([siteId, jobId]) => requestCancel(siteId, jobId)));
-    };
-    const isolateFailedPpu = async (triggerSiteId: number, failure: string, terminalJobId?: string) => {
-      if (batchStopReason.current === "operator" || batchStopReason.current === "threshold") return;
-      if (batchStopReason.current === "infrastructure") return;
-      batchStopReason.current = "infrastructure";
-      setBatchCancelling(true);
-      setBatchSiteStates(current => Object.fromEntries(Object.entries(current).map(([siteId, state]) => [
-        siteId,
-        Number(siteId) === triggerSiteId ? "error" : state === "running" ? "cancelling" : state,
-      ])) as Record<number, BatchSiteState>);
-      setSites(current => current.map(site => site.id === triggerSiteId ? { ...site, stage: "error", error: failure } : site));
-      const { activeJobs } = lifecycle.cancel();
-      appendLog(
-        `[PPU] ISOLATED · ${selection.facilityId}/${selection.ppuId} · ${siteLabel(triggerSiteId)} · ${failure}`,
-        true,
-        "PPU",
-      );
-      await Promise.all(activeJobs.map(async ([siteId, jobId]) => {
-        if (jobId === terminalJobId) return;
-        const accepted = await requestCancel(siteId, jobId);
-        if (!accepted) return;
-        try {
-          await waitTerminal(jobId, gatewayPolicy);
-        } catch (reconcileError) {
-          setBatchObservationState("reconnecting");
-          appendLog(
-            `[PPU] CANCEL RECONCILIATION PENDING · ${selection.facilityId}/${selection.ppuId} · ${jobId} · ${reconcileError instanceof Error ? reconcileError.message : "unknown error"}`,
-            true,
-            "PPU",
-          );
-        }
-      }));
-    };
 
     try {
-      await Promise.all(siteIds.map(async siteId => {
-        for (let round = 1; round <= repeatValue; round += 1) {
-          for (const operation of operations) {
-            let operationSucceeded = false;
-            for (let attempt = 0; attempt <= retryValue; attempt += 1) {
-              if (batchStopReason.current === "threshold" || batchStopReason.current === "infrastructure") {
-                terminalize(siteId, cancellationState(siteId));
-                return;
-              }
-              if (!lifecycle.prepare(siteId, operation)) {
-                terminalize(siteId, cancellationState(siteId));
-                return;
-              }
-              await new Promise(resolve => window.setTimeout(resolve, 0));
-              if (!lifecycle.beginSubmit(siteId)) {
-                terminalize(siteId, cancellationState(siteId));
-                return;
-              }
-              const job = await runSite(siteId, operation, true, () => lifecycle.canDispatch(siteId));
-              if (!job) {
-                if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
-                else {
-                  await isolateFailedPpu(siteId, "Job submission failed");
-                  terminalize(siteId, "error", "Job submission failed");
-                }
-                return;
-              }
-              if (lifecycle.accepted(siteId, job.job_id)) await requestCancel(siteId, job.job_id);
-              let finalJob: JobSnapshot;
-              try {
-                finalJob = await waitTerminal(job.job_id, gatewayPolicy);
-              } catch (waitError) {
-                if (lifecycle.isCancelRequested(siteId)) terminalize(siteId, cancellationState(siteId));
-                else {
-                  const message = waitError instanceof Error ? waitError.message : "Batch polling failed";
-                  await isolateFailedPpu(siteId, message);
-                  terminalize(siteId, "error", message);
-                }
-                return;
-              }
-              if (lifecycle.isCancelRequested(siteId) || cancelRequests.current.has(job.job_id)) {
-                terminalize(siteId, cancellationState(siteId));
-                return;
-              }
-              if (finalJob.state === "success") {
-                operationSucceeded = true;
-                break;
-              }
-              if (finalJob.state === "failed" || finalJob.state === "timeout") {
-                if (attempt < retryValue) {
-                  appendLog(`[${siteLabel(siteId)}] RETRY ${attempt + 1}/${retryValue} · Round ${round}/${repeatValue} · ${operation.toUpperCase()}`, false, "BAT");
-                  continue;
-                }
-                faultedSites.add(siteId);
-                setBatchManufacturing(current => current ? { ...current, fail: current.fail + 1 } : current);
-                terminalize(siteId, "faulted", finalJob.result?.error?.message);
-                await triggerThresholdIfNeeded();
-                return;
-              }
-              if (finalJob.state === "cancelled") {
-                terminalize(siteId, cancellationState(siteId));
-                return;
-              }
-              const failure = finalJob.result?.error?.message ?? finalJob.state.toUpperCase();
-              await isolateFailedPpu(siteId, failure, finalJob.job_id);
-              terminalize(siteId, "error", failure);
-              return;
-            }
-            if (!operationSucceeded) return;
-          }
-          setBatchManufacturing(current => current ? { ...current, pass: current.pass + 1 } : current);
-        }
-        terminalize(siteId, "success");
-      }));
-
-      const successful = siteIds.filter(siteId => results[siteId] === "success");
-      const cancelled = siteIds.filter(siteId => results[siteId] === "cancelled");
-      const faulted = siteIds.filter(siteId => results[siteId] === "faulted");
-      const errors = siteIds.filter(siteId => results[siteId] === "error");
-      const stopped = siteIds.filter(siteId => results[siteId] === "stopped");
-      const groups: string[] = [];
-      if (successful.length > 0) groups.push(`success: ${siteListLabel(successful)}`);
-      if (faulted.length > 0) groups.push(`faulted: ${siteListLabel(faulted)}`);
-      if (errors.length > 0) groups.push(`error: ${siteListLabel(errors)}`);
-      if (stopped.length > 0) groups.push(`stopped: ${siteListLabel(stopped)}`);
-      if (cancelled.length > 0) groups.push(`cancelled: ${siteListLabel(cancelled)}`);
-      const outcome = errors.length > 0 || stopped.length > 0
-        ? "ERROR"
-        : faulted.length > 0
-          ? "PARTIAL"
-          : cancelled.length === siteIds.length
-            ? "CANCELLED"
-            : cancelled.length > 0
-              ? "PARTIAL"
-              : "COMPLETE";
-      appendLog(`${outcome} · ${groups.join(" · ")}`, errors.length > 0 || faulted.length > 0 || stopped.length > 0, "BAT");
-    } finally {
-      if (batchLifecycle.current === lifecycle) batchLifecycle.current = null;
-      if (activeGatewayPolicy.current === gatewayPolicy) activeGatewayPolicy.current = null;
-      setLastCycleMs(Date.now() - cycleStart);
-      setBatchStartedAt(null);
-      setBatchRunning(false);
-      setBatchCancelling(false);
+      const accepted = await startEngineeringServerBatch(apiBase, {
+        sessionId: engineeringSessionId,
+        targets: [{
+          facility_id: selection.facilityId,
+          ppu_id: selection.ppuId,
+          site_ids: siteIds,
+        }],
+        operations,
+        executionPolicy: {
+          repeat_count: repeatValue,
+          site_retry_limit: retryValue,
+          failed_site_stop_threshold: thresholdValue,
+        },
+        targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : null,
+        assetFile: imageAsset,
+        allowSyntheticMockImage: syntheticMockImageAvailable,
+        readOffset: Number(readOffset),
+        readLength: Number(readLength),
+      });
+      const mockRevision = accepted.mock_runtime?.profile_revision;
+      appendLog(
+        `[BATCH] ACCEPTED · ${accepted.batch_id}${mockRevision ? ` · Mock rev ${mockRevision}` : ""}`,
+        false,
+        "BAT",
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Batch submission failed";
+      setOperatorWarning(message);
+      appendLog(`[BATCH] SUBMISSION ERROR · ${message}`, true, "BAT");
     }
   }
 
   async function cancelBatch() {
-    const lifecycle = batchLifecycle.current;
-    if (!batchRunning || batchCancelling || !lifecycle) return;
-    appendLog("[BATCH] CANCEL", false, "USR");
-    batchStopReason.current = "operator";
-    const { activeJobs } = lifecycle.cancel();
-    setBatchCancelling(true);
-    setBatchSiteStates(current => Object.fromEntries(
-      Object.entries(current).map(([siteId, state]) => [siteId, state === "running" ? "cancelling" : state]),
-    ) as Record<number, BatchSiteState>);
-    await Promise.all(activeJobs.map(([siteId, jobId]) => requestCancel(siteId, jobId)));
+    if (!batchRunning || batchCancelling || !batchSnapshot) return;
+    appendLog(`[BATCH] ABORT REQUESTED · ${batchSnapshot.batch_id}`, false, "USR");
+    try {
+      await abortEngineeringServerBatch(apiBase);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Batch abort failed";
+      setOperatorWarning(message);
+      appendLog(`[BATCH] ABORT ERROR · ${message}`, true, "BAT");
+    }
   }
 
   async function cancelSite(siteId: number) {
+    if (batchRunning) return;
     const site = sites.find(item => item.id === siteId);
     if (!site?.jobId || !isRunning(site)) return;
     appendLog(`[${siteLabel(siteId)}] CANCEL`, false, "USR");
-    const lifecycle = batchLifecycle.current;
-    if (batchRunning && lifecycle) {
-      operatorCancelledSites.current.add(siteId);
-      const jobId = lifecycle.cancelSite(siteId);
-      setBatchSiteState(siteId, "cancelling");
-      if (jobId) await requestCancel(siteId, jobId);
-      return;
-    }
     await requestCancel(siteId, site.jobId);
   }
+
+  const displayedImageName = imageAsset?.name
+    ?? batchSnapshot?.asset?.name
+    ?? (requiresImage && syntheticMockImageAvailable ? syntheticImageLabel : "Select programming image (.bin)...");
 
   return (
     <section className="engineeringProgramming engineeringProgrammingV2">
@@ -1112,7 +981,7 @@ export default function ProgrammingWorkspaceV2() {
           items={batchKpis}
           ariaLabel="Engineering Batch Summary"
           title="BATCH SUMMARY"
-          meta={`${batchManufacturing ? "Current Batch" : "Batch Preview"} · ${displayedBatch.sites} Sites · ${displayedBatch.totalIc} ICs`}
+          meta={`${batchSnapshot ? "Current Batch" : "Batch Preview"} · ${displayedBatch.sites} Sites · ${displayedBatch.totalIc} ICs`}
         />
 
         <div className="productionProgrammingWorkflow">
@@ -1184,10 +1053,10 @@ export default function ProgrammingWorkspaceV2() {
                   <div className="imageField">
                     <span
                       className="programmingFileName"
-                      data-image-source={imageAsset ? "user" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none"}
-                      title={imageAsset?.name}
+                      data-image-source={imageAsset ? "user" : batchSnapshot?.asset ? "batch_snapshot" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none"}
+                      title={displayedImageName}
                     >
-                      {imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? syntheticImageLabel : "Select programming image (.bin)...")}
+                      {displayedImageName}
                     </span>
                     <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>Browse...</button>
                     <input ref={imageInputRef} aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" hidden disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} />
@@ -1233,11 +1102,12 @@ export default function ProgrammingWorkspaceV2() {
                 </div>
 
                 {operatorWarning && <div className="warning engineeringOperationWarning" role="alert"><span>{operatorWarning}</span><button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button></div>}
+                {engineeringBatch.error && batchObservationState === "reconnecting" && <div className="warning engineeringOperationWarning" role="status">{engineeringBatch.error}</div>}
                 {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
 
                 <div className="programmingActions">
                   <button type="button" className="startProgramming executeBatch" disabled={!batchReadiness.ready || !policyValid} onClick={() => void runBatch()}>▶ START PROGRAMMING</button>
-                  <button type="button" className="abortProgramming cancelBatch" disabled={!batchRunning || batchCancelling} onClick={() => void cancelBatch()}>■ ABORT</button>
+                  <button type="button" className="abortProgramming cancelBatch" disabled={!batchRunning || batchCancelling || !batchSnapshot} onClick={() => void cancelBatch()}>■ ABORT</button>
                 </div>
               </div>
             </section>
@@ -1272,9 +1142,14 @@ export default function ProgrammingWorkspaceV2() {
               </thead>
               <tbody className="targetSitesSection">
                 {sites.map(site => {
-                  const batchState = batchSiteStates[site.id];
-                  const displayStage: Stage = batchState === "running" || batchState === "cancelling" ? "queued" : (batchState ?? site.stage);
+                  const batchSite = batchSitesById.get(site.id);
+                  const displayStage = batchSite ? serverSiteStage(batchSite, batchSnapshot?.state === "stopping") : site.stage;
                   const selectedForBatch = selectedSiteIds.includes(site.id);
+                  const progress = batchSite?.progress_percent ?? site.progress;
+                  const error = batchSite?.error?.message ?? site.error;
+                  const displayState = batchSite
+                    ? batchSnapshot?.state === "stopping" && batchSite.state === "running" ? "CANCELLING" : batchSite.state.toUpperCase()
+                    : site.stage.toUpperCase();
                   return (
                     <tr key={site.id} data-batch-selected={selectedForBatch ? "true" : "false"} data-site-enabled={site.enabled ? "true" : "false"}>
                       <td className="engineeringBatchSelectCell">
@@ -1288,12 +1163,12 @@ export default function ProgrammingWorkspaceV2() {
                       </td>
                       <td><b>{siteLabel(site.id)}</b></td>
                       <td><b>{displayedTargetDevice !== "—" ? displayedTargetDevice : (site.target ?? "—")}</b><small>{site.interface ?? "—"}</small></td>
-                      <td><span className={`state ${displayStage}`}>{site.enabled ? (batchState?.toUpperCase() ?? site.stage.toUpperCase()) : "DISABLED"}</span>{site.error && <small className="errorText">{site.error}</small>}</td>
-                      <td><div className="tableProgress"><div className="track"><i style={{ width: `${site.progress}%` }} /></div><b>{Math.round(site.progress)}%</b></div></td>
+                      <td><span className={`state ${displayStage}`}>{site.enabled ? displayState : "DISABLED"}</span>{error && <small className="errorText">{error}</small>}</td>
+                      <td><div className="tableProgress"><div className="track"><i style={{ width: `${progress}%` }} /></div><b>{Math.round(progress)}%</b></div></td>
                       <td><b className="engineeringResult" data-result={resultLabel(displayStage)}>{resultLabel(displayStage)}</b></td>
                       <td><div className="rowActions engineeringV2Actions">
                         {operationOrder.map(operation => <button key={operation} className={operation === "program" ? "primary" : ""} aria-label={`SITE ${site.id} ${t(`operation.${operation}`)}`} title={t(`operation.${operation}`)} disabled={operationDisabled(site, operation)} onClick={() => runSingleSite(site.id, operation)}>{operationCodes[operation]}</button>)}
-                        <button className="stop" aria-label={`Cancel SITE ${site.id}`} disabled={!isRunning(site)} onClick={() => void cancelSite(site.id)}>■</button>
+                        <button className="stop" aria-label={`Cancel SITE ${site.id}`} disabled={batchRunning || !isRunning(site)} onClick={() => void cancelSite(site.id)}>■</button>
                         {site.stage === "success" && site.jobId && site.outputFile && targetApiBase && <a className="rowDownload" aria-label={`Download SITE ${site.id} read file`} href={readDownloadUrl(targetApiBase, site.jobId, site.outputFile)}>↓</a>}
                       </div></td>
                     </tr>
