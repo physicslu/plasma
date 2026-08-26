@@ -34,6 +34,7 @@ import type {
   ServerBatchState,
 } from "../server-batch-api";
 import { useWorkspaceSession, type SelectionMap } from "../workspace-session";
+import { isRecoverablePPUStatusError, ppuRetryDelayMs, PPU_STATUS_REQUEST_TIMEOUT_MS } from "./ppu-status-recovery";
 import ProductionLogPanel, { type ProductionLogEntry } from "./production-log-panel";
 import "./factory-console-v2.css";
 
@@ -396,6 +397,7 @@ export default function FactoryConsoleV2() {
   const logSequence = useRef(0);
   const activityReleaseRef = useRef<(() => void) | null>(null);
   const pollGenerationRef = useRef(0);
+  const runtimeRecoveryGenerationRef = useRef(0);
   const terminalBatchRef = useRef<string | null>(null);
   const initialProductionSet = useRef(productionSet);
   const initialBatchSelection = useRef(batchSelection);
@@ -510,6 +512,7 @@ export default function FactoryConsoleV2() {
   }, [apiBase, appendLog, applyBatchSnapshot, endActivity]);
 
   const loadSelectionRuntimes = useCallback(async (sourceCatalog: EngineeringTargetCatalog, selection: SelectionMap) => {
+    const generation = ++runtimeRecoveryGenerationRef.current;
     const targets = sourceCatalog.facilities.flatMap(facility => facility.ppus.flatMap(target => {
       const siteIds = selection[facility.facility_id]?.[target.ppu_id] ?? [];
       return siteIds.length ? [{ facility, target, siteIds, key: targetKey(facility.facility_id, target.ppu_id) }] : [];
@@ -518,6 +521,38 @@ export default function FactoryConsoleV2() {
       setRuntimes({});
       return;
     }
+
+    const runtimeForStatus = (item: (typeof targets)[number], status: Awaited<ReturnType<typeof getPPUStatus>>): PPURuntime => {
+      const selected = new Set(item.siteIds);
+      return {
+        facilityId: item.facility.facility_id,
+        target: item.target,
+        loading: false,
+        sites: status.sites.filter(site => selected.has(site.site_id)).map(runtimeFromStatus),
+      };
+    };
+
+    const recoverTarget = async (item: (typeof targets)[number], failureCount: number): Promise<void> => {
+      await delay(ppuRetryDelayMs(failureCount));
+      if (runtimeRecoveryGenerationRef.current !== generation) return;
+      const targetBase = engineeringTargetApiBase(apiBase, item.facility.facility_id, item.target.ppu_id);
+      try {
+        const status = await getPPUStatus(targetBase, PPU_STATUS_REQUEST_TIMEOUT_MS);
+        if (runtimeRecoveryGenerationRef.current !== generation) return;
+        setRuntimes(current => ({ ...current, [item.key]: runtimeForStatus(item, status) }));
+        appendLog(`[PPU] STATUS RESTORED · ${item.target.display_name}`);
+      } catch (error) {
+        if (runtimeRecoveryGenerationRef.current !== generation) return;
+        const detail = error instanceof Error ? error.message : text.loadFailed;
+        setRuntimes(current => {
+          const previous = current[item.key];
+          if (!previous) return current;
+          return { ...current, [item.key]: { ...previous, loading: false, error: detail } };
+        });
+        if (isRecoverablePPUStatusError(error)) void recoverTarget(item, failureCount + 1);
+      }
+    };
+
     setRuntimes(Object.fromEntries(targets.map(item => [item.key, {
       facilityId: item.facility.facility_id,
       target: item.target,
@@ -526,20 +561,15 @@ export default function FactoryConsoleV2() {
     } satisfies PPURuntime])));
     const results = await Promise.allSettled(targets.map(async item => {
       const targetBase = engineeringTargetApiBase(apiBase, item.facility.facility_id, item.target.ppu_id);
-      return { item, status: await getPPUStatus(targetBase) };
+      return { item, status: await getPPUStatus(targetBase, PPU_STATUS_REQUEST_TIMEOUT_MS) };
     }));
+    if (runtimeRecoveryGenerationRef.current !== generation) return;
     setRuntimes(current => {
       const next = { ...current };
       results.forEach((result, index) => {
         const item = targets[index];
         if (result.status === "fulfilled") {
-          const selected = new Set(item.siteIds);
-          next[item.key] = {
-            facilityId: item.facility.facility_id,
-            target: item.target,
-            loading: false,
-            sites: result.value.status.sites.filter(site => selected.has(site.site_id)).map(runtimeFromStatus),
-          };
+          next[item.key] = runtimeForStatus(item, result.value.status);
         } else {
           next[item.key] = {
             facilityId: item.facility.facility_id,
@@ -552,7 +582,13 @@ export default function FactoryConsoleV2() {
       });
       return next;
     });
-  }, [apiBase, text.loadFailed]);
+    results.forEach((result, index) => {
+      if (result.status !== "rejected" || !isRecoverablePPUStatusError(result.reason)) return;
+      const item = targets[index];
+      appendLog(`[PPU] STATUS ERROR · ${item.target.display_name} · RECONNECTING`, "WARN");
+      void recoverTarget(item, 1);
+    });
+  }, [apiBase, appendLog, text.loadFailed]);
 
   useEffect(() => {
     if (!workspaceHydrated) return;
@@ -605,6 +641,7 @@ export default function FactoryConsoleV2() {
     return () => {
       stopped = true;
       pollGenerationRef.current += 1;
+      runtimeRecoveryGenerationRef.current += 1;
       endActivity();
     };
   }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, ensureEngineeringSession, loadSelectionRuntimes, pollServerBatch, setBatchSelection, workspaceHydrated]);
