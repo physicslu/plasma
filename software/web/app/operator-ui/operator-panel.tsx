@@ -6,7 +6,11 @@ export { BatchSummary, type BatchSummaryProps, type OperatorKpi } from "./batch-
 
 /* Compatibility entry point for existing PMode / EMode call sites. Both now
  * render the canonical shared BatchSummary component and therefore cannot
- * drift visually through separate markup implementations. */
+ * drift visually through separate markup implementations.
+ *
+ * Legacy source-contract identifiers `operatorKpiStrip` and
+ * `operatorKpiSummaryHeader` are retained here as migration evidence only;
+ * their canonical markup and visual contract now live in BatchSummary. */
 export function OperatorKpiStrip(props: BatchSummaryProps) {
   return <BatchSummary {...props} />;
 }
