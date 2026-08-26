@@ -30,7 +30,11 @@ test("Engineering readability layer raises the approved operator font floor", as
   ]) {
     assert.ok(css.includes(contract), `missing readability contract: ${contract}`);
   }
-  assert.doesNotMatch(css, /operatorKpiStrip|data-kpi=/, "Batch Summary typography must stay with the shared component");
+  assert.doesNotMatch(
+    css,
+    /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/,
+    "Batch Summary typography must stay with the shared component",
+  );
 });
 
 test("Engineering canonical card headers do not render their legacy text twice", async () => {

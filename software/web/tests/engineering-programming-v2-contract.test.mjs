@@ -77,9 +77,11 @@ test("Engineering Batch Summary uses server Batch manufacturing outcomes and Pro
 test("Production and Engineering use the same named Batch Summary primitive", async () => {
   const production = await source("../app/fleet/factory-console-v2.tsx");
   const engineering = await source("../app/engineering/programming-workspace-v2.tsx");
-  const operatorPanel = await source("../app/operator-ui/operator-panel.tsx");
+  const batchSummary = await source("../app/operator-ui/batch-summary.tsx");
 
-  assert.match(operatorPanel, /operatorKpiSummaryHeader/);
+  assert.match(batchSummary, /className="batchSummaryHeader"/);
+  assert.match(batchSummary, /className="batchSummaryGrid"/);
+  assert.doesNotMatch(batchSummary, /operatorKpiSummary|operatorKpiStrip/);
   assert.match(production, /ariaLabel="Production Batch Summary"/);
   assert.match(production, /title="BATCH SUMMARY"/);
   assert.match(engineering, /ariaLabel="Engineering Batch Summary"/);

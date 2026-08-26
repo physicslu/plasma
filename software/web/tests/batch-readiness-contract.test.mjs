@@ -71,7 +71,7 @@ test("Emode shell density protects the Programming viewport with centered Batch 
   assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*3;[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*180px\s*minmax\(0,\s*1fr\)/);
   assert.match(css, /> \.programmingActions > button:first-child\s*\{[\s\S]*grid-column:\s*1;[\s\S]*width:\s*100%/);
   assert.match(css, /> \.programmingActions > button:last-child\s*\{[\s\S]*grid-column:\s*3;[\s\S]*width:\s*100%/);
-  assert.doesNotMatch(css, /operatorKpiStrip|data-kpi=/);
+  assert.doesNotMatch(css, /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/);
   assert.match(batchSummaryCss, /\[data-kpi="pass"\][\s\S]*border-left-color:\s*#15803d[\s\S]*background:\s*color-mix/);
   assert.match(batchSummaryCss, /\[data-kpi="fail"\][\s\S]*border-left-color:\s*#dc2626[\s\S]*background:\s*color-mix/);
   assert.match(batchSummaryCss, /\[data-kpi="pass"\] b,[\s\S]*\[data-kpi="fail"\] b[\s\S]*font-size:\s*30px/);

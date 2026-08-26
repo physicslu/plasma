@@ -16,15 +16,25 @@ test("PMode and EMode share the canonical BatchSummary component", () => {
   assert.match(pmod, /OperatorKpiStrip/);
   assert.match(emode, /OperatorKpiStrip/);
   assert.match(batchSummary, /export function BatchSummary/);
-  assert.match(batchSummary, /batchSummary operatorKpiSummary/);
+  assert.match(batchSummary, /className=\{`batchSummary \$\{title \? "has-title" : ""\}`\.trim\(\)\}/);
+  assert.match(batchSummary, /className="batchSummaryHeader"/);
+  assert.match(batchSummary, /className="batchSummaryGrid"/);
   assert.match(batchSummary, /import "\.\/batch-summary\.css"/);
+  assert.doesNotMatch(batchSummary, /import "\.\/operator-panel\.css"/);
+  assert.doesNotMatch(batchSummary, /operatorKpiSummary|operatorKpiStrip/);
+
+  // The old component name is temporarily an API-only migration shim. It must
+  // delegate to BatchSummary without bringing legacy markup or CSS ownership back.
   assert.match(operatorPanel, /import \{ BatchSummary, type BatchSummaryProps \} from "\.\/batch-summary"/);
   assert.match(operatorPanel, /export function OperatorKpiStrip\(props: BatchSummaryProps\)/);
   assert.match(operatorPanel, /return <BatchSummary \{\.\.\.props\} \/>/);
-  assert.match(operatorPanel, /export \{ BatchSummary, type BatchSummaryProps, type OperatorKpi \} from "\.\/batch-summary"/);
 });
 
 test("BatchSummary owns its complete internal visual contract", () => {
+  assert.match(batchSummaryCss, /\.batchSummary\.has-title/);
+  assert.match(batchSummaryCss, /\.batchSummaryHeader/);
+  assert.match(batchSummaryCss, /\.batchSummaryGrid/);
+  assert.doesNotMatch(batchSummaryCss, /operatorKpiSummary|operatorKpiStrip/);
   assert.match(batchSummaryCss, /font-family:\s*var\(--font-sans\),\s*Arial,\s*sans-serif/);
   assert.match(batchSummaryCss, /font-variant-numeric:\s*tabular-nums/);
   assert.match(batchSummaryCss, /min-height:\s*58px/);
@@ -42,9 +52,10 @@ test("BatchSummary owns its complete internal visual contract", () => {
 });
 
 test("mode-local CSS cannot override BatchSummary internal typography or PASS FAIL semantics", () => {
-  assert.doesNotMatch(operatorPanelCss, /operatorKpiSummary|operatorKpiStrip/);
-  assert.doesNotMatch(densityCss, /operatorKpiStrip|data-kpi=/);
-  assert.doesNotMatch(readabilityCss, /operatorKpiStrip|data-kpi=/);
-  assert.doesNotMatch(emodeCss, /operatorKpiStrip article|data-kpi=/);
+  const internalSelectors = /operatorKpiSummary|operatorKpiStrip|batchSummaryHeader|batchSummaryGrid|data-kpi=/;
+  assert.doesNotMatch(operatorPanelCss, internalSelectors);
+  assert.doesNotMatch(densityCss, internalSelectors);
+  assert.doesNotMatch(readabilityCss, internalSelectors);
+  assert.doesNotMatch(emodeCss, /batchSummaryHeader|batchSummaryGrid article|data-kpi=/);
   assert.match(emodeCss, /\.engineeringProgrammingV2 \.batchSummary\s*\{\s*margin-top:\s*7px;/);
 });

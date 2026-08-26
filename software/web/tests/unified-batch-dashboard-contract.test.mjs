@@ -17,9 +17,10 @@ test("Production and Engineering share neutral operator summary primitives", () 
   assert.match(pmod, /OperatorPanel/);
   assert.match(operatorPanel, /export function OperatorKpiStrip/);
   assert.match(operatorPanel, /export function OperatorPanel/);
-  assert.match(batchSummaryCss, /\.operatorKpiStrip/);
+  assert.match(batchSummaryCss, /\.batchSummaryGrid/);
+  assert.doesNotMatch(batchSummaryCss, /\.operatorKpiStrip/);
   assert.match(operatorCss, /\.operatorPanel/);
-  assert.doesNotMatch(operatorCss, /\.operatorKpiStrip/);
+  assert.doesNotMatch(operatorCss, /\.operatorKpiStrip|\.batchSummaryGrid/);
 
   assert.match(emode, /OperatorKpiStrip/);
   assert.match(emode, /ariaLabel="Engineering Batch Summary"/);
