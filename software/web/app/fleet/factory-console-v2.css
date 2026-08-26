@@ -203,58 +203,6 @@
   color: #607080;
   font-size: 8px;
 }
-.productionIcPicker { position: relative; min-width: 0; }
-.productionIcPickerInput {
-  min-height: 34px;
-  border: 1px solid #bdccd9;
-  border-radius: 6px;
-  background: #fff;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 24px;
-  align-items: center;
-}
-.productionIcPickerInput input {
-  min-width: 0;
-  width: 100%;
-  height: 32px;
-  padding: 0 9px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #172033;
-  font-size: 10px;
-}
-.productionIcPickerInput span { color: #64748b; text-align: center; }
-.productionIcPickerMenu {
-  position: absolute;
-  z-index: 90;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  padding: 4px;
-  border: 1px solid #bdccd9;
-  border-radius: 6px;
-  background: #fff;
-  box-shadow: 0 12px 28px rgba(15,23,42,.15);
-}
-.productionIcPickerMenu button {
-  width: 100%;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(160px, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-  text-align: left;
-  cursor: pointer;
-}
-.productionIcPickerMenu button:hover { background: #f2f7fb; }
-.productionIcPickerMenu b { font-size: 10px; }
-.productionIcPickerMenu span { color: #536273; font-size: 9px; }
-.productionIcPickerMenu small { color: #708090; font-size: 8px; }
-
 .factoryImageControl {
   min-width: 0;
   min-height: 34px;
@@ -565,8 +513,6 @@
 [data-theme="dark"] .productionTreeFacility,
 [data-theme="dark"] .productionTreePpu,
 [data-theme="dark"] .productionTreeSites label,
-[data-theme="dark"] .productionIcPickerInput,
-[data-theme="dark"] .productionIcPickerMenu,
 [data-theme="dark"] .factoryImageControl,
 [data-theme="dark"] .factoryOperationChecks label,
 [data-theme="dark"] .factoryPolicyControls input,
@@ -597,7 +543,6 @@
 }
 
 [data-theme="dark"] .factoryField > strong,
-[data-theme="dark"] .productionIcPickerInput input,
 [data-theme="dark"] .factoryImageControl button,
 [data-theme="dark"] .factoryOperationChecks label,
 [data-theme="dark"] .factoryPolicyControls label,
@@ -614,9 +559,6 @@
 [data-theme="dark"] .productionTreeFacility > summary small,
 [data-theme="dark"] .productionTreePpu > summary small,
 [data-theme="dark"] .productionTreeSites label,
-[data-theme="dark"] .productionIcPickerInput span,
-[data-theme="dark"] .productionIcPickerMenu span,
-[data-theme="dark"] .productionIcPickerMenu small,
 [data-theme="dark"] .factoryField > small,
 [data-theme="dark"] .factoryImageControl span,
 [data-theme="dark"] .factoryBatchStatus small,
@@ -632,7 +574,6 @@
 [data-theme="dark"] .productionTreeFacility > summary,
 [data-theme="dark"] .productionTreePpu > summary { color: var(--text-soft); }
 [data-theme="dark"] .productionTreeSites label.selected { background: #102c45; color: #8ec5ff; }
-[data-theme="dark"] .productionIcPickerMenu button:hover { background: var(--hover); }
 [data-theme="dark"] .factorySiteLedCard.batch-excluded { background: var(--panel-2); }
 [data-theme="dark"] .factorySiteLedCard.state-running,
 [data-theme="dark"] .factoryBatchStatus.state-running,
