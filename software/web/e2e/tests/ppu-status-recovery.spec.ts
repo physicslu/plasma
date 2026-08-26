@@ -97,3 +97,61 @@ test("transient PPU status failure auto-recovers without reselecting FPS", async
   await expect(live.locator(".factorySiteLedCard")).toHaveCount(2);
   await expect(page.getByText(/STATUS RESTORED · Mock PPU 01/)).toBeVisible();
 });
+
+test("12 second PPU status stall times out, auto-recovers, and re-enables START without reselecting FPS", async ({ page }) => {
+  let statusRequests = 0;
+
+  await page.route("**/api/engineering/**", async (route: Route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/engineering/session" && request.method() === "POST") {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          session: { session_id: "0123456789abcdef0123456789abcdef", previous_session_cleared: false },
+        }),
+      });
+      return;
+    }
+    if (path === "/api/engineering/targets") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog()) });
+      return;
+    }
+    if (path === `/api/engineering/targets/${facilityId}/${ppuId}/api/status`) {
+      statusRequests += 1;
+      if (statusRequests === 1) {
+        await new Promise(resolve => setTimeout(resolve, 12_000));
+        try {
+          await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(status()) });
+        } catch {
+          // The browser is expected to abort this intercepted request at the
+          // Production PPU observation deadline before the 12 s stall ends.
+        }
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(status()) });
+      return;
+    }
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false }) });
+  });
+
+  await page.goto("/fleet");
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
+  await commitProductionSites(page, facilityId, ppuId, [1, 2]);
+
+  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
+  const erase = programming.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox");
+  const start = programming.getByRole("button", { name: /START PROGRAMMING/ });
+  const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
+
+  await erase.check();
+  await expect(start).toBeDisabled();
+  await expect(live.getByText(/request timed out/i)).toBeVisible({ timeout: 7_000 });
+  await expect.poll(() => statusRequests, { timeout: 9_000 }).toBeGreaterThanOrEqual(2);
+  await expect(live.getByText(/request timed out/i)).toHaveCount(0);
+  await expect(live.locator(".factorySiteLedCard")).toHaveCount(2);
+  await expect(page.getByText(/STATUS RESTORED · Mock PPU 01/)).toBeVisible();
+  await expect(start).toBeEnabled();
+});
