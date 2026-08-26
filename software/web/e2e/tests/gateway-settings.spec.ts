@@ -17,18 +17,17 @@ async function settingsVisualContract(page: import("@playwright/test").Page) {
         height: rect.height,
       };
     }
-    function geometry(selector: string) {
+    function width(selector: string) {
       const element = document.querySelector(selector);
       if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
-      const rect = element.getBoundingClientRect();
-      return { width: rect.width, height: rect.height };
+      return element.getBoundingClientRect().width;
     }
     return {
       card: style(".settingsCard"),
       guide: style(".settingsGuide"),
       primaryAction: style('.settingsActions button[data-variant="primary"]'),
       field: style(".settingsField input, .settingsField select"),
-      fieldCell: geometry(".settingsField"),
+      fieldCellWidth: width(".settingsField"),
     };
   });
 }
@@ -70,7 +69,7 @@ test("EMode Settings > Gateway edits shared server-owned timeout and retry setti
   expect((panelBox?.y ?? 0) - (canvasBox?.y ?? 0)).toBeLessThanOrEqual(24);
 
   await page.getByLabel("PPU Request Timeout seconds").fill("20");
-  await page.getByLabel("PPU Retry Count")).fill("5");
+  await page.getByLabel("PPU Retry Count").fill("5");
   await page.getByRole("button", { name: "Apply Settings", exact: true }).click();
 
   await expect.poll(() => submitted).toEqual({ ppu_request_timeout_ms: 20_000, ppu_retry_count: 5 });
