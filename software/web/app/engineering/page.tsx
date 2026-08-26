@@ -8,7 +8,6 @@ import MockRuntimeSettingsPanel from "./mock-runtime-settings";
 import ProgrammingWorkspaceV2 from "./programming-workspace-v2";
 import "./engineering.css";
 import "./engineering-density.css";
-import "./engineering-log.css";
 import "./engineering-workspace-refresh.css";
 import "./engineering-readability.css";
 import "./engineering-alignment.css";
