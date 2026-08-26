@@ -1,5 +1,5 @@
 import type { EngineeringTargetCatalog, PPUStatus } from "../plasma-api";
-import { engineeringTargetApiBase, getPPUStatus } from "../plasma-api";
+import { engineeringTargetApiBase, getPPUStatus, PlasmaApiError } from "../plasma-api";
 import type { SelectionMap } from "../workspace-session";
 
 export const PPU_STATUS_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 5_000] as const;
@@ -31,6 +31,10 @@ export async function probePPUStatus(
     engineeringTargetApiBase(apiBase, target.facilityId, target.ppuId),
     PPU_STATUS_REQUEST_TIMEOUT_MS,
   );
+}
+
+export function isRecoverablePPUStatusError(error: unknown): boolean {
+  return error instanceof PlasmaApiError && error.transient;
 }
 
 export function ppuRetryDelayMs(failureCount: number): number {
