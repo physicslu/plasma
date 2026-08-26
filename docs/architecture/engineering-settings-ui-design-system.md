@@ -85,7 +85,7 @@ Settings UI 共用只處理 presentation 與 interaction pattern，不改變設�
 3. Playwright E2E。
 4. Mock CD Browser Runtime Acceptance（若相關 workflow 被觸發）。
 
-Browser regression 必須至少驗證 Gateway / Mock 的 shared Card、Guide、primary action 與 Field computed style 一致，並額外比較實際 Field column width、input/select height 與 primary action height，避免「CSS property 名義共用、實際 geometry 已漂移」的 regression。兩頁也必須維持 `settingsActive` top-aligned canvas。
+Browser regression 必須至少驗證 Gateway / Mock 的 shared Card、Guide、primary action 與 Field computed style 一致，並額外比較 input/select 與 primary action 的實際高度，避免「CSS property 名義共用、實際 control geometry 已漂移」的 regression。Field column density 由各 surface 使用 shared `SettingsGrid` 的 source contract 保護；Card / Guide 高度與實際欄寬可因 domain content 與可用畫布寬度不同，不應誤設為跨頁完全相等的 invariant。兩頁也必須維持 `settingsActive` top-aligned canvas。
 
 ## 7. Review rule
 
