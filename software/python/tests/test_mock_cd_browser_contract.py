@@ -67,12 +67,29 @@ def test_engineering_asset_cache_spec_uses_real_gateway_without_route_mocking() 
     source = ASSET_CACHE_SPEC.read_text(encoding="utf-8")
     assert "page.route(" not in source
     assert "1024 * 1024" in source
+
+    # Engineering programming now submits its Image through the server-owned Batch API.
+    assert 'url.pathname === "/api/batches"' in source
+    assert "counters.batches" in source
+
+    # Legacy asset endpoints are observed only to prove that the active path does not use them.
     assert "api/programming-assets/check" in source
-    assert "counters.uploads" in source
+    assert "counters.legacyAssetChecks" in source
+    assert "counters.legacyAssetUploads" in source
+    assert "expect(counters.legacyAssetChecks).toBe(0)" in source
+    assert "expect(counters.legacyAssetUploads).toBe(0)" in source
+
+    # Reconnect must retain the Engineering session contract.
     assert "previous_session_id" in source
-    assert 'Object.hasOwn(body, "asset_base64")' in source
-    assert 'typeof body.asset_sha256 === "string"' in source
-    assert 'Object.hasOwn(body, "image_sha256")' in source
+
+    # The Programming Image is carried as the Batch asset, using canonical asset fields.
+    assert "const firstAsset = firstBatch.asset" in source
+    assert 'expect(typeof firstAsset.asset_base64).toBe("string")' in source
+    assert 'expect(typeof firstAsset.asset_sha256).toBe("string")' in source
+    assert 'expect(Object.hasOwn(firstAsset, "image_sha256")).toBe(false)' in source
+
+    # The active Engineering path must not fall back to direct per-site jobs.
+    assert "expect(counters.directJobs).toBe(0)" in source
 
 
 def test_browser_playwright_configs_keep_real_stack_suite_isolated() -> None:
