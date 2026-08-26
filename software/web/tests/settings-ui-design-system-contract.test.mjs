@@ -44,14 +44,30 @@ test("Gateway and Mock consume shared Settings UI instead of owning duplicate vi
   assert.match(mockCss, /\.mockOperationTable/);
 });
 
+test("Gateway composition follows the approved Mock Settings reference", () => {
+  assert.match(mock, /title=\{text\.title\}/);
+  assert.match(mock, /subtitle=\{text\.subtitle\}/);
+  assert.match(mock, /<SettingsCard ariaLabel="Mock runtime controls">/);
+  assert.match(mock, /<SettingsGrid columns=\{3\}>/);
+
+  assert.match(gateway, /title=\{text\.title\}/);
+  assert.match(gateway, /subtitle=\{text\.subtitle\}/);
+  assert.match(gateway, /<SettingsCard ariaLabel="Gateway Communication Settings">/);
+  assert.match(gateway, /<SettingsGrid columns=\{3\}>/);
+  assert.doesNotMatch(gateway, /SettingsTabs/);
+});
+
 test("Gateway and Mock share the same settings canvas placement contract", () => {
   assert.match(page, /settingsSurfaceActive = active === "settings" \|\| active === "mock"/);
   assert.match(page, /settingsSurfaceActive \? "settingsActive"/);
 });
 
-test("Shared Settings UI owns cards, fields, actions, guide typography and explicit test numbering", () => {
+test("Shared Settings UI owns Mock-reference cards, controls, actions, guide typography and numbering", () => {
   assert.match(sharedCss, /\.settingsCard,[\s\S]*\.settingsGuide/);
-  assert.match(sharedCss, /\.settingsPage input:not\(\[type="checkbox"\]\),[\s\S]*\.settingsPage select/);
+  assert.match(sharedCss, /--settings-control-height:\s*40px/);
+  assert.match(sharedCss, /--settings-action-height:\s*40px/);
+  assert.match(sharedCss, /\.settingsPage input:not\(\[type="checkbox"\]\),[\s\S]*height:\s*var\(--settings-control-height\)/);
+  assert.match(sharedCss, /\.settingsActions button\s*\{[\s\S]*min-height:\s*var\(--settings-action-height\)/);
   assert.match(sharedCss, /\.settingsActions button\[data-variant="primary"\]/);
   assert.match(sharedCss, /\.settingsGuide > header p,[\s\S]*font-size:\s*14px;[\s\S]*line-height:\s*1\.7/);
   assert.match(sharedCss, /counter-reset:\s*settings-test-step/);
