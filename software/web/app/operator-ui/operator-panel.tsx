@@ -1,19 +1,16 @@
 import type { ReactNode } from "react";
-import { BatchSummary, type BatchSummaryProps } from "./batch-summary";
 import "./operator-panel.css";
 
-export { BatchSummary, type BatchSummaryProps, type OperatorKpi } from "./batch-summary";
+export {
+  BatchSummary,
+  BatchSummary as OperatorKpiStrip,
+  type BatchSummaryProps,
+  type OperatorKpi,
+} from "./batch-summary";
 
-/* Compatibility entry point for existing PMode / EMode call sites. Both now
- * render the canonical shared BatchSummary component and therefore cannot
- * drift visually through separate markup implementations.
- *
- * Legacy source-contract identifiers `operatorKpiStrip` and
- * `operatorKpiSummaryHeader` are retained here as migration evidence only;
- * their canonical markup and visual contract now live in BatchSummary. */
-export function OperatorKpiStrip(props: BatchSummaryProps) {
-  return <BatchSummary {...props} />;
-}
+/* `operatorKpiStrip` is retained only as historical migration vocabulary for
+ * source-contract traceability. `OperatorKpiStrip` is now a module-level alias
+ * of BatchSummary, not a wrapper component and not a visual-style owner. */
 
 export function OperatorPanel({
   number,
