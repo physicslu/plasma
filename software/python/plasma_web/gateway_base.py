@@ -69,7 +69,7 @@ def _require_declared_keys(
     unknown = sorted(set(values) - allowed)
     if unknown:
         raise ValueError(f"{label} contains unexpected fields: {', '.join(unknown)}")
-    missing = sorted((required or set()) - set(values)
+    missing = sorted((required or set()) - set(values))
     if missing:
         raise ValueError(f"{label} is missing required fields: {', '.join(missing)}")
 
