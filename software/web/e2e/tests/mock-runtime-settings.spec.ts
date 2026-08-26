@@ -49,7 +49,7 @@ test("Engineering Mock settings apply per-mille error, timing, seed and show ser
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Mock", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: /Mock (設定|Settings)/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Mock (設定|Settings)$/ })).toBeVisible();
   await expect(page.getByText("REV 1", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Program error rate percent")).toHaveValue("5");
   await expect(page.getByLabel("Program throughput KiB per second")).toHaveValue("512");
