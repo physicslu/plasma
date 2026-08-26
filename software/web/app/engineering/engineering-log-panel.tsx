@@ -97,7 +97,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
       downloadFilenamePrefix="plasma-engineering"
       filterAriaLabel="Engineering log filters"
       logAriaLabel="Engineering job log"
-      className="engineeringOperatorLog"
+      className="engineeringLogCard engineeringOperatorLog"
     />
   );
 }
