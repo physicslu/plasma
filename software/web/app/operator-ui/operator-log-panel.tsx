@@ -38,6 +38,7 @@ export function OperatorLogPanel({
   onClear,
   downloadFilenamePrefix,
   filterAriaLabel,
+  filterItemAriaLabelPrefix,
   logAriaLabel,
   emptyText = "No log entries for selected filters.",
   className = "",
@@ -48,6 +49,7 @@ export function OperatorLogPanel({
   onClear: () => void;
   downloadFilenamePrefix: string;
   filterAriaLabel: string;
+  filterItemAriaLabelPrefix: string;
   logAriaLabel: string;
   emptyText?: string;
   className?: string;
@@ -77,7 +79,7 @@ export function OperatorLogPanel({
   }
 
   return (
-    <section className={`logCard operatorLogCard ${className}`.trim()} aria-label={title}>
+    <section className={`logCard operatorLogCard ${className}`.trim()}>
       <div className="logHead operatorLogHead">
         <div className="operatorLogTitle"><span />{title}</div>
         <div className="operatorLogActions">
@@ -98,7 +100,7 @@ export function OperatorLogPanel({
           <label key={category} className={visibleCategories.includes(category) ? "active" : ""}>
             <input
               type="checkbox"
-              aria-label={`${filterAriaLabel} ${category}`}
+              aria-label={`${filterItemAriaLabelPrefix} ${category}`}
               checked={visibleCategories.includes(category)}
               onChange={() => toggleCategory(category)}
             />
