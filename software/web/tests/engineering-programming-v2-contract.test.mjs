@@ -57,16 +57,18 @@ test("LIVE SITE STATUS owns Batch Site selection while keeping every PPU Site vi
   assert.match(workspace, /disabled=\{batchRunning \|\| !site\.enabled \|\| isRunning\(site\)\}/);
 });
 
-test("Engineering Batch Summary uses the Production KPI vocabulary and IC outcome semantics", async () => {
+test("Engineering Batch Summary uses server Batch manufacturing outcomes and Production KPI vocabulary", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
 
   assert.match(workspace, /title="BATCH SUMMARY"/);
   for (const label of ["SITES", "TOTAL IC", "PROCESSED IC", "PASS", "FAIL", "YIELD", "BATCH TIME"]) {
     assert.match(workspace, new RegExp(`label: "${label}"`));
   }
-  assert.match(workspace, /totalIc: siteIds\.length \* repeatValue/);
-  assert.match(workspace, /pass: current\.pass \+ 1/);
-  assert.match(workspace, /fail: current\.fail \+ 1/);
+  assert.match(workspace, /const previewTotalIc = selectedSiteIds\.length \* \(repeatValue \?\? 0\)/);
+  assert.match(workspace, /const batchManufacturing = useMemo\(\(\) => \{/);
+  assert.match(workspace, /site\.completed_rounds/);
+  assert.match(workspace, /site\.final_failures/);
+  assert.match(workspace, /totalIc: batchSnapshot\.sites\.length \* batchSnapshot\.execution_policy\.repeat_count/);
   assert.match(workspace, /const completedIc = displayedBatch\.pass \+ displayedBatch\.fail/);
   assert.match(workspace, /label: "PROCESSED IC", value: completedIc/);
   assert.doesNotMatch(workspace, /CYCLE TIME/);
@@ -84,24 +86,32 @@ test("Production and Engineering use the same named Batch Summary primitive", as
   assert.match(engineering, /title="BATCH SUMMARY"/);
 });
 
-test("Engineering Programming keeps direct PPU jobs rather than borrowing Production server Batch ownership", async () => {
+test("Engineering keeps direct single-Site jobs separate from server-owned Batch execution", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const controller = await source("../app/engineering/engineering-server-batch.ts");
 
   assert.match(workspace, /startJob\(/);
   assert.match(workspace, /cancelJob\(/);
-  assert.doesNotMatch(workspace, /createServerBatch/);
-  assert.doesNotMatch(workspace, /ServerBatchSnapshot/);
+  assert.match(workspace, /startEngineeringServerBatch\(/);
+  assert.match(workspace, /restoreEngineeringServerBatch\(/);
+  assert.match(workspace, /abortEngineeringServerBatch\(/);
+  assert.match(controller, /createServerBatch\(/);
+  assert.match(controller, /getServerBatch\(/);
+  assert.match(controller, /cancelServerBatch\(/);
 });
 
-test("Engineering Target IC is optional but a selected catalog record is sent to the direct job boundary", async () => {
+test("Engineering Target IC is optional and crosses both direct-Job and server-Batch boundaries", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
   const api = await source("../app/plasma-api.ts");
+  const batchApi = await source("../app/server-batch-api.ts");
 
   assert.match(workspace, /ICPickerField/);
   assert.match(workspace, /targetDevice:\s*targetDevice\s*\?/);
   assert.match(api, /targetDevice\?:\s*JobTargetDeviceRequest/);
   assert.match(api, /body\.target_device\s*=/);
   assert.match(api, /engineeringTarget\s*&&\s*options\.targetDevice/);
+  assert.match(batchApi, /targetDevice\?:\s*BatchTargetDeviceRequest/);
+  assert.match(batchApi, /target_device:\s*options\.targetDevice/);
 });
 
 test("Engineering retains explicit Retry while the former Production single-PPU route is retired", async () => {
