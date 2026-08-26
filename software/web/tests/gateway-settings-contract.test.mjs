@@ -22,17 +22,29 @@ test("EMode Settings owns the server-backed shared Gateway communication policy"
   assert.match(settingsApi, /ppu_retry_count: 3/);
   assert.match(settingsPanel, /PPU Request Timeout seconds/);
   assert.match(settingsPanel, /PPU Retry Count/);
-  assert.match(settingsPanel, /<SettingsTabs ariaLabel="Engineering settings categories">/);
-  assert.match(settingsPanel, /aria-current="page">Gateway<\/button>/);
+  assert.match(settingsPanel, /GATEWAY COMMUNICATION CONFIGURATION/);
+  assert.match(settingsPanel, /Gateway 設定/);
+  assert.match(settingsPanel, /<SettingsGrid columns=\{3\}>/);
+  assert.doesNotMatch(settingsPanel, /<SettingsTabs/);
   assert.match(serverBatchApi, /gateway_settings\?: GatewaySettings/);
 });
 
-test("Gateway uses the shared Engineering Settings UI primitives", () => {
-  for (const primitive of ["SettingsPage", "SettingsTabs", "SettingsCard", "SettingsGrid", "SettingsField", "SettingsActions", "SettingsMessage", "SettingsGuide"]) {
+test("Gateway uses the shared Engineering Settings UI primitives without a redundant local tab shell", () => {
+  for (const primitive of ["SettingsPage", "SettingsCard", "SettingsGrid", "SettingsField", "SettingsActions", "SettingsMessage", "SettingsGuide"]) {
     assert.match(settingsPanel, new RegExp(primitive));
     assert.match(sharedSettingsUi, new RegExp(`export function ${primitive}`));
   }
   assert.doesNotMatch(settingsPanel, /gateway-settings\.css/);
+  assert.doesNotMatch(settingsPanel, /SettingsTabs/);
+});
+
+test("Shared Settings controls lock the Mock-reference geometry", () => {
+  assert.match(sharedSettingsCss, /--settings-control-height:\s*40px/);
+  assert.match(sharedSettingsCss, /--settings-action-height:\s*40px/);
+  assert.match(sharedSettingsCss, /height:\s*var\(--settings-control-height\)/);
+  assert.match(sharedSettingsCss, /min-height:\s*var\(--settings-action-height\)/);
+  assert.match(sharedSettingsCss, /font:\s*600 14px\/1\.2 var\(--font-mono\)/);
+  assert.match(sharedSettingsCss, /font:\s*700 14px\/1\.2 var\(--font-sans\)/);
 });
 
 test("EMode settings surfaces stay top-aligned and keep Gateway help on the same page", () => {
