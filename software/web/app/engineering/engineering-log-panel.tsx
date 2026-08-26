@@ -10,6 +10,7 @@ import {
   type OperatorLogEntry,
 } from "../operator-ui/operator-log-panel";
 import { useWorkspaceSession } from "../workspace-session";
+import "./engineering-log-placement.css";
 
 export type EngineeringLogCategory = OperatorLogCategory;
 
@@ -46,9 +47,6 @@ export function engineeringLogCategoryLabel(category: EngineeringLogCategory): s
 }
 
 function engineeringLogText(entry: EngineeringLogEntry): string {
-  // Compatibility normalization: older Engineering workspace state still
-  // carries offset/length fields. Canonical R means Read Entire Main Flash, so
-  // operator-facing audit text must not present those legacy values as intent.
   return entry.text
     .replace(/ · read offset \d+ · length \d+/gi, " · read MAIN FLASH")
     .replace(/ · offset \d+ · length \d+/gi, " · MAIN FLASH");
@@ -97,7 +95,7 @@ export default function EngineeringLogPanel({ logs, onClear }: EngineeringLogPan
       downloadFilenamePrefix="plasma-engineering"
       filterAriaLabel="Engineering log filters"
       logAriaLabel="Engineering job log"
-      className="engineeringLogCard engineeringOperatorLog"
+      className="engineeringOperatorLog"
     />
   );
 }
