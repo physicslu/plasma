@@ -49,7 +49,8 @@
   font: 700 13px var(--font-sans);
 }
 
-.gatewaySettingsCard {
+.gatewaySettingsCard,
+.gatewaySettingsGuide {
   display: grid;
   gap: 20px;
   padding: 22px;
@@ -59,7 +60,11 @@
 }
 
 .gatewaySettingsCard header p,
-.gatewaySettingsHint {
+.gatewaySettingsHint,
+.gatewaySettingsGuide header p,
+.gatewaySettingsGuide article > p,
+.gatewaySettingsGuide dd,
+.gatewaySettingsGuide li {
   color: var(--text-soft);
   font-size: 12px;
   line-height: 1.65;
@@ -124,6 +129,90 @@
 .gatewaySettingsActions button:disabled {
   cursor: default;
   opacity: .5;
+}
+
+.gatewaySettingsGuide {
+  gap: 16px;
+}
+
+.gatewaySettingsGuide header small {
+  color: var(--cyan);
+  font: 800 9px var(--font-mono);
+  letter-spacing: .12em;
+}
+
+.gatewaySettingsGuide header h2 {
+  margin: 5px 0 6px;
+  font-size: 18px;
+}
+
+.gatewaySettingsGuide header p,
+.gatewaySettingsGuide article > p {
+  margin: 0;
+}
+
+.gatewaySettingsGuideGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.gatewaySettingsGuide article {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+}
+
+.gatewaySettingsGuide article h3 {
+  margin: 0 0 7px;
+  font-size: 14px;
+}
+
+.gatewaySettingsGuide dl {
+  display: grid;
+  gap: 13px;
+  margin: 0;
+}
+
+.gatewaySettingsGuide dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.gatewaySettingsGuide dt {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gatewaySettingsGuide dd {
+  margin: 0;
+}
+
+.gatewaySettingsGuide ol {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
+.gatewaySettingsCaution {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--amber) 8%, var(--panel));
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .gatewaySettingsGuideGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 640px) {
