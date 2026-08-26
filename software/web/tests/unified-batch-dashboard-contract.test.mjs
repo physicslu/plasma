@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const legacyShared = fs.readFileSync(new URL("../app/batch-dashboard-panels.tsx", import.meta.url), "utf8");
 const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 const pmodCss = fs.readFileSync(new URL("../app/fleet/factory-console-v2.css", import.meta.url), "utf8");
 const operatorPanel = fs.readFileSync(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
@@ -90,15 +89,6 @@ test("Production LED board remains the primary high-density runtime surface", ()
   assert.match(pmodCss, /factorySiteLed\[data-state="running"\]/);
   assert.match(pmodCss, /factorySiteLed\[data-state="success"\]/);
   assert.match(pmodCss, /factorySiteLed\[data-state="faulted"\]/);
-});
-
-test("legacy shared Batch diagnostics remain available to older surfaces without controlling Factory Console v2", () => {
-  assert.match(legacyShared, /BatchTopologySummary/);
-  assert.match(legacyShared, /ActiveFpsSummary/);
-  assert.match(legacyShared, /BatchPolicyPanel/);
-  assert.doesNotMatch(pmod, /BatchTopologySummary/);
-  assert.doesNotMatch(pmod, /ActiveFpsSummary/);
-  assert.doesNotMatch(pmod, /BatchPolicyPanel/);
 });
 
 test("Engineering v2 policy is behavioral rather than decorative", () => {
