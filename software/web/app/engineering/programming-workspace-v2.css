@@ -87,25 +87,10 @@
   color: var(--text, #172033);
 }
 
-/* Engineering Programming is status-first: keep setup dense so the Site table
-   owns the majority of the vertical viewport. */
-.engineeringProgrammingV2 .operatorKpiSummary {
-  gap: 7px;
+/* Engineering Programming is status-first: keep the shared Batch Summary's
+   internal visual contract untouched and only own its placement in this page. */
+.engineeringProgrammingV2 .batchSummary {
   margin-top: 7px;
-}
-
-.engineeringProgrammingV2 .operatorKpiStrip article {
-  min-height: 58px;
-  padding: 8px 10px;
-}
-
-.engineeringProgrammingV2 .operatorKpiStrip article small {
-  font-size: 9px;
-}
-
-.engineeringProgrammingV2 .operatorKpiStrip article b {
-  margin-top: 3px;
-  font-size: 24px;
 }
 
 .engineeringProgrammingV2 .productionProgrammingWorkflow {
@@ -400,12 +385,6 @@
 
 /* Target Sites moved into LIVE SITE STATUS, so the desktop cards can remain
    side-by-side at substantially narrower content widths without overlap. */
-@container engineering-programming (max-width: 1050px) {
-  .engineeringProgrammingV2 .operatorKpiStrip {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 @container engineering-programming (max-width: 920px) {
   .engineeringProgrammingV2 .productionProgrammingWorkflow {
     grid-template-columns: minmax(0, 1fr);
@@ -430,10 +409,6 @@
 }
 
 @media (max-width: 760px) {
-  .engineeringProgrammingV2 .operatorKpiStrip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .engineeringProgrammingV2 .jobRow,
   .engineeringPolicyRow,
   .engineeringReadRow {

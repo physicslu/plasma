@@ -60,6 +60,7 @@ test("Emode shell density protects the Programming viewport with centered Batch 
   const css = await read("engineering/engineering-density.css");
   const v2Css = await read("engineering/programming-workspace-v2.css");
   const refreshCss = await read("engineering/engineering-workspace-refresh.css");
+  const batchSummaryCss = await read("operator-ui/batch-summary.css");
 
   assert.match(css, /\.engineeringShell\s*\{[\s\S]*padding:\s*0;[\s\S]*gap:\s*0/);
   assert.match(css, /\.engineeringCanvas\.programmingActive\s*\{[\s\S]*padding:\s*10px 12px 18px/);
@@ -70,9 +71,10 @@ test("Emode shell density protects the Programming viewport with centered Batch 
   assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*3;[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*180px\s*minmax\(0,\s*1fr\)/);
   assert.match(css, /> \.programmingActions > button:first-child\s*\{[\s\S]*grid-column:\s*1;[\s\S]*width:\s*100%/);
   assert.match(css, /> \.programmingActions > button:last-child\s*\{[\s\S]*grid-column:\s*3;[\s\S]*width:\s*100%/);
-  assert.match(css, /\[data-kpi="pass"\][\s\S]*border-left-color:\s*#15803d[\s\S]*background:\s*color-mix/);
-  assert.match(css, /\[data-kpi="fail"\][\s\S]*border-left-color:\s*#dc2626[\s\S]*background:\s*color-mix/);
-  assert.match(css, /\[data-kpi="pass"\] b,[\s\S]*\[data-kpi="fail"\] b[\s\S]*font-size:\s*30px/);
+  assert.doesNotMatch(css, /operatorKpiStrip|data-kpi=/);
+  assert.match(batchSummaryCss, /\[data-kpi="pass"\][\s\S]*border-left-color:\s*#15803d[\s\S]*background:\s*color-mix/);
+  assert.match(batchSummaryCss, /\[data-kpi="fail"\][\s\S]*border-left-color:\s*#dc2626[\s\S]*background:\s*color-mix/);
+  assert.match(batchSummaryCss, /\[data-kpi="pass"\] b,[\s\S]*\[data-kpi="fail"\] b[\s\S]*font-size:\s*30px/);
   assert.match(refreshCss, /\.engineeringWorkspace\s*\{[\s\S]*grid-template-columns:\s*224px minmax\(0, 1fr\)/);
   assert.match(refreshCss, /min-height:\s*calc\(100vh - 64px\)/);
   assert.match(refreshCss, /\.engineeringProgrammingV2 \.productionProgrammingWorkflow\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);

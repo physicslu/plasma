@@ -7,6 +7,7 @@ const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", impo
 const pmodCss = fs.readFileSync(new URL("../app/fleet/factory-console-v2.css", import.meta.url), "utf8");
 const operatorPanel = fs.readFileSync(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
 const operatorCss = fs.readFileSync(new URL("../app/operator-ui/operator-panel.css", import.meta.url), "utf8");
+const batchSummaryCss = fs.readFileSync(new URL("../app/operator-ui/batch-summary.css", import.meta.url), "utf8");
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
 const serverBatchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const snapshotStore = fs.readFileSync(new URL("../app/server-batch-snapshot-store.ts", import.meta.url), "utf8");
@@ -16,8 +17,9 @@ test("Production and Engineering share neutral operator summary primitives", () 
   assert.match(pmod, /OperatorPanel/);
   assert.match(operatorPanel, /export function OperatorKpiStrip/);
   assert.match(operatorPanel, /export function OperatorPanel/);
-  assert.match(operatorCss, /\.operatorKpiStrip/);
+  assert.match(batchSummaryCss, /\.operatorKpiStrip/);
   assert.match(operatorCss, /\.operatorPanel/);
+  assert.doesNotMatch(operatorCss, /\.operatorKpiStrip/);
 
   assert.match(emode, /OperatorKpiStrip/);
   assert.match(emode, /ariaLabel="Engineering Batch Summary"/);
@@ -37,7 +39,7 @@ test("Production KPI row separates equipment scope, planned IC quantity, and pro
   assert.match(pmod, /formatBatchTime\(batchSnapshot, clockNow\)/);
   assert.match(pmod, /label: \"PROCESSED IC\", value: manufacturing\.total/);
   assert.match(pmod, /displayedBatchSelection = serverBatchRunning \? serverBatchMembership : batchSelection/);
-  assert.match(operatorCss, /grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\)/);
+  assert.match(batchSummaryCss, /grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\)/);
 });
 
 test("Production manufacturing KPIs use server Batch truth and exclude cancelled work from Yield", () => {

@@ -118,6 +118,53 @@ async function installDashboardMock(page: Page) {
   });
 }
 
+async function batchSummaryComputedStyle(page: Page, ariaLabel: string) {
+  const summary = page.getByRole("region", { name: ariaLabel });
+  await expect(summary).toBeVisible();
+  return await summary.evaluate(element => {
+    const pass = element.querySelector<HTMLElement>('[data-kpi="pass"]')!;
+    const fail = element.querySelector<HTMLElement>('[data-kpi="fail"]')!;
+    const passLabel = pass.querySelector<HTMLElement>("small")!;
+    const passValue = pass.querySelector<HTMLElement>("b")!;
+    const failLabel = fail.querySelector<HTMLElement>("small")!;
+    const failValue = fail.querySelector<HTMLElement>("b")!;
+    const summaryStyle = getComputedStyle(element);
+    const passStyle = getComputedStyle(pass);
+    const failStyle = getComputedStyle(fail);
+    const passLabelStyle = getComputedStyle(passLabel);
+    const passValueStyle = getComputedStyle(passValue);
+    const failLabelStyle = getComputedStyle(failLabel);
+    const failValueStyle = getComputedStyle(failValue);
+    return {
+      fontFamily: summaryStyle.fontFamily,
+      pass: {
+        background: passStyle.backgroundColor,
+        edgeColor: passStyle.borderLeftColor,
+        edgeWidth: passStyle.borderLeftWidth,
+        minHeight: passStyle.minHeight,
+        paddingTop: passStyle.paddingTop,
+        paddingLeft: passStyle.paddingLeft,
+        labelSize: passLabelStyle.fontSize,
+        labelWeight: passLabelStyle.fontWeight,
+        valueSize: passValueStyle.fontSize,
+        valueWeight: passValueStyle.fontWeight,
+      },
+      fail: {
+        background: failStyle.backgroundColor,
+        edgeColor: failStyle.borderLeftColor,
+        edgeWidth: failStyle.borderLeftWidth,
+        minHeight: failStyle.minHeight,
+        paddingTop: failStyle.paddingTop,
+        paddingLeft: failStyle.paddingLeft,
+        labelSize: failLabelStyle.fontSize,
+        labelWeight: failLabelStyle.fontWeight,
+        valueSize: failValueStyle.fontSize,
+        valueWeight: failValueStyle.fontWeight,
+      },
+    };
+  });
+}
+
 test("Production Factory Console v2 keeps tree selection, LED status and separate next-Batch membership", async ({ page }) => {
   await installDashboardMock(page);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -181,4 +228,34 @@ test("Engineering Programming remains the status-first single-PPU workspace", as
   await expect(page.getByLabel("Engineering Site selection").locator("tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Select all Engineering batch Sites")).toBeChecked();
   await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
+});
+
+test("PMode and EMode Batch Summary share identical PASS FAIL computed styles", async ({ page }) => {
+  await installDashboardMock(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.goto("/fleet");
+  const productionStyle = await batchSummaryComputedStyle(page, "Production Batch Summary");
+
+  await page.goto("/engineering");
+  await page.getByRole("button", { name: "Programming", exact: true }).click();
+  const engineeringStyle = await batchSummaryComputedStyle(page, "Engineering Batch Summary");
+
+  expect(engineeringStyle).toEqual(productionStyle);
+  expect(productionStyle.pass.edgeColor).toBe("rgb(21, 128, 61)");
+  expect(productionStyle.fail.edgeColor).toBe("rgb(220, 38, 38)");
+  expect(productionStyle.pass.edgeWidth).toBe("4px");
+  expect(productionStyle.fail.edgeWidth).toBe("4px");
+  expect(productionStyle.pass.minHeight).toBe("58px");
+  expect(productionStyle.pass.paddingTop).toBe("8px");
+  expect(productionStyle.pass.paddingLeft).toBe("10px");
+  expect(productionStyle.pass.labelSize).toBe("10px");
+  expect(productionStyle.fail.labelSize).toBe("10px");
+  expect(productionStyle.pass.labelWeight).toBe("900");
+  expect(productionStyle.fail.labelWeight).toBe("900");
+  expect(productionStyle.pass.valueSize).toBe("30px");
+  expect(productionStyle.fail.valueSize).toBe("30px");
+  expect(productionStyle.pass.valueWeight).toBe("900");
+  expect(productionStyle.fail.valueWeight).toBe("900");
+  expect(productionStyle.pass.background).not.toBe(productionStyle.fail.background);
 });
