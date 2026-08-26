@@ -13,6 +13,7 @@ export const DEFAULT_GATEWAY_SETTINGS: GatewaySettings = {
 };
 
 const GATEWAY_STATUS_TRANSPORT_MARGIN_MS = 5_000;
+const GATEWAY_SETTINGS_FALLBACK_TTL_MS = 5_000;
 
 type GatewaySettingsPayload = {
   ok: boolean;
@@ -22,10 +23,12 @@ type GatewaySettingsPayload = {
 
 const cachedSettings = new Map<string, GatewaySettings>();
 const inFlightSettings = new Map<string, Promise<GatewaySettings>>();
+const fallbackSettingsUntil = new Map<string, number>();
 const settingsListeners = new Set<(apiBase: string, settings: GatewaySettings) => void>();
 
 function publishGatewaySettings(apiBase: string, settings: GatewaySettings): GatewaySettings {
   cachedSettings.set(apiBase, settings);
+  fallbackSettingsUntil.delete(apiBase);
   settingsListeners.forEach(listener => listener(apiBase, settings));
   return settings;
 }
@@ -52,7 +55,15 @@ export function cachedGatewaySettings(apiBase: string): GatewaySettings {
 }
 
 export async function ensureGatewaySettings(apiBase: string): Promise<GatewaySettings> {
-  return cachedSettings.get(apiBase) ?? await getGatewaySettings(apiBase);
+  const cached = cachedSettings.get(apiBase);
+  if (cached) return cached;
+  if ((fallbackSettingsUntil.get(apiBase) ?? 0) > Date.now()) return DEFAULT_GATEWAY_SETTINGS;
+  try {
+    return await getGatewaySettings(apiBase);
+  } catch {
+    fallbackSettingsUntil.set(apiBase, Date.now() + GATEWAY_SETTINGS_FALLBACK_TTL_MS);
+    return DEFAULT_GATEWAY_SETTINGS;
+  }
 }
 
 export function subscribeGatewaySettings(
