@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import time
 from dataclasses import replace
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer
@@ -18,7 +19,8 @@ from . import gateway_base as base
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
 from .engineering_targets import EngineeringPPUProvider
-from .gateway_settings import GatewaySettingsController
+from .gateway_communication import ppu_response_budget_ms, request_with_gateway_policy
+from .gateway_settings import GatewayCommunicationPolicy, GatewaySettingsController
 from .mock_batch_runtime import MockAwareBatchRuntimeManager
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
@@ -45,10 +47,14 @@ def _mock_runtime_payload(settings: dict[str, Any]) -> dict[str, Any]:
 
 
 def _gateway_settings_payload(settings: dict[str, int]) -> dict[str, Any]:
+    policy = GatewayCommunicationPolicy(**settings)
     return {
         "ok": True,
         "rest_contract_version": WEB_REST_CONTRACT_VERSION,
-        "gateway_settings": settings,
+        "gateway_settings": {
+            **settings,
+            "ppu_response_budget_ms": ppu_response_budget_ms(policy),
+        },
     }
 
 
@@ -202,6 +208,7 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
 
     batch_runtime: BatchRuntimeManager | None = None
     gateway_settings = GatewaySettingsController()
+    engineering_status_retry_backoff_s = 1.0
 
     @staticmethod
     def _batch_path(path: str) -> list[str] | None:
@@ -323,6 +330,108 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             return
         self._error(exc)
 
+    def _communication_unavailable(self, exc: PlasmaError) -> None:
+        base._gateway_diagnostic(
+            "request_error",
+            method=self.command,
+            path=urlparse(self.path).path,
+            error_type=exc.error_type,
+            message=exc.message[:300],
+        )
+        self._json(
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            {
+                "ok": False,
+                "error": {
+                    "error_code": exc.code.value,
+                    "error_type": exc.error_type,
+                    "message": exc.message,
+                },
+            },
+        )
+
+    def _engineering_status_request(self, parsed) -> bool:
+        engineering = self._engineering_target(parsed.path)
+        if engineering is None or engineering[2] != ["api", "status"]:
+            return False
+        if self.engineering_provider is None:
+            self._engineering_unavailable()
+            return True
+
+        facility_id, ppu_id, _ = engineering
+        ppu_level_observation = False
+        started_at = time.monotonic()
+        try:
+            query = parse_qs(parsed.query, keep_blank_values=True)
+            base._require_declared_keys(query, allowed={"job", "site"}, label="status query")
+            job = base._query_value(query, "job")
+            site = base._query_value(query, "site")
+            site_id = base._parse_site_id(site) if site is not None else None
+            ppu_level_observation = job is None and site_id is None
+            if ppu_level_observation:
+                base._gateway_diagnostic(
+                    "engineering_ppu_status_start",
+                    facility_id=facility_id,
+                    ppu_id=ppu_id,
+                )
+
+            policy = self.gateway_settings.snapshot()
+
+            def on_retry(attempt: int, retry_count: int, delay_s: float, error: PlasmaError) -> None:
+                if not ppu_level_observation:
+                    return
+                base._gateway_diagnostic(
+                    "engineering_ppu_status_retry",
+                    facility_id=facility_id,
+                    ppu_id=ppu_id,
+                    attempt=attempt,
+                    retry_count=retry_count,
+                    delay_ms=round(delay_s * 1000, 3),
+                    error_code=error.code.value,
+                    error_type=error.error_type,
+                )
+
+            payload = base._run(
+                request_with_gateway_policy(
+                    lambda: self.engineering_provider.status(
+                        facility_id,
+                        ppu_id,
+                        site_id=site_id,
+                        job_id=job,
+                    ),
+                    policy,
+                    retry_backoff_s=self.engineering_status_retry_backoff_s,
+                    on_retry=on_retry,
+                )
+            )
+            if ppu_level_observation:
+                sites = payload.get("sites") if isinstance(payload, dict) else None
+                base._gateway_diagnostic(
+                    "engineering_ppu_status_ok",
+                    facility_id=facility_id,
+                    ppu_id=ppu_id,
+                    elapsed_ms=round((time.monotonic() - started_at) * 1000, 3),
+                    site_count=len(sites) if isinstance(sites, list) else None,
+                )
+            self._json(HTTPStatus.OK, payload)
+        except Exception as exc:
+            if ppu_level_observation:
+                base._gateway_diagnostic(
+                    "engineering_ppu_status_error",
+                    facility_id=facility_id,
+                    ppu_id=ppu_id,
+                    elapsed_ms=round((time.monotonic() - started_at) * 1000, 3),
+                    error_type=exc.error_type if isinstance(exc, PlasmaError) else type(exc).__name__,
+                )
+            if isinstance(exc, PlasmaError) and exc.code in {
+                ErrorCode.CONNECTION_TIMEOUT,
+                ErrorCode.CONNECTION_FAILED,
+            }:
+                self._communication_unavailable(exc)
+            else:
+                self._error(exc)
+        return True
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if self._is_gateway_settings_path(parsed.path):
@@ -365,6 +474,9 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 self._json(HTTPStatus.OK, _mock_runtime_payload(provider.mock_runtime_settings()))
             except Exception as exc:
                 self._error(exc)
+            return
+
+        if self._engineering_status_request(parsed):
             return
 
         tail = self._batch_path(parsed.path)
