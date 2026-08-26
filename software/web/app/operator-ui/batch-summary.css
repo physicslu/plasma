@@ -4,7 +4,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.batchSummary.operatorKpiSummary.has-title {
+.batchSummary.has-title {
   overflow: hidden;
   border: 1px solid var(--line, #d4dee8);
   border-radius: 7px;
@@ -12,7 +12,7 @@
   box-shadow: 0 1px 5px rgba(15, 23, 42, .04);
 }
 
-.batchSummary .operatorKpiSummaryHeader {
+.batchSummaryHeader {
   min-height: 30px;
   padding: 5px 8px;
   border-bottom: 1px solid var(--line, #d4dee8);
@@ -22,28 +22,28 @@
   gap: 6px;
 }
 
-.batchSummary .operatorKpiSummaryHeader strong {
+.batchSummaryHeader strong {
   color: var(--text, #172033);
   font-size: 11px;
   font-weight: 900;
 }
 
-.batchSummary .operatorKpiSummaryHeader small {
+.batchSummaryHeader small {
   color: var(--text-soft, #51606f);
   font-size: 8px;
 }
 
-.batchSummary.operatorKpiSummary.has-title .operatorKpiStrip {
+.batchSummary.has-title .batchSummaryGrid {
   padding: 6px;
 }
 
-.batchSummary .operatorKpiStrip {
+.batchSummaryGrid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
 }
 
-.batchSummary .operatorKpiStrip article {
+.batchSummaryGrid article {
   min-width: 0;
   min-height: 58px;
   padding: 8px 10px;
@@ -53,78 +53,78 @@
   box-shadow: 0 1px 4px rgba(15, 23, 42, .04);
 }
 
-.batchSummary .operatorKpiStrip small,
-.batchSummary .operatorKpiStrip b {
+.batchSummaryGrid small,
+.batchSummaryGrid b {
   display: block;
 }
 
-.batchSummary .operatorKpiStrip small {
+.batchSummaryGrid small {
   color: var(--text-soft, #425466);
   font-size: 10px;
   font-weight: 850;
   letter-spacing: .035em;
 }
 
-.batchSummary .operatorKpiStrip b {
+.batchSummaryGrid b {
   margin-top: 3px;
   color: var(--text, #172033);
   font-size: 24px;
   line-height: 1;
 }
 
-.batchSummary .operatorKpiStrip article[data-tone="info"] b { color: #2563eb; }
-.batchSummary .operatorKpiStrip article[data-tone="pass"] b { color: #16803a; }
-.batchSummary .operatorKpiStrip article[data-tone="fail"] b { color: #dc2626; }
+.batchSummaryGrid article[data-tone="info"] b { color: #2563eb; }
+.batchSummaryGrid article[data-tone="pass"] b { color: #16803a; }
+.batchSummaryGrid article[data-tone="fail"] b { color: #dc2626; }
 
 /* Canonical Batch Summary visual contract comes from the approved EMode
  * operator surface. PASS / FAIL need stronger peripheral-vision emphasis than
  * topology or count KPIs while retaining the same card footprint. */
-.batchSummary .operatorKpiStrip article[data-kpi="pass"],
-.batchSummary .operatorKpiStrip article[data-kpi="fail"] {
+.batchSummaryGrid article[data-kpi="pass"],
+.batchSummaryGrid article[data-kpi="fail"] {
   border-left-width: 4px;
 }
 
-.batchSummary .operatorKpiStrip article[data-kpi="pass"] {
+.batchSummaryGrid article[data-kpi="pass"] {
   border-left-color: #15803d;
   background: color-mix(in srgb, #15803d 7%, var(--panel, #fff));
 }
 
-.batchSummary .operatorKpiStrip article[data-kpi="fail"] {
+.batchSummaryGrid article[data-kpi="fail"] {
   border-left-color: #dc2626;
   background: color-mix(in srgb, #dc2626 7%, var(--panel, #fff));
 }
 
-.batchSummary .operatorKpiStrip article[data-kpi="pass"] small,
-.batchSummary .operatorKpiStrip article[data-kpi="fail"] small {
+.batchSummaryGrid article[data-kpi="pass"] small,
+.batchSummaryGrid article[data-kpi="fail"] small {
   font-size: 10px;
   font-weight: 900;
 }
 
-.batchSummary .operatorKpiStrip article[data-kpi="pass"] b,
-.batchSummary .operatorKpiStrip article[data-kpi="fail"] b {
+.batchSummaryGrid article[data-kpi="pass"] b,
+.batchSummaryGrid article[data-kpi="fail"] b {
   margin-top: 2px;
   font-size: 30px;
   font-weight: 900;
 }
 
-[data-theme="dark"] .batchSummary.operatorKpiSummary.has-title,
-[data-theme="dark"] .batchSummary .operatorKpiSummaryHeader {
+[data-theme="dark"] .batchSummary.has-title,
+[data-theme="dark"] .batchSummaryHeader {
   border-color: var(--line);
   background: var(--panel);
 }
 
-[data-theme="dark"] .batchSummary .operatorKpiSummaryHeader {
+[data-theme="dark"] .batchSummaryHeader {
   background: var(--panel-2);
 }
 
 @container (max-width: 1050px) {
-  .batchSummary .operatorKpiStrip {
+  .batchSummaryGrid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @container (max-width: 700px) {
-  .batchSummary .operatorKpiStrip {
+  .batchSummaryGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
