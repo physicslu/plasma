@@ -1,0 +1,150 @@
+/* Canonical IC Picker visual ownership.
+ *
+ * ICPickerField is shared by Production and Engineering. Internal picker
+ * selectors live here so product-mode styles cannot silently fork the control.
+ * The two host profiles below preserve the currently approved density in each
+ * workspace while keeping all picker internals under one stylesheet owner.
+ */
+.icPicker {
+  position: relative;
+  min-width: 0;
+  font-family: var(--font-sans), Arial, sans-serif;
+}
+
+.icPickerInput {
+  min-height: 40px;
+  border: 1px solid var(--line-strong, #b7c1cb);
+  border-radius: 7px;
+  background: var(--panel, #fff);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center;
+}
+
+.icPickerInput input {
+  min-width: 0;
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text, #172033);
+  font-size: 12px;
+}
+
+.icPickerInput span {
+  color: var(--muted, #64748b);
+  text-align: center;
+}
+
+.icPickerMenu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid var(--line-strong, #b7c1cb);
+  border-radius: 7px;
+  background: var(--panel, #fff);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+}
+
+.icPickerMenu button {
+  width: 100%;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text, #172033);
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(180px, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.icPickerMenu button:hover {
+  background: var(--panel-2, #f3f6f8);
+}
+
+.icPickerMenu b { font-size: 11px; }
+.icPickerMenu span { color: var(--text-soft, #46515b); font-size: 9px; }
+.icPickerMenu small { color: var(--muted, #64748b); font-size: 8px; }
+
+/* PMode keeps its deliberately denser operator control geometry, but the
+ * variant remains owned here instead of in Factory Console CSS. */
+.factoryConsoleV2 .icPickerInput {
+  min-height: 34px;
+  border-color: #bdccd9;
+  border-radius: 6px;
+  background: #fff;
+  grid-template-columns: minmax(0, 1fr) 24px;
+}
+
+.factoryConsoleV2 .icPickerInput input {
+  height: 32px;
+  padding: 0 9px;
+  color: #172033;
+  font-size: 10px;
+}
+
+.factoryConsoleV2 .icPickerInput span { color: #64748b; }
+
+.factoryConsoleV2 .icPickerMenu {
+  z-index: 90;
+  display: block;
+  gap: 0;
+  padding: 4px;
+  border-color: #bdccd9;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .15);
+}
+
+.factoryConsoleV2 .icPickerMenu button {
+  padding: 7px 8px;
+  border-radius: 4px;
+  grid-template-columns: minmax(150px, 1fr) minmax(160px, 1fr) auto;
+  gap: 7px;
+  color: #172033;
+}
+
+.factoryConsoleV2 .icPickerMenu button:hover { background: #f2f7fb; }
+.factoryConsoleV2 .icPickerMenu b { font-size: 10px; }
+.factoryConsoleV2 .icPickerMenu span { color: #536273; font-size: 9px; }
+.factoryConsoleV2 .icPickerMenu small { color: #708090; font-size: 8px; text-transform: none; }
+
+/* EMode retains its current readable evidence treatment. */
+.engineeringProgrammingV2 .icPickerMenu small { text-transform: uppercase; }
+
+[data-theme="dark"] .factoryConsoleV2 .icPickerInput,
+[data-theme="dark"] .factoryConsoleV2 .icPickerMenu {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .factoryConsoleV2 .icPickerInput input,
+[data-theme="dark"] .factoryConsoleV2 .icPickerMenu button {
+  color: var(--text);
+}
+
+[data-theme="dark"] .factoryConsoleV2 .icPickerInput span,
+[data-theme="dark"] .factoryConsoleV2 .icPickerMenu span,
+[data-theme="dark"] .factoryConsoleV2 .icPickerMenu small {
+  color: var(--muted);
+}
+
+[data-theme="dark"] .factoryConsoleV2 .icPickerMenu button:hover {
+  background: var(--hover);
+}
+
+@media (max-width: 760px) {
+  .engineeringProgrammingV2 .icPickerMenu button {
+    grid-template-columns: 1fr;
+  }
+}
