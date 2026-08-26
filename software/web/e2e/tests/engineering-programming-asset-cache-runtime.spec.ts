@@ -6,6 +6,14 @@ const engineeringPpuSites = Number(process.env.MOCK_CD_ENGINEERING_PPU_SITES ?? 
 const targetBase = `/api/engineering/targets/${engineeringFacilityId}/${engineeringPpuId}`;
 const oneMiB = Buffer.from(Array.from({ length: 1024 * 1024 }, (_, index) => (index * 29 + 7) & 0xff));
 
+type RuntimeCounters = {
+  sessions: number;
+  batches: number;
+  directJobs: number;
+  legacyAssetChecks: number;
+  legacyAssetUploads: number;
+};
+
 async function selectSitesOneAndTwo(page: import("@playwright/test").Page) {
   for (let siteId = 1; siteId <= engineeringPpuSites; siteId += 1) {
     const checkbox = page.getByLabel(`Batch select SITE ${siteId}`);
@@ -19,20 +27,26 @@ async function selectSitesOneAndTwo(page: import("@playwright/test").Page) {
 
 async function runTwoSiteProgram(
   page: import("@playwright/test").Page,
-  expectedJobCount: number,
-  counters: { jobs: number },
+  expectedBatchCount: number,
+  counters: RuntimeCounters,
 ) {
   const execute = page.locator(".executeBatch");
   await expect(execute).toBeEnabled();
   await execute.click();
-  await expect.poll(() => counters.jobs, { timeout: 30_000 }).toBe(expectedJobCount);
+  await expect.poll(() => counters.batches, { timeout: 30_000 }).toBe(expectedBatchCount);
   await expect(execute).toBeEnabled({ timeout: 30_000 });
 }
 
-test("1 MiB Engineering Image Asset uploads once per PPU session and reloads after reconnect", async ({ page }) => {
-  const counters = { sessions: 0, checks: 0, uploads: 0, jobs: 0 };
+test("1 MiB Engineering Image Asset is submitted once per server Batch and remains usable after reconnect", async ({ page }) => {
+  const counters: RuntimeCounters = {
+    sessions: 0,
+    batches: 0,
+    directJobs: 0,
+    legacyAssetChecks: 0,
+    legacyAssetUploads: 0,
+  };
   const sessionBodies: Array<Record<string, unknown>> = [];
-  const jobBodies: Array<Record<string, unknown>> = [];
+  const batchBodies: Array<Record<string, unknown>> = [];
 
   page.on("request", request => {
     const url = new URL(request.url());
@@ -42,17 +56,21 @@ test("1 MiB Engineering Image Asset uploads once per PPU session and reloads aft
       sessionBodies.push(request.postDataJSON() as Record<string, unknown>);
       return;
     }
+    if (url.pathname === "/api/batches") {
+      counters.batches += 1;
+      batchBodies.push(request.postDataJSON() as Record<string, unknown>);
+      return;
+    }
     if (url.pathname === `${targetBase}/api/programming-assets/check`) {
-      counters.checks += 1;
+      counters.legacyAssetChecks += 1;
       return;
     }
     if (url.pathname === `${targetBase}/api/programming-assets`) {
-      counters.uploads += 1;
+      counters.legacyAssetUploads += 1;
       return;
     }
     if (url.pathname === `${targetBase}/api/jobs`) {
-      counters.jobs += 1;
-      jobBodies.push(request.postDataJSON() as Record<string, unknown>);
+      counters.directJobs += 1;
     }
   });
 
@@ -75,20 +93,40 @@ test("1 MiB Engineering Image Asset uploads once per PPU session and reloads aft
   await page.getByLabel("Engineering batch program").check();
 
   const sessionsAtFirstRun = counters.sessions;
-  await runTwoSiteProgram(page, 2, counters);
+  await runTwoSiteProgram(page, 1, counters);
   expect(counters.sessions).toBe(sessionsAtFirstRun);
-  expect(counters.checks).toBe(1);
-  expect(counters.uploads).toBe(1);
-  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "asset_base64"))).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => typeof body.asset_sha256 === "string")).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => !Object.hasOwn(body, "image_sha256"))).toBe(true);
-  expect(jobBodies.slice(0, 2).every(body => typeof body.session_id === "string")).toBe(true);
+  expect(counters.directJobs).toBe(0);
+  expect(counters.legacyAssetChecks).toBe(0);
+  expect(counters.legacyAssetUploads).toBe(0);
 
-  await runTwoSiteProgram(page, 4, counters);
-  expect(counters.checks).toBe(2);
-  expect(counters.uploads).toBe(1);
+  const firstBatch = batchBodies[0];
+  expect(firstBatch.targets).toEqual([{
+    facility_id: engineeringFacilityId,
+    ppu_id: engineeringPpuId,
+    site_ids: [1, 2],
+  }]);
+  expect(firstBatch.operations).toEqual(["program"]);
+  expect(typeof firstBatch.session_id).toBe("string");
+  const firstAsset = firstBatch.asset as Record<string, unknown>;
+  expect(firstAsset.asset_name).toBe("engineering-cache-1MiB.bin");
+  expect(firstAsset.asset_type).toBe("image");
+  expect(firstAsset.asset_format).toBe("binary");
+  expect(firstAsset.asset_size).toBe(oneMiB.length);
+  expect(typeof firstAsset.asset_sha256).toBe("string");
+  expect(typeof firstAsset.asset_base64).toBe("string");
+  expect(Buffer.from(String(firstAsset.asset_base64), "base64").equals(oneMiB)).toBe(true);
+  expect(Object.hasOwn(firstAsset, "image_sha256")).toBe(false);
+
+  await runTwoSiteProgram(page, 2, counters);
+  expect(counters.directJobs).toBe(0);
+  expect(counters.legacyAssetChecks).toBe(0);
+  expect(counters.legacyAssetUploads).toBe(0);
+  const secondAsset = batchBodies[1].asset as Record<string, unknown>;
+  expect(secondAsset.asset_sha256).toBe(firstAsset.asset_sha256);
+  expect(secondAsset.asset_size).toBe(oneMiB.length);
 
   const sessionsBeforeReconnect = counters.sessions;
+  const previousBatchSession = batchBodies[1].session_id;
   await page.locator(".engineeringGateway button[type=submit]").click();
   await expect.poll(() => counters.sessions).toBeGreaterThan(sessionsBeforeReconnect);
   await expect(facility.locator("option")).toHaveCount(8, { timeout: 15_000 });
@@ -99,7 +137,10 @@ test("1 MiB Engineering Image Asset uploads once per PPU session and reloads aft
   expect(sessionBodies.at(-1)?.previous_session_id).toBeTruthy();
 
   await selectSitesOneAndTwo(page);
-  await runTwoSiteProgram(page, 6, counters);
-  expect(counters.checks).toBe(3);
-  expect(counters.uploads).toBe(2);
+  await runTwoSiteProgram(page, 3, counters);
+  expect(batchBodies[2].session_id).toBeTruthy();
+  expect(batchBodies[2].session_id).not.toBe(previousBatchSession);
+  expect(counters.directJobs).toBe(0);
+  expect(counters.legacyAssetChecks).toBe(0);
+  expect(counters.legacyAssetUploads).toBe(0);
 });
