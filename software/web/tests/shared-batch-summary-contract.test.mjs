@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const operatorPanel = fs.readFileSync(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
+const batchSummary = fs.readFileSync(new URL("../app/operator-ui/batch-summary.tsx", import.meta.url), "utf8");
 const batchSummaryCss = fs.readFileSync(new URL("../app/operator-ui/batch-summary.css", import.meta.url), "utf8");
 const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
@@ -10,11 +11,13 @@ const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-
 test("PMode and EMode share the canonical BatchSummary component", () => {
   assert.match(pmod, /OperatorKpiStrip/);
   assert.match(emode, /OperatorKpiStrip/);
-  assert.match(operatorPanel, /export function BatchSummary/);
-  assert.match(operatorPanel, /batchSummary operatorKpiSummary/);
+  assert.match(batchSummary, /export function BatchSummary/);
+  assert.match(batchSummary, /batchSummary operatorKpiSummary/);
+  assert.match(batchSummary, /import "\.\/batch-summary\.css"/);
+  assert.match(operatorPanel, /import \{ BatchSummary, type BatchSummaryProps \} from "\.\/batch-summary"/);
   assert.match(operatorPanel, /export function OperatorKpiStrip\(props: BatchSummaryProps\)/);
   assert.match(operatorPanel, /return <BatchSummary \{\.\.\.props\} \/>/);
-  assert.match(operatorPanel, /import "\.\/batch-summary\.css"/);
+  assert.match(operatorPanel, /export \{ BatchSummary, type BatchSummaryProps, type OperatorKpi \} from "\.\/batch-summary"/);
 });
 
 test("canonical BatchSummary style is based on the approved EMode KPI visual contract", () => {
