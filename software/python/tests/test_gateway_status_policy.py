@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
-from plasma_web.gateway import PlasmaWebHandler
+from plasma_web.gateway import PlasmaWebHandler, _gateway_settings_payload
 from plasma_web.gateway_communication import ppu_response_budget_ms, request_with_gateway_policy
 from plasma_web.gateway_settings import GatewayCommunicationPolicy
 
@@ -52,6 +52,16 @@ class TimeoutEngineeringProvider:
 class GatewayStatusPolicyTests(unittest.TestCase):
     def test_default_policy_exposes_complete_response_budget(self) -> None:
         self.assertEqual(ppu_response_budget_ms(GatewayCommunicationPolicy()), 47_000)
+        payload = _gateway_settings_payload(
+            {"revision": 1, "ppu_request_timeout_ms": 10_000, "ppu_retry_count": 3}
+        )
+        self.assertEqual(payload["gateway_settings"]["ppu_response_budget_ms"], 47_000)
+
+    def test_derived_response_budget_tracks_current_gateway_policy(self) -> None:
+        payload = _gateway_settings_payload(
+            {"revision": 2, "ppu_request_timeout_ms": 15_000, "ppu_retry_count": 2}
+        )
+        self.assertEqual(payload["gateway_settings"]["ppu_response_budget_ms"], 48_000)
 
     def test_shared_policy_helper_retries_transient_failure(self) -> None:
         attempts = 0
