@@ -5,6 +5,7 @@ import asyncio
 import base64
 import json
 import mimetypes
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,6 +24,17 @@ from .engineering_targets import EngineeringPPUProvider, MockEngineeringPPUProvi
 FLEET_CONTRACT_VERSION = "1"
 WEB_REST_CONTRACT_VERSION = "3"
 GATEWAY_SERVICE_NAME = "plasma-web-rest-gateway"
+
+
+def _gateway_diagnostic(event: str, **fields: Any) -> None:
+    print(
+        json.dumps(
+            {"component": GATEWAY_SERVICE_NAME, "event": event, **fields},
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
 
 def _run(coro: Any) -> Any:
@@ -57,7 +69,7 @@ def _require_declared_keys(
     unknown = sorted(set(values) - allowed)
     if unknown:
         raise ValueError(f"{label} contains unexpected fields: {', '.join(unknown)}")
-    missing = sorted((required or set()) - set(values))
+    missing = sorted((required or set()) - set(values)
     if missing:
         raise ValueError(f"{label} is missing required fields: {', '.join(missing)}")
 
@@ -172,6 +184,13 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
         return value
 
     def _error(self, exc: Exception) -> None:
+        _gateway_diagnostic(
+            "request_error",
+            method=self.command,
+            path=urlparse(self.path).path,
+            error_type=type(exc).__name__,
+            message=str(exc)[:300],
+        )
         if isinstance(exc, PlasmaError):
             self._json(
                 HTTPStatus.BAD_REQUEST,
@@ -295,17 +314,43 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
                     job = _query_value(query, "job")
                     site = _query_value(query, "site")
                     site_id = _parse_site_id(site) if site is not None else None
-                    self._json(
-                        HTTPStatus.OK,
-                        _run(
+                    ppu_level_observation = job is None and site_id is None
+                    started_at = time.monotonic()
+                    if ppu_level_observation:
+                        _gateway_diagnostic(
+                            "engineering_ppu_status_start",
+                            facility_id=facility_id,
+                            ppu_id=ppu_id,
+                        )
+                    try:
+                        payload = _run(
                             self.engineering_provider.status(
                                 facility_id,
                                 ppu_id,
                                 site_id=site_id,
                                 job_id=job,
                             )
-                        ),
-                    )
+                        )
+                    except Exception as exc:
+                        if ppu_level_observation:
+                            _gateway_diagnostic(
+                                "engineering_ppu_status_error",
+                                facility_id=facility_id,
+                                ppu_id=ppu_id,
+                                elapsed_ms=round((time.monotonic() - started_at) * 1000, 3),
+                                error_type=type(exc).__name__,
+                            )
+                        raise
+                    if ppu_level_observation:
+                        sites = payload.get("sites") if isinstance(payload, dict) else None
+                        _gateway_diagnostic(
+                            "engineering_ppu_status_ok",
+                            facility_id=facility_id,
+                            ppu_id=ppu_id,
+                            elapsed_ms=round((time.monotonic() - started_at) * 1000, 3),
+                            site_count=len(sites) if isinstance(sites, list) else None,
+                        )
+                    self._json(HTTPStatus.OK, payload)
                     return
                 if len(tail) == 5 and tail[:2] == ["api", "jobs"] and tail[3] == "files":
                     job_id = tail[2]
