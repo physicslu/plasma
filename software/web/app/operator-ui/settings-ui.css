@@ -1,4 +1,8 @@
 .settingsPage {
+  --settings-control-height: 40px;
+  --settings-control-radius: 7px;
+  --settings-control-padding-x: 12px;
+  --settings-action-height: 40px;
   width: min(1120px, 100%);
   display: grid;
   gap: 18px;
@@ -134,14 +138,15 @@
 .settingsPage input:not([type="checkbox"]),
 .settingsPage select {
   width: 100%;
+  height: var(--settings-control-height);
   min-width: 0;
   box-sizing: border-box;
-  padding: 10px 12px;
+  padding: 0 var(--settings-control-padding-x);
   border: 1px solid var(--line-strong);
-  border-radius: 7px;
+  border-radius: var(--settings-control-radius);
   background: var(--panel-2);
   color: var(--text);
-  font: 600 14px var(--font-mono);
+  font: 600 14px/1.2 var(--font-mono);
 }
 
 .settingsPage input:disabled,
@@ -180,12 +185,14 @@
 }
 
 .settingsActions button {
-  padding: 10px 16px;
+  min-height: var(--settings-action-height);
+  box-sizing: border-box;
+  padding: 0 16px;
   border: 1px solid var(--line-strong);
-  border-radius: 7px;
+  border-radius: var(--settings-control-radius);
   background: var(--panel);
   color: var(--text);
-  font-weight: 700;
+  font: 700 14px/1.2 var(--font-sans);
   cursor: pointer;
 }
 
