@@ -91,6 +91,7 @@ export default function ProductionLogPanel({ logs, title, clearLabel, onClear }:
       onClear={clearLog}
       downloadFilenamePrefix="plasma-production"
       filterAriaLabel="Production log filters"
+      filterItemAriaLabelPrefix="Production log filter"
       logAriaLabel="Production batch log"
       className="productionOperatorLog"
     />
