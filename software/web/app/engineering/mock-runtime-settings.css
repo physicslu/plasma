@@ -44,7 +44,8 @@
 }
 
 .mockRuntimeControls,
-.mockAppliedSummary {
+.mockAppliedSummary,
+.mockRuntimeGuide {
   border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
   border-radius: 14px;
   padding: 16px;
@@ -194,6 +195,100 @@
   font-weight: 800;
 }
 
+.mockRuntimeGuide {
+  display: grid;
+  gap: 14px;
+}
+
+.mockRuntimeGuide header small {
+  color: var(--cyan);
+  font: 800 9px var(--font-mono);
+  letter-spacing: .12em;
+}
+
+.mockRuntimeGuide header h3 {
+  margin: 5px 0 6px;
+  font-size: 18px;
+}
+
+.mockRuntimeGuide header p,
+.mockRuntimeGuide article > p,
+.mockRuntimeGuide dd,
+.mockRuntimeGuide li span {
+  margin: 0;
+  color: var(--muted, #738096);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.mockRuntimeGuideGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.mockRuntimeGuide article {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel, #111827) 90%, black 10%);
+}
+
+.mockRuntimeGuide dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.mockRuntimeGuide dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.mockRuntimeGuide dt,
+.mockRuntimeGuide li b {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mockRuntimeGuide dd {
+  margin: 0;
+}
+
+.mockRuntimeGuide article h4 {
+  margin: 0 0 7px;
+  font-size: 14px;
+}
+
+.mockRuntimeGuide ol {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
+.mockRuntimeGuide li b,
+.mockRuntimeGuide li span {
+  display: block;
+}
+
+.mockRuntimeGuide li span {
+  margin-top: 2px;
+}
+
+.mockRuntimeCaution {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--amber) 8%, var(--panel, #111827));
+  color: var(--muted, #738096);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .mockRuntimeLoading,
 .mockRuntimeError {
   min-height: 180px;
@@ -220,6 +315,12 @@
   }
   .mockAppliedHeader p {
     text-align: left;
+  }
+}
+
+@media (max-width: 760px) {
+  .mockRuntimeGuideGrid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
