@@ -6,7 +6,8 @@ import { beginBatchExecutionActivity, notifyBatchExecutionActivityChanged } from
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
-import { OperatorKpiStrip, OperatorPanel } from "../operator-ui/operator-panel";
+import { BatchSummary } from "../operator-ui/batch-summary";
+import { OperatorPanel } from "../operator-ui/operator-panel";
 import {
   engineeringTargetApiBase,
   getEngineeringTargets,
@@ -946,7 +947,7 @@ export default function FactoryConsoleV2() {
 
         {catalog && (
           <>
-            <OperatorKpiStrip
+            <BatchSummary
               items={kpis}
               ariaLabel="Production Batch Summary"
               title="BATCH SUMMARY"

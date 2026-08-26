@@ -41,13 +41,17 @@ test("Production and Engineering share operator programming vocabulary while kee
   const emode = await read("engineering/programming-workspace-v2.tsx");
   const sharedPanel = await read("operator-ui/operator-panel.tsx");
 
+  assert.match(pmod, /BatchSummary/);
+  assert.match(emode, /BatchSummary/);
+  assert.doesNotMatch(pmod, /OperatorKpiStrip/);
+  assert.doesNotMatch(emode, /OperatorKpiStrip/);
   assert.match(pmod, /OperatorPanel/);
   assert.match(pmod, /PROGRAMMING JOB/);
   assert.match(pmod, /START PROGRAMMING/);
   assert.match(pmod, /LIVE SITE STATUS/);
   assert.match(pmod, /ICPickerField/);
   assert.match(pmod, /Programming Image/);
-  assert.match(sharedPanel, /operatorKpiStrip/);
+  assert.doesNotMatch(sharedPanel, /BatchSummary|OperatorKpiStrip|operatorKpiStrip/);
   assert.match(sharedPanel, /operatorPanel/);
 
   assert.match(emode, /PROGRAMMING JOB/);

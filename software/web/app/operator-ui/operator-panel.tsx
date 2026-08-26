@@ -1,17 +1,6 @@
 import type { ReactNode } from "react";
 import "./operator-panel.css";
 
-export {
-  BatchSummary,
-  BatchSummary as OperatorKpiStrip,
-  type BatchSummaryProps,
-  type OperatorKpi,
-} from "./batch-summary";
-
-/* `operatorKpiStrip` is retained only as historical migration vocabulary for
- * source-contract traceability. `OperatorKpiStrip` is now a module-level alias
- * of BatchSummary, not a wrapper component and not a visual-style owner. */
-
 export function OperatorPanel({
   number,
   title,

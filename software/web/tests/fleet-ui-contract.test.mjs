@@ -73,9 +73,11 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /PROGRAMMING JOB/);
   assert.match(source, /LIVE SITE STATUS/);
   assert.match(source, /FACTORY LOG/);
-  assert.match(source, /OperatorKpiStrip/);
+  assert.match(source, /import \{ BatchSummary \} from "\.\.\/operator-ui\/batch-summary"/);
+  assert.match(source, /<BatchSummary/);
+  assert.doesNotMatch(source, /OperatorKpiStrip/);
   assert.match(source, /OperatorPanel/);
-  assert.match(sharedPanel, /operatorKpiStrip/);
+  assert.doesNotMatch(sharedPanel, /BatchSummary|OperatorKpiStrip|operatorKpiStrip/);
   assert.match(sharedPanel, /operatorPanel/);
   assert.match(sharedPanelCss, /\.operatorPanel/);
 

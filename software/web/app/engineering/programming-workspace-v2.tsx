@@ -12,7 +12,7 @@ import {
   type GatewaySettings,
 } from "../gateway-settings-api";
 import { useI18n } from "../i18n";
-import { OperatorKpiStrip } from "../operator-ui/operator-panel";
+import { BatchSummary } from "../operator-ui/batch-summary";
 import {
   cancelJob,
   engineeringTargetApiBase,
@@ -977,7 +977,7 @@ export default function ProgrammingWorkspaceV2() {
           </form>
         </header>
 
-        <OperatorKpiStrip
+        <BatchSummary
           items={batchKpis}
           ariaLabel="Engineering Batch Summary"
           title="BATCH SUMMARY"

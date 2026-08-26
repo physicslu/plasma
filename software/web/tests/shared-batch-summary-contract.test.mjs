@@ -12,9 +12,14 @@ const emodeCss = fs.readFileSync(new URL("../app/engineering/programming-workspa
 const densityCss = fs.readFileSync(new URL("../app/engineering/engineering-density.css", import.meta.url), "utf8");
 const readabilityCss = fs.readFileSync(new URL("../app/engineering/engineering-readability.css", import.meta.url), "utf8");
 
-test("PMode and EMode share the canonical BatchSummary component", () => {
-  assert.match(pmod, /OperatorKpiStrip/);
-  assert.match(emode, /OperatorKpiStrip/);
+test("PMode and EMode import the canonical BatchSummary directly", () => {
+  assert.match(pmod, /import \{ BatchSummary \} from "\.\.\/operator-ui\/batch-summary"/);
+  assert.match(emode, /import \{ BatchSummary \} from "\.\.\/operator-ui\/batch-summary"/);
+  assert.match(pmod, /<BatchSummary/);
+  assert.match(emode, /<BatchSummary/);
+  assert.doesNotMatch(pmod, /OperatorKpiStrip/);
+  assert.doesNotMatch(emode, /OperatorKpiStrip/);
+
   assert.match(batchSummary, /export function BatchSummary/);
   assert.match(batchSummary, /className=\{`batchSummary \$\{title \? "has-title" : ""\}`\.trim\(\)\}/);
   assert.match(batchSummary, /className="batchSummaryHeader"/);
@@ -23,12 +28,7 @@ test("PMode and EMode share the canonical BatchSummary component", () => {
   assert.doesNotMatch(batchSummary, /import "\.\/operator-panel\.css"/);
   assert.doesNotMatch(batchSummary, /operatorKpiSummary|operatorKpiStrip/);
 
-  // The old public name is temporarily an API-only export alias. There must be
-  // no wrapper function, local BatchSummary import, markup, or style ownership.
-  assert.match(operatorPanel, /BatchSummary as OperatorKpiStrip/);
-  assert.doesNotMatch(operatorPanel, /export function OperatorKpiStrip/);
-  assert.doesNotMatch(operatorPanel, /return <BatchSummary/);
-  assert.doesNotMatch(operatorPanel, /import \{ BatchSummary/);
+  assert.doesNotMatch(operatorPanel, /BatchSummary|OperatorKpiStrip|operatorKpiStrip/);
 });
 
 test("BatchSummary owns its complete internal visual contract", () => {
