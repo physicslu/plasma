@@ -35,6 +35,7 @@ export default function EngineeringPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const active = mockActive ? "mock" : emodeSection;
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
+  const settingsSurfaceActive = active === "settings" || active === "mock";
 
   function selectSection(id: (typeof sections)[number][0]) {
     if (id === "mock") {
@@ -88,7 +89,7 @@ export default function EngineeringPage() {
             </button>
           </aside>
 
-          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : active === "settings" ? "settingsActive" : ""}`}>
+          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : settingsSurfaceActive ? "settingsActive" : ""}`}>
             {active === "programming" ? (
               <ProgrammingWorkspaceV2 />
             ) : active === "mock" ? (

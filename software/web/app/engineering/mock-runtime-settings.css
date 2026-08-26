@@ -1,99 +1,9 @@
 .mockRuntimePanel {
-  display: grid;
-  gap: 18px;
   width: 100%;
-}
-
-.mockRuntimeHeader,
-.mockAppliedHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.mockRuntimeHeader small,
-.mockAppliedHeader small {
-  color: var(--muted, #738096);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-}
-
-.mockRuntimeHeader h2,
-.mockAppliedHeader h3 {
-  margin: 4px 0 6px;
-}
-
-.mockRuntimeHeader p,
-.mockAppliedHeader p,
-.mockRuntimeHint {
-  margin: 0;
-  color: var(--muted, #738096);
-  line-height: 1.5;
-}
-
-.mockRevisionBadge {
-  flex: none;
-  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  border-radius: 999px;
-  padding: 7px 11px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.mockRuntimeControls,
-.mockAppliedSummary,
-.mockRuntimeGuide {
-  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
-  border-radius: 14px;
-  padding: 16px;
-  background: color-mix(in srgb, var(--panel, #111827) 96%, transparent);
-}
-
-.mockRuntimeControls {
-  display: grid;
-  gap: 15px;
-}
-
-.mockRuntimeToggle {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-weight: 700;
-}
-
-.mockRuntimeMetaGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.mockRuntimeMetaGrid label {
-  display: grid;
-  gap: 6px;
-}
-
-.mockRuntimeMetaGrid label > span {
-  color: var(--muted, #738096);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.mockRuntimeMetaGrid input,
-.mockRuntimeMetaGrid select,
-.mockOperationTable input {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 8px;
-  padding: 8px 9px;
-  color: inherit;
-  background: color-mix(in srgb, var(--panel, #111827) 90%, black 10%);
 }
 
 .mockOperationTableWrap {
+  min-width: 0;
   overflow-x: auto;
 }
 
@@ -108,7 +18,7 @@
 .mockOperationTable td,
 .mockAppliedTable th,
 .mockAppliedTable td {
-  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-bottom: 1px solid var(--line);
   padding: 9px 8px;
   text-align: left;
   white-space: nowrap;
@@ -116,239 +26,36 @@
 
 .mockOperationTable thead th,
 .mockAppliedTable thead th {
-  color: var(--muted, #738096);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: .04em;
 }
 
-.mockRuntimeValidation {
-  margin: 0;
-  color: #ef4444;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.mockRuntimeNotice {
-  margin: 0;
-  color: #22c55e;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.mockRuntimeActions {
-  display: flex;
-  gap: 10px;
-}
-
-.mockRuntimeActions button {
-  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  border-radius: 9px;
-  padding: 9px 14px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.mockRuntimeActions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.mockApplyButton {
-  background: color-mix(in srgb, #2563eb 82%, transparent);
-  color: white;
-}
-
-.mockAppliedSummary {
-  display: grid;
-  gap: 14px;
-}
-
-.mockAppliedHeader p {
-  max-width: 520px;
-  text-align: right;
-  font-size: 12px;
-}
-
-.mockAppliedMeta {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-
-.mockAppliedMeta div {
-  border: 1px solid color-mix(in srgb, currentColor 11%, transparent);
-  border-radius: 10px;
-  padding: 10px;
-}
-
-.mockAppliedMeta dt {
-  color: var(--muted, #738096);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.mockAppliedMeta dd {
-  margin: 4px 0 0;
-  font-size: 14px;
+.mockOperationTable tbody th,
+.mockAppliedTable tbody th {
+  color: var(--text);
   font-weight: 800;
 }
 
-.mockRuntimeGuide {
-  display: grid;
-  gap: 14px;
-}
-
-.mockRuntimeGuide header small {
-  color: var(--cyan);
-  font: 800 9px var(--font-mono);
-  letter-spacing: .12em;
-}
-
-.mockRuntimeGuide header h3 {
-  margin: 5px 0 6px;
-  font-size: 18px;
-}
-
-.mockRuntimeGuide header p,
-.mockRuntimeGuide article > p,
-.mockRuntimeGuide dd,
-.mockRuntimeGuide li span {
-  margin: 0;
-  color: var(--muted, #738096);
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-.mockRuntimeGuideGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
-}
-
-.mockRuntimeGuide article {
-  min-width: 0;
-  padding: 15px;
-  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--panel, #111827) 90%, black 10%);
-}
-
-.mockRuntimeGuide dl {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-}
-
-.mockRuntimeGuide dl > div {
-  display: grid;
-  gap: 3px;
-}
-
-.mockRuntimeGuide dt,
-.mockRuntimeGuide li b {
-  color: inherit;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.mockRuntimeGuide dd {
-  margin: 0;
-}
-
-.mockRuntimeGuide article h4 {
-  margin: 0 0 7px;
-  font-size: 14px;
-}
-
-.mockRuntimeGuide ol {
-  counter-reset: mock-test-step;
-  display: grid;
-  gap: 10px;
-  margin: 10px 0 0;
-  padding-left: 0;
-  list-style: none;
-}
-
-.mockRuntimeGuide li {
-  counter-increment: mock-test-step;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 6px;
-  align-items: start;
-}
-
-.mockRuntimeGuide li::before {
-  content: counter(mock-test-step) "：";
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  color: inherit;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.mockRuntimeGuide li b,
-.mockRuntimeGuide li span {
-  display: block;
-  grid-column: 2;
-}
-
-.mockRuntimeGuide li span {
-  margin-top: 2px;
-}
-
-.mockRuntimeCaution {
-  margin: 0;
-  padding: 11px 13px;
-  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--amber) 8%, var(--panel, #111827));
-  color: var(--muted, #738096);
-  font-size: 14px;
-  line-height: 1.7;
+.mockOperationTable input {
+  min-width: 110px;
 }
 
 .mockRuntimeLoading,
 .mockRuntimeError {
+  width: min(1120px, 100%);
   min-height: 180px;
   display: grid;
   place-items: center;
-  border: 1px dashed color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 14px;
-  color: var(--muted, #738096);
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--muted);
   text-align: center;
   padding: 24px;
 }
 
 .mockRuntimeError {
-  color: #ef4444;
-}
-
-@media (max-width: 900px) {
-  .mockRuntimeMetaGrid,
-  .mockAppliedMeta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .mockAppliedHeader {
-    display: grid;
-  }
-  .mockAppliedHeader p {
-    text-align: left;
-  }
-}
-
-@media (max-width: 760px) {
-  .mockRuntimeGuideGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 620px) {
-  .mockRuntimeHeader,
-  .mockRuntimeMetaGrid,
-  .mockAppliedMeta {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
+  color: var(--red, #dc2626);
 }

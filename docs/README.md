@@ -28,6 +28,7 @@
 - **Current** — [PMode Factory Console v2](architecture/pmode-factory-console-v2.md)
 - **Current** — [Engineering Programming Workspace](architecture/engineering-programming-workspace.md)
 - **Current** — [Engineering Programming Observability](architecture/engineering-programming-observability.md)
+- **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Current** — [Device Support and Validation](architecture/device-support-validation.md)
 - **Current** — [Mock Runtime v1.1](architecture/mock-runtime-v1.1.md)

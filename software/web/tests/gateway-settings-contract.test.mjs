@@ -4,7 +4,8 @@ import test from "node:test";
 
 const settingsApi = await readFile(new URL("../app/gateway-settings-api.ts", import.meta.url), "utf8");
 const settingsPanel = await readFile(new URL("../app/engineering/gateway-settings.tsx", import.meta.url), "utf8");
-const gatewaySettingsCss = await readFile(new URL("../app/engineering/gateway-settings.css", import.meta.url), "utf8");
+const sharedSettingsUi = await readFile(new URL("../app/operator-ui/settings-ui.tsx", import.meta.url), "utf8");
+const sharedSettingsCss = await readFile(new URL("../app/operator-ui/settings-ui.css", import.meta.url), "utf8");
 const engineeringPage = await readFile(new URL("../app/engineering/page.tsx", import.meta.url), "utf8");
 const engineeringCss = await readFile(new URL("../app/engineering/engineering.css", import.meta.url), "utf8");
 const engineeringWorkspace = await readFile(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
@@ -20,24 +21,34 @@ test("EMode Settings owns the server-backed shared Gateway communication policy"
   assert.match(settingsApi, /ppu_retry_count: 3/);
   assert.match(settingsPanel, /PPU Request Timeout seconds/);
   assert.match(settingsPanel, /PPU Retry Count/);
-  assert.match(settingsPanel, /<button type="button" aria-current="page">Gateway<\/button>/);
+  assert.match(settingsPanel, /<SettingsTabs ariaLabel="Engineering settings categories">/);
+  assert.match(settingsPanel, /aria-current="page">Gateway<\/button>/);
   assert.match(serverBatchApi, /gateway_settings\?: GatewaySettings/);
 });
 
-test("EMode Settings stays top-aligned and keeps Gateway help on the same page", () => {
-  assert.match(engineeringPage, /settingsActive/);
+test("Gateway uses the shared Engineering Settings UI primitives", () => {
+  for (const primitive of ["SettingsPage", "SettingsTabs", "SettingsCard", "SettingsGrid", "SettingsField", "SettingsActions", "SettingsMessage", "SettingsGuide"]) {
+    assert.match(settingsPanel, new RegExp(primitive));
+    assert.match(sharedSettingsUi, new RegExp(`export function ${primitive}`));
+  }
+  assert.doesNotMatch(settingsPanel, /gateway-settings\.css/);
+});
+
+test("EMode settings surfaces stay top-aligned and keep Gateway help on the same page", () => {
+  assert.match(engineeringPage, /settingsSurfaceActive = active === "settings" \|\| active === "mock"/);
+  assert.match(engineeringPage, /settingsSurfaceActive \? "settingsActive"/);
   assert.match(engineeringCss, /\.engineeringCanvas\.settingsActive\s*\{[\s\S]*?place-items:\s*start stretch;/);
-  assert.match(settingsPanel, /aria-label="Gateway Settings Guide"/);
+  assert.match(settingsPanel, /ariaLabel="Gateway Settings Guide"/);
   assert.match(settingsPanel, /Gateway 設定說明/);
   assert.match(settingsPanel, /測試方法/);
   assert.match(settingsPanel, /Mock 的 E\/P\/V\/R Error Rate/);
 });
 
-test("Gateway test method renders explicit full-width-colon step numbers", () => {
-  assert.match(gatewaySettingsCss, /counter-reset:\s*gateway-test-step/);
-  assert.match(gatewaySettingsCss, /counter-increment:\s*gateway-test-step/);
-  assert.match(gatewaySettingsCss, /content:\s*counter\(gateway-test-step\)\s*"："/);
-  assert.match(gatewaySettingsCss, /list-style:\s*none/);
+test("Shared Settings Guide renders explicit full-width-colon step numbers", () => {
+  assert.match(sharedSettingsCss, /counter-reset:\s*settings-test-step/);
+  assert.match(sharedSettingsCss, /counter-increment:\s*settings-test-step/);
+  assert.match(sharedSettingsCss, /content:\s*counter\(settings-test-step\)\s*"："/);
+  assert.match(sharedSettingsCss, /list-style:\s*none/);
 });
 
 test("Engineering freezes communication policy and reconciles only accepted PPU Jobs", () => {

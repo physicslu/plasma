@@ -7,8 +7,17 @@ import {
   type GatewaySettings,
 } from "../gateway-settings-api";
 import { useI18n } from "../i18n";
+import {
+  SettingsActions,
+  SettingsCard,
+  SettingsField,
+  SettingsGrid,
+  SettingsGuide,
+  SettingsMessage,
+  SettingsPage,
+  SettingsTabs,
+} from "../operator-ui/settings-ui";
 import { useWorkspaceSession } from "../workspace-session";
-import "./gateway-settings.css";
 
 const guideCopy = {
   "zh-TW": {
@@ -122,78 +131,79 @@ export default function GatewaySettingsPanel() {
   }
 
   return (
-    <section className="engineeringGatewaySettings" aria-label="Engineering Settings">
-      <header className="gatewaySettingsHeading">
-        <div><small>ENGINEERING MODE</small><h1>Settings</h1></div>
-        {applied && <span>REV {applied.revision}</span>}
-      </header>
-
-      <nav className="gatewaySettingsTabs" aria-label="Engineering settings categories">
+    <SettingsPage
+      className="engineeringGatewaySettings"
+      ariaLabel="Engineering Settings"
+      eyebrow="ENGINEERING MODE"
+      title="Settings"
+      revision={applied?.revision}
+    >
+      <SettingsTabs ariaLabel="Engineering settings categories">
         <button type="button" aria-current="page">Gateway</button>
-      </nav>
+      </SettingsTabs>
 
-      <section className="gatewaySettingsCard" aria-label="Gateway Communication Settings">
-        <header>
-          <h2>Gateway</h2>
-          <p>{locale === "zh-TW"
-            ? "設定 Plasma Web REST Gateway 與 PPU 的通訊逾時及重試規則；PMode 與 EMode 共用。"
-            : "Configure shared Plasma Web REST Gateway to PPU communication timeout and retry policy."}</p>
-        </header>
+      <SettingsCard
+        ariaLabel="Gateway Communication Settings"
+        title="Gateway"
+        description={locale === "zh-TW"
+          ? "設定 Plasma Web REST Gateway 與 PPU 的通訊逾時及重試規則；PMode 與 EMode 共用。"
+          : "Configure shared Plasma Web REST Gateway to PPU communication timeout and retry policy."}
+      >
+        <SettingsGrid columns={2}>
+          <SettingsField label="Request Timeout" hint="1–120 seconds" unit="sec">
+            <input
+              aria-label="PPU Request Timeout seconds"
+              type="number"
+              min="1"
+              max="120"
+              value={timeoutSeconds}
+              disabled={loading || saving}
+              onChange={event => { setSaved(false); setTimeoutSeconds(event.target.value); }}
+            />
+          </SettingsField>
+          <SettingsField label="Retry Count" hint="0–10 retries" unit="times">
+            <input
+              aria-label="PPU Retry Count"
+              type="number"
+              min="0"
+              max="10"
+              value={retryCount}
+              disabled={loading || saving}
+              onChange={event => { setSaved(false); setRetryCount(event.target.value); }}
+            />
+          </SettingsField>
+        </SettingsGrid>
 
-        <div className="gatewaySettingsFields">
-          <label>
-            <span>Request Timeout</span>
-            <div><input aria-label="PPU Request Timeout seconds" type="number" min="1" max="120" value={timeoutSeconds} disabled={loading || saving} onChange={event => { setSaved(false); setTimeoutSeconds(event.target.value); }} /><b>sec</b></div>
-            <small>1–120 seconds</small>
-          </label>
-          <label>
-            <span>Retry Count</span>
-            <div><input aria-label="PPU Retry Count" type="number" min="0" max="10" value={retryCount} disabled={loading || saving} onChange={event => { setSaved(false); setRetryCount(event.target.value); }} /><b>times</b></div>
-            <small>0–10 retries</small>
-          </label>
-        </div>
-
-        <p className="gatewaySettingsHint">{locale === "zh-TW"
+        <p className="settingsHint">{locale === "zh-TW"
           ? "重試間隔依序為 1、2、4 秒，後續維持 4 秒。執行中的 Batch 保留開始時的設定；修改只影響下一個 Batch。"
           : "Retry backoff is 1, 2, then 4 seconds. Running Batches retain their frozen settings; changes apply to the next Batch."}</p>
 
-        {error && <p className="gatewaySettingsError" role="alert">{error}</p>}
-        {saved && <p className="gatewaySettingsSaved" role="status">{locale === "zh-TW" ? "Gateway 設定已儲存。" : "Gateway settings saved."}</p>}
+        {error && <SettingsMessage tone="error" role="alert">{error}</SettingsMessage>}
+        {saved && <SettingsMessage tone="success" role="status">{locale === "zh-TW" ? "Gateway 設定已儲存。" : "Gateway settings saved."}</SettingsMessage>}
 
-        <div className="gatewaySettingsActions">
-          <button type="button" disabled={!valid || !changed || loading || saving} onClick={() => void apply()}>
+        <SettingsActions>
+          <button data-variant="primary" type="button" disabled={!valid || !changed || loading || saving} onClick={() => void apply()}>
             {saving ? "Saving..." : "Apply Settings"}
           </button>
-        </div>
-      </section>
+        </SettingsActions>
+      </SettingsCard>
 
-      <section className="gatewaySettingsGuide" aria-label="Gateway Settings Guide">
-        <header>
-          <small>{guide.eyebrow}</small>
-          <h2>{guide.overviewTitle}</h2>
-          <p>{guide.overviewBody}</p>
-        </header>
-
-        <div className="gatewaySettingsGuideGrid">
-          <article>
-            <dl>
-              <div><dt>{guide.timeoutTitle}</dt><dd>{guide.timeoutBody}</dd></div>
-              <div><dt>{guide.retryTitle}</dt><dd>{guide.retryBody}</dd></div>
-              <div><dt>{guide.freezeTitle}</dt><dd>{guide.freezeBody}</dd></div>
-              <div><dt>{guide.safetyTitle}</dt><dd>{guide.safetyBody}</dd></div>
-            </dl>
-          </article>
-          <article>
-            <h3>{guide.testTitle}</h3>
-            <p>{guide.testIntro}</p>
-            <ol>
-              {guide.testSteps.map(step => <li key={step}>{step}</li>)}
-            </ol>
-          </article>
-        </div>
-
-        <p className="gatewaySettingsCaution">{guide.caution}</p>
-      </section>
-    </section>
+      <SettingsGuide
+        ariaLabel="Gateway Settings Guide"
+        eyebrow={guide.eyebrow}
+        title={guide.overviewTitle}
+        intro={guide.overviewBody}
+        items={[
+          { term: guide.timeoutTitle, description: guide.timeoutBody },
+          { term: guide.retryTitle, description: guide.retryBody },
+          { term: guide.freezeTitle, description: guide.freezeBody },
+          { term: guide.safetyTitle, description: guide.safetyBody },
+        ]}
+        testTitle={guide.testTitle}
+        testIntro={guide.testIntro}
+        tests={guide.testSteps.map(step => ({ description: step }))}
+        caution={guide.caution}
+      />
+    </SettingsPage>
   );
 }
