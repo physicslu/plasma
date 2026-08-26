@@ -14,7 +14,6 @@ test("Engineering readability layer raises the approved operator font floor", as
   const css = await source(readabilityPath);
 
   for (const contract of [
-    ".operatorKpiStrip article small {\n  font-size: 10px;",
     ".liveSiteStatus > header > span::before {\n  font-size: 12px;",
     ".workflowField select,\n.engineeringProgrammingV2 .jobRow,",
     ".workflowField > span {\n  font-size: 12px;",
@@ -31,6 +30,7 @@ test("Engineering readability layer raises the approved operator font floor", as
   ]) {
     assert.ok(css.includes(contract), `missing readability contract: ${contract}`);
   }
+  assert.doesNotMatch(css, /operatorKpiStrip|data-kpi=/, "Batch Summary typography must stay with the shared component");
 });
 
 test("Engineering canonical card headers do not render their legacy text twice", async () => {
