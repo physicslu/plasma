@@ -274,6 +274,7 @@ export default function ProgrammingWorkspaceV2() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
   const lastObservedBatchState = useRef<string | null>(null);
+  const syncedBatchId = useRef<string | null>(null);
   const initialSelectionKey = selection.facilityId && selection.ppuId
     ? `${selection.facilityId}/${selection.ppuId}`
     : null;
@@ -490,26 +491,30 @@ export default function ProgrammingWorkspaceV2() {
   }, [apiBase, workspaceHydrated]);
 
   useEffect(() => {
-    if (!batchSnapshot) return;
-    const first = batchSnapshot.sites[0];
-    if (first) {
-      const batchTarget = { facilityId: first.facility_id, ppuId: first.ppu_id };
-      if (!sameTarget(selection, batchTarget)) setSelection(batchTarget);
-      const ids = batchSnapshot.sites
-        .filter(site => site.facility_id === first.facility_id && site.ppu_id === first.ppu_id)
-        .map(site => site.site_id)
-        .sort((left, right) => left - right);
-      siteSelectionTarget.current = `${first.facility_id}/${first.ppu_id}`;
-      setSelectedSiteIdsState(ids);
-    }
-    setSelectedOperations([...batchSnapshot.operations]);
-    setRepeatCount(String(batchSnapshot.execution_policy.repeat_count));
-    setSiteRetryLimit(String(batchSnapshot.execution_policy.site_retry_limit));
-    setStopPolicy(batchSnapshot.execution_policy.failed_site_stop_threshold === null
-      ? { kind: "never" }
-      : { kind: "failed_sites", threshold: batchSnapshot.execution_policy.failed_site_stop_threshold });
-    setReadOffset(String(batchSnapshot.read.offset));
-    setReadLength(String(batchSnapshot.read.length));
+    if (!batchSnapshot || syncedBatchId.current === batchSnapshot.batch_id) return;
+    syncedBatchId.current = batchSnapshot.batch_id;
+    const snapshot = batchSnapshot;
+    queueMicrotask(() => {
+      const first = snapshot.sites[0];
+      if (first) {
+        const batchTarget = { facilityId: first.facility_id, ppuId: first.ppu_id };
+        if (!sameTarget(selection, batchTarget)) setSelection(batchTarget);
+        const ids = snapshot.sites
+          .filter(site => site.facility_id === first.facility_id && site.ppu_id === first.ppu_id)
+          .map(site => site.site_id)
+          .sort((left, right) => left - right);
+        siteSelectionTarget.current = `${first.facility_id}/${first.ppu_id}`;
+        setSelectedSiteIdsState(ids);
+      }
+      setSelectedOperations([...snapshot.operations]);
+      setRepeatCount(String(snapshot.execution_policy.repeat_count));
+      setSiteRetryLimit(String(snapshot.execution_policy.site_retry_limit));
+      setStopPolicy(snapshot.execution_policy.failed_site_stop_threshold === null
+        ? { kind: "never" }
+        : { kind: "failed_sites", threshold: snapshot.execution_policy.failed_site_stop_threshold });
+      setReadOffset(String(snapshot.read.offset));
+      setReadLength(String(snapshot.read.length));
+    });
   }, [batchSnapshot, selection, setReadLength, setReadOffset, setSelectedOperations, setSelectedSiteIdsState, setSelection]);
 
   useEffect(() => {
