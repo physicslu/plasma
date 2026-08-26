@@ -3,16 +3,19 @@ type Listener = () => void;
 const listeners = new Set<Listener>();
 let activeBatchExecutions = 0;
 
-// Keep this key aligned with the Production page reconnect hint. The storage
-// check is deliberately inside the activity store so a temporary Batch polling
-// failure cannot unlock P/E mode switching while the authoritative server
-// Batch may still be running.
-const ACTIVE_BATCH_STORAGE_KEY = "plasma-production-active-batch-v1";
+// Keep these keys aligned with the PMode and EMode server-Batch reconnect
+// handles. Storage checks deliberately live in the shared activity store so a
+// temporary observer loss or a mode-local component unmount cannot unlock
+// P/E mode switching while an authoritative server Batch may still be active.
+const ACTIVE_BATCH_STORAGE_KEYS = [
+  "plasma-production-active-batch-v1",
+  "plasma-engineering-active-batch-v1",
+] as const;
 
 function hasUnresolvedStoredBatch(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return Boolean(window.sessionStorage.getItem(ACTIVE_BATCH_STORAGE_KEY));
+    return ACTIVE_BATCH_STORAGE_KEYS.some(key => Boolean(window.sessionStorage.getItem(key)));
   } catch {
     return false;
   }
@@ -22,7 +25,7 @@ function emit(): void {
   listeners.forEach(listener => listener());
 }
 
-export function subscribeBatchExecutionActivity(listener: Listener): () => void {
+export function subscribeBatchExecutionActivity(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
@@ -36,8 +39,8 @@ export function notifyBatchExecutionActivityChanged(): void {
 export function getBatchExecutionActivityCount(): number {
   // A stored non-terminal Batch ID is a fail-closed execution lease. During
   // normal observation activeBatchExecutions is already 1, so max() avoids
-  // double-counting. If observation drops and the component releases its local
-  // lease, the stored Batch keeps navigation locked until reconnect/terminal.
+  // double-counting. If observation drops or a mode-local surface unmounts,
+  // the stored Batch keeps navigation locked until reconnect/terminal.
   return Math.max(activeBatchExecutions, hasUnresolvedStoredBatch() ? 1 : 0);
 }
 
