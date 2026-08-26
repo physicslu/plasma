@@ -36,7 +36,7 @@ import type {
   SiteSnapshot,
 } from "../plasma-api";
 import { useWorkspaceSession, type TargetSelection } from "../workspace-session";
-import "../fleet/programming/production-programming.css";
+import "./programming-workspace-base.css";
 import EngineeringLogPanel, {
   classifyEngineeringLog,
   engineeringLogCategoryLabel,

@@ -1,9 +1,0 @@
-/*
- * Compatibility import only.
- *
- * Production Single PPU Programming is retired. The surviving shared
- * Programming visual base is owned by Engineering Mode. Keep this file free
- * of Production-specific rules until the Engineering workspace import path is
- * migrated to its local stylesheet.
- */
-@import "../../engineering/programming-workspace-base.css";
