@@ -1,0 +1,44 @@
+.batchSummary.operatorKpiSummary .operatorKpiStrip article {
+  min-height: 58px;
+  padding: 8px 10px;
+}
+
+.batchSummary.operatorKpiSummary .operatorKpiStrip article small {
+  font-size: 10px;
+}
+
+.batchSummary.operatorKpiSummary .operatorKpiStrip article b {
+  margin-top: 3px;
+  font-size: 24px;
+}
+
+/* Canonical Batch Summary visual contract comes from the approved EMode
+ * operator surface. PASS / FAIL need stronger peripheral-vision emphasis than
+ * topology or count KPIs while retaining the same card footprint. */
+.batchSummary.operatorKpiSummary .operatorKpiStrip article[data-kpi="pass"],
+.batchSummary.operatorKpiSummary .operatorKpiStrip article[data-kpi="fail"] {
+  border-left-width: 4px;
+}
+
+.batchSummary.operatorKpiSummary .operatorKpiStrip article[data-kpi="pass"] {
+  border-left-color: #15803d;
+  background: color-mix(in srgb, #15803d 7%, var(--panel, #fff));
+}
+
+.batchSummary.operatorKpiSummary .operatorKpiStrip article[data-kpi="fail"] {
+  border-left-color: #dc2626;
+  background: color-mix(in srgb, #dc2626 7%, var(--panel, #fff));
+}
+
+.batchSummary.operatorKpiSummary .operatorKpiStrip article[data-kpi="pass"] small,
+.batchSummary.operatorKpiSummary .operatorKpiStrip article[data-kpi="fail"] small {
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.batchSummary.operatorKpiSummary .operatorKpiStrip article[data-kpi="pass"] b,
+.batchSummary.operatorKpiSummary .operatorKpiStrip article[data-kpi="fail"] b {
+  margin-top: 2px;
+  font-size: 30px;
+  font-weight: 900;
+}
