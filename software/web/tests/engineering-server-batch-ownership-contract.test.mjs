@@ -81,7 +81,7 @@ test("Engineering keeps direct single-Site Jobs separate from Batch ownership", 
 
 test("Mock settings remain immutable for an accepted server Batch", async () => {
   const controller = await read("engineering/engineering-server-batch.ts");
-  const mockRuntime = await fs.readFile(new URL("../../docs/architecture/mock-runtime-v1.1.md", import.meta.url), "utf8");
+  const mockRuntime = await fs.readFile(new URL("../../../docs/architecture/mock-runtime-v1.1.md", import.meta.url), "utf8");
 
   assert.match(controller, /createServerBatch\(apiBase, options\)/);
   assert.match(mockRuntime, /One immutable Mock Profile snapshot/);
