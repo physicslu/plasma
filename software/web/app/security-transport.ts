@@ -1,6 +1,7 @@
 type SecurityTransportState = {
   credentialLoaded: boolean;
   authenticationRequired: boolean;
+  securityDetected: boolean;
 };
 
 type Listener = () => void;
@@ -15,6 +16,7 @@ const listeners = new Set<Listener>();
 const ambiguousCommandIds = new Map<string, string>();
 let bearerToken: string | null = null;
 let authenticationRequired = false;
+let securityDetected = false;
 let uninstallTransport: (() => void) | null = null;
 
 const gatewayPathPrefixes = [
@@ -42,11 +44,12 @@ export function getSecurityTransportState(): SecurityTransportState {
   return {
     credentialLoaded: bearerToken !== null,
     authenticationRequired,
+    securityDetected,
   };
 }
 
 export function getSecurityTransportServerState(): SecurityTransportState {
-  return { credentialLoaded: false, authenticationRequired: false };
+  return { credentialLoaded: false, authenticationRequired: false, securityDetected: false };
 }
 
 export function setSecurityBearerToken(token: string): void {
@@ -55,13 +58,14 @@ export function setSecurityBearerToken(token: string): void {
     throw new Error("Plasma Bearer token must contain 32..512 characters");
   }
   bearerToken = normalized;
+  securityDetected = true;
   authenticationRequired = false;
   emit();
 }
 
 export function clearSecurityBearerToken(): void {
   bearerToken = null;
-  authenticationRequired = false;
+  authenticationRequired = securityDetected;
   ambiguousCommandIds.clear();
   emit();
 }
@@ -132,13 +136,13 @@ function mergedHeaders(input: RequestInfo | URL, init?: RequestInit): Headers {
   return headers;
 }
 
-async function shouldRetainCommandIdentity(response: Response): Promise<boolean> {
-  if (response.status !== 409) return false;
+async function securityErrorCode(response: Response): Promise<string | undefined> {
+  if (response.status !== 401 && response.status !== 409) return undefined;
   try {
     const payload = await response.clone().json() as SecurityErrorPayload;
-    return payload.error?.error_code === "E4104";
+    return payload.error?.error_code;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -176,12 +180,12 @@ export function installSecurityTransport(): () => void {
 
     const method = requestMethod(input, init);
     const headers = mergedHeaders(input, init);
-    if (bearerToken && !headers.has("Authorization")) {
+    if (securityDetected && bearerToken && !headers.has("Authorization")) {
       headers.set("Authorization", `Bearer ${bearerToken}`);
     }
 
     let identity: string | null = null;
-    if (isStateChanging(method) && !headers.has("Idempotency-Key")) {
+    if (securityDetected && isStateChanging(method) && !headers.has("Idempotency-Key")) {
       identity = commandIdentity(url, method, init);
       headers.set("Idempotency-Key", commandIdFor(identity));
     }
@@ -193,16 +197,17 @@ export function installSecurityTransport(): () => void {
 
     try {
       const response = await originalFetch(request, request === input ? nextInit : undefined);
-      if (response.status === 401) {
-        if (!authenticationRequired) {
-          authenticationRequired = true;
-          emit();
-        }
-      } else if (bearerToken && authenticationRequired) {
+      const errorCode = await securityErrorCode(response);
+      if (response.status === 401 && errorCode === "E4101") {
+        const changed = !securityDetected || !authenticationRequired;
+        securityDetected = true;
+        authenticationRequired = true;
+        if (changed) emit();
+      } else if (securityDetected && bearerToken && authenticationRequired) {
         authenticationRequired = false;
         emit();
       }
-      if (identity && !(await shouldRetainCommandIdentity(response))) {
+      if (identity && errorCode !== "E4104") {
         ambiguousCommandIds.delete(identity);
       }
       return response;
@@ -216,7 +221,7 @@ export function installSecurityTransport(): () => void {
 
   const onClick = (event: MouseEvent) => {
     const anchor = outputDownloadAnchor(event.target);
-    if (!anchor) return;
+    if (!anchor || !securityDetected) return;
     event.preventDefault();
     if (!bearerToken) {
       if (!authenticationRequired) {
