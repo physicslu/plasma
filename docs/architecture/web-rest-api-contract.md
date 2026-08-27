@@ -220,6 +220,44 @@ Standalone/local inline Program/Verify may submit one materialized Asset directl
 
 The Gateway validates the Asset and normalizes it before creating the wire-level `JobRequest.image`.
 
+A direct REST Job may optionally declare an execution-owner token:
+
+```json
+{
+  "site_id": 1,
+  "operation": "erase",
+  "execution_owner_id": "client-scoped-token"
+}
+```
+
+For Engineering routes the Gateway maps that token to `execution_owner_kind=engineering_session`; for the standalone REST path it maps to `rest_client`. The token is a concurrency label only and is **not** an authenticated security identity. Authentication/authorization remains a separate security requirement.
+
+If a REST Job omits `execution_owner_id`, the fixed Gateway process labels (`plasma-web`, `plasma-web-engineering`) are not trusted as client identity. The PPU fails closed by treating each such Job as a separate `rest_job` owner. Multi-Site Web production execution should use the server-side Batch API, where immutable `batch_id` is the shared owner identity.
+
+## PPU execution ownership conflict
+
+The physical PPU is the backend admission authority. While one execution owner has submitting, queued, running or cancelling Jobs, a different owner cannot enter the same PPU.
+
+Canonical conflict response:
+
+```text
+HTTP 409 Conflict
+E4010 PPU_BUSY
+```
+
+The error payload includes `error_type=PPU_BUSY`, `recoverable=true`, and structured context containing the PPU identity plus active/requested owner identity. This is a control-plane admission conflict, not a manufacturing FAIL and not a Gateway reachability failure.
+
+PPU STATUS exposes read-only operational ownership state under:
+
+```text
+ppu.execution.busy
+ppu.execution.owner_kind
+ppu.execution.owner_id
+ppu.execution.active_job_count
+```
+
+See [PPU Execution Ownership](ppu-execution-ownership.md) for lease resolution and lifecycle semantics.
+
 ## Session and catalog fields
 
 Canonical REST v3 fields include:
@@ -245,15 +283,21 @@ A session/PPU may cache multiple Assets simultaneously. This is required for fut
 
 ## Concurrency authority
 
-Source Asset SHA is the cache identity. It is not necessarily the final PPU execution-resource identity.
+PPU execution ownership and Programming Image compatibility are separate constraints.
 
-Program/Verify concurrency is controlled by the **Normalized Image SHA**:
+The primary control-plane invariant is:
+
+```text
+one PPU -> at most one active execution owner
+```
+
+Within one permitted execution owner, Program/Verify also enforces the existing shared-resource rule based on the **Normalized Image SHA**:
 
 ```text
 Asset -> normalize -> Image SHA -> PPU-wide active Image lease
 ```
 
-This prevents two Sites on one physical PPU from concurrently programming different target Images while allowing multiple Sites to share the same normalized Image.
+The execution-owner lease prevents unrelated Batch/client work from overlapping. The normalized-Image lease prevents multiple permitted Sites from concurrently programming different target Images while allowing Sites within one owner to share the same normalized Image.
 
 ## Serial Number
 
