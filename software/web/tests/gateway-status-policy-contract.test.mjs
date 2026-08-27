@@ -6,6 +6,7 @@ const gateway = await readFile(new URL("../../python/plasma_web/gateway.py", imp
 const communication = await readFile(new URL("../../python/plasma_web/gateway_communication.py", import.meta.url), "utf8");
 const settingsApi = await readFile(new URL("../app/gateway-settings-api.ts", import.meta.url), "utf8");
 const plasmaApi = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
+const pmodConsole = await readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 const pmodRecovery = await readFile(new URL("../app/fleet/ppu-status-recovery.ts", import.meta.url), "utf8");
 
 test("Gateway owns Engineering PPU status timeout and retry policy", () => {
@@ -33,6 +34,7 @@ test("Browser status timeout is only an outer watchdog derived from Gateway resp
   assert.match(plasmaApi, /ensureGatewaySettings/);
   assert.match(plasmaApi, /gatewayStatusObservationTimeoutMs/);
 
-  assert.match(pmodRecovery, /PPU_STATUS_REQUEST_TIMEOUT_MS = undefined/);
-  assert.doesNotMatch(pmodRecovery, /PPU_STATUS_REQUEST_TIMEOUT_MS = 5_000/);
+  assert.doesNotMatch(pmodConsole, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
+  assert.doesNotMatch(pmodRecovery, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
+  assert.match(pmodConsole, /getPPUStatus\(targetBase\)/);
 });
