@@ -53,7 +53,6 @@ VIEWER_PERMISSIONS = frozenset(
         Permission.PROGRAMMING_ASSET_READ,
     }
 )
-
 OPERATOR_PERMISSIONS = VIEWER_PERMISSIONS | frozenset(
     {
         Permission.BATCH_START,
@@ -68,7 +67,6 @@ OPERATOR_PERMISSIONS = VIEWER_PERMISSIONS | frozenset(
         Permission.JOB_OUTPUT_READ,
     }
 )
-
 ENGINEER_PERMISSIONS = OPERATOR_PERMISSIONS | frozenset({Permission.MOCK_SETTINGS_WRITE})
 ADMIN_PERMISSIONS = ENGINEER_PERMISSIONS | frozenset({Permission.GATEWAY_SETTINGS_WRITE})
 SERVICE_PERMISSIONS = frozenset(
@@ -85,7 +83,6 @@ SERVICE_PERMISSIONS = frozenset(
         Permission.PROGRAMMING_ASSET_WRITE,
     }
 )
-
 ROLE_PERMISSIONS: dict[str, frozenset[Permission]] = {
     "viewer": VIEWER_PERMISSIONS,
     "operator": OPERATOR_PERMISSIONS,
@@ -147,9 +144,7 @@ class Principal:
     def allows(self, permission: Permission, resource: ResourceRef | None = None) -> bool:
         if permission not in self.permissions:
             return False
-        if resource is None:
-            return True
-        return any(scope.matches(resource) for scope in self.scopes)
+        return resource is None or any(scope.matches(resource) for scope in self.scopes)
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,11 +165,9 @@ class GatewaySecurityConfig:
         normalized = tuple(principals)
         if not normalized:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security config requires at least one principal")
-        ids = [principal.principal_id for principal in normalized]
-        if len(ids) != len(set(ids)):
+        if len({p.principal_id for p in normalized}) != len(normalized):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security principal IDs must be unique")
-        digests = [principal.token_sha256 for principal in normalized]
-        if len(digests) != len(set(digests)):
+        if len({p.token_sha256 for p in normalized}) != len(normalized):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security token digests must be unique")
         self.principals = normalized
 
@@ -226,15 +219,15 @@ class GatewaySecurityConfig:
                 f"security principal {index} has unknown roles",
                 context={"unknown_roles": unknown_roles},
             )
-
         permissions: set[Permission] = set()
         for role in roles_raw:
             permissions.update(ROLE_PERMISSIONS[role])
-        explicit_raw = raw.get("permissions", [])
-        if not isinstance(explicit_raw, list) or any(not isinstance(value, str) for value in explicit_raw):
+
+        explicit = raw.get("permissions", [])
+        if not isinstance(explicit, list) or any(not isinstance(value, str) for value in explicit):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} permissions are invalid")
         try:
-            permissions.update(Permission(value) for value in explicit_raw)
+            permissions.update(Permission(value) for value in explicit)
         except ValueError as exc:
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
@@ -264,17 +257,17 @@ class GatewaySecurityConfig:
         ppu_id = raw.get("ppu_id", "*")
         if not isinstance(facility_id, str) or not facility_id or not isinstance(ppu_id, str) or not ppu_id:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope IDs are invalid")
-        site_ids_raw = raw.get("site_ids", "*")
-        if site_ids_raw == "*":
+        raw_sites = raw.get("site_ids", "*")
+        if raw_sites == "*":
             site_ids = None
+        elif (
+            isinstance(raw_sites, list)
+            and raw_sites
+            and all(not isinstance(site, bool) and isinstance(site, int) and site >= 1 for site in raw_sites)
+        ):
+            site_ids = frozenset(raw_sites)
         else:
-            if (
-                not isinstance(site_ids_raw, list)
-                or not site_ids_raw
-                or any(isinstance(site, bool) or not isinstance(site, int) or site < 1 for site in site_ids_raw)
-            ):
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope site_ids are invalid")
-            site_ids = frozenset(site_ids_raw)
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope site_ids are invalid")
         return ResourceScope(facility_id=facility_id, ppu_id=ppu_id, site_ids=site_ids)
 
 
@@ -315,7 +308,7 @@ class GatewaySecurityStore:
                 CREATE TABLE IF NOT EXISTS security_audit (
                     audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
-                    principal_id TEXT,
+                    principal_id TEXT NOT NULL,
                     decision TEXT NOT NULL,
                     action TEXT NOT NULL,
                     method TEXT NOT NULL,
@@ -343,7 +336,7 @@ class GatewaySecurityStore:
     def audit(
         self,
         *,
-        principal_id: str | None,
+        principal_id: str,
         decision: str,
         action: str,
         method: str,
@@ -352,6 +345,8 @@ class GatewaySecurityStore:
         command_id: str | None = None,
         detail: dict[str, Any] | None = None,
     ) -> None:
+        if not principal_id:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Durable security audit requires an authenticated principal")
         with self._lock:
             self._connection.execute(
                 """
@@ -373,6 +368,10 @@ class GatewaySecurityStore:
                 ),
             )
             self._connection.commit()
+
+    def audit_count(self) -> int:
+        with self._lock:
+            return int(self._connection.execute("SELECT COUNT(*) FROM security_audit").fetchone()[0])
 
     def begin_command(
         self,
@@ -481,15 +480,11 @@ class GatewaySecurityController:
         return cls(GatewaySecurityConfig.load(config_path), GatewaySecurityStore(state_path))
 
     def authenticate(self, authorization: str | None, *, method: str, path: str) -> Principal:
+        # Unauthenticated traffic is intentionally not written to the durable
+        # SQLite audit ledger. A hostile caller must not be able to turn bad
+        # credentials into synchronous microSD writes. The HTTP handler emits
+        # non-durable runtime diagnostics for E4101 instead.
         if not isinstance(authorization, str) or not authorization.startswith("Bearer "):
-            self.store.audit(
-                principal_id=None,
-                decision="unauthenticated",
-                action="authenticate",
-                method=method,
-                path=path,
-                resource=None,
-            )
             raise PlasmaError(ErrorCode.AUTHENTICATION_REQUIRED, "Bearer authentication is required")
         token = authorization[7:]
         if len(token) < 32 or len(token) > 512:
@@ -500,14 +495,6 @@ class GatewaySecurityController:
             if hmac.compare_digest(digest, principal.token_sha256):
                 matched = principal
         if matched is None:
-            self.store.audit(
-                principal_id=None,
-                decision="unauthenticated",
-                action="authenticate",
-                method=method,
-                path=path,
-                resource=None,
-            )
             raise PlasmaError(ErrorCode.AUTHENTICATION_REQUIRED, "Bearer authentication is required")
         return matched
 
