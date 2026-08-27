@@ -45,11 +45,17 @@ function fpsCheckbox(page: Page, ppuId: string, siteId = 1) {
 }
 
 function programmingJob(page: Page) {
-  return page.getByRole("region", { name: "PROGRAMMING JOB" });
+  return page.getByRole("region", {
+    name: "Production Programming Job",
+    exact: true,
+  });
 }
 
 function operationCheckbox(page: Page, index: number) {
-  return programmingJob(page).locator(".factoryOperationChecks label").nth(index).getByRole("checkbox");
+  return programmingJob(page)
+    .getByRole("group", { name: "Production batch operations", exact: true })
+    .getByRole("checkbox")
+    .nth(index);
 }
 
 async function chooseTarget(page: Page) {
