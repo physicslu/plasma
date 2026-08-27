@@ -1,6 +1,6 @@
 # Secure Gateway Deployment
 
-Status: opt-in rollout path implemented by PR #168; canonical `plasma-web.service` remains the default until the security drop-in is enabled.
+Status: opt-in rollout path implemented by PR #168; PR #169 adds an initial entry identity/profile flow. Canonical `plasma-web.service` remains the default until the security drop-in is enabled.
 
 ## Purpose
 
@@ -43,16 +43,29 @@ The Web Console installs a passive security transport at the app shell. It does 
 HTTP 401 / E4101 AUTHENTICATION_REQUIRED
 ```
 
-Only then does that browser page mark the selected Gateway as secure and show the bottom-right authentication control:
+The `/demo` entry probes `GET /api/security/me`. On a secure deployment an unauthenticated probe receives `E4101`, activates the secure browser transport and shows the entry Security Profile flow. On a canonical non-secure Gateway the endpoint is absent and the existing landing-page behavior remains unchanged.
+
+The entry offers four **expected test profiles**:
 
 ```text
-AUTH REQUIRED secure boundary detected; no valid in-memory credential
-AUTH READY    credential loaded in browser memory
+Viewer
+Operator
+Engineer
+Admin
 ```
 
-This detection rule is part of the rollback boundary: an ordinary non-secure Gateway keeps its existing request/CORS behavior and does not receive `Authorization` or `Idempotency-Key` headers from this transport.
+Selecting a profile never grants authority. The user then enters a Bearer token and the browser calls:
 
-Enter the Bearer token through the masked password dialog. The token remains only in JavaScript memory and is cleared by a full browser reload.
+```text
+GET /api/security/me
+Authorization: Bearer <token>
+```
+
+The backend returns the authenticated Principal's ID, roles, permissions and Facility / PPU / Site scopes. The entry displays those backend results and warns if they do not match the profile the user selected. All navigation gating is derived from the returned permissions, not from the selected profile.
+
+`/demo` is the sole credential-input owner while the user is at the entry. The bottom-right `AUTH REQUIRED` / `AUTH READY` control remains available on PMode, EMode and other secured routes after leaving the entry. This avoids two competing credential inputs while preserving the #168 in-workspace recovery control.
+
+The Bearer token remains only in JavaScript memory and is cleared by a full browser reload.
 
 The external security store exposes a stable browser snapshot. Loading, replacing or clearing a credential advances an in-memory credential revision. Engineering sessions are bound to that revision, so a new credential cannot inherit the previous Principal's Engineering session. When a valid token is entered after `E4101`, Engineering initialization is retriggered automatically rather than requiring a manual Retry or page reload.
 
@@ -91,6 +104,8 @@ Expected REST behavior:
 
 ```text
 GET  /api/health/live                       -> 200 without credential
+GET  /api/security/me                       -> 401 E4101 without credential
+GET  /api/security/me + valid token         -> Principal / roles / permissions / scopes
 POST /api/jobs                              -> 401 without credential
 POST /api/jobs + valid token, no key        -> 400 / invalid argument
 POST /api/jobs + valid token + valid key    -> authorized execution
@@ -101,15 +116,22 @@ Same key + changed request                   -> 409 E4103
 Same key + in-progress/ambiguous command     -> 409 E4104
 ```
 
-Browser smoke test:
+Entry/profile smoke test:
 
-1. load PMode or EMode without a token and confirm a protected call returns authentication required;
-2. confirm the `AUTH REQUIRED` control appears only after that `E4101` response;
-3. load the local-admin token using the masked AUTH dialog;
-4. confirm Engineering automatically reconnects and status, Batch and direct Job operations work without manual Retry;
-5. perform one Read operation and download its BIN output through the authenticated download path;
-6. replace the credential and confirm Engineering creates a fresh credential-bound session rather than reusing the previous Principal's session;
-7. reload the page and confirm the credential is gone; the page redetects secure mode from `E4101` rather than from persisted browser state.
+1. load `/demo` without a token and confirm the four expected profiles appear after `E4101` detection;
+2. choose Viewer, Operator, Engineer or Admin and paste that test Principal's token;
+3. confirm the displayed Principal, Role and Scope come from `/api/security/me`;
+4. deliberately choose a profile that does not match the token and confirm the UI warns but does not alter backend permissions;
+5. confirm Viewer cannot enter Engineering, while Operator/Engineer/Admin are gated according to their returned permission set;
+6. confirm clearing identity returns the secure entry to `AUTH REQUIRED` without persisting the token or selected profile.
+
+Workspace smoke test:
+
+1. authenticate at `/demo` and enter PMode or EMode;
+2. confirm status, Batch and permitted direct Job operations work;
+3. perform one Read operation and download its BIN output through the authenticated download path;
+4. replace the credential using the in-workspace AUTH control and confirm Engineering creates a fresh credential-bound session rather than reusing the previous Principal's session;
+5. reload the page and confirm the credential is gone; the page redetects secure mode from `E4101` rather than from persisted browser state.
 
 ## Roll back
 
@@ -134,6 +156,6 @@ The following remain separate follow-up work:
 
 - Cloudflare Access / OIDC identity mapping;
 - human login/session management beyond the local memory-only Bearer flow;
-- UI controls that are proactively disabled from the resolved Principal permissions/roles;
+- permission-aware disabling inside every PMode / EMode control (the entry is permission-aware, but the backend remains authoritative for all direct REST access);
 - credential rotation/revocation UX;
 - centralized multi-PPU identity management through Plasma Manager.

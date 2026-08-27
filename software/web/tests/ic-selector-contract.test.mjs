@@ -31,7 +31,8 @@ test("IC lookup remains outside the canonical Product Mode navigation", async ()
   const productNav = globalNav.match(/<nav className="globalProductNav"[\s\S]*?<\/nav>/)?.[0];
   assert.ok(productNav, "canonical Product Mode navigation must exist");
   assert.doesNotMatch(productNav, /\/devices/);
-  assert.match(demo, /className="demoCard utility" href="\/devices"/);
+  assert.match(demo, /className=\{`demoCard utility \$\{devicesDisabled \? "disabled" : ""\}`\}[\s\S]*?href="\/devices"/);
+  assert.match(demo, /principalHasPermission\(principal, "catalog\.read"\)/);
   assert.doesNotMatch(demo, /blockLockedNavigation/);
 });
 

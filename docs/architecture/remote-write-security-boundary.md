@@ -1,6 +1,6 @@
 # Remote Write Security Boundary
 
-Status: backend security boundary plus opt-in deployment/browser integration implemented; canonical Gateway deployment remains the default until secure mode is explicitly enabled
+Status: backend security boundary, opt-in deployment/browser integration, and initial entry Principal identity/profile flow implemented; canonical Gateway deployment remains the default until secure mode is explicitly enabled
 
 ## Security invariant
 
@@ -127,6 +127,16 @@ Credential comparison uses constant-time digest comparison.
 
 The opt-in browser flow keeps the Bearer token only in JavaScript memory. The browser does not assume that every Gateway is secure: it first observes `401 / E4101 AUTHENTICATION_REQUIRED`, then activates Authorization and Idempotency headers for that Gateway. A full page reload clears the credential and secure-detection state.
 
+The deployed secure Gateway exposes authenticated Principal introspection at:
+
+```text
+GET /api/security/me
+```
+
+The response contains the caller's Principal ID, roles, effective permissions and Facility / PPU / Site scopes. It never returns bearer material or token digests. The `/demo` entry uses this endpoint to show the authenticated backend identity.
+
+Viewer / Operator / Engineer / Admin selections on the entry page are **expected test profiles only**. Selecting a profile cannot add permissions or widen scope. If the selected profile disagrees with the bearer token's authenticated Principal, the UI reports the mismatch and continues to use the backend Principal as the only authority.
+
 Credential changes advance an in-memory revision. Engineering sessions are bound to that revision so replacing a token cannot silently reuse the previous Principal's Engineering session. A valid credential entered after `E4101` causes Engineering initialization to run again automatically.
 
 Cloudflare Access/OIDC remains a future identity bridge. It must map the authenticated external identity into the same canonical Principal / permission / scope model rather than bypassing it.
@@ -215,7 +225,7 @@ The design is intentionally embedded-grade:
 
 ## Deployment status
 
-PR #168 provides an opt-in deployable security path while preserving the canonical Gateway as the rollback/default path.
+PR #168 provides an opt-in deployable security path while preserving the canonical Gateway as the rollback/default path. PR #169 adds the first Principal-aware entry flow for local security validation.
 
 Implemented integration includes:
 
@@ -229,15 +239,17 @@ Implemented integration includes:
 - CORS support for `Authorization` and `Idempotency-Key`;
 - passive browser secure-boundary detection from `401 / E4101`, memory-only masked credential entry and authenticated Readback download;
 - stable browser security snapshots and credential-revision-bound Engineering session recovery;
-- deployment and browser contract tests for the above boundaries.
+- authenticated `GET /api/security/me` Principal / permission / scope introspection;
+- `/demo` Viewer / Operator / Engineer / Admin expected-profile selection with backend-authoritative identity display and permission-aware entry navigation;
+- backend role/permission matrix tests plus deployment and browser contract tests for the above boundaries.
 
-The existing `plasma_web.gateway` / `plasma-web.service` path remains canonical until the security systemd drop-in is explicitly enabled. Therefore #168 does **not** force every standalone or development deployment into secure mode and retains a reversible rollout boundary.
+The existing `plasma_web.gateway` / `plasma-web.service` path remains canonical until the security systemd drop-in is explicitly enabled. Therefore secure rollout does **not** force every standalone or development deployment into secure mode and retains a reversible rollout boundary.
 
 Remaining follow-up work is intentionally outside this slice:
 
 - Cloudflare Access / OIDC identity mapping;
-- a principal introspection endpoint and role/permission-aware UI controls;
+- permission-aware disabled controls throughout every PMode / EMode execution surface;
 - richer human credential rotation/revocation and session lifecycle UX;
 - centralized multi-PPU identity management through Plasma Manager.
 
-The backend remains the authorization authority even after role-aware UI is added; disabled UI controls are convenience and operator guidance, not the security boundary.
+The backend remains the authorization authority even with role-aware entry UI; disabled UI controls are convenience and operator guidance, not the security boundary.

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import os
 import stat
+from http import HTTPStatus
 from pathlib import Path
+from urllib.parse import urlparse
 
 from plasma_core.errors import ErrorCode, PlasmaError
 
@@ -102,6 +104,27 @@ class DeployedSecurePlasmaWebHandler(SecurePlasmaWebHandler):
             "Content-Type, Authorization, Idempotency-Key",
         )
         self.send_header("Access-Control-Max-Age", "600")
+
+    def do_GET(self) -> None:
+        if urlparse(self.path).path != "/api/security/me":
+            super().do_GET()
+            return
+        try:
+            principal = self._principal()
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "ok": True,
+                    "principal": {
+                        "id": principal.principal_id,
+                        "roles": list(principal.roles),
+                        "permissions": sorted(permission.value for permission in principal.permissions),
+                        "scopes": [scope.to_dict() for scope in principal.scopes],
+                    },
+                },
+            )
+        except Exception as exc:
+            self._error(exc)
 
 
 def main() -> None:
