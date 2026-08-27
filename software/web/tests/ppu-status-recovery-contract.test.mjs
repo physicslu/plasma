@@ -11,14 +11,14 @@ test("PMode retries transient PPU status failures without requiring Production S
   assert.match(consoleSource, /runtimeRecoveryGenerationRef/);
   assert.match(consoleSource, /isRecoverablePPUStatusError/);
   assert.match(consoleSource, /ppuRetryDelayMs/);
-  assert.match(consoleSource, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
+  assert.doesNotMatch(consoleSource, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
+  assert.match(consoleSource, /getPPUStatus\(targetBase\)/);
   assert.match(consoleSource, /STATUS ERROR .* RECONNECTING/);
   assert.match(consoleSource, /STATUS RESTORED/);
   assert.match(consoleSource, /runtimeRecoveryGenerationRef\.current \+= 1/);
 
   assert.match(recoverySource, /PPU_STATUS_RETRY_DELAYS_MS = \[1_000, 2_000, 4_000, 5_000\]/);
-  assert.match(recoverySource, /PPU_STATUS_REQUEST_TIMEOUT_MS = undefined/);
-  assert.doesNotMatch(recoverySource, /PPU_STATUS_REQUEST_TIMEOUT_MS = 5_000/);
+  assert.doesNotMatch(recoverySource, /PPU_STATUS_REQUEST_TIMEOUT_MS/);
   assert.match(recoverySource, /error instanceof PlasmaApiError && error\.transient/);
 
   assert.match(plasmaApi, /ensureGatewaySettings/);
