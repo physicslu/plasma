@@ -9,7 +9,7 @@ from pathlib import Path
 from plasma_core.batch import BatchExecutionPolicy, BatchTarget
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_web.batch_state_store import BatchStateStore
-from plasma_web.persistent_batch_runtime import PersistentBatchRuntimeManager
+from plasma_web.durable_batch_runtime import DurableBatchRuntimeManager
 
 
 class DurableProvider:
@@ -17,6 +17,7 @@ class DurableProvider:
         self.jobs: dict[str, dict] = {}
         self.start_calls: list[str] = []
         self.cancel_calls: list[str] = []
+        self.cancel_completes_after = 1
         self._lock = threading.RLock()
 
     def catalog(self):
@@ -63,18 +64,19 @@ class DurableProvider:
             job = self.jobs.get(job_id)
             if job is None:
                 raise PlasmaError(ErrorCode.JOB_NOT_FOUND, f"Job not found: {job_id}")
-            job.update(
-                {
-                    "state": "cancelled",
-                    "progress_percent": job.get("progress_percent", 0.0),
-                    "result": {
+            if len(self.cancel_calls) >= self.cancel_completes_after:
+                job.update(
+                    {
                         "state": "cancelled",
-                        "attempts": 1,
-                        "attempt_history": [],
-                        "error": None,
-                    },
-                }
-            )
+                        "progress_percent": job.get("progress_percent", 0.0),
+                        "result": {
+                            "state": "cancelled",
+                            "attempts": 1,
+                            "attempt_history": [],
+                            "error": None,
+                        },
+                    }
+                )
             return {"ok": True, "job": dict(job)}
 
     def read_output_file(self, *args, **kwargs):
@@ -131,8 +133,8 @@ class PersistentBatchRuntimeTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def new_manager(self) -> PersistentBatchRuntimeManager:
-        return PersistentBatchRuntimeManager(
+    def new_manager(self) -> DurableBatchRuntimeManager:
+        return DurableBatchRuntimeManager(
             self.provider,
             state_path=self.state_path,
             poll_interval_s=0.01,
@@ -140,17 +142,18 @@ class PersistentBatchRuntimeTests(unittest.TestCase):
             checkpoint_interval_s=0.01,
         )
 
-    def test_restart_reconciles_existing_job_without_duplicate_submission(self):
+    def start_one_erase(self):
         manager = self.new_manager()
         snapshot = manager.create_batch(
             targets=(self.target,),
             operations=["erase"],
             policy=BatchExecutionPolicy(),
         )
-        batch_id = snapshot["batch_id"]
         wait_until(lambda: len(self.provider.start_calls) == 1)
-        job_id = self.provider.start_calls[0]
+        return manager, snapshot["batch_id"], self.provider.start_calls[0]
 
+    def test_restart_reconciles_existing_job_without_duplicate_submission(self):
+        manager, batch_id, job_id = self.start_one_erase()
         manager.close(timeout_s=1.0)
         self.assertEqual(self.provider.start_calls, [job_id])
 
@@ -163,16 +166,42 @@ class PersistentBatchRuntimeTests(unittest.TestCase):
         self.assertEqual(self.provider.start_calls, [job_id])
         recovered.close(timeout_s=1.0)
 
+    def test_terminal_job_ledger_advances_cursor_without_resubmitting(self):
+        manager, batch_id, job_id = self.start_one_erase()
+        manager.close(timeout_s=1.0)
+        self.provider.complete(job_id)
+        terminal = dict(self.provider.jobs[job_id])
+
+        store = BatchStateStore(self.state_path)
+        store.update_job(batch_id, job_id, phase="terminal", job=terminal)
+        store.close()
+
+        recovered = self.new_manager()
+        wait_until(lambda: recovered.get(batch_id)["state"] == "success")
+        final = recovered.get(batch_id)
+        self.assertEqual(final["operation_statistics"]["erase"]["logical_executions"], 1)
+        self.assertEqual(final["operation_statistics"]["erase"]["attempts"], 1)
+        self.assertEqual(self.provider.start_calls, [job_id])
+        recovered.close(timeout_s=1.0)
+
+    def test_restart_during_abort_reissues_cancel_idempotently(self):
+        self.provider.cancel_completes_after = 2
+        manager, batch_id, job_id = self.start_one_erase()
+        manager.cancel(batch_id)
+        wait_until(lambda: len(self.provider.cancel_calls) >= 1)
+        self.assertEqual(self.provider.jobs[job_id]["state"], "running")
+        manager.close(timeout_s=1.0)
+
+        recovered = self.new_manager()
+        wait_until(lambda: recovered.get(batch_id)["state"] == "cancelled")
+        final = recovered.get(batch_id)
+        self.assertEqual(final["state"], "cancelled")
+        self.assertGreaterEqual(self.provider.cancel_calls.count(job_id), 2)
+        self.assertEqual(self.provider.start_calls, [job_id])
+        recovered.close(timeout_s=1.0)
+
     def test_accepted_job_missing_after_restart_fails_closed(self):
-        manager = self.new_manager()
-        snapshot = manager.create_batch(
-            targets=(self.target,),
-            operations=["erase"],
-            policy=BatchExecutionPolicy(),
-        )
-        batch_id = snapshot["batch_id"]
-        wait_until(lambda: len(self.provider.start_calls) == 1)
-        job_id = self.provider.start_calls[0]
+        manager, batch_id, job_id = self.start_one_erase()
         manager.close(timeout_s=1.0)
 
         with self.provider._lock:
