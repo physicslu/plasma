@@ -1,6 +1,6 @@
 # Plasma Console Operator Guide
 
-本指南說明目前 Plasma Web Console 的 PMode（量產模式）與 EMode（工程模式）操作契約。它是操作摘要；詳細資料模型與 API 仍以 [Batch Domain Model](../architecture/batch-domain-model.md)、[Web REST API Contract](../architecture/web-rest-api-contract.md) 與 [Gateway Communication and Recovery](../architecture/gateway-communication-recovery.md) 為準。
+本指南說明目前 Plasma Web Console 的 PMode（量產模式）與 EMode（工程模式）操作契約。它是操作摘要；詳細資料模型與 API 仍以 [Batch Domain Model](../architecture/batch-domain-model.md)、[Web REST API Contract](../architecture/web-rest-api-contract.md)、[PPU Execution Ownership](../architecture/ppu-execution-ownership.md) 與 [Gateway Communication and Recovery](../architecture/gateway-communication-recovery.md) 為準。
 
 ## 模式與執行鎖定
 
@@ -9,6 +9,19 @@
 - Batch 在 `QUEUED`、`RUNNING` 或 `STOPPING` 時，模式切換與 Batch membership 必須鎖定。
 - 只有在所有已接受 Job 都被觀察為 terminal，且 Batch 已進入 terminal state 後，才可解除模式鎖定。
 - 執行中只提供 whole-Batch **ABORT**；operator ABORT 會取消該 Batch 所有仍在執行的 Job。
+
+UI mode-switch guard 只是 UX 保護。真正的 PPU concurrency boundary 在 backend：一台 PPU 同一時間最多只有一個 active execution owner。同一個 server-side Batch 可以在該 PPU 多個 Sites 並行，但另一個 Batch 或 direct REST Job 不能插入。
+
+如果另一個 execution owner 已占用 PPU，新 submission 會 fail closed：
+
+```text
+HTTP 409 Conflict
+E4010 PPU_BUSY
+```
+
+`PPU_BUSY` 是 control-plane admission conflict，不是 IC FAIL、不是 Yield failure，也不是 Gateway unreachable。Operator 不應靠 reload、切換 P/E Mode 或重新選 PPU 繞過 ownership；應等待既有 owned Jobs terminal，或對真正的 active Batch 執行正常 ABORT／cancel 流程。
+
+PPU STATUS 可提供 `ppu.execution.busy / owner_kind / owner_id / active_job_count` 作診斷。Browser/network disconnect 本身不會釋放 ownership；lease 跟隨 authoritative Job lifecycle，避免 client loss 讓仍在執行的 PPU 工作被錯誤重用。
 
 ## 建立 Batch
 
@@ -70,12 +83,13 @@ EMode 的 `Settings -> Gateway` 設定 PMode／EMode 共用政策：
 
 1. 查看 Site 的 `communication_state`、Batch error 與 Engineering Job Log，區分 `FAULTED` 和 `ERROR`。
 2. `HTTP 503 + E2001 CONNECTION_FAILED` 或 `E2002 CONNECTION_TIMEOUT` 表示 **Gateway 已經回覆 HTTP response，但 PPU communication policy 已重試用盡**。這不是「Gateway unreachable」的證據。
-3. Browser transport timeout／network error 若完全沒有 HTTP response，屬於不同邊界。此時只能說 Browser 沒有完成 Gateway/public-path request，不能直接推論 PPU programming 已失敗或停止。
-4. 單一 PPU 的 Gateway retry 用盡時，只停止並取消該 PPU 在目前 Batch 的 active Jobs；其他 PPU 繼續。
-5. 如果整個 Batch runtime 發生無法歸屬單一 PPU 的例外，或 Stop Policy 被觸發，才可能停止整個 Batch。
-6. 若畫面仍顯示 busy，不可只靠重新整理強制解除。先確認 Batch terminal；必要時按 whole-Batch ABORT，等待 accepted Jobs terminal。
-7. 重新連線只重建觀察能力，不可把未知中的 Job 直接當成失敗或成功。
-8. Active Batch 的 execution truth 以 server Batch snapshot 為準；獨立 PPU status observation 發生延遲，不等於 Batch execution 本身失敗。
+3. `HTTP 409 + E4010 PPU_BUSY` 表示 Gateway／PPU control plane 可達，但另一個 execution owner 正在使用該 PPU。不要把它當 timeout，也不要重送成平行工作。
+4. Browser transport timeout／network error若完全沒有 HTTP response，屬於不同邊界。此時只能說 Browser 沒有完成 Gateway/public-path request，不能直接推論 PPU programming 已失敗或停止。
+5. 單一 PPU 的 Gateway retry 用盡時，只停止並取消該 PPU 在目前 Batch 的 active Jobs；其他 PPU 繼續。
+6. 如果整個 Batch runtime 發生無法歸屬單一 PPU 的例外，或 Stop Policy 被觸發，才可能停止整個 Batch。
+7. 若畫面仍顯示 busy，不可只靠重新整理強制解除。先確認 Batch terminal；必要時按 whole-Batch ABORT，等待 accepted Jobs terminal。
+8. 重新連線只重建觀察能力，不可把未知中的 Job 直接當成失敗或成功，也不會主動搶走既有 PPU execution ownership。
+9. Active Batch 的 execution truth 以 server Batch snapshot 為準；獨立 PPU status observation 發生延遲，不等於 Batch execution 本身失敗。
 
 ## Gateway response-boundary 診斷
 

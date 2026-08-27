@@ -21,6 +21,7 @@
 | E4007 | BATCH_NOT_FOUND | Batch ID 不存在 |
 | E4008 | BATCH_SITE_FAILURE_THRESHOLD_EXCEEDED | FAULTED Site 數達到 Batch stop threshold |
 | E4009 | BATCH_INFRASTRUCTURE_ERROR | Batch runtime、Gateway 或 PPU 通訊基礎設施異常 |
+| E4010 | PPU_BUSY | PPU 已由另一個 active execution owner 使用；新 execution 必須 fail closed |
 | E5001 | TARGET_NOT_FOUND | 找不到 target（預留實機） |
 | E5002 | INTERFACE_FAILURE | OpenOCD／FPGA 介面錯誤，或無法完成安全關閉 |
 | E5003 | INTERFACE_NOT_CONFIGURED | 硬體介面尚未配置或實作 |
@@ -34,7 +35,9 @@
 | E9001 | INTERNAL_ERROR | 未預期的軟體錯誤 |
 | E9002 | JOB_ABORTED | Server 重啟時發現未完成 Job |
 
-Protocol v3.3 是唯一 canonical runtime wire contract。Current runtime 只序列化 `SITE_INVALID`、`SITE_DISABLED` 與 `SITE_BUSY`；不提供退休的 Channel error aliases。
+Protocol v3.3 是唯一 canonical runtime wire contract。Current runtime 使用 canonical Site／Job／Batch／PPU errors；不提供退休的 Channel error aliases。
+
+`PPU_BUSY` 是 control-plane admission conflict，不是 IC programming FAIL。當另一個 execution owner 仍有 active Jobs 時，新 owner 的 Job 必須在建立 Job 前被拒絕。`recoverable=true` 表示 caller 可在 ownership 釋放後重新嘗試，不代表可以越過既有 owner 強制執行。
 
 `recoverable=true` 只表示軟體允許依政策重試，不代表重試必然安全。對於不確定 target 是否已部分寫入的操作，handler 必須先執行明確的復原流程，例如 reset、重新 halt 與完整 erase。
 

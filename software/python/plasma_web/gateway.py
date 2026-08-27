@@ -251,6 +251,14 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             body["asset_sha256"] = None
         return body
 
+    @staticmethod
+    def _validated_rest_owner(value: Any) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value or len(value) > 256:
+            raise ValueError("execution_owner_id must be a non-empty string of at most 256 characters")
+        return value
+
     def _job_request(
         self,
         body: dict[str, Any],
@@ -261,12 +269,23 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
     ):
         normalized = dict(body)
         raw_target_device = normalized.pop("target_device", None)
+        execution_owner_id = self._validated_rest_owner(normalized.pop("execution_owner_id", None))
         request = super()._job_request(
             normalized,
             client_id=client_id,
             default_timeout_s=default_timeout_s,
             allow_inline_asset=allow_inline_asset,
         )
+        if execution_owner_id is not None:
+            owner_kind = "engineering_session" if client_id == "plasma-web-engineering" else "rest_client"
+            request = replace(
+                request,
+                metadata={
+                    **request.metadata,
+                    "execution_owner_kind": owner_kind,
+                    "execution_owner_id": execution_owner_id,
+                },
+            )
         if raw_target_device is None:
             return request
         if client_id != "plasma-web-engineering":
@@ -284,6 +303,31 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 "target_device": target_device.to_dict(),
             },
         )
+
+    def _error(self, exc: Exception) -> None:
+        if isinstance(exc, PlasmaError) and exc.code is ErrorCode.PPU_BUSY:
+            base._gateway_diagnostic(
+                "request_error",
+                method=self.command,
+                path=urlparse(self.path).path,
+                error_type=exc.error_type,
+                message=exc.message[:300],
+            )
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "error_code": exc.code.value,
+                        "error_type": exc.error_type,
+                        "message": exc.message,
+                        "recoverable": exc.recoverable,
+                        "context": dict(exc.context),
+                    },
+                },
+            )
+            return
+        super()._error(exc)
 
     def _mock_unavailable(self) -> None:
         self._json(

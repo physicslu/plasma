@@ -18,6 +18,7 @@
 ## Architecture and contracts
 
 - **Current** — [Facility / PPU / Site Domain Model](architecture/ppu-facility-sites.md)
+- **Current** — [PPU Execution Ownership](architecture/ppu-execution-ownership.md)
 - **Current** — [Domain Naming and Identity Policy](architecture/domain-naming-migration.md)
 - **Current** — [Web Product Modes](architecture/web-product-modes.md)
 - **Current** — [Web REST API Contract](architecture/web-rest-api-contract.md)
