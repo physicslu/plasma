@@ -18,9 +18,9 @@ const gatewayPathPrefixes = [
   "/api/batches",
   "/api/settings/gateway",
   "/api/mock/runtime",
-  "/api/engineering/",
+  "/api/engineering",
   "/api/devices/search",
-  "/api/health/",
+  "/api/health",
   "/api/node",
 ];
 
@@ -63,7 +63,10 @@ export function clearSecurityBearerToken(): void {
 
 function configuredGatewayOrigins(): Set<string> {
   const origins = new Set<string>();
-  for (const candidate of [DEFAULT_API_BASE, typeof window !== "undefined" ? window.localStorage.getItem("plasma-api-base") : null]) {
+  for (const candidate of [
+    DEFAULT_API_BASE,
+    typeof window !== "undefined" ? window.localStorage.getItem("plasma-api-base") : null,
+  ]) {
     if (!candidate) continue;
     try {
       origins.add(new URL(candidate).origin);
@@ -76,7 +79,7 @@ function configuredGatewayOrigins(): Set<string> {
 }
 
 function isGatewayPath(pathname: string): boolean {
-  return gatewayPathPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix));
+  return gatewayPathPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 function isGatewayRequest(url: URL): boolean {
@@ -119,7 +122,7 @@ function outputDownloadAnchor(target: EventTarget | null): HTMLAnchorElement | n
   try {
     const url = new URL(anchor.href, window.location.href);
     if (!isGatewayRequest(url)) return null;
-    if (!/^\/api\/(?:engineering\/targets\/[^/]+\/[^/]+\/)?jobs\/[^/]+\/files\/[^/]+$/.test(url.pathname)) {
+    if (!/^\/api\/(?:engineering\/targets\/[^/]+\/[^/]+\/api\/)?jobs\/[^/]+\/files\/[^/]+$/.test(url.pathname)) {
       return null;
     }
     return anchor;
@@ -160,8 +163,10 @@ export function installSecurityTransport(): () => void {
     try {
       const response = await originalFetch(request, request === input ? nextInit : undefined);
       if (response.status === 401) {
-        authenticationRequired = true;
-        emit();
+        if (!authenticationRequired) {
+          authenticationRequired = true;
+          emit();
+        }
       } else if (bearerToken && authenticationRequired) {
         authenticationRequired = false;
         emit();
@@ -189,7 +194,10 @@ export function installSecurityTransport(): () => void {
         try {
           const download = document.createElement("a");
           download.href = objectUrl;
-          download.download = responseFilename(response, decodeURIComponent(url.pathname.split("/").pop() ?? "readback.bin"));
+          download.download = responseFilename(
+            response,
+            decodeURIComponent(url.pathname.split("/").pop() ?? "readback.bin"),
+          );
           download.style.display = "none";
           document.body.appendChild(download);
           download.click();
@@ -212,3 +220,8 @@ export function installSecurityTransport(): () => void {
   };
   return uninstallTransport;
 }
+
+// This module is imported by the root client provider. Installing at module
+// evaluation time ensures the transport exists before child polling/effects can
+// issue the first protected Gateway request during hydration.
+if (typeof window !== "undefined") installSecurityTransport();
