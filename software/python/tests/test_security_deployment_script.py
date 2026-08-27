@@ -24,7 +24,14 @@ def test_security_deploy_enable_and_disable_are_reversible(tmp_path: Path) -> No
     (unit_dir / "plasma-web.service").write_text("[Service]\nExecStart=/canonical/gateway\n", encoding="utf-8")
 
     configured_repo = tmp_path / "configured-repo"
-    (configured_repo / "software" / "python").mkdir(parents=True)
+    python_root = configured_repo / "software" / "python"
+    output_root = python_root / "output"
+    output_root.mkdir(parents=True)
+    output_root.chmod(0o755)
+    persisted_readback = output_root / "readback.bin"
+    persisted_readback.write_bytes(b"private-target-data")
+    persisted_readback.chmod(0o644)
+
     plasmactl_config = config_home / "plasma" / "plasmactl.env"
     plasmactl_config.parent.mkdir(parents=True)
     plasmactl_config.write_text(
@@ -81,6 +88,7 @@ def test_security_deploy_enable_and_disable_are_reversible(tmp_path: Path) -> No
 
     security_config = config_home / "plasma" / "security.yaml"
     assert stat.S_IMODE(security_config.stat().st_mode) == 0o600
+    assert stat.S_IMODE(security_config.parent.stat().st_mode) == 0o700
     config = yaml.safe_load(security_config.read_text(encoding="utf-8"))
     principal = config["principals"][0]
     assert principal["id"] == "local-admin"
@@ -89,6 +97,8 @@ def test_security_deploy_enable_and_disable_are_reversible(tmp_path: Path) -> No
 
     state_dir = state_home / "plasma"
     assert stat.S_IMODE(state_dir.stat().st_mode) == 0o700
+    assert stat.S_IMODE(output_root.stat().st_mode) == 0o700
+    assert stat.S_IMODE(persisted_readback.stat().st_mode) == 0o600
 
     dropin = unit_dir / "plasma-web.service.d" / "security.conf"
     dropin_source = dropin.read_text(encoding="utf-8")
@@ -113,3 +123,4 @@ def test_security_deploy_enable_and_disable_are_reversible(tmp_path: Path) -> No
     )
     assert not dropin.exists()
     assert security_config.exists()
+    assert persisted_readback.exists()
