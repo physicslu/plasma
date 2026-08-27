@@ -49,6 +49,7 @@
 - **Current** — [Multi-machine Development Guide](development/multi-machine-development-guide.md)
 - **Current** — [VS Code Remote Workspace Standard](development/vscode-remote-workspace.md)
 - **Current** — [Integration Host Deployment Guide](development/swpc-deployment.md)
+- **Current** — [Secure Gateway Deployment](development/secure-gateway-deployment.md)
 - **Current** — [Fleet Demo Deployment](development/fleet-demo.md)
 - **Current** — [Mock Continuous Delivery](development/mock-cd.md)
 - **Current** — [Mock Runtime Operator Guide](development/mock-runtime-operator-guide.md)
