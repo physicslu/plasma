@@ -252,13 +252,14 @@ class GatewaySecurityConfig:
 
     @staticmethod
     def _scope(raw: Any, principal_index: int) -> ResourceScope:
-        if not isinstance(raw, dict) or set(raw) - {"facility_id", "ppu_id", "site_ids"}:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope is invalid")
-        facility_id = raw.get("facility_id", "*")
-        ppu_id = raw.get("ppu_id", "*")
+        required = {"facility_id", "ppu_id", "site_ids"}
+        if not isinstance(raw, dict) or set(raw) != required:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope fields are invalid")
+        facility_id = raw["facility_id"]
+        ppu_id = raw["ppu_id"]
         if not isinstance(facility_id, str) or not facility_id or not isinstance(ppu_id, str) or not ppu_id:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope IDs are invalid")
-        raw_sites = raw.get("site_ids", "*")
+        raw_sites = raw["site_ids"]
         if raw_sites == "*":
             site_ids = None
         elif (
