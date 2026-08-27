@@ -13,8 +13,7 @@ This keeps one REST implementation and makes rollback explicit: removing the sys
 From the Plasma repository:
 
 ```bash
-chmod +x scripts/plasma-security-deploy
-./scripts/plasma-security-deploy enable
+bash scripts/plasma-security-deploy enable
 ```
 
 On first enable the helper:
@@ -27,29 +26,40 @@ On first enable the helper:
 6. installs a `plasma-web.service.d/security.conf` user-systemd drop-in;
 7. restarts `plasma-web.service` through `plasma_web.secure_gateway_app`.
 
+The launcher fails closed when the security config or an existing SQLite state/WAL/SHM file is not owned by the Gateway process user or is readable/writable by group/other users. Config and state paths must be different files.
+
 The plaintext token is intentionally **not** written to the repository, deployment config, localStorage or sessionStorage.
 
 Keep the displayed token in an appropriate credential manager. If it is lost, rotate the principal credential explicitly rather than trying to recover plaintext from the SHA-256 digest.
 
 ## Browser credential flow
 
-The Web Console installs one security transport at the app shell. Click the bottom-right authentication control:
+The Web Console installs a passive security transport at the app shell. It does **not** add security headers to the existing canonical Gateway. A protected request must first receive the canonical secure-boundary response:
 
 ```text
-AUTH OFF      no in-memory Bearer credential
-AUTH READY    credential loaded in browser memory
-AUTH REQUIRED Gateway returned HTTP 401
+HTTP 401 / E4101 AUTHENTICATION_REQUIRED
 ```
 
-Paste the Bearer token when prompted. The token remains only in JavaScript memory and is cleared by a full browser reload.
+Only then does that browser page mark the selected Gateway as secure and show the bottom-right authentication control:
 
-For Plasma Gateway requests the browser transport:
+```text
+AUTH REQUIRED secure boundary detected; no valid in-memory credential
+AUTH READY    credential loaded in browser memory
+```
 
-- adds `Authorization: Bearer <token>` when a credential is loaded;
-- adds `Idempotency-Key` to state-changing requests;
-- preserves the same command identity across an ambiguous transport failure so an identical retry cannot issue a second physical command;
-- never attaches the credential to arbitrary third-party URLs;
-- converts protected Readback download links into authenticated `fetch()` downloads because normal `<a href>` navigation cannot carry the Authorization header.
+This detection rule is part of the rollback boundary: an ordinary non-secure Gateway keeps its existing request/CORS behavior and does not receive `Authorization` or `Idempotency-Key` headers from this transport.
+
+Enter the Bearer token through the masked password dialog. The token remains only in JavaScript memory and is cleared by a full browser reload.
+
+Once secure mode has been detected, Plasma Gateway requests:
+
+- add `Authorization: Bearer <token>` when a credential is loaded;
+- add `Idempotency-Key` to state-changing requests;
+- preserve the same command identity after an ambiguous network/transport failure;
+- preserve the same command identity after `409 / E4104 COMMAND_IN_PROGRESS`;
+- release the command identity after completed responses, authorization/input failures, `E4103`, `PPU_BUSY`, and other non-ambiguous `409` responses so a later legitimate retry can obtain a new command ID;
+- never attach the credential to arbitrary third-party URLs;
+- convert protected Readback download links into authenticated `fetch()` downloads because normal `<a href>` navigation cannot carry the Authorization header.
 
 ## CORS
 
@@ -68,7 +78,7 @@ The configured origin policy remains the same `--cors-origin` policy used by the
 After enable:
 
 ```bash
-./scripts/plasma-security-deploy status
+bash scripts/plasma-security-deploy status
 systemctl --user status plasma-web.service
 ```
 
@@ -88,16 +98,17 @@ Same key + in-progress/ambiguous command     -> 409 E4104
 
 Browser smoke test:
 
-1. load PMode or EMode without a token and confirm protected calls report authentication required;
-2. load the local-admin token using the AUTH control;
-3. confirm status, Batch and direct Job operations work;
-4. perform one Read operation and download its BIN output through the authenticated download path;
-5. reload the page and confirm the credential returns to `AUTH OFF` rather than being persisted.
+1. load PMode or EMode without a token and confirm a protected call returns authentication required;
+2. confirm the `AUTH REQUIRED` control appears only after that `E4101` response;
+3. load the local-admin token using the masked AUTH dialog;
+4. confirm status, Batch and direct Job operations work;
+5. perform one Read operation and download its BIN output through the authenticated download path;
+6. reload the page and confirm the credential is gone; the page redetects secure mode from `E4101` rather than from persisted browser state.
 
 ## Roll back
 
 ```bash
-./scripts/plasma-security-deploy disable
+bash scripts/plasma-security-deploy disable
 ```
 
 The helper removes only the systemd override and restarts `plasma-web.service` with the canonical Gateway entry point. It deliberately leaves these files intact:
@@ -108,6 +119,8 @@ The helper removes only the systemd override and restarts `plasma-web.service` w
 ```
 
 This prevents rollback from destroying credential configuration or audit/replay evidence.
+
+After disabling secure mode, perform a full browser reload. Security detection and Bearer credentials are intentionally page-memory state; reload clears them and restores the canonical Gateway's original cross-origin header behavior.
 
 ## Security boundaries not included in this slice
 
