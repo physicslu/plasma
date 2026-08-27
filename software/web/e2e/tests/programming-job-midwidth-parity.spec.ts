@@ -132,11 +132,12 @@ test("PMode and EMode keep one Programming Job control presentation through the 
   expect(await presentation(page, ".programmingActions .startProgramming")).toEqual(pStart);
   expect(await presentation(page, ".programmingActions .abortProgramming")).toEqual(pAbort);
 
+  /* Status tone may differ because each mode can be in a different semantic
+     state. Geometry and typography are the cross-mode invariant. */
   const eStatus = await presentation(page, ".batchReadiness");
   expect(eStatus.height).toBe(pStatus.height);
   expect(eStatus.minHeight).toBe(pStatus.minHeight);
   expect(eStatus.padding).toBe(pStatus.padding);
-  expect(eStatus.border).toBe(pStatus.border);
   expect(eStatus.radius).toBe(pStatus.radius);
   expect(eStatus.fontSize).toBe(pStatus.fontSize);
   expect(eStatus.fontWeight).toBe(pStatus.fontWeight);
