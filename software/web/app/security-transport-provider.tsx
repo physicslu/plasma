@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
+import { usePathname } from "next/navigation";
 import {
   clearSecurityBearerToken,
   getSecurityTransportServerState,
@@ -11,6 +12,7 @@ import {
 } from "./security-transport";
 
 export function SecurityTransportProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const state = useSyncExternalStore(
     subscribeSecurityTransport,
     getSecurityTransportState,
@@ -54,11 +56,12 @@ export function SecurityTransportProvider({ children }: { children: React.ReactN
     : state.credentialLoaded
       ? "AUTH READY"
       : "AUTH OFF";
+  const entryOwnsCredential = pathname === "/demo";
 
   return (
     <>
       {children}
-      {state.securityDetected && (
+      {state.securityDetected && !entryOwnsCredential && (
         <button
           type="button"
           className={`securityCredentialControl ${state.authenticationRequired ? "required" : state.credentialLoaded ? "ready" : "off"}`}
@@ -71,7 +74,7 @@ export function SecurityTransportProvider({ children }: { children: React.ReactN
         </button>
       )}
 
-      {state.securityDetected && dialogOpen && (
+      {state.securityDetected && !entryOwnsCredential && dialogOpen && (
         <div className="securityCredentialBackdrop" role="presentation" onMouseDown={event => {
           if (event.currentTarget === event.target) closeCredentialDialog();
         }}>
