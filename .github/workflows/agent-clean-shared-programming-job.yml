@@ -1,0 +1,43 @@
+name: Agent Clean Shared Programming Job
+
+on:
+  push:
+    branches:
+      - agent/fix-emode-programming-job-structure
+    paths:
+      - .github/workflows/agent-clean-shared-programming-job.yml
+
+permissions:
+  contents: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fix-emode-programming-job-structure
+      - name: Remove stale mode-local picker refs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in [
+              "software/web/app/fleet/factory-console-v2.tsx",
+              "software/web/app/engineering/programming-workspace-v2.tsx",
+          ]:
+              path = Path(name)
+              text = path.read_text(encoding="utf-8")
+              text = text.replace('import { ICPickerField } from "../devices/ic-picker-field";\n', '')
+              text = text.replace('  const imageInputRef = useRef<HTMLInputElement>(null);\n', '')
+              text = text.replace('      inputRef: imageInputRef,\n', '')
+              text = text.replace('      onBrowse: () => imageInputRef.current?.click(),\n', '')
+              path.write_text(text, encoding="utf-8")
+          PY
+      - name: Commit cleanup
+        run: |
+          git config user.name "plasma-agent"
+          git config user.email "plasma-agent@users.noreply.github.com"
+          git add software/web/app/fleet/factory-console-v2.tsx software/web/app/engineering/programming-workspace-v2.tsx
+          git diff --cached --check
+          git commit -m "Remove stale mode-local Programming Job picker refs"
+          git push origin HEAD:agent/fix-emode-programming-job-structure
