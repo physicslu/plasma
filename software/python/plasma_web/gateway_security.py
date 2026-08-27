@@ -121,6 +121,8 @@ class ResourceScope:
             return False
         if resource.ppu_id is not None and self.ppu_id not in {"*", resource.ppu_id}:
             return False
+        if resource.site_id is None and self.site_ids is not None:
+            return False
         if resource.site_id is not None and self.site_ids is not None and resource.site_id not in self.site_ids:
             return False
         return True
@@ -200,7 +202,8 @@ class GatewaySecurityConfig:
         if not isinstance(raw, dict):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} must be an object")
         allowed = {"id", "token_sha256", "roles", "permissions", "scopes"}
-        if not {"id", "token_sha256"} <= set(raw) or set(raw) - allowed:
+        required = {"id", "token_sha256", "scopes"}
+        if not required <= set(raw) or set(raw) - allowed:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} fields are invalid")
         principal_id = raw["id"]
         token_sha256 = raw["token_sha256"]
@@ -237,7 +240,7 @@ class GatewaySecurityConfig:
         if not permissions:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} has no permissions")
 
-        scopes_raw = raw.get("scopes", [{"facility_id": "*", "ppu_id": "*", "site_ids": "*"}])
+        scopes_raw = raw["scopes"]
         if not isinstance(scopes_raw, list) or not scopes_raw:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} scopes are invalid")
         scopes = tuple(GatewaySecurityConfig._scope(scope, index) for scope in scopes_raw)
