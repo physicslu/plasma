@@ -24,6 +24,20 @@ class PersistentMockAwareBatchRuntimeManager(PersistentBatchRuntimeManager):
 
     provider: SharedImageMockEngineeringPPUProvider
 
+    def __init__(
+        self,
+        provider: SharedImageMockEngineeringPPUProvider,
+        *args: Any,
+        state_path: str | Path | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            provider,
+            *args,
+            state_path=state_path or (provider.root / "batch-state.sqlite3"),
+            **kwargs,
+        )
+
     @staticmethod
     def _mock_payload(snapshot: dict[str, Any], context: dict[str, Any] | None) -> dict[str, Any]:
         normalized = dict(snapshot)
