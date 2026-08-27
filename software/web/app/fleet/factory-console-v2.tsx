@@ -40,7 +40,7 @@ import {
   summarizePPUHealth,
   type GatewayHealthState,
 } from "./communication-health";
-import { isRecoverablePPUStatusError, ppuRetryDelayMs, PPU_STATUS_REQUEST_TIMEOUT_MS } from "./ppu-status-recovery";
+import { isRecoverablePPUStatusError, ppuRetryDelayMs } from "./ppu-status-recovery";
 import ProductionLogPanel, { type ProductionLogEntry } from "./production-log-panel";
 import "./factory-console-v2.css";
 
@@ -548,7 +548,7 @@ export default function FactoryConsoleV2() {
       if (runtimeRecoveryGenerationRef.current !== generation) return;
       const targetBase = engineeringTargetApiBase(apiBase, item.facility.facility_id, item.target.ppu_id);
       try {
-        const status = await getPPUStatus(targetBase, PPU_STATUS_REQUEST_TIMEOUT_MS);
+        const status = await getPPUStatus(targetBase);
         if (runtimeRecoveryGenerationRef.current !== generation) return;
         setGatewayHealth("online");
         setRuntimes(current => ({ ...current, [item.key]: runtimeForStatus(item, status) }));
@@ -574,7 +574,7 @@ export default function FactoryConsoleV2() {
     } satisfies PPURuntime])));
     const results = await Promise.allSettled(targets.map(async item => {
       const targetBase = engineeringTargetApiBase(apiBase, item.facility.facility_id, item.target.ppu_id);
-      return { item, status: await getPPUStatus(targetBase, PPU_STATUS_REQUEST_TIMEOUT_MS) };
+      return { item, status: await getPPUStatus(targetBase) };
     }));
     if (runtimeRecoveryGenerationRef.current !== generation) return;
     setGatewayHealth(gatewayHealthFromSettled(results));
