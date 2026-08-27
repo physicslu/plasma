@@ -18,6 +18,34 @@ from tests.test_secure_gateway_rest import FakeLocalClient
 TOKEN = "operator-token-scope-regression-0123456789abcdef0123456789abcdef"
 
 
+class FakeEngineeringCatalogProvider:
+    def catalog(self):
+        return {
+            "ok": True,
+            "provider": "test",
+            "facility_count": 2,
+            "ppu_count": 3,
+            "site_count": 9,
+            "facilities": [
+                {
+                    "facility_id": "facility-1",
+                    "display_name": "Facility 1",
+                    "ppus": [
+                        {"ppu_id": "ppu-1", "display_name": "PPU 1", "site_count": 3},
+                        {"ppu_id": "ppu-2", "display_name": "PPU 2", "site_count": 2},
+                    ],
+                },
+                {
+                    "facility_id": "facility-2",
+                    "display_name": "Facility 2",
+                    "ppus": [
+                        {"ppu_id": "ppu-3", "display_name": "PPU 3", "site_count": 4},
+                    ],
+                },
+            ],
+        }
+
+
 @pytest.fixture
 def scoped_gateway(tmp_path: Path):
     config_path = tmp_path / "security.yaml"
@@ -51,6 +79,7 @@ def scoped_gateway(tmp_path: Path):
     local_client = FakeLocalClient()
     SecurePlasmaWebHandler.security_controller = security
     SecurePlasmaWebHandler.client_factory = staticmethod(lambda: local_client)
+    SecurePlasmaWebHandler.engineering_provider = FakeEngineeringCatalogProvider()
     SecurePlasmaWebHandler.batch_runtime = None
     server = ThreadingHTTPServer(("127.0.0.1", 0), SecurePlasmaWebHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -63,6 +92,7 @@ def scoped_gateway(tmp_path: Path):
         thread.join()
         security.close()
         SecurePlasmaWebHandler.security_controller = None
+        SecurePlasmaWebHandler.engineering_provider = None
         SecurePlasmaWebHandler.batch_runtime = None
 
 
@@ -104,11 +134,14 @@ def test_decimal_string_site_id_cannot_bypass_site_scope(scoped_gateway) -> None
     assert local_client.start_calls == before
 
 
-def test_site_scoped_principal_cannot_read_parent_ppu_status(scoped_gateway) -> None:
+def test_site_scoped_principal_reads_only_allowed_sites_from_parent_ppu_status(scoped_gateway) -> None:
     server, _ = scoped_gateway
     status, payload = _request(server, "GET", "/api/status")
-    assert status == 403
-    assert payload["error"]["error_code"] == "E4102"
+    assert status == 200
+    assert payload["ok"] is True
+    assert [site["site_id"] for site in payload["sites"]] == [1, 2]
+    assert payload["ppu"]["site_count"] == 2
+    assert payload["ppu"]["enabled_site_count"] == 2
 
 
 def test_site_scoped_principal_can_read_an_allowed_site(scoped_gateway) -> None:
@@ -116,6 +149,18 @@ def test_site_scoped_principal_can_read_an_allowed_site(scoped_gateway) -> None:
     status, payload = _request(server, "GET", "/api/status?site=2")
     assert status == 200
     assert payload["ok"] is True
+    assert [site["site_id"] for site in payload["sites"]] == [2]
+
+
+def test_engineering_catalog_returns_only_ppus_intersecting_principal_scope(scoped_gateway) -> None:
+    server, _ = scoped_gateway
+    status, payload = _request(server, "GET", "/api/engineering/targets")
+    assert status == 200
+    assert payload["facility_count"] == 1
+    assert payload["ppu_count"] == 1
+    assert payload["site_count"] == 3
+    assert [facility["facility_id"] for facility in payload["facilities"]] == ["facility-1"]
+    assert [ppu["ppu_id"] for ppu in payload["facilities"][0]["ppus"]] == ["ppu-1"]
 
 
 def test_authenticated_unclassified_api_route_fails_closed(scoped_gateway) -> None:
