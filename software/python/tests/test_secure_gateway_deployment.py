@@ -89,12 +89,15 @@ def test_secure_launcher_creates_owner_only_state(
         controller.close()
 
 
-def test_deployed_secure_handler_exposes_auth_cors_and_enforces_write_boundary(tmp_path: Path) -> None:
+def test_deployed_secure_handler_exposes_auth_cors_and_enforces_write_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     config_path = tmp_path / "security.yaml"
     state_path = tmp_path / "security-state.sqlite3"
     _write_config(config_path)
-    os.environ["PLASMA_SECURITY_CONFIG"] = str(config_path)
-    os.environ["PLASMA_SECURITY_STATE"] = str(state_path)
+    monkeypatch.setenv("PLASMA_SECURITY_CONFIG", str(config_path))
+    monkeypatch.setenv("PLASMA_SECURITY_STATE", str(state_path))
     controller = load_security_controller_from_env()
     local_client = FakeLocalClient()
     DeployedSecurePlasmaWebHandler.security_controller = controller
@@ -161,5 +164,3 @@ def test_deployed_secure_handler_exposes_auth_cors_and_enforces_write_boundary(t
         controller.close()
         DeployedSecurePlasmaWebHandler.security_controller = None
         DeployedSecurePlasmaWebHandler.batch_runtime = None
-        os.environ.pop("PLASMA_SECURITY_CONFIG", None)
-        os.environ.pop("PLASMA_SECURITY_STATE", None)
