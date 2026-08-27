@@ -11,6 +11,8 @@ import {
 } from "./security-transport";
 
 export function SecurityTransportProvider({ children }: { children: React.ReactNode }) {
+  if (typeof window !== "undefined") installSecurityTransport();
+
   const state = useSyncExternalStore(
     subscribeSecurityTransport,
     getSecurityTransportState,
