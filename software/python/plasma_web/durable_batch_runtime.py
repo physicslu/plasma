@@ -18,8 +18,65 @@ class DurableBatchRuntimeManager(PersistentBatchRuntimeManager):
     Recovery reconstructs Site accounting/cursor from the durable Job ledger so
     a Job that reached terminal state immediately before a Gateway crash is not
     submitted again merely because the in-memory Site snapshot had not yet
-    advanced.
+    advanced. Retained terminal snapshots remain queryable after later Gateway
+    restarts for the configured durable-history retention window.
     """
+
+    @staticmethod
+    def _public_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+        result = dict(snapshot)
+        result.pop("_recovery", None)
+        return result
+
+    def _historical_snapshot(self, batch_id: str) -> dict[str, Any] | None:
+        stored = self._state_store.load_batch(batch_id)
+        if stored is None or not stored.snapshot:
+            return None
+        state = str(stored.snapshot.get("state", ""))
+        if state not in {"success", "partial", "error", "cancelled"}:
+            return None
+        return self._public_snapshot(stored.snapshot)
+
+    def get(self, batch_id: str) -> dict[str, Any]:
+        try:
+            return super().get(batch_id)
+        except PlasmaError as exc:
+            if exc.code is not ErrorCode.JOB_NOT_FOUND:
+                raise
+            historical = self._historical_snapshot(batch_id)
+            if historical is None:
+                raise
+            return historical
+
+    def cancel(self, batch_id: str) -> dict[str, Any]:
+        try:
+            return super().cancel(batch_id)
+        except PlasmaError as exc:
+            if exc.code is not ErrorCode.JOB_NOT_FOUND:
+                raise
+            historical = self._historical_snapshot(batch_id)
+            if historical is None:
+                raise
+            return historical
+
+    def cancel_ppu(self, batch_id: str, facility_id: str, ppu_id: str) -> dict[str, Any]:
+        try:
+            return super().cancel_ppu(batch_id, facility_id, ppu_id)
+        except PlasmaError as exc:
+            if exc.code is not ErrorCode.JOB_NOT_FOUND:
+                raise
+            historical = self._historical_snapshot(batch_id)
+            if historical is None:
+                raise
+            site_matches = any(
+                isinstance(site, dict)
+                and site.get("facility_id") == facility_id
+                and site.get("ppu_id") == ppu_id
+                for site in historical.get("sites", [])
+            )
+            if not site_matches:
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "PPU is not part of this Batch")
+            return historical
 
     @staticmethod
     def _operation_index(batch: BatchRecord, operation: str) -> int:
