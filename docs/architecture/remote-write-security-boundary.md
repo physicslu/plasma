@@ -159,17 +159,21 @@ No TTL is used to steal an in-progress command identity. Long hardware operation
 
 ## Audit ledger
 
-The security state database uses SQLite with WAL and `synchronous=FULL` and records:
+The security state database uses SQLite with WAL and `synchronous=FULL` and records authenticated control-plane decisions such as:
 
 - authenticated principal ID;
-- authorization decision;
-- action/permission;
+- authorization denial;
+- admitted/replayed command action;
 - method and path;
 - resource context;
 - Idempotency-Key command ID;
 - command lifecycle and returned HTTP response.
 
 Bearer tokens are never written to the audit database.
+
+**Unauthenticated traffic is deliberately not written to the durable SQLite audit ledger.** Missing or invalid credentials return `E4101` and may be emitted as non-durable runtime diagnostics, but an unauthenticated remote caller must not be able to force one `synchronous=FULL` microSD write per bad request. This is an embedded DoS/write-amplification boundary, not an omission of authorization auditability.
+
+Once a Principal has been authenticated, authorization denials and admitted command lifecycle events are durable-audited.
 
 The audit ledger records control-plane decisions. It does not replace Batch/Job execution truth or PPU authoritative state.
 
@@ -193,7 +197,8 @@ The design is intentionally embedded-grade:
 - no Keycloak/PostgreSQL/Redis requirement on the PPU;
 - token verification is local and lightweight;
 - authorization is an in-memory permission/scope check;
-- SQLite durable writes occur at command/audit boundaries, not every progress update;
+- unauthenticated failures do not trigger durable SQLite writes;
+- SQLite durable writes occur at authenticated command/audit boundaries, not every progress update;
 - an external identity provider may supply identity, but standalone PPU authorization must not depend on Plasma Manager or Internet availability.
 
 ## Deployment status
@@ -207,6 +212,7 @@ The next security integration must provide:
 - optional Cloudflare Access/OIDC identity bridge;
 - CORS support for authentication/idempotency headers;
 - `plasmactl` security configuration and state paths;
+- owner-only filesystem permissions for security config/state and persisted Programming Image material;
 - UI read-only indication and disabled write controls;
 - deployment smoke tests proving unauthenticated/direct REST writes cannot bypass the secure handler.
 
