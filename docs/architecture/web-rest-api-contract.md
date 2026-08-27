@@ -30,7 +30,55 @@ GET  /api/settings/gateway
 POST /api/settings/gateway
 ```
 
-The POST body contains exactly `ppu_request_timeout_ms` and `ppu_retry_count`; `revision` is server-owned. Each server-side Batch freezes the current revision at START. Defaults, validation ranges, retry boundaries and failure containment are defined in [Gateway Communication and Recovery](gateway-communication-recovery.md).
+The writable POST body contains exactly:
+
+```json
+{
+  "ppu_request_timeout_ms": 10000,
+  "ppu_retry_count": 3
+}
+```
+
+`revision` is server-owned. `ppu_response_budget_ms` is also server-owned, read-only, and derived from the configured attempt count plus Gateway communication backoff. Clients must not persist or POST the derived response budget.
+
+Canonical GET semantics include:
+
+```json
+{
+  "revision": 1,
+  "ppu_request_timeout_ms": 10000,
+  "ppu_retry_count": 3,
+  "ppu_response_budget_ms": 47000
+}
+```
+
+With the default policy, four 10-second attempts plus 1 s, 2 s, and 4 s backoff produce a 47-second Gateway response budget. The Browser may derive an outer HTTP transport watchdog from that response budget plus a transport margin; the Browser does not own a second PPU timeout/retry policy.
+
+Each server-side Batch freezes the current persistent Gateway policy revision at START. Direct Engineering PPU status observations use the current Gateway settings for each request. Defaults, validation ranges, retry boundaries and failure containment are defined in [Gateway Communication and Recovery](gateway-communication-recovery.md).
+
+## Engineering PPU status observation
+
+Canonical status routes are:
+
+```text
+GET /api/engineering/targets/{facility_id}/{ppu_id}/api/status
+GET /api/engineering/targets/{facility_id}/{ppu_id}/api/status?site={site_id}&job={job_id}
+```
+
+The Gateway owns the PPU request deadline, transient retry/backoff, stable communication error normalization, and response budget for these routes.
+
+When transient PPU communication retries are exhausted, the Gateway returns:
+
+```text
+HTTP 503 Service Unavailable
+E2001 CONNECTION_FAILED
+or
+E2002 CONNECTION_TIMEOUT
+```
+
+An HTTP 503 carrying one of these stable codes is proof that the Browser received a Gateway HTTP response. It is not evidence that the Gateway itself was unreachable. A Browser transport failure with no HTTP response is a different failure boundary and must not be collapsed into the same semantic state.
+
+PPU-level status diagnostics distinguish provider completion from Gateway response writing. `engineering_ppu_status_ok` means the provider payload was obtained; `engineering_ppu_status_response_sent` means the Gateway handler response-write call returned. Neither event by itself proves end-to-end Browser receipt. See [Gateway Communication and Recovery](gateway-communication-recovery.md) for the diagnostic boundary and interpretation rules.
 
 ## Server-side Batch routes
 

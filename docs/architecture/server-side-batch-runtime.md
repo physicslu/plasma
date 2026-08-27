@@ -1,6 +1,6 @@
 # Plasma Server-side Batch Runtime
 
-Status: Phase 1 execution contract
+Status: current server-side Batch execution baseline
 
 ## Purpose
 
@@ -46,7 +46,7 @@ site_retry_limit = 1 -> at most 2 attempts
 site_retry_limit = 2 -> at most 3 attempts
 ```
 
-Phase 1 uses one Batch-level retry limit for every selected operation. The Batch Runtime passes this policy into the canonical Job `max_retries` contract; it does not implement a second retry engine.
+The Batch Runtime passes this policy into the canonical Job `max_retries` contract; it does not implement a second manufacturing retry engine.
 
 If a recoverable operation failure consumes all allowed retries, that Site becomes `FAULTED` and does not start later operations or rounds in the same Batch.
 
@@ -112,11 +112,29 @@ A Batch containing both successful and infrastructure-error Sites ends as
 whole-Batch stop action, apart from the separately configured manufacturing
 failure-threshold circuit breaker.
 
+## Execution truth and observation boundary
+
+Once a Batch is accepted, the **server Batch snapshot is authoritative execution truth** for membership, lifecycle, counters, per-Site Batch state, cancellation reconciliation, and terminal outcome.
+
+```text
+Browser
+   |
+   +-- GET /api/batches/{batch_id}
+   |      -> authoritative Batch execution snapshot
+   |
+   +-- direct PPU status observation
+          -> communication/readiness/diagnostic evidence only
+```
+
+A direct PPU status request must not override or fabricate Batch execution facts. A delayed or failed observation path does not prove that programming failed, stopped, or completed. Conversely, a successful direct PPU status response does not replace the accepted Batch snapshot for manufacturing accounting.
+
+This separation matters during communication incidents: Batch execution may continue and later terminate successfully even while an independent PPU observation request is delayed. Infrastructure observation errors remain `ERROR`/reconnect evidence and must not be converted into IC `FAIL` merely to make the UI terminal.
+
 ## Programming Asset invariant
 
 One Batch may bind at most one Programming Asset for Program/Verify. The Asset identity is fixed before execution begins and is cached to each participating PPU before the Batch worker thread starts.
 
-Phase 1 stores this provenance in the Batch snapshot:
+The Batch snapshot stores this provenance:
 
 ```text
 name
@@ -170,7 +188,7 @@ communication_attempt
 
 ## REST contract
 
-Phase 1 endpoints:
+Current endpoints:
 
 ```text
 POST /api/batches
@@ -212,15 +230,14 @@ The response is `202 Accepted` and contains a server-generated Batch ID plus the
 
 ## Current provider boundary
 
-The Batch Runtime consumes a provider-shaped execution boundary (`status`, `start_job`, `cancel_job`, Asset cache and timeout lookup). In Phase 1 the server-side Engineering Mock Provider is the available multi-PPU backend.
+The Batch Runtime consumes a provider-shaped execution boundary (`status`, `start_job`, `cancel_job`, Asset cache and timeout lookup). The server-side Engineering Mock Provider is the available multi-PPU backend in the current baseline.
 
 This is intentionally not a claim that the current Mock Provider is the final production fleet transport. The Batch policy/state machine is provider-independent; a real fleet/Manager execution adapter can implement the same boundary later without moving Batch policy back into the browser.
 
 ## Deferred work
 
-Not part of this Phase 1 runtime PR:
+Current deferred work includes:
 
-- Production UI migration from browser-owned `Promise.all` orchestration to `/api/batches`
 - Mock Profile UI and deterministic fault-profile binding
 - `minimum_active_sites`
 - per-operation retry limits
@@ -228,4 +245,4 @@ Not part of this Phase 1 runtime PR:
 - cross-host Programming Asset distribution service
 - Blob TTL/LRU/GC
 
-These are separate changes so the execution engine and operator UI can be validated independently.
+Production PMode already consumes the server-owned Batch runtime; migration from browser-owned `Promise.all` orchestration is no longer deferred work and must not be reintroduced as an architecture option.
