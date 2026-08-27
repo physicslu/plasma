@@ -90,7 +90,7 @@ A principal that may start Batches but lacks `ppu.program` cannot use Batch as a
 
 ## Resource scopes
 
-Each principal must declare one or more explicit scopes over:
+Each principal must declare one or more scopes over:
 
 ```text
 Facility
@@ -98,9 +98,7 @@ Facility
       └─ Site
 ```
 
-Omitting `scopes` is a configuration error. The security config never turns a missing scope into an implicit global grant.
-
-`*` means all resources at that level. Site scopes can be an explicit list.
+Omitting `scopes` is a configuration error. Every scope must explicitly contain `facility_id`, `ppu_id`, and `site_ids`; omitted fields are rejected rather than interpreted as wildcards. To grant all resources at a level, the configuration must explicitly write `*`.
 
 Example:
 
