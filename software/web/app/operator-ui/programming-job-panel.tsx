@@ -1,4 +1,5 @@
-import type { ChangeEvent, ReactNode, RefObject } from "react";
+import { useRef } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
 import { OperatorPanel } from "./operator-panel";
@@ -46,8 +47,6 @@ export type ProgrammingJobImage = {
   browseDisabled: boolean;
   inputDisabled: boolean;
   inputAriaLabel: string;
-  inputRef: RefObject<HTMLInputElement | null>;
-  onBrowse: () => void;
   onFileChange: (file: File | null, event: ChangeEvent<HTMLInputElement>) => void;
 };
 
@@ -111,6 +110,7 @@ export function ProgrammingJobPanel({
   onAbort: () => void | Promise<void>;
 }) {
   const toggleLabel = collapsed ? expandLabel : collapseLabel;
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <OperatorPanel
@@ -147,9 +147,9 @@ export function ProgrammingJobPanel({
             <strong>2. {imageLabel}</strong>
             <div className="programmingJobImageControl">
               <span data-image-source={image.source} title={image.title ?? image.name}>{image.name}</span>
-              <button type="button" disabled={image.browseDisabled} onClick={image.onBrowse}>{image.browseLabel}</button>
+              <button type="button" disabled={image.browseDisabled} onClick={() => imageInputRef.current?.click()}>{image.browseLabel}</button>
               <input
-                ref={image.inputRef}
+                ref={imageInputRef}
                 type="file"
                 aria-label={image.inputAriaLabel}
                 accept=".bin,application/octet-stream"
