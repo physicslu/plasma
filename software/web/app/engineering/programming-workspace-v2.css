@@ -215,24 +215,6 @@
   line-height: 1.25;
 }
 
-.engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.engineeringProgrammingV2 .programmingBatchOperations .operationChecks label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 9px;
-}
-
-.engineeringProgrammingV2 .programmingBatchOperations .operationChecks input {
-  width: 15px;
-  height: 15px;
-}
-
 .engineeringProgrammingV2 .batchReadiness {
   min-height: 26px;
   display: inline-flex;
@@ -295,11 +277,6 @@
 .engineeringProgrammingV2 .programmingActions {
   gap: 9px;
   margin-top: 0;
-}
-
-.engineeringProgrammingV2 .programmingActions button {
-  min-height: 38px;
-  font-size: 11px;
 }
 
 .engineeringProgrammingV2 .liveSiteStatus {
