@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-repo="${PLASMA_REPO:-$(cd "$(dirname "$script_path")/.." && pwd)}"
+default_repo="$(cd "$(dirname "$script_path")/.." && pwd)"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
 plasmactl_config="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
@@ -12,6 +12,7 @@ if [[ -f "$plasmactl_config" ]]; then
   source "$plasmactl_config"
 fi
 
+repo="${PLASMA_REPO:-$default_repo}"
 python_dir="$repo/software/python"
 python_bin="${PLASMA_PYTHON:-$python_dir/.venv/bin/python}"
 gateway_host="${PLASMA_GATEWAY_HOST:-0.0.0.0}"
