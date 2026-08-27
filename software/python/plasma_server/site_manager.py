@@ -287,7 +287,7 @@ class SiteManager:
             self.output.write_state(request.job_id, worker._state_payload(runtime))
             worker.enqueue(runtime)
         except Exception:
-            self.registry._jobs.pop(request.job_id, None)
+            self.registry.discard(request.job_id)
             self._release_execution_job(request.job_id)
             raise
         runtime.future.add_done_callback(
