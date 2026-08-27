@@ -17,9 +17,10 @@ test("browser security credential remains memory-only", () => {
 
 test("gateway fetches receive bearer authentication and durable command identity", () => {
   assert.match(transport, /headers\.set\("Authorization", `Bearer \$\{bearerToken\}`\)/);
-  assert.match(transport, /headers\.set\("Idempotency-Key", commandId\)/);
+  assert.match(transport, /headers\.set\("Idempotency-Key", commandIdFor\(identity\)\)/);
   assert.match(transport, /ambiguousCommandIds\.get\(identity\)/);
   assert.match(transport, /error_code === "E4104"/);
+  assert.match(transport, /shouldRetainCommandIdentity/);
 });
 
 
