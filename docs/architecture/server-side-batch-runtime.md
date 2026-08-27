@@ -112,6 +112,29 @@ A Batch containing both successful and infrastructure-error Sites ends as
 whole-Batch stop action, apart from the separately configured manufacturing
 failure-threshold circuit breaker.
 
+## Durable Batch state and Gateway restart
+
+Batch identity is no longer defined by Gateway process memory alone. The durable runtime persists the immutable Batch specification, frozen Gateway policy, Programming Asset material when present, execution checkpoints, and a Job ledger in a versioned SQLite database.
+
+The critical admission order is:
+
+```text
+allocate durable Job ID
+    -> persist Job as submitting
+    -> send to PPU
+    -> persist accepted / rejected / terminal evidence
+```
+
+After Gateway restart, non-terminal Batches are reconstructed and every ambiguous or accepted Job is reconciled against authoritative PPU state by the same durable Job ID. A Job is never blindly resubmitted merely because the old Gateway did not retain its accept response in memory.
+
+The durable Job ledger also rebuilds Site accounting and the next operation cursor. This closes the crash window where a PPU Job became terminal immediately before the Gateway updated its in-memory Site state.
+
+Restart during whole-Batch ABORT reissues cancellation idempotently for known non-terminal Job IDs and waits for authoritative terminal state. Requesting cancellation does not itself prove that a Job stopped.
+
+Terminal Batch snapshots remain queryable from durable history for the configured retention window even when they are no longer resident in Gateway RAM. Current default retention is 30 days.
+
+See [Batch Persistence and Gateway Restart Recovery](batch-persistence-recovery.md) for the complete durability, schema and topology contract.
+
 ## Execution truth and observation boundary
 
 Once a Batch is accepted, the **server Batch snapshot is authoritative execution truth** for membership, lifecycle, counters, per-Site Batch state, cancellation reconciliation, and terminal outcome.
@@ -145,6 +168,8 @@ sha256
 ```
 
 The server-side Batch API accepts the Asset once at Batch creation. Per-Site/round Jobs reference the cached Asset by SHA instead of asking the browser to resend or reselect a file.
+
+For restart recovery, the current embedded durability layer retains the materialized Asset bytes needed to re-cache the identical immutable Asset. This local storage is a recovery mechanism, not a credential vault or authorization boundary.
 
 ## Statistics
 
@@ -232,7 +257,9 @@ The response is `202 Accepted` and contains a server-generated Batch ID plus the
 
 The Batch Runtime consumes a provider-shaped execution boundary (`status`, `start_job`, `cancel_job`, Asset cache and timeout lookup). The server-side Engineering Mock Provider is the available multi-PPU backend in the current baseline.
 
-This is intentionally not a claim that the current Mock Provider is the final production fleet transport. The Batch policy/state machine is provider-independent; a real fleet/Manager execution adapter can implement the same boundary later without moving Batch policy back into the browser.
+Current Mock Batch execution uses the durable runtime and persists Batch history. However, the Mock PPU servers are process-coupled to the Gateway. A Gateway restart therefore also destroys their Job registries, so a non-terminal Mock Batch cannot be reconciled like work on an independent physical PPU. It terminates as an infrastructure recovery ERROR rather than a fabricated manufacturing result.
+
+The provider-independent durable recovery implementation is the required runtime boundary for a future independent real fleet/PPU provider. A real provider must preserve authoritative PPU Job state across Gateway process loss before claiming restart continuation.
 
 ## Deferred work
 
@@ -241,7 +268,6 @@ Current deferred work includes:
 - Mock Profile UI and deterministic fault-profile binding
 - `minimum_active_sites`
 - per-operation retry limits
-- persistent Batch database / restart recovery
 - cross-host Programming Asset distribution service
 - Blob TTL/LRU/GC
 
