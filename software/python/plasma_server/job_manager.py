@@ -80,6 +80,10 @@ class JobRegistry:
         self._jobs[request.job_id] = runtime
         return runtime
 
+    def discard(self, job_id: str) -> None:
+        """Remove a Job that failed before worker admission completed."""
+        self._jobs.pop(job_id, None)
+
     def get(self, job_id: str) -> JobRuntime:
         try:
             return self._jobs[job_id]
