@@ -2,6 +2,7 @@ type SecurityTransportState = {
   credentialLoaded: boolean;
   authenticationRequired: boolean;
   securityDetected: boolean;
+  credentialRevision: number;
 };
 
 type Listener = () => void;
@@ -14,9 +15,17 @@ const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_PLASMA_API_URL ?? "https://plas
 const MAX_AMBIGUOUS_COMMANDS = 256;
 const listeners = new Set<Listener>();
 const ambiguousCommandIds = new Map<string, string>();
+const SERVER_SNAPSHOT: SecurityTransportState = {
+  credentialLoaded: false,
+  authenticationRequired: false,
+  securityDetected: false,
+  credentialRevision: 0,
+};
 let bearerToken: string | null = null;
 let authenticationRequired = false;
 let securityDetected = false;
+let credentialRevision = 0;
+let stateSnapshot: SecurityTransportState = SERVER_SNAPSHOT;
 let uninstallTransport: (() => void) | null = null;
 
 const gatewayPathPrefixes = [
@@ -32,6 +41,12 @@ const gatewayPathPrefixes = [
 ];
 
 function emit(): void {
+  stateSnapshot = {
+    credentialLoaded: bearerToken !== null,
+    authenticationRequired,
+    securityDetected,
+    credentialRevision,
+  };
   listeners.forEach(listener => listener());
 }
 
@@ -41,15 +56,11 @@ export function subscribeSecurityTransport(listener: Listener): () => void {
 }
 
 export function getSecurityTransportState(): SecurityTransportState {
-  return {
-    credentialLoaded: bearerToken !== null,
-    authenticationRequired,
-    securityDetected,
-  };
+  return stateSnapshot;
 }
 
 export function getSecurityTransportServerState(): SecurityTransportState {
-  return { credentialLoaded: false, authenticationRequired: false, securityDetected: false };
+  return SERVER_SNAPSHOT;
 }
 
 export function setSecurityBearerToken(token: string): void {
@@ -60,6 +71,7 @@ export function setSecurityBearerToken(token: string): void {
   bearerToken = normalized;
   securityDetected = true;
   authenticationRequired = false;
+  credentialRevision += 1;
   emit();
 }
 
@@ -67,6 +79,7 @@ export function clearSecurityBearerToken(): void {
   bearerToken = null;
   authenticationRequired = securityDetected;
   ambiguousCommandIds.clear();
+  credentialRevision += 1;
   emit();
 }
 
