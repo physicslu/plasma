@@ -6,59 +6,47 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ## High Priority
 
-### Backend PPU Execution Ownership / Lease
-
-**Status:** TODO  
-**Layer:** Backend control-plane invariant  
-**Reason:** The Web UI mode-switch guard only prevents accidental operator navigation in one browser. It cannot prevent another browser tab, another PC, Plasma Manager, or a direct REST client from submitting conflicting work to the same PPU.
-
-Required invariant:
-
-```text
-one PPU -> at most one active execution owner
-```
-
-The backend must own and enforce an execution lease/ownership record for each PPU. Production Mode and Engineering Mode are clients of that invariant, not its source of truth.
-
-Expected behavior:
-
-- Acquire an execution lease before dispatching a PPU Job.
-- Keep the lease while any Site Job for that execution owner is submitting, queued, running, or cancelling.
-- Reject conflicting execution from another owner/client with an explicit REST error such as `409 PPU_BUSY`.
-- Include enough conflict metadata for diagnostics, for example PPU identity and current execution owner.
-- Release the lease only after all owned Jobs reach terminal states, including cancellation completion.
-- Define stale-owner recovery for browser/network/client loss without terminating valid PPU Jobs incorrectly.
-- Enforce the invariant in the Python/backend execution path so direct REST access cannot bypass it.
-- Add concurrency tests covering Production vs Engineering, two browser clients, direct REST calls, cancellation races, and stale lease recovery.
-
-Non-goal: do not rely on a disabled P/E navigation control as the concurrency mechanism. That UI guard is UX protection only.
-
-### Persistent Batch State and Gateway Restart Recovery
+### Remote Write Authentication and Authorization
 
 **Status:** TODO
 
-**Layer:** Server-side Batch runtime
+**Layer:** Security/control plane
 
-**Reason:** Batch records and accepted-Job observation currently live in Gateway process memory. A Gateway process restart loses the observer even though a PPU may still own accepted Jobs.
-
-Required invariant:
-
-```text
-Gateway restart -> recover Batch identity and reconcile accepted Jobs -> no fabricated terminal result
-```
+**Reason:** Optional Plasma Manager is observation-only and current remote write surfaces are not a production authorization design. Browser/runtime execution-owner tokens are concurrency identities only; they are not authenticated security principals.
 
 Required work:
 
-- persist immutable Batch input, state transitions, accepted Job IDs and policy revision;
-- recover `QUEUED` / `RUNNING` / `STOPPING` records on process start;
-- query authoritative PPU Job state before releasing execution ownership;
-- make cancel/recovery idempotent;
-- define retention and schema migration;
-- test restart during submission, observation, retry and ABORT.
+- authenticate operator and service identities;
+- authorize Facility/PPU/Site and operation scope;
+- provide replay/idempotency and auditable command identity;
+- keep standalone PPU execution independent from Manager availability;
+- complete threat modeling before exposing write APIs outside a trusted network.
+
+### EMode Design System convergence to PMode baseline
+
+**Status:** TODO
+
+**Layer:** Web presentation/component ownership
+
+**Reason:** PMode is the current canonical operational visual baseline, while EMode still owns presentation variants for equivalent concepts. Shared domain semantics must not create two independently drifting visual systems.
+
+Required work:
+
+- reuse canonical typography, spacing, border, card and semantic status tokens;
+- converge Batch Summary / PASS / FAIL / YIELD presentation ownership;
+- converge Section Card and Site Card shell ownership;
+- converge button, select, input and checkbox variants;
+- preserve EMode-specific engineering information architecture and diagnostic controls;
+- keep PMode and EMode behavior contracts independent where their operational responsibilities differ;
+- protect the shared design-system boundary with source/E2E/visual regression tests.
+
+Non-goal: do not make EMode a copy of the PMode layout. The target is one Plasma design system with mode-specific workflows.
+
+## Deferred product capability
 
 ### Real Provider and Physical IC Quantity Handoff
 
-**Status:** TODO
+**Status:** TODO / deferred from the current 1-4 technical-debt sequence
 
 **Layer:** Production execution
 
@@ -72,21 +60,37 @@ Required work:
 - preserve `PROCESSED IC = PASS + FAIL` and exclude infrastructure ERROR;
 - validate sockets, hardware, Z2/FPGA path and real target separately from Mock.
 
-### Remote Write Authentication and Authorization
+## Resolved architecture debt
 
-**Status:** TODO
+### Backend PPU Execution Ownership / Lease
 
-**Layer:** Security/control plane
+Resolved by the backend execution-ownership contract merged in PR #164.
 
-**Reason:** Optional Plasma Manager is observation-only and current remote write surfaces are not a production authorization design.
+The physical PPU now enforces:
 
-Required work:
+```text
+one PPU -> at most one active execution owner
+```
 
-- authenticate operator and service identities;
-- authorize Facility/PPU/Site and operation scope;
-- provide replay/idempotency and auditable command identity;
-- keep standalone PPU execution independent from Manager availability;
-- complete threat modeling before exposing write APIs outside a trusted network.
+The invariant lives at the Python/backend PPU execution boundary, supports same-owner multi-Site concurrency, exposes `E4010 PPU_BUSY` / HTTP 409 for conflicting owners, preserves ownership until terminal Job state, and is not bypassed by direct REST access. PMode/EMode navigation guards remain UX protection rather than concurrency authority.
+
+See [PPU Execution Ownership](../architecture/ppu-execution-ownership.md).
+
+### Persistent Batch State and Gateway Restart Recovery
+
+Resolved by the durable Batch persistence/reconciliation contract introduced with PR #165.
+
+The current invariant is:
+
+```text
+Gateway restart -> recover Batch identity and reconcile durable Job IDs -> no fabricated terminal result
+```
+
+The implementation persists immutable Batch input, frozen communication policy, Programming Asset material when needed, execution checkpoints and Job admission state in versioned SQLite storage. Recovery reconciles `submitting` / `accepted` Job IDs against authoritative independent-PPU state, rebuilds Site cursors from the durable Job ledger, handles restart during ABORT idempotently, retries transient recovery observation according to Gateway policy, and retains terminal Batch history for later REST lookup.
+
+The process-coupled Engineering Mock topology cannot preserve an independent PPU Job registry across Gateway restart; non-terminal Mock work therefore becomes an infrastructure recovery ERROR rather than a fabricated manufacturing result.
+
+See [Batch Persistence and Gateway Restart Recovery](../architecture/batch-persistence-recovery.md).
 
 ## Resolved maintenance debt
 
