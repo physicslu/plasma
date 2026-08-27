@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { evaluateBatchReadiness } from "../batch-readiness";
 import { beginBatchExecutionActivity, notifyBatchExecutionActivityChanged } from "../batch-execution-activity";
 import type { DeviceSearchResult } from "../device-catalog-api";
-import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
 import { BatchSummary } from "../operator-ui/batch-summary";
 import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
@@ -403,7 +402,6 @@ export default function FactoryConsoleV2() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [programmingJobCollapsed, setProgrammingJobCollapsed] = useState(false);
 
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
   const activityReleaseRef = useRef<(() => void) | null>(null);
   const pollGenerationRef = useRef(0);
@@ -1148,8 +1146,6 @@ export default function FactoryConsoleV2() {
       browseDisabled: batchRunning,
       inputDisabled: batchRunning,
       inputAriaLabel: "Production Programming Image file",
-      inputRef: imageInputRef,
-      onBrowse: () => imageInputRef.current?.click(),
       onFileChange: (file, event) => {
         if (file && file.size > MAX_IMAGE_BYTES) {
           setOperatorWarning(text.imageTooLarge);

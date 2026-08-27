@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { evaluateBatchReadiness } from "../batch-readiness";
 import type { DeviceSearchResult } from "../device-catalog-api";
-import { ICPickerField } from "../devices/ic-picker-field";
 import {
   cachedGatewaySettings,
   getGatewaySettings,
@@ -272,7 +271,6 @@ export default function ProgrammingWorkspaceV2() {
   const submissionGenerations = useRef<Record<number, number>>({});
   const configuredGatewayPolicy = useRef<GatewaySettings>(cachedGatewaySettings(apiBase));
   const cancelRequests = useRef<Set<string>>(new Set());
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
   const lastObservedBatchState = useRef<string | null>(null);
   const syncedBatchId = useRef<string | null>(null);
@@ -1055,8 +1053,6 @@ export default function ProgrammingWorkspaceV2() {
       browseDisabled: targetLocked,
       inputDisabled: targetLocked,
       inputAriaLabel: "Engineering Programming Image Asset file",
-      inputRef: imageInputRef,
-      onBrowse: () => imageInputRef.current?.click(),
       onFileChange: file => selectImageAsset(file),
     }}
     operationsLabel="Operations"
