@@ -9,8 +9,9 @@
  * font-size: 0 in engineering-workspace-refresh.css. Only the canonical
  * ::before labels are enlarged here; otherwise both strings render at once.
  *
- * Batch Summary typography is intentionally excluded. The shared
- * operator-ui/batch-summary.css contract is its sole visual owner.
+ * Batch Summary and equivalent Programming Job operation/action/status controls
+ * are intentionally excluded. Their shared operator-ui styles are the sole
+ * visual owners across PMode and EMode.
  */
 
 .engineeringProgrammingV2 .targetingCard > header::before,
@@ -49,18 +50,9 @@
   font-size: 9px;
 }
 
-.engineeringProgrammingV2 .programmingBatchOperations .operationChecks label,
 .engineeringProgrammingV2 .engineeringPolicyRow > label,
 .engineeringProgrammingV2 .engineeringRetryField {
   font-size: 10px;
-}
-
-.engineeringProgrammingV2 .batchReadiness {
-  font-size: 10px;
-}
-
-.engineeringProgrammingV2 .programmingActions button {
-  font-size: 12px;
 }
 
 .engineeringProgrammingV2 .liveSiteStatus > header small {
