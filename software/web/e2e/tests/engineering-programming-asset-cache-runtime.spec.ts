@@ -30,7 +30,14 @@ async function runTwoSiteProgram(
   expectedBatchCount: number,
   counters: RuntimeCounters,
 ) {
-  const execute = page.locator(".executeBatch");
+  const programmingJob = page.getByRole("region", {
+    name: "Engineering Programming Job",
+    exact: true,
+  });
+  const execute = programmingJob.getByRole("button", {
+    name: "START PROGRAMMING",
+    exact: true,
+  });
   await expect(execute).toBeEnabled();
   await execute.click();
   await expect.poll(() => counters.batches, { timeout: 30_000 }).toBe(expectedBatchCount);
