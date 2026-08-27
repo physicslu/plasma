@@ -34,6 +34,12 @@ import type {
   ServerBatchState,
 } from "../server-batch-api";
 import { useWorkspaceSession, type SelectionMap } from "../workspace-session";
+import {
+  gatewayHealthFromError,
+  gatewayHealthFromSettled,
+  summarizePPUHealth,
+  type GatewayHealthState,
+} from "./communication-health";
 import { isRecoverablePPUStatusError, ppuRetryDelayMs, PPU_STATUS_REQUEST_TIMEOUT_MS } from "./ppu-status-recovery";
 import ProductionLogPanel, { type ProductionLogEntry } from "./production-log-panel";
 import "./factory-console-v2.css";
@@ -93,6 +99,7 @@ const copy = {
     provider: "Mock PPU Provider",
     loading: "正在連接 Mock Provider…",
     offline: "Mock Provider 無法使用。請確認 Plasma Web REST Gateway 已啟用 Mock Provider。",
+    gatewayUnreachable: "Plasma Web REST Gateway 無法連線。",
     productionSelection: "PRODUCTION SITE SELECTION",
     productionSelectionHint: "Tree 定義 Production Set；進入量產後仍可在 Live Site Status 決定下一個 Batch 的 PPU / Site membership。",
     showSelection: "展開",
@@ -142,6 +149,7 @@ const copy = {
     provider: "Mock PPU Provider",
     loading: "Connecting to Mock Provider…",
     offline: "Mock Provider is unavailable. Enable the Mock Provider on the Plasma Web REST Gateway.",
+    gatewayUnreachable: "Plasma Web REST Gateway is unreachable.",
     productionSelection: "PRODUCTION SITE SELECTION",
     productionSelectionHint: "The tree defines the Production Set. Live Site Status independently defines the next Batch PPU / Site membership.",
     showSelection: "Show",
@@ -380,6 +388,7 @@ export default function FactoryConsoleV2() {
 
   const [catalog, setCatalog] = useState<EngineeringTargetCatalog | null>(null);
   const [providerError, setProviderError] = useState<string | null>(null);
+  const [gatewayHealth, setGatewayHealth] = useState<GatewayHealthState>("connecting");
   const [runtimes, setRuntimes] = useState<Record<string, PPURuntime>>({});
   const [targetDevice, setTargetDevice] = useState<DeviceSearchResult | null>(null);
   const [operatorWarning, setOperatorWarning] = useState<string | null>(null);
@@ -485,6 +494,7 @@ export default function FactoryConsoleV2() {
       } catch (error) {
         if (pollGenerationRef.current !== generation) return;
         consecutiveFailures += 1;
+        setGatewayHealth(gatewayHealthFromError(error));
         setBatchObservationState("reconnecting");
         const detail = error instanceof Error ? error.message : "unknown error";
         appendLog(`[BAT] OBSERVATION ERROR · ${detail} · RECONNECTING ${consecutiveFailures}`, "WARN");
@@ -492,6 +502,7 @@ export default function FactoryConsoleV2() {
         continue;
       }
       if (pollGenerationRef.current !== generation) return;
+      setGatewayHealth("online");
       if (consecutiveFailures > 0) {
         appendLog(`[BAT] OBSERVATION RESTORED · ${batchId}`);
         consecutiveFailures = 0;
@@ -539,10 +550,12 @@ export default function FactoryConsoleV2() {
       try {
         const status = await getPPUStatus(targetBase, PPU_STATUS_REQUEST_TIMEOUT_MS);
         if (runtimeRecoveryGenerationRef.current !== generation) return;
+        setGatewayHealth("online");
         setRuntimes(current => ({ ...current, [item.key]: runtimeForStatus(item, status) }));
         appendLog(`[PPU] STATUS RESTORED · ${item.target.display_name}`);
       } catch (error) {
         if (runtimeRecoveryGenerationRef.current !== generation) return;
+        setGatewayHealth(gatewayHealthFromError(error));
         const detail = error instanceof Error ? error.message : text.loadFailed;
         setRuntimes(current => {
           const previous = current[item.key];
@@ -564,6 +577,7 @@ export default function FactoryConsoleV2() {
       return { item, status: await getPPUStatus(targetBase, PPU_STATUS_REQUEST_TIMEOUT_MS) };
     }));
     if (runtimeRecoveryGenerationRef.current !== generation) return;
+    setGatewayHealth(gatewayHealthFromSettled(results));
     setRuntimes(current => {
       const next = { ...current };
       results.forEach((result, index) => {
@@ -598,6 +612,7 @@ export default function FactoryConsoleV2() {
         await ensureEngineeringSession(apiBase);
         const nextCatalog = await getEngineeringTargets(apiBase);
         if (stopped) return;
+        setGatewayHealth("online");
         setCatalog(nextCatalog);
         setProviderError(null);
         appendLog(`[PROVIDER] ${nextCatalog.provider.toUpperCase()} · ${nextCatalog.facility_count} Facilities · ${nextCatalog.ppu_count} PPUs · ${nextCatalog.site_count} Sites`);
@@ -607,6 +622,7 @@ export default function FactoryConsoleV2() {
           try {
             const restored = await getServerBatch(apiBase, stored.batchId);
             if (stopped) return;
+            setGatewayHealth("online");
             applyBatchSnapshot(restored, nextCatalog);
             if (!terminalServerBatchStates.has(restored.state)) {
               beginActivity();
@@ -619,7 +635,8 @@ export default function FactoryConsoleV2() {
               return;
             }
             clearStoredBatch();
-          } catch {
+          } catch (error) {
+            setGatewayHealth(gatewayHealthFromError(error));
             clearStoredBatch();
           }
         }
@@ -633,6 +650,7 @@ export default function FactoryConsoleV2() {
       } catch (error) {
         if (stopped) return;
         const detail = error instanceof Error ? error.message : "Mock Provider unavailable";
+        setGatewayHealth(gatewayHealthFromError(error));
         setProviderError(detail);
         setCatalog(null);
         appendLog(`[PROVIDER] unavailable · ${detail}`, "ERROR");
@@ -713,6 +731,29 @@ export default function FactoryConsoleV2() {
     failed_site_stop_threshold: thresholdValue,
   } : null;
 
+  const ppuHealth = useMemo(() => summarizePPUHealth(
+    gatewayHealth,
+    Boolean(catalog),
+    Boolean(providerError),
+    productionTargets.map(active => {
+      const runtime = runtimes[active.key];
+      const reconnecting = runtime?.sites.some(site => site.communicationState === "reconnecting") ?? false;
+      const communicationFailed = runtime?.sites.some(site => site.communicationState === "failed") ?? false;
+      return {
+        loading: !runtime || runtime.loading || reconnecting,
+        error: runtime?.error ?? (communicationFailed ? "PPU communication failed" : undefined),
+        expectedSiteIds: active.siteIds,
+        observedSiteIds: runtime?.sites.map(site => site.id) ?? [],
+      };
+    }),
+  ), [catalog, gatewayHealth, productionTargets, providerError, runtimes]);
+  const gatewayTone = gatewayHealth === "online" ? "online" : gatewayHealth === "unreachable" ? "offline" : "loading";
+  const gatewayLabel = gatewayHealth === "online"
+    ? "Gateway ONLINE"
+    : gatewayHealth === "unreachable"
+      ? "Gateway UNREACHABLE"
+      : "Gateway CONNECTING";
+
   const allSitesExecutable = batchTargets.length > 0 && batchTargets.every(active => {
     const runtime = runtimes[active.key];
     if (!runtime || runtime.loading || runtime.error) return false;
@@ -725,7 +766,7 @@ export default function FactoryConsoleV2() {
   const requiresImage = selectedOperations.some(operation => operation === "program" || operation === "verify");
   const syntheticMockImageAvailable = catalog?.provider === "mock";
   const batchReadiness = evaluateBatchReadiness({
-    providerOnline: Boolean(catalog && !providerError),
+    providerOnline: gatewayHealth === "online" && Boolean(catalog && !providerError),
     targetValid: syntheticMockImageAvailable || Boolean(targetDevice),
     selectedSiteCount: batchCounts.sites,
     selectedOperationCount: selectedOperations.length,
@@ -925,6 +966,7 @@ export default function FactoryConsoleV2() {
         readOffset: 0,
         readLength: 256,
       });
+      setGatewayHealth("online");
       applyBatchSnapshot(accepted, catalog);
       setBatchCommandState("idle");
       if (terminalServerBatchStates.has(accepted.state)) return;
@@ -937,6 +979,7 @@ export default function FactoryConsoleV2() {
       });
     } catch (error) {
       endActivity();
+      setGatewayHealth(gatewayHealthFromError(error));
       setBatchCommandState("idle");
       const detail = error instanceof Error ? error.message : "Batch submission failed";
       setOperatorWarning(detail);
@@ -951,8 +994,10 @@ export default function FactoryConsoleV2() {
     appendLog(`[BAT] ABORT REQUESTED · ${activeBatchId}`, "WARN");
     try {
       const next = await cancelServerBatch(apiBase, activeBatchId);
+      setGatewayHealth("online");
       if (catalog) applyBatchSnapshot(next, catalog);
     } catch (error) {
+      setGatewayHealth(gatewayHealthFromError(error));
       appendLog(`[BAT] ABORT ERROR · ${error instanceof Error ? error.message : "unknown error"}`, "ERROR");
     } finally {
       setBatchCommandState("idle");
@@ -970,14 +1015,14 @@ export default function FactoryConsoleV2() {
       <section className="factoryConsoleShell">
         <header className="factoryConsoleHeader">
           <h1>{text.title}</h1>
-          <div className={`factoryProvider ${providerError ? "offline" : catalog ? "online" : "loading"}`}>
-            <i /><span>{providerError ? "OFFLINE" : catalog ? "Connected" : "Connecting"}</span><b>PMode</b>
+          <div className={`factoryProvider ${gatewayTone}`} aria-label="Factory communication health">
+            <i /><span>{gatewayLabel} · {ppuHealth.label}</span><b>PMode</b>
           </div>
         </header>
 
         {!catalog && (
           <section className="factoryConsoleNotice" role="status">
-            <b>{providerError ? text.offline : text.loading}</b>
+            <b>{gatewayHealth === "unreachable" ? text.gatewayUnreachable : providerError ? text.offline : text.loading}</b>
             {providerError && <span>{providerError}</span>}
           </section>
         )}

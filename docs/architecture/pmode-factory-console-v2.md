@@ -180,6 +180,33 @@ Only an explicit operator ABORT cancels the complete Batch. Failure to observe
 the Gateway itself remains a reconnecting observation state and cannot be used
 to infer Site failure or Job termination.
 
+## Communication health semantics
+
+The Factory Console must not compress Gateway reachability, Provider availability, and PPU readiness into one `Connected` flag. They are separate operational domains:
+
+```text
+Browser -> Gateway -> Engineering Provider -> selected PPU(s)
+```
+
+The header therefore exposes layered health such as:
+
+```text
+Gateway ONLINE · PPU 4/4 READY
+Gateway ONLINE · PPU 3/4 READY · DEGRADED
+Gateway UNREACHABLE · PPU UNKNOWN
+Gateway ONLINE · PPU UNAVAILABLE
+```
+
+Health state is derived from real requests already required by the workflow; PMode must not introduce a second periodic health-polling loop solely to drive the header.
+
+An HTTP response, including a structured `503 / E2001 / E2002` communication failure, proves that the Gateway responded. In that case Gateway state remains `ONLINE`, while the affected PPU observation becomes `DEGRADED`. A browser transport failure with no HTTP response is evidence that the Gateway path is currently `UNREACHABLE`; PPU readiness then becomes `UNKNOWN`, because the browser has no valid observation from which to infer PPU state.
+
+A successful catalog or Batch observation is also Gateway reachability evidence. Later request evidence supersedes older evidence, so a stale successful catalog load must not permanently keep the header green after a transport failure. Conversely, any later successful HTTP response restores Gateway state to `ONLINE`.
+
+PPU readiness is evaluated only for PPUs in the committed Production Set. Missing Sites, PPU status errors, or failed PPU communication make that PPU degraded; active communication retry is represented as loading/reconnecting rather than manufacturing failure. No committed PPU means `PPU —`.
+
+`START PROGRAMMING` is fail-closed when Gateway state is not `ONLINE` or selected PPU runtime is incomplete/degraded. Display semantics and execution readiness must not contradict each other.
+
 Program continues to mean write only. Verify remains an explicit operation.
 
 ## Shared UI boundary

@@ -50,6 +50,21 @@ function targetStatus(ppuId: string) {
 }
 
 async function installMockProvider(page: Page) {
+  await page.route("**/api/settings/gateway", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        gateway_settings: {
+          revision: 1,
+          ppu_request_timeout_ms: 10_000,
+          ppu_retry_count: 3,
+          ppu_response_budget_ms: 47_000,
+        },
+      }),
+    });
+  });
   await page.route("**/api/engineering/**", async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());

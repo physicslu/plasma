@@ -46,10 +46,11 @@ test("demo entry exposes only canonical Product Modes in top-level navigation", 
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
   await expectProductNavigation(page, "量產模式");
 
-  // Standard browser CI intentionally does not start the Python Mock PPU
-  // Provider. The Production route must still expose its explicit Mock
-  // provider status instead of falling back to the former Fleet BFF model.
-  await expect(page.getByRole("status")).toContainText(/Mock Provider/);
+  // Standard browser CI intentionally does not start the Python Gateway.
+  // A no-response transport failure must be reported as Gateway unreachable
+  // with unknown PPU state, not as a provider failure or the retired Fleet BFF.
+  await expect(page.getByLabel("Factory communication health")).toContainText("Gateway UNREACHABLE · PPU UNKNOWN");
+  await expect(page.getByRole("status")).toContainText("Plasma Web REST Gateway 無法連線。");
   await expect(page.getByText("Fleet BFF HTTP 503")).toHaveCount(0);
 
   await page.getByRole("navigation", { name: "產品模式" }).getByRole("link", { name: "工程模式", exact: true }).click();
