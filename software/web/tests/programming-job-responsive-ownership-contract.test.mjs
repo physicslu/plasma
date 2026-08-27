@@ -2,36 +2,42 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
+const component = fs.readFileSync(new URL("../app/operator-ui/programming-job-panel.tsx", import.meta.url), "utf8");
 const shared = fs.readFileSync(new URL("../app/operator-ui/programming-job-controls.css", import.meta.url), "utf8");
 const refresh = fs.readFileSync(new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url), "utf8");
 const density = fs.readFileSync(new URL("../app/engineering/engineering-density.css", import.meta.url), "utf8");
 const readability = fs.readFileSync(new URL("../app/engineering/engineering-readability.css", import.meta.url), "utf8");
+const alignment = fs.readFileSync(new URL("../app/engineering/engineering-alignment.css", import.meta.url), "utf8");
 const v2 = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.css", import.meta.url), "utf8");
 
-test("shared Programming Job contract owns one PMode-derived desktop composition", () => {
-  assert.match(shared, /\.factoryActionBar,[\s\S]*\.engineeringProgrammingV2 \.programmingJobCard \.programmingActions/);
-  assert.match(shared, /grid-template-columns:\s*minmax\(0, 1fr\) 160px minmax\(0, 1fr\)/);
-  assert.match(shared, /\.factoryBatchStatus,[\s\S]*\.engineeringProgrammingV2 \.programmingJobCard \.batchReadiness/);
-  assert.match(shared, /height:\s*34px/);
-  assert.match(shared, /width:\s*14px/);
-  assert.match(shared, /min-height:\s*38px/);
+test("shared Programming Job has one real three-child action composition", () => {
+  assert.match(component, /className="programmingJobActionBar"/);
+  assert.equal((component.match(/data-programming-job-action=/g) ?? []).length, 3);
+  const start = component.indexOf('data-programming-job-action="start"');
+  const status = component.indexOf('data-programming-job-action="status"');
+  const abort = component.indexOf('data-programming-job-action="abort"');
+  assert.ok(start < status && status < abort);
+
+  assert.match(shared, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 160px minmax\(0, 1fr\)/);
+  assert.doesNotMatch(shared, /\.programmingJobStatus\s*\{[\s\S]*position:\s*absolute/);
+  assert.doesNotMatch(shared, /transform:\s*translateX/);
 });
 
-test("Engineering responsive layers cannot reintroduce a second operation/action presentation", () => {
-  assert.doesNotMatch(refresh, /\.programmingBatchOperations \.operationChecks\s*\{/);
-  assert.doesNotMatch(refresh, /\.programmingBatchOperations \.operationChecks label\s*\{/);
-  assert.doesNotMatch(refresh, /\.programmingActions\s*button\s*\{/);
-  assert.doesNotMatch(refresh, /\.programmingJobBody\s*>\s*\.batchReadiness\s*\{/);
-  assert.doesNotMatch(refresh, /grid-template-columns:\s*minmax\(0, 1fr\) minmax\(140px, \.55fr\)/);
+test("shared Programming Job fields cannot switch to a mode-local desktop composition", () => {
+  assert.match(shared, /\.programmingJobGrid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);
+  assert.match(shared, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*128px minmax\(0, 1fr\)/);
 
-  assert.doesNotMatch(readability, /\.programmingBatchOperations \.operationChecks label/);
-  assert.doesNotMatch(readability, /\.programmingActions button/);
-  assert.doesNotMatch(readability, /\.batchReadiness\s*\{/);
+  for (const source of [refresh, density, readability, alignment, v2]) {
+    assert.doesNotMatch(source, /\.programmingJobGrid\b/);
+    assert.doesNotMatch(source, /\.programmingJobField\b/);
+    assert.doesNotMatch(source, /\.programmingJobActionBar\b/);
+    assert.doesNotMatch(source, /\.programmingJobStatus\b/);
+    assert.doesNotMatch(source, /\.programmingJobOperationChecks\b/);
+    assert.doesNotMatch(source, /\.programmingJobPolicyControls\b/);
+  }
+});
 
-  assert.doesNotMatch(density, /> \.batchReadiness\s*\{/);
-  assert.doesNotMatch(density, /grid-template-columns:\s*minmax\(0, 1fr\) 180px minmax\(0, 1fr\)/);
-  assert.doesNotMatch(density, /> \.programmingActions > button/);
-
-  assert.doesNotMatch(v2, /\.batchReadiness\s*\{/);
-  assert.doesNotMatch(v2, /\.programmingActions\s*\{/);
+test("mobile stacking remains owned by the shared component stylesheet", () => {
+  assert.match(shared, /@media \(max-width:\s*760px\)[\s\S]*\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*1fr/);
+  assert.match(shared, /@media \(max-width:\s*760px\)[\s\S]*\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*1fr/);
 });
