@@ -9,6 +9,7 @@ export default defineConfig({
     "engineering-programming-asset-cache-runtime.spec.ts",
     "production-multi-ppu-runtime.spec.ts",
     "mock-runtime-settings-runtime.spec.ts",
+    "programming-job-real-stack-parity.spec.ts",
   ],
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
