@@ -18,6 +18,7 @@ class DurableProvider:
         self.start_calls: list[str] = []
         self.cancel_calls: list[str] = []
         self.cancel_completes_after = 1
+        self.status_failures_remaining = 0
         self._lock = threading.RLock()
 
     def catalog(self):
@@ -53,6 +54,9 @@ class DurableProvider:
         if job_id is None:
             return {"ok": True, "sites": []}
         with self._lock:
+            if self.status_failures_remaining > 0:
+                self.status_failures_remaining -= 1
+                raise TimeoutError("simulated recovery observation timeout")
             job = self.jobs.get(job_id)
             if job is None:
                 raise PlasmaError(ErrorCode.JOB_NOT_FOUND, f"Job not found: {job_id}")
@@ -120,6 +124,7 @@ class BatchStateStoreTests(unittest.TestCase):
             recovered = store.load_recoverable()
             self.assertEqual([item.batch_id for item in recovered], ["batch-test"])
             self.assertEqual(recovered[0].spec["operations"], ["erase"])
+            self.assertEqual(store.load_batch("batch-test").batch_id, "batch-test")
             store.close()
 
 
@@ -166,6 +171,31 @@ class PersistentBatchRuntimeTests(unittest.TestCase):
         self.assertEqual(self.provider.start_calls, [job_id])
         recovered.close(timeout_s=1.0)
 
+    def test_ambiguous_submission_is_reconciled_by_durable_job_id(self):
+        manager, batch_id, job_id = self.start_one_erase()
+        manager.close(timeout_s=1.0)
+        store = BatchStateStore(self.state_path)
+        store.update_job(batch_id, job_id, phase="submitting")
+        store.close()
+        self.provider.complete(job_id)
+
+        recovered = self.new_manager()
+        wait_until(lambda: recovered.get(batch_id)["state"] == "success")
+        self.assertEqual(self.provider.start_calls, [job_id])
+        recovered.close(timeout_s=1.0)
+
+    def test_recovery_status_uses_gateway_retry_without_resubmitting(self):
+        manager, batch_id, job_id = self.start_one_erase()
+        manager.close(timeout_s=1.0)
+        self.provider.complete(job_id)
+        self.provider.status_failures_remaining = 2
+
+        recovered = self.new_manager()
+        wait_until(lambda: recovered.get(batch_id)["state"] == "success")
+        self.assertEqual(self.provider.status_failures_remaining, 0)
+        self.assertEqual(self.provider.start_calls, [job_id])
+        recovered.close(timeout_s=1.0)
+
     def test_terminal_job_ledger_advances_cursor_without_resubmitting(self):
         manager, batch_id, job_id = self.start_one_erase()
         manager.close(timeout_s=1.0)
@@ -199,6 +229,20 @@ class PersistentBatchRuntimeTests(unittest.TestCase):
         self.assertGreaterEqual(self.provider.cancel_calls.count(job_id), 2)
         self.assertEqual(self.provider.start_calls, [job_id])
         recovered.close(timeout_s=1.0)
+
+    def test_terminal_batch_remains_queryable_and_cancel_is_idempotent_after_restart(self):
+        manager, batch_id, job_id = self.start_one_erase()
+        self.provider.complete(job_id)
+        wait_until(lambda: manager.get(batch_id)["state"] == "success")
+        manager.close(timeout_s=1.0)
+
+        restarted = self.new_manager()
+        historical = restarted.get(batch_id)
+        self.assertEqual(historical["state"], "success")
+        self.assertNotIn("_recovery", historical)
+        self.assertEqual(restarted.cancel(batch_id)["state"], "success")
+        self.assertEqual(self.provider.start_calls, [job_id])
+        restarted.close(timeout_s=1.0)
 
     def test_accepted_job_missing_after_restart_fails_closed(self):
         manager, batch_id, job_id = self.start_one_erase()
