@@ -220,7 +220,7 @@ Standalone/local inline Program/Verify may submit one materialized Asset directl
 
 The Gateway validates the Asset and normalizes it before creating the wire-level `JobRequest.image`.
 
-A direct REST Job may optionally declare an execution-owner token:
+A direct REST Job may declare an execution-owner token:
 
 ```json
 {
@@ -230,9 +230,11 @@ A direct REST Job may optionally declare an execution-owner token:
 }
 ```
 
-For Engineering routes the Gateway maps that token to `execution_owner_kind=engineering_session`; for the standalone REST path it maps to `rest_client`. The token is a concurrency label only and is **not** an authenticated security identity. Authentication/authorization remains a separate security requirement.
+The current Web `startJob()` client automatically supplies one random page-instance token and reuses it for direct Jobs issued from that loaded Browser page. This lets an existing direct multi-Site workflow express one logical execution owner while another Browser page or PC receives a different owner. A page reload creates a new token; it does not inherit ownership from Jobs that may still be active.
 
-If a REST Job omits `execution_owner_id`, the fixed Gateway process labels (`plasma-web`, `plasma-web-engineering`) are not trusted as client identity. The PPU fails closed by treating each such Job as a separate `rest_job` owner. Multi-Site Web production execution should use the server-side Batch API, where immutable `batch_id` is the shared owner identity.
+For Engineering routes the Gateway currently maps an explicit token to `execution_owner_kind=engineering_session`; for the standalone REST path it maps to `rest_client`. These names are execution-source labels only. The token is a concurrency label and is **not** an authenticated security identity or authorization credential. Authentication/authorization remains a separate security requirement.
+
+If a raw REST Job omits `execution_owner_id`, the fixed Gateway process labels (`plasma-web`, `plasma-web-engineering`) are not trusted as client identity. The PPU fails closed by treating each such Job as a separate `rest_job` owner. Server-side PMode/EMode Batch execution uses immutable `batch_id` as its shared owner and does not depend on the Browser page token.
 
 ## PPU execution ownership conflict
 
