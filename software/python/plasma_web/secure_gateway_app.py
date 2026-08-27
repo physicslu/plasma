@@ -24,7 +24,7 @@ def _required_path_from_env(name: str) -> Path:
 
 def _require_owner_only_file(path: Path, *, label: str) -> None:
     try:
-        mode = stat.S_IMODE(path.stat().st_mode)
+        metadata = path.stat()
     except OSError as exc:
         raise PlasmaError(
             ErrorCode.CONFIG_INVALID,
@@ -33,6 +33,12 @@ def _require_owner_only_file(path: Path, *, label: str) -> None:
         ) from exc
     if not path.is_file():
         raise PlasmaError(ErrorCode.CONFIG_INVALID, f"{label} must be a regular file: {path}")
+    if hasattr(os, "geteuid") and metadata.st_uid != os.geteuid():
+        raise PlasmaError(
+            ErrorCode.CONFIG_INVALID,
+            f"{label} must be owned by the Gateway process user: {path}",
+        )
+    mode = stat.S_IMODE(metadata.st_mode)
     if mode & 0o077:
         raise PlasmaError(
             ErrorCode.CONFIG_INVALID,
@@ -41,10 +47,26 @@ def _require_owner_only_file(path: Path, *, label: str) -> None:
         )
 
 
+def _validate_existing_security_state(path: Path) -> None:
+    for candidate, label in (
+        (path, "Gateway security state"),
+        (Path(f"{path}-wal"), "Gateway security state WAL"),
+        (Path(f"{path}-shm"), "Gateway security state shared memory"),
+    ):
+        if candidate.exists():
+            _require_owner_only_file(candidate, label=label)
+
+
 def load_security_controller_from_env() -> GatewaySecurityController:
     config_path = _required_path_from_env(SECURITY_CONFIG_ENV)
     state_path = _required_path_from_env(SECURITY_STATE_ENV)
+    if config_path == state_path:
+        raise PlasmaError(
+            ErrorCode.CONFIG_INVALID,
+            "Gateway security config and state paths must be different files",
+        )
     _require_owner_only_file(config_path, label="Gateway security config")
+    _validate_existing_security_state(state_path)
     state_path.parent.mkdir(parents=True, exist_ok=True)
 
     previous_umask = os.umask(0o077)
@@ -53,8 +75,9 @@ def load_security_controller_from_env() -> GatewaySecurityController:
     finally:
         os.umask(previous_umask)
 
-    if state_path.exists():
-        state_path.chmod(0o600)
+    for candidate in (state_path, Path(f"{state_path}-wal"), Path(f"{state_path}-shm")):
+        if candidate.exists():
+            candidate.chmod(0o600)
     return controller
 
 
