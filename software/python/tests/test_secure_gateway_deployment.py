@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from plasma_core.errors import ErrorCode, PlasmaError
+import plasma_web.secure_gateway_app as secure_gateway_app
 from plasma_web.secure_gateway_app import (
     DeployedSecurePlasmaWebHandler,
     load_security_controller_from_env,
@@ -116,6 +117,31 @@ def test_secure_launcher_creates_owner_only_state(
         assert os.stat(state_path).st_mode & 0o077 == 0
     finally:
         controller.close()
+
+
+def test_secure_launcher_keeps_gateway_created_material_owner_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "security.yaml"
+    state_path = tmp_path / "security-state.sqlite3"
+    output_path = tmp_path / "readback.bin"
+    _write_config(config_path)
+    monkeypatch.setenv("PLASMA_SECURITY_CONFIG", str(config_path))
+    monkeypatch.setenv("PLASMA_SECURITY_STATE", str(state_path))
+    original_handler = secure_gateway_app.gateway.PlasmaWebHandler
+
+    def fake_gateway_main() -> None:
+        assert secure_gateway_app.gateway.PlasmaWebHandler is DeployedSecurePlasmaWebHandler
+        output_path.write_bytes(b"target-readback")
+
+    monkeypatch.setattr(secure_gateway_app.gateway, "main", fake_gateway_main)
+    secure_gateway_app.main()
+
+    assert output_path.is_file()
+    assert os.stat(output_path).st_mode & 0o077 == 0
+    assert secure_gateway_app.gateway.PlasmaWebHandler is original_handler
+    assert DeployedSecurePlasmaWebHandler.security_controller is None
 
 
 def test_deployed_secure_handler_exposes_auth_cors_and_enforces_write_boundary(
