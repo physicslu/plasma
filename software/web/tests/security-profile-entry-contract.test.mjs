@@ -5,6 +5,7 @@ import test from "node:test";
 const entry = readFileSync(new URL("../app/demo/page.tsx", import.meta.url), "utf8");
 const profile = readFileSync(new URL("../app/security-profile.ts", import.meta.url), "utf8");
 const transport = readFileSync(new URL("../app/security-transport.ts", import.meta.url), "utf8");
+const provider = readFileSync(new URL("../app/security-transport-provider.tsx", import.meta.url), "utf8");
 
 
 test("entry exposes the four expected test profiles without making them authority", () => {
@@ -22,6 +23,15 @@ test("security identity is fetched from the authenticated backend boundary", () 
   assert.match(transport, /"\/api\/security"/);
   assert.match(entry, /getSecurityPrincipal\(apiBase\)/);
   assert.match(entry, /setSecurityBearerToken\(tokenDraft\)/);
+});
+
+
+test("demo entry is the single credential owner while other routes retain global AUTH", () => {
+  assert.match(provider, /usePathname\(\)/);
+  assert.match(provider, /entryOwnsCredential = pathname === "\/demo"/);
+  assert.match(provider, /state\.securityDetected && !entryOwnsCredential/);
+  assert.match(entry, /\}, \[apiBase, hydrated\]\);/);
+  assert.doesNotMatch(entry, /\[apiBase, hydrated, transport\.credentialRevision\]/);
 });
 
 
