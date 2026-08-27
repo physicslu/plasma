@@ -94,6 +94,16 @@ class BatchStateStore:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, f"Persisted {label} must be an object")
         return value
 
+    @classmethod
+    def _stored_batch(cls, row: sqlite3.Row) -> StoredBatch:
+        return StoredBatch(
+            batch_id=str(row["batch_id"]),
+            spec=cls._object(str(row["spec_json"]), "Batch spec"),
+            snapshot=cls._object(str(row["snapshot_json"]), "Batch snapshot"),
+            asset_data=bytes(row["asset_blob"]) if row["asset_blob"] is not None else None,
+            updated_at=str(row["updated_at"]),
+        )
+
     def _migrate(self) -> None:
         version = int(self._connection.execute("PRAGMA user_version").fetchone()[0])
         if version == 0:
@@ -261,6 +271,18 @@ class BatchStateStore:
                 )
             self._connection.commit()
 
+    def load_batch(self, batch_id: str) -> StoredBatch | None:
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT batch_id, spec_json, snapshot_json, asset_blob, updated_at
+                FROM batches
+                WHERE batch_id = ?
+                """,
+                (batch_id,),
+            ).fetchone()
+        return self._stored_batch(row) if row is not None else None
+
     def load_recoverable(self) -> list[StoredBatch]:
         with self._lock:
             rows = self._connection.execute(
@@ -271,16 +293,7 @@ class BatchStateStore:
                 ORDER BY created_at ASC
                 """
             ).fetchall()
-        return [
-            StoredBatch(
-                batch_id=str(row["batch_id"]),
-                spec=self._object(str(row["spec_json"]), "Batch spec"),
-                snapshot=self._object(str(row["snapshot_json"]), "Batch snapshot"),
-                asset_data=bytes(row["asset_blob"]) if row["asset_blob"] is not None else None,
-                updated_at=str(row["updated_at"]),
-            )
-            for row in rows
-        ]
+        return [self._stored_batch(row) for row in rows]
 
     def load_jobs(self, batch_id: str) -> list[StoredBatchJob]:
         with self._lock:
