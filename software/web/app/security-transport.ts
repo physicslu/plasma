@@ -5,7 +5,12 @@ type SecurityTransportState = {
 
 type Listener = () => void;
 
+type SecurityErrorPayload = {
+  error?: { error_code?: string };
+};
+
 const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_PLASMA_API_URL ?? "https://plasma.open4th.com";
+const MAX_AMBIGUOUS_COMMANDS = 256;
 const listeners = new Set<Listener>();
 const ambiguousCommandIds = new Map<string, string>();
 let bearerToken: string | null = null;
@@ -61,12 +66,18 @@ export function clearSecurityBearerToken(): void {
   emit();
 }
 
+function savedGatewayApiBase(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem("plasma-api-base");
+  } catch {
+    return null;
+  }
+}
+
 function configuredGatewayOrigins(): Set<string> {
   const origins = new Set<string>();
-  for (const candidate of [
-    DEFAULT_API_BASE,
-    typeof window !== "undefined" ? window.localStorage.getItem("plasma-api-base") : null,
-  ]) {
+  for (const candidate of [DEFAULT_API_BASE, savedGatewayApiBase()]) {
     if (!candidate) continue;
     try {
       origins.add(new URL(candidate).origin);
@@ -97,6 +108,18 @@ function commandIdentity(url: URL, method: string, init?: RequestInit): string {
   return `${method}\n${url.toString()}\n${body}`;
 }
 
+function commandIdFor(identity: string): string {
+  const existing = ambiguousCommandIds.get(identity);
+  if (existing) return existing;
+  if (ambiguousCommandIds.size >= MAX_AMBIGUOUS_COMMANDS) {
+    const oldest = ambiguousCommandIds.keys().next().value as string | undefined;
+    if (oldest) ambiguousCommandIds.delete(oldest);
+  }
+  const commandId = `browser-${window.crypto.randomUUID()}`;
+  ambiguousCommandIds.set(identity, commandId);
+  return commandId;
+}
+
 function isStateChanging(method: string): boolean {
   return !["GET", "HEAD", "OPTIONS"].includes(method);
 }
@@ -107,6 +130,16 @@ function mergedHeaders(input: RequestInfo | URL, init?: RequestInit): Headers {
     new Headers(init.headers).forEach((value, key) => headers.set(key, value));
   }
   return headers;
+}
+
+async function shouldRetainCommandIdentity(response: Response): Promise<boolean> {
+  if (response.status !== 409) return false;
+  try {
+    const payload = await response.clone().json() as SecurityErrorPayload;
+    return payload.error?.error_code === "E4104";
+  } catch {
+    return false;
+  }
 }
 
 function responseFilename(response: Response, fallback: string): string {
@@ -150,9 +183,7 @@ export function installSecurityTransport(): () => void {
     let identity: string | null = null;
     if (isStateChanging(method) && !headers.has("Idempotency-Key")) {
       identity = commandIdentity(url, method, init);
-      const commandId = ambiguousCommandIds.get(identity) ?? `browser-${window.crypto.randomUUID()}`;
-      ambiguousCommandIds.set(identity, commandId);
-      headers.set("Idempotency-Key", commandId);
+      headers.set("Idempotency-Key", commandIdFor(identity));
     }
 
     const nextInit: RequestInit = { ...init, headers };
@@ -171,7 +202,9 @@ export function installSecurityTransport(): () => void {
         authenticationRequired = false;
         emit();
       }
-      if (identity && response.status !== 409) ambiguousCommandIds.delete(identity);
+      if (identity && !(await shouldRetainCommandIdentity(response))) {
+        ambiguousCommandIds.delete(identity);
+      }
       return response;
     } catch (error) {
       // Keep the same command identity after an ambiguous transport failure.
@@ -183,8 +216,15 @@ export function installSecurityTransport(): () => void {
 
   const onClick = (event: MouseEvent) => {
     const anchor = outputDownloadAnchor(event.target);
-    if (!anchor || !bearerToken) return;
+    if (!anchor) return;
     event.preventDefault();
+    if (!bearerToken) {
+      if (!authenticationRequired) {
+        authenticationRequired = true;
+        emit();
+      }
+      return;
+    }
     const url = new URL(anchor.href, window.location.href);
     void wrappedFetch(url.toString(), { method: "GET" })
       .then(async response => {
