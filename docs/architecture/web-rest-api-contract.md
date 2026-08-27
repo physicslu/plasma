@@ -21,6 +21,50 @@ rest_contract_version = "3"
 
 `GET /api/node` publishes `rest_contract_version` independently from the fleet `contract_version`.
 
+## Remote-write security contract
+
+The backend secure REST boundary is implemented by `SecurePlasmaWebHandler`. Its deployment/browser activation is still pending; the current `plasma_web.gateway` entry point remains unchanged until identity transport and deployment configuration are completed.
+
+When the secure boundary is active, protected requests authenticate a canonical Principal using:
+
+```text
+Authorization: Bearer <high-entropy-credential>
+```
+
+Authorization is permission-based and resource-scoped over Facility / PPU / Site. Role names such as `viewer`, `operator`, `engineer`, `admin`, and `service` are permission bundles rather than route-specific role checks.
+
+Viewer is information read-only. In particular:
+
+```text
+GET status / Batch information = read-only information access
+IC READ operation              = ppu.read execution permission
+```
+
+IC Read is not a Viewer permission because it drives hardware, consumes execution capacity, and can expose target contents.
+
+State-changing requests under the secure boundary also require a durable command identity:
+
+```text
+Idempotency-Key: <command-id>
+```
+
+The server persists `principal_id + command_id` before execution. An identical completed retry returns the persisted HTTP response without executing the physical command again. Reusing the same key for a different request is rejected; a command whose admission remains in progress/ambiguous is fail-closed rather than blindly reissued.
+
+Canonical security errors are:
+
+```text
+HTTP 401  E4101 AUTHENTICATION_REQUIRED
+HTTP 403  E4102 AUTHORIZATION_DENIED
+HTTP 409  E4103 COMMAND_REPLAY_CONFLICT
+HTTP 409  E4104 COMMAND_IN_PROGRESS
+```
+
+Authentication must precede protected Provider/PPU resource lookup. Missing/invalid credentials do not create durable SQLite audit writes; this prevents unauthenticated traffic from turning `synchronous=FULL` audit persistence into microSD write amplification. Authenticated authorization denials and admitted command lifecycle events are durable-audited.
+
+Browser CORS transport for `Authorization` and `Idempotency-Key`, standalone Zynq credential provisioning, optional Cloudflare/OIDC identity bridging, and deployment activation are intentionally deferred to the identity-integration slice. Until that wiring is active, the security boundary is not claimed as a deployed protection for the current Gateway entry point.
+
+See [Remote Write Security Boundary](remote-write-security-boundary.md).
+
 ## Gateway communication settings
 
 PMode and EMode share one persistent Gateway policy resource:
@@ -232,7 +276,7 @@ A direct REST Job may declare an execution-owner token:
 
 The current Web `startJob()` client automatically supplies one random page-instance token and reuses it for direct Jobs issued from that loaded Browser page. This lets an existing direct multi-Site workflow express one logical execution owner while another Browser page or PC receives a different owner. A page reload creates a new token; it does not inherit ownership from Jobs that may still be active.
 
-For Engineering routes the Gateway currently maps an explicit token to `execution_owner_kind=engineering_session`; for the standalone REST path it maps to `rest_client`. These names are execution-source labels only. The token is a concurrency label and is **not** an authenticated security identity or authorization credential. Authentication/authorization remains a separate security requirement.
+For Engineering routes the Gateway currently maps an explicit token to `execution_owner_kind=engineering_session`; for the standalone REST path it maps to `rest_client`. These names are execution-source labels only. The token is a concurrency label and is **not** an authenticated security identity or authorization credential.
 
 If a raw REST Job omits `execution_owner_id`, the fixed Gateway process labels (`plasma-web`, `plasma-web-engineering`) are not trusted as client identity. The PPU fails closed by treating each such Job as a separate `rest_job` owner. Server-side PMode/EMode Batch execution uses immutable `batch_id` as its shared owner and does not depend on the Browser page token.
 
