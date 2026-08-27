@@ -23,10 +23,13 @@ On first enable the helper:
 3. stores only the SHA-256 token digest in YAML;
 4. prints the plaintext token once to the terminal;
 5. configures `~/.local/state/plasma/security-state.sqlite3` as the durable command/audit store;
-6. installs a `plasma-web.service.d/security.conf` user-systemd drop-in;
-7. restarts `plasma-web.service` through `plasma_web.secure_gateway_app`.
+6. tightens existing Gateway output / Programming Image / readback material so group/other permissions are removed;
+7. installs a `plasma-web.service.d/security.conf` user-systemd drop-in;
+8. restarts `plasma-web.service` through `plasma_web.secure_gateway_app`.
 
 The launcher fails closed when the security config or an existing SQLite state/WAL/SHM file is not owned by the Gateway process user or is readable/writable by group/other users. Config and state paths must be different files.
+
+The secure launcher keeps process `umask 077` for the Gateway lifetime so newly-created Programming Image material, Readback files, logs and security state are private by default. The deployment helper also hardens already-existing output material before secure mode starts.
 
 The plaintext token is intentionally **not** written to the repository, deployment config, localStorage or sessionStorage.
 
@@ -50,6 +53,8 @@ AUTH READY    credential loaded in browser memory
 This detection rule is part of the rollback boundary: an ordinary non-secure Gateway keeps its existing request/CORS behavior and does not receive `Authorization` or `Idempotency-Key` headers from this transport.
 
 Enter the Bearer token through the masked password dialog. The token remains only in JavaScript memory and is cleared by a full browser reload.
+
+The external security store exposes a stable browser snapshot. Loading, replacing or clearing a credential advances an in-memory credential revision. Engineering sessions are bound to that revision, so a new credential cannot inherit the previous Principal's Engineering session. When a valid token is entered after `E4101`, Engineering initialization is retriggered automatically rather than requiring a manual Retry or page reload.
 
 Once secure mode has been detected, Plasma Gateway requests:
 
@@ -101,9 +106,10 @@ Browser smoke test:
 1. load PMode or EMode without a token and confirm a protected call returns authentication required;
 2. confirm the `AUTH REQUIRED` control appears only after that `E4101` response;
 3. load the local-admin token using the masked AUTH dialog;
-4. confirm status, Batch and direct Job operations work;
+4. confirm Engineering automatically reconnects and status, Batch and direct Job operations work without manual Retry;
 5. perform one Read operation and download its BIN output through the authenticated download path;
-6. reload the page and confirm the credential is gone; the page redetects secure mode from `E4101` rather than from persisted browser state.
+6. replace the credential and confirm Engineering creates a fresh credential-bound session rather than reusing the previous Principal's session;
+7. reload the page and confirm the credential is gone; the page redetects secure mode from `E4101` rather than from persisted browser state.
 
 ## Roll back
 
