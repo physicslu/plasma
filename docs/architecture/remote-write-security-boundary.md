@@ -22,6 +22,8 @@ execution
 
 PMode and EMode are workflow/UI concepts. They are not authorization boundaries. A caller using direct REST or curl must receive the same authorization decision as a browser.
 
+The secure handler also treats unknown `/api` routes as denied rather than inheriting a newly-added canonical route without an explicit authorization rule. This prevents future Gateway route growth from silently creating an authentication/authorization bypass.
+
 ## Principal and permission model
 
 The backend authorizes permissions, not role-name branches. Roles are only predefined permission bundles.
@@ -88,13 +90,15 @@ A principal that may start Batches but lacks `ppu.program` cannot use Batch as a
 
 ## Resource scopes
 
-Each principal has one or more scopes over:
+Each principal must declare one or more explicit scopes over:
 
 ```text
 Facility
   └─ PPU
       └─ Site
 ```
+
+Omitting `scopes` is a configuration error. The security config never turns a missing scope into an implicit global grant.
 
 `*` means all resources at that level. Site scopes can be an explicit list.
 
@@ -108,6 +112,12 @@ scopes:
 ```
 
 The permission and resource scope must both pass.
+
+Scopes are hierarchical. A Site-limited scope identifies its containing PPU as an addressable parent resource so the caller can use PPU-level metadata and shared resources required by its authorized Sites, such as the Programming Asset cache. This does **not** grant execution access to sibling Sites: every Site execution command is still checked against the exact normalized Site ID.
+
+Any PPU-level response that contains Site-level state is filtered at the secure boundary. For example, `GET /api/status` may address the parent PPU, but a principal scoped to Sites 1 and 2 receives only Sites 1 and 2 in the returned Site list. Likewise, the Engineering target catalog is filtered to Facilities/PPUs that intersect the caller's scope.
+
+Security resource parsing uses the same canonical Site parser as the inherited Gateway routes. Decimal string Site IDs such as `"3"` are normalized before authorization, so a caller cannot bypass Site scope by changing the JSON representation from integer `3` to string `"3"`.
 
 ## Authentication credential boundary
 
