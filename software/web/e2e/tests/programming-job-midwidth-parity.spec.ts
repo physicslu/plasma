@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -86,77 +86,74 @@ async function installMockProvider(page: Page) {
   });
 }
 
-async function presentation(page: Page, selector: string) {
-  return page.locator(selector).first().evaluate(element => {
-    const style = getComputedStyle(element);
+async function actionOrder(panel: Locator) {
+  return panel.locator(":scope [data-programming-job-actions] > [data-programming-job-action]").evaluateAll(elements =>
+    elements.map(element => element.getAttribute("data-programming-job-action")),
+  );
+}
+
+async function fieldOrder(panel: Locator) {
+  return panel.locator(":scope [data-programming-job-fields] > [data-programming-job-field]").evaluateAll(elements =>
+    elements.map(element => element.getAttribute("data-programming-job-field")),
+  );
+}
+
+async function controlPresentation(panel: Locator) {
+  return panel.evaluate(element => {
+    const read = (selector: string) => {
+      const target = element.querySelector<HTMLElement>(selector);
+      if (!target) throw new Error(`missing ${selector}`);
+      const style = getComputedStyle(target);
+      return {
+        minHeight: style.minHeight,
+        padding: style.padding,
+        radius: style.borderRadius,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        position: style.position,
+      };
+    };
     return {
-      height: style.height,
-      minHeight: style.minHeight,
-      padding: style.padding,
-      border: style.border,
-      radius: style.borderRadius,
-      background: style.backgroundImage === "none" ? style.backgroundColor : style.backgroundImage,
-      color: style.color,
-      fontSize: style.fontSize,
-      fontWeight: style.fontWeight,
-      display: style.display,
+      operation: read(".programmingJobOperationChecks label"),
+      checkbox: read(".programmingJobOperationChecks input"),
+      start: read('[data-programming-job-action="start"]'),
+      status: read('[data-programming-job-action="status"]'),
+      abort: read('[data-programming-job-action="abort"]'),
     };
   });
 }
 
-test("PMode and EMode keep one Programming Job control presentation through the 761-980px container range", async ({ page }) => {
-  await page.setViewportSize({ width: 1200, height: 900 });
-  await page.addInitScript(() => sessionStorage.clear());
-  await installMockProvider(page);
+for (const width of [1200, 1680]) {
+  test(`PMode and EMode render one shared Programming Job structure at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.addInitScript(() => sessionStorage.clear());
+    await installMockProvider(page);
 
-  await page.goto("/fleet");
-  await expect(page.locator(".factoryOperationChecks label").first()).toBeVisible();
+    await page.goto("/fleet");
+    const pPanel = page.getByRole("region", { name: "Production Programming Job" });
+    await expect(pPanel).toBeVisible();
+    expect(await fieldOrder(pPanel)).toEqual(["target", "image", "operations", "policy"]);
+    expect(await actionOrder(pPanel)).toEqual(["start", "status", "abort"]);
+    const pPresentation = await controlPresentation(pPanel);
 
-  const pOperation = await presentation(page, ".factoryOperationChecks label");
-  const pCheckbox = await presentation(page, ".factoryOperationChecks input");
-  const pStart = await presentation(page, ".factoryStartButton");
-  const pAbort = await presentation(page, ".factoryAbortButton");
-  const pStatus = await presentation(page, ".factoryBatchStatus");
+    await page.goto("/engineering");
+    await page.locator(".engineeringWorkspace nav button").nth(2).click();
+    const ePanel = page.getByRole("region", { name: "Engineering Programming Job" });
+    await expect(ePanel).toBeVisible();
+    expect(await fieldOrder(ePanel)).toEqual(["target", "image", "operations", "policy"]);
+    expect(await actionOrder(ePanel)).toEqual(["start", "status", "abort"]);
+    const ePresentation = await controlPresentation(ePanel);
 
-  await page.goto("/engineering");
-  await page.locator(".engineeringWorkspace nav button").nth(2).click();
-  await expect(page.locator(".programmingBatchOperations .operationChecks label").first()).toBeVisible();
+    expect(ePresentation).toEqual(pPresentation);
+    expect(ePresentation.status.position).toBe("static");
 
-  const container = await page.locator(".engineeringProgrammingV2").boundingBox();
-  expect(container).not.toBeNull();
-  expect(container!.width).toBeGreaterThan(760);
-  expect(container!.width).toBeLessThanOrEqual(980);
-
-  expect(await presentation(page, ".programmingBatchOperations .operationChecks label")).toEqual(pOperation);
-  expect(await presentation(page, ".programmingBatchOperations .operationChecks input")).toEqual(pCheckbox);
-  expect(await presentation(page, ".programmingActions .startProgramming")).toEqual(pStart);
-  expect(await presentation(page, ".programmingActions .abortProgramming")).toEqual(pAbort);
-
-  /* Status tone may differ because each mode can be in a different semantic
-     state. Geometry and typography are the cross-mode invariant. */
-  const eStatus = await presentation(page, ".batchReadiness");
-  expect(eStatus.height).toBe(pStatus.height);
-  expect(eStatus.minHeight).toBe(pStatus.minHeight);
-  expect(eStatus.padding).toBe(pStatus.padding);
-  expect(eStatus.radius).toBe(pStatus.radius);
-  expect(eStatus.fontSize).toBe(pStatus.fontSize);
-  expect(eStatus.fontWeight).toBe(pStatus.fontWeight);
-  expect(eStatus.display).toBe(pStatus.display);
-
-  const actions = await page.locator(".programmingActions").boundingBox();
-  const start = await page.locator(".programmingActions .startProgramming").boundingBox();
-  const readiness = await page.locator(".batchReadiness").boundingBox();
-  const abort = await page.locator(".programmingActions .abortProgramming").boundingBox();
-  for (const box of [actions, start, readiness, abort]) expect(box).not.toBeNull();
-
-  expect(Math.abs(start!.width - abort!.width)).toBeLessThanOrEqual(2);
-  expect(Math.abs(readiness!.width - 160)).toBeLessThanOrEqual(2);
-  expect(start!.x + start!.width).toBeLessThan(readiness!.x);
-  expect(readiness!.x + readiness!.width).toBeLessThan(abort!.x);
-
-  const centerY = (box: NonNullable<typeof start>) => box.y + box.height / 2;
-  expect(Math.abs(centerY(start!) - centerY(readiness!))).toBeLessThanOrEqual(2);
-  expect(Math.abs(centerY(abort!) - centerY(readiness!))).toBeLessThanOrEqual(2);
-  expect(Math.abs(start!.x - actions!.x)).toBeLessThanOrEqual(2);
-  expect(Math.abs((abort!.x + abort!.width) - (actions!.x + actions!.width))).toBeLessThanOrEqual(2);
-});
+    const actionBar = ePanel.locator("[data-programming-job-actions]");
+    const start = await actionBar.locator('[data-programming-job-action="start"]').boundingBox();
+    const statusBox = await actionBar.locator('[data-programming-job-action="status"]').boundingBox();
+    const abort = await actionBar.locator('[data-programming-job-action="abort"]').boundingBox();
+    for (const box of [start, statusBox, abort]) expect(box).not.toBeNull();
+    expect(Math.abs(statusBox!.width - 160)).toBeLessThanOrEqual(2);
+    expect(start!.x + start!.width).toBeLessThan(statusBox!.x);
+    expect(statusBox!.x + statusBox!.width).toBeLessThan(abort!.x);
+  });
+}
