@@ -162,7 +162,10 @@
 .engineeringProgrammingV2 .programmingJobCard .batchReadiness {
   position: absolute;
   left: 50%;
-  bottom: 0;
+  /* EMode's Programming Job content box has 14px bottom padding. START and
+     ABORT sit inside that content box, so the centered status must use the same
+     inset rather than the outer padding edge. */
+  bottom: 14px;
   z-index: 1;
   width: 160px;
   transform: translateX(-50%);
