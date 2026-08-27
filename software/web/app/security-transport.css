@@ -1,0 +1,153 @@
+.securityCredentialControl {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--ink, #172033) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel, #fff) 94%, transparent);
+  color: var(--ink, #172033);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 14%);
+  font: 700 11px/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: .06em;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.securityCredentialControl span {
+  font-size: 10px;
+}
+
+.securityCredentialControl.ready span {
+  color: #16824b;
+}
+
+.securityCredentialControl.required {
+  border-color: color-mix(in srgb, #c63f3f 55%, transparent);
+}
+
+.securityCredentialControl.required span {
+  color: #c63f3f;
+}
+
+.securityCredentialControl.off {
+  opacity: .72;
+}
+
+.securityCredentialControl:hover,
+.securityCredentialControl:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.securityCredentialBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 42%);
+  backdrop-filter: blur(4px);
+}
+
+.securityCredentialDialog {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, var(--ink, #172033) 18%, transparent);
+  border-radius: 16px;
+  background: var(--panel, #fff);
+  color: var(--ink, #172033);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 26%);
+}
+
+.securityCredentialDialog p {
+  margin: 0 0 5px;
+  font: 700 10px/1.2 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: .12em;
+  opacity: .65;
+}
+
+.securityCredentialDialog h2 {
+  margin: 0 0 5px;
+  font-size: 18px;
+}
+
+.securityCredentialDialog small {
+  opacity: .7;
+}
+
+.securityCredentialDialog label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.securityCredentialDialog input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--ink, #172033) 22%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel, #fff) 96%, var(--ink, #172033));
+  color: inherit;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.securityCredentialDialog input:focus {
+  outline: 2px solid color-mix(in srgb, #2f6fe4 55%, transparent);
+  outline-offset: 1px;
+}
+
+.securityCredentialError {
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #c63f3f 12%, transparent);
+  color: #c63f3f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.securityCredentialActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.securityCredentialActions span {
+  flex: 1;
+}
+
+.securityCredentialActions button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--ink, #172033) 18%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.securityCredentialActions button.primary {
+  background: #2f6fe4;
+  border-color: #2f6fe4;
+  color: #fff;
+}
+
+.securityCredentialActions button.danger {
+  color: #c63f3f;
+}
+
+.securityCredentialActions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}

@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+default_repo="$(cd "$(dirname "$script_path")/.." && pwd)"
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+plasmactl_config="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
+
+if [[ -f "$plasmactl_config" ]]; then
+  # shellcheck source=/dev/null
+  source "$plasmactl_config"
+fi
+
+repo="${PLASMA_REPO:-$default_repo}"
+python_dir="$repo/software/python"
+python_bin="${PLASMA_PYTHON:-$python_dir/.venv/bin/python}"
+gateway_host="${PLASMA_GATEWAY_HOST:-0.0.0.0}"
+gateway_port="${PLASMA_GATEWAY_PORT:-18080}"
+cors_origin="${PLASMA_CORS_ORIGIN:-*}"
+engineering_mock_enabled="${PLASMA_ENGINEERING_MOCK_ENABLED:-0}"
+engineering_mock_root="${PLASMA_ENGINEERING_MOCK_ROOT:-$state_home/plasma/engineering-mock}"
+security_config="${PLASMA_SECURITY_CONFIG:-$config_home/plasma/security.yaml}"
+security_state="${PLASMA_SECURITY_STATE:-$state_home/plasma/security-state.sqlite3}"
+unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+dropin_dir="$unit_dir/plasma-web.service.d"
+dropin_file="$dropin_dir/security.conf"
+
+say() {
+  printf '[plasma-security] %s\n' "$*"
+}
+
+die() {
+  printf '[plasma-security] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_runtime() {
+  [[ -x "$python_bin" ]] || die "找不到 Plasma Python runtime：$python_bin"
+  command -v systemctl >/dev/null 2>&1 || die "找不到 systemctl"
+  [[ -f "$unit_dir/plasma-web.service" ]] || die "找不到 plasma-web.service；請先執行 plasmactl install"
+  for value in "$repo" "$python_bin" "$security_config" "$security_state" "$engineering_mock_root"; do
+    [[ "$value" != *' '* ]] || die "Security deployment 目前不支援含空白的路徑：$value"
+    [[ "$value" != *$'\n'* ]] || die "Security deployment 路徑不可包含換行"
+  done
+}
+
+write_initial_security_config() {
+  [[ ! -e "$security_config" ]] || return 1
+  mkdir -p "$(dirname "$security_config")" "$(dirname "$security_state")"
+  chmod 700 "$(dirname "$security_config")" "$(dirname "$security_state")"
+  umask 077
+
+  local token digest
+  token="$($python_bin -c 'import secrets; print(secrets.token_urlsafe(48))')"
+  digest="$($python_bin -c 'import hashlib,sys; print(hashlib.sha256(sys.argv[1].encode()).hexdigest())' "$token")"
+  cat >"$security_config" <<EOF
+version: 1
+principals:
+  - id: local-admin
+    token_sha256: $digest
+    roles: [admin]
+    scopes:
+      - facility_id: "*"
+        ppu_id: "*"
+        site_ids: "*"
+EOF
+  chmod 600 "$security_config"
+  printf '%s' "$token"
+}
+
+harden_security_files() {
+  [[ -f "$security_config" && -O "$security_config" ]] || die "Security config 必須由目前使用者擁有：$security_config"
+  chmod 600 "$security_config"
+  mkdir -p "$(dirname "$security_state")"
+  chmod 700 "$(dirname "$security_state")"
+  local candidate
+  for candidate in "$security_state" "$security_state-wal" "$security_state-shm"; do
+    if [[ -e "$candidate" ]]; then
+      [[ -f "$candidate" && -O "$candidate" ]] || die "Security state 必須是目前使用者擁有的一般檔案：$candidate"
+      chmod 600 "$candidate"
+    fi
+  done
+}
+
+harden_existing_material() {
+  local private_root
+  for private_root in "$python_dir/output" "$engineering_mock_root"; do
+    if [[ -e "$private_root" ]]; then
+      [[ -d "$private_root" && -O "$private_root" ]] || die "Secure output root 必須由目前使用者擁有：$private_root"
+      chmod -R go-rwx "$private_root"
+    fi
+  done
+}
+
+write_secure_dropin() {
+  local engineering_mock_args=""
+  if [[ "$engineering_mock_enabled" == "1" ]]; then
+    engineering_mock_args=" --engineering-mock --engineering-mock-root $engineering_mock_root"
+  fi
+
+  mkdir -p "$dropin_dir"
+  cat >"$dropin_file" <<EOF
+[Service]
+Environment=PLASMA_SECURITY_CONFIG=$security_config
+Environment=PLASMA_SECURITY_STATE=$security_state
+ExecStart=
+ExecStart=$python_bin -m plasma_web.secure_gateway_app --host $gateway_host --port $gateway_port --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $python_dir/output --cors-origin $cors_origin$engineering_mock_args
+EOF
+}
+
+enable_security() {
+  require_runtime
+  local token=""
+  if [[ ! -e "$security_config" ]]; then
+    token="$(write_initial_security_config)"
+    say "已建立 owner-only security config：$security_config"
+  else
+    say "沿用既有 security config：$security_config"
+  fi
+
+  harden_security_files
+  harden_existing_material
+  write_secure_dropin
+  systemctl --user daemon-reload
+  systemctl --user restart plasma-web.service
+  systemctl --user is-active --quiet plasma-web.service || die "plasma-web.service 啟動失敗"
+  say "Secure Gateway 已啟用"
+  say "Config: $security_config"
+  say "State:  $security_state"
+  if [[ -n "$token" ]]; then
+    printf '\n=== Plasma local-admin Bearer token（只顯示這一次；未寫入磁碟）===\n%s\n==============================================================\n' "$token"
+  else
+    say "既有 config 不保存 plaintext token；如已遺失 token，請明確輪替 credential。"
+  fi
+}
+
+disable_security() {
+  require_runtime
+  rm -f "$dropin_file"
+  rmdir "$dropin_dir" 2>/dev/null || true
+  systemctl --user daemon-reload
+  systemctl --user restart plasma-web.service
+  systemctl --user is-active --quiet plasma-web.service || die "plasma-web.service 啟動失敗"
+  say "Secure Gateway override 已移除；plasma-web.service 已回到 canonical Gateway。"
+  say "Security config/state 保留，不自動刪除。"
+}
+
+show_status() {
+  if [[ -f "$dropin_file" ]]; then
+    say "Secure Gateway override: enabled"
+    say "Drop-in: $dropin_file"
+  else
+    say "Secure Gateway override: disabled"
+  fi
+  systemctl --user is-active plasma-web.service || true
+}
+
+case "${1:-enable}" in
+  enable) enable_security ;;
+  disable) disable_security ;;
+  status) show_status ;;
+  *) die "用法：$0 [enable|disable|status]" ;;
+esac
