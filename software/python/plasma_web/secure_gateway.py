@@ -89,6 +89,96 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
         return principal
 
     @staticmethod
+    def _filtered_status_payload(
+        payload: dict[str, Any],
+        principal: Principal,
+        facility_id: str,
+        ppu_id: str,
+    ) -> dict[str, Any]:
+        sites = payload.get("sites")
+        if not isinstance(sites, list):
+            return payload
+        visible_sites: list[dict[str, Any]] = []
+        for site in sites:
+            if not isinstance(site, dict):
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Status response contains an invalid Site resource")
+            raw_site_id = site.get("site_id")
+            try:
+                site_id = base._parse_site_id(raw_site_id)
+            except ValueError as exc:
+                raise PlasmaError(
+                    ErrorCode.CONFIG_INVALID,
+                    "Status response contains an invalid Site identity",
+                    original_exception=exc,
+                ) from exc
+            if principal.allows(
+                Permission.STATUS_READ,
+                ResourceRef(facility_id, ppu_id, site_id),
+            ):
+                visible_sites.append(site)
+        filtered = dict(payload)
+        filtered["sites"] = visible_sites
+        ppu = filtered.get("ppu")
+        if isinstance(ppu, dict):
+            visible_ppu = dict(ppu)
+            if "site_count" in visible_ppu:
+                visible_ppu["site_count"] = len(visible_sites)
+            if "enabled_site_count" in visible_ppu:
+                visible_ppu["enabled_site_count"] = sum(
+                    1 for site in visible_sites if site.get("enabled") is True
+                )
+            filtered["ppu"] = visible_ppu
+        return filtered
+
+    @staticmethod
+    def _filtered_engineering_catalog(
+        payload: dict[str, Any],
+        principal: Principal,
+    ) -> dict[str, Any]:
+        facilities = payload.get("facilities")
+        if not isinstance(facilities, list):
+            return payload
+        visible_facilities: list[dict[str, Any]] = []
+        visible_ppu_count = 0
+        visible_site_count = 0
+        for facility in facilities:
+            if not isinstance(facility, dict):
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Engineering catalog contains an invalid Facility")
+            facility_id = facility.get("facility_id")
+            ppus = facility.get("ppus")
+            if not isinstance(facility_id, str) or not facility_id or not isinstance(ppus, list):
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Engineering catalog contains an invalid Facility identity")
+            visible_ppus: list[dict[str, Any]] = []
+            for ppu in ppus:
+                if not isinstance(ppu, dict):
+                    raise PlasmaError(ErrorCode.CONFIG_INVALID, "Engineering catalog contains an invalid PPU")
+                ppu_id = ppu.get("ppu_id")
+                if not isinstance(ppu_id, str) or not ppu_id:
+                    raise PlasmaError(ErrorCode.CONFIG_INVALID, "Engineering catalog contains an invalid PPU identity")
+                if principal.allows(
+                    Permission.CATALOG_READ,
+                    ResourceRef(facility_id, ppu_id),
+                ):
+                    visible_ppus.append(ppu)
+                    raw_site_count = ppu.get("site_count", 0)
+                    if isinstance(raw_site_count, int) and not isinstance(raw_site_count, bool) and raw_site_count >= 0:
+                        visible_site_count += raw_site_count
+            if visible_ppus:
+                visible_facility = dict(facility)
+                visible_facility["ppus"] = visible_ppus
+                visible_facilities.append(visible_facility)
+                visible_ppu_count += len(visible_ppus)
+        filtered = dict(payload)
+        filtered["facilities"] = visible_facilities
+        if "facility_count" in filtered:
+            filtered["facility_count"] = len(visible_facilities)
+        if "ppu_count" in filtered:
+            filtered["ppu_count"] = visible_ppu_count
+        if "site_count" in filtered:
+            filtered["site_count"] = visible_site_count
+        return filtered
+
+    @staticmethod
     def _resources_from_batch(snapshot: dict[str, Any]) -> tuple[ResourceRef, ...]:
         sites = snapshot.get("sites")
         if not isinstance(sites, list) or not sites:
@@ -236,7 +326,11 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             return
         if path != "/api" and not path.startswith("/api/"):
             return
-        if path in {"/api/engineering/targets", "/api/devices/search"}:
+        if path == "/api/engineering/targets":
+            self._authorize(Permission.CATALOG_READ)
+            self._security_filter_engineering_catalog = True
+            return
+        if path == "/api/devices/search":
             self._authorize(Permission.CATALOG_READ)
             return
         if path in {"/api/settings/gateway", "/api/mock/runtime"}:
@@ -264,6 +358,7 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
                     path=path,
                     resource=resource,
                 )
+                self._security_status_scope = (principal, facility_id, ppu_id)
                 return
             if len(tail) == 5 and tail[:2] == ["api", "jobs"] and tail[3] == "files":
                 resource = self._engineering_job_resource(facility_id, ppu_id, tail[2])
@@ -288,6 +383,9 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
                 path=path,
                 resource=resource,
             )
+            if resource.facility_id is None or resource.ppu_id is None:
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Local status resource identity is incomplete")
+            self._security_status_scope = (principal, resource.facility_id, resource.ppu_id)
             return
 
         parts = path.split("/")
@@ -419,6 +517,14 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
         return False
 
     def _json(self, status: int, payload: dict[str, Any]) -> None:
+        if int(status) == int(HTTPStatus.OK):
+            status_scope = getattr(self, "_security_status_scope", None)
+            if status_scope is not None:
+                principal, facility_id, ppu_id = status_scope
+                payload = self._filtered_status_payload(payload, principal, facility_id, ppu_id)
+            if getattr(self, "_security_filter_engineering_catalog", False):
+                payload = self._filtered_engineering_catalog(payload, self._principal())
+
         admission: CommandAdmission | None = getattr(self, "_security_active_command", None)
         if admission is not None:
             self._security_active_command = None
