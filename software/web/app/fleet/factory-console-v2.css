@@ -231,7 +231,6 @@
   font-weight: 750;
   cursor: pointer;
 }
-.factoryOperationChecks,
 .factoryPolicyControls {
   min-width: 0;
   display: flex;
@@ -239,22 +238,6 @@
   gap: 6px;
   flex-wrap: nowrap;
 }
-.factoryOperationChecks label {
-  min-width: 0;
-  min-height: 34px;
-  padding: 0 9px;
-  border: 1px solid #ced9e2;
-  border-radius: 6px;
-  background: #f8fbfd;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: #334155;
-  font-size: 9px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.factoryOperationChecks input { accent-color: #2563eb; }
 .factoryPolicyControls label {
   display: inline-flex;
   align-items: center;
@@ -281,21 +264,11 @@
   grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr);
   gap: 12px;
 }
-.factoryActionBar button,
 .factoryBatchStatus {
   min-height: 38px;
   border-radius: 6px;
   font-size: 10px;
   font-weight: 850;
-}
-.factoryActionBar button {
-  border: 1px solid transparent;
-  cursor: pointer;
-}
-.factoryStartButton { background: linear-gradient(180deg, #2f80d4, #1f65aa); color: #fff; }
-.factoryAbortButton { background: linear-gradient(180deg, #df5a5a, #bc3333); color: #fff; }
-.factoryActionBar button:disabled { opacity: .42; cursor: not-allowed; }
-.factoryBatchStatus {
   padding: 4px 8px;
   border: 1px solid #cbd7e1;
   background: #f8fbfd;
@@ -514,7 +487,6 @@
 [data-theme="dark"] .productionTreePpu,
 [data-theme="dark"] .productionTreeSites label,
 [data-theme="dark"] .factoryImageControl,
-[data-theme="dark"] .factoryOperationChecks label,
 [data-theme="dark"] .factoryPolicyControls input,
 [data-theme="dark"] .factoryPolicyControls select,
 [data-theme="dark"] .factoryBatchStatus,
@@ -544,7 +516,6 @@
 
 [data-theme="dark"] .factoryField > strong,
 [data-theme="dark"] .factoryImageControl button,
-[data-theme="dark"] .factoryOperationChecks label,
 [data-theme="dark"] .factoryPolicyControls label,
 [data-theme="dark"] .factoryPolicyControls input,
 [data-theme="dark"] .factoryPolicyControls select,
@@ -605,7 +576,6 @@
   .factoryField { grid-template-columns: 1fr; }
   .factoryField > strong { text-align: left; }
   .factoryField > small { grid-column: 1; }
-  .factoryOperationChecks,
   .factoryPolicyControls { flex-wrap: wrap; }
   .factoryActionBar { grid-template-columns: 1fr; }
   .factoryPpuRow { width: min(max-content, 100%); }

@@ -24,18 +24,23 @@ Required work:
 
 ### EMode Design System convergence to PMode baseline
 
-**Status:** TODO
+**Status:** IN PROGRESS
 
 **Layer:** Web presentation/component ownership
 
 **Reason:** PMode is the current canonical operational visual baseline, while EMode still owns presentation variants for equivalent concepts. Shared domain semantics must not create two independently drifting visual systems.
 
-Required work:
+Completed convergence slices:
 
-- reuse canonical typography, spacing, border, card and semantic status tokens;
-- converge Batch Summary / PASS / FAIL / YIELD presentation ownership;
-- converge Section Card and Site Card shell ownership;
-- converge button, select, input and checkbox variants;
+- Batch Summary / PASS / FAIL / YIELD presentation uses shared `operator-ui` ownership;
+- Engineering Settings uses the shared Settings UI primitives and approved Mock-derived page composition;
+- Programming Job operation checkbox tiles and START / ABORT actions use one shared `operator-ui/programming-job-controls.css` visual contract derived from the PMode baseline; mode-local CSS no longer owns those equivalent control visuals.
+
+Required remaining audit/work:
+
+- reuse canonical typography, spacing, border, card and semantic status tokens wherever equivalent concepts still drift;
+- audit Section Card and Site Card shell ownership;
+- audit remaining button, select, input and checkbox variants outside the Programming Job operation/action controls;
 - preserve EMode-specific engineering information architecture and diagnostic controls;
 - keep PMode and EMode behavior contracts independent where their operational responsibilities differ;
 - protect the shared design-system boundary with source/E2E/visual regression tests.

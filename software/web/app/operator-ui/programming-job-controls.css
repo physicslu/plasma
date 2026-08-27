@@ -1,0 +1,93 @@
+/*
+ * Canonical Programming Job control presentation.
+ *
+ * PMode is the approved visual baseline.  PMode and EMode may keep different
+ * workflow/layout ownership, but equivalent Programming Job operation choices
+ * and START / ABORT actions must render from this one shared visual contract.
+ */
+
+.programmingOperationChecks,
+.factoryOperationChecks,
+.engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.programmingOperationChecks label,
+.factoryOperationChecks label,
+.engineeringProgrammingV2 .programmingBatchOperations .operationChecks label {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid #ced9e2;
+  border-radius: 6px;
+  background: #f8fbfd;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #334155;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.programmingOperationChecks input,
+.factoryOperationChecks input,
+.engineeringProgrammingV2 .programmingBatchOperations .operationChecks input {
+  accent-color: #2563eb;
+}
+
+.programmingActionButton,
+.factoryActionBar .factoryStartButton,
+.factoryActionBar .factoryAbortButton,
+.engineeringProgrammingV2 .programmingActions .startProgramming,
+.engineeringProgrammingV2 .programmingActions .abortProgramming {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.programmingActionStart,
+.factoryActionBar .factoryStartButton,
+.engineeringProgrammingV2 .programmingActions .startProgramming {
+  background: linear-gradient(180deg, #2f80d4, #1f65aa);
+}
+
+.programmingActionAbort,
+.factoryActionBar .factoryAbortButton,
+.engineeringProgrammingV2 .programmingActions .abortProgramming {
+  background: linear-gradient(180deg, #df5a5a, #bc3333);
+}
+
+.programmingActionButton:disabled,
+.factoryActionBar .factoryStartButton:disabled,
+.factoryActionBar .factoryAbortButton:disabled,
+.engineeringProgrammingV2 .programmingActions .startProgramming:disabled,
+.engineeringProgrammingV2 .programmingActions .abortProgramming:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .programmingOperationChecks label,
+[data-theme="dark"] .factoryOperationChecks label,
+[data-theme="dark"] .engineeringProgrammingV2 .programmingBatchOperations .operationChecks label {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .programmingOperationChecks,
+  .factoryOperationChecks,
+  .engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
+    flex-wrap: wrap;
+  }
+}
