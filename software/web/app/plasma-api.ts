@@ -505,6 +505,7 @@ export async function startJob(
     offset?: number;
     length?: number;
     targetDevice?: JobTargetDeviceRequest;
+    executionOwnerId?: string;
     requestTimeoutMs?: number;
     submissionGuard?: () => boolean;
     onAssetEvent?: (event: AssetTransferEvent) => void;
@@ -551,6 +552,9 @@ export async function startJob(
       site_id: options.siteId,
       operation: options.operation,
     };
+    if (options.executionOwnerId) {
+      body.execution_owner_id = options.executionOwnerId;
+    }
     if (engineeringTarget && options.targetDevice) {
       body.target_device = {
         vendor: options.targetDevice.vendor,
