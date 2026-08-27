@@ -150,6 +150,27 @@ def test_operator_scope_rejects_other_site_and_ppu(tmp_path: Path) -> None:
         controller.close()
 
 
+def test_site_limited_scope_does_not_authorize_parent_ppu_resource(tmp_path: Path) -> None:
+    controller, tokens = _controller(tmp_path)
+    try:
+        principal = controller.authenticate(
+            f"Bearer {tokens['operator']}",
+            method="GET",
+            path="/api/status",
+        )
+        with pytest.raises(PlasmaError) as exc_info:
+            controller.authorize(
+                principal,
+                Permission.STATUS_READ,
+                method="GET",
+                path="/api/status",
+                resource=ResourceRef("mock-facility-01", "mock-facility-01-ppu-01"),
+            )
+        assert exc_info.value.code is ErrorCode.AUTHORIZATION_DENIED
+    finally:
+        controller.close()
+
+
 def test_missing_or_invalid_bearer_token_is_unauthenticated_without_durable_writes(tmp_path: Path) -> None:
     controller, _ = _controller(tmp_path)
     try:
@@ -247,6 +268,30 @@ def test_same_idempotency_key_cannot_change_payload_or_duplicate_inflight_comman
         controller.close()
 
 
+def test_security_config_requires_explicit_resource_scopes(tmp_path: Path) -> None:
+    token = "high-entropy-token-0123456789abcdef0123456789abcdef"
+    config_path = tmp_path / "security.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "principals": [
+                    {
+                        "id": "viewer",
+                        "token_sha256": _token_digest(token),
+                        "roles": ["viewer"],
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(PlasmaError) as exc_info:
+        GatewaySecurityConfig.load(config_path)
+    assert exc_info.value.code is ErrorCode.CONFIG_INVALID
+
+
 def test_config_stores_only_token_hash_not_plaintext_token(tmp_path: Path) -> None:
     token = "high-entropy-token-0123456789abcdef0123456789abcdef"
     config_path = tmp_path / "security.yaml"
@@ -259,6 +304,7 @@ def test_config_stores_only_token_hash_not_plaintext_token(tmp_path: Path) -> No
                         "id": "viewer",
                         "token_sha256": _token_digest(token),
                         "roles": ["viewer"],
+                        "scopes": [{"facility_id": "*", "ppu_id": "*", "site_ids": "*"}],
                     }
                 ],
             },
