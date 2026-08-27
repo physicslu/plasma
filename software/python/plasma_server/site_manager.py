@@ -281,9 +281,12 @@ class SiteManager:
                 recoverable=True,
             )
 
-        owner_kind, owner_id = self._reserve_execution_job(request)
+        # Registry insertion happens before lease reservation, but still before
+        # any worker dispatch. This makes duplicate job IDs fail without
+        # touching the active execution lease or an existing JobRuntime.
+        runtime = self.registry.create(request)
         try:
-            runtime = self.registry.create(request)
+            owner_kind, owner_id = self._reserve_execution_job(request)
             self.output.write_state(request.job_id, worker._state_payload(runtime))
             worker.enqueue(runtime)
         except Exception:
