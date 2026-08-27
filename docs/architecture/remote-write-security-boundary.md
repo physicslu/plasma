@@ -1,6 +1,6 @@
 # Remote Write Security Boundary
 
-Status: backend security boundary implemented in `SecurePlasmaWebHandler`; deployment/browser activation remains pending
+Status: backend security boundary plus opt-in deployment/browser integration implemented; canonical Gateway deployment remains the default until secure mode is explicitly enabled
 
 ## Security invariant
 
@@ -125,7 +125,11 @@ This SHA-256 design is for random API/service tokens with sufficient entropy. It
 
 Credential comparison uses constant-time digest comparison.
 
-The first backend slice does not yet define the browser login/session flow or Cloudflare/OIDC bridge. Those are deployment/identity integration concerns and must map their authenticated identity into the same canonical Principal model.
+The opt-in browser flow keeps the Bearer token only in JavaScript memory. The browser does not assume that every Gateway is secure: it first observes `401 / E4101 AUTHENTICATION_REQUIRED`, then activates Authorization and Idempotency headers for that Gateway. A full page reload clears the credential and secure-detection state.
+
+Credential changes advance an in-memory revision. Engineering sessions are bound to that revision so replacing a token cannot silently reuse the previous Principal's Engineering session. A valid credential entered after `E4101` causes Engineering initialization to run again automatically.
+
+Cloudflare Access/OIDC remains a future identity bridge. It must map the authenticated external identity into the same canonical Principal / permission / scope model rather than bypassing it.
 
 ## Idempotency and replay protection
 
@@ -211,17 +215,29 @@ The design is intentionally embedded-grade:
 
 ## Deployment status
 
-`SecurePlasmaWebHandler` currently composes and protects the canonical REST routes, but the existing `plasma_web.gateway` deployment entry remains unchanged in this backend slice.
+PR #168 provides an opt-in deployable security path while preserving the canonical Gateway as the rollback/default path.
 
-The next security integration must provide:
+Implemented integration includes:
 
-- browser/session identity transport;
-- local standalone Zynq credential flow;
-- optional Cloudflare Access/OIDC identity bridge;
-- CORS support for authentication/idempotency headers;
-- `plasmactl` security configuration and state paths;
-- owner-only filesystem permissions for security config/state and persisted Programming Image material;
-- UI read-only indication and disabled write controls;
-- deployment smoke tests proving unauthenticated/direct REST writes cannot bypass the secure handler.
+- `plasma_web.secure_gateway_app`, which reuses canonical Gateway/Batch/Engineering/Mock wiring and substitutes the secure handler at process startup;
+- explicit owner-only security config/state paths through `PLASMA_SECURITY_CONFIG` and `PLASMA_SECURITY_STATE`;
+- validation of SQLite state/WAL/SHM ownership and permissions;
+- process `umask 077` for secure Gateway-created Programming Image, Readback, log and security material;
+- hardening of pre-existing Gateway output material when secure deployment is enabled;
+- reversible user-systemd deployment through `scripts/plasma-security-deploy enable|disable|status`;
+- local high-entropy `local-admin` credential generation that persists only the SHA-256 digest and prints plaintext once;
+- CORS support for `Authorization` and `Idempotency-Key`;
+- passive browser secure-boundary detection from `401 / E4101`, memory-only masked credential entry and authenticated Readback download;
+- stable browser security snapshots and credential-revision-bound Engineering session recovery;
+- deployment and browser contract tests for the above boundaries.
 
-Until that deployment wiring is merged and enabled, Remote Write Authentication / Authorization remains open architecture debt.
+The existing `plasma_web.gateway` / `plasma-web.service` path remains canonical until the security systemd drop-in is explicitly enabled. Therefore #168 does **not** force every standalone or development deployment into secure mode and retains a reversible rollout boundary.
+
+Remaining follow-up work is intentionally outside this slice:
+
+- Cloudflare Access / OIDC identity mapping;
+- a principal introspection endpoint and role/permission-aware UI controls;
+- richer human credential rotation/revocation and session lifecycle UX;
+- centralized multi-PPU identity management through Plasma Manager.
+
+The backend remains the authorization authority even after role-aware UI is added; disabled UI controls are convenience and operator guidance, not the security boundary.
