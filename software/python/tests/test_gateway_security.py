@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -11,7 +10,6 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_web.gateway_security import (
     GatewaySecurityConfig,
     GatewaySecurityController,
-    GatewaySecurityStore,
     Permission,
     ResourceRef,
 )
@@ -152,13 +150,15 @@ def test_operator_scope_rejects_other_site_and_ppu(tmp_path: Path) -> None:
         controller.close()
 
 
-def test_missing_or_invalid_bearer_token_is_unauthenticated(tmp_path: Path) -> None:
+def test_missing_or_invalid_bearer_token_is_unauthenticated_without_durable_writes(tmp_path: Path) -> None:
     controller, _ = _controller(tmp_path)
     try:
+        before = controller.store.audit_count()
         for authorization in (None, "Basic abc", "Bearer short", "Bearer " + "x" * 48):
             with pytest.raises(PlasmaError) as exc_info:
                 controller.authenticate(authorization, method="POST", path="/api/batches")
             assert exc_info.value.code is ErrorCode.AUTHENTICATION_REQUIRED
+        assert controller.store.audit_count() == before
     finally:
         controller.close()
 
