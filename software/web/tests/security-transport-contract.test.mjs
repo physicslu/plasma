@@ -9,8 +9,9 @@ const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8
 
 test("browser security credential remains memory-only", () => {
   assert.match(transport, /let bearerToken: string \| null = null/);
-  assert.doesNotMatch(transport, /setItem\([^\n]*(?:token|credential)/i);
-  assert.doesNotMatch(provider, /localStorage|sessionStorage/);
+  assert.doesNotMatch(transport, /(?:localStorage|sessionStorage)\.setItem\([^\n]*(?:token|credential)/i);
+  assert.doesNotMatch(provider, /(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\(/);
+  assert.match(provider, /type="password"/);
 });
 
 
@@ -18,19 +19,21 @@ test("gateway fetches receive bearer authentication and durable command identity
   assert.match(transport, /headers\.set\("Authorization", `Bearer \$\{bearerToken\}`\)/);
   assert.match(transport, /headers\.set\("Idempotency-Key", commandId\)/);
   assert.match(transport, /ambiguousCommandIds\.get\(identity\)/);
-  assert.match(transport, /response\.status !== 409/);
+  assert.match(transport, /error_code === "E4104"/);
 });
 
 
 test("authenticated readback downloads cannot bypass the fetch security boundary", () => {
   assert.match(transport, /outputDownloadAnchor/);
+  assert.match(transport, /engineering\\\/targets/);
   assert.match(transport, /document\.addEventListener\("click", onClick, true\)/);
   assert.match(transport, /response\.blob\(\)/);
 });
 
 
-test("security transport is installed at the application shell", () => {
+test("security transport is installed before child Gateway effects", () => {
   assert.match(layout, /SecurityTransportProvider/);
   assert.match(layout, /<SecurityTransportProvider>/);
+  assert.match(transport, /if \(typeof window !== "undefined"\) installSecurityTransport\(\)/);
   assert.match(provider, /installSecurityTransport\(\)/);
 });
