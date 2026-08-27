@@ -18,10 +18,11 @@ from plasma_core.errors import ErrorCode, PlasmaError
 from . import gateway_base as base
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
 from .device_catalog import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, get_default_device_catalog
+from .durable_batch_runtime import DurableBatchRuntimeManager
 from .engineering_targets import EngineeringPPUProvider
 from .gateway_communication import ppu_response_budget_ms, request_with_gateway_policy
 from .gateway_settings import GatewayCommunicationPolicy, GatewaySettingsController
-from .mock_batch_runtime import MockAwareBatchRuntimeManager
+from .persistent_mock_batch_runtime import PersistentMockAwareBatchRuntimeManager
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
@@ -665,6 +666,26 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
             self._batch_error(exc)
 
 
+def _build_batch_runtime(
+    engineering_provider: EngineeringPPUProvider | None,
+    *,
+    settings: GatewaySettingsController,
+    output_root: Path,
+) -> BatchRuntimeManager | None:
+    if isinstance(engineering_provider, SharedImageMockEngineeringPPUProvider):
+        return PersistentMockAwareBatchRuntimeManager(
+            engineering_provider,
+            gateway_settings=settings,
+        )
+    if engineering_provider is not None:
+        return DurableBatchRuntimeManager(
+            engineering_provider,
+            state_path=output_root / "batch-state.sqlite3",
+            gateway_settings=settings,
+        )
+    return None
+
+
 def serve(
     host: str,
     port: int,
@@ -680,14 +701,11 @@ def serve(
     PlasmaWebHandler.client_factory = staticmethod(lambda: base.PlasmaClient(plasma_host, plasma_port))
     PlasmaWebHandler.engineering_provider = engineering_provider
     PlasmaWebHandler.gateway_settings = settings
-    if isinstance(engineering_provider, SharedImageMockEngineeringPPUProvider):
-        PlasmaWebHandler.batch_runtime = MockAwareBatchRuntimeManager(engineering_provider, gateway_settings=settings)
-    else:
-        PlasmaWebHandler.batch_runtime = (
-            BatchRuntimeManager(engineering_provider, gateway_settings=settings)
-            if engineering_provider is not None
-            else None
-        )
+    PlasmaWebHandler.batch_runtime = _build_batch_runtime(
+        engineering_provider,
+        settings=settings,
+        output_root=output_root,
+    )
     PlasmaWebHandler.allowed_origins = frozenset(cors_origins)
     PlasmaWebHandler.output_root = output_root.resolve()
     PlasmaWebHandler.static_root = static_root.resolve() if static_root is not None else None
