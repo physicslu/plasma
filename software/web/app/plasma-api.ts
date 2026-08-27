@@ -189,6 +189,14 @@ const activeExecutionJobs = new Set<string>();
 const inFlightJobSnapshots = new Map<string, Promise<JobSnapshot>>();
 let pendingJobSubmissions = 0;
 let lastExecutionActivityCount = 0;
+let directBrowserExecutionOwnerId: string | null = null;
+
+function browserExecutionOwnerId(): string {
+  if (directBrowserExecutionOwnerId === null) {
+    directBrowserExecutionOwnerId = window.crypto.randomUUID();
+  }
+  return directBrowserExecutionOwnerId;
+}
 
 function executionJobKey(apiBase: string, jobId: string): string {
   return `${apiBase}|${jobId}`;
@@ -551,10 +559,8 @@ export async function startJob(
     const body: Record<string, unknown> = {
       site_id: options.siteId,
       operation: options.operation,
+      execution_owner_id: options.executionOwnerId ?? browserExecutionOwnerId(),
     };
-    if (options.executionOwnerId) {
-      body.execution_owner_id = options.executionOwnerId;
-    }
     if (engineeringTarget && options.targetDevice) {
       body.target_device = {
         vendor: options.targetDevice.vendor,
