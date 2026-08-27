@@ -8,12 +8,13 @@ from plasma_core.enums import Operation
 from plasma_core.models import iso_now
 
 from .batch_runtime import BatchRuntimeManager, BatchTargetDeviceSnapshot
+from .durable_batch_runtime import DurableBatchRuntimeManager
 from .mock_synthetic_image import synthetic_mock_asset_from_context
-from .persistent_batch_runtime import BATCH_RECOVERY_ERROR, PersistentBatchRuntimeManager
+from .persistent_batch_runtime import BATCH_RECOVERY_ERROR
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
-class PersistentMockAwareBatchRuntimeManager(PersistentBatchRuntimeManager):
+class PersistentMockAwareBatchRuntimeManager(DurableBatchRuntimeManager):
     """Persistent Batch runtime for the process-coupled Engineering Mock provider.
 
     The Mock PPU servers are children of the Gateway process, so a Gateway
