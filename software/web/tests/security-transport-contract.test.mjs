@@ -5,6 +5,7 @@ import test from "node:test";
 const transport = readFileSync(new URL("../app/security-transport.ts", import.meta.url), "utf8");
 const provider = readFileSync(new URL("../app/security-transport-provider.tsx", import.meta.url), "utf8");
 const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const workspaceSession = readFileSync(new URL("../app/workspace-session.tsx", import.meta.url), "utf8");
 
 
 test("browser security credential remains memory-only and masked", () => {
@@ -12,6 +13,15 @@ test("browser security credential remains memory-only and masked", () => {
   assert.doesNotMatch(transport, /(?:localStorage|sessionStorage)\.setItem\([^\n]*(?:token|credential)/i);
   assert.doesNotMatch(provider, /(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\(/);
   assert.match(provider, /type="password"/);
+});
+
+
+test("security transport exposes stable external-store snapshots", () => {
+  assert.match(transport, /const SERVER_SNAPSHOT: SecurityTransportState =/);
+  assert.match(transport, /let stateSnapshot: SecurityTransportState = SERVER_SNAPSHOT/);
+  assert.match(transport, /return stateSnapshot;/);
+  assert.match(transport, /return SERVER_SNAPSHOT;/);
+  assert.doesNotMatch(transport, /getSecurityTransportState\(\): SecurityTransportState \{\s*return \{/s);
 });
 
 
@@ -28,6 +38,16 @@ test("gateway fetches receive bearer authentication and durable command identity
   assert.match(transport, /headers\.set\("Idempotency-Key", commandIdFor\(identity\)\)/);
   assert.match(transport, /ambiguousCommandIds\.get\(identity\)/);
   assert.match(transport, /errorCode !== "E4104"/);
+});
+
+
+test("credential changes advance generation and force a fresh Engineering session", () => {
+  assert.match(transport, /credentialRevision \+= 1/g);
+  assert.match(workspaceSession, /useSyncExternalStore\(/);
+  assert.match(workspaceSession, /current\.credentialRevision === credentialRevision/);
+  assert.match(workspaceSession, /pending\.credentialRevision === credentialRevision/);
+  assert.match(workspaceSession, /getSecurityTransportState\(\)\.credentialRevision !== credentialRevision/);
+  assert.match(workspaceSession, /securityTransport\.credentialRevision/);
 });
 
 
