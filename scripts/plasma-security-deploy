@@ -48,6 +48,7 @@ require_runtime() {
 write_initial_security_config() {
   [[ ! -e "$security_config" ]] || return 1
   mkdir -p "$(dirname "$security_config")" "$(dirname "$security_state")"
+  chmod 700 "$(dirname "$security_config")" "$(dirname "$security_state")"
   umask 077
 
   local token digest
@@ -66,6 +67,30 @@ principals:
 EOF
   chmod 600 "$security_config"
   printf '%s' "$token"
+}
+
+harden_security_files() {
+  [[ -f "$security_config" && -O "$security_config" ]] || die "Security config 必須由目前使用者擁有：$security_config"
+  chmod 600 "$security_config"
+  mkdir -p "$(dirname "$security_state")"
+  chmod 700 "$(dirname "$security_state")"
+  local candidate
+  for candidate in "$security_state" "$security_state-wal" "$security_state-shm"; do
+    if [[ -e "$candidate" ]]; then
+      [[ -f "$candidate" && -O "$candidate" ]] || die "Security state 必須是目前使用者擁有的一般檔案：$candidate"
+      chmod 600 "$candidate"
+    fi
+  done
+}
+
+harden_existing_material() {
+  local private_root
+  for private_root in "$python_dir/output" "$engineering_mock_root"; do
+    if [[ -e "$private_root" ]]; then
+      [[ -d "$private_root" && -O "$private_root" ]] || die "Secure output root 必須由目前使用者擁有：$private_root"
+      chmod -R go-rwx "$private_root"
+    fi
+  done
 }
 
 write_secure_dropin() {
@@ -91,13 +116,11 @@ enable_security() {
     token="$(write_initial_security_config)"
     say "已建立 owner-only security config：$security_config"
   else
-    [[ -f "$security_config" ]] || die "Security config 不是一般檔案：$security_config"
-    chmod 600 "$security_config"
     say "沿用既有 security config：$security_config"
   fi
 
-  mkdir -p "$(dirname "$security_state")"
-  chmod 700 "$(dirname "$security_state")"
+  harden_security_files
+  harden_existing_material
   write_secure_dropin
   systemctl --user daemon-reload
   systemctl --user restart plasma-web.service
