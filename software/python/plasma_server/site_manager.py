@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any
 
 from plasma_core.config import PlasmaConfig, SiteConfig
@@ -22,6 +24,27 @@ from .site_worker import SiteWorker
 InterfaceFactory = Callable[[SiteConfig], BaseInterface]
 
 
+@dataclass(slots=True)
+class PPUExecutionLease:
+    """Active execution ownership for one physical PPU.
+
+    A logical owner may run multiple Site Jobs concurrently. A different owner
+    is rejected until every Job currently owned by the lease is terminal.
+    """
+
+    owner_kind: str
+    owner_id: str
+    job_ids: set[str] = field(default_factory=set)
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "busy": True,
+            "owner_kind": self.owner_kind,
+            "owner_id": self.owner_id,
+            "active_job_count": len(self.job_ids),
+        }
+
+
 class SiteManager:
     """Own the Programming Sites local to exactly one physical PPU."""
 
@@ -40,6 +63,8 @@ class SiteManager:
         self._site_configs = {site.id: site for site in config.sites}
         self.interfaces: dict[int, BaseInterface] = {}
         self.workers: dict[int, SiteWorker] = {}
+        self._execution_lock = threading.RLock()
+        self._execution_lease: PPUExecutionLease | None = None
         self._started = False
 
         for site in config.sites:
@@ -116,6 +141,124 @@ class SiteManager:
             raise PlasmaError(ErrorCode.SITE_DISABLED, f"site is disabled: SITE{site_id}")
         return self.workers[site_id]
 
+    @staticmethod
+    def _validate_execution_owner(value: Any, field_name: str) -> str:
+        if not isinstance(value, str) or not value or len(value) > 256:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"{field_name} must be a non-empty string of at most 256 characters",
+            )
+        return value
+
+    @classmethod
+    def _execution_owner(cls, request: JobRequest) -> tuple[str, str]:
+        explicit_kind = request.metadata.get("execution_owner_kind")
+        explicit_id = request.metadata.get("execution_owner_id")
+        if (explicit_kind is None) != (explicit_id is None):
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "execution_owner_kind and execution_owner_id must be supplied together",
+            )
+        if explicit_kind is not None and explicit_id is not None:
+            return (
+                cls._validate_execution_owner(explicit_kind, "execution_owner_kind"),
+                cls._validate_execution_owner(explicit_id, "execution_owner_id"),
+            )
+
+        batch_id = request.metadata.get("batch_id")
+        if batch_id is not None:
+            return "batch", cls._validate_execution_owner(batch_id, "batch_id")
+
+        return "client", cls._validate_execution_owner(request.client_id, "client_id")
+
+    def _reserve_execution_job(self, request: JobRequest) -> tuple[str, str]:
+        owner_kind, owner_id = self._execution_owner(request)
+        acquired = False
+        conflict: PPUExecutionLease | None = None
+        with self._execution_lock:
+            lease = self._execution_lease
+            if lease is not None and (lease.owner_kind, lease.owner_id) != (owner_kind, owner_id):
+                conflict = PPUExecutionLease(
+                    owner_kind=lease.owner_kind,
+                    owner_id=lease.owner_id,
+                    job_ids=set(lease.job_ids),
+                )
+            else:
+                if lease is None:
+                    lease = PPUExecutionLease(owner_kind=owner_kind, owner_id=owner_id)
+                    self._execution_lease = lease
+                    acquired = True
+                lease.job_ids.add(request.job_id)
+
+        if conflict is not None:
+            self.server_log.event(
+                "WARNING",
+                "ppu_execution_lease_conflict",
+                ppu_id=self.config.ppu.id,
+                facility_id=self.config.ppu.facility_id,
+                active_owner_kind=conflict.owner_kind,
+                active_owner_id=conflict.owner_id,
+                requested_owner_kind=owner_kind,
+                requested_owner_id=owner_id,
+                requested_job_id=request.job_id,
+            )
+            raise PlasmaError(
+                ErrorCode.PPU_BUSY,
+                "PPU is owned by another active execution",
+                recoverable=True,
+                context={
+                    "ppu_id": self.config.ppu.id,
+                    "facility_id": self.config.ppu.facility_id,
+                    "active_owner_kind": conflict.owner_kind,
+                    "active_owner_id": conflict.owner_id,
+                    "requested_owner_kind": owner_kind,
+                    "requested_owner_id": owner_id,
+                },
+            )
+
+        if acquired:
+            self.server_log.event(
+                "INFO",
+                "ppu_execution_lease_acquired",
+                ppu_id=self.config.ppu.id,
+                facility_id=self.config.ppu.facility_id,
+                owner_kind=owner_kind,
+                owner_id=owner_id,
+            )
+        return owner_kind, owner_id
+
+    def _release_execution_job(self, job_id: str) -> None:
+        released: tuple[str, str] | None = None
+        with self._execution_lock:
+            lease = self._execution_lease
+            if lease is None or job_id not in lease.job_ids:
+                return
+            lease.job_ids.discard(job_id)
+            if not lease.job_ids:
+                released = (lease.owner_kind, lease.owner_id)
+                self._execution_lease = None
+        if released is not None:
+            self.server_log.event(
+                "INFO",
+                "ppu_execution_lease_released",
+                ppu_id=self.config.ppu.id,
+                facility_id=self.config.ppu.facility_id,
+                owner_kind=released[0],
+                owner_id=released[1],
+            )
+
+    def execution_lease_snapshot(self) -> dict[str, Any]:
+        with self._execution_lock:
+            lease = self._execution_lease
+            if lease is None:
+                return {
+                    "busy": False,
+                    "owner_kind": None,
+                    "owner_id": None,
+                    "active_job_count": 0,
+                }
+            return lease.snapshot()
+
     def enqueue(self, request: JobRequest) -> asyncio.Future[JobResult]:
         if not self._started:
             raise PlasmaError(ErrorCode.INTERNAL_ERROR, "site manager is not started")
@@ -129,13 +272,19 @@ class SiteManager:
                 f"SITE{request.site_id} queue is full",
                 recoverable=True,
             )
-        runtime = self.registry.create(request)
+
+        owner_kind, owner_id = self._reserve_execution_job(request)
         try:
+            runtime = self.registry.create(request)
             self.output.write_state(request.job_id, worker._state_payload(runtime))
             worker.enqueue(runtime)
         except Exception:
             self.registry._jobs.pop(request.job_id, None)
+            self._release_execution_job(request.job_id)
             raise
+        runtime.future.add_done_callback(
+            lambda _future, job_id=request.job_id: self._release_execution_job(job_id)
+        )
         self.server_log.event(
             "INFO",
             "job_queued",
@@ -144,6 +293,8 @@ class SiteManager:
             job_id=request.job_id,
             site_id=request.site_id,
             operation=request.operation.value,
+            execution_owner_kind=owner_kind,
+            execution_owner_id=owner_id,
         )
         return runtime.future
 
@@ -181,6 +332,7 @@ class SiteManager:
             "display_name": ppu.display_name,
             "site_count": self.config.site_count,
             "enabled_site_count": self.config.enabled_site_count,
+            "execution": self.execution_lease_snapshot(),
             "capabilities": {
                 "max_supported_sites": self.config.server.max_supported_sites,
                 "operations": [
