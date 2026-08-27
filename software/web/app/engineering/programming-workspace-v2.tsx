@@ -13,6 +13,7 @@ import {
 } from "../gateway-settings-api";
 import { useI18n } from "../i18n";
 import { BatchSummary } from "../operator-ui/batch-summary";
+import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
 import {
   cancelJob,
   engineeringTargetApiBase,
@@ -1031,86 +1032,85 @@ export default function ProgrammingWorkspaceV2() {
           </section>
 
           <div className="productionProgrammingRight">
-            <section className={`productionProgrammingCard programmingJobCard unifiedBatchControlStack ${programmingJobCollapsed ? "is-collapsed" : ""}`} data-dashboard-mode="engineering">
-              <header>
-                PROGRAMMING JOB
-                <button
-                  type="button"
-                  className="engineeringPanelToggle"
-                  aria-label={`${programmingJobCollapsed ? "Expand" : "Collapse"} Programming Job`}
-                  aria-expanded={!programmingJobCollapsed}
-                  onClick={() => setProgrammingJobCollapsed(current => !current)}
-                >{programmingJobCollapsed ? "展開⌄" : "收合⌃"}</button>
-              </header>
-              <div className={`cardBody programmingJobBody programmingBatchToolbar ${programmingJobCollapsed ? "is-collapsed" : ""}`}>
-                <div className="jobRow">
-                  <strong>1. Target IC</strong>
-                  <ICPickerField apiBase={apiBase} value={targetDevice} onChange={selectTargetDevice} disabled={targetLocked} placeholder="Search ICPN / IC identifier..." />
-                </div>
+            <ProgrammingJobPanel
+    mode="engineering"
+    title="PROGRAMMING JOB"
+    collapsed={programmingJobCollapsed}
+    onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
+    expandLabel={locale === "zh-TW" ? "展開" : "Show"}
+    collapseLabel={locale === "zh-TW" ? "收合" : "Hide"}
+    apiBase={apiBase}
+    targetDevice={targetDevice}
+    onTargetChange={selectTargetDevice}
+    targetDisabled={targetLocked}
+    targetPlaceholder="Search ICPN / IC identifier..."
+    targetLabel="Target IC"
+    imageLabel="Programming Image"
+    image={{
+      name: displayedImageName,
+      title: displayedImageName,
+      source: imageAsset ? "user" : batchSnapshot?.asset ? "batch_snapshot" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none",
+      hint: syntheticMockImageAvailable ? syntheticImageHint : "Binary Programming Image (.bin).",
+      browseLabel: "Browse...",
+      browseDisabled: targetLocked,
+      inputDisabled: targetLocked,
+      inputAriaLabel: "Engineering Programming Image Asset file",
+      inputRef: imageInputRef,
+      onBrowse: () => imageInputRef.current?.click(),
+      onFileChange: file => selectImageAsset(file),
+    }}
+    operationsLabel="Operations"
+    operations={operationOrder.map(operation => ({
+      key: operation,
+      code: operationCodes[operation],
+      label: t(`operation.${operation}`),
+      checked: selectedOperations.includes(operation),
+      disabled: batchRunning,
+      ariaLabel: `Engineering batch ${operation}`,
+      onChange: () => toggleOperation(operation),
+    }))}
+    policyLabel="Batch Policy"
+    policy={{
+      repeatLabel: "Repeat",
+      repeatValue: repeatCount,
+      repeatDisabled: batchRunning,
+      repeatAriaLabel: "Repeat Count",
+      onRepeatChange: setRepeatCount,
+      retryLabel: "Retry",
+      retryValue: siteRetryLimit,
+      retryDisabled: batchRunning,
+      retryAriaLabel: "Site Retry Limit",
+      onRetryChange: setSiteRetryLimit,
+      stopLabel: "Stop Policy",
+      stopValue: stopPolicyValue,
+      stopDisabled: batchRunning,
+      stopAriaLabel: "Engineering Stop Policy",
+      stopOptions: [
+        { value: "never", label: "Never" },
+        ...selectedSiteIds.map((_, index) => ({ value: String(index + 1), label: `${index + 1} Fail` })),
+      ],
+      onStopChange: value => setStopPolicy(value === "never" ? { kind: "never" } : { kind: "failed_sites", threshold: Number(value) }),
+    }}
+    compatibilityFields={selectedOperations.includes("read") ? (
+      <div className="engineeringReadRow">
+        <label>Offset:<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
+        <label>Length:<input aria-label="Engineering READ length" type="number" min="1" step="1" value={readLength} disabled={batchRunning} onChange={event => setReadLength(event.target.value)} /></label>
+      </div>
+    ) : null}
+    startLabel="START PROGRAMMING"
+    startDisabled={!batchReadiness.ready || !policyValid}
+    onStart={runBatch}
+    statusLabel="BATCH STATUS"
+    statusValue={batchRunning && batchObservationState === "reconnecting" ? "RECONNECTING" : batchReadiness.label}
+    statusClassName={`readiness-${batchReadiness.code}`}
+    abortLabel="ABORT"
+    abortDisabled={!batchRunning || batchCancelling || !batchSnapshot}
+    onAbort={cancelBatch}
+  />
 
-                <div className="jobRow">
-                  <strong>2. Programming Image</strong>
-                  <div className="imageField">
-                    <span
-                      className="programmingFileName"
-                      data-image-source={imageAsset ? "user" : batchSnapshot?.asset ? "batch_snapshot" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none"}
-                      title={displayedImageName}
-                    >
-                      {displayedImageName}
-                    </span>
-                    <button type="button" className="engineeringBrowseButton" disabled={targetLocked} onClick={() => imageInputRef.current?.click()}>Browse...</button>
-                    <input ref={imageInputRef} aria-label="Engineering Programming Image Asset file" type="file" accept=".bin,application/octet-stream" hidden disabled={targetLocked} onChange={event => selectImageAsset(event.target.files?.[0] ?? null)} />
-                  </div>
-                  <small className="engineeringImageHint">{syntheticMockImageAvailable ? syntheticImageHint : "Binary Programming Image (.bin)."}</small>
-                </div>
-
-                <div className="jobRow programmingBatchOperations">
-                  <strong>3. Operations</strong>
-                  <div className="operationChecks" role="group" aria-label="Engineering batch operations">
-                    {operationOrder.map(operation => (
-                      <label key={operation}>
-                        <input type="checkbox" aria-label={`Engineering batch ${operation}`} checked={selectedOperations.includes(operation)} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
-                        <b>{operationCodes[operation]}</b>
-                        <span>{t(`operation.${operation}`)}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="jobRow engineeringPolicyRow">
-                  <strong>4. Batch Policy</strong>
-                  <label>Repeat:<input aria-label="Repeat Count" type="number" min="1" max="10000" value={repeatCount} disabled={batchRunning} onChange={event => setRepeatCount(event.target.value)} /></label>
-                  <label className="engineeringRetryField">Retry:<input aria-label="Site Retry Limit" type="number" min="0" max="20" value={siteRetryLimit} disabled={batchRunning} onChange={event => setSiteRetryLimit(event.target.value)} /></label>
-                  <label>Stop Policy:
-                    <select aria-label="Engineering Stop Policy" value={stopPolicyValue} disabled={batchRunning} onChange={event => setStopPolicy(event.target.value === "never" ? { kind: "never" } : { kind: "failed_sites", threshold: Number(event.target.value) })}>
-                      <option value="never">Never</option>
-                      {selectedSiteIds.map((_, index) => <option key={index + 1} value={index + 1}>{index + 1} Fail</option>)}
-                    </select>
-                  </label>
-                </div>
-
-                {selectedOperations.includes("read") && (
-                  <div className="jobRow engineeringReadRow">
-                    <strong>READ Parameters</strong>
-                    <label>Offset:<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
-                    <label>Length:<input aria-label="Engineering READ length" type="number" min="1" step="1" value={readLength} disabled={batchRunning} onChange={event => setReadLength(event.target.value)} /></label>
-                  </div>
-                )}
-
-                <div className={`batchReadiness readiness-${batchReadiness.code}`} role="status" aria-label="Batch readiness">
-                  <small>BATCH</small><b>{batchRunning && batchObservationState === "reconnecting" ? "RECONNECTING" : batchReadiness.label}</b>
-                </div>
-
-                {operatorWarning && <div className="warning engineeringOperationWarning" role="alert"><span>{operatorWarning}</span><button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button></div>}
-                {engineeringBatch.error && batchObservationState === "reconnecting" && <div className="warning engineeringOperationWarning" role="status">{engineeringBatch.error}</div>}
-                {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
-
-                <div className="programmingActions">
-                  <button type="button" className="startProgramming executeBatch" disabled={!batchReadiness.ready || !policyValid} onClick={() => void runBatch()}>▶ START PROGRAMMING</button>
-                  <button type="button" className="abortProgramming cancelBatch" disabled={!batchRunning || batchCancelling || !batchSnapshot} onClick={() => void cancelBatch()}>■ ABORT</button>
-                </div>
-              </div>
-            </section>
+  {operatorWarning && <div className="warning engineeringOperationWarning" role="alert"><span>{operatorWarning}</span><button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button></div>}
+  {engineeringBatch.error && batchObservationState === "reconnecting" && <div className="warning engineeringOperationWarning" role="status">{engineeringBatch.error}</div>}
+  {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
           </div>
         </div>
 
