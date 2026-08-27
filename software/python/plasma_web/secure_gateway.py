@@ -90,33 +90,56 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
 
     @staticmethod
     def _resources_from_batch(snapshot: dict[str, Any]) -> tuple[ResourceRef, ...]:
+        sites = snapshot.get("sites")
+        if not isinstance(sites, list) or not sites:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Batch snapshot has no resolvable Site resources")
         resources: list[ResourceRef] = []
-        for site in snapshot.get("sites", []):
+        for site in sites:
             if not isinstance(site, dict):
-                continue
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Batch snapshot contains an invalid Site resource")
             facility_id = site.get("facility_id")
             ppu_id = site.get("ppu_id")
             site_id = site.get("site_id")
-            if isinstance(facility_id, str) and isinstance(ppu_id, str) and isinstance(site_id, int):
-                resources.append(ResourceRef(facility_id, ppu_id, site_id))
+            if (
+                not isinstance(facility_id, str)
+                or not facility_id
+                or not isinstance(ppu_id, str)
+                or not ppu_id
+                or isinstance(site_id, bool)
+                or not isinstance(site_id, int)
+                or site_id < 1
+            ):
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Batch snapshot contains an invalid Site identity")
+            resources.append(ResourceRef(facility_id, ppu_id, site_id))
         return tuple(resources)
 
     @staticmethod
     def _resources_from_targets(raw_targets: Any) -> tuple[ResourceRef, ...]:
-        if not isinstance(raw_targets, list):
-            return ()
+        if not isinstance(raw_targets, list) or not raw_targets:
+            raise ValueError("Batch targets must be a non-empty array")
         resources: list[ResourceRef] = []
-        for target in raw_targets:
-            if not isinstance(target, dict):
-                continue
-            facility_id = target.get("facility_id")
-            ppu_id = target.get("ppu_id")
-            site_ids = target.get("site_ids")
-            if not isinstance(facility_id, str) or not isinstance(ppu_id, str) or not isinstance(site_ids, list):
-                continue
-            for site_id in site_ids:
-                if isinstance(site_id, int) and not isinstance(site_id, bool) and site_id >= 1:
-                    resources.append(ResourceRef(facility_id, ppu_id, site_id))
+        for index, raw in enumerate(raw_targets):
+            if not isinstance(raw, dict):
+                raise ValueError(f"Batch target {index} must be an object")
+            base._require_declared_keys(
+                raw,
+                allowed={"facility_id", "ppu_id", "site_ids"},
+                required={"facility_id", "ppu_id", "site_ids"},
+                label=f"Batch target {index}",
+            )
+            site_ids = raw["site_ids"]
+            if not isinstance(site_ids, list) or not site_ids:
+                raise ValueError(f"Batch target {index} site_ids must be a non-empty array")
+            facility_id = str(raw["facility_id"])
+            ppu_id = str(raw["ppu_id"])
+            for raw_site_id in site_ids:
+                resources.append(
+                    ResourceRef(
+                        facility_id=facility_id,
+                        ppu_id=ppu_id,
+                        site_id=base._parse_site_id(raw_site_id),
+                    )
+                )
         return tuple(resources)
 
     @staticmethod
@@ -198,6 +221,14 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
         self._security_active_command = admission
         return False
 
+    def _deny_unclassified_api_route(self, path: str) -> None:
+        principal = self._principal()
+        raise PlasmaError(
+            ErrorCode.AUTHORIZATION_DENIED,
+            "Secure Gateway has no authorization rule for this API route",
+            context={"principal_id": principal.principal_id, "path": path},
+        )
+
     def _guard_get(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
@@ -218,14 +249,13 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             if tail == ["api", "status"]:
                 principal = self._principal()
                 query = parse_qs(parsed.query, keep_blank_values=True)
-                job_values = query.get("job")
-                site_values = query.get("site")
-                if job_values and len(job_values) == 1 and job_values[0]:
-                    resource = self._engineering_job_resource(facility_id, ppu_id, job_values[0])
+                base._require_declared_keys(query, allowed={"job", "site"}, label="status query")
+                job = base._query_value(query, "job")
+                site = base._query_value(query, "site")
+                if job is not None:
+                    resource = self._engineering_job_resource(facility_id, ppu_id, job)
                 else:
-                    site_id = None
-                    if site_values and len(site_values) == 1 and site_values[0].isdigit():
-                        site_id = int(site_values[0])
+                    site_id = base._parse_site_id(site) if site is not None else None
                     resource = ResourceRef(facility_id, ppu_id, site_id)
                 self._controller().authorize(
                     principal,
@@ -243,14 +273,13 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
         if path == "/api/status":
             principal = self._principal()
             query = parse_qs(parsed.query, keep_blank_values=True)
-            job_values = query.get("job")
-            site_values = query.get("site")
-            if job_values and len(job_values) == 1 and job_values[0]:
-                resource = self._local_job_resource(job_values[0])
+            base._require_declared_keys(query, allowed={"job", "site"}, label="status query")
+            job = base._query_value(query, "job")
+            site = base._query_value(query, "site")
+            if job is not None:
+                resource = self._local_job_resource(job)
             else:
-                site_id = None
-                if site_values and len(site_values) == 1 and site_values[0].isdigit():
-                    site_id = int(site_values[0])
+                site_id = base._parse_site_id(site) if site is not None else None
                 resource = self._local_resource(site_id)
             self._controller().authorize(
                 principal,
@@ -267,26 +296,25 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             return
 
         tail = self._batch_path(path)
-        if tail is not None and len(tail) == 1 and self.batch_runtime is not None:
-            principal = self._principal()
-            snapshot = self.batch_runtime.get(tail[0])
-            resources = self._resources_from_batch(snapshot)
-            if not resources:
-                self._controller().authorize(
-                    principal,
-                    Permission.BATCH_READ,
-                    method=self.command,
-                    path=path,
-                    resource=None,
-                )
-            for resource in resources:
-                self._controller().authorize(
-                    principal,
-                    Permission.BATCH_READ,
-                    method=self.command,
-                    path=path,
-                    resource=resource,
-                )
+        if tail is not None:
+            if self.batch_runtime is None:
+                self._principal()
+                return
+            if len(tail) == 1:
+                principal = self._principal()
+                snapshot = self.batch_runtime.get(tail[0])
+                resources = self._resources_from_batch(snapshot)
+                for resource in resources:
+                    self._controller().authorize(
+                        principal,
+                        Permission.BATCH_READ,
+                        method=self.command,
+                        path=path,
+                        resource=resource,
+                    )
+                return
+
+        self._deny_unclassified_api_route(path)
 
     def _guard_post(self) -> bool:
         parsed = urlparse(self.path)
@@ -314,8 +342,7 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             if tail == ["api", "jobs"]:
                 body = self._body()
                 operation = Operation(str(body.get("operation")))
-                site_id = body.get("site_id")
-                site = site_id if isinstance(site_id, int) and not isinstance(site_id, bool) else None
+                site = base._parse_site_id(body.get("site_id"))
                 target = ResourceRef(facility_id, ppu_id, site)
                 return self._admit_command(_OPERATION_PERMISSIONS[operation], resources=(target,))
 
@@ -329,15 +356,19 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             self._principal()
             body = self._body()
             operation = Operation(str(body.get("operation")))
-            site_id = body.get("site_id")
-            site = site_id if isinstance(site_id, int) and not isinstance(site_id, bool) else None
+            site = base._parse_site_id(body.get("site_id"))
             return self._admit_command(
                 _OPERATION_PERMISSIONS[operation],
                 resources=(self._local_resource(site),),
             )
 
         tail = self._batch_path(path)
-        if tail is None or self.batch_runtime is None:
+        if tail is None:
+            if path == "/api" or path.startswith("/api/"):
+                self._deny_unclassified_api_route(path)
+            return False
+        if self.batch_runtime is None:
+            self._principal()
             return False
         if not tail:
             self._principal()
@@ -353,20 +384,18 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
                     resource=resource,
                 )
             operations = body.get("operations")
-            if isinstance(operations, list):
-                for raw_operation in operations:
-                    try:
-                        permission = _OPERATION_PERMISSIONS[Operation(str(raw_operation))]
-                    except (ValueError, KeyError):
-                        continue
-                    for resource in resources:
-                        self._controller().authorize(
-                            principal,
-                            permission,
-                            method=self.command,
-                            path=path,
-                            resource=resource,
-                        )
+            if not isinstance(operations, list):
+                raise ValueError("Batch operations must be an array")
+            for raw_operation in operations:
+                permission = _OPERATION_PERMISSIONS[Operation(str(raw_operation))]
+                for resource in resources:
+                    self._controller().authorize(
+                        principal,
+                        permission,
+                        method=self.command,
+                        path=path,
+                        resource=resource,
+                    )
             return self._admit_command(Permission.BATCH_START, resources=resources)
         if len(tail) == 2 and tail[1] == "cancel":
             self._principal()
@@ -386,6 +415,7 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             if not resources:
                 resources = (ResourceRef(tail[2], tail[3]),)
             return self._admit_command(Permission.BATCH_CANCEL, resources=resources)
+        self._deny_unclassified_api_route(path)
         return False
 
     def _json(self, status: int, payload: dict[str, Any]) -> None:
