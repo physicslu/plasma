@@ -607,7 +607,6 @@ export default function FactoryConsoleV2() {
   useEffect(() => {
     if (!workspaceHydrated) return;
     let stopped = false;
-    setGatewayHealth("connecting");
     void (async () => {
       try {
         await ensureEngineeringSession(apiBase);
