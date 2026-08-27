@@ -40,6 +40,12 @@ class PPUStatusTests(unittest.TestCase):
                     "display_name": "Line A PPU",
                     "site_count": 3,
                     "enabled_site_count": 0,
+                    "execution": {
+                        "busy": False,
+                        "owner_kind": None,
+                        "owner_id": None,
+                        "active_job_count": 0,
+                    },
                     "capabilities": {
                         "max_supported_sites": 8,
                         "operations": ["erase", "program", "verify", "read"],
