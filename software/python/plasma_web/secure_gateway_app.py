@@ -107,13 +107,18 @@ class DeployedSecurePlasmaWebHandler(SecurePlasmaWebHandler):
 def main() -> None:
     controller = load_security_controller_from_env()
     original_handler = gateway.PlasmaWebHandler
+    previous_umask = os.umask(0o077)
     DeployedSecurePlasmaWebHandler.security_controller = controller
     gateway.PlasmaWebHandler = DeployedSecurePlasmaWebHandler
     try:
+        # Secure mode owns not only the SQLite security ledger but also all
+        # Programming Image/readback/log files created by the Gateway process.
+        # Keep newly-created material private by default for the full process lifetime.
         gateway.main()
     finally:
         gateway.PlasmaWebHandler = original_handler
         DeployedSecurePlasmaWebHandler.security_controller = None
+        os.umask(previous_umask)
         controller.close()
 
 
