@@ -215,24 +215,8 @@
   line-height: 1.25;
 }
 
-.engineeringProgrammingV2 .batchReadiness {
-  min-height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  justify-self: start;
-  padding: 0 8px;
-  border: 1px solid var(--line, #d6dde6);
-  border-radius: 6px;
-  background: var(--panel-2, #f6f8fa);
-  font-size: 8px;
-}
-
-.engineeringProgrammingV2 .batchReadiness small,
-.engineeringProgrammingV2 .batchReadiness b {
-  font-size: inherit;
-}
+/* Batch readiness presentation is shared with the PMode Batch Status control.
+   This file intentionally owns no readiness geometry or typography. */
 
 .engineeringPolicyRow {
   grid-template-columns: 145px max-content max-content max-content;
@@ -274,10 +258,8 @@
   width: 80px;
 }
 
-.engineeringProgrammingV2 .programmingActions {
-  gap: 9px;
-  margin-top: 0;
-}
+/* START / BATCH STATUS / ABORT presentation is owned only by the shared
+   operator-ui Programming Job control contract. */
 
 .engineeringProgrammingV2 .liveSiteStatus {
   margin-top: 8px;

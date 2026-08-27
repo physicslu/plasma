@@ -60,21 +60,27 @@ test("Production and Engineering share operator programming vocabulary while kee
   assert.doesNotMatch(emode, /BatchTopologySummary/);
 });
 
-test("Emode shell density protects the Programming viewport with centered Batch status", async () => {
+test("Emode density owns placement while shared Programming Job controls own centered Batch status", async () => {
   const css = await read("engineering/engineering-density.css");
   const v2Css = await read("engineering/programming-workspace-v2.css");
   const refreshCss = await read("engineering/engineering-workspace-refresh.css");
   const batchSummaryCss = await read("operator-ui/batch-summary.css");
+  const controlsCss = await read("operator-ui/programming-job-controls.css");
 
   assert.match(css, /\.engineeringShell\s*\{[\s\S]*padding:\s*0;[\s\S]*gap:\s*0/);
   assert.match(css, /\.engineeringCanvas\.programmingActive\s*\{[\s\S]*padding:\s*10px 12px 18px/);
   assert.match(css, /\.programmingJobBody\.programmingBatchToolbar\s*\{[\s\S]*grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)[\s\S]*grid-template-areas:\s*none/);
   assert.match(css, /> \.engineeringPolicyRow\s*\{[\s\S]*grid-column:\s*4\s*\/\s*7;[\s\S]*grid-row:\s*2/);
   assert.match(css, /> \.engineeringReadRow\s*\{[\s\S]*display:\s*none/);
-  assert.match(css, /> \.batchReadiness\s*\{[\s\S]*grid-column:\s*3\s*\/\s*5;[\s\S]*grid-row:\s*3/);
-  assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*3;[\s\S]*width:\s*100%;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*180px\s*minmax\(0,\s*1fr\)/);
-  assert.match(css, /> \.programmingActions > button:first-child\s*\{[\s\S]*grid-column:\s*1;[\s\S]*width:\s*100%/);
-  assert.match(css, /> \.programmingActions > button:last-child\s*\{[\s\S]*grid-column:\s*3;[\s\S]*width:\s*100%/);
+  assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*3;[\s\S]*width:\s*100%/);
+  assert.doesNotMatch(css, /> \.batchReadiness\s*\{/);
+  assert.doesNotMatch(css, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s*180px\s*minmax\(0,\s*1fr\)/);
+  assert.doesNotMatch(css, /> \.programmingActions > button/);
+
+  assert.match(controlsCss, /\.factoryActionBar,[\s\S]*\.engineeringProgrammingV2 \.programmingJobCard \.programmingActions/);
+  assert.match(controlsCss, /grid-template-columns:\s*minmax\(0, 1fr\) 160px minmax\(0, 1fr\)/);
+  assert.match(controlsCss, /\.factoryBatchStatus,[\s\S]*\.engineeringProgrammingV2 \.programmingJobCard \.batchReadiness/);
+
   assert.doesNotMatch(css, /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/);
   assert.match(batchSummaryCss, /\[data-kpi="pass"\][\s\S]*border-left-color:\s*#15803d[\s\S]*background:\s*color-mix/);
   assert.match(batchSummaryCss, /\[data-kpi="fail"\][\s\S]*border-left-color:\s*#dc2626[\s\S]*background:\s*color-mix/);

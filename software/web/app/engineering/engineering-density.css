@@ -52,12 +52,9 @@
   padding: 6px 7px;
 }
 
-/* The shared Programming toolbar owns a file/operations/actions grid-area
- * contract for PMode. Engineering Programming is a different workspace and
- * must explicitly neutralize that grid-area contract. Otherwise the generic
- * toolbar areas override the Engineering job layout. The six-column desktop
- * grid keeps the two control halves equal while allowing the final action row
- * to place Batch readiness between the two operator actions. */
+/* Engineering owns field placement, not equivalent Programming Job control
+ * presentation. Operation tiles, Batch status and START / ABORT composition are
+ * owned by operator-ui/programming-job-controls.css using the PMode baseline. */
 @container engineering-programming (min-width: 981px) {
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar {
     grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -103,40 +100,13 @@
     display: none;
   }
 
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .batchReadiness {
-    grid-column: 3 / 5;
-    grid-row: 3;
-    justify-self: center;
-    align-self: center;
-    min-width: 132px;
-    max-width: calc(100% - 24px);
-    text-align: center;
-    z-index: 1;
-  }
-
-  /* START and ABORT still own the full measurable action row. The middle track
-   * is reserved for Batch status, leaving the two operator actions equal and as
-   * wide as the remaining space permits. */
+  /* Placement only: the shared Programming Job contract owns the three-column
+   * START | BATCH STATUS | ABORT geometry and all internal control styling. */
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions {
     grid-column: 1 / -1;
     grid-row: 3;
     width: 100%;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr);
-    gap: 12px;
     align-self: center;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions > button:first-child {
-    grid-column: 1;
-    width: 100%;
-    min-width: 0;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions > button:last-child {
-    grid-column: 3;
-    width: 100%;
-    min-width: 0;
   }
 
   html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .warning {

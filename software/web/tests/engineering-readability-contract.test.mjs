@@ -4,14 +4,15 @@ import test from "node:test";
 
 const readabilityPath = new URL("../app/engineering/engineering-readability.css", import.meta.url);
 const refreshPath = new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url);
+const sharedControlsPath = new URL("../app/operator-ui/programming-job-controls.css", import.meta.url);
 const pagePath = new URL("../app/engineering/page.tsx", import.meta.url);
 
 async function source(url) {
   return readFile(url, "utf8");
 }
 
-test("Engineering readability layer raises the approved operator font floor", async () => {
-  const css = await source(readabilityPath);
+test("Engineering readability layer raises the approved operator font floor without overriding shared Programming controls", async () => {
+  const [css, sharedControls] = await Promise.all([source(readabilityPath), source(sharedControlsPath)]);
 
   for (const contract of [
     ".liveSiteStatus > header > span::before {\n  font-size: 12px;",
@@ -19,10 +20,7 @@ test("Engineering readability layer raises the approved operator font floor", as
     ".workflowField > span {\n  font-size: 12px;",
     ".jobRow > strong {\n  font-size: 12px;",
     ".engineeringImageHint {\n  font-size: 9px;",
-    ".programmingBatchOperations .operationChecks label,",
     ".engineeringRetryField {\n  font-size: 10px;",
-    ".batchReadiness {\n  font-size: 10px;",
-    ".programmingActions button {\n  font-size: 12px;",
     ".channelTable {\n  font-size: 12px;",
     ".channelTable th {\n  font-size: 10px;",
     ".channelTable td:nth-child(2) b {\n  font-size: 13px;",
@@ -30,6 +28,17 @@ test("Engineering readability layer raises the approved operator font floor", as
   ]) {
     assert.ok(css.includes(contract), `missing readability contract: ${contract}`);
   }
+
+  for (const forbidden of [
+    ".programmingBatchOperations .operationChecks label",
+    ".batchReadiness {",
+    ".programmingActions button",
+  ]) {
+    assert.equal(css.includes(forbidden), false, `Engineering readability must not override shared Programming control: ${forbidden}`);
+  }
+
+  assert.match(sharedControls, /font-size:\s*9px[\s\S]*font-weight:\s*700/);
+  assert.match(sharedControls, /\.programmingActions \.startProgramming,[\s\S]*font-size:\s*10px[\s\S]*font-weight:\s*850/);
   assert.doesNotMatch(
     css,
     /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/,

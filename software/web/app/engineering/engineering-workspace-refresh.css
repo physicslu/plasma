@@ -277,20 +277,9 @@
   align-items: start;
 }
 
-.engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(78px, 1fr));
-  gap: 8px;
-}
-
-.engineeringProgrammingV2 .programmingBatchOperations .operationChecks label {
-  justify-content: center;
-  min-height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-2);
-  padding: 4px 8px;
-}
+/* Programming Job operation controls intentionally have no EMode-local display,
+ * tile geometry, typography or state styling. The shared operator-ui contract
+ * owns those equivalent controls using the approved PMode presentation. */
 
 .engineeringProgrammingV2 .engineeringPolicyRow {
   grid-template-columns: 126px repeat(3, max-content);
@@ -308,29 +297,16 @@
   margin-top: -4px;
 }
 
-.engineeringProgrammingV2 .programmingJobBody > .batchReadiness {
-  grid-column: 1;
-  align-self: center;
-  min-height: 34px;
-  padding-inline: 12px;
-}
-
 .engineeringProgrammingV2 .programmingJobBody > .warning,
 .engineeringProgrammingV2 .programmingJobBody > .engineeringOperationWarning {
   grid-column: 1 / -1;
 }
 
+/* Placement only. Shared operator-ui owns START / BATCH STATUS / ABORT internal
+ * composition, dimensions, typography, colors and disabled states. */
 .engineeringProgrammingV2 .programmingJobBody > .programmingActions {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) minmax(150px, .8fr);
-  gap: 12px;
-  margin: 0;
-}
-
-.engineeringProgrammingV2 .programmingActions button {
-  min-height: 44px;
-  font-size: 12px;
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .engineeringProgrammingV2 .liveSiteStatus {
@@ -366,13 +342,8 @@
   .engineeringProgrammingV2 .engineeringReadRow,
   .engineeringProgrammingV2 .programmingJobBody > .warning,
   .engineeringProgrammingV2 .programmingJobBody > .engineeringOperationWarning,
-  .engineeringProgrammingV2 .programmingJobBody > .programmingActions,
-  .engineeringProgrammingV2 .programmingJobBody > .batchReadiness {
-    grid-column: 1;
-  }
-
   .engineeringProgrammingV2 .programmingJobBody > .programmingActions {
-    grid-template-columns: minmax(0, 1fr) minmax(140px, .55fr);
+    grid-column: 1;
   }
 }
 
@@ -422,9 +393,5 @@
   .engineeringProgrammingV2 .engineeringPolicyRow,
   .engineeringProgrammingV2 .engineeringReadRow {
     grid-template-columns: 1fr;
-  }
-
-  .engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
