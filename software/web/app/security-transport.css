@@ -1,0 +1,46 @@
+.securityCredentialControl {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--ink, #172033) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel, #fff) 94%, transparent);
+  color: var(--ink, #172033);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 14%);
+  font: 700 11px/1 var(--font-mono, ui-monospace, monospace);
+  letter-spacing: .06em;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.securityCredentialControl span {
+  font-size: 10px;
+}
+
+.securityCredentialControl.ready span {
+  color: #16824b;
+}
+
+.securityCredentialControl.required {
+  border-color: color-mix(in srgb, #c63f3f 55%, transparent);
+}
+
+.securityCredentialControl.required span {
+  color: #c63f3f;
+}
+
+.securityCredentialControl.off {
+  opacity: .72;
+}
+
+.securityCredentialControl:hover,
+.securityCredentialControl:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
