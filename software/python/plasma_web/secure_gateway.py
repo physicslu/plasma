@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from http import HTTPStatus
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -9,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 
+from . import gateway_base as base
 from .gateway import PlasmaWebHandler as CanonicalPlasmaWebHandler
 from .gateway_security import (
     CommandAdmission,
@@ -30,14 +30,10 @@ _OPERATION_PERMISSIONS = {
 class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
     """Canonical Plasma REST Gateway with an explicit security boundary.
 
-    This handler deliberately composes the existing canonical Gateway instead
-    of reimplementing routes. Authentication/authorization happens before the
-    inherited route is invoked, and state-changing requests are admitted through
-    a durable idempotency ledger before they can reach a Batch runtime or PPU.
-
-    Deployment wiring and browser identity integration are separate from this
-    backend boundary. A SecurePlasmaWebHandler without a configured controller
-    fails closed.
+    Authentication happens before protected control-plane/PPU state is looked
+    up. Authorization then checks the exact Facility/PPU/Site whenever the Job
+    or Batch identity can resolve it. State-changing requests pass through the
+    durable idempotency ledger before the inherited canonical route executes.
     """
 
     security_controller: GatewaySecurityController | None = None
@@ -83,12 +79,11 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
 
     def _authorize(self, permission: Permission, resource: ResourceRef | None = None) -> Principal:
         principal = self._principal()
-        parsed = urlparse(self.path)
         self._controller().authorize(
             principal,
             permission,
             method=self.command,
-            path=parsed.path,
+            path=urlparse(self.path).path,
             resource=resource,
         )
         return principal
@@ -124,10 +119,43 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
                     resources.append(ResourceRef(facility_id, ppu_id, site_id))
         return tuple(resources)
 
+    @staticmethod
+    def _job_site_id(payload: dict[str, Any]) -> int:
+        job = payload.get("job")
+        if not isinstance(job, dict):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Job lookup did not return a Job object")
+        site_id = job.get("site_id")
+        if isinstance(site_id, bool) or not isinstance(site_id, int) or site_id < 1:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Job lookup did not return a valid Site identity")
+        return site_id
+
     def _local_resource(self, site_id: int | None = None) -> ResourceRef:
         snapshot = self._local_snapshot()
         ppu = snapshot["ppu"]
-        return ResourceRef(ppu_id=str(ppu["ppu_id"]), site_id=site_id)
+        return ResourceRef(
+            facility_id=str(ppu["facility_id"]),
+            ppu_id=str(ppu["ppu_id"]),
+            site_id=site_id,
+        )
+
+    def _local_job_resource(self, job_id: str) -> ResourceRef:
+        self._principal()  # Authentication must precede any PPU lookup.
+        payload = base._run(self.client_factory().status(job_id=job_id))
+        local = self._local_resource(self._job_site_id(payload))
+        return local
+
+    def _engineering_job_resource(self, facility_id: str, ppu_id: str, job_id: str) -> ResourceRef:
+        self._principal()  # Authentication must precede any Provider/PPU lookup.
+        if self.engineering_provider is None:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Engineering Provider is not enabled")
+        payload = base._run(
+            self.engineering_provider.status(
+                facility_id,
+                ppu_id,
+                job_id=job_id,
+            )
+        )
+        return ResourceRef(facility_id, ppu_id, self._job_site_id(payload))
 
     def _admit_command(
         self,
@@ -137,16 +165,15 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
     ) -> bool:
         principal = self._principal()
         parsed = urlparse(self.path)
-        if resources:
-            for resource in resources:
-                self._controller().authorize(
-                    principal,
-                    permission,
-                    method=self.command,
-                    path=parsed.path,
-                    resource=resource,
-                )
-        else:
+        for resource in resources:
+            self._controller().authorize(
+                principal,
+                permission,
+                method=self.command,
+                path=parsed.path,
+                resource=resource,
+            )
+        if not resources:
             self._controller().authorize(
                 principal,
                 permission,
@@ -171,9 +198,6 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
         self._security_active_command = admission
         return False
 
-    def _authorize_operation(self, operation: Operation, resource: ResourceRef) -> None:
-        self._authorize(_OPERATION_PERMISSIONS[operation], resource)
-
     def _guard_get(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
@@ -181,52 +205,88 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             return
         if path != "/api" and not path.startswith("/api/"):
             return
-        if path == "/api/engineering/targets" or path == "/api/devices/search":
+        if path in {"/api/engineering/targets", "/api/devices/search"}:
             self._authorize(Permission.CATALOG_READ)
             return
-        if path == "/api/settings/gateway" or path == "/api/mock/runtime":
+        if path in {"/api/settings/gateway", "/api/mock/runtime"}:
             self._authorize(Permission.SETTINGS_READ)
             return
 
         engineering = self._engineering_target(path)
         if engineering is not None:
             facility_id, ppu_id, tail = engineering
-            resource = ResourceRef(facility_id, ppu_id)
             if tail == ["api", "status"]:
+                principal = self._principal()
                 query = parse_qs(parsed.query, keep_blank_values=True)
+                job_values = query.get("job")
                 site_values = query.get("site")
-                site_id = None
-                if site_values and len(site_values) == 1 and site_values[0].isdigit():
-                    site_id = int(site_values[0])
-                self._authorize(Permission.STATUS_READ, ResourceRef(facility_id, ppu_id, site_id))
+                if job_values and len(job_values) == 1 and job_values[0]:
+                    resource = self._engineering_job_resource(facility_id, ppu_id, job_values[0])
+                else:
+                    site_id = None
+                    if site_values and len(site_values) == 1 and site_values[0].isdigit():
+                        site_id = int(site_values[0])
+                    resource = ResourceRef(facility_id, ppu_id, site_id)
+                self._controller().authorize(
+                    principal,
+                    Permission.STATUS_READ,
+                    method=self.command,
+                    path=path,
+                    resource=resource,
+                )
                 return
             if len(tail) == 5 and tail[:2] == ["api", "jobs"] and tail[3] == "files":
+                resource = self._engineering_job_resource(facility_id, ppu_id, tail[2])
                 self._authorize(Permission.JOB_OUTPUT_READ, resource)
                 return
 
         if path == "/api/status":
+            principal = self._principal()
             query = parse_qs(parsed.query, keep_blank_values=True)
+            job_values = query.get("job")
             site_values = query.get("site")
-            site_id = None
-            if site_values and len(site_values) == 1 and site_values[0].isdigit():
-                site_id = int(site_values[0])
-            self._authorize(Permission.STATUS_READ, self._local_resource(site_id))
+            if job_values and len(job_values) == 1 and job_values[0]:
+                resource = self._local_job_resource(job_values[0])
+            else:
+                site_id = None
+                if site_values and len(site_values) == 1 and site_values[0].isdigit():
+                    site_id = int(site_values[0])
+                resource = self._local_resource(site_id)
+            self._controller().authorize(
+                principal,
+                Permission.STATUS_READ,
+                method=self.command,
+                path=path,
+                resource=resource,
+            )
             return
 
         parts = path.split("/")
         if len(parts) == 6 and parts[1:3] == ["api", "jobs"] and parts[4] == "files":
-            self._authorize(Permission.JOB_OUTPUT_READ, self._local_resource())
+            self._authorize(Permission.JOB_OUTPUT_READ, self._local_job_resource(parts[3]))
             return
 
         tail = self._batch_path(path)
         if tail is not None and len(tail) == 1 and self.batch_runtime is not None:
+            principal = self._principal()
             snapshot = self.batch_runtime.get(tail[0])
             resources = self._resources_from_batch(snapshot)
-            if resources:
-                for resource in resources:
-                    self._authorize(Permission.BATCH_READ, resource)
-            else:
-                self._authorize(Permission.BATCH_READ)
+            if not resources:
+                self._controller().authorize(
+                    principal,
+                    Permission.BATCH_READ,
+                    method=self.command,
+                    path=path,
+                    resource=None,
+                )
+            for resource in resources:
+                self._controller().authorize(
+                    principal,
+                    Permission.BATCH_READ,
+                    method=self.command,
+                    path=path,
+                    resource=resource,
+                )
 
     def _guard_post(self) -> bool:
         parsed = urlparse(self.path)
@@ -249,7 +309,8 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             if tail == ["api", "programming-assets"]:
                 return self._admit_command(Permission.PROGRAMMING_ASSET_WRITE, resources=(resource,))
             if len(tail) == 4 and tail[:2] == ["api", "jobs"] and tail[3] == "cancel":
-                return self._admit_command(Permission.JOB_CANCEL, resources=(resource,))
+                job_resource = self._engineering_job_resource(facility_id, ppu_id, tail[2])
+                return self._admit_command(Permission.JOB_CANCEL, resources=(job_resource,))
             if tail == ["api", "jobs"]:
                 body = self._body()
                 operation = Operation(str(body.get("operation")))
@@ -259,19 +320,27 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
                 return self._admit_command(_OPERATION_PERMISSIONS[operation], resources=(target,))
 
         if path.startswith("/api/jobs/") and path.endswith("/cancel"):
-            return self._admit_command(Permission.JOB_CANCEL, resources=(self._local_resource(),))
+            job_id = path.split("/")[3]
+            return self._admit_command(
+                Permission.JOB_CANCEL,
+                resources=(self._local_job_resource(job_id),),
+            )
         if path == "/api/jobs":
+            self._principal()
             body = self._body()
             operation = Operation(str(body.get("operation")))
             site_id = body.get("site_id")
             site = site_id if isinstance(site_id, int) and not isinstance(site_id, bool) else None
-            target = self._local_resource(site)
-            return self._admit_command(_OPERATION_PERMISSIONS[operation], resources=(target,))
+            return self._admit_command(
+                _OPERATION_PERMISSIONS[operation],
+                resources=(self._local_resource(site),),
+            )
 
         tail = self._batch_path(path)
         if tail is None or self.batch_runtime is None:
             return False
         if not tail:
+            self._principal()
             body = self._body()
             resources = self._resources_from_targets(body.get("targets"))
             principal = self._principal()
@@ -300,16 +369,23 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
                         )
             return self._admit_command(Permission.BATCH_START, resources=resources)
         if len(tail) == 2 and tail[1] == "cancel":
+            self._principal()
             snapshot = self.batch_runtime.get(tail[0])
             return self._admit_command(
                 Permission.BATCH_CANCEL,
                 resources=self._resources_from_batch(snapshot),
             )
         if len(tail) == 5 and tail[1] == "targets" and tail[4] == "cancel":
-            return self._admit_command(
-                Permission.BATCH_CANCEL,
-                resources=(ResourceRef(tail[2], tail[3]),),
+            self._principal()
+            snapshot = self.batch_runtime.get(tail[0])
+            resources = tuple(
+                resource
+                for resource in self._resources_from_batch(snapshot)
+                if resource.facility_id == tail[2] and resource.ppu_id == tail[3]
             )
+            if not resources:
+                resources = (ResourceRef(tail[2], tail[3]),)
+            return self._admit_command(Permission.BATCH_CANCEL, resources=resources)
         return False
 
     def _json(self, status: int, payload: dict[str, Any]) -> None:
@@ -340,6 +416,12 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             }
             status = status_by_code.get(exc.code)
             if status is not None:
+                if exc.code is ErrorCode.AUTHENTICATION_REQUIRED:
+                    base._gateway_diagnostic(
+                        "security_authentication_failed",
+                        method=self.command,
+                        path=urlparse(self.path).path,
+                    )
                 self._json(
                     status,
                     {
