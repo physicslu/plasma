@@ -72,6 +72,12 @@ export default function DemoLandingPage() {
   const [profileChecking, setProfileChecking] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
+  // Probe once for the selected Gateway after hydration. On a canonical
+  // non-secure Gateway this is a harmless 404 and the existing landing page is
+  // unchanged. On a secure Gateway E4101 activates the security transport.
+  // The /demo entry owns credential changes itself, so credentialRevision is
+  // intentionally not an effect dependency; this avoids racing the explicit
+  // login request with a second identity probe.
   useEffect(() => {
     if (!hydrated) return;
     let active = true;
@@ -89,12 +95,9 @@ export default function DemoLandingPage() {
         } else if (getSecurityTransportState().securityDetected) {
           setProfileError(error instanceof Error ? error.message : "Security profile request failed");
         }
-      })
-      .finally(() => {
-        if (active) setProfileChecking(false);
       });
     return () => { active = false; };
-  }, [apiBase, hydrated, transport.credentialRevision]);
+  }, [apiBase, hydrated]);
 
   const selectedMatchesPrincipal = selectedProfile === null
     || principal === null
