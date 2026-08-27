@@ -121,8 +121,6 @@ class ResourceScope:
             return False
         if resource.ppu_id is not None and self.ppu_id not in {"*", resource.ppu_id}:
             return False
-        if resource.site_id is None and self.site_ids is not None:
-            return False
         if resource.site_id is not None and self.site_ids is not None and resource.site_id not in self.site_ids:
             return False
         return True
