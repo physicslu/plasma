@@ -16,7 +16,7 @@ Every permanent configuration value needs explicit answers for:
 4. **Lifecycle** — when is it created, changed, applied, and retired?
 5. **Version/Migration** — how does persisted old state move to a new schema?
 
-Generated systemd units, environment blocks, browser bootstrap values, and other derived configuration are not independent sources of truth. They must be reproducible from authoritative input.
+Generated systemd units, environment blocks, browser bootstrap values, derived response budgets, and other derived configuration are not independent sources of truth. They must be reproducible from authoritative input.
 
 ## 2. Canonical domain
 
@@ -45,6 +45,7 @@ The word **Facility** is used for a factory/lab/deployment location. **Site** is
 | PPU identity | PPU ID, model, serial identity, facility association | Device provisioning | Device-local persistent identity |
 | PPU capability | Site count, supported operations/interfaces, FPGA/Image capability | PPU runtime/hardware | Device-reported capability |
 | Gateway communication policy | PPU request timeout and retry count | Plasma Web REST Gateway | Persistent Gateway settings YAML |
+| Derived communication budget | complete PPU observation response budget | Plasma Web REST Gateway | Derived from Gateway policy; not persisted |
 | Site configuration | Site enablement, interface binding, per-Site limits | PPU configuration | Canonical PPU config |
 | Target profile | IC family, memory geometry, interface | Target-definition layer | Checked-in target/profile data |
 | Job configuration | operation, target, file, offset, read length | Job request/server | Accepted server-side job record |
@@ -52,7 +53,7 @@ The word **Facility** is used for a factory/lab/deployment location. **Site** is
 | User preference | theme, layout, visible Sites | Browser/user | Browser-local preference storage |
 | Secrets/credentials | certificates, tokens, private keys | Security/deployment layer | Protected secret storage |
 
-A browser may cache presentation preferences, but it must not become authoritative for PPU inventory, Site topology, Site capability, or hardware capability.
+A browser may cache presentation preferences, but it must not become authoritative for PPU inventory, Site topology, Site capability, hardware capability, Gateway retry policy, or Gateway response budget.
 
 ## 4. Deployment configuration
 
@@ -182,6 +183,10 @@ Once a job is accepted, the server-side job record is authoritative for that exe
 
 The resource is edited through `EMode -> Settings -> Gateway` and shared by PMode and EMode. Each Batch freezes a policy revision at START; updates affect only future Batches.
 
+The writable persistent fields are `ppu_request_timeout_ms` and `ppu_retry_count`; `revision` is server-owned. The complete observation budget `ppu_response_budget_ms` is calculated by the Gateway from configured attempts plus communication backoff. It is read-only, not persisted, and must not be treated as a third operator setting.
+
+The Browser may derive an outer HTTP watchdog from `ppu_response_budget_ms` plus a transport margin. That watchdog is a client-side transport guard only. It must not become a second source of truth for PPU request timeout or retry count.
+
 ## 7. Schema versioning and migration
 
 Configuration that survives a software upgrade requires an explicit schema/version strategy.
@@ -263,6 +268,8 @@ PPU inventory
 PPU Site count
 Site enable/disable truth
 PPU hardware interfaces/capability
+Gateway timeout/retry policy
+Gateway response budget
 production routing policy
 authentication secrets
 job execution state
@@ -334,6 +341,8 @@ What public API Base is effective?
 What ports are active?
 What Facility / PPU identity is active?
 What Site topology/capability is active?
+What Gateway policy revision is active?
+What derived PPU response budget is effective?
 ```
 
 A future structured read-only effective-configuration/status endpoint may reduce ambiguity, but its API contract should be designed deliberately rather than inferred from UI convenience.
@@ -356,6 +365,8 @@ A future structured read-only effective-configuration/status endpoint may reduce
 | `PLASMA_ENGINEERING_MOCK_ROOT` | Test runtime | Deployment | Operator-local state path | Must remain outside the Git worktree |
 | `NEXT_PUBLIC_PLASMA_API_URL` | Derived runtime | Deployment generator | Generated systemd environment | Not independent truth |
 | Gateway PPU timeout/retry | Gateway policy | Gateway | Persistent Gateway settings YAML | Frozen into each Batch snapshot |
+| `ppu_response_budget_ms` | Derived Gateway policy | Gateway | Calculated from timeout/retry/backoff | Read-only; not persisted/writable |
+| Browser HTTP watchdog | Derived transport guard | Browser | Gateway response budget + margin | Not a PPU policy source |
 | Browser theme/layout | User preference | Browser/user | Browser storage | User-local only |
 | PPU ID | PPU identity | PPU provisioning | Device-local identity | Stable resource identity |
 | Site count | PPU capability | PPU/device | Device capability report | Support 1–8 in current software |
@@ -370,7 +381,8 @@ A future structured read-only effective-configuration/status endpoint may reduce
 3. Keep topology/capability truth out of browser storage
 4. Keep canonical Site identity one-based across new layers
 5. Keep Manager observation separate from Batch command ownership
-6. Add effective-config observability where ambiguity remains operationally costly
+6. Keep Gateway communication policy server-owned and derived budgets read-only
+7. Add effective-config observability where ambiguity remains operationally costly
 ```
 
 Do not build a large generic configuration framework merely because configuration exists. Add abstraction only when repeated concrete requirements justify it.

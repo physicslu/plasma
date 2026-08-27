@@ -11,7 +11,8 @@ Browser / UI
     -> observes Gateway responses and presents reconnect state
 
 Plasma Web REST Gateway
-    -> owns PPU request deadline, retry count, and communication backoff
+    -> owns PPU request deadline, retry count, communication backoff,
+       stable communication errors, and the declared response budget
 
 PPU
     -> executes the requested status / Job operation
@@ -63,6 +64,38 @@ PMode may perform a later background status re-probe after one complete Gateway 
 
 The browser still has an HTTP transport watchdog to detect a Gateway/public-path request that never completes. Its deadline is derived from `ppu_response_budget_ms` plus a transport margin. The margin exists only to prevent an outer browser timeout from racing the authoritative Gateway policy.
 
+## Response-boundary diagnostics
+
+PPU-level Engineering status diagnostics separate the provider phase from the Gateway HTTP response-write phase. The normal sequence is:
+
+```text
+engineering_ppu_status_start
+engineering_ppu_status_ok
+engineering_ppu_status_response_sent
+```
+
+The fields `provider_elapsed_ms`, `response_write_elapsed_ms`, and `total_elapsed_ms` allow the two phases to be distinguished.
+
+The semantics are deliberately narrow:
+
+- `engineering_ppu_status_ok` means the Gateway obtained a PPU/provider payload successfully. It does **not** prove that the HTTP response was written successfully or received by the Browser.
+- `engineering_ppu_status_response_sent` means the Gateway handler's response-write call returned successfully. It does **not** prove that Vite, Cloudflare/public ingress, or the Browser received or acknowledged the response.
+- `engineering_ppu_status_response_error` means the provider phase succeeded but the Gateway response-write call raised an exception. The diagnostic includes `error_type` plus provider/write/total timing.
+- `engineering_ppu_status_error` remains a provider/PPU communication failure; response-write failures must not be misclassified as PPU failures.
+
+A response-write failure therefore has this diagnostic sequence:
+
+```text
+engineering_ppu_status_start
+engineering_ppu_status_ok
+engineering_ppu_status_response_error
+request_error
+```
+
+These events are intentionally PPU-level observation diagnostics. Job-specific status observation does not emit the same PPU-level noise.
+
+The current diagnostics do not provide a per-request correlation ID. Timestamp ordering is useful operational evidence but must not be treated as mathematical proof that two independently observed log/browser events belong to the same request. A future correlation identifier may improve this boundary without changing communication policy.
+
 ## Retry boundary
 
 Only transient timeout, OS/connection failure, `CONNECTION_TIMEOUT`, and `CONNECTION_FAILED` are retryable. Gateway communication backoff is capped:
@@ -106,9 +139,12 @@ Terminal states include `SUCCESS`, `PARTIAL`, `ERROR`, and `CANCELLED`. A reconn
 
 1. Record `batch_id` when applicable, Facility, PPU, Site, current `job_id`, policy revision and timestamps.
 2. Distinguish submission failure (no accepted Job identity) from status-observation failure (accepted Job identity may exist).
-3. For PPU-level Engineering observation, correlate `engineering_ppu_status_start`, optional `engineering_ppu_status_retry`, and `engineering_ppu_status_ok` / `engineering_ppu_status_error`.
-4. If the Gateway logs a fast `status_ok` but the browser times out, investigate the response/public-ingress/browser path rather than the PPU.
-5. Check `communication_state` and `communication_attempt` before classifying a Batch event.
-6. Preserve `ERROR` as an infrastructure outcome; never convert it to IC `FAIL` merely to close a Batch.
-7. If ABORT is requested, wait for Batch terminal reconciliation before switching product mode.
-8. Treat a manual reconnect as transport recovery, not proof that an accepted Job stopped.
+3. For PPU-level Engineering observation, correlate `engineering_ppu_status_start`, optional `engineering_ppu_status_retry`, `engineering_ppu_status_ok` / `engineering_ppu_status_error`, and the response-boundary event `engineering_ppu_status_response_sent` / `engineering_ppu_status_response_error`.
+4. If `engineering_ppu_status_error` occurs, investigate the PPU/provider communication path and the Gateway retry classification before blaming the public path.
+5. If `engineering_ppu_status_ok` is followed by `engineering_ppu_status_response_error`, the provider completed but the Gateway response-write boundary failed; do not classify that incident as a PPU programming failure.
+6. If `engineering_ppu_status_ok` and `engineering_ppu_status_response_sent` are both present but the Browser still times out, the Gateway provider and handler response-write call both completed. Investigate the downstream Vite proxy / public ingress / Browser fetch path without claiming any one component as root cause until evidence identifies it.
+7. If `engineering_ppu_status_ok` appears without either response-boundary event, inspect the Gateway handler/write path and confirm the deployed version before drawing conclusions.
+8. Check `communication_state` and `communication_attempt` before classifying a Batch event.
+9. Preserve `ERROR` as an infrastructure outcome; never convert it to IC `FAIL` merely to close a Batch.
+10. If ABORT is requested, wait for Batch terminal reconciliation before switching product mode.
+11. Treat a manual reconnect as transport recovery, not proof that an accepted Job stopped.
