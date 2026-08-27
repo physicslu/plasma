@@ -28,12 +28,12 @@ const testDevice = {
 };
 
 export function programmingJob(page: Page) {
-  return page.getByRole("region", { name: "PROGRAMMING JOB" });
+  return page.getByRole("region", { name: "Production Programming Job" });
 }
 
 export function productionOperation(page: Page, code: "E" | "P" | "V" | "R") {
   const index = { E: 0, P: 1, V: 2, R: 3 }[code];
-  return programmingJob(page).locator(".factoryOperationChecks label").nth(index).getByRole("checkbox");
+  return programmingJob(page).locator(".programmingJobOperationChecks label").nth(index).getByRole("checkbox");
 }
 
 export async function installTestDeviceCatalog(page: Page) {
