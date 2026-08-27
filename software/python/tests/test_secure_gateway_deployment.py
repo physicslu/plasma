@@ -57,6 +57,19 @@ def test_secure_launcher_requires_explicit_paths(monkeypatch: pytest.MonkeyPatch
     assert exc_info.value.code is ErrorCode.CONFIG_INVALID
 
 
+def test_secure_launcher_rejects_same_config_and_state_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "security.yaml"
+    _write_config(config_path)
+    monkeypatch.setenv("PLASMA_SECURITY_CONFIG", str(config_path))
+    monkeypatch.setenv("PLASMA_SECURITY_STATE", str(config_path))
+    with pytest.raises(PlasmaError) as exc_info:
+        load_security_controller_from_env()
+    assert exc_info.value.code is ErrorCode.CONFIG_INVALID
+
+
 def test_secure_launcher_rejects_group_or_world_readable_config(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -70,6 +83,22 @@ def test_secure_launcher_rejects_group_or_world_readable_config(
         load_security_controller_from_env()
     assert exc_info.value.code is ErrorCode.CONFIG_INVALID
     assert not state_path.exists()
+
+
+def test_secure_launcher_rejects_existing_readable_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "security.yaml"
+    state_path = tmp_path / "security-state.sqlite3"
+    _write_config(config_path)
+    state_path.write_bytes(b"")
+    state_path.chmod(0o644)
+    monkeypatch.setenv("PLASMA_SECURITY_CONFIG", str(config_path))
+    monkeypatch.setenv("PLASMA_SECURITY_STATE", str(state_path))
+    with pytest.raises(PlasmaError) as exc_info:
+        load_security_controller_from_env()
+    assert exc_info.value.code is ErrorCode.CONFIG_INVALID
 
 
 def test_secure_launcher_creates_owner_only_state(
@@ -162,5 +191,6 @@ def test_deployed_secure_handler_exposes_auth_cors_and_enforces_write_boundary(
         server.server_close()
         thread.join()
         controller.close()
-        DeployedSecurePlasmaWebHandler.security_controller = None
-        DeployedSecurePlasmaWebHandler.batch_runtime = None
+        for attribute in ("security_controller", "client_factory", "batch_runtime", "allowed_origins"):
+            if attribute in DeployedSecurePlasmaWebHandler.__dict__:
+                delattr(DeployedSecurePlasmaWebHandler, attribute)
