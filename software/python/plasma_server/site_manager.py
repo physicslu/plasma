@@ -169,6 +169,14 @@ class SiteManager:
         if batch_id is not None:
             return "batch", cls._validate_execution_owner(batch_id, "batch_id")
 
+        # REST gateway client IDs are process-global labels, not authenticated
+        # client identities. Treat an unscoped REST Job as its own execution so
+        # two browser tabs/PCs cannot bypass PPU ownership merely because both
+        # requests carry the same fixed gateway client_id. Multi-Site Web work
+        # that needs one shared owner must use the server-side Batch contract.
+        if request.client_id in {"plasma-web", "plasma-web-engineering"}:
+            return "rest_job", cls._validate_execution_owner(request.job_id, "job_id")
+
         return "client", cls._validate_execution_owner(request.client_id, "client_id")
 
     def _reserve_execution_job(self, request: JobRequest) -> tuple[str, str]:
