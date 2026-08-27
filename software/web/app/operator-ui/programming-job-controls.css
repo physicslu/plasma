@@ -1,9 +1,10 @@
 /*
  * Canonical Programming Job control presentation.
  *
- * PMode is the approved visual baseline.  PMode and EMode may keep different
- * workflow/layout ownership, but equivalent Programming Job operation choices
- * and START / ABORT actions must render from this one shared visual contract.
+ * PMode is the approved visual baseline. PMode and EMode may keep different
+ * workflow/layout ownership, but equivalent Programming Job operation choices,
+ * Batch status and START / ABORT actions must render from this one shared visual
+ * contract.
  */
 
 .programmingOperationChecks,
@@ -20,7 +21,9 @@
 .factoryOperationChecks label,
 .engineeringProgrammingV2 .programmingBatchOperations .operationChecks label {
   min-width: 0;
+  height: 34px;
   min-height: 34px;
+  box-sizing: border-box;
   padding: 0 9px;
   border: 1px solid #ced9e2;
   border-radius: 6px;
@@ -31,13 +34,35 @@
   color: #334155;
   font-size: 9px;
   font-weight: 700;
+  line-height: 1;
   white-space: nowrap;
 }
 
 .programmingOperationChecks input,
 .factoryOperationChecks input,
 .engineeringProgrammingV2 .programmingBatchOperations .operationChecks input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: 0 0 14px;
   accent-color: #2563eb;
+}
+
+/*
+ * The desktop Programming Job action composition is canonical PMode:
+ *
+ *   START PROGRAMMING | BATCH STATUS | ABORT
+ *
+ * EMode historically kept Batch readiness above a two-column action row. Keep
+ * its readiness semantics, but place that status in the same middle-column
+ * presentation instead of maintaining a second visual composition.
+ */
+.factoryActionBar,
+.engineeringProgrammingV2 .programmingJobCard .programmingActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .programmingActionButton,
@@ -76,11 +101,105 @@
   box-shadow: none;
 }
 
+.programmingBatchStatus,
+.factoryBatchStatus,
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness {
+  min-height: 38px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid #cbd7e1;
+  border-radius: 6px;
+  background: #f8fbfd;
+  display: grid;
+  place-content: center;
+  gap: 1px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.programmingBatchStatus small,
+.factoryBatchStatus small,
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness small {
+  color: #657482;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.programmingBatchStatus b,
+.factoryBatchStatus b,
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness b {
+  color: #172033;
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+/* EMode keeps its existing readiness data, but the visual label is the same
+   canonical status title used by PMode. */
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness small {
+  font-size: 0;
+}
+
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness small::after {
+  content: "BATCH STATUS";
+  font-size: 7px;
+}
+
+.engineeringProgrammingV2 .programmingJobCard .programmingJobBody {
+  position: relative;
+}
+
+.engineeringProgrammingV2 .programmingJobCard .programmingActions .startProgramming {
+  grid-column: 1;
+}
+
+.engineeringProgrammingV2 .programmingJobCard .programmingActions .abortProgramming {
+  grid-column: 3;
+}
+
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: 1;
+  width: 160px;
+  transform: translateX(-50%);
+}
+
+.factoryBatchStatus.state-running,
+.factoryBatchStatus.state-queued,
+.factoryBatchStatus.state-stopping,
+.factoryBatchStatus.state-reconnecting,
+.factoryBatchStatus.state-submitting,
+.factoryBatchStatus.state-aborting,
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness.readiness-running,
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness.readiness-cancelling {
+  border-color: #f3ba55;
+  background: #fff9e9;
+}
+
+.factoryBatchStatus.state-success,
+.engineeringProgrammingV2 .programmingJobCard .batchReadiness.readiness-batch-ready {
+  border-color: #78d69a;
+  background: #f1fbf4;
+}
+
 [data-theme="dark"] .programmingOperationChecks label,
 [data-theme="dark"] .factoryOperationChecks label,
-[data-theme="dark"] .engineeringProgrammingV2 .programmingBatchOperations .operationChecks label {
+[data-theme="dark"] .engineeringProgrammingV2 .programmingBatchOperations .operationChecks label,
+[data-theme="dark"] .programmingBatchStatus,
+[data-theme="dark"] .factoryBatchStatus,
+[data-theme="dark"] .engineeringProgrammingV2 .programmingJobCard .batchReadiness {
   background: var(--panel);
   border-color: var(--line);
+  color: var(--text);
+}
+
+[data-theme="dark"] .programmingBatchStatus b,
+[data-theme="dark"] .factoryBatchStatus b,
+[data-theme="dark"] .engineeringProgrammingV2 .programmingJobCard .batchReadiness b {
   color: var(--text);
 }
 
@@ -89,5 +208,21 @@
   .factoryOperationChecks,
   .engineeringProgrammingV2 .programmingBatchOperations .operationChecks {
     flex-wrap: wrap;
+  }
+
+  .factoryActionBar,
+  .engineeringProgrammingV2 .programmingJobCard .programmingActions {
+    grid-template-columns: 1fr;
+  }
+
+  .engineeringProgrammingV2 .programmingJobCard .programmingActions .startProgramming,
+  .engineeringProgrammingV2 .programmingJobCard .programmingActions .abortProgramming {
+    grid-column: 1;
+  }
+
+  .engineeringProgrammingV2 .programmingJobCard .batchReadiness {
+    position: static;
+    width: 100%;
+    transform: none;
   }
 }
