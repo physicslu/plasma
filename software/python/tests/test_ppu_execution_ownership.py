@@ -125,6 +125,36 @@ class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
         await client.wait_for_job(first.job_id)
         await client.wait_for_job(same_batch.job_id)
 
+    async def test_unscoped_rest_jobs_do_not_share_fixed_gateway_client_identity(self) -> None:
+        client = await self.start_server()
+        first = JobRequest(
+            site_id=1,
+            operation=Operation.ERASE,
+            job_id="rest-job-a",
+            client_id="plasma-web-engineering",
+        )
+        second = JobRequest(
+            site_id=2,
+            operation=Operation.ERASE,
+            job_id="rest-job-b",
+            client_id="plasma-web-engineering",
+        )
+
+        await client.start(first)
+        status = await client.status()
+        self.assertEqual(status["ppu"]["execution"]["owner_kind"], "rest_job")
+        self.assertEqual(status["ppu"]["execution"]["owner_id"], first.job_id)
+
+        with self.assertRaises(PlasmaError) as caught:
+            await client.start(second)
+        self.assertEqual(caught.exception.code, ErrorCode.PPU_BUSY)
+        self.assertEqual(caught.exception.context["active_owner_id"], first.job_id)
+        self.assertEqual(caught.exception.context["requested_owner_id"], second.job_id)
+
+        await client.wait_for_job(first.job_id)
+        await client.start(second)
+        await client.wait_for_job(second.job_id)
+
     async def test_execution_owner_metadata_requires_kind_and_id_together(self) -> None:
         client = await self.start_server()
         invalid = JobRequest(
