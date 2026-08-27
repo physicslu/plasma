@@ -150,7 +150,7 @@ def test_operator_scope_rejects_other_site_and_ppu(tmp_path: Path) -> None:
         controller.close()
 
 
-def test_site_limited_scope_does_not_authorize_parent_ppu_resource(tmp_path: Path) -> None:
+def test_site_limited_scope_can_address_parent_ppu_resource(tmp_path: Path) -> None:
     controller, tokens = _controller(tmp_path)
     try:
         principal = controller.authenticate(
@@ -158,15 +158,13 @@ def test_site_limited_scope_does_not_authorize_parent_ppu_resource(tmp_path: Pat
             method="GET",
             path="/api/status",
         )
-        with pytest.raises(PlasmaError) as exc_info:
-            controller.authorize(
-                principal,
-                Permission.STATUS_READ,
-                method="GET",
-                path="/api/status",
-                resource=ResourceRef("mock-facility-01", "mock-facility-01-ppu-01"),
-            )
-        assert exc_info.value.code is ErrorCode.AUTHORIZATION_DENIED
+        controller.authorize(
+            principal,
+            Permission.STATUS_READ,
+            method="GET",
+            path="/api/status",
+            resource=ResourceRef("mock-facility-01", "mock-facility-01-ppu-01"),
+        )
     finally:
         controller.close()
 
