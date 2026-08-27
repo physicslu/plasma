@@ -32,14 +32,13 @@ jobs:
                   pmod_import + 'import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";\n',
                   1,
               )
-          pmod_start_marker = '''            <OperatorPanel
-              number={2}
-              title={text.programmingJob}'''
-          pmod_start = pmod.index(pmod_start_marker)
-          pmod_close = '''
-            </OperatorPanel>'''
-          pmod_end = pmod.index(pmod_close, pmod_start) + len(pmod_close)
-          pmod_shared = '''            <ProgrammingJobPanel
+          pmod_title = pmod.index('title={text.programmingJob}')
+          pmod_start = pmod.rfind('<OperatorPanel', 0, pmod_title)
+          if pmod_start < 0:
+              raise RuntimeError('PMode Programming Job OperatorPanel start not found')
+          pmod_end_token = '</OperatorPanel>'
+          pmod_end = pmod.index(pmod_end_token, pmod_title) + len(pmod_end_token)
+          pmod_shared = '''<ProgrammingJobPanel
               mode="production"
               title={text.programmingJob}
               collapsed={programmingJobCollapsed}
@@ -127,12 +126,13 @@ jobs:
                   emode_import + 'import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";\n',
                   1,
               )
-          emode_start_marker = '''            <section className={`productionProgrammingCard programmingJobCard unifiedBatchControlStack ${programmingJobCollapsed ? "is-collapsed" : ""}`} data-dashboard-mode="engineering">'''
-          emode_start = emode.index(emode_start_marker)
-          emode_close = '''
-            </section>'''
-          emode_end = emode.index(emode_close, emode_start) + len(emode_close)
-          emode_shared = '''            <ProgrammingJobPanel
+          emode_class = emode.index('programmingJobCard unifiedBatchControlStack')
+          emode_start = emode.rfind('<section', 0, emode_class)
+          if emode_start < 0:
+              raise RuntimeError('EMode Programming Job section start not found')
+          emode_end_token = '</section>'
+          emode_end = emode.index(emode_end_token, emode_class) + len(emode_end_token)
+          emode_shared = '''<ProgrammingJobPanel
               mode="engineering"
               title="PROGRAMMING JOB"
               collapsed={programmingJobCollapsed}
