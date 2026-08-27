@@ -75,7 +75,6 @@ export default function DemoLandingPage() {
   useEffect(() => {
     if (!hydrated) return;
     let active = true;
-    setProfileChecking(true);
     void getSecurityPrincipal(apiBase)
       .then(identity => {
         if (!active) return;
