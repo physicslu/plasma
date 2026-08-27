@@ -89,6 +89,28 @@ class PPUExecutionOwnershipTests(unittest.IsolatedAsyncioTestCase):
         await client.start(third)
         await client.wait_for_job(third.job_id)
 
+    async def test_duplicate_job_id_does_not_remove_existing_job_or_lease(self) -> None:
+        client = await self.start_server()
+        original = self.owned_request(1, "duplicate-active-job", "owner-a")
+        await client.start(original)
+
+        with self.assertRaises(PlasmaError) as caught:
+            await client.start(original)
+        self.assertEqual(caught.exception.code, ErrorCode.DUPLICATE_JOB)
+
+        status = await client.status()
+        self.assertTrue(status["ppu"]["execution"]["busy"])
+        self.assertEqual(status["ppu"]["execution"]["owner_kind"], "test")
+        self.assertEqual(status["ppu"]["execution"]["owner_id"], "owner-a")
+        self.assertEqual(status["ppu"]["execution"]["active_job_count"], 1)
+
+        observed = await client.status(job_id=original.job_id)
+        self.assertEqual(observed["job"]["job_id"], original.job_id)
+        await client.wait_for_job(original.job_id)
+
+        released = await client.status()
+        self.assertFalse(released["ppu"]["execution"]["busy"])
+
     async def test_batch_id_is_the_execution_owner_not_shared_batch_client_id(self) -> None:
         client = await self.start_server()
         first = JobRequest(
