@@ -58,18 +58,20 @@ export function SecurityTransportProvider({ children }: { children: React.ReactN
   return (
     <>
       {children}
-      <button
-        type="button"
-        className={`securityCredentialControl ${state.authenticationRequired ? "required" : state.credentialLoaded ? "ready" : "off"}`}
-        onClick={openCredentialDialog}
-        aria-label="Configure Plasma Bearer credential"
-        title="Bearer credential is memory-only and is never written to browser storage."
-      >
-        <span aria-hidden="true">●</span>
-        {label}
-      </button>
+      {state.securityDetected && (
+        <button
+          type="button"
+          className={`securityCredentialControl ${state.authenticationRequired ? "required" : state.credentialLoaded ? "ready" : "off"}`}
+          onClick={openCredentialDialog}
+          aria-label="Configure Plasma Bearer credential"
+          title="Bearer credential is memory-only and is never written to browser storage."
+        >
+          <span aria-hidden="true">●</span>
+          {label}
+        </button>
+      )}
 
-      {dialogOpen && (
+      {state.securityDetected && dialogOpen && (
         <div className="securityCredentialBackdrop" role="presentation" onMouseDown={event => {
           if (event.currentTarget === event.target) closeCredentialDialog();
         }}>
