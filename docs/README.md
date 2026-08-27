@@ -25,6 +25,7 @@
 - **Current** — [Configuration Architecture](architecture/configuration-architecture.md)
 - **Current** — [Batch Domain Model](architecture/batch-domain-model.md)
 - **Current** — [Server-side Batch Runtime](architecture/server-side-batch-runtime.md)
+- **Current** — [Batch Persistence and Gateway Restart Recovery](architecture/batch-persistence-recovery.md)
 - **Current** — [Gateway Communication and Recovery](architecture/gateway-communication-recovery.md)
 - **Current** — [PMode Factory Console v2](architecture/pmode-factory-console-v2.md)
 - **Current** — [Engineering Programming Workspace](architecture/engineering-programming-workspace.md)
