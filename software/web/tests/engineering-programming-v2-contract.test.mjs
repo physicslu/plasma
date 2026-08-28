@@ -27,11 +27,12 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.match(sharedJob, /aria-expanded=\{!collapsed\}/);
   assert.doesNotMatch(workspace, /TARGET SITES/);
   assert.doesNotMatch(workspace, /LIVE PROGRESS MONITOR/);
+  assert.doesNotMatch(workspace, /RECENT EVENTS|recentEvents|Engineering recent events/);
+  assert.doesNotMatch(refresh, /recentEvents/);
 
   assert.match(refresh, /grid-template-columns:\s*minmax\(0, 1fr\)/);
   assert.match(refresh, /1\. SYSTEM SETUP/);
   assert.match(refresh, /3\. LIVE SITE STATUS/);
-  assert.match(refresh, /\.engineeringProgrammingV2 \.recentEvents\s*\{[\s\S]*display:\s*none !important/);
 });
 
 test("Engineering shell uses the approved dark EMode sidebar and supports collapse", async () => {
@@ -139,6 +140,20 @@ test("Engineering v2 advertises only the implemented binary Programming Image no
   assert.match(workspace, /Binary Programming Image \(\.bin\)\./);
   assert.doesNotMatch(sharedJob, /\.hex/);
   assert.doesNotMatch(workspace, /\.hex/);
+});
+
+test("Engineering READ uses target-owned Main Flash defaults with no hidden operator state", async () => {
+  const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const session = await source("../app/workspace-session.tsx");
+  const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
+
+  assert.match(workspace, /const ENGINEERING_READ_OFFSET = 0/);
+  assert.match(workspace, /const ENGINEERING_READ_LENGTH = 256/);
+  assert.match(workspace, /readOffset:\s*ENGINEERING_READ_OFFSET/);
+  assert.match(workspace, /readLength:\s*ENGINEERING_READ_LENGTH/);
+  assert.doesNotMatch(workspace, /Engineering READ offset|Engineering READ length|engineeringReadRow/);
+  assert.doesNotMatch(session, /emodeReadOffset|emodeReadLength/);
+  assert.doesNotMatch(sharedJob, /compatibilityFields|programmingJobCompatibility/);
 });
 
 test("Engineering v2 retains per-Site cancellation, polling and full audit evidence", async () => {
