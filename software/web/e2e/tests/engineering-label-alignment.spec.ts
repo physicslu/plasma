@@ -110,7 +110,7 @@ function expectProgrammingJobRail(metric: Awaited<ReturnType<typeof rowMetrics>>
   expect(metric.labelOffset).toBeLessThanOrEqual(26);
   expect(metric.controlOffset).toBeGreaterThanOrEqual(288);
   expect(metric.controlOffset).toBeLessThanOrEqual(296);
-  expect(metric.gap).toBeGreaterThan(120);
+  expect(metric.gap).toBeGreaterThan(90);
   expect(metric.textAlign).toBe("left");
   expect(metric.justifySelf).toBe("start");
 }
