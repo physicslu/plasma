@@ -19,6 +19,9 @@ class DurableProvider:
         self.cancel_calls: list[str] = []
         self.cancel_completes_after = 1
         self.status_failures_remaining = 0
+        self.block_start_return = False
+        self.start_return_blocked = threading.Event()
+        self.release_start_return = threading.Event()
         self._lock = threading.RLock()
 
     def catalog(self):
@@ -48,7 +51,12 @@ class DurableProvider:
                 "result": None,
             }
             self.jobs[request.job_id] = job
-            return {"ok": True, "job": dict(job)}
+            response = {"ok": True, "job": dict(job)}
+        if self.block_start_return:
+            self.start_return_blocked.set()
+            if not self.release_start_return.wait(timeout=3.0):
+                raise TimeoutError("test provider start_job return remained blocked")
+        return response
 
     async def status(self, facility_id, ppu_id, *, site_id=None, job_id=None):
         if job_id is None:
@@ -214,9 +222,31 @@ class PersistentBatchRuntimeTests(unittest.TestCase):
         self.assertEqual(self.provider.start_calls, [job_id])
         recovered.close(timeout_s=1.0)
 
+    def test_cancel_intent_is_not_lost_when_job_publication_is_late(self):
+        self.provider.block_start_return = True
+        manager = self.new_manager()
+        snapshot = manager.create_batch(
+            targets=(self.target,),
+            operations=["erase"],
+            policy=BatchExecutionPolicy(),
+        )
+        batch_id = snapshot["batch_id"]
+        wait_until(self.provider.start_return_blocked.is_set)
+        job_id = self.provider.start_calls[0]
+
+        manager.cancel(batch_id)
+        self.assertEqual(self.provider.cancel_calls, [])
+        self.provider.release_start_return.set()
+
+        wait_until(lambda: manager.get(batch_id)["state"] == "cancelled")
+        self.assertEqual(self.provider.cancel_calls, [job_id])
+        self.assertEqual(self.provider.start_calls, [job_id])
+        manager.close(timeout_s=1.0)
+
     def test_restart_during_abort_reissues_cancel_idempotently(self):
         self.provider.cancel_completes_after = 2
         manager, batch_id, job_id = self.start_one_erase()
+        wait_until(lambda: manager.get(batch_id)["sites"][0]["current_job_id"] == job_id)
         manager.cancel(batch_id)
         wait_until(lambda: len(self.provider.cancel_calls) >= 1)
         self.assertEqual(self.provider.jobs[job_id]["state"], "running")

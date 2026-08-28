@@ -214,6 +214,7 @@ class BatchRecord:
     cancelled_ppus: set[str] = field(default_factory=set)
     failed_ppus: set[str] = field(default_factory=set)
     active_jobs: dict[str, tuple[BatchTarget, str]] = field(default_factory=dict)
+    cancel_dispatched_jobs: set[str] = field(default_factory=set, repr=False)
     lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
     loop: asyncio.AbstractEventLoop | None = field(default=None, repr=False)
     thread: threading.Thread | None = field(default=None, repr=False)
@@ -652,6 +653,9 @@ class BatchRuntimeManager:
             site.current_job_id = job_id
             batch.active_jobs[site.target.key] = (site.target, job_id)
 
+        if self._stop_disposition(batch, site) is not None:
+            await self._cancel_active_job(batch, site.target, job_id)
+
         terminal_states = {"success", "failed", "error", "cancelled", "timeout", "aborted"}
         observed_terminal = False
         try:
@@ -771,6 +775,25 @@ class BatchRuntimeManager:
         if should_cancel:
             await self._cancel_active_jobs(batch, ppu_key=ppu_key)
 
+    async def _cancel_active_job(self, batch: BatchRecord, target: BatchTarget, job_id: str) -> None:
+        with batch.lock:
+            if job_id in batch.cancel_dispatched_jobs:
+                return
+            batch.cancel_dispatched_jobs.add(job_id)
+        site = batch.sites[target.key]
+        try:
+            await self._provider_request(
+                batch,
+                site,
+                "cancel",
+                lambda: self.provider.cancel_job(target.facility_id, target.ppu_id, job_id),
+            )
+        finally:
+            with batch.lock:
+                current = batch.active_jobs.get(target.key)
+                if current is not None and current[1] == job_id:
+                    batch.active_jobs.pop(target.key, None)
+
     async def _cancel_active_jobs(self, batch: BatchRecord, *, ppu_key: str | None = None) -> None:
         with batch.lock:
             active = [
@@ -780,17 +803,7 @@ class BatchRuntimeManager:
             ]
         if not active:
             return
-        async def cancel_one(target: BatchTarget, job_id: str) -> None:
-            site = batch.sites[target.key]
-            try:
-                await self._provider_request(
-                    batch,
-                    site,
-                    "cancel",
-                    lambda: self.provider.cancel_job(target.facility_id, target.ppu_id, job_id),
-                )
-            finally:
-                with batch.lock:
-                    batch.active_jobs.pop(target.key, None)
-
-        await asyncio.gather(*(cancel_one(target, job_id) for target, job_id in active), return_exceptions=True)
+        await asyncio.gather(
+            *(self._cancel_active_job(batch, target, job_id) for target, job_id in active),
+            return_exceptions=True,
+        )
