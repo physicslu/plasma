@@ -1,3 +1,5 @@
+@import "./operator-design-contract.css";
+
 .batchSummary {
   container-type: inline-size;
   font-family: var(--font-sans), Arial, sans-serif;
@@ -7,14 +9,14 @@
 .batchSummary.has-title {
   overflow: hidden;
   border: 1px solid var(--line, #d4dee8);
-  border-radius: 7px;
+  border-radius: var(--operator-panel-radius);
   background: var(--panel, #fff);
   box-shadow: 0 1px 5px rgba(15, 23, 42, .04);
 }
 
 .batchSummaryHeader {
-  min-height: 30px;
-  padding: 5px 8px;
+  min-height: var(--operator-panel-header-min-height);
+  padding: var(--operator-panel-header-padding-block) var(--operator-panel-header-padding-inline);
   border-bottom: 1px solid var(--line, #d4dee8);
   background: linear-gradient(180deg, #f4f7f9, #eaf0f4);
   display: flex;
@@ -24,13 +26,13 @@
 
 .batchSummaryHeader strong {
   color: var(--text, #172033);
-  font-size: 11px;
+  font-size: var(--operator-panel-title-font-size);
   font-weight: 900;
 }
 
 .batchSummaryHeader small {
   color: var(--text-soft, #51606f);
-  font-size: 8px;
+  font-size: var(--operator-panel-meta-font-size);
 }
 
 .batchSummary.has-title .batchSummaryGrid {
@@ -48,7 +50,7 @@
   min-height: 58px;
   padding: 8px 10px;
   border: 1px solid var(--line, #d4dee8);
-  border-radius: 7px;
+  border-radius: var(--operator-panel-radius);
   background: var(--panel, #fff);
   box-shadow: 0 1px 4px rgba(15, 23, 42, .04);
 }
@@ -76,9 +78,6 @@
 .batchSummaryGrid article[data-tone="pass"] b { color: #16803a; }
 .batchSummaryGrid article[data-tone="fail"] b { color: #dc2626; }
 
-/* Canonical Batch Summary visual contract comes from the approved EMode
- * operator surface. PASS / FAIL need stronger peripheral-vision emphasis than
- * topology or count KPIs while retaining the same card footprint. */
 .batchSummaryGrid article[data-kpi="pass"],
 .batchSummaryGrid article[data-kpi="fail"] {
   border-left-width: 4px;
