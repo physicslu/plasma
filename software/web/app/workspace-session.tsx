@@ -78,10 +78,6 @@ type WorkspaceSessionContextValue = {
   setEmodeSiteIds: Dispatch<SetStateAction<number[] | null>>;
   emodeOperations: Operation[];
   setEmodeOperations: Dispatch<SetStateAction<Operation[]>>;
-  emodeReadOffset: string;
-  setEmodeReadOffset: Dispatch<SetStateAction<string>>;
-  emodeReadLength: string;
-  setEmodeReadLength: Dispatch<SetStateAction<string>>;
 };
 
 const WorkspaceSessionContext = createContext<WorkspaceSessionContextValue | null>(null);
@@ -120,8 +116,6 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
   const [emodeSelection, setEmodeSelection] = useState<TargetSelection>({ facilityId: "", ppuId: "" });
   const [emodeSiteIds, setEmodeSiteIds] = useState<number[] | null>(null);
   const [emodeOperations, setEmodeOperations] = useState<Operation[]>([]);
-  const [emodeReadOffset, setEmodeReadOffset] = useState("0");
-  const [emodeReadLength, setEmodeReadLength] = useState("256");
 
   useEffect(() => {
     let saved = DEFAULT_API_BASE;
@@ -250,10 +244,6 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     setEmodeSiteIds,
     emodeOperations,
     setEmodeOperations,
-    emodeReadOffset,
-    setEmodeReadOffset,
-    emodeReadLength,
-    setEmodeReadLength,
   }), [
     hydrated,
     apiBase,
@@ -273,8 +263,6 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     emodeSelection,
     emodeSiteIds,
     emodeOperations,
-    emodeReadOffset,
-    emodeReadLength,
   ]);
 
   return <WorkspaceSessionContext.Provider value={value}>{children}</WorkspaceSessionContext.Provider>;
