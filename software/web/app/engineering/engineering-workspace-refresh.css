@@ -1,7 +1,8 @@
 /* Engineering workspace refresh.
  * Programming flow:
  *   SYSTEM SETUP -> PROGRAMMING JOB -> LIVE SITE STATUS -> OPERATOR LOG.
- * Shared panels own their shell/header/title presentation; this file owns page layout.
+ * Shared panels own their shell/header/title presentation; this file owns page
+ * and panel composition, not individual Programming control presentation.
  */
 
 .engineeringPage {
@@ -230,13 +231,8 @@
   display: none;
 }
 
-.engineeringProgrammingV2 .targetingCard .workflowField {
-  grid-template-columns: 128px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  margin: 0;
-}
-
+/* The topology footer is panel composition. Its chrome and typography have
+ * separate owners in the Programming and readability layers. */
 .engineeringProgrammingV2 .targetingCard .topologyFoot {
   grid-column: 1 / -1;
   margin-top: 0;
@@ -307,9 +303,5 @@
   .engineeringNavIcon {
     width: 20px;
     font-size: 16px;
-  }
-
-  .engineeringProgrammingV2 .targetingCard .workflowField {
-    grid-template-columns: 1fr;
   }
 }
