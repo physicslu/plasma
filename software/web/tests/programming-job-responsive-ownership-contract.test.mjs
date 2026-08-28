@@ -25,7 +25,8 @@ test("shared Programming Job has one real three-child action composition", () =>
 
 test("shared Programming Job fields cannot switch to a mode-local desktop composition", () => {
   assert.match(shared, /\.programmingJobGrid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);
-  assert.match(shared, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*clamp\(190px, 15vw, 260px\) minmax\(0, 1fr\)/);
+  assert.match(shared, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*128px minmax\(0, 1fr\)[\s\S]*column-gap:\s*8px/);
+  assert.doesNotMatch(shared, /clamp\(190px, 15vw, 260px\)|column-gap:\s*28px/);
 
   for (const source of [refresh, density, readability, alignment, v2]) {
     assert.doesNotMatch(source, /\.programmingJobGrid\b/);
