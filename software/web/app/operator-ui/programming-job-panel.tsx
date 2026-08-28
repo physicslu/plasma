@@ -2,7 +2,7 @@ import { useRef } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
-import { OperatorPanel } from "./operator-panel";
+import { OperatorPanel, OperatorPanelToggle } from "./operator-panel";
 import "./programming-job-controls.css";
 
 export type ProgrammingJobOperation = {
@@ -108,25 +108,23 @@ export function ProgrammingJobPanel({
   abortDisabled: boolean;
   onAbort: () => void | Promise<void>;
 }) {
-  const toggleLabel = collapsed ? expandLabel : collapseLabel;
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const modeLabel = mode === "production" ? "Production" : "Engineering";
 
   return (
     <OperatorPanel
       number={2}
       title={title}
       className={`programmingJobPanel unifiedBatchControlStack ${collapsed ? "is-collapsed" : ""}`}
-      ariaLabel={`${mode === "production" ? "Production" : "Engineering"} Programming Job`}
+      ariaLabel={`${modeLabel} Programming Job`}
       actions={(
-        <button
-          type="button"
-          className="programmingJobCollapseButton"
-          aria-label={`${collapsed ? "Expand" : "Collapse"} ${mode === "production" ? "Production" : "Engineering"} Programming Job`}
-          aria-expanded={!collapsed}
+        <OperatorPanelToggle
+          expanded={!collapsed}
+          expandLabel={expandLabel}
+          collapseLabel={collapseLabel}
+          ariaLabel={`${collapsed ? "Expand" : "Collapse"} ${modeLabel} Programming Job`}
           onClick={onToggleCollapsed}
-        >
-          {toggleLabel} {collapsed ? "⌄" : "⌃"}
-        </button>
+        />
       )}
     >
       {!collapsed && (
@@ -162,7 +160,7 @@ export function ProgrammingJobPanel({
 
           <div className="programmingJobField" data-programming-job-field="operations">
             <strong>3. {operationsLabel}</strong>
-            <div className="programmingJobOperationChecks" role="group" aria-label={`${mode === "production" ? "Production" : "Engineering"} batch operations`}>
+            <div className="programmingJobOperationChecks" role="group" aria-label={`${modeLabel} batch operations`}>
               {operations.map(operation => (
                 <label key={operation.key}>
                   <input
