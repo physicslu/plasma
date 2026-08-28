@@ -82,7 +82,7 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
       <article className="documentArticle">
         <p className="documentEyebrow">PMODE · PRODUCTION OPERATION</p>
         <h1>{zh ? "PMode 操作總覽" : "PMode Overview"}</h1>
-        <p className="documentLead">{zh ? "PMode 用於量產操作。Operator 先選定 Facility / PPU / Site，再以單一 Programming Job 定義 Target IC、Programming Image、E/P/V/R 與 Batch Policy。" : "PMode is the production workflow for selecting Facility / PPU / Site scope and executing one Programming Job definition across a server-owned Batch."}</p>
+        <p className="documentLead">{zh ? "PMode 是 Production Mode（量產模式），用於正式燒錄與批次量產作業。Operator 先選定 Facility / PPU / Site，再以單一 Programming Job 定義 Target IC、Programming Image、E/P/V/R 與 Batch Policy。" : "PMode means Production Mode. It is used for production programming and batch operations: select Facility / PPU / Site scope, then define Target IC, Programming Image, E/P/V/R, and Batch Policy in one Programming Job."}</p>
         <section><h2>{zh ? "核心物件" : "Core objects"}</h2><DefinitionTable rows={[
           ["Facility", zh ? "設備所在的產線、實驗室或管理區域。" : "The line, lab, or managed area that owns PPUs."],
           ["PPU", zh ? "實際執行燒錄工作的 PPU。" : "The PPU that executes programming work."],
@@ -159,7 +159,7 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
       <article className="documentArticle">
         <p className="documentEyebrow">EMODE · ENGINEERING OPERATION</p>
         <h1>{zh ? "EMode 操作總覽" : "EMode Overview"}</h1>
-        <p className="documentLead">{zh ? "EMode 面向工程分析與單一 PPU 操作。它保留與 PMode 共用的 Programming Job 語意，但增加 Facility / PPU targeting、單 Site 操作、診斷資訊、Gateway 與 Mock 設定。" : "EMode is the engineering workflow for a single PPU, sharing Programming Job semantics with PMode while adding targeting, direct Site actions, diagnostics, Gateway, and Mock settings."}</p>
+        <p className="documentLead">{zh ? "EMode 是 Engineering Mode（工程模式），用於工程開發、驗證、診斷與設定。它保留與 PMode 共用的 Programming Job 語意，但增加 Facility / PPU targeting、單 Site 操作、診斷資訊、Gateway 與 Mock 設定。" : "EMode means Engineering Mode. It is used for engineering development, validation, diagnostics, and configuration while sharing Programming Job semantics with PMode and adding targeting, direct Site actions, Gateway, and Mock settings."}</p>
         <section><h2>{zh ? "使用原則" : "Operating principles"}</h2><ul><li>{zh ? "先確認 Facility / PPU，再解讀 Site 狀態與 Job log。" : "Resolve Facility / PPU before interpreting Site state and Job logs."}</li><li>{zh ? "Direct single-Site Job 與 server-owned Batch 是不同 execution owner。" : "Direct single-Site Jobs and server-owned Batches are different execution owners."}</li><li>{zh ? "EMode 提供更多診斷資訊，但不能繞過 backend 的 PPU ownership 與授權。" : "Engineering diagnostics do not bypass backend PPU ownership or authorization."}</li></ul></section>
       </article>
     );
@@ -208,14 +208,16 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
     <article className="documentArticle">
       <p className="documentEyebrow">EMODE · SETTINGS · MOCK</p>
       <h1>{zh ? "Mock 設定說明" : "Mock Settings"}</h1>
+      <p className="documentLead">{zh ? "以下只列目前 Mock Settings UI 可以直接修改的欄位。" : "Only fields that are directly editable in the current Mock Settings UI are listed below."}</p>
       <DefinitionTable rows={[
-        ["Enable / Disable", zh ? "決定測試 runtime 是否使用 Mock provider 行為。" : "Controls whether Mock-provider behavior is used for test runtime."],
-        ["Default Image Size", zh ? "Synthetic Programming Image 的預設大小；目前設計支援 64 KiB 起至 4 MiB。" : "Default Synthetic Programming Image size; current design supports 64 KiB through 4 MiB."],
-        ["E/P/V/R Error Rate", zh ? "注入 Erase / Program / Verify / Read 操作失敗，解析度為 0.1%。不是 Gateway 斷線率。" : "Injects Erase / Program / Verify / Read operation failures at 0.1% resolution. It is not a Gateway disconnect rate."],
-        ["Operation Timing", zh ? "模擬各操作執行時間。" : "Simulates operation execution time."],
-        ["Timing Jitter", zh ? "讓執行時間帶有可控誤差，而不是每次完全相同。" : "Adds controlled timing variation instead of identical durations."],
-        ["Seed", zh ? "固定 seed 可重現相同的 Mock 隨機行為，便於 regression。" : "A fixed seed makes Mock random behavior reproducible for regression."],
-        ["Synthetic Image", zh ? "Mock 可產生測試用 Image，僅用於軟體流程驗證。" : "Mock can generate a test Image for software-flow validation only."],
+        ["Enabled", zh ? "開啟或關閉 Profile timing / error injection。" : "Enable or disable Profile timing and error injection."],
+        ["Default Image Size", zh ? "Mock Synthetic Programming Image 的預設大小，可設定 64–4096 KiB，step 為 64 KiB。" : "Default Mock Synthetic Programming Image size, configurable from 64 to 4096 KiB in 64 KiB steps."],
+        ["Seed Mode", zh ? "可選 Auto 或 Fixed；Fixed 用於需要重現相同測試條件的情境。" : "Choose Auto or Fixed. Fixed is useful when the same controlled test condition must be reproduced."],
+        ["Fixed Seed", zh ? "Seed Mode = Fixed 時可設定非負整數 seed；Auto 模式時此欄位不可編輯。" : "When Seed Mode is Fixed, configure a non-negative integer seed; this field is disabled in Auto mode."],
+        ["E/P/V/R Error Rate", zh ? "Erase / Program / Verify / Read 各自可設定 0–100% 的 operation failure rate，解析度 0.1%；不是 Gateway/network 斷線率。" : "Each Erase / Program / Verify / Read operation has a configurable 0–100% failure rate at 0.1% resolution; this is not a Gateway or network disconnect rate."],
+        ["E/P/V/R Base Time", zh ? "每個 operation 可設定基礎模擬執行時間，單位 ms。" : "Configure the base simulated execution time for each operation in milliseconds."],
+        ["E/P/V/R Throughput", zh ? "每個 operation 可設定模擬 throughput，UI 單位為 KiB/s。" : "Configure simulated throughput for each operation; the UI uses KiB/s."],
+        ["E/P/V/R Jitter", zh ? "每個 operation 可設定額外的 ± timing variation，單位 ms。" : "Configure additional ± timing variation for each operation in milliseconds."],
       ]} />
       <aside className="documentNotice critical">{zh ? "Mock PASS ≠ 真實 OpenOCD、Z2/FPGA、socket 或實體 IC programming 已驗證。" : "Mock PASS ≠ validation of real OpenOCD, Z2/FPGA, socket, or physical IC programming."}</aside>
     </article>
