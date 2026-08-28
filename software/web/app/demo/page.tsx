@@ -72,6 +72,12 @@ export default function DemoLandingPage() {
   const [profileChecking, setProfileChecking] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
+  // Probe once for the selected Gateway after hydration. On a canonical
+  // non-secure Gateway this is a harmless 404 and the existing landing page is
+  // unchanged. On a secure Gateway E4101 activates the security transport.
+  // The /demo entry owns credential changes itself, so credentialRevision is
+  // intentionally not an effect dependency; this avoids racing the explicit
+  // login request with a second identity probe.
   useEffect(() => {
     if (!hydrated) return;
     let active = true;
@@ -208,9 +214,18 @@ export default function DemoLandingPage() {
               </form>
             ) : (
               <div className="demoPrincipal" role="status">
-                <div><small>PRINCIPAL</small><b>{principal.id}</b></div>
-                <div><small>ROLE</small><b>{roleSummary(principal)}</b></div>
-                <div className="scope"><small>SCOPE</small><b>{scopeSummary}</b></div>
+                <div>
+                  <small>PRINCIPAL</small>
+                  <b>{principal.id}</b>
+                </div>
+                <div>
+                  <small>ROLE</small>
+                  <b>{roleSummary(principal)}</b>
+                </div>
+                <div className="scope">
+                  <small>SCOPE</small>
+                  <b>{scopeSummary}</b>
+                </div>
                 <button type="button" onClick={signOut}>{zh ? "清除身份" : "Clear identity"}</button>
               </div>
             )}
@@ -227,31 +242,57 @@ export default function DemoLandingPage() {
         )}
 
         <div className="demoChoices">
-          <Link className={`demoCard fleet ${productionDisabled ? "disabled" : ""}`} href="/fleet" aria-disabled={productionDisabled || undefined} tabIndex={productionDisabled ? -1 : undefined} onClick={event => blockDisabledNavigation(event, productionDisabled)}>
+          <Link
+            className={`demoCard fleet ${productionDisabled ? "disabled" : ""}`}
+            href="/fleet"
+            aria-disabled={productionDisabled || undefined}
+            tabIndex={productionDisabled ? -1 : undefined}
+            onClick={event => blockDisabledNavigation(event, productionDisabled)}
+          >
             <div className="demoCardHead"><span>01</span><b>{t("mode.production")}</b></div>
             <h2>{t("demo.production.title")}</h2>
             <p>{t("demo.production.description")}</p>
             <strong>{productionDisabled ? (zh ? "需要授權" : "Authentication required") : t("demo.production.open")}</strong>
           </Link>
 
-          <Link className={`demoCard ${engineeringDisabled ? "disabled" : ""}`} href="/engineering" aria-disabled={engineeringDisabled || undefined} tabIndex={engineeringDisabled ? -1 : undefined} onClick={event => blockDisabledNavigation(event, engineeringDisabled)}>
+          <Link
+            className={`demoCard ${engineeringDisabled ? "disabled" : ""}`}
+            href="/engineering"
+            aria-disabled={engineeringDisabled || undefined}
+            tabIndex={engineeringDisabled ? -1 : undefined}
+            onClick={event => blockDisabledNavigation(event, engineeringDisabled)}
+          >
             <div className="demoCardHead"><span>02</span><b>{t("mode.engineering")}</b></div>
             <h2>{t("demo.engineering.title")}</h2>
             <p>{t("demo.engineering.description")}</p>
             <strong>{engineeringDisabled ? (zh ? "目前身份不可進入" : "Not permitted for this identity") : t("demo.engineering.open")}</strong>
           </Link>
 
-          <Link className={`demoCard utility ${devicesDisabled ? "disabled" : ""}`} href="/devices" aria-disabled={devicesDisabled || undefined} tabIndex={devicesDisabled ? -1 : undefined} onClick={event => blockDisabledNavigation(event, devicesDisabled)}>
+          <Link
+            className={`demoCard utility ${devicesDisabled ? "disabled" : ""}`}
+            href="/devices"
+            aria-disabled={devicesDisabled || undefined}
+            tabIndex={devicesDisabled ? -1 : undefined}
+            onClick={event => blockDisabledNavigation(event, devicesDisabled)}
+          >
             <div className="demoCardHead"><span>03</span><b>{zh ? "料號查詢" : "IC LOOKUP"}</b></div>
             <h2>IC Selector</h2>
-            <p>{zh ? "直接輸入 ICPN／IC identifier 查詢 Vendor、Family、OCD mapping 與目前可用的驗證證據。" : "Search an ICPN or IC identifier directly for Vendor, Family, OCD mapping, and currently available validation evidence."}</p>
+            <p>
+              {zh
+                ? "直接輸入 ICPN／IC identifier 查詢 Vendor、Family、OCD mapping 與目前可用的驗證證據。"
+                : "Search an ICPN or IC identifier directly for Vendor, Family, OCD mapping, and currently available validation evidence."}
+            </p>
             <strong>{devicesDisabled ? (zh ? "目前身份不可查詢" : "Not permitted for this identity") : (zh ? "查詢 IC 料號 →" : "Open IC Selector →")}</strong>
           </Link>
 
           <Link className="demoCard documents" href="/documents">
             <div className="demoCardHead"><span>04</span><b>{zh ? "操作文件" : "DOCUMENTS"}</b></div>
             <h2>{zh ? "文件" : "Documents"}</h2>
-            <p>{zh ? "查看 PMode / EMode 操作流程、Programming Job、Batch / Status、Gateway 與 Mock 設定說明。" : "Read PMode / EMode operation flows and references for Programming Job, Batch / Status, Gateway, and Mock settings."}</p>
+            <p>
+              {zh
+                ? "查看 PMode / EMode 操作流程、Programming Job、Batch / Status、Gateway 與 Mock 設定說明。"
+                : "Read PMode / EMode operation flows and references for Programming Job, Batch / Status, Gateway, and Mock settings."}
+            </p>
             <strong>{zh ? "開啟操作文件 →" : "Open Documents →"}</strong>
           </Link>
         </div>
