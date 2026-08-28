@@ -20,7 +20,10 @@ test("Documents exposes PMode and EMode static operator guides through the share
 
   await nav.getByRole("button", { name: "Gateway Settings", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Gateway (設定說明|Settings)/ })).toBeVisible();
-  await expect(page.getByText("4 × 10 sec + 1 + 2 + 4 sec = 47 sec", { exact: true })).toBeVisible();
+  await expect(page.getByText("PPU Request Timeout", { exact: true })).toBeVisible();
+  await expect(page.getByText("PPU Retry Count", { exact: true })).toBeVisible();
+  await expect(page.getByText("PPU Response Budget", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Browser Watchdog", { exact: true })).toHaveCount(0);
 
   await nav.getByRole("button", { name: "Mock Settings", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Mock (設定說明|Settings)/ })).toBeVisible();
