@@ -2,7 +2,6 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import {
   expectProgrammingJobDesktopActionGeometry,
   programmingJob as sharedProgrammingJob,
-  programmingJobAction,
   programmingJobField,
   programmingJobFieldOrder,
   programmingJobOperation,
