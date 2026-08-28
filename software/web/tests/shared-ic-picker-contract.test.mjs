@@ -6,9 +6,10 @@ async function source(path) {
   return fs.readFile(new URL(path, import.meta.url), "utf8");
 }
 
-test("PMode and EMode consume one neutral ICPickerField primitive", async () => {
-  const [picker, pmod, emode] = await Promise.all([
+test("PMode and EMode consume one neutral ICPickerField primitive through ProgrammingJobPanel", async () => {
+  const [picker, sharedJob, pmod, emode] = await Promise.all([
     source("../app/devices/ic-picker-field.tsx"),
+    source("../app/operator-ui/programming-job-panel.tsx"),
     source("../app/fleet/factory-console-v2.tsx"),
     source("../app/engineering/programming-workspace-v2.tsx"),
   ]);
@@ -18,8 +19,11 @@ test("PMode and EMode consume one neutral ICPickerField primitive", async () => 
   assert.match(picker, /className="icPickerInput"/);
   assert.match(picker, /className="icPickerMenu"/);
   assert.doesNotMatch(picker, /productionIcPicker/);
-  assert.match(pmod, /ICPickerField/);
-  assert.match(emode, /ICPickerField/);
+  assert.match(sharedJob, /ICPickerField/);
+  assert.match(pmod, /<ProgrammingJobPanel[\s\S]*mode="production"/);
+  assert.match(emode, /<ProgrammingJobPanel[\s\S]*mode="engineering"/);
+  assert.match(pmod, /targetDevice=\{targetDevice\}/);
+  assert.match(emode, /targetDevice=\{targetDevice\}/);
 });
 
 test("shared IC picker stylesheet owns internal visuals and host density profiles", async () => {

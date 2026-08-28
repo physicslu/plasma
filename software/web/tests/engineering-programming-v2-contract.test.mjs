@@ -9,6 +9,7 @@ async function source(path) {
 test("Engineering Programming uses the approved status-first single-PPU workflow", async () => {
   const page = await source("../app/engineering/page.tsx");
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
   const refresh = await source("../app/engineering/engineering-workspace-refresh.css");
 
   assert.match(page, /ProgrammingWorkspaceV2/);
@@ -20,14 +21,15 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.match(workspace, /START PROGRAMMING/);
   assert.match(workspace, /LIVE SITE STATUS/);
   assert.match(workspace, /aria-label=\{`\$\{setupCollapsed \? "Expand" : "Collapse"\} System Setup`\}/);
-  assert.match(workspace, /aria-label=\{`\$\{programmingJobCollapsed \? "Expand" : "Collapse"\} Programming Job`\}/);
-  assert.match(workspace, /programmingJobCollapsed \? "is-collapsed" : ""/);
+  assert.match(workspace, /<ProgrammingJobPanel[\s\S]*mode="engineering"/);
+  assert.match(workspace, /collapsed=\{programmingJobCollapsed\}/);
+  assert.match(sharedJob, /className="programmingJobCollapseButton"/);
+  assert.match(sharedJob, /aria-expanded=\{!collapsed\}/);
   assert.doesNotMatch(workspace, /TARGET SITES/);
   assert.doesNotMatch(workspace, /LIVE PROGRESS MONITOR/);
 
   assert.match(refresh, /grid-template-columns:\s*minmax\(0, 1fr\)/);
   assert.match(refresh, /1\. SYSTEM SETUP/);
-  assert.match(refresh, /2\. PROGRAMMING JOB/);
   assert.match(refresh, /3\. LIVE SITE STATUS/);
   assert.match(refresh, /\.engineeringProgrammingV2 \.recentEvents\s*\{[\s\S]*display:\s*none !important/);
 });
@@ -104,10 +106,13 @@ test("Engineering keeps direct single-Site jobs separate from server-owned Batch
 
 test("Engineering Target IC is optional and crosses both direct-Job and server-Batch boundaries", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
   const api = await source("../app/plasma-api.ts");
   const batchApi = await source("../app/server-batch-api.ts");
 
-  assert.match(workspace, /ICPickerField/);
+  assert.match(sharedJob, /ICPickerField/);
+  assert.match(workspace, /targetDevice=\{targetDevice\}/);
+  assert.match(workspace, /onTargetChange=\{selectTargetDevice\}/);
   assert.match(workspace, /targetDevice:\s*targetDevice\s*\?/);
   assert.match(api, /targetDevice\?:\s*JobTargetDeviceRequest/);
   assert.match(api, /body\.target_device\s*=/);
@@ -127,9 +132,12 @@ test("Engineering retains explicit Retry while the former Production single-PPU 
 
 test("Engineering v2 advertises only the implemented binary Programming Image normalizer", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
+  const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
 
-  assert.match(workspace, /accept="\.bin,application\/octet-stream"/);
-  assert.match(workspace, /Programming Image \(\.bin\)/);
+  assert.match(sharedJob, /accept="\.bin,application\/octet-stream"/);
+  assert.match(workspace, /imageLabel="Programming Image"/);
+  assert.match(workspace, /Binary Programming Image \(\.bin\)\./);
+  assert.doesNotMatch(sharedJob, /\.hex/);
   assert.doesNotMatch(workspace, /\.hex/);
 });
 

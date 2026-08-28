@@ -37,8 +37,8 @@ test("Engineering readability layer raises the approved operator font floor with
     assert.equal(css.includes(forbidden), false, `Engineering readability must not override shared Programming control: ${forbidden}`);
   }
 
-  assert.match(sharedControls, /font-size:\s*9px[\s\S]*font-weight:\s*700/);
-  assert.match(sharedControls, /\.programmingActions \.startProgramming,[\s\S]*font-size:\s*10px[\s\S]*font-weight:\s*850/);
+  assert.match(sharedControls, /\.programmingJobOperationChecks label\s*\{[\s\S]*font-size:\s*9px[\s\S]*font-weight:\s*700/);
+  assert.match(sharedControls, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*font-size:\s*10px[\s\S]*font-weight:\s*850/);
   assert.doesNotMatch(
     css,
     /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/,
@@ -56,7 +56,7 @@ test("Engineering canonical card headers do not render their legacy text twice",
   );
   assert.ok(
     refresh.includes(".engineeringProgrammingV2 .targetingCard > header,\n.engineeringProgrammingV2 .programmingJobCard > header {\n  font-size: 0;"),
-    "raw SYSTEM SETUP / PROGRAMMING JOB header text must remain hidden",
+    "raw SYSTEM SETUP / legacy PROGRAMMING JOB header text must remain hidden while legacy selectors are still present",
   );
   assert.ok(css.includes(".targetingCard > header::before,"));
   assert.ok(css.includes(".programmingJobCard > header::before,"));
