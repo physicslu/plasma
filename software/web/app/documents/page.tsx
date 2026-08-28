@@ -85,7 +85,7 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
         <p className="documentLead">{zh ? "PMode 用於量產操作。Operator 先選定 Facility / PPU / Site，再以單一 Programming Job 定義 Target IC、Programming Image、E/P/V/R 與 Batch Policy。" : "PMode is the production workflow for selecting Facility / PPU / Site scope and executing one Programming Job definition across a server-owned Batch."}</p>
         <section><h2>{zh ? "核心物件" : "Core objects"}</h2><DefinitionTable rows={[
           ["Facility", zh ? "設備所在的產線、實驗室或管理區域。" : "The line, lab, or managed area that owns PPUs."],
-          ["PPU", zh ? "實際執行燒錄工作的 Programmer Processing Unit。" : "The Programmer Processing Unit that executes programming work."],
+          ["PPU", zh ? "實際執行燒錄工作的 PPU。" : "The PPU that executes programming work."],
           ["Site", zh ? "PPU 上可獨立執行工作的實體燒錄位置。" : "An independently executable programming position on a PPU."],
           ["Programming Job", zh ? "Target IC、Image、Operations 與 Batch Policy 的工作定義。" : "The work definition containing Target IC, Image, Operations, and Batch Policy."],
           ["Batch", zh ? "START 後由 Server 擁有與追蹤的執行實例。" : "The server-owned execution instance created after START."],
