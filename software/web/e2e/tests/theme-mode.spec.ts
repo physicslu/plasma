@@ -1,4 +1,9 @@
 import { expect, test } from "@playwright/test";
+import {
+  programmingJob,
+  programmingJobField,
+  programmingJobFieldOrder,
+} from "./programming-job-test-helpers";
 
 async function installEmptyEngineeringCatalog(page: import("@playwright/test").Page) {
   await page.route("**/api/engineering/**", async route => {
@@ -44,17 +49,16 @@ test("Pmod image controls precede EPVR and Pmod Emode share persistent Light Dar
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: "PMODE · FACTORY CONSOLE" })).toBeVisible();
 
-  const fieldOrder = await page.locator(".factoryJobGrid").evaluate(element => (
-    Array.from(element.children).map(child => child.className)
-  ));
-  expect(fieldOrder).toEqual([
-    "factoryField targetField",
-    "factoryField imageFieldV2",
-    "factoryField operationField",
-    "factoryField policyField",
+  const panel = programmingJob(page, "production");
+  await expect(panel).toBeVisible();
+  expect(await programmingJobFieldOrder(panel)).toEqual([
+    "target",
+    "image",
+    "operations",
+    "policy",
   ]);
-  const imageBox = await page.locator(".imageFieldV2").boundingBox();
-  const operationsBox = await page.locator(".operationField").boundingBox();
+  const imageBox = await programmingJobField(panel, "image").boundingBox();
+  const operationsBox = await programmingJobField(panel, "operations").boundingBox();
   expect(imageBox).not.toBeNull();
   expect(operationsBox).not.toBeNull();
   expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(operationsBox!.y);

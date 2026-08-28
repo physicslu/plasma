@@ -95,7 +95,16 @@ async function rowMetrics(row: Locator) {
   });
 }
 
-test("Engineering labels sit close to controls and field groups stay near section edges", async ({ page }) => {
+function expectRightAlignedRail(metric: Awaited<ReturnType<typeof rowMetrics>>, minOffset: number, maxOffset: number) {
+  expect(metric.gap).toBeGreaterThanOrEqual(6);
+  expect(metric.gap).toBeLessThanOrEqual(10);
+  expect(metric.controlOffset).toBeGreaterThanOrEqual(minOffset);
+  expect(metric.controlOffset).toBeLessThanOrEqual(maxOffset);
+  expect(metric.textAlign).toBe("right");
+  expect(metric.justifySelf).toBe("end");
+}
+
+test("Engineering targeting keeps its compact rail while Programming Job keeps the shared canonical rail", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await installMockProvider(page);
   await page.goto("/engineering");
@@ -110,13 +119,11 @@ test("Engineering labels sit close to controls and field groups stay near sectio
   const operations = await rowMetrics(programmingJobField(job, "operations"));
   const policy = await rowMetrics(programmingJobField(job, "policy"));
 
-  for (const metric of [facility, ppu, target, image, operations, policy]) {
-    expect(metric.gap).toBeGreaterThanOrEqual(6);
-    expect(metric.gap).toBeLessThanOrEqual(10);
-    expect(metric.controlOffset).toBeGreaterThanOrEqual(118);
-    expect(metric.controlOffset).toBeLessThanOrEqual(122);
-    expect(metric.textAlign).toBe("right");
-    expect(metric.justifySelf).toBe("end");
+  for (const metric of [facility, ppu]) {
+    expectRightAlignedRail(metric, 118, 122);
+  }
+  for (const metric of [target, image, operations, policy]) {
+    expectRightAlignedRail(metric, 134, 138);
   }
 
   expect(Math.abs(target.controlX - operations.controlX)).toBeLessThanOrEqual(2);
