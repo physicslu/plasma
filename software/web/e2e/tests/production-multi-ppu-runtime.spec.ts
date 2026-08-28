@@ -51,6 +51,10 @@ function programmingJob(page: Page) {
   });
 }
 
+function programmingJobStatus(page: Page) {
+  return programmingJob(page).locator('[data-programming-job-action="status"] b');
+}
+
 function operationCheckbox(page: Page, index: number) {
   return programmingJob(page)
     .getByRole("group", { name: "Production batch operations", exact: true })
@@ -155,7 +159,7 @@ test("real Production Mock submits one server Batch for two PPUs and completes b
 
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
-  await expect(page.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expect(programmingJobStatus(page)).toHaveText("SUCCESS");
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("2");
   await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
   expect(ownership.browserJobPosts()).toBe(0);
@@ -195,7 +199,7 @@ test("real Production Mock shares one Programming Asset across two PPUs for Eras
 
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 30_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 30_000 });
-  await expect(page.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expect(programmingJobStatus(page)).toHaveText("SUCCESS");
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("2");
   await expect(page.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
   expect(ownership.browserJobPosts()).toBe(0);
@@ -239,7 +243,7 @@ test("real Production Mock exposes only whole-Batch ABORT for multi-PPU runtime"
     await expect.poll(() => ownership.wholeBatchCancels(), { timeout: 5_000 }).toBe(1);
     await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
     await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
-    await expect(page.locator(".factoryBatchStatus b")).toHaveText("CANCELLED");
+    await expect(programmingJobStatus(page)).toHaveText("CANCELLED");
 
     expect(ownership.batchPpuCancels).toEqual([]);
     expect(ownership.browserJobPosts()).toBe(0);
