@@ -1,6 +1,37 @@
 import type { ReactNode } from "react";
 import "./operator-panel.css";
 
+export function OperatorPanelToggle({
+  expanded,
+  onClick,
+  expandLabel,
+  collapseLabel,
+  ariaLabel,
+  disabled = false,
+  className = "",
+}: {
+  expanded: boolean;
+  onClick: () => void;
+  expandLabel: string;
+  collapseLabel: string;
+  ariaLabel: string;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`operatorPanelToggle ${className}`.trim()}
+      aria-label={ariaLabel}
+      aria-expanded={expanded}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {expanded ? collapseLabel : expandLabel} {expanded ? "⌃" : "⌄"}
+    </button>
+  );
+}
+
 export function OperatorPanel({
   number,
   title,
