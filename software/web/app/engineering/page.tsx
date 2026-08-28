@@ -92,7 +92,7 @@ export default function EngineeringPage() {
                         aria-pressed={settingsSurfaceActive && settingsSection === "gateway"}
                         onClick={() => selectSettingsSection("gateway")}
                       >
-                        <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                        <span className="engineeringNavTreeBranch" aria-hidden="true">├</span>
                         <span className="engineeringNavLabel">Gateway</span>
                       </button>
                       <button
