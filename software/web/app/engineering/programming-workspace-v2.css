@@ -1,3 +1,5 @@
+@import "../operator-ui/operator-design-contract.css";
+
 .engineeringProgrammingV2 {
   min-width: 0;
   container-type: inline-size;
@@ -13,7 +15,6 @@
 .engineeringProgrammingV2 .productionProgrammingWorkflow,
 .engineeringProgrammingV2 .productionProgrammingWorkflow > *,
 .engineeringProgrammingV2 .productionProgrammingRight,
-.engineeringProgrammingV2 .programmingJobCard,
 .engineeringProgrammingV2 .targetingCard {
   min-width: 0;
 }
@@ -87,8 +88,6 @@
   color: var(--text, #172033);
 }
 
-/* Engineering Programming is status-first: keep the shared Batch Summary's
-   internal visual contract untouched and only own its placement in this page. */
 .engineeringProgrammingV2 .batchSummary {
   margin-top: 7px;
 }
@@ -104,9 +103,9 @@
 }
 
 .engineeringProgrammingV2 .productionProgrammingCard > header {
-  min-height: 30px;
-  padding: 0 11px;
-  font-size: 11px;
+  min-height: var(--operator-panel-header-min-height);
+  padding: var(--operator-panel-header-padding-block) var(--operator-panel-header-padding-inline);
+  font-size: var(--operator-panel-title-font-size);
   justify-content: space-between;
 }
 
@@ -118,15 +117,14 @@
   border-radius: 5px;
   background: var(--panel, #fff);
   color: var(--text, #172033);
-  font-size: 9px;
+  font-size: var(--operator-control-font-size);
   font-weight: 800;
   cursor: pointer;
 }
 
-.engineeringProgrammingV2 .targetingCard.is-collapsed > header,
-.engineeringProgrammingV2 .programmingJobCard.is-collapsed > header {
+.engineeringProgrammingV2 .targetingCard.is-collapsed > header {
   border-bottom: 0;
-  border-radius: 8px;
+  border-radius: var(--operator-panel-radius);
 }
 
 .engineeringProgrammingV2 .cardBody {
@@ -145,10 +143,8 @@
   font-size: 10px;
 }
 
-.engineeringProgrammingV2 .workflowField select,
-.engineeringProgrammingV2 .jobRow select,
-.engineeringProgrammingV2 .jobRow input[type="number"] {
-  min-height: 32px;
+.engineeringProgrammingV2 .workflowField select {
+  min-height: var(--operator-control-min-height);
 }
 
 .engineeringProgrammingV2 .topologyFoot {
@@ -156,110 +152,6 @@
   padding: 7px 9px;
   font-size: 9px;
 }
-
-.engineeringProgrammingV2 .programmingBatchToolbar {
-  display: grid;
-  min-width: 0;
-}
-
-.engineeringProgrammingV2 .programmingJobBody {
-  gap: 8px;
-}
-
-.engineeringProgrammingV2 .jobRow {
-  grid-template-columns: 145px minmax(0, 1fr);
-  gap: 9px;
-}
-
-.engineeringProgrammingV2 .jobRow > strong {
-  font-size: 10px;
-}
-
-/* Engineering v2 owns this picker. Pin its grid explicitly so legacy
-   Programming Image toolbar rules cannot reorder the filename and Browse button. */
-.engineeringProgrammingV2 .imageField {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 82px;
-  grid-template-rows: minmax(32px, auto);
-  min-width: 0;
-}
-
-.engineeringProgrammingV2 .imageField .programmingFileName {
-  grid-column: 1;
-  grid-row: 1;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  max-width: none;
-  padding: 0 9px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 400;
-}
-
-.engineeringProgrammingV2 .imageField .engineeringBrowseButton {
-  grid-column: 2;
-  grid-row: 1;
-  width: 82px;
-  min-width: 82px;
-  min-height: 32px;
-  padding: 0 8px;
-  font-size: 9px;
-}
-
-.engineeringProgrammingV2 .engineeringImageHint {
-  font-size: 8px;
-  line-height: 1.25;
-}
-
-/* Batch readiness presentation is shared with the PMode Batch Status control.
-   This file intentionally owns no readiness geometry or typography. */
-
-.engineeringPolicyRow {
-  grid-template-columns: 145px max-content max-content max-content;
-}
-
-.engineeringPolicyRow > label,
-.engineeringRetryField {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 9px;
-  white-space: nowrap;
-}
-
-.engineeringPolicyRow input,
-.engineeringRetryField input {
-  width: 58px;
-  min-width: 58px;
-  max-width: 58px;
-}
-
-.engineeringPolicyRow select {
-  width: 108px;
-  min-width: 108px;
-}
-
-.engineeringReadRow {
-  grid-template-columns: 145px max-content max-content;
-}
-
-.engineeringReadRow label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 9px;
-}
-
-.engineeringReadRow input {
-  width: 80px;
-}
-
-/* START / BATCH STATUS / ABORT presentation is owned only by the shared
-   operator-ui Programming Job control contract. */
 
 .engineeringProgrammingV2 .liveSiteStatus {
   margin-top: 8px;
@@ -273,7 +165,7 @@
 .engineeringProgrammingV2 .liveSiteStatus > header small {
   margin-left: auto;
   color: var(--muted, #64748b);
-  font-size: 8px;
+  font-size: var(--operator-panel-meta-font-size);
   font-weight: 650;
 }
 
@@ -334,23 +226,13 @@
 .engineeringResult[data-result="CANCELLED"],
 .engineeringResult[data-result="STOPPED"] { color: #64748b; }
 
-.engineeringProgrammingV2 .recentEvents {
-  margin-top: 8px;
-}
-
 .engineeringProgrammingV2 .engineeringLogCard {
   margin-top: 8px;
 }
 
-/* Target Sites moved into LIVE SITE STATUS, so the desktop cards can remain
-   side-by-side at substantially narrower content widths without overlap. */
 @container engineering-programming (max-width: 920px) {
   .engineeringProgrammingV2 .productionProgrammingWorkflow {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .engineeringPolicyRow {
-    grid-template-columns: 145px max-content max-content max-content;
   }
 }
 
@@ -368,12 +250,6 @@
 }
 
 @media (max-width: 760px) {
-  .engineeringProgrammingV2 .jobRow,
-  .engineeringPolicyRow,
-  .engineeringReadRow {
-    grid-template-columns: 1fr;
-  }
-
   .engineeringProgrammingV2 .liveSiteStatus > header {
     align-items: flex-start;
     flex-direction: column;
