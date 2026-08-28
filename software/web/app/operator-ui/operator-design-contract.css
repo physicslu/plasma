@@ -1,0 +1,28 @@
+/*
+ * Plasma Operator UI density contract.
+ *
+ * Panel-level components must consume these tokens instead of inventing
+ * mode-local or component-local scales. PMode and EMode may differ in
+ * workflow composition, but shared operator surfaces use one visual density.
+ */
+
+:root {
+  --operator-panel-radius: 7px;
+  --operator-panel-header-min-height: 30px;
+  --operator-panel-header-padding-block: 5px;
+  --operator-panel-header-padding-inline: 8px;
+  --operator-panel-title-font-size: 11px;
+  --operator-panel-meta-font-size: 8px;
+  --operator-panel-body-padding: 9px;
+
+  --operator-field-label-font-size: 11px;
+  --operator-helper-font-size: 8px;
+  --operator-control-min-height: 32px;
+  --operator-control-font-size: 10px;
+  --operator-checkbox-size: 14px;
+
+  --operator-action-min-height: 40px;
+  --operator-action-font-size: 11px;
+  --operator-status-label-font-size: 8px;
+  --operator-status-value-font-size: 12px;
+}
