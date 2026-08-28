@@ -1,4 +1,5 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
+import { programmingJob, programmingJobField } from "./programming-job-test-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -75,12 +76,12 @@ async function installMockProvider(page: Page) {
   });
 }
 
-async function rowMetrics(page: Page, selector: string, index: number) {
-  return page.locator(selector).nth(index).evaluate(row => {
-    const children = Array.from(row.children);
+async function rowMetrics(row: Locator) {
+  return row.evaluate(element => {
+    const children = Array.from(element.children);
     const label = children[0] as HTMLElement;
     const control = children[1] as HTMLElement;
-    const rowBox = row.getBoundingClientRect();
+    const rowBox = element.getBoundingClientRect();
     const labelBox = label.getBoundingClientRect();
     const controlBox = control.getBoundingClientRect();
     const style = getComputedStyle(label);
@@ -101,12 +102,13 @@ test("Engineering labels sit close to controls and field groups stay near sectio
   await page.locator(".engineeringWorkspace nav button").nth(2).click();
   await expect(page.getByLabel("Engineering PPU", { exact: true })).toBeVisible();
 
-  const facility = await rowMetrics(page, ".targetingCard .workflowField", 0);
-  const ppu = await rowMetrics(page, ".targetingCard .workflowField", 1);
-  const target = await rowMetrics(page, ".programmingJobBody > .jobRow", 0);
-  const image = await rowMetrics(page, ".programmingJobBody > .jobRow", 1);
-  const operations = await rowMetrics(page, ".programmingJobBody > .jobRow", 2);
-  const policy = await rowMetrics(page, ".programmingJobBody > .jobRow", 3);
+  const facility = await rowMetrics(page.locator(".targetingCard .workflowField").nth(0));
+  const ppu = await rowMetrics(page.locator(".targetingCard .workflowField").nth(1));
+  const job = programmingJob(page, "engineering");
+  const target = await rowMetrics(programmingJobField(job, "target"));
+  const image = await rowMetrics(programmingJobField(job, "image"));
+  const operations = await rowMetrics(programmingJobField(job, "operations"));
+  const policy = await rowMetrics(programmingJobField(job, "policy"));
 
   for (const metric of [facility, ppu, target, image, operations, policy]) {
     expect(metric.gap).toBeGreaterThanOrEqual(6);
