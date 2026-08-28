@@ -32,6 +32,31 @@ export function OperatorPanelToggle({
   );
 }
 
+export function OperatorPanelHeader({
+  number,
+  title,
+  meta,
+  actions,
+  className = "",
+}: {
+  number?: number;
+  title: string;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <header className={`operatorPanelHeader ${className}`.trim()}>
+      <div className="operatorPanelTitle">
+        {typeof number === "number" && <span>{number}.</span>}
+        <strong>{title}</strong>
+        {meta && <small>{meta}</small>}
+      </div>
+      {actions && <div className="operatorPanelActions">{actions}</div>}
+    </header>
+  );
+}
+
 export function OperatorPanel({
   number,
   title,
@@ -51,14 +76,7 @@ export function OperatorPanel({
 }) {
   return (
     <section className={`operatorPanel ${className}`.trim()} aria-label={ariaLabel ?? title}>
-      <header className="operatorPanelHeader">
-        <div className="operatorPanelTitle">
-          {typeof number === "number" && <span>{number}.</span>}
-          <strong>{title}</strong>
-          {meta && <small>{meta}</small>}
-        </div>
-        {actions && <div className="operatorPanelActions">{actions}</div>}
-      </header>
+      <OperatorPanelHeader number={number} title={title} meta={meta} actions={actions} />
       <div className="operatorPanelBody">{children}</div>
     </section>
   );
