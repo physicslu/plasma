@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import threading
+import time
 import unittest
 from contextlib import redirect_stdout
 from http.client import HTTPConnection
@@ -88,6 +89,27 @@ class GatewayStatusObservabilityTests(unittest.TestCase):
                 events.append(payload)
         return events
 
+    @classmethod
+    def wait_for_diagnostic_event(
+        cls,
+        capture: io.StringIO,
+        event_name: str,
+        *,
+        timeout_s: float = 1.0,
+    ) -> None:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if any(
+                event.get("event") == event_name
+                for event in cls.diagnostic_events(capture.getvalue())
+            ):
+                return
+            time.sleep(0.001)
+        observed = [event.get("event") for event in cls.diagnostic_events(capture.getvalue())]
+        raise AssertionError(
+            f"timed out waiting for diagnostic event {event_name!r}; observed={observed!r}"
+        )
+
     def test_ppu_level_status_logs_provider_and_response_boundary_latency(self):
         self.provider.fail = False
         capture = io.StringIO()
@@ -95,6 +117,11 @@ class GatewayStatusObservabilityTests(unittest.TestCase):
             status, payload = self.request(
                 "/api/engineering/targets/mock-facility-01/mock-facility-01-ppu-01/api/status"
             )
+            # The client can finish reading the declared Content-Length before
+            # the ThreadingHTTPServer request thread emits the post-write
+            # response boundary event. Keep stdout redirected until that
+            # terminal observability event has actually been published.
+            self.wait_for_diagnostic_event(capture, "engineering_ppu_status_response_sent")
 
         self.assertEqual(status, 200)
         self.assertEqual(len(payload["sites"]), 2)
