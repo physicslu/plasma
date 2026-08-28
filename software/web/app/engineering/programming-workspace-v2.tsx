@@ -92,6 +92,8 @@ type StopPolicy = { kind: "never" } | { kind: "failed_sites"; threshold: number 
 const MAX_IMAGE_ASSET_BYTES = 16 * 1024 * 1024;
 const MAX_LOG_ENTRIES = 1000;
 const POLL_INTERVAL_MS = 500;
+const ENGINEERING_READ_OFFSET = 0;
+const ENGINEERING_READ_LENGTH = 256;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
 const terminalStates = new Set<JobState>(["success", "failed", "error", "cancelled", "timeout", "aborted"]);
 const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
@@ -241,10 +243,6 @@ export default function ProgrammingWorkspaceV2() {
     setEmodeSiteIds: setSelectedSiteIdsState,
     emodeOperations: selectedOperations,
     setEmodeOperations: setSelectedOperations,
-    emodeReadOffset: readOffset,
-    setEmodeReadOffset: setReadOffset,
-    emodeReadLength: readLength,
-    setEmodeReadLength: setReadLength,
   } = useWorkspaceSession();
   const engineeringBatch = useEngineeringServerBatchState();
   const batchSnapshot = engineeringBatch.snapshot;
@@ -306,10 +304,6 @@ export default function ProgrammingWorkspaceV2() {
     .map(site => site.id);
   const allSelectableSitesSelected = selectableSiteIds.length > 0
     && selectableSiteIds.every(siteId => selectedSiteIds.includes(siteId));
-  const readRangeValid = Number.isInteger(Number(readOffset))
-    && Number(readOffset) >= 0
-    && Number.isInteger(Number(readLength))
-    && Number(readLength) > 0;
   const targetLocked = batchRunning || submittingSiteIds.length > 0 || sites.some(isRunning);
   const requiresImage = selectedOperations.some(operation => operation === "program" || operation === "verify");
   const allSitesExecutable = selectedSites.length === selectedSiteIds.length
@@ -324,7 +318,7 @@ export default function ProgrammingWorkspaceV2() {
     imagePresent: Boolean(imageAsset) || syntheticMockImageAvailable || Boolean(batchSnapshot?.asset),
     imageValid: !imageAsset || imageAsset.size <= MAX_IMAGE_ASSET_BYTES,
     readSelected: selectedOperations.includes("read"),
-    readParamsValid: readRangeValid,
+    readParamsValid: true,
     allSitesExecutable,
     batchRunning: batchRunning && !batchCancelling,
     batchCancelling,
@@ -511,10 +505,8 @@ export default function ProgrammingWorkspaceV2() {
       setStopPolicy(snapshot.execution_policy.failed_site_stop_threshold === null
         ? { kind: "never" }
         : { kind: "failed_sites", threshold: snapshot.execution_policy.failed_site_stop_threshold });
-      setReadOffset(String(snapshot.read.offset));
-      setReadLength(String(snapshot.read.length));
     });
-  }, [batchSnapshot, selection, setReadLength, setReadOffset, setSelectedOperations, setSelectedSiteIdsState, setSelection]);
+  }, [batchSnapshot, selection, setSelectedOperations, setSelectedSiteIdsState, setSelection]);
 
   useEffect(() => {
     if (!batchSnapshot) return;
@@ -765,7 +757,6 @@ export default function ProgrammingWorkspaceV2() {
     if (submittingSiteIds.includes(site.id)) return true;
     if ((operation === "program" || operation === "verify") && !imageAsset && !syntheticMockImageAvailable) return true;
     if ((operation === "program" || operation === "verify") && Boolean(imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES)) return true;
-    if (operation === "read" && !readRangeValid) return true;
     return false;
   }
 
@@ -788,8 +779,8 @@ export default function ProgrammingWorkspaceV2() {
         assetFile: operation === "erase" || operation === "read" ? null : imageAsset,
         engineeringSessionId: engineeringSessionId ?? undefined,
         allowSyntheticMockImage: usesSyntheticImage,
-        offset: operation === "read" ? Number(readOffset) : undefined,
-        length: operation === "read" ? Number(readLength) : undefined,
+        offset: operation === "read" ? ENGINEERING_READ_OFFSET : undefined,
+        length: operation === "read" ? ENGINEERING_READ_LENGTH : undefined,
         targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : undefined,
         requestTimeoutMs: configuredGatewayPolicy.current.ppu_request_timeout_ms,
         onAssetEvent: logAssetEvent,
@@ -822,7 +813,7 @@ export default function ProgrammingWorkspaceV2() {
   }
 
   function runSingleSite(siteId: number, operation: Operation) {
-    const readDetail = operation === "read" ? ` · offset ${readOffset} · length ${readLength}` : "";
+    const readDetail = operation === "read" ? " · MAIN FLASH" : "";
     appendLog(`[${siteLabel(siteId)}] EXECUTE ${operation.toUpperCase()}${readDetail}`, false, "USR");
     void runSite(siteId, operation);
   }
@@ -897,7 +888,7 @@ export default function ProgrammingWorkspaceV2() {
 
     const siteIds = [...selectedSiteIds];
     const operations = operationOrder.filter(operation => selectedOperations.includes(operation));
-    const readDetail = operations.includes("read") ? ` · read offset ${readOffset} · length ${readLength}` : "";
+    const readDetail = operations.includes("read") ? " · read MAIN FLASH" : "";
     setOperatorWarning(null);
     trackedJobs.current = {};
     appendLog(
@@ -923,8 +914,8 @@ export default function ProgrammingWorkspaceV2() {
         targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : null,
         assetFile: imageAsset,
         allowSyntheticMockImage: syntheticMockImageAvailable,
-        readOffset: Number(readOffset),
-        readLength: Number(readLength),
+        readOffset: ENGINEERING_READ_OFFSET,
+        readLength: ENGINEERING_READ_LENGTH,
       });
       const mockRevision = accepted.mock_runtime?.profile_revision;
       appendLog(
@@ -1031,82 +1022,76 @@ export default function ProgrammingWorkspaceV2() {
 
           <div className="productionProgrammingRight">
             <ProgrammingJobPanel
-    mode="engineering"
-    title="PROGRAMMING JOB"
-    collapsed={programmingJobCollapsed}
-    onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
-    expandLabel={locale === "zh-TW" ? "展開" : "Show"}
-    collapseLabel={locale === "zh-TW" ? "收合" : "Hide"}
-    apiBase={apiBase}
-    targetDevice={targetDevice}
-    onTargetChange={selectTargetDevice}
-    targetDisabled={targetLocked}
-    targetPlaceholder="Search ICPN / IC identifier..."
-    targetLabel="Target IC"
-    imageLabel="Programming Image"
-    image={{
-      name: displayedImageName,
-      title: displayedImageName,
-      source: imageAsset ? "user" : batchSnapshot?.asset ? "batch_snapshot" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none",
-      hint: syntheticMockImageAvailable ? syntheticImageHint : "Binary Programming Image (.bin).",
-      browseLabel: "Browse...",
-      browseDisabled: targetLocked,
-      inputDisabled: targetLocked,
-      inputAriaLabel: "Engineering Programming Image Asset file",
-      onFileChange: file => selectImageAsset(file),
-    }}
-    operationsLabel="Operations"
-    operations={operationOrder.map(operation => ({
-      key: operation,
-      code: operationCodes[operation],
-      label: t(`operation.${operation}`),
-      checked: selectedOperations.includes(operation),
-      disabled: batchRunning,
-      ariaLabel: `Engineering batch ${operation}`,
-      onChange: () => toggleOperation(operation),
-    }))}
-    policyLabel="Batch Policy"
-    policy={{
-      repeatLabel: "Repeat",
-      repeatValue: repeatCount,
-      repeatDisabled: batchRunning,
-      repeatAriaLabel: "Repeat Count",
-      onRepeatChange: setRepeatCount,
-      retryLabel: "Retry",
-      retryValue: siteRetryLimit,
-      retryDisabled: batchRunning,
-      retryAriaLabel: "Site Retry Limit",
-      onRetryChange: setSiteRetryLimit,
-      stopLabel: "Stop Policy",
-      stopValue: stopPolicyValue,
-      stopDisabled: batchRunning,
-      stopAriaLabel: "Engineering Stop Policy",
-      stopOptions: [
-        { value: "never", label: "Never" },
-        ...selectedSiteIds.map((_, index) => ({ value: String(index + 1), label: `${index + 1} Fail` })),
-      ],
-      onStopChange: value => setStopPolicy(value === "never" ? { kind: "never" } : { kind: "failed_sites", threshold: Number(value) }),
-    }}
-    compatibilityFields={selectedOperations.includes("read") ? (
-      <div className="engineeringReadRow">
-        <label>Offset:<input aria-label="Engineering READ offset" type="number" min="0" step="1" value={readOffset} disabled={batchRunning} onChange={event => setReadOffset(event.target.value)} /></label>
-        <label>Length:<input aria-label="Engineering READ length" type="number" min="1" step="1" value={readLength} disabled={batchRunning} onChange={event => setReadLength(event.target.value)} /></label>
-      </div>
-    ) : null}
-    startLabel="START PROGRAMMING"
-    startDisabled={!batchReadiness.ready || !policyValid}
-    onStart={runBatch}
-    statusLabel="BATCH STATUS"
-    statusValue={batchRunning && batchObservationState === "reconnecting" ? "RECONNECTING" : batchReadiness.label}
-    statusClassName={`readiness-${batchReadiness.code}`}
-    abortLabel="ABORT"
-    abortDisabled={!batchRunning || batchCancelling || !batchSnapshot}
-    onAbort={cancelBatch}
-  />
+              mode="engineering"
+              title="PROGRAMMING JOB"
+              collapsed={programmingJobCollapsed}
+              onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
+              expandLabel={locale === "zh-TW" ? "展開" : "Show"}
+              collapseLabel={locale === "zh-TW" ? "收合" : "Hide"}
+              apiBase={apiBase}
+              targetDevice={targetDevice}
+              onTargetChange={selectTargetDevice}
+              targetDisabled={targetLocked}
+              targetPlaceholder="Search ICPN / IC identifier..."
+              targetLabel="Target IC"
+              imageLabel="Programming Image"
+              image={{
+                name: displayedImageName,
+                title: displayedImageName,
+                source: imageAsset ? "user" : batchSnapshot?.asset ? "batch_snapshot" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none",
+                hint: syntheticMockImageAvailable ? syntheticImageHint : "Binary Programming Image (.bin).",
+                browseLabel: "Browse...",
+                browseDisabled: targetLocked,
+                inputDisabled: targetLocked,
+                inputAriaLabel: "Engineering Programming Image Asset file",
+                onFileChange: file => selectImageAsset(file),
+              }}
+              operationsLabel="Operations"
+              operations={operationOrder.map(operation => ({
+                key: operation,
+                code: operationCodes[operation],
+                label: t(`operation.${operation}`),
+                checked: selectedOperations.includes(operation),
+                disabled: batchRunning,
+                ariaLabel: `Engineering batch ${operation}`,
+                onChange: () => toggleOperation(operation),
+              }))}
+              policyLabel="Batch Policy"
+              policy={{
+                repeatLabel: "Repeat",
+                repeatValue: repeatCount,
+                repeatDisabled: batchRunning,
+                repeatAriaLabel: "Repeat Count",
+                onRepeatChange: setRepeatCount,
+                retryLabel: "Retry",
+                retryValue: siteRetryLimit,
+                retryDisabled: batchRunning,
+                retryAriaLabel: "Site Retry Limit",
+                onRetryChange: setSiteRetryLimit,
+                stopLabel: "Stop Policy",
+                stopValue: stopPolicyValue,
+                stopDisabled: batchRunning,
+                stopAriaLabel: "Engineering Stop Policy",
+                stopOptions: [
+                  { value: "never", label: "Never" },
+                  ...selectedSiteIds.map((_, index) => ({ value: String(index + 1), label: `${index + 1} Fail` })),
+                ],
+                onStopChange: value => setStopPolicy(value === "never" ? { kind: "never" } : { kind: "failed_sites", threshold: Number(value) }),
+              }}
+              startLabel="START PROGRAMMING"
+              startDisabled={!batchReadiness.ready || !policyValid}
+              onStart={runBatch}
+              statusLabel="BATCH STATUS"
+              statusValue={batchRunning && batchObservationState === "reconnecting" ? "RECONNECTING" : batchReadiness.label}
+              statusClassName={`readiness-${batchReadiness.code}`}
+              abortLabel="ABORT"
+              abortDisabled={!batchRunning || batchCancelling || !batchSnapshot}
+              onAbort={cancelBatch}
+            />
 
-  {operatorWarning && <div className="warning engineeringOperationWarning" role="alert"><span>{operatorWarning}</span><button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button></div>}
-  {engineeringBatch.error && batchObservationState === "reconnecting" && <div className="warning engineeringOperationWarning" role="status">{engineeringBatch.error}</div>}
-  {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
+            {operatorWarning && <div className="warning engineeringOperationWarning" role="alert"><span>{operatorWarning}</span><button type="button" aria-label={dismissWarning} onClick={() => setOperatorWarning(null)}>×</button></div>}
+            {engineeringBatch.error && batchObservationState === "reconnecting" && <div className="warning engineeringOperationWarning" role="status">{engineeringBatch.error}</div>}
+            {imageAsset && imageAsset.size > MAX_IMAGE_ASSET_BYTES && <div className="warning">{t("engineeringProgramming.imageAssetTooLarge")}</div>}
           </div>
         </div>
 
@@ -1172,13 +1157,6 @@ export default function ProgrammingWorkspaceV2() {
                 })}
               </tbody>
             </table>
-          </div>
-        </section>
-
-        <section className="productionProgrammingCard recentEvents" aria-label="Engineering recent events">
-          <header>RECENT EVENTS</header>
-          <div className="recentEventsBody">
-            {logs.length === 0 ? <p>No events yet.</p> : logs.slice(0, 5).map(entry => <div key={entry.id}><span className={entry.error ? "eventDot warn" : "eventDot"} />{entry.text}</div>)}
           </div>
         </section>
 
