@@ -7,6 +7,9 @@ const sharedComponent = fs.readFileSync(new URL("../app/operator-ui/programming-
 const sharedCss = fs.readFileSync(new URL("../app/operator-ui/programming-job-controls.css", import.meta.url), "utf8");
 const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
+const sharedDriver = fs.readFileSync(new URL("../e2e/tests/programming-job-test-helpers.ts", import.meta.url), "utf8");
+const productionRuntime = fs.readFileSync(new URL("../e2e/tests/production-multi-ppu-runtime.spec.ts", import.meta.url), "utf8");
+const engineeringRuntime = fs.readFileSync(new URL("../e2e/tests/engineering-programming-asset-cache-runtime.spec.ts", import.meta.url), "utf8");
 
 test("PMode and EMode render the same ProgrammingJobPanel component", () => {
   assert.match(layout, /operator-ui\/programming-job-controls\.css/);
@@ -25,6 +28,31 @@ test("shared component owns all four Programming Job fields", () => {
   assert.match(sharedComponent, /className="programmingJobImageControl"/);
   assert.match(sharedComponent, /className="programmingJobOperationChecks"/);
   assert.match(sharedComponent, /className="programmingJobPolicyControls"/);
+});
+
+test("shared component exposes semantic operation, policy and action test hooks", () => {
+  assert.match(sharedComponent, /data-programming-job-operation=\{operation\.key\}/);
+  for (const policy of ["repeat", "retry", "stop"]) {
+    assert.match(sharedComponent, new RegExp(`data-programming-job-policy="${policy}"`));
+  }
+  for (const action of ["start", "status", "abort"]) {
+    assert.match(sharedComponent, new RegExp(`data-programming-job-action="${action}"`));
+  }
+});
+
+test("PMode and EMode runtime tests consume one Programming Job test driver", () => {
+  assert.match(sharedDriver, /expectedFields:[^\n]*\["target", "image", "operations", "policy"\]/);
+  assert.match(sharedDriver, /expectedActions:[^\n]*\["start", "status", "abort"\]/);
+  assert.match(sharedDriver, /expectedOperations:[^\n]*\["erase", "program", "verify", "read"\]/);
+  assert.match(sharedDriver, /expectedPolicies:[^\n]*\["repeat", "retry", "stop"\]/);
+  assert.match(sharedDriver, /export async function expectProgrammingJobContract/);
+  assert.match(sharedDriver, /export function programmingJobOperation/);
+  assert.match(sharedDriver, /export function programmingJobAction/);
+
+  assert.match(productionRuntime, /from "\.\/programming-job-test-helpers"/);
+  assert.match(productionRuntime, /programmingJob\(page, "production"\)/);
+  assert.match(engineeringRuntime, /from "\.\/programming-job-test-helpers"/);
+  assert.match(engineeringRuntime, /programmingJob\(page, "engineering"\)/);
 });
 
 test("shared action bar structurally owns START then STATUS then ABORT", () => {
