@@ -1,4 +1,8 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  expectProgrammingJobContract,
+  programmingJob,
+} from "./programming-job-test-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -85,32 +89,29 @@ async function installEngineeringApi(page: Page) {
   });
 }
 
-test("Engineering labels are readable without reviving duplicate card headers", async ({ page }) => {
+test("Engineering labels keep setup readability while Programming Job follows the shared operator baseline", async ({ page }) => {
   await installEngineeringApi(page);
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
-  for (const selector of [".targetingCard > header", ".programmingJobCard > header"]) {
-    const header = page.locator(selector);
-    await expect(header).toBeVisible();
-    expect(await header.evaluate(element => getComputedStyle(element).fontSize)).toBe("0px");
-  }
+  const setupHeader = page.locator(".targetingCard > header");
+  await expect(setupHeader).toBeVisible();
+  expect(await setupHeader.evaluate(element => getComputedStyle(element).fontSize)).toBe("0px");
 
-  const setupPseudo = await page.locator(".targetingCard > header").evaluate(element => ({
+  const setupPseudo = await setupHeader.evaluate(element => ({
     content: getComputedStyle(element, "::before").content,
     fontSize: getComputedStyle(element, "::before").fontSize,
   }));
   expect(setupPseudo.content).toContain("SYSTEM SETUP");
   expect(setupPseudo.fontSize).toBe("12px");
 
-  const jobPseudo = await page.locator(".programmingJobCard > header").evaluate(element => ({
-    content: getComputedStyle(element, "::before").content,
-    fontSize: getComputedStyle(element, "::before").fontSize,
-  }));
-  expect(jobPseudo.content).toContain("PROGRAMMING JOB");
-  expect(jobPseudo.fontSize).toBe("12px");
+  const job = programmingJob(page, "engineering");
+  await expectProgrammingJobContract(job);
+  const jobTitle = job.locator(".operatorPanelTitle > strong");
+  await expect(jobTitle).toHaveText("PROGRAMMING JOB");
+  expect(await jobTitle.evaluate(element => getComputedStyle(element).fontSize)).toBe("11px");
 
   const setupLabels = page.locator(".targetingCard .workflowField > span");
   await expect(setupLabels).toHaveCount(2);
@@ -118,10 +119,10 @@ test("Engineering labels are readable without reviving duplicate card headers", 
     expect(await setupLabels.nth(index).evaluate(element => getComputedStyle(element).fontSize)).toBe("12px");
   }
 
-  const jobLabels = page.locator(".programmingJobBody .jobRow > strong");
+  const jobLabels = job.locator('[data-programming-job-field] > strong');
   await expect(jobLabels).toHaveCount(4);
   for (let index = 0; index < 4; index += 1) {
-    expect(await jobLabels.nth(index).evaluate(element => getComputedStyle(element).fontSize)).toBe("12px");
+    expect(await jobLabels.nth(index).evaluate(element => getComputedStyle(element).fontSize)).toBe("11px");
   }
 
   const siteNames = page.locator(".channelTable tbody td:nth-child(2) b");
