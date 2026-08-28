@@ -16,6 +16,8 @@ const serverBatchRuntime = await readFile(new URL("../../python/plasma_web/batch
 
 test("EMode Settings owns the server-backed shared Gateway communication policy", () => {
   assert.match(engineeringPage, /active === "settings"/);
+  assert.match(engineeringPage, /type SettingsSection = "gateway" \| "mock"/);
+  assert.match(engineeringPage, /selectSettingsSection\("gateway"\)/);
   assert.match(engineeringPage, /<GatewaySettingsPanel \/>/);
   assert.match(settingsApi, /\/api\/settings\/gateway/);
   assert.match(settingsApi, /ppu_request_timeout_ms: 10_000/);
@@ -47,8 +49,11 @@ test("Shared Settings controls lock the Mock-reference geometry", () => {
   assert.match(sharedSettingsCss, /font:\s*700 14px\/1\.2 var\(--font-sans\)/);
 });
 
-test("EMode settings surfaces stay top-aligned and keep Gateway help on the same page", () => {
-  assert.match(engineeringPage, /settingsSurfaceActive = active === "settings" \|\| active === "mock"/);
+test("EMode settings children share one top-aligned Settings surface and keep Gateway help on the same page", () => {
+  assert.match(engineeringPage, /settingsSurfaceActive = active === "settings"/);
+  assert.match(engineeringPage, /settingsSection === "mock"/);
+  assert.match(engineeringPage, /selectSettingsSection\("gateway"\)/);
+  assert.match(engineeringPage, /selectSettingsSection\("mock"\)/);
   assert.match(engineeringPage, /settingsSurfaceActive \? "settingsActive"/);
   assert.match(engineeringCss, /\.engineeringCanvas\.settingsActive\s*\{[\s\S]*?place-items:\s*start stretch;/);
   assert.match(settingsPanel, /ariaLabel="Gateway Settings Guide"/);
