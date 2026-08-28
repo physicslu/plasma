@@ -265,7 +265,7 @@ async function installApi(
   });
 }
 
-test("Engineering Programming renders the approved three-row workflow and binds Target IC to a direct PPU job", async ({ page }) => {
+test("Engineering Programming renders the approved workflow and binds Target IC to a direct PPU job", async ({ page }) => {
   const submissions: Array<Record<string, unknown>> = [];
   await installApi(page, submissions);
   await page.setViewportSize({ width: 1536, height: 1000 });
@@ -282,7 +282,8 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
   await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("LIVE SITE STATUS", { exact: true })).toBeVisible();
-  await expect(page.locator(".engineeringProgrammingV2 .recentEvents")).toBeHidden();
+  await expect(page.locator(".engineeringProgrammingV2 .recentEvents")).toHaveCount(0);
+  await expect(page.getByText("RECENT EVENTS", { exact: true })).toHaveCount(0);
   await expect(programmingJobPolicy(job, "retry")).toHaveValue("3");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();

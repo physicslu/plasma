@@ -1,5 +1,7 @@
-/* Engineering workspace density contract: the navigation rail owns the full
- * height while Programming keeps its control stack compact and status-first. */
+/* Engineering workspace density owns page spacing only.
+ * Shared operator controls, including Programming Job, own their own internal
+ * presentation through operator-ui design contracts. */
+
 .engineeringShell {
   padding: 0;
   gap: 0;
@@ -50,67 +52,4 @@
 
 .engineeringSelectorPanel .channelChecks label {
   padding: 6px 7px;
-}
-
-/* Engineering owns field placement, not equivalent Programming Job control
- * presentation. Operation tiles, Batch status and START / ABORT composition are
- * owned by operator-ui/programming-job-controls.css using the PMode baseline. */
-@container engineering-programming (min-width: 981px) {
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    grid-template-areas: none;
-    grid-auto-flow: row;
-    align-content: start;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .jobRow:first-child {
-    grid-column: 1 / 4;
-    grid-row: 1;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .jobRow:nth-child(2) {
-    grid-column: 4 / 7;
-    grid-row: 1;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingBatchOperations {
-    grid-area: auto;
-    grid-column: 1 / 4;
-    grid-row: 2;
-    display: grid;
-    grid-template-columns: 126px minmax(0, 1fr);
-    align-items: start;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringPolicyRow {
-    grid-area: auto;
-    grid-column: 4 / 7;
-    grid-row: 2;
-    display: grid;
-    grid-template-columns: 112px max-content max-content minmax(118px, max-content);
-    gap: 10px 12px;
-    align-items: center;
-  }
-
-  /* Canonical READ has no operator-entered range. The execution layer resolves
-   * the complete Main Programmable Flash geometry from the target support
-   * implementation. Keep the legacy DOM node non-visible until its state fields
-   * are removed from the compatibility workspace session contract. */
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringReadRow {
-    display: none;
-  }
-
-  /* Placement only: the shared Programming Job contract owns the three-column
-   * START | BATCH STATUS | ABORT geometry and all internal control styling. */
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingActions {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    width: 100%;
-    align-self: center;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .warning {
-    grid-column: 1 / -1;
-    grid-row: 4;
-  }
 }

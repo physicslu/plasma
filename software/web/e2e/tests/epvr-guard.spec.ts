@@ -133,7 +133,7 @@ async function expectEngineeringV2Geometry(page: Page) {
   expect(actionBox).not.toBeNull();
   expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(operationBox!.y);
   expect(operationBox!.y + operationBox!.height).toBeLessThanOrEqual(actionBox!.y);
-  await expect(image.locator("[data-image-source]")).toHaveCSS("font-size", "13px");
+  await expect(image.locator("[data-image-source]")).toHaveCSS("font-size", "10px");
 }
 
 test("Pmod Mock readiness uses Synthetic Image when no file is selected", async ({ page }) => {

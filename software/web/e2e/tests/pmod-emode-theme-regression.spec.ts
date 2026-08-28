@@ -294,9 +294,9 @@ test("Emode v2 keeps workspace density while Programming Job follows the shared 
   for (const box of [header, kpis, workflow, setup, jobBox, liveStatus]) expect(box).not.toBeNull();
   expect(header!.height).toBeLessThanOrEqual(90);
   expect(kpis!.height).toBeLessThanOrEqual(180);
-  expect(jobBox!.height).toBeGreaterThanOrEqual(500);
-  expect(jobBox!.height).toBeLessThanOrEqual(560);
+  expect(jobBox!.height).toBeGreaterThan(250);
+  expect(jobBox!.height).toBeLessThan(400);
   expect(setup!.y + setup!.height).toBeLessThanOrEqual(jobBox!.y);
   expect(jobBox!.y + jobBox!.height).toBeLessThanOrEqual(liveStatus!.y);
-  await expect(page.locator(".recentEvents")).toBeHidden();
+  await expect(page.locator(".recentEvents")).toHaveCount(0);
 });

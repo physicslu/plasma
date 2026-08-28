@@ -1,17 +1,30 @@
+@import "./operator-design-contract.css";
+
 .operatorLogCard {
   font-family: var(--font-sans), Arial, sans-serif;
 }
 
 .operatorLogHead {
   height: auto;
-  min-height: 38px;
-  padding-block: 8px;
-  gap: 12px;
+  min-height: var(--operator-panel-header-min-height);
+  padding: var(--operator-panel-header-padding-block) var(--operator-panel-header-padding-inline);
+  gap: 10px;
 }
 
 .operatorLogTitle,
 .operatorLogActions {
   flex: 0 0 auto;
+}
+
+.operatorLogTitle {
+  font-family: var(--font-sans), Arial, sans-serif;
+  font-size: var(--operator-panel-title-font-size);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.operatorLogActions button {
+  font-size: var(--operator-control-font-size);
 }
 
 .operatorLogFilters {
