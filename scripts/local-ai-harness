@@ -1,0 +1,273 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="${BASH_SOURCE[0]}"
+while [[ -L "$script_path" ]]; do
+  script_dir="$(cd -P "$(dirname "$script_path")" && pwd)"
+  script_path="$(readlink "$script_path")"
+  [[ "$script_path" == /* ]] || script_path="$script_dir/$script_path"
+done
+repo_root="$(cd -P "$(dirname "$script_path")/.." && pwd)"
+
+model="${PLASMA_LOCAL_AI_MODEL:-qwen3.8:27b-mlx}"
+ollama_url="${PLASMA_OLLAMA_URL:-http://127.0.0.1:11434}"
+harness_port="${PLASMA_HARNESS_PORT:-3080}"
+ollama_port=""
+state_dir="${TMPDIR:-/tmp}/plasma-local-ai-${UID:-$(id -u)}"
+ollama_pid_file="$state_dir/ollama.pid"
+harness_pid_file="$state_dir/harness.pid"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/local-ai-harness <command>
+
+Commands:
+  ollama   Run Ollama in the foreground with Plasma's local-AI policy
+  warmup   Check Ollama/model availability and load the configured model
+  harness  Run the DeepSeek Harness Web UI from the Plasma repository root
+  status   Print non-secret local-AI diagnostics
+  stop     Stop only services previously started by this helper
+  help     Show this help
+
+Environment overrides:
+  PLASMA_LOCAL_AI_MODEL  Model name (default: qwen3.8:27b-mlx)
+  PLASMA_OLLAMA_URL      Local Ollama URL (default: http://127.0.0.1:11434)
+  PLASMA_HARNESS_PORT    Harness Web port (default: 3080)
+EOF
+}
+
+fail() {
+  printf '[local-ai] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+validate_config() {
+  [[ "$model" =~ ^[[:alnum:]_.:/-]+$ ]] || fail "Invalid PLASMA_LOCAL_AI_MODEL: $model"
+  [[ "$harness_port" =~ ^[0-9]+$ ]] && (( harness_port >= 1 && harness_port <= 65535 )) || \
+    fail "PLASMA_HARNESS_PORT must be an integer from 1 to 65535"
+  [[ "$ollama_url" =~ ^http://(127\.0\.0\.1|localhost):[0-9]+/?$ ]] || \
+    fail "PLASMA_OLLAMA_URL must be an http://127.0.0.1:PORT or http://localhost:PORT URL"
+  ollama_url="${ollama_url%/}"
+  ollama_port="${ollama_url##*:}"
+  (( ollama_port >= 1 && ollama_port <= 65535 )) || \
+    fail "PLASMA_OLLAMA_URL port must be an integer from 1 to 65535"
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"
+}
+
+pid_command() {
+  ps -p "$1" -o command= 2>/dev/null || true
+}
+
+record_foreground_pid() {
+  local pid_file="$1" existing_pid=""
+  mkdir -p "$state_dir"
+  chmod 700 "$state_dir"
+  if [[ -f "$pid_file" ]]; then
+    read -r existing_pid <"$pid_file" || true
+    if [[ "$existing_pid" =~ ^[0-9]+$ ]] && kill -0 "$existing_pid" 2>/dev/null; then
+      fail "A launcher ownership record already refers to live PID $existing_pid. Inspect it before starting another instance."
+    fi
+    rm -f "$pid_file"
+  fi
+  printf '%s\n' "$$" >"$pid_file"
+}
+
+ollama_reachable() {
+  curl --silent --show-error --fail --max-time 3 "$ollama_url/api/tags" >/dev/null 2>&1
+}
+
+model_installed() {
+  curl --silent --show-error --fail --max-time 5 "$ollama_url/api/tags" 2>/dev/null | \
+    grep -Fq "\"name\":\"$model\""
+}
+
+port_pids() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -tiTCP:"$1" -sTCP:LISTEN 2>/dev/null | sort -u || true
+  fi
+}
+
+run_ollama() {
+  require_command ollama
+  record_foreground_pid "$ollama_pid_file"
+  printf '%s\n' \
+    "[local-ai] Plasma repository: $repo_root" \
+    "[local-ai] Starting Ollama in the foreground at $ollama_url" \
+    '[local-ai] OLLAMA_LOAD_TIMEOUT=30m OLLAMA_KEEP_ALIVE=-1 OLLAMA_NUM_PARALLEL=1'
+  export OLLAMA_HOST="$ollama_url"
+  export OLLAMA_LOAD_TIMEOUT=30m
+  export OLLAMA_KEEP_ALIVE=-1
+  export OLLAMA_NUM_PARALLEL=1
+  exec ollama serve
+}
+
+run_warmup() {
+  require_command curl
+  require_command python3
+  ollama_reachable || fail "Ollama is unavailable at $ollama_url. Start it with: scripts/local-ai-harness ollama"
+  model_installed || fail "Model $model is not installed. This helper will not pull it automatically; install it explicitly with: ollama pull $model"
+
+  local response payload
+  payload="{\"model\":\"$model\",\"prompt\":\"Reply briefly.\",\"stream\":false,\"options\":{\"temperature\":0,\"num_predict\":16}}"
+  printf '[local-ai] Warming model %s...\n' "$model"
+  response="$(curl --silent --show-error --fail --max-time 1800 \
+    -H 'Content-Type: application/json' -d "$payload" "$ollama_url/api/generate")" || \
+    fail "Ollama warmup request failed"
+  python3 -c '
+import json
+import sys
+
+expected_model = sys.argv[1]
+try:
+    payload = json.load(sys.stdin)
+except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    raise SystemExit(f"invalid JSON: {exc}")
+
+if not isinstance(payload, dict):
+    raise SystemExit("top-level response is not an object")
+if payload.get("model") != expected_model:
+    raise SystemExit("response model does not match the configured model")
+if payload.get("done") is not True:
+    raise SystemExit("generation did not complete successfully")
+if payload.get("error"):
+    raise SystemExit("Ollama returned an error")
+
+response = payload.get("response", "")
+thinking = payload.get("thinking", "")
+if not isinstance(response, str) or not isinstance(thinking, str):
+    raise SystemExit("completion fields have invalid types")
+if not response.strip() and not thinking.strip():
+    raise SystemExit("completion contains neither response nor reasoning content")
+' "$model" <<<"$response" || fail "Ollama returned an invalid warmup completion"
+  printf '[local-ai] Model is loaded and generation completed successfully.\n'
+}
+
+resolve_harness_command() {
+  if command -v dsh >/dev/null 2>&1; then
+    harness_command=(dsh --profile web)
+    return
+  fi
+
+  # Offline/no-install mode may run an already available official package but
+  # cannot silently download or install one from the registry.
+  if command -v npx >/dev/null 2>&1 && \
+    npx --offline --no-install --package=@deepseek-ai/dsh dsh --version >/dev/null 2>&1; then
+    harness_command=(npx --offline --no-install --package=@deepseek-ai/dsh dsh --profile web)
+    return
+  fi
+  fail "DeepSeek Harness is unavailable. Install the official @deepseek-ai/dsh package explicitly; this helper will not install it."
+}
+
+run_harness() {
+  resolve_harness_command
+  record_foreground_pid "$harness_pid_file"
+  cd "$repo_root"
+  printf '%s\n' \
+    "[local-ai] Plasma Harness workspace: $repo_root" \
+    "[local-ai] Starting Harness Web UI in the foreground on 127.0.0.1:$harness_port"
+  exec "${harness_command[@]}" --port "$harness_port"
+}
+
+show_status() {
+  local pids
+  printf '%s\n' \
+    "Plasma repository: $repo_root" \
+    "Model: $model" \
+    "Ollama URL: $ollama_url" \
+    'OLLAMA_LOAD_TIMEOUT=30m' \
+    'OLLAMA_KEEP_ALIVE=-1' \
+    'OLLAMA_NUM_PARALLEL=1' \
+    "Harness Web port: $harness_port"
+
+  if command -v ollama >/dev/null 2>&1; then
+    printf '\nOllama version:\n'
+    ollama --version 2>&1 || true
+    printf '\nOllama loaded models (`ollama ps`):\n'
+    OLLAMA_HOST="$ollama_url" ollama ps 2>&1 || true
+  else
+    printf '\nOllama command: unavailable\n'
+  fi
+
+  if ollama_reachable; then
+    printf 'Ollama API: reachable\n'
+    if model_installed; then
+      printf 'Configured model: installed\n'
+    else
+      printf 'Configured model: not installed\n'
+    fi
+  else
+    printf 'Ollama API: unreachable\nConfigured model: unknown (API unavailable)\n'
+  fi
+
+  if command -v dsh >/dev/null 2>&1; then
+    printf '\nHarness command: %s\nHarness version: ' "$(command -v dsh)"
+    dsh --version 2>&1 || true
+  elif command -v npx >/dev/null 2>&1 && \
+    npx --offline --no-install --package=@deepseek-ai/dsh dsh --version >/dev/null 2>&1; then
+    printf '\nHarness command: npx --offline --no-install --package=@deepseek-ai/dsh dsh\nHarness version: '
+    npx --offline --no-install --package=@deepseek-ai/dsh dsh --version 2>&1 || true
+  else
+    printf '\nHarness command: unavailable\n'
+  fi
+
+  pids="$(port_pids "$harness_port")"
+  if [[ -n "$pids" ]]; then
+    printf 'Harness Web port: listening (PID(s): %s)\n' "$(tr '\n' ' ' <<<"$pids" | sed 's/[[:space:]]*$//')"
+  else
+    printf 'Harness Web port: not listening\n'
+  fi
+}
+
+stop_owned_process() {
+  local label="$1" pid_file="$2" expected="$3" port="$4" pid command listeners
+  [[ -f "$pid_file" ]] || {
+    printf '[local-ai] %s: no launcher ownership record; not stopping anything.\n' "$label"
+    return
+  }
+  read -r pid <"$pid_file"
+  [[ "$pid" =~ ^[0-9]+$ ]] || fail "$label ownership record is invalid; remove $pid_file after inspecting it"
+  if ! kill -0 "$pid" 2>/dev/null; then
+    printf '[local-ai] %s: recorded process is no longer running.\n' "$label"
+    rm -f "$pid_file"
+    return
+  fi
+  command="$(pid_command "$pid")"
+  if [[ "$command" != *"$expected"* ]]; then
+    printf '[local-ai] %s: PID %s does not match the expected command; refusing to stop it.\n' "$label" "$pid" >&2
+    printf '[local-ai] Inspect manually with: ps -p %s -o pid=,command=\n' "$pid" >&2
+    return 1
+  fi
+  listeners="$(port_pids "$port")"
+  if ! grep -Fxq "$pid" <<<"$listeners"; then
+    printf '[local-ai] %s: PID %s does not own expected listening port %s; refusing to stop it.\n' \
+      "$label" "$pid" "$port" >&2
+    printf '[local-ai] Inspect manually with: ps -p %s -o pid=,command=\n' "$pid" >&2
+    return 1
+  fi
+  kill -TERM "$pid"
+  rm -f "$pid_file"
+  printf '[local-ai] %s: sent TERM to launcher-owned PID %s.\n' "$label" "$pid"
+}
+
+run_stop() {
+  local failed=0
+  stop_owned_process Ollama "$ollama_pid_file" 'ollama serve' "$ollama_port" || failed=1
+  stop_owned_process Harness "$harness_pid_file" 'dsh' "$harness_port" || failed=1
+  if [[ "$failed" == 1 ]]; then
+    fail "One or more processes could not be identified safely and were left running"
+  fi
+}
+
+validate_config
+case "${1:-help}" in
+  ollama) run_ollama ;;
+  warmup) run_warmup ;;
+  harness) run_harness ;;
+  status) show_status ;;
+  stop) run_stop ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; fail "Unknown command: $1" ;;
+esac

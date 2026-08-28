@@ -19,7 +19,10 @@ targets=(README.md docs)
 failed=0
 
 for pattern in "${patterns[@]}"; do
-  mapfile -t files < <(grep -RIlE --include='*.md' -- "$pattern" "${targets[@]}" 2>/dev/null || true)
+  files=()
+  while IFS= read -r file; do
+    files+=("$file")
+  done < <(grep -RIlE --include='*.md' -- "$pattern" "${targets[@]}" 2>/dev/null || true)
   if ((${#files[@]})); then
     printf 'ERROR: public documentation contains an operator-specific identifier pattern:\n' >&2
     printf '  %s\n' "${files[@]}" >&2
