@@ -34,10 +34,7 @@ async function runTwoSiteProgram(
     name: "Engineering Programming Job",
     exact: true,
   });
-  const execute = programmingJob.getByRole("button", {
-    name: "START PROGRAMMING",
-    exact: true,
-  });
+  const execute = programmingJob.locator('[data-programming-job-action="start"]');
   await expect(execute).toBeEnabled();
   await execute.click();
   await expect.poll(() => counters.batches, { timeout: 30_000 }).toBe(expectedBatchCount);
