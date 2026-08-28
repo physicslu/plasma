@@ -25,9 +25,10 @@
   }
 }
 
-/* Once the workspace stacks vertically, labels return to natural left
- * alignment and preserve the previous 12 px vertical control separation. */
-@media (max-width: 760px) {
+/* Once the Programming workspace itself becomes narrow, stack targeting fields
+ * regardless of the outer viewport width. This avoids a 761-980 px viewport
+ * gap while the Engineering sidebar still consumes horizontal space. */
+@container engineering-programming (max-width: 760px) {
   .engineeringProgrammingV2 .targetingCard .workflowField {
     grid-template-columns: 1fr;
     gap: 12px;
