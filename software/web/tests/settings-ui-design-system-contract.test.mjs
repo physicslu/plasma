@@ -57,9 +57,13 @@ test("Gateway composition follows the approved Mock Settings reference", () => {
   assert.doesNotMatch(gateway, /SettingsTabs/);
 });
 
-test("Gateway and Mock share the same settings canvas placement contract", () => {
-  assert.match(page, /settingsSurfaceActive = active === "settings" \|\| active === "mock"/);
+test("Gateway and Mock are child views of the same Settings canvas placement contract", () => {
+  assert.match(page, /type SettingsSection = "gateway" \| "mock"/);
+  assert.match(page, /settingsSurfaceActive = active === "settings"/);
+  assert.match(page, /selectSettingsSection\("gateway"\)/);
+  assert.match(page, /selectSettingsSection\("mock"\)/);
   assert.match(page, /settingsSurfaceActive \? "settingsActive"/);
+  assert.doesNotMatch(page, /\["mock", "engineering\.settings"/);
 });
 
 test("Shared Settings UI owns Mock-reference cards, controls, actions, guide typography and numbering", () => {
