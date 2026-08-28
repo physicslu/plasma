@@ -89,6 +89,7 @@ async function rowMetrics(row: Locator) {
       gap: controlBox.left - labelBox.right,
       controlX: controlBox.left,
       controlOffset: controlBox.left - rowBox.left,
+      labelOffset: labelBox.left - rowBox.left,
       textAlign: style.textAlign,
       justifySelf: style.justifySelf,
     };
@@ -104,7 +105,17 @@ function expectRightAlignedRail(metric: Awaited<ReturnType<typeof rowMetrics>>, 
   expect(metric.justifySelf).toBe("end");
 }
 
-test("Engineering targeting keeps its compact rail while Programming Job keeps the shared canonical rail", async ({ page }) => {
+function expectProgrammingJobRail(metric: Awaited<ReturnType<typeof rowMetrics>>) {
+  expect(metric.labelOffset).toBeGreaterThanOrEqual(22);
+  expect(metric.labelOffset).toBeLessThanOrEqual(26);
+  expect(metric.controlOffset).toBeGreaterThanOrEqual(288);
+  expect(metric.controlOffset).toBeLessThanOrEqual(296);
+  expect(metric.gap).toBeGreaterThan(120);
+  expect(metric.textAlign).toBe("left");
+  expect(metric.justifySelf).toBe("start");
+}
+
+test("Engineering targeting keeps its compact rail while Programming Job keeps the approved shared card rail", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await installMockProvider(page);
   await page.goto("/engineering");
@@ -123,7 +134,7 @@ test("Engineering targeting keeps its compact rail while Programming Job keeps t
     expectRightAlignedRail(metric, 118, 122);
   }
   for (const metric of [target, image, operations, policy]) {
-    expectRightAlignedRail(metric, 134, 138);
+    expectProgrammingJobRail(metric);
   }
 
   expect(Math.abs(target.controlX - operations.controlX)).toBeLessThanOrEqual(2);
