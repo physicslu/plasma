@@ -89,7 +89,7 @@ async function installEngineeringApi(page: Page) {
   });
 }
 
-test("Engineering panels use one header scale while Programming Job follows the shared operator baseline", async ({ page }) => {
+test("Engineering-specific headings stay readable while Programming Job follows the shared operator baseline", async ({ page }) => {
   await installEngineeringApi(page);
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
@@ -105,7 +105,7 @@ test("Engineering panels use one header scale while Programming Job follows the 
     fontSize: getComputedStyle(element, "::before").fontSize,
   }));
   expect(setupPseudo.content).toContain("SYSTEM SETUP");
-  expect(setupPseudo.fontSize).toBe("11px");
+  expect(setupPseudo.fontSize).toBe("12px");
 
   const job = programmingJob(page, "engineering");
   await expectProgrammingJobContract(job);
@@ -116,7 +116,7 @@ test("Engineering panels use one header scale while Programming Job follows the 
   const setupLabels = page.locator(".targetingCard .workflowField > span");
   await expect(setupLabels).toHaveCount(2);
   for (let index = 0; index < 2; index += 1) {
-    expect(await setupLabels.nth(index).evaluate(element => getComputedStyle(element).fontSize)).toBe("10px");
+    expect(await setupLabels.nth(index).evaluate(element => getComputedStyle(element).fontSize)).toBe("12px");
   }
 
   const jobLabels = job.locator('[data-programming-job-field] > strong');
