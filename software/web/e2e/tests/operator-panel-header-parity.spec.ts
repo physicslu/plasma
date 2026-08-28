@@ -150,6 +150,24 @@ async function toggleSignature(locator: Locator) {
   });
 }
 
+async function directTextGeometry(locator: Locator, text: string) {
+  return locator.evaluate((element, expectedText) => {
+    const textNode = Array.from(element.childNodes).find(node =>
+      node.nodeType === Node.TEXT_NODE && node.textContent?.includes(expectedText),
+    );
+    if (!textNode) throw new Error(`Missing direct text node containing ${expectedText}`);
+    const range = document.createRange();
+    range.selectNodeContents(textNode);
+    const textRect = range.getBoundingClientRect();
+    const headerRect = element.getBoundingClientRect();
+    return {
+      left: textRect.left - headerRect.left,
+      width: textRect.width,
+      headerWidth: headerRect.width,
+    };
+  }, text);
+}
+
 async function expectSameSignatures(locators: Locator[], signature: (locator: Locator) => Promise<Record<string, string>>) {
   for (const locator of locators) await expect(locator).toBeVisible();
   const baseline = await signature(locators[0]);
@@ -231,4 +249,15 @@ test("PMode and EMode first-level Panel Header Title and Toggle computed styles 
     await expect(toggle).toBeVisible();
     expect(await toggleSignature(toggle)).toEqual(productionToggle);
   }
+
+  const setupHeader = page.locator(".targetingCard > header");
+  const setupTitle = await directTextGeometry(setupHeader, "SYSTEM SETUP & TARGETING");
+  expect(setupTitle.left).toBeLessThan(64);
+  expect(setupTitle.left).toBeLessThan(setupTitle.headerWidth / 4);
+
+  const setupHeaderBox = await setupHeader.boundingBox();
+  const setupToggleBox = await page.locator(".targetingCard .engineeringPanelToggle").boundingBox();
+  expect(setupHeaderBox).not.toBeNull();
+  expect(setupToggleBox).not.toBeNull();
+  expect(Math.abs((setupHeaderBox!.x + setupHeaderBox!.width) - (setupToggleBox!.x + setupToggleBox!.width))).toBeLessThan(16);
 });
