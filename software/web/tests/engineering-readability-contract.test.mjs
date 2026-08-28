@@ -5,22 +5,25 @@ import test from "node:test";
 const readabilityPath = new URL("../app/engineering/engineering-readability.css", import.meta.url);
 const refreshPath = new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url);
 const sharedControlsPath = new URL("../app/operator-ui/programming-job-controls.css", import.meta.url);
+const designContractPath = new URL("../app/operator-ui/operator-design-contract.css", import.meta.url);
 const pagePath = new URL("../app/engineering/page.tsx", import.meta.url);
 
 async function source(url) {
   return readFile(url, "utf8");
 }
 
-test("Engineering readability layer raises the approved operator font floor without overriding shared Programming controls", async () => {
-  const [css, sharedControls] = await Promise.all([source(readabilityPath), source(sharedControlsPath)]);
+test("Engineering readability owns only Engineering targeting and live Site typography", async () => {
+  const [css, sharedControls, designContract] = await Promise.all([
+    source(readabilityPath),
+    source(sharedControlsPath),
+    source(designContractPath),
+  ]);
 
   for (const contract of [
     ".liveSiteStatus > header > span::before {\n  font-size: 12px;",
-    ".workflowField select,\n.engineeringProgrammingV2 .jobRow,",
+    ".workflowField,\n.engineeringProgrammingV2 .workflowField select {\n  font-size: 11px;",
     ".workflowField > span {\n  font-size: 12px;",
-    ".jobRow > strong {\n  font-size: 12px;",
-    ".engineeringImageHint {\n  font-size: 9px;",
-    ".engineeringRetryField {\n  font-size: 10px;",
+    ".topologyFoot {\n  font-size: 10px;",
     ".channelTable {\n  font-size: 12px;",
     ".channelTable th {\n  font-size: 10px;",
     ".channelTable td:nth-child(2) b {\n  font-size: 13px;",
@@ -30,15 +33,24 @@ test("Engineering readability layer raises the approved operator font floor with
   }
 
   for (const forbidden of [
-    ".programmingBatchOperations .operationChecks label",
+    ".programmingJob",
+    ".jobRow",
+    ".imageField",
+    ".engineeringBrowseButton",
+    ".engineeringImageHint",
+    ".engineeringPolicyRow",
+    ".engineeringRetryField",
+    ".programmingBatchOperations",
     ".batchReadiness {",
     ".programmingActions button",
   ]) {
-    assert.equal(css.includes(forbidden), false, `Engineering readability must not override shared Programming control: ${forbidden}`);
+    assert.equal(css.includes(forbidden), false, `Engineering readability must not own retired/shared Programming selector: ${forbidden}`);
   }
 
-  assert.match(sharedControls, /\.programmingJobOperationChecks label\s*\{[\s\S]*font-size:\s*13px[\s\S]*font-weight:\s*550/);
-  assert.match(sharedControls, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*font-size:\s*17px[\s\S]*font-weight:\s*800/);
+  assert.match(sharedControls, /\.programmingJobOperationChecks label\s*\{[\s\S]*font-size:\s*var\(--operator-control-font-size\)[\s\S]*font-weight:\s*550/);
+  assert.match(sharedControls, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*font-size:\s*var\(--operator-action-font-size\)[\s\S]*font-weight:\s*800/);
+  assert.match(designContract, /--operator-control-font-size:\s*10px/);
+  assert.match(designContract, /--operator-action-font-size:\s*11px/);
   assert.doesNotMatch(
     css,
     /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/,
@@ -46,20 +58,15 @@ test("Engineering readability layer raises the approved operator font floor with
   );
 });
 
-test("Engineering System Setup header hides its legacy raw text without owning shared Programming Job header presentation", async () => {
+test("Engineering System Setup label rewrite does not own Programming Job presentation", async () => {
   const [css, refresh] = await Promise.all([source(readabilityPath), source(refreshPath)]);
 
-  assert.equal(
-    css.includes(".engineeringProgrammingV2 .productionProgrammingCard > header,"),
-    false,
-    "readability CSS must not revive raw card header text",
-  );
-  assert.match(refresh, /\.engineeringProgrammingV2 \.targetingCard > header,[\s\S]*font-size:\s*0/);
+  assert.match(refresh, /\.engineeringProgrammingV2 \.targetingCard > header\s*\{[\s\S]*font-size:\s*0/);
   assert.ok(css.includes(".targetingCard > header::before,"));
   assert.doesNotMatch(
-    css,
-    /\.programmingJob(?:Panel|Grid|Field|ActionBar|Status|OperationChecks|PolicyControls)\b/,
-    "Engineering readability must not own shared Programming Job presentation",
+    `${css}\n${refresh}`,
+    /\.programmingJob(?:Panel|Card|Grid|Field|ActionBar|Status|OperationChecks|PolicyControls)\b/,
+    "Engineering styles must not own shared Programming Job presentation",
   );
 });
 
