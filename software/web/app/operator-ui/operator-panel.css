@@ -31,6 +31,21 @@
   font-family: var(--font-sans), Arial, sans-serif;
 }
 
+/*
+ * Engineering productionProgrammingCard headers still expose their number,
+ * title and trailing control/meta as direct flex items. Keep the title group
+ * anchored to the left while the trailing item owns the far-right edge.
+ */
+.productionProgrammingCard > header {
+  justify-content: flex-start;
+  gap: 5px;
+}
+
+.productionProgrammingCard > header > .engineeringPanelToggle,
+.productionProgrammingCard > header > small {
+  margin-left: auto;
+}
+
 .operatorPanelTitle {
   min-width: 0;
   display: flex;
