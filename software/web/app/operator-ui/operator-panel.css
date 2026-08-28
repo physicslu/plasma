@@ -1,17 +1,19 @@
+@import "./operator-design-contract.css";
+
 .operatorPanel {
   min-width: 0;
   border: 1px solid var(--line, #d4dee8);
-  border-radius: 7px;
+  border-radius: var(--operator-panel-radius);
   background: var(--panel, #fff);
   overflow: visible;
   box-shadow: 0 1px 5px rgba(15, 23, 42, .04);
 }
 
 .operatorPanelHeader {
-  min-height: 30px;
-  padding: 5px 8px;
+  min-height: var(--operator-panel-header-min-height);
+  padding: var(--operator-panel-header-padding-block) var(--operator-panel-header-padding-inline);
   border-bottom: 1px solid var(--line, #d4dee8);
-  border-radius: 7px 7px 0 0;
+  border-radius: var(--operator-panel-radius) var(--operator-panel-radius) 0 0;
   background: linear-gradient(180deg, #f4f7f9, #eaf0f4);
   display: flex;
   align-items: center;
@@ -29,7 +31,7 @@
 .operatorPanelTitle > span,
 .operatorPanelTitle > strong {
   color: var(--text, #172033);
-  font-size: 11px;
+  font-size: var(--operator-panel-title-font-size);
   font-weight: 900;
 }
 
@@ -39,7 +41,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-soft, #51606f);
-  font-size: 8px;
+  font-size: var(--operator-panel-meta-font-size);
 }
 
 .operatorPanelActions {
@@ -51,7 +53,7 @@
 
 .operatorPanelBody {
   min-width: 0;
-  padding: 9px;
+  padding: var(--operator-panel-body-padding);
 }
 
 @media (max-width: 700px) {
