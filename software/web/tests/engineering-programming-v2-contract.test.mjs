@@ -10,6 +10,7 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   const page = await source("../app/engineering/page.tsx");
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
+  const sharedPanel = await source("../app/operator-ui/operator-panel.tsx");
   const refresh = await source("../app/engineering/engineering-workspace-refresh.css");
 
   assert.match(page, /ProgrammingWorkspaceV2/);
@@ -23,16 +24,19 @@ test("Engineering Programming uses the approved status-first single-PPU workflow
   assert.match(workspace, /aria-label=\{`\$\{setupCollapsed \? "Expand" : "Collapse"\} System Setup`\}/);
   assert.match(workspace, /<ProgrammingJobPanel[\s\S]*mode="engineering"/);
   assert.match(workspace, /collapsed=\{programmingJobCollapsed\}/);
-  assert.match(sharedJob, /className="programmingJobCollapseButton"/);
-  assert.match(sharedJob, /aria-expanded=\{!collapsed\}/);
+  assert.match(sharedJob, /<OperatorPanelToggle/);
+  assert.match(sharedPanel, /export function OperatorPanelToggle/);
+  assert.match(sharedPanel, /aria-expanded=\{expanded\}/);
+  assert.doesNotMatch(sharedJob, /programmingJobCollapseButton/);
   assert.doesNotMatch(workspace, /TARGET SITES/);
   assert.doesNotMatch(workspace, /LIVE PROGRESS MONITOR/);
   assert.doesNotMatch(workspace, /RECENT EVENTS|recentEvents|Engineering recent events/);
   assert.doesNotMatch(refresh, /recentEvents/);
 
   assert.match(refresh, /grid-template-columns:\s*minmax\(0, 1fr\)/);
-  assert.match(refresh, /1\. SYSTEM SETUP/);
-  assert.match(refresh, /3\. LIVE SITE STATUS/);
+  assert.match(refresh, /content:\s*"1\. "/);
+  assert.match(refresh, /content:\s*"3\. "/);
+  assert.doesNotMatch(refresh, /1\. SYSTEM SETUP|3\. LIVE SITE STATUS|font-size:\s*0/);
 });
 
 test("Engineering shell uses the approved dark EMode sidebar and supports collapse", async () => {
@@ -77,14 +81,17 @@ test("Engineering Batch Summary uses server Batch manufacturing outcomes and Pro
   assert.doesNotMatch(workspace, /CYCLE TIME/);
 });
 
-test("Production and Engineering use the same named Batch Summary primitive", async () => {
+test("Production and Engineering use the same Batch Summary and shared Panel Header primitives", async () => {
   const production = await source("../app/fleet/factory-console-v2.tsx");
   const engineering = await source("../app/engineering/programming-workspace-v2.tsx");
   const batchSummary = await source("../app/operator-ui/batch-summary.tsx");
+  const sharedPanel = await source("../app/operator-ui/operator-panel.tsx");
 
-  assert.match(batchSummary, /className="batchSummaryHeader"/);
+  assert.match(batchSummary, /import \{ OperatorPanelHeader \} from "\.\/operator-panel"/);
+  assert.match(batchSummary, /<OperatorPanelHeader title=\{title\} meta=\{meta\} \/>/);
   assert.match(batchSummary, /className="batchSummaryGrid"/);
-  assert.doesNotMatch(batchSummary, /operatorKpiSummary|operatorKpiStrip/);
+  assert.doesNotMatch(batchSummary, /batchSummaryHeader|operatorKpiSummary|operatorKpiStrip/);
+  assert.match(sharedPanel, /export function OperatorPanelHeader/);
   assert.match(production, /ariaLabel="Production Batch Summary"/);
   assert.match(production, /title="BATCH SUMMARY"/);
   assert.match(engineering, /ariaLabel="Engineering Batch Summary"/);
