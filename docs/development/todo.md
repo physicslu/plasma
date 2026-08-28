@@ -6,21 +6,22 @@ An item leaves this register only when its backend invariant, recovery semantics
 
 ## High Priority
 
-### Remote Write Authentication and Authorization
+### Security Rollout and Identity Integration
 
-**Status:** TODO
+**Status:** TODO / follow-up after PRs #167-#169
 
 **Layer:** Security/control plane
 
-**Reason:** Optional Plasma Manager is observation-only and current remote write surfaces are not a production authorization design. Browser/runtime execution-owner tokens are concurrency identities only; they are not authenticated security principals.
+**Reason:** The core remote-write authentication and authorization boundary is implemented and is no longer technical debt. Remaining work is production rollout and identity lifecycle integration around that boundary.
 
-Required work:
+Required remaining work:
 
-- authenticate operator and service identities;
-- authorize Facility/PPU/Site and operation scope;
-- provide replay/idempotency and auditable command identity;
-- keep standalone PPU execution independent from Manager availability;
-- complete threat modeling before exposing write APIs outside a trusted network.
+- complete the production threat model before exposing write APIs outside a trusted network;
+- decide and document when secure Gateway deployment becomes the canonical production default while preserving standalone PPU operation and rollback;
+- map Cloudflare Access / OIDC identities into the existing backend Principal / Permission / Facility-PPU-Site Scope model without bypassing backend authorization;
+- add permission-aware disabled/hidden execution controls throughout PMode and EMode as operator guidance, while keeping the backend as the authority;
+- add human credential rotation, revocation and session-lifecycle UX;
+- define centralized multi-PPU identity management through Plasma Manager without making standalone PPU authorization depend on Manager availability.
 
 ### EMode Design System convergence to PMode baseline
 
@@ -66,6 +67,38 @@ Required work:
 - validate sockets, hardware, Z2/FPGA path and real target separately from Mock.
 
 ## Resolved architecture debt
+
+### Remote Write Authentication and Authorization
+
+Resolved by the security boundary and integration work merged in PRs #167, #168 and #169.
+
+The current security invariant is:
+
+```text
+authenticated Principal
+    -> permission authorization
+    -> Facility / PPU / Site scope authorization
+    -> durable Idempotency-Key command identity
+    -> auditable command admission
+    -> execution
+```
+
+The implementation now provides:
+
+- canonical backend Principal, Permission and Facility / PPU / Site Scope authorization;
+- Viewer / Operator / Engineer / Admin / Service role bundles while keeping authorization permission-based rather than role-name based;
+- high-entropy Bearer authentication using stored SHA-256 token digests rather than persisted plaintext credentials;
+- durable SQLite command/audit state with replay protection and idempotent completed-command replay;
+- stable `401/E4101`, `403/E4102`, `409/E4103` and `409/E4104` security contracts;
+- secure Gateway deployment wiring with owner-only security state/configuration, restrictive process permissions and reversible systemd enable/disable behavior;
+- browser transport for Authorization and Idempotency-Key that remains passive on canonical non-secure deployments;
+- authenticated `GET /api/security/me` Principal / permission / scope introspection;
+- Viewer / Operator / Engineer / Admin expected-profile entry flow with the backend Principal remaining authoritative;
+- standalone PPU authorization that does not depend on Plasma Manager availability.
+
+Cloudflare Access / OIDC identity bridging, permission-aware control disabling, credential lifecycle UX and centralized multi-PPU identity management are follow-up rollout work and are tracked separately above; they do not reopen the completed backend remote-write authorization invariant.
+
+See [Remote Write Security Boundary](../architecture/remote-write-security-boundary.md).
 
 ### Backend PPU Execution Ownership / Lease
 
