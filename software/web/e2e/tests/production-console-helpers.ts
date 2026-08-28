@@ -1,4 +1,9 @@
 import { expect, type Page } from "@playwright/test";
+import {
+  programmingJob as sharedProgrammingJob,
+  programmingJobOperation,
+  type ProgrammingJobOperation,
+} from "./programming-job-test-helpers";
 
 export const factoryConsoleHeading = "PMODE · FACTORY CONSOLE";
 export const testTargetIc = "STM32F103C8T6";
@@ -28,12 +33,17 @@ const testDevice = {
 };
 
 export function programmingJob(page: Page) {
-  return page.getByRole("region", { name: "Production Programming Job" });
+  return sharedProgrammingJob(page, "production");
 }
 
 export function productionOperation(page: Page, code: "E" | "P" | "V" | "R") {
-  const index = { E: 0, P: 1, V: 2, R: 3 }[code];
-  return programmingJob(page).locator(".programmingJobOperationChecks label").nth(index).getByRole("checkbox");
+  const operation: Record<typeof code, ProgrammingJobOperation> = {
+    E: "erase",
+    P: "program",
+    V: "verify",
+    R: "read",
+  };
+  return programmingJobOperation(programmingJob(page), operation[code]);
 }
 
 export async function installTestDeviceCatalog(page: Page) {
