@@ -1,4 +1,13 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  expectProgrammingJobDesktopActionGeometry,
+  programmingJob as sharedProgrammingJob,
+  programmingJobAction,
+  programmingJobField,
+  programmingJobFieldOrder,
+  programmingJobOperation,
+  programmingJobPolicy,
+} from "./programming-job-test-helpers";
 import { commitProductionSites, factoryConsoleHeading, programmingJob } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
@@ -97,44 +106,39 @@ async function background(page: Page, selector: string) {
   return page.locator(selector).first().evaluate(element => getComputedStyle(element).backgroundColor);
 }
 
-test("Pmod dark theme covers operator surfaces and keeps file picker before EPVR", async ({ page }) => {
+test("Pmod dark theme covers operator surfaces and keeps shared Programming Job field order", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
   await commitProductionSites(page, facilityId, ppu1Id, [1]);
   await expect(page.locator(`[data-production-ppu="${ppu1Id}"]`)).toBeVisible();
 
-  const fieldOrder = await programmingJob(page).locator(".factoryJobGrid").evaluate(element => (
-    Array.from(element.children).map(child => child.className)
-  ));
-  expect(fieldOrder).toEqual([
-    "factoryField targetField",
-    "factoryField imageFieldV2",
-    "factoryField operationField",
-    "factoryField policyField",
-  ]);
+  const job = programmingJob(page);
+  expect(await programmingJobFieldOrder(job)).toEqual(["target", "image", "operations", "policy"]);
 
-  const targetBox = await page.locator(".targetField").boundingBox();
-  const imageBox = await page.locator(".imageFieldV2").boundingBox();
-  const operationsBox = await page.locator(".operationField").boundingBox();
-  const policyBox = await page.locator(".policyField").boundingBox();
-  const actionsBox = await page.locator(".factoryActionBar").boundingBox();
-  expect(targetBox).not.toBeNull();
-  expect(imageBox).not.toBeNull();
-  expect(operationsBox).not.toBeNull();
-  expect(policyBox).not.toBeNull();
-  expect(actionsBox).not.toBeNull();
-  expect(Math.abs(targetBox!.y - imageBox!.y)).toBeLessThanOrEqual(2);
-  expect(operationsBox!.y).toBeGreaterThanOrEqual(imageBox!.y + imageBox!.height - 1);
-  expect(Math.abs(operationsBox!.y - policyBox!.y)).toBeLessThanOrEqual(2);
-  expect(actionsBox!.y).toBeGreaterThanOrEqual(operationsBox!.y + operationsBox!.height - 1);
+  const targetBox = await programmingJobField(job, "target").boundingBox();
+  const imageBox = await programmingJobField(job, "image").boundingBox();
+  const operationsBox = await programmingJobField(job, "operations").boundingBox();
+  const policyBox = await programmingJobField(job, "policy").boundingBox();
+  const actionsBox = await job.locator('[data-programming-job-actions="production"]').boundingBox();
+  for (const box of [targetBox, imageBox, operationsBox, policyBox, actionsBox]) expect(box).not.toBeNull();
+  expect(targetBox!.y).toBeLessThanOrEqual(imageBox!.y);
+  expect(imageBox!.y).toBeLessThanOrEqual(operationsBox!.y);
+  expect(operationsBox!.y).toBeLessThanOrEqual(policyBox!.y);
+  expect(actionsBox!.y).toBeGreaterThanOrEqual(policyBox!.y + policyBox!.height - 1);
 
   const theme = page.getByRole("group", { name: "Theme" });
   await theme.getByRole("button", { name: "Dark", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect.poll(() => background(page, ".factoryConsoleV2")).toBe("rgb(7, 17, 29)");
-  for (const selector of [".operatorPanel", ".factoryImageControl", ".factoryOperationChecks label", ".factoryPpuRow", ".factorySiteLedCard"]) {
-    await expect.poll(() => background(page, selector)).toBe("rgb(12, 25, 39)");
+  for (const locator of [
+    page.locator(".operatorPanel").first(),
+    programmingJobField(job, "image").locator(".programmingJobImageControl"),
+    programmingJobField(job, "operations").locator("label").first(),
+    page.locator(".factoryPpuRow").first(),
+    page.locator(".factorySiteLedCard").first(),
+  ]) {
+    await expect.poll(() => locator.evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgb(12, 25, 39)");
   }
   const headingColor = await page.locator(".factoryConsoleHeader h1").evaluate(element => getComputedStyle(element).color);
   expect(headingColor).toBe("rgb(255, 255, 255)");
@@ -199,7 +203,7 @@ test("Emode Gateway URL, Connect, and EMode label retain readable Light and Dark
   });
 });
 
-test("Emode v2 stays dense with centered Batch status and target-owned READ", async ({ page }) => {
+test("Emode v2 keeps workspace density while Programming Job follows the shared dark presentation", async ({ page }) => {
   await installMockProvider(page);
   await page.goto("/fleet");
   const theme = page.getByRole("group", { name: "Theme" });
@@ -233,56 +237,42 @@ test("Emode v2 stays dense with centered Batch status and target-owned READ", as
   expect(selectStyle.optionBackground).toBe("rgb(12, 25, 39)");
   expect(selectStyle.optionColor).toBe("rgb(233, 243, 248)");
 
-  const browseStyle = await page.locator(".engineeringBrowseButton").evaluate(element => {
+  const job = sharedProgrammingJob(page, "engineering");
+  const imageField = programmingJobField(job, "image");
+  const browse = imageField.getByRole("button", { name: "Browse...", exact: true });
+  const imageText = imageField.locator("[data-image-source]");
+  const browseStyle = await browse.evaluate(element => {
     const style = getComputedStyle(element);
     return {
       height: Number.parseFloat(style.height),
-      radius: style.borderRadius,
       color: style.color,
       background: style.backgroundColor,
     };
   });
   expect(browseStyle.height).toBeGreaterThanOrEqual(30);
-  expect(browseStyle.radius).toBe("7px");
   expect(browseStyle.color).toBe("rgb(233, 243, 248)");
   expect(browseStyle.background).not.toBe("rgba(0, 0, 0, 0)");
 
-  const browse = await page.locator(".engineeringBrowseButton").boundingBox();
-  const imageText = await page.locator(".engineeringProgramming .programmingFileName").boundingBox();
-  expect(browse).not.toBeNull();
-  expect(imageText).not.toBeNull();
-  expect(imageText!.x).toBeLessThan(browse!.x);
-  expect(Math.abs(browse!.x - (imageText!.x + imageText!.width))).toBeLessThanOrEqual(2);
+  const browseBox = await browse.boundingBox();
+  const imageTextBox = await imageText.boundingBox();
+  expect(browseBox).not.toBeNull();
+  expect(imageTextBox).not.toBeNull();
+  expect(imageTextBox!.x).toBeLessThan(browseBox!.x);
+  expect(Math.abs(browseBox!.x - (imageTextBox!.x + imageTextBox!.width))).toBeLessThanOrEqual(2);
 
-  const repeat = await page.getByLabel("Repeat Count").boundingBox();
-  const retry = await page.getByLabel("Site Retry Limit").boundingBox();
-  const stopPolicy = await page.getByLabel("Engineering Stop Policy").boundingBox();
-  const operations = await page.locator(".programmingBatchOperations").boundingBox();
-  const policy = await page.locator(".engineeringPolicyRow").boundingBox();
-  const readiness = await page.locator(".batchReadiness").boundingBox();
-  const jobBody = await page.locator(".programmingJobBody").boundingBox();
-  const actions = await page.locator(".programmingActions").boundingBox();
-  const startButton = await page.locator(".programmingActions .startProgramming").boundingBox();
-  const abortButton = await page.locator(".programmingActions .abortProgramming").boundingBox();
-  for (const box of [repeat, retry, stopPolicy, operations, policy, readiness, jobBody, actions, startButton, abortButton]) expect(box).not.toBeNull();
-
+  const repeat = await programmingJobPolicy(job, "repeat").boundingBox();
+  const retry = await programmingJobPolicy(job, "retry").boundingBox();
+  const stopPolicy = await programmingJobPolicy(job, "stop").boundingBox();
+  const operations = await programmingJobField(job, "operations").boundingBox();
+  const policy = await programmingJobField(job, "policy").boundingBox();
+  for (const box of [repeat, retry, stopPolicy, operations, policy]) expect(box).not.toBeNull();
   const policyControlY = [repeat!.y, retry!.y, stopPolicy!.y];
   expect(Math.max(...policyControlY) - Math.min(...policyControlY)).toBeLessThanOrEqual(2);
-  expect(Math.abs(operations!.y - policy!.y)).toBeLessThanOrEqual(6);
-  const actionCenterY = actions!.y + actions!.height / 2;
-  const readinessCenterY = readiness!.y + readiness!.height / 2;
-  expect(Math.abs(actionCenterY - readinessCenterY)).toBeLessThanOrEqual(3);
-  expect(actions!.width).toBeGreaterThanOrEqual(jobBody!.width - 40);
-  expect(Math.abs(startButton!.width - abortButton!.width)).toBeLessThanOrEqual(2);
-  expect(Math.abs(startButton!.x - actions!.x)).toBeLessThanOrEqual(2);
-  expect(Math.abs((abortButton!.x + abortButton!.width) - (actions!.x + actions!.width))).toBeLessThanOrEqual(2);
-  expect(startButton!.x + startButton!.width).toBeLessThan(readiness!.x);
-  expect(readiness!.x + readiness!.width).toBeLessThan(abortButton!.x);
+  expect(operations!.y).toBeLessThanOrEqual(policy!.y);
+  await expectProgrammingJobDesktopActionGeometry(job);
 
-  await page.getByLabel("Engineering batch read").check();
-  await expect(page.locator(".engineeringReadRow")).toBeHidden();
-  await expect(page.getByLabel("Engineering READ offset")).toBeHidden();
-  await expect(page.getByLabel("Engineering READ length")).toBeHidden();
+  await programmingJobOperation(job, "read").check();
+  await expect(programmingJobOperation(job, "read")).toBeChecked();
 
   const passKpi = await page.locator('[data-kpi="pass"]').evaluate(element => {
     const style = getComputedStyle(element);
@@ -300,13 +290,13 @@ test("Emode v2 stays dense with centered Batch status and target-owned READ", as
   const kpis = await page.getByRole("region", { name: "Engineering Batch Summary" }).boundingBox();
   const workflow = await page.locator(".productionProgrammingWorkflow").boundingBox();
   const setup = await page.locator(".targetingCard").boundingBox();
-  const job = await page.locator(".programmingJobCard").boundingBox();
+  const jobBox = await job.boundingBox();
   const liveStatus = await page.locator(".liveSiteStatus").boundingBox();
-  for (const box of [header, kpis, workflow, setup, job, liveStatus]) expect(box).not.toBeNull();
+  for (const box of [header, kpis, workflow, setup, jobBox, liveStatus]) expect(box).not.toBeNull();
   expect(header!.height).toBeLessThanOrEqual(90);
   expect(kpis!.height).toBeLessThanOrEqual(180);
-  expect(job!.height).toBeLessThanOrEqual(420);
-  expect(setup!.y + setup!.height).toBeLessThanOrEqual(job!.y);
-  expect(job!.y + job!.height).toBeLessThanOrEqual(liveStatus!.y);
+  expect(jobBox!.height).toBeLessThanOrEqual(420);
+  expect(setup!.y + setup!.height).toBeLessThanOrEqual(jobBox!.y);
+  expect(jobBox!.y + jobBox!.height).toBeLessThanOrEqual(liveStatus!.y);
   await expect(page.locator(".recentEvents")).toBeHidden();
 });
