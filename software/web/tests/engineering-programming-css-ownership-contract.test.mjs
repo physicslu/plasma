@@ -50,7 +50,8 @@ test("Programming base owns chrome only and targeting field geometry has one own
   assert.doesNotMatch(refresh, /\.workflowField\s*\{/);
   assert.match(alignment, /\.targetingCard \.workflowField\s*\{[\s\S]*display:\s*grid[\s\S]*align-items:\s*center[\s\S]*margin:\s*0/);
   assert.match(alignment, /@container engineering-programming \(min-width: 761px\)[\s\S]*grid-template-columns:\s*112px minmax\(0, 1fr\)[\s\S]*gap:\s*8px/);
-  assert.match(alignment, /@media \(max-width: 760px\)[\s\S]*grid-template-columns:\s*1fr[\s\S]*gap:\s*12px/);
+  assert.match(alignment, /@container engineering-programming \(max-width: 760px\)[\s\S]*grid-template-columns:\s*1fr[\s\S]*gap:\s*12px/);
+  assert.doesNotMatch(alignment, /@media \(max-width: 760px\)[\s\S]*\.targetingCard \.workflowField/);
 
   assert.match(readability, /\.workflowField,[\s\S]*\.workflowField select\s*\{\s*font-size:\s*11px/);
   assert.match(readability, /\.workflowField > span\s*\{\s*font-size:\s*12px[\s\S]*font-weight:\s*650/);
