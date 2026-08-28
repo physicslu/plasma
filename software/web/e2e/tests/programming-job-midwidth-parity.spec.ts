@@ -1,4 +1,10 @@
-import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
+import { test, type Page, type Route } from "@playwright/test";
+import {
+  expectProgrammingJobContract,
+  expectProgrammingJobDesktopActionGeometry,
+  programmingJob,
+  programmingJobPresentation,
+} from "./programming-job-test-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -86,74 +92,29 @@ async function installMockProvider(page: Page) {
   });
 }
 
-async function actionOrder(panel: Locator) {
-  return panel.locator(":scope [data-programming-job-actions] > [data-programming-job-action]").evaluateAll(elements =>
-    elements.map(element => element.getAttribute("data-programming-job-action")),
-  );
-}
-
-async function fieldOrder(panel: Locator) {
-  return panel.locator(":scope [data-programming-job-fields] > [data-programming-job-field]").evaluateAll(elements =>
-    elements.map(element => element.getAttribute("data-programming-job-field")),
-  );
-}
-
-async function controlPresentation(panel: Locator) {
-  return panel.evaluate(element => {
-    const read = (selector: string) => {
-      const target = element.querySelector<HTMLElement>(selector);
-      if (!target) throw new Error(`missing ${selector}`);
-      const style = getComputedStyle(target);
-      return {
-        minHeight: style.minHeight,
-        padding: style.padding,
-        radius: style.borderRadius,
-        fontSize: style.fontSize,
-        fontWeight: style.fontWeight,
-        position: style.position,
-      };
-    };
-    return {
-      operation: read(".programmingJobOperationChecks label"),
-      checkbox: read(".programmingJobOperationChecks input"),
-      start: read('[data-programming-job-action="start"]'),
-      status: read('[data-programming-job-action="status"]'),
-      abort: read('[data-programming-job-action="abort"]'),
-    };
-  });
-}
-
 for (const width of [1200, 1680]) {
-  test(`PMode and EMode render one shared Programming Job structure at ${width}px`, async ({ page }) => {
+  test(`PMode and EMode render one shared Programming Job contract at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.addInitScript(() => sessionStorage.clear());
     await installMockProvider(page);
 
     await page.goto("/fleet");
-    const pPanel = page.getByRole("region", { name: "Production Programming Job" });
-    await expect(pPanel).toBeVisible();
-    expect(await fieldOrder(pPanel)).toEqual(["target", "image", "operations", "policy"]);
-    expect(await actionOrder(pPanel)).toEqual(["start", "status", "abort"]);
-    const pPresentation = await controlPresentation(pPanel);
+    const pPanel = programmingJob(page, "production");
+    await expectProgrammingJobContract(pPanel);
+    const pPresentation = await programmingJobPresentation(pPanel);
 
     await page.goto("/engineering");
     await page.locator(".engineeringWorkspace nav button").nth(2).click();
-    const ePanel = page.getByRole("region", { name: "Engineering Programming Job" });
-    await expect(ePanel).toBeVisible();
-    expect(await fieldOrder(ePanel)).toEqual(["target", "image", "operations", "policy"]);
-    expect(await actionOrder(ePanel)).toEqual(["start", "status", "abort"]);
-    const ePresentation = await controlPresentation(ePanel);
+    const ePanel = programmingJob(page, "engineering");
+    await expectProgrammingJobContract(ePanel);
+    const ePresentation = await programmingJobPresentation(ePanel);
 
-    expect(ePresentation).toEqual(pPresentation);
-    expect(ePresentation.status.position).toBe("static");
-
-    const actionBar = ePanel.locator("[data-programming-job-actions]");
-    const start = await actionBar.locator('[data-programming-job-action="start"]').boundingBox();
-    const statusBox = await actionBar.locator('[data-programming-job-action="status"]').boundingBox();
-    const abort = await actionBar.locator('[data-programming-job-action="abort"]').boundingBox();
-    for (const box of [start, statusBox, abort]) expect(box).not.toBeNull();
-    expect(Math.abs(statusBox!.width - 160)).toBeLessThanOrEqual(2);
-    expect(start!.x + start!.width).toBeLessThan(statusBox!.x);
-    expect(statusBox!.x + statusBox!.width).toBeLessThan(abort!.x);
+    if (JSON.stringify(ePresentation) !== JSON.stringify(pPresentation)) {
+      throw new Error("PMode and EMode Programming Job presentation diverged");
+    }
+    if (ePresentation.status.position !== "static") {
+      throw new Error(`Programming Job status must remain in normal flow, got ${ePresentation.status.position}`);
+    }
+    await expectProgrammingJobDesktopActionGeometry(ePanel);
   });
 }
