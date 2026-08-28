@@ -111,7 +111,7 @@ test("Engineering labels keep setup readability while Programming Job follows th
   await expectProgrammingJobContract(job);
   const jobTitle = job.locator(".operatorPanelTitle > strong");
   await expect(jobTitle).toHaveText("PROGRAMMING JOB");
-  expect(await jobTitle.evaluate(element => getComputedStyle(element).fontSize)).toBe("11px");
+  expect(await jobTitle.evaluate(element => getComputedStyle(element).fontSize)).toBe("14px");
 
   const setupLabels = page.locator(".targetingCard .workflowField > span");
   await expect(setupLabels).toHaveCount(2);
@@ -122,7 +122,7 @@ test("Engineering labels keep setup readability while Programming Job follows th
   const jobLabels = job.locator('[data-programming-job-field] > strong');
   await expect(jobLabels).toHaveCount(4);
   for (let index = 0; index < 4; index += 1) {
-    expect(await jobLabels.nth(index).evaluate(element => getComputedStyle(element).fontSize)).toBe("11px");
+    expect(await jobLabels.nth(index).evaluate(element => getComputedStyle(element).fontSize)).toBe("15px");
   }
 
   const siteNames = page.locator(".channelTable tbody td:nth-child(2) b");
