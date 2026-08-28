@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { commitProductionSites, factoryConsoleHeading } from "./production-console-helpers";
+import {
+  programmingJobAction,
+  programmingJobOperation,
+} from "./programming-job-test-helpers";
+import { commitProductionSites, factoryConsoleHeading, programmingJob } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -163,9 +167,9 @@ test("Gateway-owned status window can exceed 5 seconds and PMode still recovers 
   await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
   await commitProductionSites(page, facilityId, ppuId, [1, 2]);
 
-  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
-  const erase = programming.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox");
-  const start = programming.getByRole("button", { name: /START PROGRAMMING/ });
+  const job = programmingJob(page);
+  const erase = programmingJobOperation(job, "erase");
+  const start = programmingJobAction(job, "start");
   const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
 
   await erase.check();
