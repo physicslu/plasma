@@ -1,7 +1,8 @@
-/* Engineering workspace refresh approved after PR #122.
- * The operator flow is deliberately vertical:
- *   SYSTEM SETUP -> PROGRAMMING JOB -> LIVE SITE STATUS.
- * The Site table remains the primary runtime surface. */
+/* Engineering workspace refresh.
+ * Programming flow:
+ *   SYSTEM SETUP -> PROGRAMMING JOB -> LIVE SITE STATUS -> OPERATOR LOG.
+ * Shared panels own their internal presentation; this file owns page layout.
+ */
 
 .engineeringPage {
   min-height: 100vh;
@@ -197,7 +198,6 @@
   background: var(--panel-3);
 }
 
-/* Three-row Programming hierarchy. */
 .engineeringProgrammingV2 .productionProgrammingWorkflow {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -210,24 +210,17 @@
   width: 100%;
 }
 
-.engineeringProgrammingV2 .targetingCard,
-.engineeringProgrammingV2 .programmingJobCard {
+.engineeringProgrammingV2 .targetingCard {
   width: 100%;
 }
 
-.engineeringProgrammingV2 .targetingCard > header,
-.engineeringProgrammingV2 .programmingJobCard > header {
+.engineeringProgrammingV2 .targetingCard > header {
   font-size: 0;
 }
 
 .engineeringProgrammingV2 .targetingCard > header::before {
   content: "1. SYSTEM SETUP";
-  font-size: 11px;
-}
-
-.engineeringProgrammingV2 .programmingJobCard > header::before {
-  content: "2. PROGRAMMING JOB";
-  font-size: 11px;
+  font-size: var(--operator-panel-title-font-size, 11px);
 }
 
 .engineeringProgrammingV2 .targetingCard .cardBody {
@@ -257,58 +250,6 @@
   padding: 7px 12px;
 }
 
-.engineeringProgrammingV2 .programmingJobBody {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 12px 24px;
-  padding: 14px 16px;
-}
-
-.engineeringProgrammingV2 .programmingJobBody > .jobRow {
-  min-width: 0;
-  grid-template-columns: 126px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-}
-
-.engineeringProgrammingV2 .programmingJobBody > .programmingBatchOperations {
-  align-items: start;
-}
-
-/* Programming Job operation controls intentionally have no EMode-local display,
- * tile geometry, typography or state styling. The shared operator-ui contract
- * owns those equivalent controls using the approved PMode presentation. */
-
-.engineeringProgrammingV2 .engineeringPolicyRow {
-  grid-template-columns: 126px repeat(3, max-content);
-  gap: 10px 18px;
-  align-items: center;
-}
-
-.engineeringProgrammingV2 .engineeringReadRow {
-  grid-column: 1 / -1;
-  grid-template-columns: 126px max-content max-content;
-}
-
-.engineeringProgrammingV2 .programmingJobBody .engineeringImageHint {
-  grid-column: 2;
-  margin-top: -4px;
-}
-
-.engineeringProgrammingV2 .programmingJobBody > .warning,
-.engineeringProgrammingV2 .programmingJobBody > .engineeringOperationWarning {
-  grid-column: 1 / -1;
-}
-
-/* Placement only. Shared operator-ui owns START / BATCH STATUS / ABORT internal
- * composition, dimensions, typography, colors and disabled states. */
-.engineeringProgrammingV2 .programmingJobBody > .programmingActions {
-  grid-column: 1 / -1;
-  width: 100%;
-}
-
 .engineeringProgrammingV2 .liveSiteStatus {
   margin-top: 10px;
 }
@@ -319,13 +260,7 @@
 
 .engineeringProgrammingV2 .liveSiteStatus > header > span::before {
   content: "3. LIVE SITE STATUS";
-  font-size: 11px;
-}
-
-/* Recent Events duplicated the detailed Engineering log and consumed the
- * Site-runtime viewport. It is intentionally removed from Programming. */
-.engineeringProgrammingV2 .recentEvents {
-  display: none !important;
+  font-size: var(--operator-panel-title-font-size, 11px);
 }
 
 .engineeringProgrammingV2 .engineeringLogCard {
@@ -333,16 +268,11 @@
 }
 
 @container engineering-programming (max-width: 980px) {
-  .engineeringProgrammingV2 .targetingCard .cardBody,
-  .engineeringProgrammingV2 .programmingJobBody {
+  .engineeringProgrammingV2 .targetingCard .cardBody {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .engineeringProgrammingV2 .targetingCard .topologyFoot,
-  .engineeringProgrammingV2 .engineeringReadRow,
-  .engineeringProgrammingV2 .programmingJobBody > .warning,
-  .engineeringProgrammingV2 .programmingJobBody > .engineeringOperationWarning,
-  .engineeringProgrammingV2 .programmingJobBody > .programmingActions {
+  .engineeringProgrammingV2 .targetingCard .topologyFoot {
     grid-column: 1;
   }
 }
@@ -388,10 +318,7 @@
     font-size: 16px;
   }
 
-  .engineeringProgrammingV2 .targetingCard .workflowField,
-  .engineeringProgrammingV2 .programmingJobBody > .jobRow,
-  .engineeringProgrammingV2 .engineeringPolicyRow,
-  .engineeringProgrammingV2 .engineeringReadRow {
+  .engineeringProgrammingV2 .targetingCard .workflowField {
     grid-template-columns: 1fr;
   }
 }
