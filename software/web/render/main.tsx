@@ -2,6 +2,7 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import DemoLandingPage from "../app/demo/page";
 import DevicesPage from "../app/devices/page";
+import DocumentsPage from "../app/documents/page";
 import EngineeringPage from "../app/engineering/page";
 import FleetPage from "../app/fleet/page";
 import { GlobalNav } from "../app/global-nav";
@@ -23,6 +24,7 @@ function RetiredFleetProgrammingRoute() {
 function CurrentPage() {
   const pathname = usePathname();
   if (pathname === "/devices" || pathname.startsWith("/devices/")) return <DevicesPage />;
+  if (pathname === "/documents" || pathname.startsWith("/documents/")) return <DocumentsPage />;
   if (pathname === "/fleet/programming") return <RetiredFleetProgrammingRoute />;
   if (pathname === "/fleet" || pathname.startsWith("/fleet/")) return <FleetPage />;
   if (pathname === "/engineering" || pathname.startsWith("/engineering/")) {

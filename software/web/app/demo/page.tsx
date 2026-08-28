@@ -284,6 +284,17 @@ export default function DemoLandingPage() {
             </p>
             <strong>{devicesDisabled ? (zh ? "目前身份不可查詢" : "Not permitted for this identity") : (zh ? "查詢 IC 料號 →" : "Open IC Selector →")}</strong>
           </Link>
+
+          <Link className="demoCard documents" href="/documents">
+            <div className="demoCardHead"><span>04</span><b>{zh ? "操作文件" : "DOCUMENTS"}</b></div>
+            <h2>{zh ? "文件" : "Documents"}</h2>
+            <p>
+              {zh
+                ? "查看 PMode / EMode 操作流程、Programming Job、Batch / Status、Gateway 與 Mock 設定說明。"
+                : "Read PMode / EMode operation flows and references for Programming Job, Batch / Status, Gateway, and Mock settings."}
+            </p>
+            <strong>{zh ? "開啟操作文件 →" : "Open Documents →"}</strong>
+          </Link>
         </div>
 
         <div className="demoBoundary">
