@@ -1,57 +1,27 @@
 /* Engineering Programming readability layer.
  *
- * The approved desktop geometry is intentionally unchanged. This file only
- * raises the typography floor for operator-facing controls and runtime status.
- * Compact secondary evidence remains one step smaller so LIVE SITE STATUS can
- * stay in the same viewport budget.
- *
- * Important: the raw SYSTEM SETUP / PROGRAMMING JOB card header text stays at
- * font-size: 0 in engineering-workspace-refresh.css. Only the canonical
- * ::before labels are enlarged here; otherwise both strings render at once.
- *
- * Batch Summary and equivalent Programming Job operation/action/status controls
- * are intentionally excluded. Their shared operator-ui styles are the sole
- * visual owners across PMode and EMode.
+ * This file owns typography only for Engineering-specific targeting and live
+ * Site status surfaces. Shared Programming Job and Batch Summary typography is
+ * owned exclusively by operator-ui.
  */
 
 .engineeringProgrammingV2 .targetingCard > header::before,
-.engineeringProgrammingV2 .programmingJobCard > header::before,
 .engineeringProgrammingV2 .liveSiteStatus > header > span::before {
   font-size: 12px;
 }
 
 .engineeringProgrammingV2 .workflowField,
-.engineeringProgrammingV2 .workflowField select,
-.engineeringProgrammingV2 .jobRow,
-.engineeringProgrammingV2 .jobRow select {
+.engineeringProgrammingV2 .workflowField select {
   font-size: 11px;
 }
 
-/* Facility / PPU selectors are primary setup decisions, so their visible text
- * labels get the same 12 px floor as the primary Programming Job labels. */
+/* Facility / PPU selectors are primary setup decisions. */
 .engineeringProgrammingV2 .workflowField > span {
   font-size: 12px;
   font-weight: 650;
 }
 
-.engineeringProgrammingV2 .jobRow > strong {
-  font-size: 12px;
-}
-
 .engineeringProgrammingV2 .topologyFoot {
-  font-size: 10px;
-}
-
-.engineeringProgrammingV2 .imageField .engineeringBrowseButton {
-  font-size: 10px;
-}
-
-.engineeringProgrammingV2 .engineeringImageHint {
-  font-size: 9px;
-}
-
-.engineeringProgrammingV2 .engineeringPolicyRow > label,
-.engineeringProgrammingV2 .engineeringRetryField {
   font-size: 10px;
 }
 
@@ -69,8 +39,7 @@
   font-size: 10px;
 }
 
-/* SITE-01 / SITE-02 are primary physical-location identifiers. They must be
- * easier to scan than the secondary target/provider evidence below them. */
+/* SITE-01 / SITE-02 are primary physical-location identifiers. */
 .engineeringProgrammingV2 .channelTable td:nth-child(2) b {
   font-size: 13px;
   font-weight: 700;
