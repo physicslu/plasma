@@ -1,7 +1,7 @@
 /* Engineering workspace refresh.
  * Programming flow:
  *   SYSTEM SETUP -> PROGRAMMING JOB -> LIVE SITE STATUS -> OPERATOR LOG.
- * Shared panels own their internal presentation; this file owns page layout.
+ * Shared panels own their shell/header/title presentation; this file owns page layout.
  */
 
 .engineeringPage {
@@ -214,13 +214,9 @@
   width: 100%;
 }
 
-.engineeringProgrammingV2 .targetingCard > header {
-  font-size: 0;
-}
-
+/* Numbering is layout metadata only; title typography belongs to OperatorPanel. */
 .engineeringProgrammingV2 .targetingCard > header::before {
-  content: "1. SYSTEM SETUP";
-  font-size: var(--operator-panel-title-font-size, 11px);
+  content: "1. ";
 }
 
 .engineeringProgrammingV2 .targetingCard .cardBody {
@@ -254,13 +250,8 @@
   margin-top: 10px;
 }
 
-.engineeringProgrammingV2 .liveSiteStatus > header > span {
-  font-size: 0;
-}
-
 .engineeringProgrammingV2 .liveSiteStatus > header > span::before {
-  content: "3. LIVE SITE STATUS";
-  font-size: var(--operator-panel-title-font-size, 11px);
+  content: "3. ";
 }
 
 .engineeringProgrammingV2 .engineeringLogCard {
