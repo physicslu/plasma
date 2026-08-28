@@ -39,13 +39,13 @@
 .demoSecurityWarning { border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line)); background: color-mix(in srgb, var(--amber) 7%, var(--panel)); color: var(--amber); }
 .demoSecurityError { border: 1px solid color-mix(in srgb, var(--red) 45%, var(--line)); background: color-mix(in srgb, var(--red) 7%, var(--panel)); color: var(--red); }
 
-.demoChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.demoChoices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .demoCard { min-height: 310px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(145deg, var(--panel), var(--panel-2)); color: var(--text); text-decoration: none; padding: 22px; box-shadow: 0 24px 70px var(--card-shadow); transition: transform .16s ease, border-color .16s ease; }
 .demoCard:hover { transform: translateY(-2px); border-color: var(--cyan); }
 .demoCard.disabled { opacity: .48; cursor: not-allowed; filter: saturate(.65); }
 .demoCard.disabled:hover { transform: none; border-color: var(--line); }
 .demoCard.fleet { background: linear-gradient(145deg, color-mix(in srgb, var(--cyan) 7%, var(--panel)), var(--panel-2)); }
-.demoCard.utility { background: linear-gradient(145deg, color-mix(in srgb, var(--cyan) 4%, var(--panel)), var(--panel-2)); }
+.demoCard.utility, .demoCard.documents { background: linear-gradient(145deg, color-mix(in srgb, var(--cyan) 4%, var(--panel)), var(--panel-2)); }
 .demoCardHead { display: flex; align-items: center; gap: 9px; }
 .demoCardHead span { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--cyan); font: 700 10px var(--font-mono); }
 .demoCardHead b { color: var(--muted); font: 10px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
@@ -56,12 +56,15 @@
 .demoBoundary b { color: var(--text); }
 .demoBoundary span { color: var(--muted); }
 
+@media (max-width: 1100px) {
+  .demoChoices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 900px) {
   .demoProfileGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .demoPrincipal { grid-template-columns: 1fr 1fr; }
   .demoPrincipal .scope { grid-column: 1 / -1; }
   .demoPrincipal button { grid-column: 1 / -1; }
-  .demoChoices { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
@@ -73,6 +76,7 @@
   .demoCredential button { width: 100%; }
   .demoPrincipal { grid-template-columns: 1fr; }
   .demoPrincipal .scope, .demoPrincipal button { grid-column: auto; }
+  .demoChoices { grid-template-columns: 1fr; }
   .demoCard { min-height: 280px; }
   .demoBoundary { flex-direction: column; }
 }
