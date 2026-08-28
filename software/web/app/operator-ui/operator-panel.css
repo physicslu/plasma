@@ -51,6 +51,30 @@
   gap: 6px;
 }
 
+.operatorPanelToggle {
+  min-width: 66px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong, #bdd0d9);
+  border-radius: 5px;
+  background: var(--panel, #fff);
+  color: var(--text-soft, #51606f);
+  font-size: var(--operator-control-font-size);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.operatorPanelToggle:hover:not(:disabled) {
+  background: var(--panel-2, #f6f9fb);
+  color: var(--text, #172033);
+}
+
+.operatorPanelToggle:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 .operatorPanelBody {
   min-width: 0;
   padding: var(--operator-panel-body-padding);
