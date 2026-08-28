@@ -1,7 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+async function waitForHydration(page: import("@playwright/test").Page) {
+  await expect(
+    page.getByRole("button", { name: "EN", exact: true }),
+    "Documents client-state controls must not be exercised before hydration is interactive",
+  ).toBeEnabled();
+}
+
 test("Documents exposes PMode and EMode static operator guides through the shared EMode-style tree", async ({ page }) => {
   await page.goto("/documents");
+  await waitForHydration(page);
 
   await expect(page.locator('[data-route-marker="Documents"]')).toBeVisible();
   await expect(page.getByRole("heading", { name: /PMode (操作總覽|Overview)/ })).toBeVisible();
@@ -22,6 +30,7 @@ test("Documents exposes PMode and EMode static operator guides through the share
 test("Documents sidebar collapses with the same desktop behavior as EMode", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/documents");
+  await waitForHydration(page);
 
   const workspace = page.locator(".documentsPage");
   await page.getByRole("button", { name: "Collapse Documents menu" }).click();
@@ -34,6 +43,7 @@ test("Documents sidebar collapses with the same desktop behavior as EMode", asyn
 test("Documents navigation remains usable on a narrow viewport", async ({ page }) => {
   await page.setViewportSize({ width: 720, height: 900 });
   await page.goto("/documents");
+  await waitForHydration(page);
 
   const nav = page.getByRole("navigation", { name: /文件導覽|Documents navigation/ });
   await nav.getByRole("button", { name: "Batch & Status", exact: true }).click();
