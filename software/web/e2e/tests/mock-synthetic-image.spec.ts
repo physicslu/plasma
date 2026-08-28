@@ -1,5 +1,10 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import {
+  programmingJobAction,
+  programmingJobField,
+  programmingJobStatusValue,
+} from "./programming-job-test-helpers";
+import {
   chooseTestTarget,
   commitProductionSites,
   factoryConsoleHeading,
@@ -197,10 +202,11 @@ test("Production Mock submits Synthetic Image intent without browser-generated a
   await chooseTestTarget(page);
 
   const job = programmingJob(page);
+  const imageName = programmingJobField(job, "image").locator("[data-image-source]");
   await productionOperation(page, "P").check();
-  await expect(job.locator(".factoryImageControl span")).toHaveText("Mock Synthetic Image");
-  await expect(job.locator(".factoryBatchStatus b")).toHaveText("BATCH READY");
-  await job.locator(".factoryStartButton").click();
+  await expect(imageName).toHaveText("Mock Synthetic Image");
+  await expect(programmingJobStatusValue(job)).toHaveText("BATCH READY");
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => api.submittedBatch).not.toBeNull();
   const submitted = api.submittedBatch!;
@@ -208,6 +214,6 @@ test("Production Mock submits Synthetic Image intent without browser-generated a
   expect(submitted.session_id).toBe("0123456789abcdef0123456789abcdef");
   expect(submitted).not.toHaveProperty("asset");
 
-  await expect(job.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
-  await expect(job.locator(".factoryImageControl span")).toHaveText("Mock Synthetic Image");
+  await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
+  await expect(imageName).toHaveText("Mock Synthetic Image");
 });
