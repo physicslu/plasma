@@ -1,4 +1,4 @@
-import { test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 import {
   expectProgrammingJobContract,
   expectProgrammingJobDesktopActionGeometry,
@@ -109,12 +109,8 @@ for (const width of [1200, 1680]) {
     await expectProgrammingJobContract(ePanel);
     const ePresentation = await programmingJobPresentation(ePanel);
 
-    if (JSON.stringify(ePresentation) !== JSON.stringify(pPresentation)) {
-      throw new Error("PMode and EMode Programming Job presentation diverged");
-    }
-    if (ePresentation.status.position !== "static") {
-      throw new Error(`Programming Job status must remain in normal flow, got ${ePresentation.status.position}`);
-    }
+    expect(ePresentation).toEqual(pPresentation);
+    expect(ePresentation.status.position).toBe("static");
     await expectProgrammingJobDesktopActionGeometry(ePanel);
   });
 }
