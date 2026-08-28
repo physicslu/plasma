@@ -23,31 +23,6 @@ Required remaining work:
 - add human credential rotation, revocation and session-lifecycle UX;
 - define centralized multi-PPU identity management through Plasma Manager without making standalone PPU authorization depend on Manager availability.
 
-### EMode Design System convergence to PMode baseline
-
-**Status:** IN PROGRESS
-
-**Layer:** Web presentation/component ownership
-
-**Reason:** PMode is the current canonical operational visual baseline, while EMode still owns presentation variants for equivalent concepts. Shared domain semantics must not create two independently drifting visual systems.
-
-Completed convergence slices:
-
-- Batch Summary / PASS / FAIL / YIELD presentation uses shared `operator-ui` ownership;
-- Engineering Settings uses the shared Settings UI primitives and approved Mock-derived page composition;
-- Programming Job operation checkbox tiles and START / ABORT actions use one shared `operator-ui/programming-job-controls.css` visual contract derived from the PMode baseline; mode-local CSS no longer owns those equivalent control visuals.
-
-Required remaining audit/work:
-
-- reuse canonical typography, spacing, border, card and semantic status tokens wherever equivalent concepts still drift;
-- audit Section Card and Site Card shell ownership;
-- audit remaining button, select, input and checkbox variants outside the Programming Job operation/action controls;
-- preserve EMode-specific engineering information architecture and diagnostic controls;
-- keep PMode and EMode behavior contracts independent where their operational responsibilities differ;
-- protect the shared design-system boundary with source/E2E/visual regression tests.
-
-Non-goal: do not make EMode a copy of the PMode layout. The target is one Plasma design system with mode-specific workflows.
-
 ## Deferred product capability
 
 ### Real Provider and Physical IC Quantity Handoff
@@ -65,6 +40,48 @@ Required work:
 - bind PASS/FAIL to one physical IC identity or traceable presentation event;
 - preserve `PROCESSED IC = PASS + FAIL` and exclude infrastructure ERROR;
 - validate sockets, hardware, Z2/FPGA path and real target separately from Mock.
+
+## Resolved presentation debt
+
+### PMode / EMode Design System Convergence
+
+Resolved by the shared Operator UI convergence work completed through PRs #170-#178 and the final repository audit performed after PR #179.
+
+The current design-system boundary is:
+
+```text
+same operational concept
+    -> shared component / presentation owner
+
+mode-specific operational responsibility
+    -> mode-specific information architecture / diagnostics
+```
+
+Shared-equivalent surfaces now have explicit common ownership:
+
+- Programming Job uses the same `ProgrammingJobPanel` component in PMode and EMode, with `operator-ui/programming-job-controls.css` as the shared presentation owner;
+- first-level Operator Panel Header / Title / Meta / Collapse presentation is owned by shared `operator-ui/operator-panel.css` primitives;
+- Batch Summary and PASS / FAIL / YIELD presentation use shared `operator-ui` ownership and semantic theme tokens;
+- Engineering Gateway and Mock Settings use the shared Settings UI primitives rather than independent page-local control systems;
+- operator density contracts define shared panel, field, checkbox, action and status sizing for equivalent operator surfaces;
+- source, browser parity and visual-regression contracts prevent equivalent PMode / EMode presentation ownership from silently splitting again.
+
+The final audit also confirms that the remaining differences are intentional workflow boundaries rather than unresolved convergence debt:
+
+- PMode keeps LED-first Site cards for production/operator visibility;
+- EMode keeps the diagnostic Site table for engineering diagnosis;
+- EMode Gateway, Facility/PPU targeting, engineering warnings and Site-selection controls remain Engineering-specific because PMode does not expose equivalent diagnostic controls;
+- Engineering navigation and page composition remain mode-specific and are not required to mirror the PMode information architecture.
+
+Therefore the convergence target is complete: Plasma has one shared design system for equivalent concepts without forcing PMode and EMode into one layout. Future presentation duplication should be tracked as a new, concrete ownership defect rather than reopening this broad convergence debt.
+
+Relevant guardrails include:
+
+- `software/web/tests/programming-job-control-design-system-contract.test.mjs`;
+- `software/web/tests/engineering-programming-css-ownership-contract.test.mjs`;
+- `software/web/tests/settings-ui-design-system-contract.test.mjs`;
+- `software/web/e2e/tests/operator-panel-header-parity.spec.ts`;
+- `software/web/e2e/tests/programming-job-real-stack-parity.spec.ts`.
 
 ## Resolved architecture debt
 
