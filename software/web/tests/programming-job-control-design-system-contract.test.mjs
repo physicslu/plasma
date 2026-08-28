@@ -3,10 +3,18 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const designContract = fs.readFileSync(new URL("../app/operator-ui/operator-design-contract.css", import.meta.url), "utf8");
+const operatorPanelCss = fs.readFileSync(new URL("../app/operator-ui/operator-panel.css", import.meta.url), "utf8");
+const batchSummaryCss = fs.readFileSync(new URL("../app/operator-ui/batch-summary.css", import.meta.url), "utf8");
+const operatorLogCss = fs.readFileSync(new URL("../app/operator-ui/operator-log-panel.css", import.meta.url), "utf8");
 const sharedComponent = fs.readFileSync(new URL("../app/operator-ui/programming-job-panel.tsx", import.meta.url), "utf8");
 const sharedCss = fs.readFileSync(new URL("../app/operator-ui/programming-job-controls.css", import.meta.url), "utf8");
 const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
+const emodeSession = fs.readFileSync(new URL("../app/workspace-session.tsx", import.meta.url), "utf8");
+const emodeCss = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.css", import.meta.url), "utf8");
+const emodeDensity = fs.readFileSync(new URL("../app/engineering/engineering-density.css", import.meta.url), "utf8");
+const emodeRefresh = fs.readFileSync(new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url), "utf8");
 const sharedDriver = fs.readFileSync(new URL("../e2e/tests/programming-job-test-helpers.ts", import.meta.url), "utf8");
 const productionRuntime = fs.readFileSync(new URL("../e2e/tests/production-multi-ppu-runtime.spec.ts", import.meta.url), "utf8");
 const engineeringRuntime = fs.readFileSync(new URL("../e2e/tests/engineering-programming-asset-cache-runtime.spec.ts", import.meta.url), "utf8");
@@ -71,20 +79,58 @@ test("shared action bar structurally owns START then STATUS then ABORT", () => {
   assert.doesNotMatch(emode, /className="programmingActions"/);
 });
 
-test("shared presentation owns the approved Programming Job card", () => {
-  assert.match(sharedCss, /\.programmingJobPanel\s*\{[\s\S]*border-radius:\s*10px/);
-  assert.match(sharedCss, /\.programmingJobPanel > \.operatorPanelHeader\s*\{[\s\S]*min-height:\s*56px/);
-  assert.match(sharedCss, /\.programmingJobField\s*\{[\s\S]*border-bottom:\s*1px solid/);
-  assert.match(sharedCss, /grid-template-columns:\s*clamp\(190px, 15vw, 260px\) minmax\(0, 1fr\)/);
-  assert.match(sharedCss, /\.programmingJobField > strong\s*\{[\s\S]*justify-self:\s*start[\s\S]*text-align:\s*left/);
-  assert.match(sharedCss, /\.programmingJobImageControl\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 144px/);
-  assert.match(sharedCss, /\.programmingJobOperationChecks label\s*\{[\s\S]*border:\s*0[\s\S]*background:\s*transparent/);
-  assert.match(sharedCss, /\.programmingJobOperationChecks input\s*\{[\s\S]*width:\s*18px/);
-  assert.match(sharedCss, /\.programmingJobPolicyControls input\s*\{[\s\S]*width:\s*138px/);
-  assert.match(sharedCss, /\.programmingJobPolicyControls select\s*\{[\s\S]*min-width:\s*190px/);
+test("Operator UI exposes one canonical panel and control density", () => {
+  const expectedTokens = [
+    ["--operator-panel-radius", "7px"],
+    ["--operator-panel-header-min-height", "30px"],
+    ["--operator-panel-title-font-size", "11px"],
+    ["--operator-panel-meta-font-size", "8px"],
+    ["--operator-field-label-font-size", "11px"],
+    ["--operator-helper-font-size", "8px"],
+    ["--operator-control-min-height", "32px"],
+    ["--operator-control-font-size", "10px"],
+    ["--operator-checkbox-size", "14px"],
+    ["--operator-action-min-height", "40px"],
+    ["--operator-action-font-size", "11px"],
+    ["--operator-status-value-font-size", "12px"],
+  ];
+  for (const [name, value] of expectedTokens) {
+    assert.match(designContract, new RegExp(`${name}:\\s*${value.replace(".", "\\.")}`));
+  }
+
+  for (const css of [operatorPanelCss, batchSummaryCss, operatorLogCss, sharedCss]) {
+    assert.match(css, /operator-design-contract\.css/);
+  }
+  assert.match(operatorPanelCss, /min-height:\s*var\(--operator-panel-header-min-height\)/);
+  assert.match(batchSummaryCss, /font-size:\s*var\(--operator-panel-title-font-size\)/);
+  assert.match(operatorLogCss, /font-size:\s*var\(--operator-panel-title-font-size\)/);
+});
+
+test("Programming Job keeps its approved structure without a jumbo private scale", () => {
+  assert.match(sharedCss, /\.programmingJobPanel > \.operatorPanelHeader\s*\{[\s\S]*min-height:\s*var\(--operator-panel-header-min-height\)/);
+  assert.match(sharedCss, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*128px minmax\(0, 1fr\)/);
+  assert.match(sharedCss, /\.programmingJobField > strong\s*\{[\s\S]*font-size:\s*var\(--operator-field-label-font-size\)/);
+  assert.match(sharedCss, /\.programmingJobImageControl\s*\{[\s\S]*min-height:\s*var\(--operator-control-min-height\)/);
+  assert.match(sharedCss, /\.programmingJobOperationChecks input\s*\{[\s\S]*width:\s*var\(--operator-checkbox-size\)/);
+  assert.match(sharedCss, /\.programmingJobPolicyControls input,[\s\S]*\.programmingJobPolicyControls select\s*\{[\s\S]*min-height:\s*var\(--operator-control-min-height\)/);
   assert.match(sharedCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.08fr\) minmax\(0, 1fr\)/);
-  assert.match(sharedCss, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*min-height:\s*64px/);
-  assert.match(sharedCss, /linear-gradient\(180deg, #1768c7, #0c51a9\)/);
-  assert.match(sharedCss, /linear-gradient\(180deg, #cf3838, #ba2929\)/);
-  assert.match(sharedCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*64px/);
+  assert.match(sharedCss, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);
+  assert.match(sharedCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);
+  assert.doesNotMatch(sharedCss, /min-height:\s*(?:56|64)px/);
+  assert.doesNotMatch(sharedCss, /font-size:\s*(?:14|15|17|18)px/);
+});
+
+test("pre-launch Engineering UI retains no hidden legacy Programming controls", () => {
+  assert.doesNotMatch(sharedComponent, /compatibilityFields|programmingJobCompatibility/);
+  assert.doesNotMatch(emode, /compatibilityFields|engineeringReadRow|Engineering READ offset|Engineering READ length/);
+  assert.doesNotMatch(emodeSession, /emodeReadOffset|emodeReadLength|setEmodeReadOffset|setEmodeReadLength/);
+  assert.match(emode, /const ENGINEERING_READ_OFFSET = 0/);
+  assert.match(emode, /const ENGINEERING_READ_LENGTH = 256/);
+  assert.match(emode, /readOffset:\s*ENGINEERING_READ_OFFSET/);
+  assert.match(emode, /readLength:\s*ENGINEERING_READ_LENGTH/);
+  assert.doesNotMatch(emode, /recentEvents|RECENT EVENTS|Engineering recent events/);
+
+  for (const css of [emodeCss, emodeDensity, emodeRefresh]) {
+    assert.doesNotMatch(css, /programmingJobBody|programmingJobCard|engineeringReadRow|recentEvents/);
+  }
 });
