@@ -18,14 +18,14 @@ test("shared Programming Job has one real three-child action composition", () =>
   const abort = component.indexOf('data-programming-job-action="abort"');
   assert.ok(start < status && status < abort);
 
-  assert.match(shared, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 160px minmax\(0, 1fr\)/);
+  assert.match(shared, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.08fr\) minmax\(0, 1fr\)/);
   assert.doesNotMatch(shared, /\.programmingJobStatus\s*\{[\s\S]*position:\s*absolute/);
   assert.doesNotMatch(shared, /transform:\s*translateX/);
 });
 
 test("shared Programming Job fields cannot switch to a mode-local desktop composition", () => {
   assert.match(shared, /\.programmingJobGrid\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);
-  assert.match(shared, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*128px minmax\(0, 1fr\)/);
+  assert.match(shared, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*clamp\(190px, 15vw, 260px\) minmax\(0, 1fr\)/);
 
   for (const source of [refresh, density, readability, alignment, v2]) {
     assert.doesNotMatch(source, /\.programmingJobGrid\b/);
