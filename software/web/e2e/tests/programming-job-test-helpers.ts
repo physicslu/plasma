@@ -111,7 +111,15 @@ export async function expectProgrammingJobDesktopActionGeometry(panel: Locator) 
   const abort = await programmingJobAction(panel, "abort").boundingBox();
   for (const box of [start, status, abort]) expect(box).not.toBeNull();
 
-  expect(Math.abs(status!.width - 160)).toBeLessThanOrEqual(2);
+  expect(start!.width).toBeGreaterThan(220);
+  expect(status!.width).toBeGreaterThan(start!.width);
+  expect(status!.width / start!.width).toBeGreaterThan(1.02);
+  expect(status!.width / start!.width).toBeLessThan(1.14);
+  expect(Math.abs(start!.width - abort!.width)).toBeLessThanOrEqual(3);
+  expect(Math.abs(start!.y - status!.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(status!.y - abort!.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(start!.height - status!.height)).toBeLessThanOrEqual(2);
+  expect(Math.abs(status!.height - abort!.height)).toBeLessThanOrEqual(2);
   expect(start!.x + start!.width).toBeLessThan(status!.x);
   expect(status!.x + status!.width).toBeLessThan(abort!.x);
 }

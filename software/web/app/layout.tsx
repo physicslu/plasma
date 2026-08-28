@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./details.css";
 import "./global-nav.css";
-import "./operator-ui/programming-job-controls.css";
 import "./security-transport.css";
 import { DEFAULT_API_BASE } from "./plasma-api";
 import { GlobalNav } from "./global-nav";

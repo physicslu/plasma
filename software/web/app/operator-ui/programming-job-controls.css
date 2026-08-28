@@ -1,30 +1,54 @@
 /*
  * Canonical Programming Job presentation.
  *
- * PMode is the approved visual baseline. PMode and EMode render the same
- * ProgrammingJobPanel DOM hierarchy; mode-specific code supplies only data,
- * state and callbacks. Do not add mode-local layout or visual overrides for
- * these controls.
+ * The complete Programming Job card is a shared visual contract. PMode and
+ * EMode render the same ProgrammingJobPanel DOM hierarchy; mode-specific code
+ * supplies only data, state and callbacks. Do not add mode-local layout or
+ * visual overrides for these controls.
  */
 
-.programmingJobPanel .operatorPanelBody {
-  padding: 9px 11px 10px;
+.programmingJobPanel {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--panel, #fff);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, .08);
 }
 
-.programmingJobPanel.is-collapsed .operatorPanelBody {
-  padding-top: 8px;
+.programmingJobPanel > .operatorPanelHeader {
+  min-height: 56px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line, #d7e0e8);
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(180deg, #f8fafc, #eef3f7);
+}
+
+.programmingJobPanel > .operatorPanelHeader .operatorPanelTitle {
+  gap: 5px;
+}
+
+.programmingJobPanel > .operatorPanelHeader .operatorPanelTitle > span,
+.programmingJobPanel > .operatorPanelHeader .operatorPanelTitle > strong {
+  color: var(--text, #0f1f38);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+.programmingJobPanel > .operatorPanelBody {
+  min-width: 0;
+  padding: 0;
 }
 
 .programmingJobCollapseButton {
-  min-width: 74px;
-  min-height: 26px;
-  padding: 0 8px;
-  border: 1px solid #c9d5df;
-  border-radius: 5px;
-  background: #fff;
-  color: #334155;
-  font-size: 9px;
-  font-weight: 750;
+  min-width: auto;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text, #0f1f38);
+  font-size: 14px;
+  font-weight: 650;
   cursor: pointer;
 }
 
@@ -34,63 +58,72 @@
 }
 
 .programmingJobGrid {
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 0;
 }
 
 .programmingJobField {
   min-width: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e4eaf0;
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
+  grid-template-columns: clamp(190px, 15vw, 260px) minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  column-gap: 28px;
+  row-gap: 8px;
 }
 
 .programmingJobField > strong {
-  justify-self: end;
-  text-align: right;
-  color: #172033;
-  font-size: 11px;
-  font-weight: 850;
+  justify-self: start;
+  text-align: left;
+  color: var(--text, #0f1f38);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .programmingJobField > small {
   grid-column: 2;
-  margin-top: -3px;
-  color: #607080;
-  font-size: 8px;
+  margin: 0;
+  color: var(--text-soft, #51606f);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .programmingJobImageControl {
   min-width: 0;
-  min-height: 34px;
-  border: 1px solid #bdccd9;
-  border-radius: 6px;
-  background: #fff;
+  min-height: 46px;
+  border: 1px solid #c5d0db;
+  border-radius: 7px;
+  background: var(--panel, #fff);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px;
+  grid-template-columns: minmax(0, 1fr) 144px;
   overflow: hidden;
 }
 
 .programmingJobImageControl > span {
   min-width: 0;
-  padding: 8px 9px;
+  padding: 0 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #536273;
-  font-size: 9px;
+  display: flex;
+  align-items: center;
+  color: var(--text-soft, #536273);
+  font-size: 13px;
 }
 
 .programmingJobImageControl > button {
+  min-height: 44px;
   border: 0;
-  border-left: 1px solid #bdccd9;
-  background: #f6f9fb;
-  color: #172033;
-  font-size: 9px;
-  font-weight: 750;
+  border-left: 1px solid #c5d0db;
+  background: linear-gradient(180deg, #fbfcfd, #f1f5f8);
+  color: var(--text, #172033);
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -103,71 +136,75 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: clamp(24px, 3vw, 56px);
   flex-wrap: nowrap;
 }
 
 .programmingJobOperationChecks label {
   min-width: 0;
-  height: 34px;
-  min-height: 34px;
-  box-sizing: border-box;
-  padding: 0 9px;
-  border: 1px solid #ced9e2;
-  border-radius: 6px;
-  background: #f8fbfd;
+  min-height: 42px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: #334155;
-  font-size: 9px;
-  font-weight: 700;
+  gap: 7px;
+  color: var(--text, #23384a);
+  font-size: 13px;
+  font-weight: 550;
   line-height: 1;
   white-space: nowrap;
 }
 
 .programmingJobOperationChecks input {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   margin: 0;
-  flex: 0 0 14px;
+  flex: 0 0 18px;
   accent-color: #2563eb;
+}
+
+.programmingJobOperationChecks b {
+  font-size: 13px;
+  font-weight: 750;
 }
 
 .programmingJobPolicyControls {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: clamp(20px, 3vw, 54px);
   flex-wrap: nowrap;
 }
 
 .programmingJobPolicyControls label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  color: #334155;
-  font-size: 9px;
+  gap: 10px;
+  color: var(--text, #23384a);
+  font-size: 13px;
+  font-weight: 650;
   white-space: nowrap;
 }
 
 .programmingJobPolicyControls input,
 .programmingJobPolicyControls select {
-  min-height: 32px;
-  border: 1px solid #bdccd9;
-  border-radius: 6px;
-  background: #fff;
-  color: #172033;
-  padding: 0 7px;
-  font-size: 9px;
+  min-height: 46px;
+  box-sizing: border-box;
+  border: 1px solid #c5d0db;
+  border-radius: 7px;
+  background: var(--panel, #fff);
+  color: var(--text, #172033);
+  padding: 0 12px;
+  font-size: 13px;
 }
 
 .programmingJobPolicyControls input {
-  width: 58px;
+  width: 138px;
 }
 
 .programmingJobPolicyControls select {
-  min-width: 92px;
+  min-width: 190px;
 }
 
 .programmingJobCompatibility[hidden] {
@@ -175,33 +212,41 @@
 }
 
 .programmingJobActionBar {
-  margin-top: 8px;
+  margin: 0;
+  padding: 28px 24px 30px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(24px, 3vw, 56px);
+  background: var(--panel, #fff);
 }
 
 .programmingJobPanel.is-collapsed .programmingJobActionBar {
-  margin-top: 0;
+  padding-top: 24px;
 }
 
 .programmingJobStart,
 .programmingJobAbort {
-  min-height: 38px;
+  min-width: 0;
+  min-height: 64px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 7px;
   color: #fff;
-  font-size: 10px;
-  font-weight: 850;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: .005em;
   cursor: pointer;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, .08);
 }
 
 .programmingJobStart {
-  background: linear-gradient(180deg, #2f80d4, #1f65aa);
+  border-color: #0b4c9d;
+  background: linear-gradient(180deg, #1768c7, #0c51a9);
 }
 
 .programmingJobAbort {
-  background: linear-gradient(180deg, #df5a5a, #bc3333);
+  border-color: #b52323;
+  background: linear-gradient(180deg, #cf3838, #ba2929);
 }
 
 .programmingJobStart:disabled,
@@ -212,32 +257,32 @@
 }
 
 .programmingJobStatus {
-  min-height: 38px;
+  min-width: 0;
+  min-height: 64px;
   box-sizing: border-box;
-  padding: 4px 8px;
-  border: 1px solid #cbd7e1;
-  border-radius: 6px;
-  background: #f8fbfd;
+  padding: 8px 14px;
+  border: 1px solid #2e75cf;
+  border-radius: 7px;
+  background: #fff;
   display: grid;
   place-content: center;
-  gap: 1px;
+  gap: 4px;
   text-align: center;
-  font-size: 10px;
-  font-weight: 850;
 }
 
 .programmingJobStatus small {
-  color: #657482;
-  font-size: 7px;
+  color: #25364b;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
+  letter-spacing: .02em;
 }
 
 .programmingJobStatus b {
-  color: #172033;
-  font-size: 9px;
+  color: #0d1730;
+  font-size: 18px;
   font-weight: 850;
-  line-height: 1.15;
+  line-height: 1.05;
 }
 
 .programmingJobStatus.state-running,
@@ -248,38 +293,54 @@
 .programmingJobStatus.state-aborting,
 .programmingJobStatus.readiness-running,
 .programmingJobStatus.readiness-cancelling {
-  border-color: #f3ba55;
+  border-color: #e4a52f;
   background: #fff9e9;
 }
 
 .programmingJobStatus.state-success,
 .programmingJobStatus.readiness-batch-ready {
-  border-color: #78d69a;
+  border-color: #55b979;
   background: #f1fbf4;
 }
 
 .programmingJobStatus.state-error,
 .programmingJobStatus.state-partial,
 .programmingJobStatus.readiness-error {
-  border-color: #f0a0a0;
+  border-color: #df7777;
   background: #fff4f4;
 }
 
-[data-theme="dark"] .programmingJobCollapseButton,
+[data-theme="dark"] .programmingJobPanel,
+[data-theme="dark"] .programmingJobPanel > .operatorPanelBody,
+[data-theme="dark"] .programmingJobActionBar {
+  background: var(--panel);
+}
+
+[data-theme="dark"] .programmingJobPanel > .operatorPanelHeader {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .programmingJobField {
+  border-color: var(--line);
+}
+
 [data-theme="dark"] .programmingJobImageControl,
 [data-theme="dark"] .programmingJobPolicyControls input,
 [data-theme="dark"] .programmingJobPolicyControls select,
-[data-theme="dark"] .programmingJobOperationChecks label,
 [data-theme="dark"] .programmingJobStatus {
   background: var(--panel);
   border-color: var(--line);
   color: var(--text);
 }
 
+[data-theme="dark"] .programmingJobCollapseButton,
 [data-theme="dark"] .programmingJobImageControl > span,
 [data-theme="dark"] .programmingJobField > strong,
+[data-theme="dark"] .programmingJobOperationChecks label,
 [data-theme="dark"] .programmingJobPolicyControls label,
-[data-theme="dark"] .programmingJobStatus b {
+[data-theme="dark"] .programmingJobStatus b,
+[data-theme="dark"] .programmingJobStatus small {
   color: var(--text);
 }
 
@@ -289,10 +350,39 @@
   color: var(--text);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 980px) {
   .programmingJobField {
+    grid-template-columns: 180px minmax(0, 1fr);
+    column-gap: 20px;
+  }
+
+  .programmingJobPolicyControls {
+    gap: 18px;
+  }
+
+  .programmingJobPolicyControls input {
+    width: 100px;
+  }
+
+  .programmingJobPolicyControls select {
+    min-width: 150px;
+  }
+
+  .programmingJobActionBar {
+    gap: 20px;
+  }
+}
+
+@media (max-width: 760px) {
+  .programmingJobPanel > .operatorPanelHeader {
+    min-height: 48px;
+    padding: 0 14px;
+  }
+
+  .programmingJobField {
+    padding: 14px;
     grid-template-columns: 1fr;
-    gap: 5px;
+    gap: 8px;
   }
 
   .programmingJobField > strong {
@@ -309,7 +399,19 @@
     flex-wrap: wrap;
   }
 
+  .programmingJobImageControl {
+    grid-template-columns: minmax(0, 1fr) 108px;
+  }
+
   .programmingJobActionBar {
+    padding: 18px 14px;
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .programmingJobStart,
+  .programmingJobAbort,
+  .programmingJobStatus {
+    min-height: 54px;
   }
 }

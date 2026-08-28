@@ -34,8 +34,9 @@ test("Engineering desktop alignment owns only the compact targeting rail", async
   }
 
   assert.ok(programmingJobCss.includes(".programmingJobField {"));
-  assert.ok(programmingJobCss.includes("grid-template-columns: 128px minmax(0, 1fr);"));
-  assert.ok(programmingJobCss.includes("gap: 8px;"));
+  assert.ok(programmingJobCss.includes("grid-template-columns: clamp(190px, 15vw, 260px) minmax(0, 1fr);"));
+  assert.ok(programmingJobCss.includes("column-gap: 28px;"));
+  assert.ok(programmingJobCss.includes("justify-self: start;\n  text-align: left;"));
 });
 
 test("Engineering mobile targeting labels return to natural left alignment and alignment CSS loads last", async () => {

@@ -3,6 +3,7 @@ import type { ChangeEvent, ReactNode } from "react";
 import type { DeviceSearchResult } from "../device-catalog-api";
 import { ICPickerField } from "../devices/ic-picker-field";
 import { OperatorPanel } from "./operator-panel";
+import "./programming-job-controls.css";
 
 export type ProgrammingJobOperation = {
   key: string;

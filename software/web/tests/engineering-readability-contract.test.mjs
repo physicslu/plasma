@@ -37,8 +37,8 @@ test("Engineering readability layer raises the approved operator font floor with
     assert.equal(css.includes(forbidden), false, `Engineering readability must not override shared Programming control: ${forbidden}`);
   }
 
-  assert.match(sharedControls, /\.programmingJobOperationChecks label\s*\{[\s\S]*font-size:\s*9px[\s\S]*font-weight:\s*700/);
-  assert.match(sharedControls, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*font-size:\s*10px[\s\S]*font-weight:\s*850/);
+  assert.match(sharedControls, /\.programmingJobOperationChecks label\s*\{[\s\S]*font-size:\s*13px[\s\S]*font-weight:\s*550/);
+  assert.match(sharedControls, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*font-size:\s*17px[\s\S]*font-weight:\s*800/);
   assert.doesNotMatch(
     css,
     /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/,

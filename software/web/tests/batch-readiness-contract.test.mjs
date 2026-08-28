@@ -76,8 +76,8 @@ test("Engineering density owns the workspace, not Programming Job internals", as
   assert.doesNotMatch(v2Css, /\.programmingJobGrid\b|\.programmingJobField\b|\.programmingJobActionBar\b|\.programmingJobStatus\b/);
   assert.doesNotMatch(refreshCss, /\.programmingJobGrid\b|\.programmingJobField\b|\.programmingJobActionBar\b|\.programmingJobStatus\b/);
 
-  assert.match(controlsCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 160px minmax\(0, 1fr\)/);
-  assert.match(controlsCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*38px/);
+  assert.match(controlsCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.08fr\) minmax\(0, 1fr\)/);
+  assert.match(controlsCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*64px/);
   assert.doesNotMatch(controlsCss, /position:\s*absolute/);
 
   assert.doesNotMatch(css, /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/);
