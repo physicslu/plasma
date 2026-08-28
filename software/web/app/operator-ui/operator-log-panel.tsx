@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { OperatorPanelHeader } from "./operator-panel";
 import "./operator-log-panel.css";
 
 export type OperatorLogCategory = "USR" | "NET" | "PPU" | "DAT" | "BAT" | "SYS";
@@ -78,15 +79,16 @@ export function OperatorLogPanel({
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
   }
 
+  const actions = (
+    <div className="operatorLogActions">
+      <button type="button" onClick={downloadLog} disabled={!entries.length}>Download .log</button>
+      <button type="button" onClick={onClear}>{clearLabel}</button>
+    </div>
+  );
+
   return (
     <section className={`logCard operatorLogCard ${className}`.trim()}>
-      <div className="logHead operatorLogHead">
-        <div className="operatorLogTitle"><span />{title}</div>
-        <div className="operatorLogActions">
-          <button type="button" onClick={downloadLog} disabled={!entries.length}>Download .log</button>
-          <button type="button" onClick={onClear}>{clearLabel}</button>
-        </div>
-      </div>
+      <OperatorPanelHeader title={title} actions={actions} />
       <div className="operatorLogFilters" role="group" aria-label={filterAriaLabel}>
         <button
           type="button"
