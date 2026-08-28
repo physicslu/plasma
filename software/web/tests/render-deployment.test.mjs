@@ -8,6 +8,7 @@ test("Render build reuses canonical React pages and resolves API requests at the
 
   assert.match(entry, /from "\.\.\/app\/demo\/page"/);
   assert.match(entry, /from "\.\.\/app\/devices\/page"/);
+  assert.match(entry, /from "\.\.\/app\/documents\/page"/);
   assert.match(entry, /from "\.\.\/app\/engineering\/page"/);
   assert.match(entry, /from "\.\.\/app\/fleet\/page"/);
   assert.doesNotMatch(entry, /from "\.\.\/app\/fleet\/programming\/page"/);
@@ -23,6 +24,7 @@ test("Render client router retires Production Single PPU Programming and preserv
   const entry = await readFile(new URL("../render/main.tsx", import.meta.url), "utf8");
 
   assert.match(entry, /pathname === "\/devices"[\s\S]*<DevicesPage \/>/);
+  assert.match(entry, /pathname === "\/documents"[\s\S]*<DocumentsPage \/>/);
   assert.match(entry, /pathname === "\/fleet\/programming"[\s\S]*<RetiredFleetProgrammingRoute \/>/);
   assert.match(entry, /replaceRoute\("\/fleet"\)/);
   assert.doesNotMatch(entry, /FleetProgrammingPage/);
