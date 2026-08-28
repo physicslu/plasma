@@ -1,12 +1,17 @@
 /* Engineering Programming label/control alignment.
  *
- * This layer owns Engineering-targeting alignment only. Typography remains in
- * engineering-readability.css. Shared Programming Job internals are owned by
- * operator-ui/programming-job-controls.css and must not be overridden here.
- *
- * Desktop/tablet rule: keep a compact 112 px label rail, right-align the label,
- * and keep the visual hand-off to the control at 8 px.
+ * This layer is the sole owner of Engineering-targeting field geometry.
+ * Typography remains in engineering-readability.css and select chrome remains
+ * in programming-workspace-v2.css. Shared Programming Job internals are owned
+ * by operator-ui/programming-job-controls.css and must not be overridden here.
  */
+.engineeringProgrammingV2 .targetingCard .workflowField {
+  display: grid;
+  align-items: center;
+  margin: 0;
+}
+
+/* Desktop/tablet: compact 112 px label rail with an 8 px control hand-off. */
 @container engineering-programming (min-width: 761px) {
   html .engineeringProgrammingV2 .targetingCard .workflowField {
     grid-template-columns: 112px minmax(0, 1fr);
@@ -20,9 +25,14 @@
   }
 }
 
-/* Once the workspace stacks vertically, right-aligned targeting labels no
- * longer help scanning. Restore their natural left alignment. */
+/* Once the workspace stacks vertically, labels return to natural left
+ * alignment and preserve the previous 12 px vertical control separation. */
 @media (max-width: 760px) {
+  .engineeringProgrammingV2 .targetingCard .workflowField {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
   .engineeringProgrammingV2 .targetingCard .workflowField > span {
     justify-self: start;
     text-align: left;
