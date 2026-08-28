@@ -117,6 +117,55 @@
   box-shadow: inset 3px 0 0 #69b4ff;
 }
 
+.engineeringNavTreeGroup {
+  display: grid;
+  gap: 4px;
+}
+
+.engineeringWorkspace .engineeringSidebar nav .engineeringNavTreeGroup > button {
+  grid-template-columns: 34px minmax(0, 1fr) 18px;
+}
+
+.engineeringNavDisclosure {
+  color: #9fb2c5;
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
+}
+
+.engineeringSidebar nav button.active .engineeringNavDisclosure {
+  color: #fff;
+}
+
+.engineeringNavChildren {
+  display: grid;
+  gap: 2px;
+  padding-left: 28px;
+}
+
+.engineeringWorkspace .engineeringSidebar nav .engineeringNavChildren button {
+  grid-template-columns: 18px minmax(0, 1fr);
+  min-height: 36px;
+  padding: 0 10px 0 4px;
+  border-radius: 5px;
+  color: #b9c9d9;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.engineeringWorkspace .engineeringSidebar nav .engineeringNavChildren button.active {
+  border-color: rgba(105, 180, 255, .22);
+  background: rgba(59, 130, 246, .16);
+  color: #fff;
+  box-shadow: inset 2px 0 0 #69b4ff;
+}
+
+.engineeringNavTreeBranch {
+  color: #71879b;
+  font: 12px var(--font-mono);
+  text-align: center;
+}
+
 .engineeringNavIcon {
   display: inline-grid;
   place-items: center;
@@ -174,12 +223,15 @@
 }
 
 .engineeringPage.sidebarCollapsed .engineeringBrand > div,
-.engineeringPage.sidebarCollapsed .engineeringNavLabel {
+.engineeringPage.sidebarCollapsed .engineeringNavLabel,
+.engineeringPage.sidebarCollapsed .engineeringNavDisclosure,
+.engineeringPage.sidebarCollapsed .engineeringNavChildren {
   display: none;
 }
 
 .engineeringPage.sidebarCollapsed .engineeringWorkspace .engineeringSidebar nav button,
-.engineeringPage.sidebarCollapsed .engineeringSidebarCollapse {
+.engineeringPage.sidebarCollapsed .engineeringSidebarCollapse,
+.engineeringPage.sidebarCollapsed .engineeringWorkspace .engineeringSidebar nav .engineeringNavTreeGroup > button {
   grid-template-columns: 1fr;
   justify-items: center;
   padding-inline: 8px;
@@ -287,8 +339,21 @@
     border-bottom: 1px solid rgba(148, 163, 184, .2);
   }
 
+  .engineeringNavTreeGroup {
+    display: flex;
+    gap: 4px;
+  }
+
+  .engineeringNavChildren {
+    display: flex;
+    gap: 4px;
+    padding-left: 0;
+  }
+
   .engineeringWorkspace .engineeringSidebar nav button,
-  .engineeringPage.sidebarCollapsed .engineeringWorkspace .engineeringSidebar nav button {
+  .engineeringPage.sidebarCollapsed .engineeringWorkspace .engineeringSidebar nav button,
+  .engineeringWorkspace .engineeringSidebar nav .engineeringNavTreeGroup > button,
+  .engineeringWorkspace .engineeringSidebar nav .engineeringNavChildren button {
     display: inline-grid;
     grid-template-columns: 22px auto;
     min-width: max-content;
@@ -296,8 +361,14 @@
     padding: 0 10px;
   }
 
-  .engineeringPage.sidebarCollapsed .engineeringNavLabel {
-    display: inline;
+  .engineeringWorkspace .engineeringSidebar nav .engineeringNavTreeGroup > button {
+    grid-template-columns: 22px auto 16px;
+  }
+
+  .engineeringPage.sidebarCollapsed .engineeringNavLabel,
+  .engineeringPage.sidebarCollapsed .engineeringNavDisclosure,
+  .engineeringPage.sidebarCollapsed .engineeringNavChildren {
+    display: flex;
   }
 
   .engineeringNavIcon {
