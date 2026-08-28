@@ -55,9 +55,19 @@ test("Documents v1 covers PMode, EMode, Gateway and Mock operator reference", ()
   ]) assert.match(documents, new RegExp(required));
 
   assert.match(documents, /IC FAIL ≠ Infrastructure ERROR/);
-  assert.match(documents, /4 × 10 sec \+ 1 \+ 2 \+ 4 sec = 47 sec/);
   assert.match(documents, /Mock PASS ≠/);
   assert.match(documents, /0\.1%/);
+});
+
+test("Gateway operator reference lists only currently editable settings", () => {
+  assert.match(documents, /\["PPU Request Timeout"/);
+  assert.match(documents, /\["PPU Retry Count"/);
+  assert.doesNotMatch(documents, /\["Retry Backoff"/);
+  assert.doesNotMatch(documents, /\["PPU Response Budget"/);
+  assert.doesNotMatch(documents, /\["Browser Watchdog"/);
+  assert.doesNotMatch(documents, /Default response budget|預設 response budget/);
+  assert.doesNotMatch(documents, /4 × 10 sec \+ 1 \+ 2 \+ 4 sec = 47 sec/);
+  assert.doesNotMatch(documents, /Job submission 不應因結果不確定而自動重送/);
 });
 
 test("Mock operator reference lists only currently editable settings", () => {

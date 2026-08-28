@@ -191,15 +191,11 @@ function TopicContent({ topic, zh }: { topic: Topic; zh: boolean }) {
       <article className="documentArticle">
         <p className="documentEyebrow">EMODE · SETTINGS · GATEWAY</p>
         <h1>{zh ? "Gateway 設定說明" : "Gateway Settings"}</h1>
+        <p className="documentLead">{zh ? "以下只列目前 Gateway Settings UI 可以直接修改的欄位。" : "Only fields that are directly editable in the current Gateway Settings UI are listed below."}</p>
         <DefinitionTable rows={[
           ["PPU Request Timeout", zh ? "單次 PPU request 的等待時間。預設 10 秒，可設定 1–120 秒。" : "Wait time for one PPU request. Default 10 seconds; range 1–120 seconds."],
-          ["PPU Retry Count", zh ? "可重試的 PPU observation request 次數。預設 3，所以最多為 1 次原始 request + 3 次 retry。" : "Retry count for retryable PPU observation requests. Default 3, for up to 1 original request + 3 retries."],
-          ["Retry Backoff", zh ? "目前採 1、2、4 秒；後續 retry 維持 4 秒。" : "Currently 1, 2, and 4 seconds; later retries remain at 4 seconds."],
-          ["PPU Response Budget", zh ? "Gateway 依 Timeout、Retry 與 backoff 推導的唯讀值。預設為 47 秒，不是第三個可寫 timeout。" : "Read-only value derived from timeout, retries, and backoff. Default 47 seconds; not a third writable timeout."],
-          ["Browser Watchdog", zh ? "Browser 外層 transport watchdog 會再加 margin；它不擁有 PPU retry policy。" : "The browser adds an outer transport margin; it does not own the PPU retry policy."],
+          ["PPU Retry Count", zh ? "暫時性 PPU 通訊錯誤的追加重試次數。預設 3，可設定 0–10；retry backoff 由系統自動管理，不可設定。" : "Additional retries for transient PPU communication errors. Default 3; range 0–10. Retry backoff is system-managed and is not configurable."],
         ]} />
-        <section><h2>{zh ? "預設 response budget" : "Default response budget"}</h2><pre className="documentFormula">4 × 10 sec + 1 + 2 + 4 sec = 47 sec</pre></section>
-        <aside className="documentNotice critical">{zh ? "Job submission 不應因結果不確定而自動重送，避免重複建立 Job。" : "Job submission must not be blindly retried after an uncertain result, to avoid duplicate Jobs."}</aside>
       </article>
     );
   }
