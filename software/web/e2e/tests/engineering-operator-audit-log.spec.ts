@@ -1,5 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  programmingJob,
+  programmingJobAction,
+  programmingJobOperation,
+} from "./programming-job-test-helpers";
 
 const facilityId = "mock-facility-01";
 const ppu1 = "mock-facility-01-ppu-01";
@@ -173,6 +178,7 @@ test("Engineering audit log reconstructs operator actions and filters without tr
 
   await openProgramming(page);
   const log = page.getByLabel("Engineering job log");
+  const job = programmingJob(page, "engineering");
   await expect(log).toContainText("[NET] [SESSION] NEW · fresh connection");
   await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
   await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
@@ -191,13 +197,13 @@ test("Engineering audit log reconstructs operator actions and filters without tr
   });
   await expect(log).toContainText("[USR] [IMG] SELECT · operator-audit.bin · 1.0 KiB");
 
-  await page.getByLabel("Engineering batch erase").check();
+  await programmingJobOperation(job, "erase").check();
   await expect(log).toContainText("[USR] [BATCH] OPERATIONS · ERASE");
-  await page.locator(".executeBatch").click();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => batchNumber).toBe(1);
   expect(directJobNumber).toBe(0);
-  await expect(page.locator(".executeBatch")).toBeEnabled();
+  await expect(programmingJobAction(job, "start")).toBeEnabled();
   await expect(log).toContainText("[USR] [BATCH] SUBMIT · ERASE · SITE-01");
   await expect(log).toContainText("[BAT] [BATCH] ACCEPTED · operator-audit-batch");
   await expect(log).toContainText("[BAT] [BATCH] SUCCESS · operator-audit-batch");
