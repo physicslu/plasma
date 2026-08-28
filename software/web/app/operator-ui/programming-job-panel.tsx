@@ -168,6 +168,7 @@ export function ProgrammingJobPanel({
                 <label key={operation.key}>
                   <input
                     type="checkbox"
+                    data-programming-job-operation={operation.key}
                     aria-label={operation.ariaLabel}
                     checked={operation.checked}
                     disabled={operation.disabled}
@@ -183,10 +184,10 @@ export function ProgrammingJobPanel({
           <div className="programmingJobField" data-programming-job-field="policy">
             <strong>4. {policyLabel}</strong>
             <div className="programmingJobPolicyControls">
-              <label>{policy.repeatLabel}<input aria-label={policy.repeatAriaLabel} type="number" min="1" max="10000" value={policy.repeatValue} disabled={policy.repeatDisabled} onChange={event => policy.onRepeatChange(event.target.value)} /></label>
-              <label>{policy.retryLabel}<input aria-label={policy.retryAriaLabel} type="number" min="0" max="20" value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
+              <label>{policy.repeatLabel}<input data-programming-job-policy="repeat" aria-label={policy.repeatAriaLabel} type="number" min="1" max="10000" value={policy.repeatValue} disabled={policy.repeatDisabled} onChange={event => policy.onRepeatChange(event.target.value)} /></label>
+              <label>{policy.retryLabel}<input data-programming-job-policy="retry" aria-label={policy.retryAriaLabel} type="number" min="0" max="20" value={policy.retryValue} disabled={policy.retryDisabled} onChange={event => policy.onRetryChange(event.target.value)} /></label>
               <label>{policy.stopLabel}
-                <select aria-label={policy.stopAriaLabel} value={policy.stopValue} disabled={policy.stopDisabled} onChange={event => policy.onStopChange(event.target.value)}>
+                <select data-programming-job-policy="stop" aria-label={policy.stopAriaLabel} value={policy.stopValue} disabled={policy.stopDisabled} onChange={event => policy.onStopChange(event.target.value)}>
                   {policy.stopOptions.map(option => <option value={option.value} key={option.value || "never"}>{option.label}</option>)}
                 </select>
               </label>
