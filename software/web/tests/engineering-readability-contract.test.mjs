@@ -37,8 +37,8 @@ test("Engineering readability layer raises the approved operator font floor with
     assert.equal(css.includes(forbidden), false, `Engineering readability must not override shared Programming control: ${forbidden}`);
   }
 
-  assert.match(sharedControls, /font-size:\s*9px[\s\S]*font-weight:\s*700/);
-  assert.match(sharedControls, /\.programmingActions \.startProgramming,[\s\S]*font-size:\s*10px[\s\S]*font-weight:\s*850/);
+  assert.match(sharedControls, /\.programmingJobOperationChecks label\s*\{[\s\S]*font-size:\s*9px[\s\S]*font-weight:\s*700/);
+  assert.match(sharedControls, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*font-size:\s*10px[\s\S]*font-weight:\s*850/);
   assert.doesNotMatch(
     css,
     /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/,
@@ -46,7 +46,7 @@ test("Engineering readability layer raises the approved operator font floor with
   );
 });
 
-test("Engineering canonical card headers do not render their legacy text twice", async () => {
+test("Engineering System Setup header hides its legacy raw text without owning shared Programming Job header presentation", async () => {
   const [css, refresh] = await Promise.all([source(readabilityPath), source(refreshPath)]);
 
   assert.equal(
@@ -54,12 +54,13 @@ test("Engineering canonical card headers do not render their legacy text twice",
     false,
     "readability CSS must not revive raw card header text",
   );
-  assert.ok(
-    refresh.includes(".engineeringProgrammingV2 .targetingCard > header,\n.engineeringProgrammingV2 .programmingJobCard > header {\n  font-size: 0;"),
-    "raw SYSTEM SETUP / PROGRAMMING JOB header text must remain hidden",
-  );
+  assert.match(refresh, /\.engineeringProgrammingV2 \.targetingCard > header,[\s\S]*font-size:\s*0/);
   assert.ok(css.includes(".targetingCard > header::before,"));
-  assert.ok(css.includes(".programmingJobCard > header::before,"));
+  assert.doesNotMatch(
+    css,
+    /\.programmingJob(?:Panel|Grid|Field|ActionBar|Status|OperationChecks|PolicyControls)\b/,
+    "Engineering readability must not own shared Programming Job presentation",
+  );
 });
 
 test("Engineering readability layer is typography-only and loads after layout CSS", async () => {

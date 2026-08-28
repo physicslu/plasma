@@ -1,5 +1,10 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { commitProductionSites } from "./production-console-helpers";
+import {
+  programmingJobAction,
+  programmingJobOperation,
+  programmingJobStatusValue,
+} from "./programming-job-test-helpers";
+import { commitProductionSites, programmingJob } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -250,14 +255,14 @@ test("Production Programming Job collapse preserves the complete Batch action ro
   await installFactoryMock(page);
   await commitTwoSiteProductionSet(page);
 
-  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
-  await programming.getByRole("button", { name: "Collapse Production Programming Job" }).click();
-  await expect(programming.getByLabel("Target IC")).toBeHidden();
-  await expect(programming.getByRole("button", { name: /START PROGRAMMING/ })).toBeVisible();
-  await expect(programming.getByRole("status", { name: "BATCH STATUS" })).toBeVisible();
-  await expect(programming.getByRole("button", { name: /ABORT/ })).toBeVisible();
-  await programming.getByRole("button", { name: "Expand Production Programming Job" }).click();
-  await expect(programming.getByLabel("Target IC")).toBeVisible();
+  const job = programmingJob(page);
+  await job.getByRole("button", { name: "Collapse Production Programming Job" }).click();
+  await expect(job.getByLabel("Target IC")).toBeHidden();
+  await expect(programmingJobAction(job, "start")).toBeVisible();
+  await expect(programmingJobAction(job, "status")).toBeVisible();
+  await expect(programmingJobAction(job, "abort")).toBeVisible();
+  await job.getByRole("button", { name: "Expand Production Programming Job" }).click();
+  await expect(job.getByLabel("Target IC")).toBeVisible();
 });
 
 test("START snapshots Batch membership; running selection is locked and only whole-Batch ABORT is exposed", async ({ page }) => {
@@ -265,9 +270,9 @@ test("START snapshots Batch membership; running selection is locked and only who
   await commitTwoSiteProductionSet(page);
   await chooseTarget(page);
 
-  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
-  await programming.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox").check();
-  await programming.getByRole("button", { name: /START PROGRAMMING/ }).click();
+  const job = programmingJob(page);
+  await programmingJobOperation(job, "erase").check();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => mock.submissions.length).toBe(1);
   expect(mock.submissions[0].targets).toEqual([{ facility_id: facilityId, ppu_id: ppuId, site_ids: [1, 2] }]);
@@ -281,10 +286,9 @@ test("START snapshots Batch membership; running selection is locked and only who
   await expect(page.getByText("Cancel PPU", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/Cancel Site/i)).toHaveCount(0);
 
-  const abort = programming.getByRole("button", { name: /ABORT/ });
-  await expect(abort).toBeEnabled();
-  await abort.click();
-  await expect(page.locator(".factoryBatchStatus b")).toHaveText("CANCELLED");
+  await expect(programmingJobAction(job, "abort")).toBeEnabled();
+  await programmingJobAction(job, "abort").click();
+  await expect(programmingJobStatusValue(job)).toHaveText("CANCELLED");
 
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
@@ -298,13 +302,13 @@ test("Mock Batch accepts no Target IC and exposes planned IC quantity, 1 Hz acti
   const mock = await installFactoryMock(page);
   await commitTwoSiteProductionSet(page);
 
-  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
-  await programming.getByLabel("Repeat Count").fill("10");
+  const job = programmingJob(page);
+  await job.getByLabel("Repeat Count").fill("10");
   await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("20");
   await expect(page.locator('[data-kpi="batch-time"] b')).toHaveText("00:00:00");
-  await programming.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox").check();
-  await expect(programming.locator(".factoryStartButton")).toBeEnabled();
-  await programming.locator(".factoryStartButton").click();
+  await programmingJobOperation(job, "erase").check();
+  await expect(programmingJobAction(job, "start")).toBeEnabled();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => mock.submissions.length).toBe(1);
   expect(mock.submissions[0].target_device).toBeUndefined();
@@ -319,7 +323,7 @@ test("Mock Batch accepts no Target IC and exposes planned IC quantity, 1 Hz acti
   });
   expect(animation).toEqual({ name: "factoryRunningPulse", duration: "1s" });
 
-  await programming.locator(".factoryAbortButton").click();
+  await programmingJobAction(job, "abort").click();
   await expect(page.locator('[data-kpi="batch-time"] b')).toHaveText("00:00:01");
   await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("20");
 });
@@ -329,9 +333,9 @@ test("active membership follows Server Batch Runtime while PROCESSED IC follows 
   await commitTwoSiteProductionSet(page);
   await chooseTarget(page);
 
-  const programming = page.getByRole("region", { name: "PROGRAMMING JOB" });
-  await programming.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox").check();
-  await programming.getByRole("button", { name: /START PROGRAMMING/ }).click();
+  const job = programmingJob(page);
+  await programmingJobOperation(job, "erase").check();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => mock.submissions.length).toBe(1);
   expect(mock.submissions[0].targets).toEqual([{ facility_id: facilityId, ppu_id: ppuId, site_ids: [1, 2] }]);
@@ -345,8 +349,8 @@ test("active membership follows Server Batch Runtime while PROCESSED IC follows 
   await expect(live.locator('[data-production-site="1"]')).toHaveAttribute("data-batch-selected", "true");
   await expect(live.locator('[data-production-site="2"]')).toHaveAttribute("data-batch-selected", "false");
 
-  await programming.getByRole("button", { name: /ABORT/ }).click();
-  await expect(page.locator(".factoryBatchStatus b")).toHaveText("CANCELLED");
+  await programmingJobAction(job, "abort").click();
+  await expect(programmingJobStatusValue(job)).toHaveText("CANCELLED");
   await expect(page.locator('[data-kpi="total-ic"] b')).toHaveText("1");
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-01" })).toBeChecked();
   await expect(live.getByRole("checkbox", { name: "Batch select Mock PPU 01 SITE-02" })).toBeChecked();

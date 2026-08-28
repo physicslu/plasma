@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { factoryConsoleHeading } from "./production-console-helpers";
+import { factoryConsoleHeading, programmingJob } from "./production-console-helpers";
 
 function catalog() {
   const siteCounts = [2, 4, 6, 8];
@@ -50,14 +50,14 @@ async function installProductionCatalog(page: Page) {
 }
 
 async function expectConstrainedProgrammingJob(page: Page) {
-  const job = page.getByRole("region", { name: "PROGRAMMING JOB" });
+  const job = programmingJob(page);
   await expect(job).toBeVisible();
 
   const layout = await job.evaluate(element => {
     const panel = element.getBoundingClientRect();
-    const grid = element.querySelector<HTMLElement>(".factoryJobGrid")!;
-    const operations = element.querySelector<HTMLElement>(".factoryOperationChecks")!;
-    const actionBar = element.querySelector<HTMLElement>(".factoryActionBar")!;
+    const grid = element.querySelector<HTMLElement>("[data-programming-job-fields]")!;
+    const operations = element.querySelector<HTMLElement>('[data-programming-job-field="operations"] [role="group"]')!;
+    const actionBar = element.querySelector<HTMLElement>("[data-programming-job-actions]")!;
     const operationTops = [...operations.querySelectorAll<HTMLElement>("label")].map(label => label.getBoundingClientRect().top);
     const actions = [...actionBar.querySelectorAll<HTMLElement>("button")].map(button => button.getBoundingClientRect());
     return {

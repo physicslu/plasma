@@ -1,4 +1,11 @@
 import { expect, test, type Page, type Request } from "@playwright/test";
+import {
+  expectProgrammingJobContract,
+  programmingJob,
+  programmingJobAction,
+  programmingJobOperation,
+  programmingJobStatusValue,
+} from "./programming-job-test-helpers";
 
 const facilityId = process.env.MOCK_CD_PRODUCTION_FACILITY_ID ?? "mock-facility-01";
 const ppuOne = process.env.MOCK_CD_PRODUCTION_PPU_ONE ?? `${facilityId}-ppu-01`;
@@ -44,14 +51,6 @@ function fpsCheckbox(page: Page, ppuId: string, siteId = 1) {
   });
 }
 
-function programmingJob(page: Page) {
-  return page.getByRole("region", { name: "PROGRAMMING JOB" });
-}
-
-function operationCheckbox(page: Page, index: number) {
-  return programmingJob(page).locator(".factoryOperationChecks label").nth(index).getByRole("checkbox");
-}
-
 async function chooseTarget(page: Page) {
   const target = page.getByLabel("Target IC");
   await target.fill(targetIc);
@@ -90,8 +89,10 @@ async function openTwoPpuProductionSet(page: Page) {
   await expect(page.locator('[data-kpi="production-sites"] b')).toHaveText("2");
 
   await chooseTarget(page);
-  await operationCheckbox(page, 0).check();
-  return { first, second };
+  const job = programmingJob(page, "production");
+  await expectProgrammingJobContract(job);
+  await programmingJobOperation(job, "erase").check();
+  return { first, second, job };
 }
 
 function observeBrowserOwnership(page: Page) {
@@ -127,9 +128,9 @@ function observeBrowserOwnership(page: Page) {
 
 test("real Production Mock submits one server Batch for two PPUs and completes both", async ({ page }) => {
   const ownership = observeBrowserOwnership(page);
-  const { first, second } = await openTwoPpuProductionSet(page);
+  const { first, second, job } = await openTwoPpuProductionSet(page);
 
-  await programmingJob(page).getByRole("button", { name: /START PROGRAMMING/ }).click();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => ownership.batchBodies.length, { timeout: 5_000 }).toBe(1);
   const body = ownership.batchBodies[0] as {
@@ -149,7 +150,7 @@ test("real Production Mock submits one server Batch for two PPUs and completes b
 
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
-  await expect(page.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("2");
   await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");
   expect(ownership.browserJobPosts()).toBe(0);
@@ -157,16 +158,16 @@ test("real Production Mock submits one server Batch for two PPUs and completes b
 
 test("real Production Mock shares one Programming Asset across two PPUs for Erase Program Verify", async ({ page }) => {
   const ownership = observeBrowserOwnership(page);
-  await openTwoPpuProductionSet(page);
+  const { job } = await openTwoPpuProductionSet(page);
 
   await page.getByLabel("Production Programming Image file").setInputFiles({
     name: "production-shared-asset.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(4096, 0xa5),
   });
-  await operationCheckbox(page, 1).check();
-  await operationCheckbox(page, 2).check();
-  await programmingJob(page).getByRole("button", { name: /START PROGRAMMING/ }).click();
+  await programmingJobOperation(job, "program").check();
+  await programmingJobOperation(job, "verify").check();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => ownership.batchBodies.length, { timeout: 5_000 }).toBe(1);
   const body = ownership.batchBodies[0] as {
@@ -189,7 +190,7 @@ test("real Production Mock shares one Programming Asset across two PPUs for Eras
 
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 30_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 30_000 });
-  await expect(page.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("2");
   await expect(page.locator('[data-kpi="yield"] b')).toHaveText("100.0%");
   expect(ownership.browserJobPosts()).toBe(0);
@@ -221,19 +222,18 @@ test("real Production Mock exposes only whole-Batch ABORT for multi-PPU runtime"
 
   try {
     const ownership = observeBrowserOwnership(page);
-    await openTwoPpuProductionSet(page);
+    const { job } = await openTwoPpuProductionSet(page);
 
-    const programming = programmingJob(page);
-    await programming.getByRole("button", { name: /START PROGRAMMING/ }).click();
+    await programmingJobAction(job, "start").click();
     await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
     await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
 
     await expect(page.getByRole("button", { name: "Cancel PPU", exact: true })).toHaveCount(0);
-    await programming.getByRole("button", { name: /ABORT/ }).click();
+    await programmingJobAction(job, "abort").click();
     await expect.poll(() => ownership.wholeBatchCancels(), { timeout: 5_000 }).toBe(1);
     await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
     await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "cancelled", { timeout: 10_000 });
-    await expect(page.locator(".factoryBatchStatus b")).toHaveText("CANCELLED");
+    await expect(programmingJobStatusValue(job)).toHaveText("CANCELLED");
 
     expect(ownership.batchPpuCancels).toEqual([]);
     expect(ownership.browserJobPosts()).toBe(0);

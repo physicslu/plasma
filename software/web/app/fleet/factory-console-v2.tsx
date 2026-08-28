@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { evaluateBatchReadiness } from "../batch-readiness";
 import { beginBatchExecutionActivity, notifyBatchExecutionActivityChanged } from "../batch-execution-activity";
 import type { DeviceSearchResult } from "../device-catalog-api";
-import { ICPickerField } from "../devices/ic-picker-field";
 import { useI18n } from "../i18n";
 import { BatchSummary } from "../operator-ui/batch-summary";
+import { ProgrammingJobPanel } from "../operator-ui/programming-job-panel";
 import { OperatorPanel } from "../operator-ui/operator-panel";
 import {
   engineeringTargetApiBase,
@@ -402,7 +402,6 @@ export default function FactoryConsoleV2() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [programmingJobCollapsed, setProgrammingJobCollapsed] = useState(false);
 
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const logSequence = useRef(0);
   const activityReleaseRef = useRef<(() => void) | null>(null);
   const pollGenerationRef = useRef(0);
@@ -1125,92 +1124,80 @@ export default function FactoryConsoleV2() {
               </div>
             </OperatorPanel>
 
-            <OperatorPanel
-              number={2}
-              title={text.programmingJob}
-              className={`factoryProgrammingJob ${programmingJobCollapsed ? "is-collapsed" : ""}`}
-              actions={(
-                <button
-                  type="button"
-                  className="selectionVisibilityButton"
-                  aria-label={`${programmingJobCollapsed ? "Expand" : "Collapse"} Production Programming Job`}
-                  aria-expanded={!programmingJobCollapsed}
-                  onClick={() => setProgrammingJobCollapsed(current => !current)}
-                >
-                  {programmingJobCollapsed ? text.showSelection : text.hideSelection} {programmingJobCollapsed ? "⌄" : "⌃"}
-                </button>
-              )}
-            >
-              {!programmingJobCollapsed && <div className="factoryJobGrid">
-                <label className="factoryField targetField">
-                  <strong>1. {text.targetIc}</strong>
-                  <ICPickerField apiBase={apiBase} value={targetDevice} onChange={setTargetDevice} disabled={batchRunning} />
-                </label>
-
-                <label className="factoryField imageFieldV2">
-                  <strong>2. {text.image}</strong>
-                  <div className="factoryImageControl">
-                    <span title={imageAsset?.name}>{imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? "Mock Synthetic Image" : "Select programming image (.bin)…")}</span>
-                    <button type="button" disabled={batchRunning} onClick={() => imageInputRef.current?.click()}>{text.browse}</button>
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      aria-label="Production Programming Image file"
-                      accept=".bin,application/octet-stream"
-                      hidden
-                      disabled={batchRunning}
-                      onChange={event => {
-                        const file = event.target.files?.[0] ?? null;
-                        if (file && file.size > MAX_IMAGE_BYTES) {
-                          setOperatorWarning(text.imageTooLarge);
-                          setImageAsset(null);
-                          event.currentTarget.value = "";
-                          return;
-                        }
-                        setImageAsset(file);
-                        if (file) appendLog(`[IMG] SELECTED · ${file.name} · ${file.size} bytes`);
-                      }}
-                    />
-                  </div>
-                  <small>{text.imageHint}</small>
-                </label>
-
-                <div className="factoryField operationField">
-                  <strong>3. {text.operations}</strong>
-                  <div className="factoryOperationChecks">
-                    {operationOrder.map(operation => (
-                      <label key={operation}>
-                        <input type="checkbox" checked={selectedOperations.includes(operation)} disabled={batchRunning} onChange={() => toggleOperation(operation)} />
-                        <b>{operationCodes[operation]}</b> {t(`operation.${operation}`)}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="factoryField policyField">
-                  <strong>4. {text.batchPolicy}</strong>
-                  <div className="factoryPolicyControls">
-                    <label>{text.repeat}<input aria-label="Repeat Count" type="number" min="1" max="10000" value={repeatCount} disabled={batchRunning} onChange={event => setRepeatCount(event.target.value)} /></label>
-                    <label>{text.retry}<input aria-label="Site Retry Limit" type="number" min="0" max="20" value={siteRetryLimit} disabled={batchRunning} onChange={event => setSiteRetryLimit(event.target.value)} /></label>
-                    <label>{text.stopPolicy}
-                      <select aria-label="Stop Policy" value={failedSiteThreshold} disabled={batchRunning || !batchCounts.sites} onChange={event => setFailedSiteThreshold(event.target.value)}>
-                        <option value="">{text.never}</option>
-                        {Array.from({ length: batchCounts.sites }, (_, index) => index + 1).map(value => <option value={String(value)} key={value}>{value} Fail</option>)}
-                      </select>
-                    </label>
-                  </div>
-                </div>
-              </div>}
-
-              <div className="factoryActionBar">
-                <button type="button" className="factoryStartButton" onClick={() => void executeBatch()} disabled={!batchReadiness.ready || !policyValid}>▶ {text.start}</button>
-                <div className={`factoryBatchStatus state-${batchStatusState}`} role="status" aria-label={text.batchStatus}>
-                  <small>{text.batchStatus}</small>
-                  <b>{batchStatusLabel}</b>
-                </div>
-                <button type="button" className="factoryAbortButton" onClick={() => void abortBatch()} disabled={!serverBatchRunning || serverBatchState === "stopping" || batchAborting}>■ {text.abort}</button>
-              </div>
-            </OperatorPanel>
+            <ProgrammingJobPanel
+    mode="production"
+    title={text.programmingJob}
+    collapsed={programmingJobCollapsed}
+    onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
+    expandLabel={text.showSelection}
+    collapseLabel={text.hideSelection}
+    apiBase={apiBase}
+    targetDevice={targetDevice}
+    onTargetChange={setTargetDevice}
+    targetDisabled={batchRunning}
+    targetLabel={text.targetIc}
+    imageLabel={text.image}
+    image={{
+      name: imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? "Mock Synthetic Image" : "Select programming image (.bin)…"),
+      title: imageAsset?.name,
+      source: imageAsset ? "user" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none",
+      hint: text.imageHint,
+      browseLabel: text.browse,
+      browseDisabled: batchRunning,
+      inputDisabled: batchRunning,
+      inputAriaLabel: "Production Programming Image file",
+      onFileChange: (file, event) => {
+        if (file && file.size > MAX_IMAGE_BYTES) {
+          setOperatorWarning(text.imageTooLarge);
+          setImageAsset(null);
+          event.currentTarget.value = "";
+          return;
+        }
+        setImageAsset(file);
+        if (file) appendLog(`[IMG] SELECTED · ${file.name} · ${file.size} bytes`);
+      },
+    }}
+    operationsLabel={text.operations}
+    operations={operationOrder.map(operation => ({
+      key: operation,
+      code: operationCodes[operation],
+      label: t(`operation.${operation}`),
+      checked: selectedOperations.includes(operation),
+      disabled: batchRunning,
+      onChange: () => toggleOperation(operation),
+    }))}
+    policyLabel={text.batchPolicy}
+    policy={{
+      repeatLabel: text.repeat,
+      repeatValue: repeatCount,
+      repeatDisabled: batchRunning,
+      repeatAriaLabel: "Repeat Count",
+      onRepeatChange: setRepeatCount,
+      retryLabel: text.retry,
+      retryValue: siteRetryLimit,
+      retryDisabled: batchRunning,
+      retryAriaLabel: "Site Retry Limit",
+      onRetryChange: setSiteRetryLimit,
+      stopLabel: text.stopPolicy,
+      stopValue: failedSiteThreshold,
+      stopDisabled: batchRunning || !batchCounts.sites,
+      stopAriaLabel: "Stop Policy",
+      stopOptions: [
+        { value: "", label: text.never },
+        ...Array.from({ length: batchCounts.sites }, (_, index) => index + 1).map(value => ({ value: String(value), label: `${value} Fail` })),
+      ],
+      onStopChange: setFailedSiteThreshold,
+    }}
+    startLabel={text.start}
+    startDisabled={!batchReadiness.ready || !policyValid}
+    onStart={executeBatch}
+    statusLabel={text.batchStatus}
+    statusValue={batchStatusLabel}
+    statusClassName={`state-${batchStatusState}`}
+    abortLabel={text.abort}
+    abortDisabled={!serverBatchRunning || serverBatchState === "stopping" || batchAborting}
+    onAbort={abortBatch}
+  />
 
             {operatorWarning && <div className="factoryWarning" role="alert"><span>{operatorWarning}</span><button type="button" onClick={() => setOperatorWarning(null)}>×</button></div>}
 

@@ -1,4 +1,5 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
+import { programmingJob, programmingJobField } from "./programming-job-test-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -75,12 +76,12 @@ async function installMockProvider(page: Page) {
   });
 }
 
-async function rowMetrics(page: Page, selector: string, index: number) {
-  return page.locator(selector).nth(index).evaluate(row => {
-    const children = Array.from(row.children);
+async function rowMetrics(row: Locator) {
+  return row.evaluate(element => {
+    const children = Array.from(element.children);
     const label = children[0] as HTMLElement;
     const control = children[1] as HTMLElement;
-    const rowBox = row.getBoundingClientRect();
+    const rowBox = element.getBoundingClientRect();
     const labelBox = label.getBoundingClientRect();
     const controlBox = control.getBoundingClientRect();
     const style = getComputedStyle(label);
@@ -94,27 +95,35 @@ async function rowMetrics(page: Page, selector: string, index: number) {
   });
 }
 
-test("Engineering labels sit close to controls and field groups stay near section edges", async ({ page }) => {
+function expectRightAlignedRail(metric: Awaited<ReturnType<typeof rowMetrics>>, minOffset: number, maxOffset: number) {
+  expect(metric.gap).toBeGreaterThanOrEqual(6);
+  expect(metric.gap).toBeLessThanOrEqual(10);
+  expect(metric.controlOffset).toBeGreaterThanOrEqual(minOffset);
+  expect(metric.controlOffset).toBeLessThanOrEqual(maxOffset);
+  expect(metric.textAlign).toBe("right");
+  expect(metric.justifySelf).toBe("end");
+}
+
+test("Engineering targeting keeps its compact rail while Programming Job keeps the shared canonical rail", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await installMockProvider(page);
   await page.goto("/engineering");
   await page.locator(".engineeringWorkspace nav button").nth(2).click();
   await expect(page.getByLabel("Engineering PPU", { exact: true })).toBeVisible();
 
-  const facility = await rowMetrics(page, ".targetingCard .workflowField", 0);
-  const ppu = await rowMetrics(page, ".targetingCard .workflowField", 1);
-  const target = await rowMetrics(page, ".programmingJobBody > .jobRow", 0);
-  const image = await rowMetrics(page, ".programmingJobBody > .jobRow", 1);
-  const operations = await rowMetrics(page, ".programmingJobBody > .jobRow", 2);
-  const policy = await rowMetrics(page, ".programmingJobBody > .jobRow", 3);
+  const facility = await rowMetrics(page.locator(".targetingCard .workflowField").nth(0));
+  const ppu = await rowMetrics(page.locator(".targetingCard .workflowField").nth(1));
+  const job = programmingJob(page, "engineering");
+  const target = await rowMetrics(programmingJobField(job, "target"));
+  const image = await rowMetrics(programmingJobField(job, "image"));
+  const operations = await rowMetrics(programmingJobField(job, "operations"));
+  const policy = await rowMetrics(programmingJobField(job, "policy"));
 
-  for (const metric of [facility, ppu, target, image, operations, policy]) {
-    expect(metric.gap).toBeGreaterThanOrEqual(6);
-    expect(metric.gap).toBeLessThanOrEqual(10);
-    expect(metric.controlOffset).toBeGreaterThanOrEqual(118);
-    expect(metric.controlOffset).toBeLessThanOrEqual(122);
-    expect(metric.textAlign).toBe("right");
-    expect(metric.justifySelf).toBe("end");
+  for (const metric of [facility, ppu]) {
+    expectRightAlignedRail(metric, 118, 122);
+  }
+  for (const metric of [target, image, operations, policy]) {
+    expectRightAlignedRail(metric, 134, 138);
   }
 
   expect(Math.abs(target.controlX - operations.controlX)).toBeLessThanOrEqual(2);

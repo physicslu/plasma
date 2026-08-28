@@ -1,5 +1,12 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import {
+  programmingJob as sharedProgrammingJob,
+  programmingJobAction,
+  programmingJobField,
+  programmingJobOperation,
+  programmingJobStatusValue,
+} from "./programming-job-test-helpers";
+import {
   chooseTestTarget,
   commitProductionSites,
   factoryConsoleHeading,
@@ -114,10 +121,10 @@ async function chooseFileFromButton(page: Page, buttonName: string, expectedFile
 }
 
 async function expectEngineeringV2Geometry(page: Page) {
-  const toolbar = page.locator(".engineeringProgrammingV2 .programmingBatchToolbar");
-  const image = toolbar.locator(".imageField");
-  const operations = toolbar.locator(".programmingBatchOperations");
-  const actions = toolbar.locator(".programmingActions");
+  const job = sharedProgrammingJob(page, "engineering");
+  const image = programmingJobField(job, "image");
+  const operations = programmingJobField(job, "operations");
+  const actions = job.locator('[data-programming-job-actions="engineering"]');
   const imageBox = await image.boundingBox();
   const operationBox = await operations.boundingBox();
   const actionBox = await actions.boundingBox();
@@ -126,7 +133,7 @@ async function expectEngineeringV2Geometry(page: Page) {
   expect(actionBox).not.toBeNull();
   expect(imageBox!.y + imageBox!.height).toBeLessThanOrEqual(operationBox!.y);
   expect(operationBox!.y + operationBox!.height).toBeLessThanOrEqual(actionBox!.y);
-  await expect(toolbar.locator(".programmingFileName")).toHaveCSS("font-size", "11px");
+  await expect(image.locator("[data-image-source]")).toHaveCSS("font-size", "9px");
 }
 
 test("Pmod Mock readiness uses Synthetic Image when no file is selected", async ({ page }) => {
@@ -136,9 +143,9 @@ test("Pmod Mock readiness uses Synthetic Image when no file is selected", async 
   await commitProductionSites(page, facilityId, ppuId, [1]);
   await chooseTestTarget(page);
   const job = programmingJob(page);
-  const readiness = job.locator(".factoryBatchStatus b");
-  const execute = job.locator(".factoryStartButton");
-  const fileName = job.locator(".factoryImageControl span");
+  const readiness = programmingJobStatusValue(job);
+  const execute = programmingJobAction(job, "start");
+  const fileName = programmingJobField(job, "image").locator("[data-image-source]");
   await expect(readiness).toHaveText("NO OP");
   await expect(execute).toBeDisabled();
   expect(api.jobRequests).toBe(0);
@@ -163,29 +170,26 @@ test("Emode Mock uses Synthetic Image and target-owned Main Flash READ", async (
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
-  const toolbar = page.locator(".programmingBatchToolbar");
-  const readiness = toolbar.getByRole("status", { name: "Batch readiness" });
-  const execute = toolbar.locator(".executeBatch");
-  const fileName = toolbar.locator(".programmingFileName");
-  await expect(readiness).toContainText("NO OP");
+  const job = sharedProgrammingJob(page, "engineering");
+  const readiness = programmingJobStatusValue(job);
+  const execute = programmingJobAction(job, "start");
+  const fileName = programmingJobField(job, "image").locator("[data-image-source]");
+  await expect(readiness).toHaveText("NO OP");
   await expect(execute).toBeDisabled();
-  const operations = toolbar.locator(".programmingBatchOperations input");
-  await operations.nth(3).check();
-  await expect(readiness).toContainText("BATCH READY");
+  const read = programmingJobOperation(job, "read");
+  await read.check();
+  await expect(readiness).toHaveText("BATCH READY");
   await expect(execute).toBeEnabled();
-  await expect(page.locator(".engineeringReadRow")).toBeHidden();
-  await expect(page.getByLabel("Engineering READ offset")).toBeHidden();
-  await expect(page.getByLabel("Engineering READ length")).toBeHidden();
-  await operations.nth(3).uncheck();
-  await operations.nth(1).check();
+  await read.uncheck();
+  await programmingJobOperation(job, "program").check();
   await expect(fileName).toHaveText("Mock Synthetic Image");
   await expect(fileName).toHaveAttribute("data-image-source", "mock_synthetic");
-  await expect(readiness).toContainText("BATCH READY");
+  await expect(readiness).toHaveText("BATCH READY");
   await expect(execute).toBeEnabled();
   await chooseFileFromButton(page, "Browse...", "emode-test.bin");
   await expect(fileName).toHaveText("emode-test.bin");
   await expect(fileName).toHaveAttribute("data-image-source", "user");
-  await expect(readiness).toContainText("BATCH READY");
+  await expect(readiness).toHaveText("BATCH READY");
   await expect(execute).toBeEnabled();
   await expectEngineeringV2Geometry(page);
   expect(api.jobRequests).toBe(0);
@@ -197,11 +201,11 @@ test("non-Mock providers remain fail-closed without a Programming Image", async 
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
-  const emodeToolbar = page.locator(".programmingBatchToolbar");
-  await emodeToolbar.locator(".programmingBatchOperations input").nth(1).check();
-  await expect(emodeToolbar.locator(".programmingFileName")).toHaveAttribute("data-image-source", "none");
-  await expect(emodeToolbar.getByRole("status", { name: "Batch readiness" })).toContainText("IMAGE REQUIRED");
-  await expect(emodeToolbar.locator(".executeBatch")).toBeDisabled();
+  const emodeJob = sharedProgrammingJob(page, "engineering");
+  await programmingJobOperation(emodeJob, "program").check();
+  await expect(programmingJobField(emodeJob, "image").locator("[data-image-source]")).toHaveAttribute("data-image-source", "none");
+  await expect(programmingJobStatusValue(emodeJob)).toHaveText("IMAGE REQUIRED");
+  await expect(programmingJobAction(emodeJob, "start")).toBeDisabled();
   await page.goto("/fleet");
   await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
   await commitProductionSites(page, facilityId, ppuId, [1]);
@@ -209,8 +213,8 @@ test("non-Mock providers remain fail-closed without a Programming Image", async 
   const pmodJob = programmingJob(page);
   const program = productionOperation(page, "P");
   if (!(await program.isChecked())) await program.check();
-  await expect(pmodJob.locator(".factoryImageControl span")).toHaveText("Select programming image (.bin)…");
-  await expect(pmodJob.locator(".factoryBatchStatus b")).toHaveText("IMAGE REQUIRED");
-  await expect(pmodJob.locator(".factoryStartButton")).toBeDisabled();
+  await expect(programmingJobField(pmodJob, "image").locator("[data-image-source]")).toHaveText("Select programming image (.bin)…");
+  await expect(programmingJobStatusValue(pmodJob)).toHaveText("IMAGE REQUIRED");
+  await expect(programmingJobAction(pmodJob, "start")).toBeDisabled();
   expect(api.jobRequests).toBe(0);
 });

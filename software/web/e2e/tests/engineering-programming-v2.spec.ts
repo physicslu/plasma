@@ -1,4 +1,11 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  expectProgrammingJobContract,
+  programmingJob,
+  programmingJobAction,
+  programmingJobOperation,
+  programmingJobPolicy,
+} from "./programming-job-test-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = "mock-facility-01-ppu-01";
@@ -268,14 +275,15 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   await expect(page.locator(".engineeringSidebar")).toBeVisible();
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
+  const job = programmingJob(page, "engineering");
+  await expectProgrammingJobContract(job);
   await expect(page.getByRole("heading", { name: "SINGLE PPU PROGRAMMING" })).toBeVisible();
   await expect(page.locator(".targetingCard > header")).toContainText("SYSTEM SETUP & TARGETING");
-  await expect(page.locator(".programmingJobCard > header")).toContainText("PROGRAMMING JOB");
   await expect(page.getByText("LIVE PROGRESS MONITOR", { exact: true })).toHaveCount(0);
   await expect(page.getByText("TARGET SITES", { exact: true })).toHaveCount(0);
   await expect(page.getByText("LIVE SITE STATUS", { exact: true })).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .recentEvents")).toBeHidden();
-  await expect(page.getByLabel("Site Retry Limit")).toHaveValue("3");
+  await expect(programmingJobPolicy(job, "retry")).toHaveValue("3");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
   await expect(page.getByLabel("Batch select SITE 2")).toBeChecked();
@@ -283,13 +291,13 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   const layout = await page.locator(".engineeringProgrammingV2").evaluate(root => {
     const box = (selector: string) => root.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
     const setup = box(".targetingCard");
-    const job = box(".programmingJobCard");
+    const jobPanel = box(".programmingJobPanel");
     const status = box(".liveSiteStatus");
     return {
       setupTop: setup.top,
       setupBottom: setup.bottom,
-      jobTop: job.top,
-      jobBottom: job.bottom,
+      jobTop: jobPanel.top,
+      jobBottom: jobPanel.bottom,
       statusTop: status.top,
     };
   });
@@ -303,12 +311,12 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   await page.getByRole("button", { name: "Expand System Setup" }).click();
   await expect(page.getByLabel("Engineering Facility")).toBeVisible();
 
-  await page.getByRole("button", { name: "Collapse Programming Job" }).click();
+  await page.getByRole("button", { name: "Collapse Engineering Programming Job" }).click();
   await expect(page.getByLabel("Target IC")).toBeHidden();
-  await expect(page.getByRole("button", { name: /START PROGRAMMING/ })).toBeVisible();
-  await expect(page.getByRole("status", { name: "Batch readiness" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /ABORT/ })).toBeVisible();
-  await page.getByRole("button", { name: "Expand Programming Job" }).click();
+  await expect(programmingJobAction(job, "start")).toBeVisible();
+  await expect(programmingJobAction(job, "status")).toBeVisible();
+  await expect(programmingJobAction(job, "abort")).toBeVisible();
+  await page.getByRole("button", { name: "Expand Engineering Programming Job" }).click();
   await expect(page.getByLabel("Target IC")).toBeVisible();
 
   const sidebarWidth = await page.locator(".engineeringSidebar").evaluate(element => element.getBoundingClientRect().width);
@@ -317,7 +325,7 @@ test("Engineering Programming renders the approved three-row workflow and binds 
   expect(collapsedWidth).toBeLessThan(sidebarWidth);
   await page.getByRole("button", { name: "Expand Engineering menu" }).click();
 
-  const target = page.getByLabel("Target IC");
+  const target = job.getByLabel("Target IC");
   await target.fill("STM32F103C8T6");
   await expect(page.getByRole("listbox", { name: "Target IC search results" })).toBeVisible();
   await page.getByRole("option", { name: /STM32F103C8T6/ }).click();
@@ -344,22 +352,24 @@ test("unselected Sites stay visible and START PROGRAMMING snapshots only checked
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
+  const job = programmingJob(page, "engineering");
+  await expectProgrammingJobContract(job);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await page.getByLabel("Batch select SITE 2").uncheck();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Batch select SITE 1")).toBeChecked();
   await expect(page.getByLabel("Batch select SITE 2")).not.toBeChecked();
 
-  await page.getByLabel("Engineering batch erase").check();
-  await page.getByLabel("Repeat Count").fill("2");
+  await programmingJobOperation(job, "erase").check();
+  await programmingJobPolicy(job, "repeat").fill("2");
   const summary = page.getByRole("region", { name: "Engineering Batch Summary" });
   await expect(summary.getByText("BATCH SUMMARY", { exact: true })).toBeVisible();
   await expect(summary.locator('[data-kpi="sites"] b')).toHaveText("1");
   await expect(summary.locator('[data-kpi="total-ic"] b')).toHaveText("2");
   await expect(summary.locator('[data-kpi="yield"] b')).toHaveText("—");
   await expect(summary.locator('[data-kpi="batch-time"] b')).toHaveText("00:00:00");
-  await expect(page.getByRole("button", { name: "START PROGRAMMING" })).toBeEnabled();
-  await page.getByRole("button", { name: "START PROGRAMMING" }).click();
+  await expect(programmingJobAction(job, "start")).toBeEnabled();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => batchSubmissions.length).toBe(1);
   expect(directSubmissions).toHaveLength(0);

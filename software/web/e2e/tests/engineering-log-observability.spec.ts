@@ -1,4 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  programmingJob,
+  programmingJobAction,
+  programmingJobOperation,
+} from "./programming-job-test-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = "mock-facility-01-ppu-01";
@@ -231,14 +236,15 @@ test("Engineering log records server Batch Programming Image submission without 
   const api = await installApi(page, true);
   await openProgramming(page);
   const log = page.getByLabel("Engineering job log");
+  const job = programmingJob(page, "engineering");
 
   await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "observable.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(1024 * 1024, 0x5a),
   });
-  await page.getByLabel("Engineering batch program").check();
-  await page.locator(".executeBatch").click();
+  await programmingJobOperation(job, "program").check();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => api.batchSubmissions).toBe(1);
   expect(api.directJobCalls).toBe(0);
@@ -260,19 +266,20 @@ test("Engineering log records server Batch Programming Image submission without 
 test("server-owned Engineering Batch exposes whole-Batch ABORT and disables per-Site cancellation", async ({ page }) => {
   const api = await installApi(page, false);
   await openProgramming(page);
-  await page.getByLabel("Engineering batch erase").check();
-  await page.locator(".executeBatch").click();
+  const job = programmingJob(page, "engineering");
+  await programmingJobOperation(job, "erase").check();
+  await programmingJobAction(job, "start").click();
 
   await expect.poll(() => api.batchSubmissions).toBe(1);
-  await expect(page.getByRole("button", { name: "ABORT" })).toBeEnabled();
+  await expect(programmingJobAction(job, "abort")).toBeEnabled();
   await expect(page.getByLabel("Cancel SITE 1")).toBeDisabled();
   await expect(page.getByLabel("Cancel SITE 2")).toBeDisabled();
   expect(api.directJobCalls).toBe(0);
 
-  await page.getByRole("button", { name: "ABORT" }).click();
+  await programmingJobAction(job, "abort").click();
   await expect.poll(() => api.batchCancels).toBe(1);
   const log = page.getByLabel("Engineering job log");
   await expect(log).toContainText("[USR] [BATCH] ABORT REQUESTED · engineering-log-batch");
   await expect(log).toContainText("[BAT] [BATCH] CANCELLED · engineering-log-batch");
-  await expect(page.locator(".executeBatch")).toBeEnabled();
+  await expect(programmingJobAction(job, "start")).toBeEnabled();
 });

@@ -3,61 +3,79 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const sharedComponent = fs.readFileSync(new URL("../app/operator-ui/programming-job-panel.tsx", import.meta.url), "utf8");
 const sharedCss = fs.readFileSync(new URL("../app/operator-ui/programming-job-controls.css", import.meta.url), "utf8");
 const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
-const pmodCss = fs.readFileSync(new URL("../app/fleet/factory-console-v2.css", import.meta.url), "utf8");
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
-const emodeBaseCss = fs.readFileSync(new URL("../app/engineering/programming-workspace-base.css", import.meta.url), "utf8");
-const emodeCss = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.css", import.meta.url), "utf8");
+const sharedDriver = fs.readFileSync(new URL("../e2e/tests/programming-job-test-helpers.ts", import.meta.url), "utf8");
+const productionRuntime = fs.readFileSync(new URL("../e2e/tests/production-multi-ppu-runtime.spec.ts", import.meta.url), "utf8");
+const engineeringRuntime = fs.readFileSync(new URL("../e2e/tests/engineering-programming-asset-cache-runtime.spec.ts", import.meta.url), "utf8");
 
-test("Programming Job control presentation is loaded as one shared operator-ui contract", () => {
+test("PMode and EMode render the same ProgrammingJobPanel component", () => {
   assert.match(layout, /operator-ui\/programming-job-controls\.css/);
-  assert.match(sharedCss, /PMode is the approved visual baseline/);
-  assert.match(sharedCss, /\.factoryOperationChecks/);
-  assert.match(sharedCss, /\.engineeringProgrammingV2 \.programmingBatchOperations \.operationChecks/);
-  assert.match(sharedCss, /\.factoryActionBar \.factoryStartButton/);
-  assert.match(sharedCss, /\.engineeringProgrammingV2 \.programmingActions \.startProgramming/);
+  assert.match(pmod, /import \{ ProgrammingJobPanel \} from "\.\.\/operator-ui\/programming-job-panel"/);
+  assert.match(emode, /import \{ ProgrammingJobPanel \} from "\.\.\/operator-ui\/programming-job-panel"/);
+  assert.equal((pmod.match(/<ProgrammingJobPanel\b/g) ?? []).length, 1);
+  assert.equal((emode.match(/<ProgrammingJobPanel\b/g) ?? []).length, 1);
+  assert.match(pmod, /<ProgrammingJobPanel[\s\S]*mode="production"/);
+  assert.match(emode, /<ProgrammingJobPanel[\s\S]*mode="engineering"/);
 });
 
-test("shared operation selectors preserve the approved PMode tile presentation", () => {
-  assert.match(sharedCss, /min-height:\s*34px/);
-  assert.match(sharedCss, /padding:\s*0 9px/);
-  assert.match(sharedCss, /border:\s*1px solid #ced9e2/);
-  assert.match(sharedCss, /border-radius:\s*6px/);
-  assert.match(sharedCss, /background:\s*#f8fbfd/);
-  assert.match(sharedCss, /gap:\s*4px/);
-  assert.match(sharedCss, /font-size:\s*9px/);
-  assert.match(sharedCss, /font-weight:\s*700/);
-  assert.match(sharedCss, /accent-color:\s*#2563eb/);
-  assert.match(sharedCss, /@media \(max-width:\s*760px\)[\s\S]*flex-wrap:\s*wrap/);
+test("shared component owns all four Programming Job fields", () => {
+  for (const field of ["target", "image", "operations", "policy"]) {
+    assert.match(sharedComponent, new RegExp(`data-programming-job-field="${field}"`));
+  }
+  assert.match(sharedComponent, /className="programmingJobImageControl"/);
+  assert.match(sharedComponent, /className="programmingJobOperationChecks"/);
+  assert.match(sharedComponent, /className="programmingJobPolicyControls"/);
 });
 
-test("shared START and ABORT actions preserve the approved PMode presentation", () => {
-  assert.match(sharedCss, /min-height:\s*38px/);
-  assert.match(sharedCss, /font-size:\s*10px/);
-  assert.match(sharedCss, /font-weight:\s*850/);
+test("shared component exposes semantic operation, policy and action test hooks", () => {
+  assert.match(sharedComponent, /data-programming-job-operation=\{operation\.key\}/);
+  for (const policy of ["repeat", "retry", "stop"]) {
+    assert.match(sharedComponent, new RegExp(`data-programming-job-policy="${policy}"`));
+  }
+  for (const action of ["start", "status", "abort"]) {
+    assert.match(sharedComponent, new RegExp(`data-programming-job-action="${action}"`));
+  }
+});
+
+test("PMode and EMode runtime tests consume one Programming Job test driver", () => {
+  assert.match(sharedDriver, /expectedFields:[^\n]*\["target", "image", "operations", "policy"\]/);
+  assert.match(sharedDriver, /expectedActions:[^\n]*\["start", "status", "abort"\]/);
+  assert.match(sharedDriver, /expectedOperations:[^\n]*\["erase", "program", "verify", "read"\]/);
+  assert.match(sharedDriver, /expectedPolicies:[^\n]*\["repeat", "retry", "stop"\]/);
+  assert.match(sharedDriver, /export async function expectProgrammingJobContract/);
+  assert.match(sharedDriver, /export function programmingJobOperation/);
+  assert.match(sharedDriver, /export function programmingJobAction/);
+
+  assert.match(productionRuntime, /from "\.\/programming-job-test-helpers"/);
+  assert.match(productionRuntime, /programmingJob\(page, "production"\)/);
+  assert.match(engineeringRuntime, /from "\.\/programming-job-test-helpers"/);
+  assert.match(engineeringRuntime, /programmingJob\(page, "engineering"\)/);
+});
+
+test("shared action bar structurally owns START then STATUS then ABORT", () => {
+  const start = sharedComponent.indexOf('data-programming-job-action="start"');
+  const status = sharedComponent.indexOf('data-programming-job-action="status"');
+  const abort = sharedComponent.indexOf('data-programming-job-action="abort"');
+  assert.ok(start >= 0, "shared START action is required");
+  assert.ok(status > start, "shared STATUS must follow START");
+  assert.ok(abort > status, "shared ABORT must follow STATUS");
+  assert.match(sharedComponent, /className="programmingJobActionBar"/);
+
+  assert.doesNotMatch(pmod, /className="factoryActionBar"/);
+  assert.doesNotMatch(pmod, /className="factoryBatchStatus/);
+  assert.doesNotMatch(emode, /className=`?\{?`?batchReadiness/);
+  assert.doesNotMatch(emode, /className="programmingActions"/);
+});
+
+test("shared presentation preserves the approved PMode controls", () => {
+  assert.match(sharedCss, /\.programmingJobOperationChecks label\s*\{[\s\S]*height:\s*34px/);
+  assert.match(sharedCss, /\.programmingJobOperationChecks input\s*\{[\s\S]*width:\s*14px/);
+  assert.match(sharedCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 160px minmax\(0, 1fr\)/);
+  assert.match(sharedCss, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*min-height:\s*38px/);
   assert.match(sharedCss, /linear-gradient\(180deg, #2f80d4, #1f65aa\)/);
   assert.match(sharedCss, /linear-gradient\(180deg, #df5a5a, #bc3333\)/);
-  assert.match(sharedCss, /opacity:\s*\.42/);
-});
-
-test("PMode and EMode keep behavior markup while local CSS cannot own equivalent control visuals", () => {
-  assert.match(pmod, /className="factoryOperationChecks"/);
-  assert.match(pmod, /className="factoryStartButton"/);
-  assert.match(pmod, /className="factoryAbortButton"/);
-  assert.match(emode, /className="operationChecks"/);
-  assert.match(emode, /className="startProgramming executeBatch"/);
-  assert.match(emode, /className="abortProgramming cancelBatch"/);
-
-  assert.doesNotMatch(pmodCss, /\.factoryOperationChecks label\s*\{/);
-  assert.doesNotMatch(pmodCss, /\.factoryStartButton\s*\{/);
-  assert.doesNotMatch(pmodCss, /\.factoryAbortButton\s*\{/);
-  assert.doesNotMatch(emodeBaseCss, /\.operationChecks\s*\{/);
-  assert.doesNotMatch(emodeBaseCss, /\.operationChecks label\s*\{/);
-  assert.doesNotMatch(emodeBaseCss, /\.operationChecks input\s*\{/);
-  assert.doesNotMatch(emodeBaseCss, /\.programmingActions button\s*\{/);
-  assert.doesNotMatch(emodeBaseCss, /\.startProgramming\s*\{/);
-  assert.doesNotMatch(emodeBaseCss, /\.abortProgramming\s*\{/);
-  assert.doesNotMatch(emodeCss, /\.programmingBatchOperations \.operationChecks/);
-  assert.doesNotMatch(emodeCss, /\.programmingActions button\s*\{/);
+  assert.match(sharedCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*38px/);
 });

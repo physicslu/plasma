@@ -1,13 +1,11 @@
 /* Engineering Programming label/control alignment.
  *
- * This layer owns alignment only. Typography remains in
- * engineering-readability.css and the approved desktop structure remains in
- * engineering-workspace-refresh.css / engineering-density.css.
+ * This layer owns Engineering-targeting alignment only. Typography remains in
+ * engineering-readability.css. Shared Programming Job internals are owned by
+ * operator-ui/programming-job-controls.css and must not be overridden here.
  *
  * Desktop/tablet rule: keep a compact 112 px label rail, right-align the label,
- * and keep the visual hand-off to the control at 8 px. The shorter rail pulls
- * the entire field group 16 px toward the left edge of each section column
- * without adding rows or changing the action layout.
+ * and keep the visual hand-off to the control at 8 px.
  */
 @container engineering-programming (min-width: 761px) {
   html .engineeringProgrammingV2 .targetingCard .workflowField {
@@ -20,59 +18,12 @@
     text-align: right;
     white-space: nowrap;
   }
-
-  html .engineeringProgrammingV2 .programmingJobBody > .jobRow {
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: 8px;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody > .jobRow > strong {
-    justify-self: end;
-    text-align: right;
-    white-space: nowrap;
-  }
 }
 
-/* The desktop density layer has higher-specificity grid ownership for these
- * two rows, so repeat the same 112 px / 8 px alignment contract here after it
- * in the cascade. */
-@container engineering-programming (min-width: 981px) {
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .programmingBatchOperations {
-    grid-template-columns: 112px minmax(0, 1fr);
-    gap: 8px;
-  }
-
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar > .engineeringPolicyRow {
-    grid-template-columns: 112px max-content max-content minmax(118px, max-content);
-    gap: 8px;
-  }
-}
-
-/* A collapsed Programming Job remains an operational control surface: only
- * Batch readiness and the two Batch actions stay visible. */
-.engineeringProgrammingV2 .programmingJobBody.is-collapsed > .jobRow,
-.engineeringProgrammingV2 .programmingJobBody.is-collapsed > .warning,
-.engineeringProgrammingV2 .programmingJobBody.is-collapsed > .engineeringOperationWarning {
-  display: none !important;
-}
-
-.engineeringProgrammingV2 .programmingJobBody.is-collapsed {
-  min-height: 0;
-  padding-block: 8px;
-}
-
-@container engineering-programming (min-width: 981px) {
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar.is-collapsed > .batchReadiness,
-  html .engineeringProgrammingV2 .programmingJobBody.programmingBatchToolbar.is-collapsed > .programmingActions {
-    grid-row: 1;
-  }
-}
-
-/* Once the workspace stacks vertically, right-aligned labels no longer help
- * scanning. Restore the natural left alignment for the mobile layout. */
+/* Once the workspace stacks vertically, right-aligned targeting labels no
+ * longer help scanning. Restore their natural left alignment. */
 @media (max-width: 760px) {
-  .engineeringProgrammingV2 .targetingCard .workflowField > span,
-  .engineeringProgrammingV2 .programmingJobBody > .jobRow > strong {
+  .engineeringProgrammingV2 .targetingCard .workflowField > span {
     justify-self: start;
     text-align: left;
   }

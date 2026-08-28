@@ -1,4 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import {
+  programmingJob,
+  programmingJobAction,
+  programmingJobOperation,
+} from "./programming-job-test-helpers";
 
 const siteCounts = [2, 4, 6, 8] as const;
 
@@ -316,7 +321,6 @@ test("Engineering EPVR job is posted to the selected Facility and PPU", async ({
   await page.getByLabel("Engineering Facility", { exact: true }).selectOption("mock-facility-02");
   await page.getByLabel("Engineering PPU", { exact: true }).selectOption("mock-facility-02-ppu-03");
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(6);
-
   await page.getByLabel("SITE 6 擦除").click();
   await expect.poll(() => api.directSubmissions.length).toBe(1);
   expect(api.directSubmissions[0].url).toBe("/api/engineering/targets/mock-facility-02/mock-facility-02-ppu-03/api/jobs");
@@ -328,16 +332,17 @@ test("Engineering EPVR job is posted to the selected Facility and PPU", async ({
 test("Server Batch Programming Image is self-contained per Batch and reconnect advances Engineering session provenance", async ({ page }) => {
   const api = await installBaseEngineeringApi(page);
   await openProgramming(page);
+  const job = programmingJob(page, "engineering");
   await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "A.bin",
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(1024 * 1024, 0x5a),
   });
-  await page.getByLabel("Engineering batch program").check();
+  await programmingJobOperation(job, "program").check();
 
-  await page.locator(".executeBatch").click();
+  await programmingJobAction(job, "start").click();
   await expect.poll(() => api.batchBodies.length).toBe(1);
-  await expect.poll(() => page.locator(".executeBatch").isEnabled()).toBe(true);
+  await expect.poll(() => programmingJobAction(job, "start").isEnabled()).toBe(true);
   expect(api.directSubmissions).toHaveLength(0);
   expect(api.legacyAssetCalls).toBe(0);
   const first = api.batchBodies[0];
@@ -348,9 +353,9 @@ test("Server Batch Programming Image is self-contained per Batch and reconnect a
   expect(typeof firstAsset.asset_sha256).toBe("string");
   expect(typeof firstAsset.asset_base64).toBe("string");
 
-  await page.locator(".executeBatch").click();
+  await programmingJobAction(job, "start").click();
   await expect.poll(() => api.batchBodies.length).toBe(2);
-  await expect.poll(() => page.locator(".executeBatch").isEnabled()).toBe(true);
+  await expect.poll(() => programmingJobAction(job, "start").isEnabled()).toBe(true);
   const secondAsset = api.batchBodies[1].asset as Record<string, unknown>;
   expect(secondAsset.asset_sha256).toBe(firstAsset.asset_sha256);
   expect(typeof secondAsset.asset_base64).toBe("string");
@@ -360,9 +365,9 @@ test("Server Batch Programming Image is self-contained per Batch and reconnect a
     mimeType: "application/octet-stream",
     buffer: Buffer.alloc(1024 * 1024, 0xa5),
   });
-  await page.locator(".executeBatch").click();
+  await programmingJobAction(job, "start").click();
   await expect.poll(() => api.batchBodies.length).toBe(3);
-  await expect.poll(() => page.locator(".executeBatch").isEnabled()).toBe(true);
+  await expect.poll(() => programmingJobAction(job, "start").isEnabled()).toBe(true);
   const thirdAsset = api.batchBodies[2].asset as Record<string, unknown>;
   expect(thirdAsset.asset_sha256).not.toBe(firstAsset.asset_sha256);
 
@@ -371,7 +376,7 @@ test("Server Batch Programming Image is self-contained per Batch and reconnect a
   await expect.poll(() => api.sessionRequests).toBeGreaterThan(sessionsBeforeReconnect);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
-  await page.locator(".executeBatch").click();
+  await programmingJobAction(job, "start").click();
   await expect.poll(() => api.batchBodies.length).toBe(4);
   expect(api.batchBodies[3].session_id).toBe("00000000000000000000000000000002");
   expect(api.legacyAssetCalls).toBe(0);

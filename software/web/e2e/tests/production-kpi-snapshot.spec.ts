@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { commitProductionSites } from "./production-console-helpers";
+import { programmingJobAction } from "./programming-job-test-helpers";
+import { commitProductionSites, productionOperation, programmingJob } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
 const ppuId = `${facilityId}-ppu-01`;
@@ -163,8 +164,8 @@ test("Production KPI cards update from authoritative Batch rounds while a Site i
   await target.fill("STM32F103C8T6");
   await page.getByRole("option", { name: /STM32F103C8T6/ }).click();
   await page.getByLabel("Repeat Count").fill("100");
-  await page.locator(".factoryOperationChecks label").filter({ hasText: /E/ }).getByRole("checkbox").check();
-  await page.getByRole("button", { name: /START PROGRAMMING/ }).click();
+  await productionOperation(page, "E").check();
+  await programmingJobAction(programmingJob(page), "start").click();
 
   await expect(page.locator('[data-kpi="pass"] b')).toHaveText("1");
   await expect(page.locator('[data-kpi="fail"] b')).toHaveText("0");

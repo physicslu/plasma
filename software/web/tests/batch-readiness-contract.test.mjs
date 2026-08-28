@@ -8,11 +8,12 @@ async function read(path) {
   return fs.readFile(new URL(path, root), "utf8");
 }
 
-test("Pmod and Engineering Programming v2 share one batch readiness source of truth", async () => {
+test("PMode and Engineering Programming share one batch readiness source of truth", async () => {
   const readiness = await read("batch-readiness.ts");
   const pmodRoute = await read("fleet/page.tsx");
   const pmod = await read("fleet/factory-console-v2.tsx");
   const emode = await read("engineering/programming-workspace-v2.tsx");
+  const sharedJob = await read("operator-ui/programming-job-panel.tsx");
 
   for (const label of [
     "BATCH READY",
@@ -32,35 +33,37 @@ test("Pmod and Engineering Programming v2 share one batch readiness source of tr
   assert.match(pmodRoute, /factory-console-v2/);
   assert.match(pmod, /evaluateBatchReadiness\(/);
   assert.match(emode, /evaluateBatchReadiness\(/);
-  assert.match(pmod, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
-  assert.match(emode, /disabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
+  assert.match(pmod, /startDisabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
+  assert.match(emode, /startDisabled=\{!batchReadiness\.ready \|\| !policyValid\}/);
+  assert.match(sharedJob, /disabled=\{startDisabled\}/);
 });
 
-test("Production and Engineering share operator programming vocabulary while keeping mode-specific ownership", async () => {
+test("Production and Engineering feed mode behavior into one ProgrammingJobPanel", async () => {
   const pmod = await read("fleet/factory-console-v2.tsx");
   const emode = await read("engineering/programming-workspace-v2.tsx");
   const sharedPanel = await read("operator-ui/operator-panel.tsx");
+  const sharedJob = await read("operator-ui/programming-job-panel.tsx");
 
   assert.match(pmod, /BatchSummary/);
   assert.match(emode, /BatchSummary/);
   assert.doesNotMatch(pmod, /OperatorKpiStrip/);
   assert.doesNotMatch(emode, /OperatorKpiStrip/);
-  assert.match(pmod, /OperatorPanel/);
-  assert.match(pmod, /PROGRAMMING JOB/);
-  assert.match(pmod, /START PROGRAMMING/);
-  assert.match(pmod, /LIVE SITE STATUS/);
-  assert.match(pmod, /ICPickerField/);
-  assert.match(pmod, /Programming Image/);
+  assert.match(pmod, /<ProgrammingJobPanel[\s\S]*mode="production"/);
+  assert.match(emode, /<ProgrammingJobPanel[\s\S]*mode="engineering"/);
+  assert.match(sharedJob, /ICPickerField/);
+  assert.match(sharedJob, /ProgrammingJobImage/);
+  assert.match(sharedJob, /ProgrammingJobPolicy/);
+  assert.match(sharedJob, /data-programming-job-action="start"/);
+  assert.match(sharedJob, /data-programming-job-action="status"/);
+  assert.match(sharedJob, /data-programming-job-action="abort"/);
   assert.doesNotMatch(sharedPanel, /BatchSummary|OperatorKpiStrip|operatorKpiStrip/);
   assert.match(sharedPanel, /operatorPanel/);
 
-  assert.match(emode, /PROGRAMMING JOB/);
-  assert.match(emode, /START PROGRAMMING/);
   assert.match(emode, /Site Retry Limit/);
   assert.doesNotMatch(emode, /BatchTopologySummary/);
 });
 
-test("Emode density owns placement while shared Programming Job controls own centered Batch status", async () => {
+test("Engineering density owns the workspace, not Programming Job internals", async () => {
   const css = await read("engineering/engineering-density.css");
   const v2Css = await read("engineering/programming-workspace-v2.css");
   const refreshCss = await read("engineering/engineering-workspace-refresh.css");
@@ -69,17 +72,13 @@ test("Emode density owns placement while shared Programming Job controls own cen
 
   assert.match(css, /\.engineeringShell\s*\{[\s\S]*padding:\s*0;[\s\S]*gap:\s*0/);
   assert.match(css, /\.engineeringCanvas\.programmingActive\s*\{[\s\S]*padding:\s*10px 12px 18px/);
-  assert.match(css, /\.programmingJobBody\.programmingBatchToolbar\s*\{[\s\S]*grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)[\s\S]*grid-template-areas:\s*none/);
-  assert.match(css, /> \.engineeringPolicyRow\s*\{[\s\S]*grid-column:\s*4\s*\/\s*7;[\s\S]*grid-row:\s*2/);
-  assert.match(css, /> \.engineeringReadRow\s*\{[\s\S]*display:\s*none/);
-  assert.match(css, /> \.programmingActions\s*\{[\s\S]*grid-column:\s*1\s*\/\s*-1;[\s\S]*grid-row:\s*3;[\s\S]*width:\s*100%/);
-  assert.doesNotMatch(css, /> \.batchReadiness\s*\{/);
-  assert.doesNotMatch(css, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s*180px\s*minmax\(0,\s*1fr\)/);
-  assert.doesNotMatch(css, /> \.programmingActions > button/);
+  assert.doesNotMatch(css, /\.programmingJobGrid\b|\.programmingJobField\b|\.programmingJobActionBar\b|\.programmingJobStatus\b/);
+  assert.doesNotMatch(v2Css, /\.programmingJobGrid\b|\.programmingJobField\b|\.programmingJobActionBar\b|\.programmingJobStatus\b/);
+  assert.doesNotMatch(refreshCss, /\.programmingJobGrid\b|\.programmingJobField\b|\.programmingJobActionBar\b|\.programmingJobStatus\b/);
 
-  assert.match(controlsCss, /\.factoryActionBar,[\s\S]*\.engineeringProgrammingV2 \.programmingJobCard \.programmingActions/);
-  assert.match(controlsCss, /grid-template-columns:\s*minmax\(0, 1fr\) 160px minmax\(0, 1fr\)/);
-  assert.match(controlsCss, /\.factoryBatchStatus,[\s\S]*\.engineeringProgrammingV2 \.programmingJobCard \.batchReadiness/);
+  assert.match(controlsCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) 160px minmax\(0, 1fr\)/);
+  assert.match(controlsCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*38px/);
+  assert.doesNotMatch(controlsCss, /position:\s*absolute/);
 
   assert.doesNotMatch(css, /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/);
   assert.match(batchSummaryCss, /\[data-kpi="pass"\][\s\S]*border-left-color:\s*#15803d[\s\S]*background:\s*color-mix/);
@@ -89,5 +88,4 @@ test("Emode density owns placement while shared Programming Job controls own cen
   assert.match(refreshCss, /min-height:\s*calc\(100vh - 64px\)/);
   assert.match(refreshCss, /\.engineeringProgrammingV2 \.productionProgrammingWorkflow\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);
   assert.match(v2Css, /\.engineeringProgrammingV2/);
-  assert.match(v2Css, /\.productionProgrammingWorkflow/);
 });

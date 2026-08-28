@@ -66,6 +66,7 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   const css = await fs.readFile(new URL("../app/fleet/factory-console-v2.css", import.meta.url), "utf8");
   const sharedPanel = await fs.readFile(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
   const sharedPanelCss = await fs.readFile(new URL("../app/operator-ui/operator-panel.css", import.meta.url), "utf8");
+  const sharedJob = await fs.readFile(new URL("../app/operator-ui/programming-job-panel.tsx", import.meta.url), "utf8");
   const batchApi = await fs.readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 
   assert.match(route, /factory-console-v2/);
@@ -112,7 +113,9 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /aria-expanded=\{!selectorCollapsed\}/);
   assert.match(css, /\.productionSiteSelection\.is-collapsed \.operatorPanelBody\s*\{\s*display:\s*none;/s);
 
-  assert.match(source, /ICPickerField/);
+  assert.match(sharedJob, /ICPickerField/);
+  assert.match(source, /<ProgrammingJobPanel[\s\S]*mode="production"/);
+  assert.match(source, /targetDevice=\{targetDevice\}/);
   assert.match(source, /if \(!targetDevice && !syntheticMockImageAvailable\)/);
   assert.match(source, /targetDevice:\s*targetDevice \? \{ vendor: targetDevice\.vendor, identifier: targetDevice\.identifier \} : null/);
   assert.match(source, /allowSyntheticMockImage:\s*syntheticMockImageAvailable/);
@@ -142,8 +145,8 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /label: "YIELD"/);
   assert.match(source, /label: "BATCH TIME"/);
   assert.match(source, /programmingJobCollapsed/);
-  assert.match(source, /Collapse"\} Production Programming Job/);
-  assert.match(source, /!programmingJobCollapsed && <div className="factoryJobGrid">/);
+  assert.match(source, /collapsed=\{programmingJobCollapsed\}/);
+  assert.match(sharedJob, /aria-expanded=\{!collapsed\}/);
 
   assert.match(css, /--site-card-w/);
   assert.match(css, /density-dense/);

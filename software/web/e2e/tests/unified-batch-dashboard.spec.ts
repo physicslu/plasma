@@ -242,7 +242,7 @@ test("Engineering Programming remains the status-first single-PPU workspace", as
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Engineering Batch Summary" })).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .targetingCard")).toBeVisible();
-  await expect(page.locator(".engineeringProgrammingV2 .programmingJobCard")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Engineering Programming Job" })).toBeVisible();
   await expect(page.locator(".engineeringProgrammingV2 .liveSiteStatus")).toBeVisible();
   await expect(page.getByLabel("Engineering Site selection").locator("tbody tr")).toHaveCount(2);
   await expect(page.getByLabel("Select all Engineering batch Sites")).toBeChecked();
