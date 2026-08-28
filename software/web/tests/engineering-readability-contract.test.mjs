@@ -46,7 +46,7 @@ test("Engineering readability layer raises the approved operator font floor with
   );
 });
 
-test("Engineering canonical card headers do not render their legacy text twice", async () => {
+test("Engineering System Setup header hides its legacy raw text without owning shared Programming Job header presentation", async () => {
   const [css, refresh] = await Promise.all([source(readabilityPath), source(refreshPath)]);
 
   assert.equal(
@@ -54,12 +54,13 @@ test("Engineering canonical card headers do not render their legacy text twice",
     false,
     "readability CSS must not revive raw card header text",
   );
-  assert.ok(
-    refresh.includes(".engineeringProgrammingV2 .targetingCard > header,\n.engineeringProgrammingV2 .programmingJobCard > header {\n  font-size: 0;"),
-    "raw SYSTEM SETUP / legacy PROGRAMMING JOB header text must remain hidden while legacy selectors are still present",
-  );
+  assert.match(refresh, /\.engineeringProgrammingV2 \.targetingCard > header,[\s\S]*font-size:\s*0/);
   assert.ok(css.includes(".targetingCard > header::before,"));
-  assert.ok(css.includes(".programmingJobCard > header::before,"));
+  assert.doesNotMatch(
+    css,
+    /\.programmingJob(?:Panel|Grid|Field|ActionBar|Status|OperationChecks|PolicyControls)\b/,
+    "Engineering readability must not own shared Programming Job presentation",
+  );
 });
 
 test("Engineering readability layer is typography-only and loads after layout CSS", async () => {
