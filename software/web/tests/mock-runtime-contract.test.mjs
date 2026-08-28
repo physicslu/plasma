@@ -10,12 +10,17 @@ const sharedSettingsUi = await readFile(new URL("../app/operator-ui/settings-ui.
 const sharedSettingsCss = await readFile(new URL("../app/operator-ui/settings-ui.css", import.meta.url), "utf8");
 const batchSource = await readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 
-test("Mock runtime settings are server-owned and exposed under Engineering", () => {
+test("Mock runtime settings are server-owned and exposed under Engineering Settings", () => {
   assert.match(apiSource, /\/api\/mock\/runtime/);
   assert.match(apiSource, /method: "POST"/);
   assert.match(pageSource, /MockRuntimeSettingsPanel/);
-  assert.match(pageSource, /\["mock", "engineering\.settings",\s*"◇"\]/);
-  assert.match(pageSource, /settingsSurfaceActive = active === "settings" \|\| active === "mock"/);
+  assert.doesNotMatch(pageSource, /\["mock", "engineering\.settings",\s*"◇"\]/);
+  assert.match(pageSource, /type SettingsSection = "gateway" \| "mock"/);
+  assert.match(pageSource, /className="engineeringNavTreeGroup"/);
+  assert.match(pageSource, /aria-expanded=\{settingsExpanded\}/);
+  assert.match(pageSource, /selectSettingsSection\("gateway"\)/);
+  assert.match(pageSource, /selectSettingsSection\("mock"\)/);
+  assert.match(pageSource, /settingsSurfaceActive = active === "settings"/);
 });
 
 test("Mock UI preserves the 0.1 percent and 4 MiB configuration contract", () => {

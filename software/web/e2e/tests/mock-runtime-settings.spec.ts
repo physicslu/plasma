@@ -47,6 +47,7 @@ test("Engineering Mock settings apply per-mille error, timing, seed and show ser
   });
 
   await page.goto("/engineering");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Mock", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: /^Mock (設定|Settings)$/ })).toBeVisible();
