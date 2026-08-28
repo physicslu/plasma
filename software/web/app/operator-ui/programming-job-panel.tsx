@@ -69,6 +69,7 @@ export function ProgrammingJobPanel({
   operations,
   policyLabel,
   policy,
+  compatibilityFields,
   startLabel,
   startDisabled,
   onStart,
@@ -97,6 +98,7 @@ export function ProgrammingJobPanel({
   operations: ProgrammingJobOperation[];
   policyLabel: string;
   policy: ProgrammingJobPolicy;
+  compatibilityFields?: ReactNode;
   startLabel: string;
   startDisabled: boolean;
   onStart: () => void | Promise<void>;
@@ -193,6 +195,8 @@ export function ProgrammingJobPanel({
           </div>
         </div>
       )}
+
+      {compatibilityFields && <div className="programmingJobCompatibility" hidden>{compatibilityFields}</div>}
 
       <div className="programmingJobActionBar" data-programming-job-actions={mode}>
         <button type="button" className="programmingJobStart" data-programming-job-action="start" disabled={startDisabled} onClick={() => void onStart()}>▶ {startLabel}</button>
