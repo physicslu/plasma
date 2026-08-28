@@ -69,6 +69,7 @@ test("Engineering density owns the workspace, not Programming Job internals", as
   const refreshCss = await read("engineering/engineering-workspace-refresh.css");
   const batchSummaryCss = await read("operator-ui/batch-summary.css");
   const controlsCss = await read("operator-ui/programming-job-controls.css");
+  const designCss = await read("operator-ui/operator-design-contract.css");
 
   assert.match(css, /\.engineeringShell\s*\{[\s\S]*padding:\s*0;[\s\S]*gap:\s*0/);
   assert.match(css, /\.engineeringCanvas\.programmingActive\s*\{[\s\S]*padding:\s*10px 12px 18px/);
@@ -77,7 +78,9 @@ test("Engineering density owns the workspace, not Programming Job internals", as
   assert.doesNotMatch(refreshCss, /\.programmingJobGrid\b|\.programmingJobField\b|\.programmingJobActionBar\b|\.programmingJobStatus\b/);
 
   assert.match(controlsCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.08fr\) minmax\(0, 1fr\)/);
-  assert.match(controlsCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*64px/);
+  assert.match(controlsCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);
+  assert.match(designCss, /--operator-action-min-height:\s*40px/);
+  assert.doesNotMatch(controlsCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*64px/);
   assert.doesNotMatch(controlsCss, /position:\s*absolute/);
 
   assert.doesNotMatch(css, /operatorKpiStrip|batchSummary(?:Header|Grid)|data-kpi=/);
