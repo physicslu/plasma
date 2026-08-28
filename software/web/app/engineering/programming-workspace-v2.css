@@ -1,15 +1,21 @@
 @import "../operator-ui/operator-design-contract.css";
 
+/* EMode Programming-specific controls and Site diagnostics live here.
+ * Page shell/navigation belongs to engineering.css, page composition belongs to
+ * engineering-workspace-refresh.css, targeting alignment belongs to
+ * engineering-alignment.css, and Site typography belongs to
+ * engineering-readability.css. */
+.engineeringProgramming {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
 .engineeringProgrammingV2 {
   min-width: 0;
   container-type: inline-size;
   container-name: engineering-programming;
-}
-
-.engineeringProgrammingV2 .productionProgrammingV2 {
-  width: 100%;
-  min-width: 0;
-  padding: 0 0 14px;
 }
 
 .engineeringProgrammingV2 .productionProgrammingWorkflow,
@@ -19,28 +25,31 @@
   min-width: 0;
 }
 
-.engineeringProgrammingV2Header {
-  min-height: 46px;
-}
-
+/* Gateway control: one EMode Programming owner. */
 .engineeringProgrammingV2Header .engineeringGateway {
   display: grid;
   grid-template-columns: 10px minmax(180px, 300px) auto auto;
   align-items: center;
   gap: 7px;
   min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 7px;
+  background: var(--panel-2);
   color: var(--text, #172033);
 }
 
 .engineeringProgrammingV2Header .engineeringGateway input {
+  width: 210px;
   min-width: 0;
   height: 28px;
   border: 1px solid var(--line-strong, #bdccd9);
   border-radius: 5px;
+  outline: 0;
   background: var(--panel, #fff);
   color: var(--text, #172033);
   padding: 0 8px;
-  font-size: 9px;
+  font: 9px var(--font-mono);
 }
 
 .engineeringProgrammingV2Header .engineeringGateway button {
@@ -69,12 +78,12 @@
 }
 
 .engineeringProgrammingV2Header .engineeringGateway.offline .onlineDot {
-  background: #ef4444;
+  background: var(--red, #ef4444);
   box-shadow: 0 0 0 3px rgba(239, 68, 68, .16);
 }
 
 .engineeringProgrammingV2Header .engineeringGateway.connecting .onlineDot {
-  background: #f59e0b;
+  background: var(--amber, #f59e0b);
   box-shadow: 0 0 0 3px rgba(245, 158, 11, .16);
 }
 
@@ -88,50 +97,80 @@
   color: var(--text, #172033);
 }
 
+/* Engineering-only boundary/warning surfaces. */
+.engineeringProgrammingV2 .engineeringBoundaryNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 45%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--cyan) 7%, var(--panel));
+  color: var(--text-soft);
+  font-size: 9px;
+}
+
+.engineeringProgrammingV2 .engineeringBoundaryNote b {
+  flex: 0 0 auto;
+  color: var(--cyan);
+  font: 800 8px var(--font-mono);
+  letter-spacing: .08em;
+}
+
+.engineeringProgrammingV2 .engineeringBoundaryNote.warning {
+  border-color: color-mix(in srgb, var(--amber) 55%, var(--line));
+  background: color-mix(in srgb, var(--amber) 8%, var(--panel));
+}
+
+.engineeringProgrammingV2 .engineeringBoundaryNote.warning b {
+  color: var(--amber);
+}
+
+.engineeringProgrammingV2 .engineeringOperationWarning {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.engineeringProgrammingV2 .engineeringOperationWarning button {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, var(--amber) 60%, var(--line));
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--amber);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
 .engineeringProgrammingV2 .batchSummary {
   margin-top: 7px;
 }
 
-.engineeringProgrammingV2 .productionProgrammingWorkflow {
-  grid-template-columns: minmax(300px, .82fr) minmax(0, 1.18fr);
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.engineeringProgrammingV2 .productionProgrammingRight {
-  gap: 0;
-}
-
-.engineeringProgrammingV2 .cardBody {
-  padding: 10px 12px;
-}
-
-.engineeringProgrammingV2 .cardBody h2 {
-  margin: 0 0 7px;
-  font-size: 10px;
-}
-
-.engineeringProgrammingV2 .workflowField {
-  grid-template-columns: 112px minmax(0, 1fr);
-  gap: 7px;
-  margin-top: 7px;
-  font-size: 10px;
-}
-
-.engineeringProgrammingV2 .workflowField select {
+/* Facility / PPU control chrome. Layout/alignment is intentionally owned by
+ * engineering-alignment.css; typography is owned by engineering-readability.css. */
+.engineeringProgrammingV2 .targetingCard .workflowField select {
   min-height: var(--operator-control-min-height);
+  border: 1px solid var(--line-strong, #b7c1cb);
+  border-radius: 7px;
+  background: var(--panel, #fff);
+  color: var(--text, #172033);
+  padding: 0 10px;
 }
 
-.engineeringProgrammingV2 .topologyFoot {
-  margin-top: 12px;
-  padding: 7px 9px;
-  font-size: 9px;
+.engineeringProgrammingV2 .targetingCard .topologyFoot {
+  border: 1px solid var(--line, #d6dde6);
+  border-radius: 7px;
+  background: var(--panel-2, #f6f8fa);
+  color: var(--text-soft, #4a5560);
 }
 
-.engineeringProgrammingV2 .liveSiteStatus {
-  margin-top: 8px;
-}
-
+/* EMode Site status remains a diagnostic table by design. PMode's LED-first
+ * Site cards are a different operational surface and are not abstracted here. */
 .engineeringV2TableWrap {
   overflow-x: auto;
 }
@@ -183,21 +222,11 @@
   min-width: 30px;
 }
 
-.engineeringResult[data-result="PASS"] { color: #15803d; }
+.engineeringResult[data-result="PASS"] { color: var(--green, #15803d); }
 .engineeringResult[data-result="FAIL"],
-.engineeringResult[data-result="ERROR"] { color: #dc2626; }
+.engineeringResult[data-result="ERROR"] { color: var(--red, #dc2626); }
 .engineeringResult[data-result="CANCELLED"],
-.engineeringResult[data-result="STOPPED"] { color: #64748b; }
-
-.engineeringProgrammingV2 .engineeringLogCard {
-  margin-top: 8px;
-}
-
-@container engineering-programming (max-width: 920px) {
-  .engineeringProgrammingV2 .productionProgrammingWorkflow {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+.engineeringResult[data-result="STOPPED"] { color: var(--muted, #64748b); }
 
 @media (max-width: 1100px) {
   .engineeringProgrammingV2Header {
@@ -209,5 +238,16 @@
   .engineeringProgrammingV2Header .engineeringGateway {
     width: 100%;
     grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .engineeringProgrammingV2Header .engineeringGateway input {
+    width: 100%;
+  }
+
+  .engineeringProgrammingV2 .engineeringBoundaryNote {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

@@ -1,6 +1,6 @@
 /* Engineering workspace density owns page spacing only.
- * Shared operator controls, including Programming Job, own their own internal
- * presentation through operator-ui design contracts. */
+ * Programming-specific controls and Site presentation belong to the
+ * Programming workspace layers, not this page-density layer. */
 
 .engineeringShell {
   padding: 0;
@@ -9,47 +9,4 @@
 
 .engineeringCanvas.programmingActive {
   padding: 10px 12px 18px;
-}
-
-.engineeringProgramming {
-  gap: 6px;
-}
-
-.engineeringProgrammingHeader {
-  padding: 7px 9px;
-  gap: 10px;
-}
-
-.engineeringProgrammingHeader p {
-  margin-bottom: 2px;
-}
-
-.engineeringProgrammingHeader > div:first-child > span {
-  margin-top: 2px;
-}
-
-.engineeringTargetSelector {
-  gap: 6px;
-}
-
-.engineeringTargetSelector label,
-.engineeringTargetIdentity {
-  padding: 6px 8px;
-}
-
-.engineeringBoundaryNote {
-  padding: 5px 8px;
-}
-
-.engineeringSelectorPanel {
-  padding: 7px 9px;
-}
-
-.engineeringSelectorPanel .channelChecks {
-  margin-top: 5px;
-  gap: 6px;
-}
-
-.engineeringSelectorPanel .channelChecks label {
-  padding: 6px 7px;
 }

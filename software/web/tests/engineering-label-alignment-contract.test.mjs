@@ -40,12 +40,14 @@ test("Engineering desktop alignment owns only the compact targeting rail", async
   assert.equal(programmingJobCss.includes("clamp(190px, 15vw, 260px)"), false);
 });
 
-test("Engineering mobile targeting labels return to natural left alignment and alignment CSS loads last", async () => {
+test("Engineering narrow-container targeting labels stack naturally and alignment CSS loads last", async () => {
   const [css, page] = await Promise.all([source(alignmentPath), source(pagePath)]);
 
-  assert.ok(css.includes("@media (max-width: 760px)"));
+  assert.ok(css.includes("@container engineering-programming (max-width: 760px)"));
+  assert.ok(css.includes("grid-template-columns: 1fr;\n    gap: 12px;"));
   assert.ok(css.includes(".targetingCard .workflowField > span"));
   assert.ok(css.includes("justify-self: start;\n    text-align: left;"));
+  assert.equal(css.includes("@media (max-width: 760px)"), false);
 
   const readability = page.indexOf('import "./engineering-readability.css";');
   const alignment = page.indexOf('import "./engineering-alignment.css";');
