@@ -1,4 +1,10 @@
 import { expect, test } from "@playwright/test";
+import {
+  expectProgrammingJobContract,
+  programmingJob,
+  programmingJobAction,
+  programmingJobOperation,
+} from "./programming-job-test-helpers";
 
 const engineeringFacilityId = process.env.MOCK_CD_ENGINEERING_FACILITY_ID ?? "mock-facility-02";
 const engineeringPpuId = process.env.MOCK_CD_ENGINEERING_PPU_ID ?? "mock-facility-02-ppu-03";
@@ -30,11 +36,8 @@ async function runTwoSiteProgram(
   expectedBatchCount: number,
   counters: RuntimeCounters,
 ) {
-  const programmingJob = page.getByRole("region", {
-    name: "Engineering Programming Job",
-    exact: true,
-  });
-  const execute = programmingJob.locator('[data-programming-job-action="start"]');
+  const job = programmingJob(page, "engineering");
+  const execute = programmingJobAction(job, "start");
   await expect(execute).toBeEnabled();
   await execute.click();
   await expect.poll(() => counters.batches, { timeout: 30_000 }).toBe(expectedBatchCount);
@@ -89,12 +92,14 @@ test("1 MiB Engineering Image Asset is submitted once per server Batch and remai
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
 
   await selectSitesOneAndTwo(page);
+  const job = programmingJob(page, "engineering");
+  await expectProgrammingJobContract(job);
   await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "engineering-cache-1MiB.bin",
     mimeType: "application/octet-stream",
     buffer: oneMiB,
   });
-  await page.getByLabel("Engineering batch program").check();
+  await programmingJobOperation(job, "program").check();
 
   const sessionsAtFirstRun = counters.sessions;
   await runTwoSiteProgram(page, 1, counters);
