@@ -1,11 +1,17 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import {
+  programmingJob as sharedProgrammingJob,
+  programmingJobAction,
+  programmingJobOperation,
+  programmingJobStatusValue,
+} from "./programming-job-test-helpers";
+import {
   chooseTestTarget,
   commitProductionSites,
   factoryConsoleHeading,
   installTestDeviceCatalog,
   productionOperation,
-  programmingJob,
+  programmingJob as productionProgrammingJob,
 } from "./production-console-helpers";
 
 const facilityId = "mock-facility-01";
@@ -343,8 +349,9 @@ async function openEngineeringBatch(page: Page) {
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
   await page.getByLabel("Batch select SITE 2").uncheck();
-  await page.getByLabel("Engineering batch erase").check();
-  await page.getByRole("button", { name: /START PROGRAMMING/ }).click();
+  const job = sharedProgrammingJob(page, "engineering");
+  await programmingJobOperation(job, "erase").check();
+  await programmingJobAction(job, "start").click();
   await expectModeLocked(page, "量產模式");
 }
 
@@ -354,13 +361,13 @@ test("Pmod server Batch locks Emode through running and stopping until terminal"
   await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
   await commitProductionSites(page, facilityId, ppuId, [1]);
   await chooseTestTarget(page);
-  const job = programmingJob(page);
+  const job = productionProgrammingJob(page);
   await productionOperation(page, "E").check();
-  await expect(job.locator(".factoryBatchStatus b")).toHaveText("BATCH READY");
-  await job.locator(".factoryStartButton").click();
+  await expect(programmingJobStatusValue(job)).toHaveText("BATCH READY");
+  await programmingJobAction(job, "start").click();
 
   await expectModeLocked(page, "工程模式");
-  await job.locator(".factoryAbortButton").click();
+  await programmingJobAction(job, "abort").click();
   await expect.poll(() => api.batchCancelRequested).toBe(true);
   await expectModeLocked(page, "工程模式");
   api.finishBatch("cancelled");
@@ -371,13 +378,13 @@ test("successful Pmod Batch releases its execution lease and restores Engineerin
   const api = await installExecutionApi(page);
   await page.goto("/fleet");
   await commitProductionSites(page, facilityId, ppuId, [1]);
-  const job = programmingJob(page);
+  const job = productionProgrammingJob(page);
   await productionOperation(page, "E").check();
-  await job.locator(".factoryStartButton").click();
+  await programmingJobAction(job, "start").click();
   await expectModeLocked(page, "工程模式");
 
   api.finishBatch("success");
-  await expect(job.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
   await expectModeUnlocked(page, "工程模式");
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("plasma-production-active-batch-v1"))).toBeNull();
 });
@@ -386,15 +393,15 @@ test("temporary Batch observation failures reconnect and still release the termi
   const api = await installExecutionApi(page);
   await page.goto("/fleet");
   await commitProductionSites(page, facilityId, ppuId, [1]);
-  const job = programmingJob(page);
+  const job = productionProgrammingJob(page);
   await productionOperation(page, "E").check();
-  await job.locator(".factoryStartButton").click();
+  await programmingJobAction(job, "start").click();
   await expectModeLocked(page, "工程模式");
 
   api.failNextBatchPolls(2);
-  await expect(job.locator(".factoryBatchStatus b")).toHaveText("RECONNECTING");
+  await expect(programmingJobStatusValue(job)).toHaveText("RECONNECTING");
   api.finishBatch("success");
-  await expect(job.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
   await expectModeUnlocked(page, "工程模式");
   await expect(page.getByText(/OBSERVATION RESTORED/)).toBeVisible();
 });
@@ -403,14 +410,14 @@ test("ABORT receiving an already successful Batch performs terminal cleanup imme
   const api = await installExecutionApi(page);
   await page.goto("/fleet");
   await commitProductionSites(page, facilityId, ppuId, [1]);
-  const job = programmingJob(page);
+  const job = productionProgrammingJob(page);
   await productionOperation(page, "E").check();
-  await job.locator(".factoryStartButton").click();
+  await programmingJobAction(job, "start").click();
   await expectModeLocked(page, "工程模式");
 
   api.finishOnBatchAbort();
-  await job.locator(".factoryAbortButton").click();
-  await expect(job.locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await programmingJobAction(job, "abort").click();
+  await expect(programmingJobStatusValue(job)).toHaveText("SUCCESS");
   await expectModeUnlocked(page, "工程模式");
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("plasma-production-active-batch-v1"))).toBeNull();
 });
@@ -425,7 +432,7 @@ test("restoring an already successful Batch clears its stale execution lease", a
     }));
   });
   await page.goto("/fleet");
-  await expect(programmingJob(page).locator(".factoryBatchStatus b")).toHaveText("SUCCESS");
+  await expect(programmingJobStatusValue(productionProgrammingJob(page))).toHaveText("SUCCESS");
   await expectModeUnlocked(page, "工程模式");
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("plasma-production-active-batch-v1"))).toBeNull();
 });
@@ -474,9 +481,10 @@ test("Emode exhausted server-owned PPU communication retry terminates Batch with
 test("Emode Batch observation outage stays fail-closed until authoritative server observation returns", async ({ page }) => {
   const api = await installExecutionApi(page);
   await openEngineeringBatch(page);
+  const job = sharedProgrammingJob(page, "engineering");
 
   api.failNextBatchPolls(2);
-  await expect(page.getByRole("status", { name: "Batch readiness" })).toContainText("RECONNECTING", { timeout: 10_000 });
+  await expect(programmingJobStatusValue(job)).toHaveText("RECONNECTING", { timeout: 10_000 });
   await expectModeLocked(page, "量產模式");
   expect(api.jobCancelRequested).toBe(false);
 
