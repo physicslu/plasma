@@ -16,12 +16,13 @@ const sections = [
   ["overview", "engineering.overview", "⌂"],
   ["ppu-sites", "engineering.ppuSites", "▤"],
   ["programming", "engineering.programming", "▶"],
-  ["mock", "engineering.settings", "◇"],
   ["diagnostics", "engineering.diagnostics", "∿"],
   ["logs", "engineering.logs", "▧"],
   ["tools", "engineering.tools", "⌘"],
   ["settings", "engineering.settings", "⚙"],
 ] as const;
+
+type SettingsSection = "gateway" | "mock";
 
 function subscribeHydration(): () => void {
   return () => {};
@@ -30,19 +31,26 @@ function subscribeHydration(): () => void {
 export default function EngineeringPage() {
   const { t } = useI18n();
   const { emodeSection, setEmodeSection } = useWorkspaceSession();
-  const [mockActive, setMockActive] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>("gateway");
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const active = mockActive ? "mock" : emodeSection;
+  const active = emodeSection;
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
-  const settingsSurfaceActive = active === "settings" || active === "mock";
+  const settingsSurfaceActive = active === "settings";
 
   function selectSection(id: (typeof sections)[number][0]) {
-    if (id === "mock") {
-      setMockActive(true);
+    if (id === "settings") {
+      setEmodeSection("settings");
+      setSettingsExpanded(value => active === "settings" ? !value : true);
       return;
     }
-    setMockActive(false);
     setEmodeSection(id);
+  }
+
+  function selectSettingsSection(id: SettingsSection) {
+    setSettingsSection(id);
+    setSettingsExpanded(true);
+    setEmodeSection("settings");
   }
 
   return (
@@ -60,18 +68,58 @@ export default function EngineeringPage() {
             </header>
 
             <nav aria-label={t("engineering.title")} aria-busy={!hydrated}>
-              {sections.map(([id, key, icon]) => (
+              {sections.map(([id, key, icon]) => id === "settings" ? (
+                <div className="engineeringNavTreeGroup" key={id}>
+                  <button
+                    type="button"
+                    disabled={!hydrated}
+                    className={active === id ? "active" : ""}
+                    aria-pressed={active === id}
+                    aria-expanded={settingsExpanded}
+                    title={t(key)}
+                    onClick={() => selectSection(id)}
+                  >
+                    <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
+                    <span className="engineeringNavLabel">{t(key)}</span>
+                    <span className="engineeringNavDisclosure" aria-hidden="true">{settingsExpanded ? "⌄" : "›"}</span>
+                  </button>
+                  {settingsExpanded && (
+                    <div className="engineeringNavChildren" role="group" aria-label="Settings">
+                      <button
+                        type="button"
+                        disabled={!hydrated}
+                        className={settingsSurfaceActive && settingsSection === "gateway" ? "active" : ""}
+                        aria-pressed={settingsSurfaceActive && settingsSection === "gateway"}
+                        onClick={() => selectSettingsSection("gateway")}
+                      >
+                        <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                        <span className="engineeringNavLabel">Gateway</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!hydrated}
+                        className={settingsSurfaceActive && settingsSection === "mock" ? "active" : ""}
+                        aria-pressed={settingsSurfaceActive && settingsSection === "mock"}
+                        onClick={() => selectSettingsSection("mock")}
+                      >
+                        <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                        <span className="engineeringNavLabel">Mock</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <button
                   key={id}
                   type="button"
                   disabled={!hydrated}
                   className={active === id ? "active" : ""}
                   aria-pressed={active === id}
-                  title={id === "mock" ? "Mock" : t(key)}
+                  title={t(key)}
                   onClick={() => selectSection(id)}
                 >
                   <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
-                  <span className="engineeringNavLabel">{id === "mock" ? "Mock" : t(key)}</span>
+                  <span className="engineeringNavLabel">{t(key)}</span>
                 </button>
               ))}
             </nav>
@@ -91,7 +139,7 @@ export default function EngineeringPage() {
           <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : settingsSurfaceActive ? "settingsActive" : ""}`}>
             {active === "programming" ? (
               <ProgrammingWorkspaceV2 />
-            ) : active === "mock" ? (
+            ) : active === "settings" && settingsSection === "mock" ? (
               <MockRuntimeSettingsPanel />
             ) : active === "settings" ? (
               <GatewaySettingsPanel />
