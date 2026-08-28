@@ -1,6 +1,14 @@
 @import "./operator-design-contract.css";
 
-.operatorPanel {
+/*
+ * Canonical first-level operator-panel presentation.
+ *
+ * OperatorPanel is the preferred component owner. Engineering's existing
+ * productionProgrammingCard hosts intentionally consume the same shared shell
+ * while their body markup remains domain-specific.
+ */
+.operatorPanel,
+.productionProgrammingCard {
   min-width: 0;
   border: 1px solid var(--line, #d4dee8);
   border-radius: var(--operator-panel-radius);
@@ -9,7 +17,8 @@
   box-shadow: 0 1px 5px rgba(15, 23, 42, .04);
 }
 
-.operatorPanelHeader {
+.operatorPanelHeader,
+.productionProgrammingCard > header {
   min-height: var(--operator-panel-header-min-height);
   padding: var(--operator-panel-header-padding-block) var(--operator-panel-header-padding-inline);
   border-bottom: 1px solid var(--line, #d4dee8);
@@ -19,6 +28,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  font-family: var(--font-sans), Arial, sans-serif;
 }
 
 .operatorPanelTitle {
@@ -29,19 +39,26 @@
 }
 
 .operatorPanelTitle > span,
-.operatorPanelTitle > strong {
+.operatorPanelTitle > strong,
+.productionProgrammingCard > header,
+.productionProgrammingCard > header > span {
   color: var(--text, #172033);
+  font-family: var(--font-sans), Arial, sans-serif;
   font-size: var(--operator-panel-title-font-size);
   font-weight: 900;
+  letter-spacing: 0;
 }
 
-.operatorPanelTitle > small {
+.operatorPanelTitle > small,
+.productionProgrammingCard > header > small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-soft, #51606f);
+  font-family: var(--font-sans), Arial, sans-serif;
   font-size: var(--operator-panel-meta-font-size);
+  font-weight: 650;
 }
 
 .operatorPanelActions {
@@ -51,12 +68,64 @@
   gap: 6px;
 }
 
+.operatorPanelToggle,
+.selectionVisibilityButton,
+.engineeringPanelToggle {
+  min-width: 66px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong, #bdd0d9);
+  border-radius: 5px;
+  background: var(--panel, #fff);
+  color: var(--text-soft, #51606f);
+  font-family: var(--font-sans), Arial, sans-serif;
+  font-size: var(--operator-control-font-size);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.operatorPanelToggle:hover:not(:disabled),
+.selectionVisibilityButton:hover:not(:disabled),
+.engineeringPanelToggle:hover:not(:disabled) {
+  background: var(--panel-2, #f6f9fb);
+  color: var(--text, #172033);
+}
+
+.operatorPanelToggle:disabled,
+.selectionVisibilityButton:disabled,
+.engineeringPanelToggle:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 .operatorPanelBody {
   min-width: 0;
   padding: var(--operator-panel-body-padding);
 }
 
+[data-theme="dark"] .operatorPanel,
+[data-theme="dark"] .productionProgrammingCard {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .operatorPanelHeader,
+[data-theme="dark"] .productionProgrammingCard > header {
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .operatorPanelToggle,
+[data-theme="dark"] .selectionVisibilityButton,
+[data-theme="dark"] .engineeringPanelToggle {
+  border-color: var(--line-strong);
+  background: var(--panel);
+  color: var(--text-soft);
+}
+
 @media (max-width: 700px) {
-  .operatorPanelHeader { align-items: flex-start; }
+  .operatorPanelHeader,
+  .productionProgrammingCard > header { align-items: flex-start; }
   .operatorPanelTitle { flex-wrap: wrap; }
 }

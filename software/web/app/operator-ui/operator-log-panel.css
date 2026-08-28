@@ -2,25 +2,14 @@
 
 .operatorLogCard {
   font-family: var(--font-sans), Arial, sans-serif;
+  overflow: hidden;
 }
 
-.operatorLogHead {
-  height: auto;
-  min-height: var(--operator-panel-header-min-height);
-  padding: var(--operator-panel-header-padding-block) var(--operator-panel-header-padding-inline);
-  gap: 10px;
-}
-
-.operatorLogTitle,
 .operatorLogActions {
   flex: 0 0 auto;
-}
-
-.operatorLogTitle {
-  font-family: var(--font-sans), Arial, sans-serif;
-  font-size: var(--operator-panel-title-font-size);
-  font-weight: 900;
-  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .operatorLogActions button {
@@ -97,11 +86,6 @@
 }
 
 @media (max-width: 760px) {
-  .operatorLogHead {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
   .operatorLogFilters {
     align-items: stretch;
   }

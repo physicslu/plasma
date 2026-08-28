@@ -4,15 +4,18 @@ import fs from "node:fs";
 
 const layout = fs.readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const designContract = fs.readFileSync(new URL("../app/operator-ui/operator-design-contract.css", import.meta.url), "utf8");
+const operatorPanel = fs.readFileSync(new URL("../app/operator-ui/operator-panel.tsx", import.meta.url), "utf8");
 const operatorPanelCss = fs.readFileSync(new URL("../app/operator-ui/operator-panel.css", import.meta.url), "utf8");
 const batchSummaryCss = fs.readFileSync(new URL("../app/operator-ui/batch-summary.css", import.meta.url), "utf8");
 const operatorLogCss = fs.readFileSync(new URL("../app/operator-ui/operator-log-panel.css", import.meta.url), "utf8");
 const sharedComponent = fs.readFileSync(new URL("../app/operator-ui/programming-job-panel.tsx", import.meta.url), "utf8");
 const sharedCss = fs.readFileSync(new URL("../app/operator-ui/programming-job-controls.css", import.meta.url), "utf8");
 const pmod = fs.readFileSync(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
+const pmodCss = fs.readFileSync(new URL("../app/fleet/factory-console-v2.css", import.meta.url), "utf8");
 const emode = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
 const emodeSession = fs.readFileSync(new URL("../app/workspace-session.tsx", import.meta.url), "utf8");
 const emodeCss = fs.readFileSync(new URL("../app/engineering/programming-workspace-v2.css", import.meta.url), "utf8");
+const emodeBase = fs.readFileSync(new URL("../app/engineering/programming-workspace-base.css", import.meta.url), "utf8");
 const emodeDensity = fs.readFileSync(new URL("../app/engineering/engineering-density.css", import.meta.url), "utf8");
 const emodeRefresh = fs.readFileSync(new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url), "utf8");
 const sharedDriver = fs.readFileSync(new URL("../e2e/tests/programming-job-test-helpers.ts", import.meta.url), "utf8");
@@ -79,7 +82,7 @@ test("shared action bar structurally owns START then STATUS then ABORT", () => {
   assert.doesNotMatch(emode, /className="programmingActions"/);
 });
 
-test("Operator UI exposes one canonical panel and control density", () => {
+test("Operator UI exposes one canonical first-level Panel Header and Toggle owner", () => {
   const expectedTokens = [
     ["--operator-panel-radius", "7px"],
     ["--operator-panel-header-min-height", "30px"],
@@ -98,16 +101,25 @@ test("Operator UI exposes one canonical panel and control density", () => {
     assert.match(designContract, new RegExp(`${name}:\\s*${value.replace(".", "\\.")}`));
   }
 
-  for (const css of [operatorPanelCss, batchSummaryCss, operatorLogCss, sharedCss]) {
-    assert.match(css, /operator-design-contract\.css/);
+  assert.match(operatorPanel, /export function OperatorPanelHeader/);
+  assert.match(operatorPanel, /export function OperatorPanelToggle/);
+  assert.match(operatorPanelCss, /\.operatorPanelHeader,[\s\S]*\.productionProgrammingCard > header/);
+  assert.match(operatorPanelCss, /\.operatorPanelTitle > span,[\s\S]*\.operatorPanelTitle > strong,[\s\S]*\.productionProgrammingCard > header/);
+  assert.match(operatorPanelCss, /font-size:\s*var\(--operator-panel-title-font-size\)/);
+  assert.match(operatorPanelCss, /font-weight:\s*900/);
+  assert.match(operatorPanelCss, /\.operatorPanelToggle,[\s\S]*\.selectionVisibilityButton,[\s\S]*\.engineeringPanelToggle/);
+
+  for (const css of [batchSummaryCss, operatorLogCss, sharedCss]) {
+    assert.doesNotMatch(css, /operatorPanelTitle[^\{]*\{|operatorPanelHeader[^\{]*\{[\s\S]*font-size:\s*var\(--operator-panel-title-font-size\)/);
   }
-  assert.match(operatorPanelCss, /min-height:\s*var\(--operator-panel-header-min-height\)/);
-  assert.match(batchSummaryCss, /font-size:\s*var\(--operator-panel-title-font-size\)/);
-  assert.match(operatorLogCss, /font-size:\s*var\(--operator-panel-title-font-size\)/);
+  assert.doesNotMatch(sharedCss, /programmingJobCollapseButton/);
+  assert.doesNotMatch(emodeCss, /\.engineeringPanelToggle\s*\{/);
+  assert.doesNotMatch(emodeBase, /\.productionProgrammingCard > header\s*\{/);
 });
 
-test("Programming Job keeps its approved structure without a jumbo private scale", () => {
-  assert.match(sharedCss, /\.programmingJobPanel > \.operatorPanelHeader\s*\{[\s\S]*min-height:\s*var\(--operator-panel-header-min-height\)/);
+test("Programming Job keeps approved body structure without owning Panel Header presentation", () => {
+  assert.match(sharedComponent, /import \{ OperatorPanel, OperatorPanelToggle \} from "\.\/operator-panel"/);
+  assert.match(sharedComponent, /<OperatorPanelToggle/);
   assert.match(sharedCss, /\.programmingJobField\s*\{[\s\S]*grid-template-columns:\s*128px minmax\(0, 1fr\)/);
   assert.match(sharedCss, /\.programmingJobField > strong\s*\{[\s\S]*font-size:\s*var\(--operator-field-label-font-size\)/);
   assert.match(sharedCss, /\.programmingJobImageControl\s*\{[\s\S]*min-height:\s*var\(--operator-control-min-height\)/);
@@ -116,8 +128,17 @@ test("Programming Job keeps its approved structure without a jumbo private scale
   assert.match(sharedCss, /\.programmingJobActionBar\s*\{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1\.08fr\) minmax\(0, 1fr\)/);
   assert.match(sharedCss, /\.programmingJobStart,[\s\S]*\.programmingJobAbort\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);
   assert.match(sharedCss, /\.programmingJobStatus\s*\{[\s\S]*min-height:\s*var\(--operator-action-min-height\)/);
+  assert.doesNotMatch(sharedCss, /\.programmingJobPanel > \.operatorPanelHeader|\.programmingJobCollapseButton/);
   assert.doesNotMatch(sharedCss, /min-height:\s*(?:56|64)px/);
   assert.doesNotMatch(sharedCss, /font-size:\s*(?:14|15|17|18)px/);
+});
+
+test("mode-local styles cannot re-own retired Programming Job or first-level Panel Header presentation", () => {
+  assert.doesNotMatch(pmodCss, /\.factoryProgrammingJob|\.factoryJobGrid|\.factoryField|\.factoryImageControl|\.factoryPolicyControls|\.factoryActionBar|\.factoryBatchStatus/);
+  assert.doesNotMatch(pmodCss, /\.selectionVisibilityButton\s*\{[\s\S]*font-size:|\.selectionVisibilityButton\s*,[\s\S]*font-size:/);
+  assert.doesNotMatch(emodeCss, /\.productionProgrammingCard > header|\.engineeringPanelToggle\s*\{/);
+  assert.doesNotMatch(emodeBase, /\.productionProgrammingCard > header\s*\{/);
+  assert.doesNotMatch(emodeRefresh, /font-size:\s*0|content:\s*"1\. SYSTEM SETUP|content:\s*"3\. LIVE SITE STATUS/);
 });
 
 test("pre-launch Engineering UI retains no hidden legacy Programming controls", () => {

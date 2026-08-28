@@ -74,7 +74,6 @@
 
 /* Production Site Selection */
 .productionSiteSelection.is-collapsed .operatorPanelBody { display: none; }
-.selectionVisibilityButton,
 .productionTreeToolbar button {
   min-height: 26px;
   padding: 0 8px;
@@ -86,9 +85,7 @@
   font-weight: 750;
   cursor: pointer;
 }
-.selectionVisibilityButton { min-width: 74px; }
-.productionTreeToolbar button:disabled,
-.selectionVisibilityButton:disabled { opacity: .45; cursor: not-allowed; }
+.productionTreeToolbar button:disabled { opacity: .45; cursor: not-allowed; }
 .productionTreeToolbar .commitProductionSet {
   border-color: #2563eb;
   background: #2563eb;
@@ -173,120 +170,6 @@
   cursor: pointer;
 }
 .productionTreeSites label.selected { border-color: #8ec5ff; background: #eff7ff; color: #1d4ed8; }
-
-/* Programming Job */
-.factoryProgrammingJob .operatorPanelBody { padding: 9px 11px 10px; }
-.factoryProgrammingJob.is-collapsed .operatorPanelBody { padding-top: 8px; }
-.factoryProgrammingJob.is-collapsed .factoryActionBar { margin-top: 0; }
-.factoryJobGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px 18px;
-}
-.factoryField {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
-}
-.factoryField > strong {
-  text-align: right;
-  color: #172033;
-  font-size: 11px;
-  font-weight: 850;
-  white-space: nowrap;
-}
-.factoryField > small {
-  grid-column: 2;
-  margin-top: -3px;
-  color: #607080;
-  font-size: 8px;
-}
-.factoryImageControl {
-  min-width: 0;
-  min-height: 34px;
-  border: 1px solid #bdccd9;
-  border-radius: 6px;
-  background: #fff;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px;
-  overflow: hidden;
-}
-.factoryImageControl span {
-  min-width: 0;
-  padding: 8px 9px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #536273;
-  font-size: 9px;
-}
-.factoryImageControl button {
-  border: 0;
-  border-left: 1px solid #bdccd9;
-  background: #f6f9fb;
-  color: #172033;
-  font-size: 9px;
-  font-weight: 750;
-  cursor: pointer;
-}
-.factoryPolicyControls {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
-.factoryPolicyControls label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: #334155;
-  font-size: 9px;
-  white-space: nowrap;
-}
-.factoryPolicyControls input,
-.factoryPolicyControls select {
-  min-height: 32px;
-  border: 1px solid #bdccd9;
-  border-radius: 6px;
-  background: #fff;
-  color: #172033;
-  padding: 0 7px;
-  font-size: 9px;
-}
-.factoryPolicyControls input { width: 58px; }
-.factoryPolicyControls select { min-width: 92px; }
-.factoryActionBar {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr);
-  gap: 12px;
-}
-.factoryBatchStatus {
-  min-height: 38px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 850;
-  padding: 4px 8px;
-  border: 1px solid #cbd7e1;
-  background: #f8fbfd;
-  display: grid;
-  place-content: center;
-  text-align: center;
-}
-.factoryBatchStatus small { color: #657482; font-size: 7px; }
-.factoryBatchStatus b { color: #172033; font-size: 9px; }
-.factoryBatchStatus.state-running,
-.factoryBatchStatus.state-queued,
-.factoryBatchStatus.state-stopping,
-.factoryBatchStatus.state-reconnecting,
-.factoryBatchStatus.state-submitting,
-.factoryBatchStatus.state-aborting { border-color: #f3ba55; background: #fff9e9; }
-.factoryBatchStatus.state-success { border-color: #78d69a; background: #f1fbf4; }
-.factoryBatchStatus.state-error,
-.factoryBatchStatus.state-partial { border-color: #f0a0a0; background: #fff4f4; }
 
 .factoryWarning,
 .factoryRuntimeError {
@@ -486,10 +369,6 @@
 [data-theme="dark"] .productionTreeFacility,
 [data-theme="dark"] .productionTreePpu,
 [data-theme="dark"] .productionTreeSites label,
-[data-theme="dark"] .factoryImageControl,
-[data-theme="dark"] .factoryPolicyControls input,
-[data-theme="dark"] .factoryPolicyControls select,
-[data-theme="dark"] .factoryBatchStatus,
 [data-theme="dark"] .factoryFacilityGroup,
 [data-theme="dark"] .factoryPpuRow,
 [data-theme="dark"] .factorySiteLedCard {
@@ -501,25 +380,17 @@
 [data-theme="dark"] .productionTreeFacility > summary,
 [data-theme="dark"] .productionTreePpu > summary,
 [data-theme="dark"] .factoryFacilityGroup > header,
-[data-theme="dark"] .factoryImageControl button,
 [data-theme="dark"] .factorySiteLed {
   background: var(--panel-2);
   border-color: var(--line);
 }
 
-[data-theme="dark"] .selectionVisibilityButton,
 [data-theme="dark"] .productionTreeToolbar button:not(.commitProductionSet) {
   border-color: var(--line-strong);
   background: var(--panel);
   color: var(--text-soft);
 }
 
-[data-theme="dark"] .factoryField > strong,
-[data-theme="dark"] .factoryImageControl button,
-[data-theme="dark"] .factoryPolicyControls label,
-[data-theme="dark"] .factoryPolicyControls input,
-[data-theme="dark"] .factoryPolicyControls select,
-[data-theme="dark"] .factoryBatchStatus b,
 [data-theme="dark"] .factorySiteLedCardTop b {
   color: var(--text);
 }
@@ -530,9 +401,6 @@
 [data-theme="dark"] .productionTreeFacility > summary small,
 [data-theme="dark"] .productionTreePpu > summary small,
 [data-theme="dark"] .productionTreeSites label,
-[data-theme="dark"] .factoryField > small,
-[data-theme="dark"] .factoryImageControl span,
-[data-theme="dark"] .factoryBatchStatus small,
 [data-theme="dark"] .factoryLegend,
 [data-theme="dark"] .factoryFacilityGroup > header span,
 [data-theme="dark"] .factoryPpuRowHeader small,
@@ -546,26 +414,12 @@
 [data-theme="dark"] .productionTreePpu > summary { color: var(--text-soft); }
 [data-theme="dark"] .productionTreeSites label.selected { background: #102c45; color: #8ec5ff; }
 [data-theme="dark"] .factorySiteLedCard.batch-excluded { background: var(--panel-2); }
-[data-theme="dark"] .factorySiteLedCard.state-running,
-[data-theme="dark"] .factoryBatchStatus.state-running,
-[data-theme="dark"] .factoryBatchStatus.state-queued,
-[data-theme="dark"] .factoryBatchStatus.state-stopping,
-[data-theme="dark"] .factoryBatchStatus.state-reconnecting,
-[data-theme="dark"] .factoryBatchStatus.state-submitting,
-[data-theme="dark"] .factoryBatchStatus.state-aborting { background: #2c2617; }
-[data-theme="dark"] .factorySiteLedCard.state-success,
-[data-theme="dark"] .factoryBatchStatus.state-success { background: #10261a; }
+[data-theme="dark"] .factorySiteLedCard.state-running { background: #2c2617; }
+[data-theme="dark"] .factorySiteLedCard.state-success { background: #10261a; }
 [data-theme="dark"] .factorySiteLedCard.state-faulted,
 [data-theme="dark"] .factorySiteLedCard.state-error,
-[data-theme="dark"] .factoryBatchStatus.state-error,
-[data-theme="dark"] .factoryBatchStatus.state-partial,
 [data-theme="dark"] .factoryWarning,
 [data-theme="dark"] .factoryRuntimeError { background: #30191d; }
-
-@media (max-width: 1120px) {
-  .factoryJobGrid { grid-template-columns: 1fr; }
-  .factoryField { grid-template-columns: 128px minmax(0, 1fr); }
-}
 
 @media (max-width: 760px) {
   .factoryConsoleV2 { padding: 8px; }
@@ -573,10 +427,5 @@
   .factoryProvider { width: 100%; }
   .productionTree { grid-template-columns: 1fr; }
   .productionTreeSites { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .factoryField { grid-template-columns: 1fr; }
-  .factoryField > strong { text-align: left; }
-  .factoryField > small { grid-column: 1; }
-  .factoryPolicyControls { flex-wrap: wrap; }
-  .factoryActionBar { grid-template-columns: 1fr; }
   .factoryPpuRow { width: min(max-content, 100%); }
 }

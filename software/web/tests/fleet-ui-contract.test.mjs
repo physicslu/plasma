@@ -80,6 +80,8 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /OperatorPanel/);
   assert.doesNotMatch(sharedPanel, /BatchSummary|OperatorKpiStrip|operatorKpiStrip/);
   assert.match(sharedPanel, /operatorPanel/);
+  assert.match(sharedPanel, /export function OperatorPanelHeader/);
+  assert.match(sharedPanel, /export function OperatorPanelToggle/);
   assert.match(sharedPanelCss, /\.operatorPanel/);
 
   assert.match(workspace, /pmodDraftSelection/);
@@ -119,6 +121,8 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /if \(!targetDevice && !syntheticMockImageAvailable\)/);
   assert.match(source, /targetDevice:\s*targetDevice \? \{ vendor: targetDevice\.vendor, identifier: targetDevice\.identifier \} : null/);
   assert.match(source, /allowSyntheticMockImage:\s*syntheticMockImageAvailable/);
+  assert.match(sharedJob, /<OperatorPanelToggle/);
+  assert.match(sharedPanel, /aria-expanded=\{expanded\}/);
 
   assert.match(source, /createServerBatch/);
   assert.match(source, /getServerBatch/);
@@ -146,7 +150,6 @@ test("Factory Console v2 separates Production Set from next Batch membership", a
   assert.match(source, /label: "BATCH TIME"/);
   assert.match(source, /programmingJobCollapsed/);
   assert.match(source, /collapsed=\{programmingJobCollapsed\}/);
-  assert.match(sharedJob, /aria-expanded=\{!collapsed\}/);
 
   assert.match(css, /--site-card-w/);
   assert.match(css, /density-dense/);

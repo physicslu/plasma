@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import {
   expectProgrammingJobContract,
   programmingJob,
@@ -89,29 +89,79 @@ async function installEngineeringApi(page: Page) {
   });
 }
 
-test("Engineering-specific headings stay readable while Programming Job follows the shared operator baseline", async ({ page }) => {
+async function headerSignature(locator: Locator) {
+  return locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      minHeight: style.minHeight,
+      paddingTop: style.paddingTop,
+      paddingBottom: style.paddingBottom,
+      paddingLeft: style.paddingLeft,
+      paddingRight: style.paddingRight,
+    };
+  });
+}
+
+async function titleSignature(locator: Locator) {
+  return locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      letterSpacing: style.letterSpacing,
+    };
+  });
+}
+
+test("Engineering first-level Panel titles share one operator header baseline while body typography stays readable", async ({ page }) => {
   await installEngineeringApi(page);
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Single PPU Programming" })).toBeVisible();
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(2);
 
-  const setupHeader = page.locator(".targetingCard > header");
-  await expect(setupHeader).toBeVisible();
-  expect(await setupHeader.evaluate(element => getComputedStyle(element).fontSize)).toBe("0px");
-
-  const setupPseudo = await setupHeader.evaluate(element => ({
-    content: getComputedStyle(element, "::before").content,
-    fontSize: getComputedStyle(element, "::before").fontSize,
-  }));
-  expect(setupPseudo.content).toContain("SYSTEM SETUP");
-  expect(setupPseudo.fontSize).toBe("12px");
-
   const job = programmingJob(page, "engineering");
   await expectProgrammingJobContract(job);
-  const jobTitle = job.locator(".operatorPanelTitle > strong");
-  await expect(jobTitle).toHaveText("PROGRAMMING JOB");
-  expect(await jobTitle.evaluate(element => getComputedStyle(element).fontSize)).toBe("11px");
+
+  const headers = [
+    page.locator(".batchSummary > .operatorPanelHeader"),
+    page.locator(".targetingCard > header"),
+    job.locator(":scope > .operatorPanelHeader"),
+    page.locator(".liveSiteStatus > header"),
+    page.locator(".engineeringOperatorLog > .operatorPanelHeader"),
+  ];
+  for (const header of headers) await expect(header).toBeVisible();
+
+  const baselineHeader = await headerSignature(headers[0]);
+  expect(baselineHeader).toMatchObject({
+    minHeight: "30px",
+    paddingTop: "5px",
+    paddingBottom: "5px",
+    paddingLeft: "8px",
+    paddingRight: "8px",
+  });
+  for (const header of headers.slice(1)) {
+    expect(await headerSignature(header)).toEqual(baselineHeader);
+  }
+
+  const titles = [
+    page.locator(".batchSummary .operatorPanelTitle > strong"),
+    page.locator(".targetingCard > header"),
+    job.locator(".operatorPanelTitle > strong"),
+    page.locator(".liveSiteStatus > header > span"),
+    page.locator(".engineeringOperatorLog .operatorPanelTitle > strong"),
+  ];
+  const baselineTitle = await titleSignature(titles[0]);
+  expect(baselineTitle.fontSize).toBe("11px");
+  expect(baselineTitle.fontWeight).toBe("900");
+  for (const title of titles.slice(1)) {
+    expect(await titleSignature(title)).toEqual(baselineTitle);
+  }
+
+  const setupPseudo = await page.locator(".targetingCard > header").evaluate(element => getComputedStyle(element, "::before").content);
+  const livePseudo = await page.locator(".liveSiteStatus > header > span").evaluate(element => getComputedStyle(element, "::before").content);
+  expect(setupPseudo).toContain("1.");
+  expect(livePseudo).toContain("3.");
 
   const setupLabels = page.locator(".targetingCard .workflowField > span");
   await expect(setupLabels).toHaveCount(2);

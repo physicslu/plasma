@@ -1,14 +1,9 @@
 /* Engineering Programming readability layer.
  *
  * This file owns typography only for Engineering-specific targeting and live
- * Site status surfaces. Shared Programming Job and Batch Summary typography is
- * owned exclusively by operator-ui.
+ * Site status body surfaces. First-level Panel Header / Title / Meta typography
+ * is owned exclusively by operator-ui/operator-panel.css.
  */
-
-.engineeringProgrammingV2 .targetingCard > header::before,
-.engineeringProgrammingV2 .liveSiteStatus > header > span::before {
-  font-size: 12px;
-}
 
 .engineeringProgrammingV2 .workflowField,
 .engineeringProgrammingV2 .workflowField select {
@@ -23,10 +18,6 @@
 
 .engineeringProgrammingV2 .topologyFoot {
   font-size: 10px;
-}
-
-.engineeringProgrammingV2 .liveSiteStatus > header small {
-  font-size: 9px;
 }
 
 /* LIVE SITE STATUS is the primary runtime surface. Raise its smallest text one

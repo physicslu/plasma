@@ -52,26 +52,6 @@
   gap: 12px;
 }
 
-.productionProgrammingCard {
-  border: 1px solid var(--line, #d6dde6);
-  border-radius: 8px;
-  background: var(--panel, #fff);
-  overflow: visible;
-  box-shadow: 0 2px 9px rgba(15, 23, 42, .07);
-}
-
-.productionProgrammingCard > header {
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  padding: 0 13px;
-  border-bottom: 1px solid var(--line, #d6dde6);
-  border-radius: 8px 8px 0 0;
-  background: linear-gradient(180deg, var(--panel-2, #f3f6f8), #e9eef2);
-  font-size: 13px;
-  font-weight: 850;
-}
-
 .cardBody {
   padding: 16px;
 }
@@ -111,10 +91,6 @@
 
 [data-theme="dark"] .productionProgrammingHeader {
   background: linear-gradient(135deg, #202a33, #2b3640);
-}
-
-[data-theme="dark"] .productionProgrammingCard > header {
-  background: var(--panel-2);
 }
 
 @media (max-width: 1120px) {

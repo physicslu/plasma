@@ -6,13 +6,14 @@ const readabilityPath = new URL("../app/engineering/engineering-readability.css"
 const refreshPath = new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url);
 const sharedControlsPath = new URL("../app/operator-ui/programming-job-controls.css", import.meta.url);
 const designContractPath = new URL("../app/operator-ui/operator-design-contract.css", import.meta.url);
+const panelCssPath = new URL("../app/operator-ui/operator-panel.css", import.meta.url);
 const pagePath = new URL("../app/engineering/page.tsx", import.meta.url);
 
 async function source(url) {
   return readFile(url, "utf8");
 }
 
-test("Engineering readability owns only Engineering targeting and live Site typography", async () => {
+test("Engineering readability owns only Engineering targeting and live Site body typography", async () => {
   const [css, sharedControls, designContract] = await Promise.all([
     source(readabilityPath),
     source(sharedControlsPath),
@@ -20,7 +21,6 @@ test("Engineering readability owns only Engineering targeting and live Site typo
   ]);
 
   for (const contract of [
-    ".liveSiteStatus > header > span::before {\n  font-size: 12px;",
     ".workflowField,\n.engineeringProgrammingV2 .workflowField select {\n  font-size: 11px;",
     ".workflowField > span {\n  font-size: 12px;",
     ".topologyFoot {\n  font-size: 10px;",
@@ -43,8 +43,11 @@ test("Engineering readability owns only Engineering targeting and live Site typo
     ".programmingBatchOperations",
     ".batchReadiness {",
     ".programmingActions button",
+    ".targetingCard > header",
+    ".liveSiteStatus > header",
+    "::before",
   ]) {
-    assert.equal(css.includes(forbidden), false, `Engineering readability must not own retired/shared Programming selector: ${forbidden}`);
+    assert.equal(css.includes(forbidden), false, `Engineering readability must not own shared/header selector: ${forbidden}`);
   }
 
   assert.match(sharedControls, /\.programmingJobOperationChecks label\s*\{[\s\S]*font-size:\s*var\(--operator-control-font-size\)[\s\S]*font-weight:\s*550/);
@@ -58,11 +61,21 @@ test("Engineering readability owns only Engineering targeting and live Site typo
   );
 });
 
-test("Engineering System Setup label rewrite does not own Programming Job presentation", async () => {
-  const [css, refresh] = await Promise.all([source(readabilityPath), source(refreshPath)]);
+test("Engineering numbering is metadata only and shared Operator Panel owns first-level title presentation", async () => {
+  const [css, refresh, panelCss] = await Promise.all([
+    source(readabilityPath),
+    source(refreshPath),
+    source(panelCssPath),
+  ]);
 
-  assert.match(refresh, /\.engineeringProgrammingV2 \.targetingCard > header\s*\{[\s\S]*font-size:\s*0/);
-  assert.ok(css.includes(".targetingCard > header::before,"));
+  assert.match(refresh, /\.engineeringProgrammingV2 \.targetingCard > header::before\s*\{\s*content:\s*"1\. ";/);
+  assert.match(refresh, /\.engineeringProgrammingV2 \.liveSiteStatus > header > span::before\s*\{\s*content:\s*"3\. ";/);
+  assert.doesNotMatch(refresh, /font-size:\s*0/);
+  assert.doesNotMatch(refresh, /content:\s*"1\. SYSTEM SETUP|content:\s*"3\. LIVE SITE STATUS/);
+  assert.match(panelCss, /\.operatorPanelHeader,[\s\S]*\.productionProgrammingCard > header/);
+  assert.match(panelCss, /font-size:\s*var\(--operator-panel-title-font-size\)/);
+  assert.match(panelCss, /font-weight:\s*900/);
+  assert.doesNotMatch(css, /targetingCard > header|liveSiteStatus > header/);
   assert.doesNotMatch(
     `${css}\n${refresh}`,
     /\.programmingJob(?:Panel|Card|Grid|Field|ActionBar|Status|OperationChecks|PolicyControls)\b/,

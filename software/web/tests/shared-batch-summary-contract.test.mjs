@@ -21,20 +21,20 @@ test("PMode and EMode import the canonical BatchSummary directly", () => {
   assert.doesNotMatch(emode, /OperatorKpiStrip/);
 
   assert.match(batchSummary, /export function BatchSummary/);
-  assert.match(batchSummary, /className=\{`batchSummary \$\{title \? "has-title" : ""\}`\.trim\(\)\}/);
-  assert.match(batchSummary, /className="batchSummaryHeader"/);
+  assert.match(batchSummary, /import \{ OperatorPanelHeader \} from "\.\/operator-panel"/);
+  assert.match(batchSummary, /<OperatorPanelHeader title=\{title\} meta=\{meta\} \/>/);
   assert.match(batchSummary, /className="batchSummaryGrid"/);
   assert.match(batchSummary, /import "\.\/batch-summary\.css"/);
-  assert.doesNotMatch(batchSummary, /import "\.\/operator-panel\.css"/);
-  assert.doesNotMatch(batchSummary, /operatorKpiSummary|operatorKpiStrip/);
+  assert.doesNotMatch(batchSummary, /batchSummaryHeader|operatorKpiSummary|operatorKpiStrip/);
 
+  assert.match(operatorPanel, /export function OperatorPanelHeader/);
   assert.doesNotMatch(operatorPanel, /BatchSummary|OperatorKpiStrip|operatorKpiStrip/);
 });
 
-test("BatchSummary owns its complete internal visual contract", () => {
+test("BatchSummary owns KPI body presentation while OperatorPanelHeader owns title presentation", () => {
   assert.match(batchSummaryCss, /\.batchSummary\.has-title/);
-  assert.match(batchSummaryCss, /\.batchSummaryHeader/);
   assert.match(batchSummaryCss, /\.batchSummaryGrid/);
+  assert.doesNotMatch(batchSummaryCss, /\.batchSummaryHeader/);
   assert.doesNotMatch(batchSummaryCss, /operatorKpiSummary|operatorKpiStrip/);
   assert.match(batchSummaryCss, /font-family:\s*var\(--font-sans\),\s*Arial,\s*sans-serif/);
   assert.match(batchSummaryCss, /font-variant-numeric:\s*tabular-nums/);
@@ -52,9 +52,9 @@ test("BatchSummary owns its complete internal visual contract", () => {
   assert.match(batchSummaryCss, /@container \(max-width:\s*700px\)/);
 });
 
-test("mode-local CSS cannot override BatchSummary internal typography or PASS FAIL semantics", () => {
+test("mode-local CSS cannot override BatchSummary KPI internals or shared title ownership", () => {
   const internalSelectors = /operatorKpiSummary|operatorKpiStrip|batchSummaryHeader|batchSummaryGrid|data-kpi=/;
-  assert.doesNotMatch(operatorPanelCss, internalSelectors);
+  assert.doesNotMatch(operatorPanelCss, /batchSummaryHeader|batchSummaryGrid|data-kpi=/);
   assert.doesNotMatch(densityCss, internalSelectors);
   assert.doesNotMatch(readabilityCss, internalSelectors);
   assert.doesNotMatch(emodeCss, /batchSummaryHeader|batchSummaryGrid article|data-kpi=/);

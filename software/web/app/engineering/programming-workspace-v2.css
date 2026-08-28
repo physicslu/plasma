@@ -102,31 +102,6 @@
   gap: 0;
 }
 
-.engineeringProgrammingV2 .productionProgrammingCard > header {
-  min-height: var(--operator-panel-header-min-height);
-  padding: var(--operator-panel-header-padding-block) var(--operator-panel-header-padding-inline);
-  font-size: var(--operator-panel-title-font-size);
-  justify-content: space-between;
-}
-
-.engineeringProgrammingV2 .engineeringPanelToggle {
-  min-width: 58px;
-  min-height: 24px;
-  padding: 2px 8px;
-  border: 1px solid var(--line-strong, #bdccd9);
-  border-radius: 5px;
-  background: var(--panel, #fff);
-  color: var(--text, #172033);
-  font-size: var(--operator-control-font-size);
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.engineeringProgrammingV2 .targetingCard.is-collapsed > header {
-  border-bottom: 0;
-  border-radius: var(--operator-panel-radius);
-}
-
 .engineeringProgrammingV2 .cardBody {
   padding: 10px 12px;
 }
@@ -155,18 +130,6 @@
 
 .engineeringProgrammingV2 .liveSiteStatus {
   margin-top: 8px;
-}
-
-.engineeringProgrammingV2 .liveSiteStatus > header {
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.engineeringProgrammingV2 .liveSiteStatus > header small {
-  margin-left: auto;
-  color: var(--muted, #64748b);
-  font-size: var(--operator-panel-meta-font-size);
-  font-weight: 650;
 }
 
 .engineeringV2TableWrap {
@@ -246,17 +209,5 @@
   .engineeringProgrammingV2Header .engineeringGateway {
     width: 100%;
     grid-template-columns: 10px minmax(0, 1fr) auto auto;
-  }
-}
-
-@media (max-width: 760px) {
-  .engineeringProgrammingV2 .liveSiteStatus > header {
-    align-items: flex-start;
-    flex-direction: column;
-    padding-block: 6px;
-  }
-
-  .engineeringProgrammingV2 .liveSiteStatus > header small {
-    margin-left: 0;
   }
 }

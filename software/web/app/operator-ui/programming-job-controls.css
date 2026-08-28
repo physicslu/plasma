@@ -3,9 +3,9 @@
 /*
  * Canonical Programming Job presentation.
  *
- * PMode and EMode share one DOM and one presentation. This component may own
- * its internal composition, but it must consume the Plasma Operator UI density
- * contract instead of defining a larger panel scale.
+ * PMode and EMode share one DOM and one presentation. The OperatorPanel owns
+ * the shell/header/title/collapse presentation; this stylesheet owns only the
+ * Programming Job body composition and actions.
  */
 
 .programmingJobPanel {
@@ -13,45 +13,11 @@
   overflow: hidden;
   border-radius: var(--operator-panel-radius);
   background: var(--panel, #fff);
-  box-shadow: 0 1px 5px rgba(15, 23, 42, .04);
-}
-
-.programmingJobPanel > .operatorPanelHeader {
-  min-height: var(--operator-panel-header-min-height);
-  padding: var(--operator-panel-header-padding-block) var(--operator-panel-header-padding-inline);
-  border-bottom: 1px solid var(--line, #d4dee8);
-  border-radius: var(--operator-panel-radius) var(--operator-panel-radius) 0 0;
-  background: linear-gradient(180deg, #f4f7f9, #eaf0f4);
-}
-
-.programmingJobPanel > .operatorPanelHeader .operatorPanelTitle > span,
-.programmingJobPanel > .operatorPanelHeader .operatorPanelTitle > strong {
-  color: var(--text, #172033);
-  font-size: var(--operator-panel-title-font-size);
-  font-weight: 900;
-  letter-spacing: 0;
 }
 
 .programmingJobPanel > .operatorPanelBody {
   min-width: 0;
   padding: 0;
-}
-
-.programmingJobCollapseButton {
-  min-width: auto;
-  min-height: 24px;
-  padding: 0 2px;
-  border: 0;
-  background: transparent;
-  color: var(--text-soft, #51606f);
-  font-size: var(--operator-control-font-size);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.programmingJobCollapseButton:disabled {
-  opacity: .45;
-  cursor: not-allowed;
 }
 
 .programmingJobGrid {
@@ -308,11 +274,6 @@
   background: var(--panel);
 }
 
-[data-theme="dark"] .programmingJobPanel > .operatorPanelHeader {
-  background: var(--panel-2);
-  border-color: var(--line);
-}
-
 [data-theme="dark"] .programmingJobField {
   border-color: var(--line);
 }
@@ -326,7 +287,6 @@
   color: var(--text);
 }
 
-[data-theme="dark"] .programmingJobCollapseButton,
 [data-theme="dark"] .programmingJobImageControl > span,
 [data-theme="dark"] .programmingJobField > strong,
 [data-theme="dark"] .programmingJobOperationChecks label,
