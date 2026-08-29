@@ -7,6 +7,7 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+from plasma_manager.config import ManagerConfig, PPURegistryEntry
 from plasma_manager.server import PlasmaManagerHandler
 
 
@@ -22,7 +23,11 @@ class ManagerReadOnlyContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.original_aggregator = PlasmaManagerHandler.aggregator
+        cls.original_config = PlasmaManagerHandler.config
         PlasmaManagerHandler.aggregator = ReadOnlyAggregator()
+        PlasmaManagerHandler.config = ManagerConfig(
+            ppus=(PPURegistryEntry(endpoint="http://127.0.0.1:9", alias="ppu-a"),),
+        )
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaManagerHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -33,10 +38,11 @@ class ManagerReadOnlyContractTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join()
         PlasmaManagerHandler.aggregator = cls.original_aggregator
+        PlasmaManagerHandler.config = cls.original_config
 
-    def request(self, method: str):
+    def request(self, method: str, path: str = "/api/fleet"):
         conn = HTTPConnection("127.0.0.1", self.server.server_port)
-        conn.request(method, "/api/fleet")
+        conn.request(method, path)
         response = conn.getresponse()
         payload = json.loads(response.read())
         status = response.status
@@ -44,14 +50,22 @@ class ManagerReadOnlyContractTests(unittest.TestCase):
         conn.close()
         return status, payload, content_type
 
-    def test_all_mutating_http_methods_are_explicitly_rejected_as_json(self):
+    def test_mutating_http_methods_remain_rejected_outside_approved_loopback_route(self):
         for method in ("POST", "PUT", "PATCH", "DELETE"):
             with self.subTest(method=method):
                 status, payload, content_type = self.request(method)
                 self.assertEqual(status, 405)
                 self.assertFalse(payload["ok"])
-                self.assertIn("read-only", payload["error"]["message"])
+                self.assertIn("PS loopback", payload["error"]["message"])
                 self.assertTrue(content_type.startswith("application/json"))
+
+    def test_unknown_ppu_alias_is_not_an_open_proxy(self):
+        status, payload, _ = self.request(
+            "POST",
+            "/api/ppus/not-enrolled/diagnostics/loopback",
+        )
+        self.assertEqual(status, 404)
+        self.assertEqual(payload["error"]["code"], "ppu_not_found")
 
     def test_cli_requires_an_explicit_manager_config(self):
         server_source = (
