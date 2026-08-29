@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Build and verify immutable Plasma product release bundles.
 
-This is a build/release tool, not an installer. It never changes services,
-installs packages, updates Git, touches FPGA/PL state, or programs target ICs.
-The build command consumes an already-built runtime payload and wraps it in the
-canonical Plasma release format. The verify command is intentionally able to
-run without access to the source repository.
+This is a build/release tool, not an installer. It consumes an already-built
+runtime payload, emits the canonical Plasma release format, and verifies that
+format without requiring source-repository access. It does not install
+packages, mutate services, update Git, touch FPGA/PL state, or program ICs.
 """
 
 from __future__ import annotations
@@ -14,7 +13,6 @@ import argparse
 import gzip
 import hashlib
 import json
-import os
 import re
 import shutil
 import stat
@@ -23,6 +21,7 @@ import sys
 import tarfile
 import tempfile
 import tomllib
+import unicodedata
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -30,7 +29,6 @@ from typing import Mapping, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PRODUCT_DESCRIPTOR_PATH = REPO_ROOT / "release" / "product.json"
 RELEASE_ROOT = "plasma-release"
 RELEASE_SCHEMA_VERSION = 1
 PRODUCT_DESCRIPTOR_SCHEMA_VERSION = 1
@@ -47,18 +45,11 @@ ROLE_TARGETS: dict[str, set[tuple[str, str]]] = {
         ("linux", "x86_64"),
         ("windows", "x86_64"),
     },
-    ROLE_PPU: {
-        ("linux", "armv7l"),
-    },
+    ROLE_PPU: {("linux", "armv7l")},
 }
 ROLE_CONTRACTS: dict[str, dict[str, str]] = {
-    ROLE_CONTROL_STATION: {
-        "web_rest_api": "3",
-    },
-    ROLE_PPU: {
-        "plasma_protocol": "3.3",
-        "web_rest_api": "3",
-    },
+    ROLE_CONTROL_STATION: {"web_rest_api": "3"},
+    ROLE_PPU: {"plasma_protocol": "3.3", "web_rest_api": "3"},
 }
 
 FORBIDDEN_PATH_SEGMENTS = {
@@ -79,13 +70,22 @@ FORBIDDEN_SECRET_BASENAMES = {
     "id_rsa",
     "secrets.json",
 }
+WINDOWS_FORBIDDEN_CHARS = set('<>:"|?*')
+WINDOWS_RESERVED_BASENAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "CLOCK$",
+    *(f"COM{index}" for index in range(1, 10)),
+    *(f"LPT{index}" for index in range(1, 10)),
+}
 SEMVER_RE = re.compile(
     r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
 )
 GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
-SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ReleaseError(ValueError):
@@ -102,24 +102,20 @@ def _sha256_file(path: Path) -> str:
 
 def _normalize_platform(value: str) -> str:
     normalized = value.strip().lower()
-    aliases = {
-        "darwin": "macos",
-        "win32": "windows",
-        "win64": "windows",
-    }
-    return aliases.get(normalized, normalized)
+    return {"darwin": "macos", "win32": "windows", "win64": "windows"}.get(
+        normalized, normalized
+    )
 
 
 def _normalize_architecture(value: str) -> str:
     normalized = value.strip().lower()
-    aliases = {
+    return {
         "aarch64": "arm64",
         "amd64": "x86_64",
         "x64": "x86_64",
         "armv7": "armv7l",
         "armhf": "armv7l",
-    }
-    return aliases.get(normalized, normalized)
+    }.get(normalized, normalized)
 
 
 def _validate_semver(value: str, *, field: str) -> str:
@@ -149,7 +145,9 @@ def _validate_build_timestamp(value: str) -> str:
 def _canonical_build_timestamp(value: str | None) -> str:
     if value is not None:
         return _validate_build_timestamp(value)
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+        "+00:00", "Z"
+    )
 
 
 def _validate_target(role: str, platform_name: str, architecture: str) -> tuple[str, str, str]:
@@ -168,13 +166,61 @@ def _validate_target(role: str, platform_name: str, architecture: str) -> tuple[
     return role, platform_name, architecture
 
 
+def _validate_portable_segment(segment: str) -> None:
+    if not segment or segment in {".", ".."}:
+        raise ReleaseError(f"invalid portable release path segment: {segment!r}")
+    if unicodedata.normalize("NFC", segment) != segment:
+        raise ReleaseError(f"release path segment must use NFC Unicode normalization: {segment!r}")
+    if any(ord(character) < 32 for character in segment):
+        raise ReleaseError(f"release path contains a control character: {segment!r}")
+    if any(character in WINDOWS_FORBIDDEN_CHARS for character in segment):
+        raise ReleaseError(f"release path is not Windows-portable: {segment!r}")
+    if segment.endswith(" ") or segment.endswith("."):
+        raise ReleaseError(f"release path may not end with a space or period: {segment!r}")
+    base = segment.split(".", 1)[0].upper()
+    if base in WINDOWS_RESERVED_BASENAMES:
+        raise ReleaseError(f"release path uses a Windows-reserved basename: {segment!r}")
+
+
+def _validate_relative_posix_path(value: str) -> PurePosixPath:
+    if not value or "\\" in value or "//" in value:
+        raise ReleaseError(f"release path is not canonical POSIX form: {value!r}")
+    pure = PurePosixPath(value)
+    if pure.is_absolute() or not pure.parts or ".." in pure.parts:
+        raise ReleaseError(f"unsafe release path: {value!r}")
+    for segment in pure.parts:
+        _validate_portable_segment(segment)
+    return pure
+
+
+def _collision_key(value: str) -> str:
+    return unicodedata.normalize("NFC", value).casefold()
+
+
+def _validate_payload_relative_path(relative: Path) -> str:
+    relative_text = relative.as_posix()
+    pure = _validate_relative_posix_path(relative_text)
+    lowered_parts = {part.casefold() for part in pure.parts}
+    forbidden = lowered_parts & FORBIDDEN_PATH_SEGMENTS
+    if forbidden:
+        raise ReleaseError(
+            f"payload path contains build/development-only segment {sorted(forbidden)[0]!r}: "
+            f"{relative_text}"
+        )
+    basename = pure.name.casefold()
+    if basename in FORBIDDEN_SECRET_BASENAMES or basename.startswith(".env."):
+        raise ReleaseError(
+            f"payload contains a prohibited secret/config filename: {relative_text}"
+        )
+    return relative_text
+
+
 def _load_product_descriptor(repo_root: Path) -> dict[str, object]:
     path = repo_root / "release" / "product.json"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ReleaseError(f"cannot load product descriptor {path}: {exc}") from exc
-
     if payload.get("schema_version") != PRODUCT_DESCRIPTOR_SCHEMA_VERSION:
         raise ReleaseError(
             f"unsupported product descriptor schema: {payload.get('schema_version')!r}"
@@ -182,7 +228,6 @@ def _load_product_descriptor(repo_root: Path) -> dict[str, object]:
     if payload.get("product") != "plasma":
         raise ReleaseError("product descriptor must identify product='plasma'")
     _validate_semver(str(payload.get("product_version", "")), field="product_version")
-
     role_contracts = payload.get("role_contracts")
     if not isinstance(role_contracts, dict):
         raise ReleaseError("product descriptor role_contracts must be an object")
@@ -203,7 +248,6 @@ def _component_versions(repo_root: Path, role: str) -> dict[str, str]:
     except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as exc:
         raise ReleaseError(f"cannot determine Python component version: {exc}") from exc
     _validate_semver(python_version, field="components.python")
-
     components = {"python": python_version}
     if role == ROLE_CONTROL_STATION:
         web_package = repo_root / "software" / "web" / "package.json"
@@ -234,34 +278,22 @@ def _discover_git_sha(repo_root: Path) -> str:
     return _validate_git_sha(completed.stdout.strip())
 
 
-def _validate_payload_relative_path(relative: Path) -> None:
-    if relative.is_absolute() or not relative.parts:
-        raise ReleaseError(f"invalid payload path: {relative}")
-    lowered_parts = {part.lower() for part in relative.parts}
-    forbidden = lowered_parts & FORBIDDEN_PATH_SEGMENTS
-    if forbidden:
-        raise ReleaseError(
-            f"payload path contains build/development-only segment {sorted(forbidden)[0]!r}: {relative}"
-        )
-    for part in relative.parts:
-        if "\n" in part or "\r" in part or "\\" in part:
-            raise ReleaseError(f"payload path contains unsupported characters: {relative}")
-    basename = relative.name.lower()
-    if basename in FORBIDDEN_SECRET_BASENAMES or basename.startswith(".env."):
-        raise ReleaseError(f"payload contains a prohibited secret/config filename: {relative}")
-
-
 def _copy_payload(source: Path, destination: Path) -> int:
     if not source.is_dir():
         raise ReleaseError(f"payload directory does not exist: {source}")
-    copied_files = 0
     destination.mkdir(parents=True, exist_ok=True)
+    copied_files = 0
+    seen_casefold: set[str] = set()
     for source_path in sorted(source.rglob("*")):
         relative = source_path.relative_to(source)
-        _validate_payload_relative_path(relative)
+        relative_text = _validate_payload_relative_path(relative)
+        collision_key = _collision_key(relative_text)
+        if collision_key in seen_casefold:
+            raise ReleaseError(f"payload has a cross-platform path collision: {relative_text}")
+        seen_casefold.add(collision_key)
         if source_path.is_symlink():
-            raise ReleaseError(f"payload symlinks are not allowed: {relative}")
-        target_path = destination / relative
+            raise ReleaseError(f"payload symlinks are not allowed: {relative_text}")
+        target_path = destination.joinpath(*PurePosixPath(relative_text).parts)
         if source_path.is_dir():
             target_path.mkdir(parents=True, exist_ok=True)
         elif source_path.is_file():
@@ -269,8 +301,17 @@ def _copy_payload(source: Path, destination: Path) -> int:
             shutil.copy2(source_path, target_path)
             copied_files += 1
         else:
-            raise ReleaseError(f"unsupported payload filesystem entry: {relative}")
+            raise ReleaseError(f"unsupported payload filesystem entry: {relative_text}")
     return copied_files
+
+
+def _archive_format(platform_name: str) -> tuple[str, str]:
+    return ("zip", ".zip") if platform_name == "windows" else ("tar.gz", ".tar.gz")
+
+
+def _artifact_name(role: str, version: str, platform_name: str, architecture: str) -> str:
+    _, suffix = _archive_format(platform_name)
+    return f"plasma-{role}-{version}-{platform_name}-{architecture}{suffix}"
 
 
 def _manifest(
@@ -299,12 +340,9 @@ def _manifest(
         "target": f"{platform_name}-{architecture}",
         "build_timestamp": build_timestamp,
         "archive_format": archive_format,
-        "contracts": dict(sorted((str(k), str(v)) for k, v in contracts.items())),
+        "contracts": dict(sorted((str(key), str(value)) for key, value in contracts.items())),
         "components": dict(sorted(components.items())),
-        "layout": {
-            "runtime": "runtime",
-            "config_defaults": "config/defaults",
-        },
+        "layout": {"runtime": "runtime", "config_defaults": "config/defaults"},
     }
 
 
@@ -314,21 +352,11 @@ def _write_sha256sums(root: Path) -> None:
         if not path.is_file() or path.name == "SHA256SUMS":
             continue
         relative = path.relative_to(root).as_posix()
+        _validate_relative_posix_path(relative)
         lines.append(f"{_sha256_file(path)}  {relative}")
     if not lines:
         raise ReleaseError("release bundle contains no files to hash")
     (root / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def _archive_format(platform_name: str) -> tuple[str, str]:
-    if platform_name == "windows":
-        return "zip", ".zip"
-    return "tar.gz", ".tar.gz"
-
-
-def _artifact_name(role: str, version: str, platform_name: str, architecture: str) -> str:
-    _, suffix = _archive_format(platform_name)
-    return f"plasma-{role}-{version}-{platform_name}-{architecture}{suffix}"
 
 
 def _tar_filter(info: tarfile.TarInfo) -> tarfile.TarInfo:
@@ -360,10 +388,7 @@ def _build_tar_gz(root: Path, artifact: Path) -> None:
 
 def _build_zip(root: Path, artifact: Path) -> None:
     with zipfile.ZipFile(
-        artifact,
-        mode="w",
-        compression=zipfile.ZIP_DEFLATED,
-        compresslevel=9,
+        artifact, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
     ) as archive:
         for path in sorted(root.rglob("*")):
             if not path.is_file():
@@ -402,11 +427,7 @@ def _verify_archive_sidecar(artifact: Path, sidecar: Path) -> str:
 
 
 def _archive_destination(base: Path, member_name: str) -> Path:
-    if "\\" in member_name:
-        raise ReleaseError(f"archive member uses non-canonical separator: {member_name!r}")
-    pure = PurePosixPath(member_name)
-    if pure.is_absolute() or not pure.parts or ".." in pure.parts:
-        raise ReleaseError(f"unsafe archive member path: {member_name!r}")
+    pure = _validate_relative_posix_path(member_name)
     if pure.parts[0] != RELEASE_ROOT:
         raise ReleaseError(
             f"archive member must be rooted at {RELEASE_ROOT!r}: {member_name!r}"
@@ -414,16 +435,27 @@ def _archive_destination(base: Path, member_name: str) -> Path:
     return base.joinpath(*pure.parts)
 
 
+def _check_archive_member_collision(
+    member_name: str, seen_exact: set[str], seen_portable: set[str]
+) -> None:
+    if member_name in seen_exact:
+        raise ReleaseError(f"duplicate archive member: {member_name}")
+    portable = _collision_key(member_name)
+    if portable in seen_portable:
+        raise ReleaseError(f"cross-platform archive path collision: {member_name}")
+    seen_exact.add(member_name)
+    seen_portable.add(portable)
+
+
 def _extract_zip(artifact: Path, destination: Path) -> None:
     file_count = 0
     total_size = 0
-    seen: set[str] = set()
+    seen_exact: set[str] = set()
+    seen_portable: set[str] = set()
     try:
         with zipfile.ZipFile(artifact, "r") as archive:
             for info in archive.infolist():
-                if info.filename in seen:
-                    raise ReleaseError(f"duplicate archive member: {info.filename}")
-                seen.add(info.filename)
+                _check_archive_member_collision(info.filename, seen_exact, seen_portable)
                 target = _archive_destination(destination, info.filename)
                 mode = (info.external_attr >> 16) & 0xFFFF
                 if stat.S_ISLNK(mode):
@@ -445,13 +477,12 @@ def _extract_zip(artifact: Path, destination: Path) -> None:
 def _extract_tar_gz(artifact: Path, destination: Path) -> None:
     file_count = 0
     total_size = 0
-    seen: set[str] = set()
+    seen_exact: set[str] = set()
+    seen_portable: set[str] = set()
     try:
         with tarfile.open(artifact, "r:gz") as archive:
             for member in archive.getmembers():
-                if member.name in seen:
-                    raise ReleaseError(f"duplicate archive member: {member.name}")
-                seen.add(member.name)
+                _check_archive_member_collision(member.name, seen_exact, seen_portable)
                 target = _archive_destination(destination, member.name)
                 if member.isdir():
                     target.mkdir(parents=True, exist_ok=True)
@@ -488,16 +519,19 @@ def _parse_sha256sums(path: Path) -> dict[str, str]:
     except OSError as exc:
         raise ReleaseError(f"cannot read {path}: {exc}") from exc
     expected: dict[str, str] = {}
+    seen_portable: set[str] = set()
     for line in lines:
         match = re.fullmatch(r"([0-9a-f]{64})  ([^\r\n]+)", line)
         if match is None:
             raise ReleaseError(f"invalid SHA256SUMS line: {line!r}")
         digest, relative = match.groups()
-        pure = PurePosixPath(relative)
-        if pure.is_absolute() or ".." in pure.parts or "\\" in relative:
-            raise ReleaseError(f"unsafe SHA256SUMS path: {relative!r}")
+        _validate_relative_posix_path(relative)
         if relative == "SHA256SUMS" or relative in expected:
             raise ReleaseError(f"invalid or duplicate SHA256SUMS entry: {relative!r}")
+        portable = _collision_key(relative)
+        if portable in seen_portable:
+            raise ReleaseError(f"cross-platform SHA256SUMS path collision: {relative!r}")
+        seen_portable.add(portable)
         expected[relative] = digest
     if not expected:
         raise ReleaseError("SHA256SUMS must contain at least one entry")
@@ -519,7 +553,7 @@ def _verify_tree_hashes(root: Path) -> None:
         extra = sorted(actual_files - set(expected))
         raise ReleaseError(f"release file-set mismatch; missing={missing}, extra={extra}")
     for relative, expected_digest in sorted(expected.items()):
-        actual_digest = _sha256_file(root / PurePosixPath(relative))
+        actual_digest = _sha256_file(root.joinpath(*PurePosixPath(relative).parts))
         if actual_digest != expected_digest:
             raise ReleaseError(
                 f"release file SHA-256 mismatch for {relative}: "
@@ -554,30 +588,31 @@ def _validate_manifest(manifest: Mapping[str, object], *, archive_format: str) -
     _validate_semver(str(manifest["product_version"]), field="product_version")
     _validate_git_sha(str(manifest["git_sha"]))
     role, platform_name, architecture = _validate_target(
-        str(manifest["role"]),
-        str(manifest["platform"]),
-        str(manifest["architecture"]),
+        str(manifest["role"]), str(manifest["platform"]), str(manifest["architecture"])
     )
-    if manifest["role"] != role or manifest["platform"] != platform_name or manifest["architecture"] != architecture:
-        raise ReleaseError("release.json role/platform/architecture must already use canonical names")
+    if (
+        manifest["role"] != role
+        or manifest["platform"] != platform_name
+        or manifest["architecture"] != architecture
+    ):
+        raise ReleaseError("release.json role/platform/architecture must use canonical names")
     if manifest["target"] != f"{platform_name}-{architecture}":
         raise ReleaseError("release.json target does not match platform/architecture")
     _validate_build_timestamp(str(manifest["build_timestamp"]))
     if manifest["archive_format"] != archive_format:
         raise ReleaseError(
-            f"release.json archive_format={manifest['archive_format']!r} does not match {archive_format!r}"
+            f"release.json archive_format={manifest['archive_format']!r} does not match "
+            f"{archive_format!r}"
         )
     if manifest["contracts"] != ROLE_CONTRACTS[role]:
-        raise ReleaseError(
-            f"release contract metadata drift for {role}: {manifest['contracts']!r}"
-        )
+        raise ReleaseError(f"release contract metadata drift for {role}: {manifest['contracts']!r}")
     components = manifest["components"]
     if not isinstance(components, dict) or not components:
         raise ReleaseError("release.json components must be a non-empty object")
-    expected_component_names = {"python", "web"} if role == ROLE_CONTROL_STATION else {"python"}
-    if set(components) != expected_component_names:
+    expected_names = {"python", "web"} if role == ROLE_CONTROL_STATION else {"python"}
+    if set(components) != expected_names:
         raise ReleaseError(
-            f"release component set mismatch for {role}: expected {sorted(expected_component_names)}, "
+            f"release component set mismatch for {role}: expected {sorted(expected_names)}, "
             f"got {sorted(components)}"
         )
     for name, version in components.items():
@@ -632,9 +667,13 @@ def verify_release(
             raise ReleaseError(f"expected role {expect_role!r}, got {manifest['role']!r}")
         if expect_platform is not None and manifest["platform"] != _normalize_platform(expect_platform):
             raise ReleaseError(
-                f"expected platform {_normalize_platform(expect_platform)!r}, got {manifest['platform']!r}"
+                f"expected platform {_normalize_platform(expect_platform)!r}, "
+                f"got {manifest['platform']!r}"
             )
-        if expect_architecture is not None and manifest["architecture"] != _normalize_architecture(expect_architecture):
+        if (
+            expect_architecture is not None
+            and manifest["architecture"] != _normalize_architecture(expect_architecture)
+        ):
             raise ReleaseError(
                 f"expected architecture {_normalize_architecture(expect_architecture)!r}, "
                 f"got {manifest['architecture']!r}"
@@ -693,7 +732,6 @@ def build_release(
             raise ReleaseError("runtime payload must contain at least one file")
         if config_defaults_dir is not None:
             _copy_payload(config_defaults_dir.resolve(), root / "config" / "defaults")
-
         manifest = _manifest(
             descriptor=descriptor,
             role=role,
@@ -705,11 +743,9 @@ def build_release(
             archive_format=archive_format,
         )
         (root / "release.json").write_text(
-            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         _write_sha256sums(root)
-
         if archive_format == "zip":
             _build_zip(root, artifact)
         else:
@@ -770,20 +806,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 git_sha=args.git_sha,
                 build_timestamp=args.build_timestamp,
             )
-            result = verify_release(artifact)
-            _print_result(result)
+            _print_result(verify_release(artifact))
             return 0
         if args.command == "verify":
-            result = verify_release(
-                args.artifact,
-                sidecar=args.sidecar,
-                extract_to=args.extract_to,
-                expect_role=args.expect_role,
-                expect_platform=args.expect_platform,
-                expect_architecture=args.expect_architecture,
-                expect_version=args.expect_version,
+            _print_result(
+                verify_release(
+                    args.artifact,
+                    sidecar=args.sidecar,
+                    extract_to=args.extract_to,
+                    expect_role=args.expect_role,
+                    expect_platform=args.expect_platform,
+                    expect_architecture=args.expect_architecture,
+                    expect_version=args.expect_version,
+                )
             )
-            _print_result(result)
             return 0
     except (ReleaseError, OSError) as exc:
         print(f"product-release: {exc}", file=sys.stderr)
