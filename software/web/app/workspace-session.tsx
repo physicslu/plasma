@@ -82,9 +82,25 @@ type WorkspaceSessionContextValue = {
 
 const WorkspaceSessionContext = createContext<WorkspaceSessionContextValue | null>(null);
 const API_STORAGE_KEY = "plasma-api-base";
+const API_MODE_STORAGE_KEY = "plasma-api-mode";
+
+type ApiMode = "managed" | "standalone";
 
 function nowTime(): string {
   return new Date().toLocaleTimeString("en-GB", { hour12: false });
+}
+
+function managedApiBase(): string {
+  return `${window.location.origin}/api/manager/ppu`;
+}
+
+async function managedRoutingConfigured(): Promise<boolean> {
+  try {
+    const response = await fetch("/api/manager/ppu", { cache: "no-store" });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function WorkspaceSessionProvider({ children }: { children: ReactNode }) {
@@ -118,23 +134,57 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
   const [emodeOperations, setEmodeOperations] = useState<Operation[]>([]);
 
   useEffect(() => {
-    let saved = DEFAULT_API_BASE;
-    try {
-      const stored = window.localStorage.getItem(API_STORAGE_KEY);
-      if (stored) saved = normalizeApiBase(stored);
-    } catch {
-      // Storage is optional. The compiled default remains valid.
-    }
-    queueMicrotask(() => {
-      setApiBaseState(saved);
-      setHydrated(true);
-    });
+    let cancelled = false;
+    void (async () => {
+      let saved = DEFAULT_API_BASE;
+      let mode: ApiMode | null = null;
+      let stored: string | null = null;
+      try {
+        const rawMode = window.localStorage.getItem(API_MODE_STORAGE_KEY);
+        if (rawMode === "managed" || rawMode === "standalone") mode = rawMode;
+        stored = window.localStorage.getItem(API_STORAGE_KEY);
+      } catch {
+        // Storage is optional. Runtime discovery remains authoritative.
+      }
+
+      if (mode === "standalone") {
+        try {
+          if (stored) saved = normalizeApiBase(stored);
+        } catch {
+          saved = DEFAULT_API_BASE;
+        }
+      } else if (mode === "managed" || await managedRoutingConfigured()) {
+        saved = managedApiBase();
+        try {
+          window.localStorage.setItem(API_MODE_STORAGE_KEY, "managed");
+          window.localStorage.setItem(API_STORAGE_KEY, saved);
+        } catch {
+          // Storage is optional.
+        }
+      } else {
+        try {
+          if (stored) saved = normalizeApiBase(stored);
+        } catch {
+          saved = DEFAULT_API_BASE;
+        }
+      }
+
+      if (!cancelled) {
+        setApiBaseState(saved);
+        setHydrated(true);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const setApiBase = useCallback((value: string): string => {
     const normalized = normalizeApiBase(value);
+    const mode: ApiMode = normalized === managedApiBase() ? "managed" : "standalone";
     setApiBaseState(normalized);
-    try { window.localStorage.setItem(API_STORAGE_KEY, normalized); } catch { /* storage is optional */ }
+    try {
+      window.localStorage.setItem(API_STORAGE_KEY, normalized);
+      window.localStorage.setItem(API_MODE_STORAGE_KEY, mode);
+    } catch { /* storage is optional */ }
     return normalized;
   }, []);
 
