@@ -17,6 +17,9 @@ product_release = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = product_release
 spec.loader.exec_module(product_release)
 
+PRODUCT_VERSION = json.loads(
+    (REPO_ROOT / "release" / "product.json").read_text(encoding="utf-8")
+)["product_version"]
 GIT_SHA = "0123456789abcdef0123456789abcdef01234567"
 BUILD_TIMESTAMP = "2026-08-30T00:00:00Z"
 
@@ -39,7 +42,7 @@ def test_source_product_descriptor_matches_embedded_release_contract() -> None:
     descriptor = product_release._load_product_descriptor(REPO_ROOT)
 
     assert descriptor["product"] == "plasma"
-    assert descriptor["product_version"] == "0.1.0"
+    assert descriptor["product_version"] == PRODUCT_VERSION
     assert descriptor["role_contracts"] == product_release.ROLE_CONTRACTS
 
 
@@ -62,7 +65,7 @@ def test_build_and_verify_linux_control_station_tar_gz_with_clean_extraction(
         build_timestamp=BUILD_TIMESTAMP,
     )
 
-    assert artifact.name == "plasma-control-station-0.1.0-linux-x86_64.tar.gz"
+    assert artifact.name == f"plasma-control-station-{PRODUCT_VERSION}-linux-x86_64.tar.gz"
     assert Path(str(artifact) + ".sha256").is_file()
 
     clean = tmp_path / "clean"
@@ -72,7 +75,7 @@ def test_build_and_verify_linux_control_station_tar_gz_with_clean_extraction(
         expect_role="control-station",
         expect_platform="linux",
         expect_architecture="x86_64",
-        expect_version="0.1.0",
+        expect_version=PRODUCT_VERSION,
     )
 
     extracted = clean / "plasma-release"
@@ -82,7 +85,9 @@ def test_build_and_verify_linux_control_station_tar_gz_with_clean_extraction(
     assert (extracted / "config" / "defaults" / "plasma-defaults.json").is_file()
     manifest = json.loads((extracted / "release.json").read_text(encoding="utf-8"))
     assert manifest["archive_format"] == "tar.gz"
-    assert manifest["components"] == {"python": "0.3.2", "web": "0.1.0"}
+    assert manifest["components"] == product_release._component_versions(
+        REPO_ROOT, "control-station"
+    )
     assert manifest["contracts"] == {"web_rest_api": "3"}
     assert result["artifact_sha256"] == product_release._sha256_file(artifact)
 
@@ -103,7 +108,7 @@ def test_windows_control_station_uses_zip_and_normalizes_amd64(tmp_path: Path) -
         build_timestamp=BUILD_TIMESTAMP,
     )
 
-    assert artifact.name == "plasma-control-station-0.1.0-windows-x86_64.zip"
+    assert artifact.name == f"plasma-control-station-{PRODUCT_VERSION}-windows-x86_64.zip"
     result = product_release.verify_release(
         artifact,
         expect_role="control-station",
@@ -127,7 +132,7 @@ def test_ppu_release_has_ppu_contracts_and_python_component_only(tmp_path: Path)
     )
 
     result = product_release.verify_release(artifact)
-    assert result["components"] == {"python": "0.3.2"}
+    assert result["components"] == product_release._component_versions(REPO_ROOT, "ppu")
     assert result["contracts"] == {
         "plasma_protocol": "3.3",
         "web_rest_api": "3",
