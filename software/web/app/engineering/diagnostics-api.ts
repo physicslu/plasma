@@ -1,4 +1,4 @@
-import { normalizeApiBase, PlasmaApiError } from "../plasma-api";
+import { PlasmaApiError } from "../plasma-api";
 
 export type LoopbackEndpoint = "ps" | "pl" | "ic";
 export type LoopbackPattern = "prbs" | "increment" | "zero" | "ones" | "aa" | "55" | "walking1" | "walking0";
@@ -19,6 +19,11 @@ export type LoopbackCaseResponse = {
   ok: true;
   rest_contract_version?: string;
   diagnostic_protocol_version: string;
+  manager: {
+    relay: "pass-through";
+    ppu_alias: string;
+    manager_rtt_ms: number;
+  };
   loopback: {
     endpoint: "ps";
     source: "ps";
@@ -39,14 +44,14 @@ type ErrorPayload = {
   error?: {
     message?: string;
     error_code?: string;
+    code?: string;
   };
 };
 
 export async function executePsLoopbackCase(
-  apiBase: string,
   request: LoopbackCaseRequest,
 ): Promise<LoopbackCaseResponse> {
-  const response = await fetch(`${normalizeApiBase(apiBase)}/api/engineering/diagnostics/loopback`, {
+  const response = await fetch("/api/manager/diagnostics/loopback", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -57,7 +62,7 @@ export async function executePsLoopbackCase(
     throw new PlasmaApiError(
       error.error?.message ?? `Loopback diagnostic failed with HTTP ${response.status}`,
       response.status,
-      error.error?.error_code,
+      error.error?.error_code ?? error.error?.code,
       response.status === 503 || response.status === 504,
     );
   }
