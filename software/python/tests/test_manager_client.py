@@ -44,6 +44,25 @@ class FakePPUGatewayHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"not-json")
 
+    def do_POST(self):
+        if self.path != "/api/engineering/diagnostics/loopback":
+            self._json(HTTPStatus.NOT_FOUND, {"ok": False})
+            return
+        content_length = int(self.headers.get("Content-Length", "0"))
+        body = json.loads(self.rfile.read(content_length))
+        self._json(
+            HTTPStatus.OK,
+            {
+                "ok": True,
+                "loopback": {
+                    "endpoint": body["endpoint"],
+                    "source": "ps",
+                    "test_id": body["test_id"],
+                    "sequence": body["sequence"],
+                },
+            },
+        )
+
 
 class ManagerPPUHttpClientTests(unittest.TestCase):
     @classmethod
@@ -78,6 +97,21 @@ class ManagerPPUHttpClientTests(unittest.TestCase):
             self.client.node()
         with self.assertRaises(PPUHTTPError):
             self.client.status()
+
+    def test_ps_loopback_uses_only_the_fixed_diagnostic_route(self):
+        status, payload = self.client.ps_loopback(
+            {
+                "endpoint": "ps",
+                "test_id": "relay-test",
+                "sequence": 7,
+                "timeout_ms": 5000,
+            },
+            timeout_s=2.0,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["loopback"]["source"], "ps")
+        self.assertEqual(payload["loopback"]["sequence"], 7)
 
 
 if __name__ == "__main__":
