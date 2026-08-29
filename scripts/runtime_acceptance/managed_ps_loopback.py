@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import zlib
 
 from common import AcceptanceError, Client
 
@@ -9,15 +10,21 @@ SCENARIO = "ps-loopback"
 
 def run(client: Client) -> dict:
     payload = b"\x00"
+    encoded = base64.b64encode(payload).decode("ascii")
+    tx_crc32 = f"{zlib.crc32(payload) & 0xFFFFFFFF:08x}"
     status, response = client.request(
         "POST",
-        "/api/diagnostics/loopback",
+        "/api/engineering/diagnostics/loopback",
         json_body={
             "endpoint": "ps",
             "test_id": f"runtime-acceptance-{client._run_id}",
             "sequence": 1,
             "pattern": "zero",
-            "payload_base64": base64.b64encode(payload).decode("ascii"),
+            "seed": "",
+            "payload_length": len(payload),
+            "payload_base64": encoded,
+            "tx_crc32": tx_crc32,
+            "timeout_ms": 10_000,
         },
         headers={"Idempotency-Key": client.idem("ps-loopback")},
     )
@@ -27,9 +34,9 @@ def run(client: Client) -> dict:
     manager = response.get("manager") or {}
     if loopback.get("endpoint") != "ps" or loopback.get("source") != "ps":
         raise AcceptanceError("PS Loopback response did not originate from PS endpoint")
-    if loopback.get("tx_crc32") != loopback.get("rx_crc32"):
+    if loopback.get("tx_crc32") != tx_crc32 or loopback.get("rx_crc32") != tx_crc32:
         raise AcceptanceError("PS Loopback CRC mismatch")
-    if response.get("payload_base64") != base64.b64encode(payload).decode("ascii"):
+    if response.get("payload_base64") != encoded:
         raise AcceptanceError("PS Loopback payload mismatch")
     if manager.get("relay") != "pass-through" or not manager.get("ppu_alias"):
         raise AcceptanceError("Manager relay evidence is missing")
