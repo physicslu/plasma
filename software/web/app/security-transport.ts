@@ -12,6 +12,7 @@ type SecurityErrorPayload = {
 };
 
 const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_PLASMA_API_URL ?? "https://plasma.open4th.com";
+const MANAGED_PPU_PREFIX = "/api/manager/ppu";
 const MAX_AMBIGUOUS_COMMANDS = 256;
 const listeners = new Set<Listener>();
 const ambiguousCommandIds = new Map<string, string>();
@@ -107,8 +108,16 @@ function configuredGatewayOrigins(): Set<string> {
   return origins;
 }
 
-function isGatewayPath(pathname: string): boolean {
+function directGatewayPath(pathname: string): boolean {
   return gatewayPathPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+function isGatewayPath(pathname: string): boolean {
+  if (directGatewayPath(pathname)) return true;
+  if (pathname.startsWith(`${MANAGED_PPU_PREFIX}/`)) {
+    return directGatewayPath(pathname.slice(MANAGED_PPU_PREFIX.length));
+  }
+  return false;
 }
 
 function isGatewayRequest(url: URL): boolean {
@@ -173,7 +182,7 @@ function outputDownloadAnchor(target: EventTarget | null): HTMLAnchorElement | n
   try {
     const url = new URL(anchor.href, window.location.href);
     if (!isGatewayRequest(url)) return null;
-    if (!/^\/api\/(?:engineering\/targets\/[^/]+\/[^/]+\/api\/)?jobs\/[^/]+\/files\/[^/]+$/.test(url.pathname)) {
+    if (!/^\/api\/(?:manager\/ppu\/)?(?:engineering\/targets\/[^/]+\/[^/]+\/api\/)?jobs\/[^/]+\/files\/[^/]+$/.test(url.pathname)) {
       return null;
     }
     return anchor;
