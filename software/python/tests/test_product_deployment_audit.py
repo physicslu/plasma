@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -9,6 +10,7 @@ SCRIPT = REPO_ROOT / "scripts" / "product-deploy.py"
 spec = importlib.util.spec_from_file_location("product_deploy", SCRIPT)
 assert spec is not None and spec.loader is not None
 product_deploy = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = product_deploy
 spec.loader.exec_module(product_deploy)
 
 
