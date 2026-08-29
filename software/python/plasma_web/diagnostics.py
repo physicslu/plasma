@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import time
 from collections.abc import Callable
 from typing import Any
@@ -68,7 +69,7 @@ def _parse_payload(body: dict[str, Any]) -> tuple[bytes, str]:
         raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "payload_base64 must be a non-empty string")
     try:
         payload = base64.b64decode(encoded, validate=True)
-    except ValueError as exc:
+    except (ValueError, binascii.Error) as exc:
         raise PlasmaError(
             ErrorCode.INVALID_ARGUMENT,
             "payload_base64 is invalid",
@@ -119,9 +120,15 @@ async def execute_ps_loopback(
     pattern = body["pattern"]
     seed = body["seed"]
     if not isinstance(pattern, str) or not pattern or len(pattern) > 128:
-        raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "pattern must be a non-empty string of at most 128 characters")
+        raise PlasmaError(
+            ErrorCode.INVALID_ARGUMENT,
+            "pattern must be a non-empty string of at most 128 characters",
+        )
     if not isinstance(seed, str) or len(seed) > 128:
-        raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "seed must be a string of at most 128 characters")
+        raise PlasmaError(
+            ErrorCode.INVALID_ARGUMENT,
+            "seed must be a string of at most 128 characters",
+        )
     payload, tx_crc32 = _parse_payload(body)
 
     started_at = time.monotonic()
@@ -158,7 +165,11 @@ async def execute_ps_loopback(
 
     if returned != payload:
         mismatch = next(
-            (index for index, (expected_byte, actual_byte) in enumerate(zip(payload, returned)) if expected_byte != actual_byte),
+            (
+                index
+                for index, (expected_byte, actual_byte) in enumerate(zip(payload, returned))
+                if expected_byte != actual_byte
+            ),
             min(len(payload), len(returned)),
         )
         raise PlasmaError(
