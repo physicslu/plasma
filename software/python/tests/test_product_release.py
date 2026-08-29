@@ -160,9 +160,12 @@ def test_unsupported_target_fails_closed(tmp_path: Path) -> None:
         Path("node_modules/pkg/index.js"),
         Path("tests/test_runtime.py"),
         Path("nested/.git/config"),
+        Path("CON.txt"),
+        Path("bad:name.txt"),
+        Path("trailing."),
     ],
 )
-def test_build_rejects_secret_and_development_only_payload_paths(
+def test_build_rejects_non_product_or_nonportable_payload_paths(
     tmp_path: Path,
     relative: Path,
 ) -> None:
@@ -172,6 +175,25 @@ def test_build_rejects_secret_and_development_only_payload_paths(
     path.write_text("should not ship\n", encoding="utf-8")
 
     with pytest.raises(product_release.ReleaseError):
+        product_release.build_release(
+            repo_root=REPO_ROOT,
+            runtime_dir=runtime,
+            output_dir=tmp_path / "out",
+            role="ppu",
+            platform_name="linux",
+            architecture="armv7l",
+            git_sha=GIT_SHA,
+            build_timestamp=BUILD_TIMESTAMP,
+        )
+
+
+def test_build_rejects_casefold_path_collision(tmp_path: Path) -> None:
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "Alpha.txt").write_text("A\n", encoding="utf-8")
+    (runtime / "alpha.txt").write_text("a\n", encoding="utf-8")
+
+    with pytest.raises(product_release.ReleaseError, match="cross-platform path collision"):
         product_release.build_release(
             repo_root=REPO_ROOT,
             runtime_dir=runtime,
@@ -247,5 +269,26 @@ def test_verify_rejects_archive_path_traversal_before_extraction(tmp_path: Path)
         archive.writestr("../escape.txt", "escape")
     product_release._write_archive_sidecar(artifact)
 
-    with pytest.raises(product_release.ReleaseError, match="unsafe archive member path"):
+    with pytest.raises(product_release.ReleaseError, match="unsafe release path"):
+        product_release.verify_release(artifact)
+
+
+def test_verify_rejects_windows_drive_or_ads_style_member(tmp_path: Path) -> None:
+    artifact = tmp_path / "malicious-windows.zip"
+    with zipfile.ZipFile(artifact, "w") as archive:
+        archive.writestr("plasma-release/C:/escape.txt", "escape")
+    product_release._write_archive_sidecar(artifact)
+
+    with pytest.raises(product_release.ReleaseError, match="not Windows-portable"):
+        product_release.verify_release(artifact)
+
+
+def test_verify_rejects_cross_platform_archive_case_collision(tmp_path: Path) -> None:
+    artifact = tmp_path / "collision.zip"
+    with zipfile.ZipFile(artifact, "w") as archive:
+        archive.writestr("plasma-release/runtime/Alpha.txt", "A")
+        archive.writestr("plasma-release/runtime/alpha.txt", "a")
+    product_release._write_archive_sidecar(artifact)
+
+    with pytest.raises(product_release.ReleaseError, match="cross-platform archive path collision"):
         product_release.verify_release(artifact)
