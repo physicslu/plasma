@@ -34,3 +34,7 @@ jobs:
         run: |
           python data/device-catalog/research/validate_stm32f1_retained_evidence.py
           python data/device-catalog/research/test_stm32f1_retained_evidence.py
+      - name: Validate STM32F1 canonical admission
+        run: |
+          python data/device-catalog/research/validate_stm32f1_admission_plan.py
+          python data/device-catalog/research/test_stm32f1_canonical_admission.py
