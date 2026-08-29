@@ -262,6 +262,10 @@ class Phase29ScaleoutTests(unittest.TestCase):
         self.assertTrue(commands[3][1].endswith("retain_stm32f1_browser_evidence.py"))
         self.assertTrue(commands[4][1].endswith("stm32f1_scaleout_admission.py"))
         self.assertNotIn("write_canonical_dataset", " ".join(" ".join(command) for command in commands))
+        orchestrator_source = (HERE / "run_stm32f1_phase2_9_scaleout.py").read_text(encoding="utf-8")
+        planner_source = (HERE / "stm32f1_scaleout_admission.py").read_text(encoding="utf-8")
+        self.assertNotIn("write_canonical_dataset", orchestrator_source)
+        self.assertNotIn("write_canonical_dataset", planner_source)
 
     def test_scaleout_planner_reuses_historical_retained_evidence_without_hardcoded_batch(self) -> None:
         plan = build_scaleout_plan(
