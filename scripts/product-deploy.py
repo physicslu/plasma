@@ -2,7 +2,7 @@
 """Read-only readiness audit for Plasma product deployment roles.
 
 This script deliberately does not install packages, create directories, change
-services, update Git, or touch hardware.  It is the bootstrap boundary between
+services, update Git, or touch hardware. It is the bootstrap boundary between
 the existing SWPC integration-host workflow and future product installers.
 """
 
@@ -18,7 +18,7 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Callable, Mapping, Sequence
 
 
 MIN_PYTHON = (3, 11, 0)
@@ -26,6 +26,11 @@ MIN_NODE = (22, 13, 0)
 ROLE_CONTROL_STATION = "control-station"
 ROLE_PPU = "ppu"
 ROLES = (ROLE_CONTROL_STATION, ROLE_PPU)
+SUPPORTED_CONTROL_STATION_ARCHITECTURES = {
+    "Darwin": {"arm64", "x86_64"},
+    "Linux": {"arm64", "x86_64"},
+    "Windows": {"x86_64"},
+}
 
 
 @dataclass(frozen=True)
@@ -40,6 +45,8 @@ class AuditReport:
     role: str
     system: str
     architecture: str
+    platform_target: str
+    service_manager: str
     python_version: str
     checks: tuple[Check, ...]
 
@@ -59,6 +66,24 @@ def _version_tuple(text: str) -> tuple[int, int, int] | None:
         return None
     major, minor, patch = match.groups()
     return int(major), int(minor), int(patch or 0)
+
+
+def _normalized_architecture(architecture: str) -> str:
+    value = architecture.strip().lower()
+    aliases = {
+        "amd64": "x86_64",
+        "x64": "x86_64",
+        "aarch64": "arm64",
+    }
+    return aliases.get(value, value)
+
+
+def _platform_slug(system: str) -> str:
+    return {
+        "Darwin": "macos",
+        "Linux": "linux",
+        "Windows": "windows",
+    }.get(system, system.strip().lower() or "unknown")
 
 
 def _command_version(path: str, args: Sequence[str]) -> str | None:
@@ -87,6 +112,20 @@ def _required_command(
     if path is None:
         return Check(name, "fail", f"missing: {detail}")
     return Check(name, "pass", path)
+
+
+def _required_one_of(
+    name: str,
+    candidates: Sequence[str],
+    *,
+    lookup: Callable[[str], str | None],
+    detail: str,
+) -> Check:
+    for candidate in candidates:
+        path = lookup(candidate)
+        if path is not None:
+            return Check(name, "pass", path)
+    return Check(name, "fail", f"missing: {detail}")
 
 
 def _not_required_command(
@@ -126,7 +165,7 @@ def _node_check(
         return Check(
             "node",
             "fail",
-            "Node.js is missing; current Control Console runtime requires >= 22.13",
+            "Node.js is missing; current Control Console server runtime requires >= 22.13",
         )
     text = version_reader(path, ("--version",))
     parsed = _version_tuple(text or "")
@@ -145,38 +184,170 @@ def _node_check(
     )
 
 
+def _control_station_platform_checks(
+    *,
+    system: str,
+    home: Path,
+    environment: Mapping[str, str],
+    lookup: Callable[[str], str | None],
+    systemd_runtime: Path,
+) -> tuple[str, list[Check]]:
+    checks: list[Check] = []
+    if system == "Darwin":
+        service_manager = "launchd"
+        checks.append(
+            _required_command(
+                "launchctl",
+                lookup=lookup,
+                detail="macOS Control Station services use launchd LaunchAgents",
+            )
+        )
+        library = home / "Library"
+        if library.is_dir() and os.access(library, os.W_OK):
+            checks.append(
+                Check(
+                    "product-data-root",
+                    "pass",
+                    str(library / "Application Support" / "Plasma"),
+                )
+            )
+        else:
+            checks.append(
+                Check(
+                    "product-data-root",
+                    "fail",
+                    f"expected writable macOS user Library at {library}",
+                )
+            )
+        checks.append(
+            Check(
+                "service-scope",
+                "info",
+                "macOS baseline uses per-user launchd LaunchAgents",
+            )
+        )
+        return service_manager, checks
+
+    if system == "Linux":
+        service_manager = "systemd"
+        checks.append(
+            _required_command(
+                "systemctl",
+                lookup=lookup,
+                detail="Linux Control Station services use system-level systemd units",
+            )
+        )
+        checks.append(
+            Check(
+                "systemd-runtime",
+                "pass" if systemd_runtime.is_dir() else "fail",
+                f"systemd runtime directory: {systemd_runtime}",
+            )
+        )
+        checks.append(
+            Check(
+                "product-data-root",
+                "info",
+                "planned Linux roots: /opt/plasma, /etc/plasma, /var/lib/plasma, /var/log/plasma",
+            )
+        )
+        checks.append(
+            Check(
+                "service-scope",
+                "info",
+                "Linux Control Station baseline uses system-level systemd services",
+            )
+        )
+        return service_manager, checks
+
+    if system == "Windows":
+        service_manager = "windows-scm"
+        checks.append(
+            _required_one_of(
+                "scm",
+                ("sc", "sc.exe"),
+                lookup=lookup,
+                detail="Windows Control Station services use Windows Service Control Manager",
+            )
+        )
+        program_files = environment.get("ProgramFiles", "").strip()
+        program_data = environment.get("ProgramData", "").strip()
+        checks.append(
+            Check(
+                "program-files-root",
+                "pass" if program_files else "fail",
+                f"ProgramFiles={program_files}" if program_files else "ProgramFiles is not defined",
+            )
+        )
+        checks.append(
+            Check(
+                "product-data-root",
+                "pass" if program_data else "fail",
+                f"{program_data}\\Plasma" if program_data else "ProgramData is not defined",
+            )
+        )
+        checks.append(
+            Check(
+                "service-scope",
+                "info",
+                "Windows Control Station baseline uses system services owned by Windows SCM; Task Scheduler is not the service lifecycle contract",
+            )
+        )
+        return service_manager, checks
+
+    return "unsupported", [
+        Check(
+            "service-manager",
+            "fail",
+            f"no Control Station service-manager contract for {system}",
+        )
+    ]
+
+
 def audit_control_station(
     *,
     system: str,
     architecture: str,
     version_info: Sequence[int],
     home: Path,
+    environment: Mapping[str, str],
     lookup: Callable[[str], str | None],
     version_reader: Callable[[str, Sequence[str]], str | None],
+    systemd_runtime: Path,
 ) -> AuditReport:
-    checks: list[Check] = [_python_check(version_info)]
+    normalized_arch = _normalized_architecture(architecture)
+    supported_arches = SUPPORTED_CONTROL_STATION_ARCHITECTURES.get(system)
+    supported_os = supported_arches is not None
+    architecture_supported = supported_os and normalized_arch in supported_arches
 
+    checks: list[Check] = [_python_check(version_info)]
     checks.append(
         Check(
             "operating-system",
-            "pass" if system == "Darwin" else "fail",
-            f"detected {system}; product Control Station baseline is macOS/Darwin",
+            "pass" if supported_os else "fail",
+            f"detected {system}; Control Station product baseline is macOS, Linux, or Windows",
         )
     )
     checks.append(
         Check(
             "architecture",
-            "pass" if architecture in {"arm64", "aarch64", "x86_64"} else "warn",
-            f"detected {architecture}; supported Mac baseline is arm64/x86_64",
+            "pass" if architecture_supported else "fail",
+            (
+                f"detected {normalized_arch}; planned Control Station target is {_platform_slug(system)}-{normalized_arch}"
+                if architecture_supported
+                else f"detected {normalized_arch}; no planned Control Station release target for {system}/{normalized_arch}"
+            ),
         )
     )
-    checks.append(
-        _required_command(
-            "launchctl",
-            lookup=lookup,
-            detail="macOS product services use launchd/LaunchAgent, not systemd",
-        )
+
+    service_manager, platform_checks = _control_station_platform_checks(
+        system=system,
+        home=home,
+        environment=environment,
+        lookup=lookup,
+        systemd_runtime=systemd_runtime,
     )
+    checks.extend(platform_checks)
     checks.append(_node_check(lookup=lookup, version_reader=version_reader))
     checks.append(
         _not_required_command(
@@ -196,39 +367,16 @@ def audit_control_station(
         _not_required_command(
             "timeout",
             lookup=lookup,
-            detail="GNU timeout is a CI/source-build dependency, not a Control Station runtime requirement",
+            detail="GNU timeout is a source/CI build helper, not a Control Station runtime requirement",
         )
     )
 
-    library = home / "Library"
-    if library.is_dir() and os.access(library, os.W_OK):
-        checks.append(
-            Check(
-                "application-support-root",
-                "pass",
-                str(library / "Application Support" / "Plasma"),
-            )
-        )
-    else:
-        checks.append(
-            Check(
-                "application-support-root",
-                "fail",
-                f"expected writable macOS user Library at {library}",
-            )
-        )
-
-    checks.append(
-        Check(
-            "service-scope",
-            "info",
-            "v1 Control Station baseline uses per-user launchd LaunchAgents; no systemd dependency",
-        )
-    )
     return AuditReport(
         role=ROLE_CONTROL_STATION,
         system=system,
-        architecture=architecture,
+        architecture=normalized_arch,
+        platform_target=f"{_platform_slug(system)}-{normalized_arch}",
+        service_manager=service_manager,
         python_version=platform.python_version(),
         checks=tuple(checks),
     )
@@ -243,6 +391,7 @@ def audit_ppu(
     systemd_runtime: Path,
     os_release: Path,
 ) -> AuditReport:
+    normalized_arch = _normalized_architecture(architecture)
     checks: list[Check] = [_python_check(version_info)]
 
     checks.append(
@@ -252,15 +401,15 @@ def audit_ppu(
             f"detected {system}; product PPU baseline is embedded Linux",
         )
     )
-    if architecture in {"armv7l", "armv7", "armhf", "aarch64", "arm64"}:
+    if normalized_arch in {"armv7l", "armv7", "armhf", "arm64"}:
         architecture_status = "pass"
-        architecture_detail = f"detected ARM target architecture {architecture}"
-    elif architecture == "x86_64":
+        architecture_detail = f"detected ARM target architecture {normalized_arch}"
+    elif normalized_arch == "x86_64":
         architecture_status = "warn"
         architecture_detail = "x86_64 is suitable for development/staging, not the Z2 product target"
     else:
         architecture_status = "warn"
-        architecture_detail = f"unclassified PPU architecture {architecture}"
+        architecture_detail = f"unclassified PPU architecture {normalized_arch}"
     checks.append(Check("architecture", architecture_status, architecture_detail))
     checks.append(
         _required_command(
@@ -329,7 +478,9 @@ def audit_ppu(
     return AuditReport(
         role=ROLE_PPU,
         system=system,
-        architecture=architecture,
+        architecture=normalized_arch,
+        platform_target=f"linux-{normalized_arch}",
+        service_manager="systemd",
         python_version=platform.python_version(),
         checks=tuple(checks),
     )
@@ -346,7 +497,9 @@ def run_audit(role: str) -> AuditReport:
         return audit_control_station(
             **common,
             home=Path.home(),
+            environment=os.environ,
             version_reader=_command_version,
+            systemd_runtime=Path("/run/systemd/system"),
         )
     if role == ROLE_PPU:
         return audit_ppu(
@@ -360,6 +513,8 @@ def run_audit(role: str) -> AuditReport:
 def _print_text(report: AuditReport) -> None:
     print(f"Plasma product deployment audit: {report.role}")
     print(f"Platform: {report.system} {report.architecture}")
+    print(f"Target:   {report.platform_target}")
+    print(f"Service:  {report.service_manager}")
     print(f"Python:   {report.python_version}")
     print()
     for check in report.checks:
