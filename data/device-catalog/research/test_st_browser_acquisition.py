@@ -182,8 +182,18 @@ class BrowserAcquisitionTests(unittest.TestCase):
     def test_live_browser_defaults_to_headed_with_explicit_headless_opt_in(self) -> None:
         default_args = parse_args(["--output", "/tmp/control.json"])
         self.assertFalse(default_args.headless)
+        self.assertEqual(default_args.control_base_device, CONTROL_BASE_DEVICE)
         headless_args = parse_args(["--headless", "--output", "/tmp/control.json"])
         self.assertTrue(headless_args.headless)
+        custom_args = parse_args(
+            [
+                "--control-base-device",
+                "STM32F100CB",
+                "--output",
+                "/tmp/control.json",
+            ]
+        )
+        self.assertEqual(custom_args.control_base_device, "STM32F100CB")
 
     def test_browser_evidence_can_be_scale_ready_without_claiming_raw_http(self) -> None:
         evidence = build_browser_evidence_record(
@@ -254,6 +264,25 @@ class BrowserAcquisitionTests(unittest.TestCase):
             [CONTROL_BASE_DEVICE],
         )
         self.assertEqual(select_targets("pilot", targets), targets)
+
+    def test_control_scope_can_select_explicit_scaleout_control(self) -> None:
+        targets = [
+            PilotTarget(
+                "STM32F100CB",
+                "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html",
+                "scaleout control",
+            ),
+            PilotTarget(CONTROL_BASE_DEVICE, TARGET_URL, "historical control"),
+        ]
+        self.assertEqual(
+            [
+                target.base_device
+                for target in select_targets(
+                    "control", targets, control_base_device="STM32F100CB"
+                )
+            ],
+            ["STM32F100CB"],
+        )
 
     def test_control_scope_fails_if_manifest_loses_control_target(self) -> None:
         targets = [
