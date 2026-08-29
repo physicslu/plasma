@@ -1,0 +1,65 @@
+import { normalizeApiBase, PlasmaApiError } from "../plasma-api";
+
+export type LoopbackEndpoint = "ps" | "pl" | "ic";
+export type LoopbackPattern = "prbs" | "increment" | "zero" | "ones" | "aa" | "55" | "walking1" | "walking0";
+
+export type LoopbackCaseRequest = {
+  endpoint: LoopbackEndpoint;
+  test_id: string;
+  sequence: number;
+  pattern: LoopbackPattern;
+  seed: string;
+  payload_length: number;
+  payload_base64: string;
+  tx_crc32: string;
+  timeout_ms: number;
+};
+
+export type LoopbackCaseResponse = {
+  ok: true;
+  rest_contract_version?: string;
+  diagnostic_protocol_version: string;
+  loopback: {
+    endpoint: "ps";
+    source: "ps";
+    test_id: string;
+    sequence: number;
+    transform: "echo";
+    pattern: string;
+    seed: string;
+    payload_length: number;
+    tx_crc32: string;
+    rx_crc32: string;
+    ppu_rtt_ms: number;
+  };
+  payload_base64: string;
+};
+
+type ErrorPayload = {
+  error?: {
+    message?: string;
+    error_code?: string;
+  };
+};
+
+export async function executePsLoopbackCase(
+  apiBase: string,
+  request: LoopbackCaseRequest,
+): Promise<LoopbackCaseResponse> {
+  const response = await fetch(`${normalizeApiBase(apiBase)}/api/engineering/diagnostics/loopback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const payload = await response.json() as LoopbackCaseResponse | ErrorPayload;
+  if (!response.ok || !("ok" in payload) || payload.ok !== true) {
+    const error = payload as ErrorPayload;
+    throw new PlasmaApiError(
+      error.error?.message ?? `Loopback diagnostic failed with HTTP ${response.status}`,
+      response.status,
+      error.error?.error_code,
+      response.status === 503 || response.status === 504,
+    );
+  }
+  return payload as LoopbackCaseResponse;
+}
