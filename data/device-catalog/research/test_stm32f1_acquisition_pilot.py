@@ -72,6 +72,28 @@ class PilotTests(unittest.TestCase):
             with self.assertRaisesRegex(AcquisitionError, "duplicate pilot base_device"):
                 read_manifest(path)
 
+    def test_manifest_rejects_more_than_ten_targets(self) -> None:
+        payload = {
+            "schema_version": 1,
+            "pilot_id": "too-large",
+            "targets": [
+                {
+                    "base_device": f"STM32F100C{index:X}",
+                    "source_url": (
+                        "https://www.st.com/en/microcontrollers-microprocessors/"
+                        f"stm32f100c{index:x}.html"
+                    ),
+                    "selection_reason": "bounded pilot test",
+                }
+                for index in range(11)
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "manifest.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(AcquisitionError, "bounded target limit of 10"):
+                read_manifest(path)
+
     def test_catalog_mapping_classifies_unique_ambiguous_and_unmapped(self) -> None:
         rows = [
             {
