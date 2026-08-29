@@ -49,6 +49,7 @@ type ErrorPayload = {
 };
 
 export async function executePsLoopbackCase(
+  _apiBase: string,
   request: LoopbackCaseRequest,
 ): Promise<LoopbackCaseResponse> {
   const response = await fetch("/api/manager/diagnostics/loopback", {
@@ -66,5 +67,19 @@ export async function executePsLoopbackCase(
       response.status === 503 || response.status === 504,
     );
   }
-  return payload as LoopbackCaseResponse;
+  const success = payload as LoopbackCaseResponse;
+  if (
+    success.manager?.relay !== "pass-through"
+    || typeof success.manager.ppu_alias !== "string"
+    || success.manager.ppu_alias.length === 0
+    || typeof success.manager.manager_rtt_ms !== "number"
+  ) {
+    throw new PlasmaApiError(
+      "Loopback response did not prove the Plasma Manager pass-through boundary",
+      502,
+      "manager_relay_unverified",
+      false,
+    );
+  }
+  return success;
 }
