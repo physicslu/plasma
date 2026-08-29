@@ -69,12 +69,12 @@ test("Phase 0 PS loopback crosses the Manager pass-through before the PPU", () =
   assert.match(managerBff, /\/api\/ppus\/\$\{encodeURIComponent\(ppuAlias\)\}\/diagnostics\/loopback/);
   assert.match(managerBff, /LOOPBACK_HOSTS/);
   assert.doesNotMatch(managerBff, /NEXT_PUBLIC_PLASMA_API_URL/);
+  assert.match(loopback, /Browser → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → Browser/);
 });
 
 test("Phase 0 still executes only the PS production real path", () => {
   assert.match(loopback, /endpoint !== "ps"/);
   assert.match(loopback, /executePsLoopbackCase/);
-  assert.match(loopback, /Browser → REST Gateway → Plasma Server → Browser/);
   assert.match(loopback, /does not use MockInterface/);
   assert.match(loopback, /never falls back to Mock/);
   assert.doesNotMatch(loopback, /mock-runtime|MockRuntime|mockRuntime/);
@@ -83,9 +83,10 @@ test("Phase 0 still executes only the PS production real path", () => {
   assert.match(loopback, /firstMismatch\(payload, returned\)/);
 });
 
-test("results render observed CRC, RTT and endpoint verification", () => {
+test("results render observed CRC, Manager RTT, PPU RTT and endpoint verification", () => {
   assert.match(loopback, /TX CRC32/);
   assert.match(loopback, /RX CRC32/);
+  assert.match(loopback, /Manager RTT/);
   assert.match(loopback, /PPU RTT/);
   assert.match(loopback, /loopbackResultBadge/);
   assert.match(resultCss, /\.loopbackResultBadge\.pass/);
