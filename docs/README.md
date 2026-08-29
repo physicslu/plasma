@@ -27,6 +27,7 @@
 - **Current** — [Server-side Batch Runtime](architecture/server-side-batch-runtime.md)
 - **Current** — [Batch Persistence and Gateway Restart Recovery](architecture/batch-persistence-recovery.md)
 - **Current** — [Gateway Communication and Recovery](architecture/gateway-communication-recovery.md)
+- **Current** — [Production Real-Path Loopback Diagnostics](architecture/diagnostics-real-path-loopback.md)
 - **Reference** — [Remote Write Security Boundary](architecture/remote-write-security-boundary.md)
 - **Current** — [PMode Factory Console v2](architecture/pmode-factory-console-v2.md)
 - **Current** — [Engineering Programming Workspace](architecture/engineering-programming-workspace.md)
