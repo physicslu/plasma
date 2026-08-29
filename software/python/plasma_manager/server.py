@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,7 +20,49 @@ from .poller import FleetPoller
 
 PS_LOOPBACK_ROUTE_PREFIX = "/api/ppus/"
 PS_LOOPBACK_ROUTE_SUFFIX = "/diagnostics/loopback"
-MAX_MANAGER_REQUEST_BYTES = 6 * 1024 * 1024
+MANAGED_PPU_ROUTE_PREFIX = "/api/ppus/"
+MANAGED_PPU_ROUTE_MARKER = "/gateway"
+MAX_MANAGER_REQUEST_BYTES = 24 * 1024 * 1024
+MAX_MANAGER_RESPONSE_BYTES = 32 * 1024 * 1024
+FORWARDED_REQUEST_HEADERS = frozenset({"authorization", "idempotency-key", "content-type", "accept"})
+
+_SEGMENT = r"[^/]+"
+_MANAGED_GET_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"^/api/health/live$",
+        r"^/api/health/ready$",
+        r"^/api/node$",
+        r"^/api/status$",
+        r"^/api/settings/gateway$",
+        r"^/api/mock/runtime$",
+        r"^/api/security/me$",
+        r"^/api/devices/search$",
+        r"^/api/engineering/targets$",
+        rf"^/api/jobs/{_SEGMENT}/files/{_SEGMENT}$",
+        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/status$",
+        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/jobs/{_SEGMENT}/files/{_SEGMENT}$",
+        rf"^/api/batches/{_SEGMENT}$",
+    )
+)
+_MANAGED_POST_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"^/api/settings/gateway$",
+        r"^/api/mock/runtime$",
+        r"^/api/engineering/diagnostics/loopback$",
+        r"^/api/engineering/session$",
+        r"^/api/jobs$",
+        rf"^/api/jobs/{_SEGMENT}/cancel$",
+        r"^/api/batches$",
+        rf"^/api/batches/{_SEGMENT}/cancel$",
+        rf"^/api/batches/{_SEGMENT}/targets/{_SEGMENT}/{_SEGMENT}/cancel$",
+        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/programming-assets/check$",
+        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/programming-assets$",
+        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/jobs$",
+        rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/jobs/{_SEGMENT}/cancel$",
+    )
+)
 
 
 class PlasmaManagerHandler(BaseHTTPRequestHandler):
@@ -39,6 +82,16 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _raw_response(self, status: int, headers: dict[str, str], body: bytes) -> None:
+        self.send_response(status)
+        for key, value in headers.items():
+            self.send_header(key, value)
+        if not any(key.lower() == "cache-control" for key in headers):
+            self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _aggregator(self) -> FleetAggregator:
         if self.aggregator is None:
             raise RuntimeError("Plasma Manager aggregator is not configured")
@@ -54,7 +107,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             raise RuntimeError("Plasma Manager configuration is not configured")
         return self.config
 
-    def _read_json_object(self) -> dict[str, Any]:
+    def _read_raw_body(self) -> bytes:
         raw_length = self.headers.get("Content-Length")
         try:
             content_length = int(raw_length or "0")
@@ -62,8 +115,11 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             raise ValueError("invalid Content-Length") from exc
         if content_length <= 0 or content_length > MAX_MANAGER_REQUEST_BYTES:
             raise ValueError("request body size is invalid")
+        return self.rfile.read(content_length)
+
+    def _read_json_object(self) -> dict[str, Any]:
         try:
-            payload = json.loads(self.rfile.read(content_length))
+            payload = json.loads(self._read_raw_body())
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ValueError("request body must be valid JSON") from exc
         if not isinstance(payload, dict):
@@ -75,16 +131,44 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         return matches[0] if len(matches) == 1 else None
 
     @staticmethod
-    def _parse_ps_loopback_alias(path: str) -> str | None:
-        if not path.startswith(PS_LOOPBACK_ROUTE_PREFIX) or not path.endswith(PS_LOOPBACK_ROUTE_SUFFIX):
-            return None
-        encoded = path[len(PS_LOOPBACK_ROUTE_PREFIX) : -len(PS_LOOPBACK_ROUTE_SUFFIX)]
+    def _valid_alias(encoded: str) -> str | None:
         if not encoded or "/" in encoded:
             return None
         alias = unquote(encoded)
         if not alias or alias in {".", ".."} or "/" in alias or "\\" in alias:
             return None
         return alias
+
+    @classmethod
+    def _parse_ps_loopback_alias(cls, path: str) -> str | None:
+        if not path.startswith(PS_LOOPBACK_ROUTE_PREFIX) or not path.endswith(PS_LOOPBACK_ROUTE_SUFFIX):
+            return None
+        encoded = path[len(PS_LOOPBACK_ROUTE_PREFIX) : -len(PS_LOOPBACK_ROUTE_SUFFIX)]
+        return cls._valid_alias(encoded)
+
+    @classmethod
+    def _parse_managed_ppu_route(cls, path: str) -> tuple[str, str] | None:
+        if not path.startswith(MANAGED_PPU_ROUTE_PREFIX):
+            return None
+        remainder = path[len(MANAGED_PPU_ROUTE_PREFIX) :]
+        encoded_alias, separator, after_alias = remainder.partition("/")
+        if not separator:
+            return None
+        alias = cls._valid_alias(encoded_alias)
+        if alias is None:
+            return None
+        marker = MANAGED_PPU_ROUTE_MARKER.lstrip("/")
+        if after_alias == marker or not after_alias.startswith(f"{marker}/"):
+            return None
+        target_path = "/" + after_alias[len(marker) + 1 :]
+        if not target_path.startswith("/api/") and target_path != "/api":
+            return None
+        return alias, target_path
+
+    @staticmethod
+    def _managed_route_allowed(method: str, target_path: str) -> bool:
+        patterns = _MANAGED_GET_PATTERNS if method == "GET" else _MANAGED_POST_PATTERNS if method == "POST" else ()
+        return any(pattern.fullmatch(target_path) for pattern in patterns)
 
     @staticmethod
     def _log_ps_loopback_relay(
@@ -107,6 +191,24 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             event["manager_rtt_ms"] = manager_rtt_ms
         print(json.dumps(event, ensure_ascii=False, sort_keys=True), flush=True)
 
+    @staticmethod
+    def _log_managed_relay(*, alias: str, method: str, target_path: str, result: str, http_status: int) -> None:
+        print(
+            json.dumps(
+                {
+                    "event": "manager_managed_ppu_relay",
+                    "ppu_alias": alias,
+                    "method": method,
+                    "path": target_path,
+                    "result": result,
+                    "http_status": int(http_status),
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path == "/api/health/live":
@@ -125,6 +227,11 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/fleet":
             self._json(HTTPStatus.OK, self._poller().snapshot())
+            return
+        managed = self._parse_managed_ppu_route(parsed.path)
+        if managed is not None:
+            alias, target_path = managed
+            self._relay_managed_ppu_request(alias, target_path, parsed.query)
             return
         self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": {"message": "not found"}})
 
@@ -211,17 +318,117 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             }
         self._json(status, payload)
 
+    def _relay_managed_ppu_request(self, alias: str, target_path: str, query: str) -> None:
+        if not self._managed_route_allowed(self.command, target_path):
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"ok": False, "error": {"code": "managed_route_not_allowed", "message": "Manager PPU route is not allowlisted"}},
+            )
+            return
+        entry = self._resolve_ppu_alias(alias)
+        if entry is None:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"ok": False, "error": {"code": "ppu_not_found", "message": "configured PPU alias was not found"}},
+            )
+            return
+
+        body: bytes | None = None
+        if self.command == "POST":
+            try:
+                body = self._read_raw_body()
+            except ValueError as exc:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"ok": False, "error": {"code": "invalid_request", "message": str(exc)}},
+                )
+                return
+
+        forwarded_headers = {
+            key: value
+            for key, value in self.headers.items()
+            if key.lower() in FORWARDED_REQUEST_HEADERS
+        }
+        target = target_path + (f"?{query}" if query else "")
+        client = PPUHttpClient(entry.endpoint, self._config().request_timeout_s)
+        started = time.monotonic()
+        try:
+            status, response_headers, response_body = client.relay(
+                self.command,
+                target,
+                headers=forwarded_headers,
+                body=body,
+                timeout_s=max(125.0, self._config().request_timeout_s),
+                max_response_bytes=MAX_MANAGER_RESPONSE_BYTES,
+            )
+        except PPUTransportError:
+            self._log_managed_relay(
+                alias=alias,
+                method=self.command,
+                target_path=target_path,
+                result="transport_error",
+                http_status=HTTPStatus.GATEWAY_TIMEOUT,
+            )
+            self._json(
+                HTTPStatus.GATEWAY_TIMEOUT,
+                {"ok": False, "error": {"code": "ppu_transport_error", "message": "PPU transport failed"}},
+            )
+            return
+        except PPUHTTPError:
+            self._log_managed_relay(
+                alias=alias,
+                method=self.command,
+                target_path=target_path,
+                result="protocol_error",
+                http_status=HTTPStatus.BAD_GATEWAY,
+            )
+            self._json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": {"code": "ppu_protocol_error", "message": "PPU response exceeded Manager relay contract"}},
+            )
+            return
+
+        manager_rtt_ms = round((time.monotonic() - started) * 1000, 3)
+        if target_path == "/api/engineering/diagnostics/loopback" and status == HTTPStatus.OK:
+            try:
+                payload = json.loads(response_body)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if isinstance(payload, dict) and payload.get("ok") is True:
+                payload = dict(payload)
+                payload["manager"] = {
+                    "relay": "pass-through",
+                    "ppu_alias": alias,
+                    "manager_rtt_ms": manager_rtt_ms,
+                }
+                response_body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                response_headers["Content-Type"] = "application/json; charset=utf-8"
+
+        self._log_managed_relay(
+            alias=alias,
+            method=self.command,
+            target_path=target_path,
+            result="pass-through",
+            http_status=status,
+        )
+        self._raw_response(status, response_headers, response_body)
+
     def _read_only(self) -> None:
         self._json(
             HTTPStatus.METHOD_NOT_ALLOWED,
             {
                 "ok": False,
-                "error": {"message": "Plasma Manager contract is read-only except for the approved PS loopback pass-through route"},
+                "error": {"message": "Plasma Manager read-only fleet surfaces reject mutation; only the legacy PS loopback route and explicit allowlisted Managed PPU routes accept writes"},
             },
         )
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        managed = self._parse_managed_ppu_route(parsed.path)
+        if managed is not None:
+            alias, target_path = managed
+            self._relay_managed_ppu_request(alias, target_path, parsed.query)
+            return
         alias = self._parse_ps_loopback_alias(parsed.path)
         if alias is not None:
             self._relay_ps_loopback(alias)

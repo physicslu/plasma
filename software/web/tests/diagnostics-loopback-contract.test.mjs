@@ -6,6 +6,8 @@ const engineering = await readFile(new URL("../app/engineering/page.tsx", import
 const loopback = await readFile(new URL("../app/engineering/loopback-test.tsx", import.meta.url), "utf8");
 const api = await readFile(new URL("../app/engineering/diagnostics-api.ts", import.meta.url), "utf8");
 const managerBff = await readFile(new URL("../app/api/manager/diagnostics/loopback/route.ts", import.meta.url), "utf8");
+const managedBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
+const managedRoute = await readFile(new URL("../app/api/manager/ppu/[...path]/route.ts", import.meta.url), "utf8");
 const vite = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
 const shell = await readFile(new URL("../app/engineering/diagnostics-test-page.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/engineering/loopback-test.css", import.meta.url), "utf8");
@@ -72,16 +74,20 @@ test("Manager BFF namespace stays in Vinext and receives alias binding", () => {
   assert.match(vite, /PLASMA_MANAGER_PPU_ALIAS:\s*process\.env\.PLASMA_MANAGER_PPU_ALIAS\s*\?\?\s*""/);
 });
 
-test("Phase 0 PS loopback crosses the Manager pass-through before the PPU", () => {
-  assert.match(api, /\/api\/manager\/diagnostics\/loopback/);
-  assert.doesNotMatch(api, /\/api\/engineering\/diagnostics\/loopback/);
+test("PS loopback uses the same workspace API base and shared Manager BFF relay as Programming", () => {
+  assert.match(api, /fetch\(`\$\{apiBase\}\/api\/engineering\/diagnostics\/loopback`/);
+  assert.doesNotMatch(api, /fetch\("\/api\/manager\/diagnostics\/loopback"/);
   assert.match(api, /success\.manager\?\.relay !== "pass-through"/);
   assert.match(api, /manager_relay_unverified/);
-  assert.match(managerBff, /PLASMA_MANAGER_API_URL/);
-  assert.match(managerBff, /PLASMA_MANAGER_PPU_ALIAS/);
-  assert.match(managerBff, /\/api\/ppus\/\$\{encodeURIComponent\(ppuAlias\)\}\/diagnostics\/loopback/);
-  assert.match(managerBff, /LOOPBACK_HOSTS/);
-  assert.doesNotMatch(managerBff, /NEXT_PUBLIC_PLASMA_API_URL/);
+  assert.match(managerBff, /relayManagerPpuRequest/);
+  assert.match(managerBff, /\/api\/engineering\/diagnostics\/loopback/);
+  assert.match(managedRoute, /relayManagerPpuRequest/);
+  assert.match(managedBff, /PLASMA_MANAGER_API_URL/);
+  assert.match(managedBff, /PLASMA_MANAGER_PPU_ALIAS/);
+  assert.match(managedBff, /\/api\/ppus\/\$\{encodeURIComponent\(ppuAlias\)\}\/gateway\$\{targetPath\}/);
+  assert.match(managedBff, /Authorization/);
+  assert.match(managedBff, /Idempotency-Key/);
+  assert.doesNotMatch(managedBff, /NEXT_PUBLIC_PLASMA_API_URL/);
   assert.match(loopback, /Control Console \(Browser\) → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → PS/);
 });
 

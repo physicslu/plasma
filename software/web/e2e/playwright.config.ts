@@ -48,15 +48,17 @@ export default defineConfig({
     timeout: 120_000,
     stdout: "ignore",
     stderr: "pipe",
-    // Standard browser CI does not start the Python Mock PPU Provider. Real
-    // Production multi-PPU execution, real-stack Programming Job parity and
-    // server-owned Mock settings are isolated to the dedicated Mock CD Browser
-    // Runtime Acceptance config.
+    // This suite mocks browser-visible Gateway calls with page.route(), so it
+    // deliberately exercises Standalone routing. Supplying a Manager alias here
+    // would select Managed Mode and move the downstream fetch into the server-side
+    // BFF, outside Playwright's browser interception boundary. Managed routing is
+    // covered by the explicit BFF/Manager contract tests and real cross-stack
+    // runtime acceptance; do not fake a healthy Manager in this suite.
     env: {
       ...process.env,
       PLASMA_FLEET_UI_ENABLED: "1",
       PLASMA_MANAGER_API_URL: "http://127.0.0.1:18180",
-      PLASMA_MANAGER_PPU_ALIAS: "ppu-a",
+      PLASMA_MANAGER_PPU_ALIAS: "",
     },
   },
 });

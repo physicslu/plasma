@@ -49,10 +49,10 @@ type ErrorPayload = {
 };
 
 export async function executePsLoopbackCase(
-  _apiBase: string,
+  apiBase: string,
   request: LoopbackCaseRequest,
 ): Promise<LoopbackCaseResponse> {
-  const response = await fetch("/api/manager/diagnostics/loopback", {
+  const response = await fetch(`${apiBase}/api/engineering/diagnostics/loopback`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),

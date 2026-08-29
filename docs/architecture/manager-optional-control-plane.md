@@ -2,23 +2,29 @@
 
 ## Status
 
-This document distinguishes **current implementation** from the **approved managed-routing target**.
+**Current software architecture contract.**
 
-The canonical vocabulary and target routing ownership are defined in [Control Plane Routing Architecture](control-plane-routing-architecture.md).
+Plasma Manager remains optional to each PPU's autonomous execution capability, but it is authoritative for routing requests issued by the central Control Console in Managed Mode.
+
+Canonical ownership is defined in [Control Plane Routing Architecture](control-plane-routing-architecture.md).
 
 ## Architectural invariant: PPU autonomy
 
-A Plasma PPU is a complete autonomous execution node. Plasma Manager is optional to the PPU itself and MUST NOT become a runtime prerequisite for local programming.
+A Plasma PPU is a complete autonomous execution node. It must not require a live Manager connection to:
 
-The dependency direction remains one-way:
+- start its local Plasma Server and PPU Gateway;
+- expose its explicit local/Standalone maintenance boundary;
+- continue an already accepted Job or Batch;
+- recover a Site;
+- perform local maintenance and diagnostics.
+
+Dependency remains one-way:
 
 ```text
 Plasma Manager -> PPU
 ```
 
-A PPU must never require a live Manager connection in order to start its local Plasma Server, expose its local maintenance/programming boundary, execute an already accepted Job, recover a Site, or perform local maintenance and diagnostics.
-
-This invariant does **not** mean that a centrally managed Console should bypass Manager. The approved target distinguishes two operating modes:
+PPU autonomy does **not** mean that a centrally managed Console may bypass Manager.
 
 ```text
 Standalone Mode
@@ -28,11 +34,9 @@ Managed Mode
 Control Console -> BFF -> Manager -> selected PPU Gateway -> Plasma Server -> local execution
 ```
 
-Manager is therefore optional for PPU autonomy but authoritative for **centrally managed routing** when Managed Mode is used.
+Manager is optional for the PPU, but mandatory for a Managed Mode central request once that mode is selected.
 
 ## Deployment roles
-
-Plasma distinguishes the **PPU role** from the **Management Host role**. The integration workstation may run both roles for development, but production Z2 deployment must not inherit that co-location as a requirement.
 
 ### PPU role — intended Z2 production direction
 
@@ -45,15 +49,13 @@ PPU / Z2
 └── Sites / target ICs
 ```
 
-The PPU role owns programming execution, PYNQ/FPGA integration and local Site behavior. The integration-host Vite development server, npm build toolchain and Plasma Manager are not mandatory Z2 runtime dependencies.
+The PPU owns execution. It does not own the fleet registry.
 
-A production PPU Web artifact, if used for a local Console, should be built off-target and served without requiring the Z2 to perform frontend compilation. Exact production serving mechanics remain a later Z2 deployment task and require target validation before being claimed complete.
+The integration-host Vite development runtime, build toolchain and Plasma Manager are not mandatory Z2 runtime dependencies.
 
 ### Management Host role
 
-The Management Host may be a Mac, industrial PC, mini PC, VM or factory server.
-
-Approved target:
+A Management Host may be a Mac, industrial PC, mini PC, VM or factory server:
 
 ```text
 Management Host
@@ -66,11 +68,11 @@ Management Host
        +--> ...
 ```
 
-The Management Host owns centralized visibility and managed PPU routing. It does not own FPGA / IC execution.
+The Management Host owns centralized visibility and managed routing. It does not execute FPGA/IC operations.
 
-## Mode A: standalone PPU
+## Mode A: Standalone PPU
 
-No Manager, central PC, registration service, heartbeat service, external scheduler or Fleet UI is required for local PPU capability.
+No Manager or central host is required for local PPU capability:
 
 ```text
 Local client / local PPU Console
@@ -85,19 +87,11 @@ Plasma Server
 SITE 1 .. SITE N
 ```
 
-This remains the fault-containment baseline and local-recovery path.
+Standalone Mode is an explicit operating mode and local recovery boundary. It is not an automatic fallback from Managed Mode.
 
-## Mode B: managed fleet
+## Mode B: Managed fleet
 
-### Current implementation
-
-Today Manager provides read-only registry / fleet aggregation plus a narrowly allowlisted PS Loopback pass-through. General Programming Job / Batch / Programming Asset write routing is not implemented through Manager yet.
-
-Current Manager behavior therefore remains intentionally limited and must not be described as a completed general command router.
-
-### Approved target
-
-Managed Console operations use one routing owner:
+Managed Mode uses one routing owner:
 
 ```text
 Control Console
@@ -108,7 +102,7 @@ BFF
       v
 Plasma Manager
       |
-      | resolve canonical ppu_alias / ppu_id
+      | resolve configured ppu_alias / canonical identity
       v
 Target PPU Gateway
       |
@@ -119,46 +113,56 @@ Plasma Server
 local execution
 ```
 
-Programming and Loopback diagnostics must share this managed prefix. The Console must not use a target PPU URL as the managed routing source of truth.
+PMode, EMode, Programming Asset/Image transfer and PS Loopback use the same Managed Mode routing ownership.
 
-The target write path must be implemented as explicit domain APIs. Manager must not become a generic arbitrary-URL reverse proxy.
+A previously stored direct Gateway URL is not the Managed Mode routing source of truth. When the Management Host is configured for Manager routing, the shared Workspace API base uses the same-origin Manager BFF path. An operator may select Standalone Mode explicitly when a direct local PPU workflow is intended.
 
 ## Browser-facing BFF boundary
 
-BFF means **Backend for Frontend** and is the presentation boundary serving the Control Console.
+BFF means **Backend for Frontend**. It is the presentation boundary for the Control Console.
 
-Its role is to provide same-origin browser APIs, hide internal Manager listener details, shape UI requests, enforce browser-facing validation/session boundaries and sanitize errors.
+It provides:
 
-It does **not** own fleet routing.
+- same-origin browser APIs;
+- validation of the management-host-local Manager configuration;
+- a configured PPU alias without exposing the PPU endpoint;
+- bounded body forwarding for Programming Asset/Image traffic;
+- propagation of required `Authorization` and `Idempotency-Key` headers;
+- binary response preservation for readback;
+- fail-closed behavior when Manager is unavailable.
 
-Current fleet read path is conceptually:
-
-```text
-Browser GET /api/fleet
-    -> Web BFF
-    -> Manager
-```
-
-The approved managed write direction extends this same ownership model with explicit APIs rather than exposing Manager internals or arbitrary PPU endpoint URLs directly to the browser.
+The BFF does not accept arbitrary PPU destination URLs and does not own the alias-to-endpoint mapping.
 
 ## Plasma Manager boundary
 
-Manager owns fleet identity and managed routing:
+Manager owns fleet identity and managed route resolution:
 
 ```text
 ppu-a -> configured PPU A Gateway
 ppu-b -> configured PPU B Gateway
 ```
 
-A managed caller supplies canonical identity / alias; Manager resolves it through its registry.
+A managed request is relayed only through explicit allowlisted domain route families. Manager is **not** a generic arbitrary-method/arbitrary-URL HTTP proxy.
 
-Manager must not accept caller-controlled destination URLs for production command forwarding. Authentication, authorization, auditability, replay/idempotency, timeout and failure semantics must be defined on explicit write contracts before each command family becomes production-capable.
+Current managed route families support the central PPU workflow for:
+
+- PPU health/status and target discovery;
+- Engineering sessions;
+- Programming Asset/Image check and upload;
+- Job submit/status/cancel/readback;
+- server-side Batch submit/status/cancel;
+- Gateway communication-policy read/write;
+- Engineering Mock runtime settings read/write when that PPU runtime exposes the Mock feature;
+- authenticated Principal introspection;
+- PS real-path Loopback.
+
+The Gateway/Mock settings writes remain subject to the PPU secure Gateway's `GATEWAY_SETTINGS_WRITE` and `MOCK_SETTINGS_WRITE` authorization/idempotency contracts. Manager merely preserves and routes that evidence.
+
+The fleet registry and fleet observation resources themselves remain read-only surfaces. Unsupported write routes fail closed.
 
 ## PPU Gateway boundary
 
-The PPU Gateway is the northbound network boundary of one Programmer.
-
-Target Z2 placement:
+The PPU Gateway is the northbound network boundary of one Programmer:
 
 ```text
 Z2 / PPU
@@ -169,97 +173,94 @@ Z2 / PPU
 └── IC
 ```
 
-It accepts requests for this PPU, validates the local REST contract, translates to local Plasma runtime behavior and reports local status/errors. It must not decide which PPU in the fleet should receive a request.
+It validates its local REST/security contract, translates accepted requests to local runtime behavior and reports local status/errors. It does not choose between PPUs.
+
+The PPU secure Gateway remains the final execution authorization authority. Manager/BFF preserve authentication and idempotency evidence but do not grant permissions or widen Facility/PPU/Site scopes.
 
 ## PPU northbound contract
 
-The PPU exposes Manager-friendly endpoints through the existing Plasma Web REST Gateway.
+Core fleet-facing reads remain:
 
-### `GET /api/health/live`
+```text
+GET /api/health/live
+GET /api/health/ready
+GET /api/node
+GET /api/status
+```
 
-Reports whether the REST Gateway process itself is alive. This endpoint deliberately does not contact the local Plasma Server.
-
-### `GET /api/health/ready`
-
-Checks whether the Gateway can reach the local Plasma Server and obtain canonical PPU identity. A live Gateway may return HTTP 503 when local execution is unavailable.
-
-### `GET /api/node`
-
-Returns the stable fleet-facing node descriptor. The same PPU can therefore be addressed through its local standalone boundary or selected through Manager in Managed Mode.
-
-Programming write routes remain implementation work and must follow the contracts in [Control Plane Routing Architecture](control-plane-routing-architecture.md) and the applicable security design.
+Managed write/read relay uses the existing PPU Gateway production API rather than defining a second Programming protocol. Exact Manager allowlisting is intentionally narrower than the complete standalone Gateway API surface.
 
 ## Programming Asset / Image direction
 
-For the first Managed Mode Programming implementation, Programming Asset / Image traffic is planned to follow the same routing ownership:
+Phase 1 uses Manager-mediated Asset/Image transfer:
 
 ```text
 Control Console
  -> BFF
  -> Manager
  -> selected PPU Gateway
- -> PPU Asset Service / Cache
+ -> Programming Asset / Batch contract
+ -> PPU cache / Programming Runtime
 ```
 
-This is a deliberate Phase-1 simplicity decision: establish one trustworthy production routing source before optimizing the binary data plane.
+The common routing owner does not require one wire representation for every workflow. EMode individual Engineering Jobs use binary Programming Asset cache upload plus `asset_sha256` Job references. PMode server-side Batch preserves its existing bounded JSON Asset envelope containing `asset_base64`, declared size and SHA-256; the PPU Gateway decodes and validates that envelope before caching/execution.
 
-A direct-to-PPU Image data path may be introduced later only if measured throughput, concurrency, latency or reliability evidence justifies it and the replacement preserves identity binding, authorization, integrity and diagnostic coverage.
+Manager does not introduce or translate either representation. BFF and Manager forward the incoming body without decoding/re-encoding the Asset. Current PMode limits a selected Image to 4 MiB, so the Base64-expanded Batch body remains below the current 24 MiB managed request bound.
+
+This is a deliberate Phase-1 compatibility decision: first establish one trustworthy route owner without silently redesigning the Batch data contract. A later direct-to-PPU or pre-upload/reference-only data plane requires measured evidence of a material bottleneck and must preserve authorization, identity binding, Asset integrity and diagnostic coverage.
 
 ## Failure-domain rule
 
-Centralized routing must not turn Manager into an execution dependency for an accepted PPU Job.
-
-Approved target behavior:
-
 ```text
 Manager / BFF unavailable
-    -> no new centrally managed command can be routed
-    -> already accepted PPU Jobs continue locally
-    -> local PPU execution / maintenance remains possible
+    -> no new centrally managed request can be routed
+    -> already accepted PPU work continues locally
+    -> explicit Standalone/local maintenance remains available
 
 Gateway failure on one PPU
     -> that PPU loses managed REST access
     -> other PPUs remain independent
 
 Plasma Server failure on one PPU
-    -> readiness for that PPU fails
+    -> readiness/execution for that PPU fails
     -> other PPUs remain independent
 ```
 
-This is the distinction between **control-plane availability** and **execution-plane autonomy**.
+This separates control-plane availability from execution-plane autonomy.
 
 ## Security boundary
 
-The current loopback-only Manager relay must not be generalized by simply proxying arbitrary HTTP methods or URLs.
+Manager routing does not replace [Remote Write Security Boundary](remote-write-security-boundary.md).
 
-Future managed write APIs require explicit decisions for:
+Current invariants include:
 
-- authentication and authorization;
-- PPU identity binding;
-- auditability;
-- replay and idempotency;
-- timeout / retry semantics;
-- cancellation ownership;
-- Programming Asset integrity;
-- failure recovery.
+- caller cannot supply a PPU destination URL;
+- Manager resolves only enrolled/configured aliases;
+- BFF and Manager forward only intentional headers;
+- PPU Gateway remains authoritative for Principal, permission and resource scope;
+- `Idempotency-Key` remains available to the PPU replay ledger;
+- unsupported route/method combinations fail closed;
+- Managed Mode does not silently bypass Manager.
 
-See [Remote Write Security Boundary](remote-write-security-boundary.md) for the security-specific constraints.
+## Current capability summary
 
-## Current versus target capability
+| Capability | Current software contract |
+|---|---|
+| PPU local autonomy | Preserved |
+| Manager fleet registry/observation | Implemented, read-only surfaces |
+| Manager PS Loopback relay | Implemented through shared managed route; legacy fixed route retained for compatibility |
+| Managed Programming Job routing | Implemented as explicit allowlisted relay |
+| Managed Programming Asset/Image relay | Implemented, bounded; EMode binary upload and PMode bounded Batch envelope retain their existing PPU contracts |
+| Managed Batch routing | Implemented for current server-side Batch REST family |
+| Managed Gateway/Mock settings | Explicit allowlisted read/write routes; PPU secure Gateway remains authorization authority |
+| Manager arbitrary reverse proxy | Prohibited |
+| PL Loopback | Not implemented; fail closed |
+| IC Loopback | Not implemented; fail closed |
 
-| Capability | Current | Approved target |
-|---|---|---|
-| PPU local autonomy | Implemented architectural property | Preserve |
-| Manager fleet observation | Read-only | Preserve |
-| Manager PS Loopback relay | Narrow allowlist | Preserve as part of shared managed route |
-| Managed Programming Job routing | Not implemented | BFF -> Manager -> selected PPU Gateway |
-| Managed Programming Asset relay | Not implemented | Manager-mediated Phase 1 |
-| Manager as arbitrary reverse proxy | Not implemented | Prohibited |
-
-The approved target is a design contract, not evidence that the write-path implementation already exists.
+Software implementation is not evidence of Z2/FPGA/real-IC behavior. Integration runtime acceptance and hardware acceptance remain separate evidence layers.
 
 ## Capacity validation on Z2
 
-Fleet/UI code is not the primary embedded performance risk. Z2 acceptance must measure programming workload under 1/2/4/8 concurrent Sites, including CPU, RAM, PS/PL transfer, filesystem/network I/O, throughput and soak stability.
+Future Z2 acceptance must measure programming workload under 1/2/4/8 concurrent Sites, including CPU, RAM, PS/PL transfer, filesystem/network I/O, throughput and soak stability.
 
-When Manager-mediated Programming Asset transfer is implemented, Manager and network measurements must also demonstrate that centralized relay does not materially degrade command responsiveness or programming throughput at the intended fleet scale. Optimization should follow measured evidence rather than speculation.
+Manager-mediated Asset transfer must likewise be measured at intended fleet scale before deciding whether a split data plane is justified.
