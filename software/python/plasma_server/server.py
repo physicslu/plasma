@@ -9,6 +9,19 @@ from pathlib import Path
 from typing import Any
 
 from plasma_core.config import PlasmaConfig, load_config
+from plasma_core.diagnostics import (
+    DIAGNOSTIC_PROTOCOL_VERSION,
+    DIAGNOSTIC_REQUEST_MESSAGE_TYPE,
+    DIAGNOSTIC_RESPONSE_MESSAGE_TYPE,
+    ECHO_TRANSFORM,
+    LOOPBACK_DIAGNOSTIC_TYPE,
+    PS_LOOPBACK_ENDPOINT,
+    crc32_hex,
+    require_crc32,
+    require_nonnegative_int,
+    require_positive_int,
+    require_test_id,
+)
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.mock_image_store import default_mock_image_store
@@ -162,6 +175,99 @@ class PlasmaServer:
             with contextlib.suppress(ConnectionError):
                 await writer.wait_closed()
 
+    def _dispatch_diagnostic(self, frame: Frame, peer: Any) -> Frame:
+        metadata = frame.metadata
+        allowed = {
+            "protocol_version",
+            "message_type",
+            "diagnostic_type",
+            "diagnostic_version",
+            "endpoint",
+            "test_id",
+            "sequence",
+            "transform",
+            "payload_length",
+            "tx_crc32",
+            "pattern",
+            "seed",
+        }
+        unknown = sorted(set(metadata) - allowed)
+        if unknown:
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"diagnostic request contains unexpected fields: {', '.join(unknown)}",
+            )
+        if metadata.get("diagnostic_type") != LOOPBACK_DIAGNOSTIC_TYPE:
+            raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "unsupported diagnostic_type")
+        if metadata.get("diagnostic_version") != DIAGNOSTIC_PROTOCOL_VERSION:
+            raise PlasmaError(
+                ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
+                f"unsupported diagnostic version: {metadata.get('diagnostic_version')!r}",
+            )
+        endpoint = metadata.get("endpoint")
+        if endpoint != PS_LOOPBACK_ENDPOINT:
+            raise PlasmaError(
+                ErrorCode.OPERATION_UNSUPPORTED,
+                f"real-path loopback endpoint is not implemented: {endpoint!r}",
+            )
+        if metadata.get("transform") != ECHO_TRANSFORM:
+            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "PS loopback requires echo transform")
+
+        test_id = require_test_id(metadata.get("test_id"))
+        sequence = require_nonnegative_int(metadata.get("sequence"), "sequence")
+        payload_length = require_positive_int(metadata.get("payload_length"), "payload_length")
+        if payload_length != len(frame.binary):
+            raise PlasmaError(
+                ErrorCode.PROTOCOL_INCOMPLETE,
+                "payload_length does not match diagnostic binary payload",
+                context={"declared": payload_length, "actual": len(frame.binary)},
+            )
+        tx_crc32 = require_crc32(metadata.get("tx_crc32"), "tx_crc32")
+        actual_crc32 = crc32_hex(frame.binary)
+        if tx_crc32 != actual_crc32:
+            raise PlasmaError(
+                ErrorCode.PROTOCOL_CHECKSUM_MISMATCH,
+                "tx_crc32 does not match diagnostic binary payload",
+                context={"expected": tx_crc32, "actual": actual_crc32},
+            )
+
+        for field in ("pattern", "seed"):
+            value = metadata.get(field)
+            if value is not None and (not isinstance(value, str) or len(value) > 128):
+                raise PlasmaError(ErrorCode.INVALID_ARGUMENT, f"{field} must be a string of at most 128 characters")
+
+        self.manager.server_log.event(
+            "INFO",
+            "diagnostic_loopback_ps",
+            peer=peer,
+            ppu_id=self.config.ppu.id,
+            facility_id=self.config.ppu.facility_id,
+            test_id=test_id,
+            sequence=sequence,
+            payload_length=payload_length,
+            crc32=actual_crc32,
+        )
+        return Frame(
+            metadata={
+                "protocol_version": PROTOCOL_VERSION,
+                "message_type": DIAGNOSTIC_RESPONSE_MESSAGE_TYPE,
+                "ok": True,
+                "diagnostic_type": LOOPBACK_DIAGNOSTIC_TYPE,
+                "diagnostic_version": DIAGNOSTIC_PROTOCOL_VERSION,
+                "endpoint": PS_LOOPBACK_ENDPOINT,
+                "source": PS_LOOPBACK_ENDPOINT,
+                "test_id": test_id,
+                "sequence": sequence,
+                "transform": ECHO_TRANSFORM,
+                "payload_length": payload_length,
+                "tx_crc32": actual_crc32,
+                "rx_crc32": actual_crc32,
+                **({"pattern": metadata["pattern"]} if "pattern" in metadata else {}),
+                **({"seed": metadata["seed"]} if "seed" in metadata else {}),
+            },
+            binary=frame.binary,
+        )
+
     async def _dispatch(self, frame: Frame, peer: Any) -> Frame:
         metadata = frame.metadata
         protocol_version = str(metadata["protocol_version"])
@@ -170,6 +276,10 @@ class PlasmaServer:
                 ErrorCode.PROTOCOL_VERSION_UNSUPPORTED,
                 f"unsupported protocol version: {protocol_version!r}",
             )
+
+        if metadata.get("message_type") == DIAGNOSTIC_REQUEST_MESSAGE_TYPE:
+            return self._dispatch_diagnostic(frame, peer)
+
         try:
             operation = Operation(str(metadata["operation"]))
         except (KeyError, ValueError) as exc:
