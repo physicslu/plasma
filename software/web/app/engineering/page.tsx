@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useI18n } from "../i18n";
 import { useWorkspaceSession } from "../workspace-session";
 import GatewaySettingsPanel from "./gateway-settings";
+import LoopbackTest from "./loopback-test";
 import MockRuntimeSettingsPanel from "./mock-runtime-settings";
 import ProgrammingWorkspaceV2 from "./programming-workspace-v2";
 import "./engineering.css";
@@ -22,6 +23,7 @@ const sections = [
   ["settings", "engineering.settings", "⚙"],
 ] as const;
 
+type DiagnosticsSection = "loopback";
 type SettingsSection = "gateway" | "mock";
 
 function subscribeHydration(): () => void {
@@ -29,22 +31,36 @@ function subscribeHydration(): () => void {
 }
 
 export default function EngineeringPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { emodeSection, setEmodeSection } = useWorkspaceSession();
+  const [diagnosticsSection, setDiagnosticsSection] = useState<DiagnosticsSection>("loopback");
+  const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("gateway");
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const active = emodeSection;
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
+  const diagnosticsSurfaceActive = active === "diagnostics";
   const settingsSurfaceActive = active === "settings";
 
   function selectSection(id: (typeof sections)[number][0]) {
+    if (id === "diagnostics") {
+      setEmodeSection("diagnostics");
+      setDiagnosticsExpanded(value => active === "diagnostics" ? !value : true);
+      return;
+    }
     if (id === "settings") {
       setEmodeSection("settings");
       setSettingsExpanded(value => active === "settings" ? !value : true);
       return;
     }
     setEmodeSection(id);
+  }
+
+  function selectDiagnosticsSection(id: DiagnosticsSection) {
+    setDiagnosticsSection(id);
+    setDiagnosticsExpanded(true);
+    setEmodeSection("diagnostics");
   }
 
   function selectSettingsSection(id: SettingsSection) {
@@ -68,7 +84,37 @@ export default function EngineeringPage() {
             </header>
 
             <nav aria-label={t("engineering.title")} aria-busy={!hydrated}>
-              {sections.map(([id, key, icon]) => id === "settings" ? (
+              {sections.map(([id, key, icon]) => id === "diagnostics" ? (
+                <div className="engineeringNavTreeGroup" key={id}>
+                  <button
+                    type="button"
+                    disabled={!hydrated}
+                    className={active === id ? "active" : ""}
+                    aria-pressed={active === id}
+                    aria-expanded={diagnosticsExpanded}
+                    title={t(key)}
+                    onClick={() => selectSection(id)}
+                  >
+                    <span className="engineeringNavIcon" aria-hidden="true">{icon}</span>
+                    <span className="engineeringNavLabel">{t(key)}</span>
+                    <span className="engineeringNavDisclosure" aria-hidden="true">{diagnosticsExpanded ? "⌄" : "›"}</span>
+                  </button>
+                  {diagnosticsExpanded && (
+                    <div className="engineeringNavChildren" role="group" aria-label="Diagnostics">
+                      <button
+                        type="button"
+                        disabled={!hydrated}
+                        className={diagnosticsSurfaceActive && diagnosticsSection === "loopback" ? "active" : ""}
+                        aria-pressed={diagnosticsSurfaceActive && diagnosticsSection === "loopback"}
+                        onClick={() => selectDiagnosticsSection("loopback")}
+                      >
+                        <span className="engineeringNavTreeBranch" aria-hidden="true">└</span>
+                        <span className="engineeringNavLabel">{locale === "zh-TW" ? "Loopback 測試" : "Loopback Test"}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : id === "settings" ? (
                 <div className="engineeringNavTreeGroup" key={id}>
                   <button
                     type="button"
@@ -136,9 +182,11 @@ export default function EngineeringPage() {
             </button>
           </aside>
 
-          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : settingsSurfaceActive ? "settingsActive" : ""}`}>
+          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : diagnosticsSurfaceActive ? "diagnosticsActive" : settingsSurfaceActive ? "settingsActive" : ""}`}>
             {active === "programming" ? (
               <ProgrammingWorkspaceV2 />
+            ) : active === "diagnostics" && diagnosticsSection === "loopback" ? (
+              <LoopbackTest />
             ) : active === "settings" && settingsSection === "mock" ? (
               <MockRuntimeSettingsPanel />
             ) : active === "settings" ? (
