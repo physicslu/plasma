@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29",
+  "observation_kind": "official_st_source_surface_baseline",
+  "observed_date": "2026-08-29",
+  "canonical_dataset_admission": false,
+  "targets": [
+    {
+      "base_device": "STM32F100CB",
+      "exact_icpns": [
+        "STM32F100CBT6B",
+        "STM32F100CBT6BTR",
+        "STM32F100CBT7B",
+        "STM32F100CBT7BTR"
+      ]
+    },
+    {
+      "base_device": "STM32F100VE",
+      "exact_icpns": [
+        "STM32F100VET6",
+        "STM32F100VET6B",
+        "STM32F100VET6BTR",
+        "STM32F100VET7B"
+      ]
+    },
+    {
+      "base_device": "STM32F101RE",
+      "exact_icpns": [
+        "STM32F101RET6",
+        "STM32F101RET6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F101ZE",
+      "exact_icpns": [
+        "STM32F101ZET6"
+      ]
+    },
+    {
+      "base_device": "STM32F102CB",
+      "exact_icpns": [
+        "STM32F102CBT6",
+        "STM32F102CBT6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F103RC",
+      "exact_icpns": [
+        "STM32F103RCT6",
+        "STM32F103RCT6TR",
+        "STM32F103RCT7",
+        "STM32F103RCT7TR",
+        "STM32F103RCY6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F105VB",
+      "exact_icpns": [
+        "STM32F105VBH6",
+        "STM32F105VBH6TR",
+        "STM32F105VBH7",
+        "STM32F105VBT6",
+        "STM32F105VBT7"
+      ]
+    },
+    {
+      "base_device": "STM32F107RC",
+      "exact_icpns": [
+        "STM32F107RCT6",
+        "STM32F107RCT6TR",
+        "STM32F107RCT7"
+      ]
+    }
+  ]
+}

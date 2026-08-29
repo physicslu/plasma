@@ -1,0 +1,63 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 1,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 1,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "control",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 1,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 4,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 1,
+    "total": 1
+  },
+  "pilot_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F100CB",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F100CB",
+        "evidence_section_sha256": "4d7b3cedd9a24bce2f18ae8f5a9d38de5c983c0a7f9a1f324b03e26c34ba08e7",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F100CBT6B",
+          "STM32F100CBT6BTR",
+          "STM32F100CBT7B",
+          "STM32F100CBT7BTR"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "aba92b687b9cf2e2b52f87190d6e657f9f96f5d1595c52f96bee74ca902f0c00",
+        "retrieved_at_utc": "2026-08-29T16:13:33Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html"
+      },
+      "selection_reason": "Value-line 128 KiB LQFP48 base-device expansion adjacent to the admitted STM32F100C8 slice.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html"
+    }
+  ],
+  "schema_version": 1
+}

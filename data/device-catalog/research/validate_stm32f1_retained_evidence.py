@@ -52,6 +52,22 @@ def _require(condition: bool, message: str) -> None:
         raise RetainedEvidenceError(message)
 
 
+def _baseline_shape(baseline: dict[str, Any]) -> tuple[int, int, set[str]]:
+    targets = baseline.get("targets")
+    _require(isinstance(targets, list) and targets, "baseline targets must be a non-empty list")
+    bases: set[str] = set()
+    candidate_count = 0
+    for target in targets:
+        _require(isinstance(target, dict), "baseline target must be an object")
+        base_device = target.get("base_device")
+        exact_icpns = target.get("exact_icpns")
+        _require(isinstance(base_device, str) and base_device, "baseline target requires base_device")
+        _require(isinstance(exact_icpns, list) and exact_icpns, f"{base_device}: baseline requires exact_icpns")
+        bases.add(base_device)
+        candidate_count += len(exact_icpns)
+    return len(targets), candidate_count, bases
+
+
 def validate_retained_evidence(
     evidence_dir: Path,
     *,
@@ -85,25 +101,28 @@ def validate_retained_evidence(
     evaluation = _read_json(evidence_dir / "evaluation.json")
     provenance = _read_json(evidence_dir / "provenance.json")
     baseline = read_baseline(baseline_path)
+    expected_targets, expected_candidates, expected_bases = _baseline_shape(baseline)
 
     _require(control.get("browser_scope") == "control", "control summary scope must be control")
     _require(control.get("attempted") == 1 and control.get("acquisition_success") == 1, "control target must pass 1/1")
     _require(control.get("acquisition_failure") == 0, "control target contains an acquisition failure")
     _require(summary.get("browser_scope") == "pilot", "pilot summary scope must be pilot")
-    _require(summary.get("attempted") == 6, "pilot must attempt exactly 6 targets")
-    _require(summary.get("acquisition_success") == 6 and summary.get("acquisition_failure") == 0, "pilot must pass 6/6")
-    _require(summary.get("exact_icpn_candidates") == 26, "pilot must contain exactly 26 candidates")
-    _require(summary.get("canonical_mapping") == {"unique": 6, "ambiguous": 0, "unmapped": 0}, "canonical mapping must be unique 6/6")
-    _require(summary.get("openocd_cfg_mapping") == {"mapped": 6, "total": 6}, "OpenOCD mapping must be complete 6/6")
+    _require(summary.get("attempted") == expected_targets, f"pilot must attempt exactly {expected_targets} targets")
+    _require(summary.get("acquisition_success") == expected_targets and summary.get("acquisition_failure") == 0, f"pilot must pass {expected_targets}/{expected_targets}")
+    _require(summary.get("exact_icpn_candidates") == expected_candidates, f"pilot must contain exactly {expected_candidates} candidates")
+    _require(summary.get("canonical_mapping") == {"unique": expected_targets, "ambiguous": 0, "unmapped": 0}, "canonical mapping must be uniquely clean for every target")
+    _require(summary.get("openocd_cfg_mapping") == {"mapped": expected_targets, "total": expected_targets}, "OpenOCD mapping must be complete for every target")
     _require(summary.get("manual_intervention_required") == 0, "pilot requires manual intervention")
 
     results = summary.get("results")
-    _require(isinstance(results, list) and len(results) == 6, "pilot results must contain 6 targets")
+    _require(isinstance(results, list) and len(results) == expected_targets, f"pilot results must contain {expected_targets} targets")
     candidate_owner: dict[str, str] = {}
+    observed_bases: set[str] = set()
     for result in results:
         _require(isinstance(result, dict), "pilot result must be an object")
         base_device = result.get("base_device")
         _require(isinstance(base_device, str) and base_device, "result requires base_device")
+        observed_bases.add(base_device)
         _require(result.get("acquisition_status") == "success", f"{base_device}: acquisition failed")
         mapping = result.get("canonical_mapping")
         _require(isinstance(mapping, dict) and mapping.get("status") == "unique", f"{base_device}: canonical mapping is not unique")
@@ -129,7 +148,8 @@ def validate_retained_evidence(
             _require(isinstance(candidate, str) and candidate.startswith(base_device), f"{base_device}: candidate maps to wrong base")
             _require(candidate not in candidate_owner, f"duplicate exact ICPN across targets: {candidate}")
             candidate_owner[candidate] = base_device
-    _require(len(candidate_owner) == 26, "retained evidence must contain 26 unique exact ICPNs")
+    _require(observed_bases == expected_bases, "retained evidence target set does not match baseline")
+    _require(len(candidate_owner) == expected_candidates, f"retained evidence must contain {expected_candidates} unique exact ICPNs")
 
     run_metadata = evaluation.get("run_metadata")
     _require(isinstance(run_metadata, dict), "evaluation requires run_metadata")
@@ -146,10 +166,10 @@ def validate_retained_evidence(
         "source_repository": "physicslu/plasma",
         "acquisition_transport": TRANSPORT,
         "headed": True,
-        "target_count": 6,
-        "acquisition_success": 6,
+        "target_count": expected_targets,
+        "acquisition_success": expected_targets,
         "acquisition_failure": 0,
-        "exact_icpn_candidate_count": 26,
+        "exact_icpn_candidate_count": expected_candidates,
         "evaluator_result": "scale_ready",
         "scale_ready": True,
         "canonical_dataset_admission": False,
@@ -162,14 +182,24 @@ def validate_retained_evidence(
     _require(isinstance(provenance.get("chromium_version"), str), "provenance requires Chromium version")
     _require(GIT_SHA_RE.fullmatch(str(provenance.get("executed_git_sha"))) is not None, "invalid executed Git SHA")
     _require(provenance.get("executed_git_sha") == run_metadata.get("git_sha"), "provenance/evaluation Git SHA mismatch")
-    _require(provenance.get("phase2_5_baseline") == {"pilot_id": baseline["pilot_id"], "schema_version": baseline["schema_version"], "sha256": _sha256(baseline_path)}, "baseline provenance mismatch")
+    baseline_provenance = provenance.get("baseline")
+    if baseline_provenance is None:
+        baseline_provenance = provenance.get("phase2_5_baseline")
+    _require(
+        baseline_provenance == {
+            "pilot_id": baseline["pilot_id"],
+            "schema_version": baseline["schema_version"],
+            "sha256": _sha256(baseline_path),
+        },
+        "baseline provenance mismatch",
+    )
     _require(manifest.get("evidence_id") == provenance.get("evidence_id"), "manifest/provenance evidence_id mismatch")
 
     return {
         "evidence_id": provenance["evidence_id"],
-        "targets": 6,
-        "acquisition_success": 6,
-        "exact_icpn_candidates": 26,
+        "targets": expected_targets,
+        "acquisition_success": expected_targets,
+        "exact_icpn_candidates": expected_candidates,
         "candidate_baseline_match": True,
         "candidate_drift": 0,
         "scale_ready": True,

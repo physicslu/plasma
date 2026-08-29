@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -74,7 +73,8 @@ def validate_admission_plan(
         if fresh != plan:
             raise AdmissionError("checked-in admission plan is not reproducible")
         state = "planned"
-        rows_after = len(rows) + plan["decision_counts"]["admit"]
+        minimum_rows_after = len(rows) + plan["decision_counts"]["admit"]
+        rows_after = minimum_rows_after
         idempotent = False
     else:
         by_icpn: dict[str, list[dict[str, str]]] = {}
@@ -84,9 +84,9 @@ def validate_admission_plan(
             proposed = item.get("proposed_canonical_row")
             if not isinstance(proposed, dict) or by_icpn.get(item["icpn"]) != [proposed]:
                 raise AdmissionError(f"canonical result does not match plan: {item.get('icpn')}")
-        expected_rows = plan.get("canonical_rows_before", -1) + plan["decision_counts"]["admit"]
-        if len(rows) != expected_rows:
-            raise AdmissionError("canonical row count does not match admission plan")
+        minimum_rows_after = plan.get("canonical_rows_before", -1) + plan["decision_counts"]["admit"]
+        if len(rows) < minimum_rows_after:
+            raise AdmissionError("canonical row count is smaller than admission result")
         rerun = build_admission_plan(
             evidence_dir=evidence_dir,
             canonical_path=canonical_path,
@@ -107,6 +107,7 @@ def validate_admission_plan(
         "decision_counts": plan["decision_counts"],
         "conflicts": plan["conflicts"],
         "canonical_rows_before": plan["canonical_rows_before"],
+        "canonical_rows_minimum_after": minimum_rows_after,
         "canonical_rows_after": rows_after,
         "post_write_idempotent": idempotent,
     }

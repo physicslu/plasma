@@ -1,0 +1,27 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "8abc99ffc25753e695b1eb19c33b64c87b4b4d67811a17cc589103f576d0038c"
+    },
+    {
+      "path": "control-summary.json",
+      "sha256": "b8b9091943fb7a6974071f84a760f83a389efbabb5d9f8a478741f6b13d7fbd3"
+    },
+    {
+      "path": "evaluation.json",
+      "sha256": "fef8b1419955cbf43b43513bd5fdfed7a4f5c4b188b4428f97f169f67bf5b9ef"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "917a2b1b00c662bb33735f16c309ec4fcd213f7b4bc3cb5ba78a4a63a28247ef"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "fb67f55c49d9228770a50eb695b1e1899f872bdfe7ea40d6f2bac7b5f1e7aa8a"
+    }
+  ],
+  "schema_version": 1
+}
