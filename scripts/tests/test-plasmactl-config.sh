@@ -51,6 +51,7 @@ run_migration_case() {
   assert_file_line "$config" "PLASMA_PUBLIC_API_URL=$expected_url"
   assert_file_line "$config" 'PLASMA_MANAGER_ENABLED=0'
   assert_file_line "$config" "PLASMA_MANAGER_CONFIG=$expected_manager_config"
+  assert_file_line "$config" 'PLASMA_MANAGER_PPU_ALIAS='
   assert_file_line "$config" 'PLASMA_ENGINEERING_MOCK_ENABLED=0'
   assert_file_line "$config" "PLASMA_ENGINEERING_MOCK_ROOT=$expected_engineering_mock_root"
 }
@@ -62,28 +63,28 @@ run_migration_case \
   legacy-tailscale \
   'PLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net:8443' \
   "$default_public_api_url" \
-  '4'
+  '5'
 
 run_migration_case \
   legacy-localhost \
   'PLASMA_PUBLIC_API_URL=http://127.0.0.1:8080' \
   "$default_public_api_url" \
-  '4'
+  '5'
 
 run_migration_case \
   custom-override \
   'PLASMA_PUBLIC_API_URL=https://lab-api.example.invalid' \
   'https://lab-api.example.invalid' \
-  '4'
+  '5'
 
 # A schema-v2 deployment already made an explicit API-base choice. Later
-# migrations add Manager and Engineering Mock settings but must not reinterpret
-# the already-versioned API Base.
+# migrations add Manager, Engineering Mock, and Manager BFF target settings but
+# must not reinterpret the already-versioned API Base.
 run_migration_case \
   already-v2 \
   $'PLASMA_CONFIG_VERSION=2\nPLASMA_PUBLIC_API_URL=https://swpc.tail820e64.ts.net:8443' \
   'https://swpc.tail820e64.ts.net:8443' \
-  '4'
+  '5'
 
 new_config="$temporary/new.env"
 PLASMACTL_LIB_ONLY=1 \
@@ -91,16 +92,17 @@ PLASMACTL_CONFIG="$new_config" \
 XDG_CONFIG_HOME="$temporary/xdg-new" \
 XDG_STATE_HOME="$temporary/state-new" \
 bash -c 'source "$1"; write_config' _ "$plasmactl_path" >/dev/null
-assert_file_line "$new_config" 'PLASMA_CONFIG_VERSION=4'
+assert_file_line "$new_config" 'PLASMA_CONFIG_VERSION=5'
 assert_file_line "$new_config" "PLASMA_PUBLIC_API_URL=$default_public_api_url"
 assert_file_line "$new_config" 'PLASMA_MANAGER_ENABLED=0'
 assert_file_line "$new_config" "PLASMA_MANAGER_CONFIG=$temporary/xdg-new/plasma/manager.yaml"
+assert_file_line "$new_config" 'PLASMA_MANAGER_PPU_ALIAS='
 assert_file_line "$new_config" 'PLASMA_ENGINEERING_MOCK_ENABLED=0'
 assert_file_line "$new_config" "PLASMA_ENGINEERING_MOCK_ROOT=$temporary/state-new/plasma/engineering-mock"
 
 # A schema-version marker is not sufficient evidence that every field added by
-# that schema is present. Reconcile an already-v4 but incomplete file using the
-# resolved safe defaults, then prove the repair is idempotent.
+# that schema is present. Reconcile an already-v4 incomplete file into schema v5
+# using safe defaults, then prove the repair is idempotent.
 incomplete_v4="$temporary/incomplete-v4.env"
 printf '%s\n' \
   'PLASMA_CONFIG_VERSION=4' \
@@ -111,14 +113,16 @@ PLASMACTL_CONFIG="$incomplete_v4" \
 XDG_CONFIG_HOME="$temporary/xdg-incomplete-v4" \
 XDG_STATE_HOME="$temporary/state-incomplete-v4" \
 bash -c 'source "$1"; write_config' _ "$plasmactl_path" >/dev/null
-assert_file_line "$incomplete_v4" 'PLASMA_CONFIG_VERSION=4'
+assert_file_line "$incomplete_v4" 'PLASMA_CONFIG_VERSION=5'
 assert_file_line "$incomplete_v4" 'PLASMA_PUBLIC_API_URL=https://operator.example.invalid'
 assert_file_line "$incomplete_v4" 'PLASMA_MANAGER_ENABLED=0'
 assert_file_line "$incomplete_v4" "PLASMA_MANAGER_CONFIG=$temporary/xdg-incomplete-v4/plasma/manager.yaml"
+assert_file_line "$incomplete_v4" 'PLASMA_MANAGER_PPU_ALIAS='
 assert_file_line "$incomplete_v4" 'PLASMA_ENGINEERING_MOCK_ENABLED=0'
 assert_file_line "$incomplete_v4" "PLASMA_ENGINEERING_MOCK_ROOT=$temporary/state-incomplete-v4/plasma/engineering-mock"
 assert_assignment_count "$incomplete_v4" PLASMA_MANAGER_ENABLED 1
 assert_assignment_count "$incomplete_v4" PLASMA_MANAGER_CONFIG 1
+assert_assignment_count "$incomplete_v4" PLASMA_MANAGER_PPU_ALIAS 1
 assert_assignment_count "$incomplete_v4" PLASMA_ENGINEERING_MOCK_ENABLED 1
 assert_assignment_count "$incomplete_v4" PLASMA_ENGINEERING_MOCK_ROOT 1
 incomplete_hash_before="$(sha256sum "$incomplete_v4" | awk '{print $1}')"
@@ -129,10 +133,10 @@ XDG_STATE_HOME="$temporary/state-incomplete-v4" \
 bash -c 'source "$1"; write_config' _ "$plasmactl_path" >/dev/null
 incomplete_hash_after="$(sha256sum "$incomplete_v4" | awk '{print $1}')"
 [[ "$incomplete_hash_before" == "$incomplete_hash_after" ]] || \
-  fail 'schema-v4 completeness repair is not idempotent'
+  fail 'schema-v5 completeness repair is not idempotent'
 
-# Partial current-schema files preserve operator-owned values and synthesize
-# only missing assignments. Never rewrite explicit Manager settings.
+# Partial old-schema files preserve operator-owned values and synthesize only
+# missing assignments. Never rewrite explicit Manager settings.
 partial_enabled="$temporary/partial-enabled-v4.env"
 printf '%s\n' \
   'PLASMA_CONFIG_VERSION=4' \
@@ -143,10 +147,13 @@ PLASMACTL_CONFIG="$partial_enabled" \
 XDG_CONFIG_HOME="$temporary/xdg-partial-enabled" \
 XDG_STATE_HOME="$temporary/state-partial-enabled" \
 bash -c 'source "$1"; migrate_config' _ "$plasmactl_path" >/dev/null
+assert_file_line "$partial_enabled" 'PLASMA_CONFIG_VERSION=5'
 assert_file_line "$partial_enabled" 'PLASMA_MANAGER_ENABLED=1'
 assert_file_line "$partial_enabled" "PLASMA_MANAGER_CONFIG=$temporary/xdg-partial-enabled/plasma/manager.yaml"
+assert_file_line "$partial_enabled" 'PLASMA_MANAGER_PPU_ALIAS='
 assert_assignment_count "$partial_enabled" PLASMA_MANAGER_ENABLED 1
 assert_assignment_count "$partial_enabled" PLASMA_MANAGER_CONFIG 1
+assert_assignment_count "$partial_enabled" PLASMA_MANAGER_PPU_ALIAS 1
 
 partial_path="$temporary/partial-path-v4.env"
 custom_manager_path="$temporary/operator/manager.yaml"
@@ -159,14 +166,34 @@ PLASMACTL_CONFIG="$partial_path" \
 XDG_CONFIG_HOME="$temporary/xdg-partial-path" \
 XDG_STATE_HOME="$temporary/state-partial-path" \
 bash -c 'source "$1"; migrate_config' _ "$plasmactl_path" >/dev/null
+assert_file_line "$partial_path" 'PLASMA_CONFIG_VERSION=5'
 assert_file_line "$partial_path" 'PLASMA_MANAGER_ENABLED=0'
 assert_file_line "$partial_path" "PLASMA_MANAGER_CONFIG=$custom_manager_path"
+assert_file_line "$partial_path" 'PLASMA_MANAGER_PPU_ALIAS='
 assert_assignment_count "$partial_path" PLASMA_MANAGER_ENABLED 1
 assert_assignment_count "$partial_path" PLASMA_MANAGER_CONFIG 1
+assert_assignment_count "$partial_path" PLASMA_MANAGER_PPU_ALIAS 1
+
+# An explicit alias already present in a v4 deployment is operator-owned input
+# and must survive the schema-v5 migration unchanged.
+explicit_alias="$temporary/explicit-alias-v4.env"
+printf '%s\n' \
+  'PLASMA_CONFIG_VERSION=4' \
+  'PLASMA_MANAGER_ENABLED=1' \
+  'PLASMA_MANAGER_PPU_ALIAS=ppu-a' \
+  >"$explicit_alias"
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$explicit_alias" \
+XDG_CONFIG_HOME="$temporary/xdg-explicit-alias" \
+XDG_STATE_HOME="$temporary/state-explicit-alias" \
+bash -c 'source "$1"; migrate_config' _ "$plasmactl_path" >/dev/null
+assert_file_line "$explicit_alias" 'PLASMA_CONFIG_VERSION=5'
+assert_file_line "$explicit_alias" 'PLASMA_MANAGER_PPU_ALIAS=ppu-a'
+assert_assignment_count "$explicit_alias" PLASMA_MANAGER_PPU_ALIAS 1
 
 # An older plasmactl must not mutate a future schema it does not understand.
 future_config="$temporary/future-schema.env"
-printf '%s\n' 'PLASMA_CONFIG_VERSION=5' >"$future_config"
+printf '%s\n' 'PLASMA_CONFIG_VERSION=6' >"$future_config"
 PLASMACTL_LIB_ONLY=1 \
 PLASMACTL_CONFIG="$future_config" \
 XDG_CONFIG_HOME="$temporary/xdg-future" \
@@ -187,6 +214,10 @@ assert_file_line \
 assert_file_line \
   "$temporary/xdg-unit/systemd/user/plasma-manager.service" \
   "ExecStart=$repo/software/python/.venv/bin/python -m plasma_manager.server --config $temporary/xdg-unit/plasma/manager.yaml"
+if grep -Fq 'PLASMA_MANAGER_API_URL=' "$temporary/xdg-unit/systemd/user/plasma-vite.service" || \
+   grep -Fq 'PLASMA_MANAGER_PPU_ALIAS=' "$temporary/xdg-unit/systemd/user/plasma-vite.service"; then
+  fail 'Manager BFF environment leaked into Vite while Manager is disabled'
+fi
 if grep -Fq 'plasma-web.service' "$temporary/xdg-unit/systemd/user/plasma-manager.service"; then
   fail 'Manager systemd unit must not depend on the local PPU Gateway'
 fi
@@ -210,22 +241,25 @@ PLASMACTL_CONFIG="$custom_unit_config" \
 XDG_CONFIG_HOME="$temporary/xdg-custom-unit" \
 XDG_STATE_HOME="$temporary/state-custom-unit" \
 bash -c 'source "$1"; migrate_config; write_units' _ "$plasmactl_path" >/dev/null
-assert_file_line "$custom_unit_config" 'PLASMA_CONFIG_VERSION=4'
+assert_file_line "$custom_unit_config" 'PLASMA_CONFIG_VERSION=5'
 assert_file_line "$custom_unit_config" "PLASMA_PUBLIC_API_URL=$custom_runtime_url"
+assert_file_line "$custom_unit_config" 'PLASMA_MANAGER_PPU_ALIAS='
 assert_file_line \
   "$temporary/xdg-custom-unit/systemd/user/plasma-vite.service" \
   "Environment=NEXT_PUBLIC_PLASMA_API_URL=$custom_runtime_url"
 
-# Manager remains opt-in. This pre-install shell test deliberately checks only
-# deployment wiring; YAML parsing itself is covered by the Python tests after
-# dependencies (including PyYAML) are installed.
+# Manager remains opt-in. This pre-install shell test checks deployment wiring
+# without parsing YAML; manager_bff_url is stubbed here. Python tests cover the
+# actual Manager registry and loopback-bind validation after dependencies exist.
 manager_yaml="$temporary/manager-enabled.yaml"
 cat >"$manager_yaml" <<'YAML'
 manager:
   host: 127.0.0.1
   port: 19180
   request_timeout_s: 2.0
-ppus: []
+ppus:
+  - endpoint: http://127.0.0.1:18080
+    alias: ppu-a
 YAML
 
 PLASMACTL_LIB_ONLY=1 \
@@ -240,9 +274,10 @@ bash -c '
 
 manager_enabled_config="$temporary/manager-enabled.env"
 printf '%s\n' \
-  'PLASMA_CONFIG_VERSION=4' \
+  'PLASMA_CONFIG_VERSION=5' \
   'PLASMA_MANAGER_ENABLED=1' \
   "PLASMA_MANAGER_CONFIG=$manager_yaml" \
+  'PLASMA_MANAGER_PPU_ALIAS=ppu-a' \
   >"$manager_enabled_config"
 PLASMACTL_LIB_ONLY=1 \
 PLASMACTL_CONFIG="$manager_enabled_config" \
@@ -253,12 +288,43 @@ bash -c '
   set -Eeuo pipefail
   source "$1"
   [[ " ${services[*]} " == *" plasma-manager.service "* ]]
+  manager_bff_url() { printf "http://127.0.0.1:19180\n"; }
   validate_unit_values
   write_units
 ' _ "$plasmactl_path" || fail 'Manager opt-in deployment wiring contract failed'
 assert_file_line \
   "$temporary/xdg-manager-enabled/systemd/user/plasma-manager.service" \
   "ExecStart=$(command -v python3) -m plasma_manager.server --config $manager_yaml"
+assert_file_line \
+  "$temporary/xdg-manager-enabled/systemd/user/plasma-vite.service" \
+  'Environment=PLASMA_MANAGER_API_URL=http://127.0.0.1:19180'
+assert_file_line \
+  "$temporary/xdg-manager-enabled/systemd/user/plasma-vite.service" \
+  'Environment=PLASMA_MANAGER_PPU_ALIAS=ppu-a'
+assert_file_line \
+  "$temporary/xdg-manager-enabled/systemd/user/plasma-vite.service" \
+  'After=network-online.target plasma-web.service plasma-manager.service'
+assert_file_line \
+  "$temporary/xdg-manager-enabled/systemd/user/plasma-vite.service" \
+  'Wants=network-online.target plasma-web.service plasma-manager.service'
+
+# Missing or unsafe BFF aliases fail closed when Manager is enabled.
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$temporary/no-manager-alias.env" \
+PLASMA_MANAGER_ENABLED=1 \
+XDG_CONFIG_HOME="$temporary/xdg-manager-no-alias" \
+XDG_STATE_HOME="$temporary/state-manager-no-alias" \
+bash -c 'source "$1"; validate_manager_settings' _ "$plasmactl_path" >/dev/null 2>&1 && \
+  fail 'Manager enabled without PLASMA_MANAGER_PPU_ALIAS was accepted'
+
+PLASMACTL_LIB_ONLY=1 \
+PLASMACTL_CONFIG="$temporary/no-invalid-alias.env" \
+PLASMA_MANAGER_ENABLED=1 \
+PLASMA_MANAGER_PPU_ALIAS='bad/alias' \
+XDG_CONFIG_HOME="$temporary/xdg-manager-bad-alias" \
+XDG_STATE_HOME="$temporary/state-manager-bad-alias" \
+bash -c 'source "$1"; validate_manager_settings' _ "$plasmactl_path" >/dev/null 2>&1 && \
+  fail 'unsafe PLASMA_MANAGER_PPU_ALIAS value was accepted'
 
 # Invalid opt-in values fail closed rather than silently changing runtime scope.
 PLASMACTL_LIB_ONLY=1 \
@@ -276,6 +342,8 @@ grep -Fq 'manager_health_check' "$plasmactl_path" || fail 'Manager health check 
 grep -Fq 'engineering_mock_health_check' "$plasmactl_path" || fail 'Engineering Mock Provider health check integration is missing'
 grep -Fq 'systemctl --user is-active --quiet plasma-manager.service' "$plasmactl_path" || fail 'Manager health check does not verify systemd service ownership'
 grep -Fq 'manager) units=(-u plasma-manager.service)' "$plasmactl_path" || fail 'Manager log target is missing'
+grep -Fq 'PLASMA_MANAGER_PPU_ALIAS' "$plasmactl_path" || fail 'Manager BFF target alias deployment wiring is missing'
+grep -Fq 'PLASMA_MANAGER_API_URL' "$plasmactl_path" || fail 'Manager BFF API URL deployment wiring is missing'
 
 # Web deployment hygiene: source changes make a long-running Vite runtime stale,
 # but package metadata alone must not cause npm ci under the live dev server.
