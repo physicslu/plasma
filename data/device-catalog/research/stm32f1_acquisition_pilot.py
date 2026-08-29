@@ -27,6 +27,7 @@ from st_product_page_acquisition import (
 )
 
 PILOT_SCHEMA_VERSION = 1
+MAX_PILOT_TARGETS = 10
 ROOT = Path(__file__).resolve().parent
 DEFAULT_MANIFEST = ROOT / "stm32f1-acquisition-pilot-manifest.json"
 DEFAULT_CATALOG = ROOT / "openocd-parts-canonical.csv"
@@ -57,6 +58,10 @@ def read_manifest(path: Path) -> tuple[str, list[PilotTarget]]:
     raw_targets = payload.get("targets")
     if not isinstance(raw_targets, list) or not raw_targets:
         raise AcquisitionError("pilot manifest requires non-empty targets")
+    if len(raw_targets) > MAX_PILOT_TARGETS:
+        raise AcquisitionError(
+            f"pilot manifest exceeds bounded target limit of {MAX_PILOT_TARGETS}"
+        )
 
     targets: list[PilotTarget] = []
     seen_bases: set[str] = set()
