@@ -12,6 +12,10 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
+from device_catalog_admission_framework import (  # noqa: E402
+    read_json,
+    write_canonical_dataset as write_framework_dataset,
+)
 from evaluate_stm32f1_live_pilot import evaluate_live_pilot, read_baseline  # noqa: E402
 from retain_stm32f1_browser_evidence import retain  # noqa: E402
 from run_stm32f1_phase2_9_scaleout import command_plan  # noqa: E402
@@ -26,6 +30,8 @@ MANIFEST = HERE / "stm32f1-phase2.9-scaleout-manifest.json"
 BASELINE = HERE / "stm32f1-phase2.9-scaleout-baseline.json"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 CANONICAL = HERE / "stm32f1-commercial-icpn.csv"
+PHASE29_PLAN = HERE / "stm32f1-phase2.9-admission-plan.json"
+PHASE29_EVIDENCE = HERE / "evidence" / "stm32f1-phase2.9-scaleout-batch1-live-2026-08-29"
 HISTORICAL_BASELINE = HERE / "stm32f1-acquisition-pilot-baseline.json"
 HISTORICAL_EVIDENCE = HERE / "evidence" / "stm32f1-phase2.6-browser-2026-08-29"
 EXPECTED_BASES = [
@@ -39,6 +45,8 @@ EXPECTED_BASES = [
     "STM32F107RC",
 ]
 EXPECTED_CANDIDATE_COUNT = 26
+PRE_ADMISSION_CANONICAL_ROWS = 49
+POST_ADMISSION_CANONICAL_ROWS = PRE_ADMISSION_CANONICAL_ROWS + EXPECTED_CANDIDATE_COUNT
 RUNTIME = {
     "engine": "chromium",
     "browser_version": "151.0.7922.34",
@@ -53,6 +61,13 @@ class Phase29ScaleoutTests(unittest.TestCase):
         return {
             item["base_device"]: item["exact_icpns"]
             for item in baseline["targets"]
+        }
+
+    def _scaleout_icpns(self) -> set[str]:
+        return {
+            icpn
+            for values in self._baseline_by_base().values()
+            for icpn in values
         }
 
     def _synthetic_pilot(self) -> dict[str, object]:
@@ -152,13 +167,35 @@ class Phase29ScaleoutTests(unittest.TestCase):
             self.assertEqual(mapping["match_count"], 1, base_device)
             self.assertEqual(mapping["target_configs"], ["tcl/target/stm32f1x.cfg"], base_device)
 
-    def test_scaleout_candidates_are_not_already_canonical(self) -> None:
+    def test_checked_in_pre_admission_plan_matches_post_admission_canonical(self) -> None:
+        plan = read_json(PHASE29_PLAN)
+        self.assertEqual(plan["candidate_count"], EXPECTED_CANDIDATE_COUNT)
+        self.assertEqual(plan["canonical_rows_before"], PRE_ADMISSION_CANONICAL_ROWS)
+        self.assertEqual(
+            plan["decision_counts"],
+            {
+                "admit": EXPECTED_CANDIDATE_COUNT,
+                "already_present": 0,
+                "manual_review_required": 0,
+                "reject": 0,
+            },
+        )
+        self.assertEqual(plan["conflicts"], 0)
+        self.assertEqual(plan["issues"], [])
+
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
-            canonical_icpns = {row["icpn"] for row in csv.DictReader(handle)}
-        scaleout_icpns = {
-            icpn for values in self._baseline_by_base().values() for icpn in values
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), POST_ADMISSION_CANONICAL_ROWS)
+        canonical_by_icpn = {row["icpn"]: row for row in rows}
+        self.assertEqual(len(canonical_by_icpn), POST_ADMISSION_CANONICAL_ROWS)
+        proposed_rows = {
+            item["icpn"]: item["proposed_canonical_row"]
+            for item in plan["candidates"]
+            if item["decision"] == "admit"
         }
-        self.assertTrue(scaleout_icpns.isdisjoint(canonical_icpns))
+        self.assertEqual(set(proposed_rows), self._scaleout_icpns())
+        for icpn, proposed in proposed_rows.items():
+            self.assertEqual(canonical_by_icpn.get(icpn), proposed, icpn)
 
     def test_existing_stm32f1_policy_can_construct_all_26_candidate_rows(self) -> None:
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
@@ -266,6 +303,61 @@ class Phase29ScaleoutTests(unittest.TestCase):
         planner_source = (HERE / "stm32f1_scaleout_admission.py").read_text(encoding="utf-8")
         self.assertNotIn("write_canonical_dataset", orchestrator_source)
         self.assertNotIn("write_canonical_dataset", planner_source)
+
+    def test_phase29_retained_evidence_replans_as_already_present_after_admission(self) -> None:
+        plan = build_scaleout_plan(
+            evidence_dir=PHASE29_EVIDENCE,
+            baseline_path=BASELINE,
+            canonical_path=CANONICAL,
+            catalog_path=CATALOG,
+        )
+        self.assertTrue(scaleout_plan_is_clean(plan))
+        self.assertEqual(plan["candidate_count"], EXPECTED_CANDIDATE_COUNT)
+        self.assertEqual(plan["scaleout_expected_candidate_count"], EXPECTED_CANDIDATE_COUNT)
+        self.assertEqual(plan["decision_counts"]["already_present"], EXPECTED_CANDIDATE_COUNT)
+        self.assertEqual(plan["decision_counts"]["admit"], 0)
+        self.assertEqual(plan["decision_counts"]["manual_review_required"], 0)
+        self.assertEqual(plan["decision_counts"]["reject"], 0)
+        self.assertEqual(plan["conflicts"], 0)
+
+    def test_phase29_generic_writer_is_single_apply_and_idempotent(self) -> None:
+        plan = read_json(PHASE29_PLAN)
+        admitted = {
+            item["icpn"]
+            for item in plan["candidates"]
+            if item["decision"] == "admit"
+        }
+        self.assertEqual(admitted, self._scaleout_icpns())
+
+        with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            fields = list(reader.fieldnames or [])
+            post_rows = list(reader)
+        pre_rows = [row for row in post_rows if row["icpn"] not in admitted]
+        self.assertEqual(len(pre_rows), PRE_ADMISSION_CANONICAL_ROWS)
+
+        with tempfile.TemporaryDirectory() as temp:
+            canonical = Path(temp) / "stm32f1-commercial-icpn.csv"
+            with canonical.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(pre_rows)
+
+            first = write_framework_dataset(plan=plan, canonical_path=canonical)
+            self.assertEqual(first["status"], "written")
+            self.assertEqual(first["rows_before"], PRE_ADMISSION_CANONICAL_ROWS)
+            self.assertEqual(first["rows_after"], POST_ADMISSION_CANONICAL_ROWS)
+            self.assertEqual(set(first["added"]), admitted)
+
+            second = write_framework_dataset(plan=plan, canonical_path=canonical)
+            self.assertEqual(second["status"], "no_op")
+            self.assertEqual(second["rows_before"], POST_ADMISSION_CANONICAL_ROWS)
+            self.assertEqual(second["rows_after"], POST_ADMISSION_CANONICAL_ROWS)
+            self.assertEqual(second["added"], [])
+
+            with canonical.open(newline="", encoding="utf-8") as handle:
+                applied_rows = list(csv.DictReader(handle))
+            self.assertEqual(applied_rows, post_rows)
 
     def test_scaleout_planner_reuses_historical_retained_evidence_without_hardcoded_batch(self) -> None:
         plan = build_scaleout_plan(
