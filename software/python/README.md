@@ -108,7 +108,7 @@ Programming Recipe 是「PPU 要做什麼」的 control-plane concept，不屬�
 - Engineering Mock Provider 支援 8 Facilities × 4 PPUs，Site 數 2/4/6/8。
 - Engineering session/PPU 可 cache 多個 Programming Assets。
 - Program/Verify 以 **Normalized Image SHA** 建立 PPU-wide active Image lease。
-- Optional `plasma_manager` 提供手動 PPU registry 與 read-only fleet aggregation；Phase 0 另提供單一路徑的 PS Loopback pass-through，Manager 仍不參與 PPU 本地 Job execution。
+- Optional `plasma_manager` 提供手動 PPU registry、read-only fleet observation，以及明確 allowlist 的 Managed PPU relay，供中央 Control Console 將 Programming、Batch、Programming Asset/Image 與 PS Loopback 經同一 Manager routing ownership 送到已註冊 PPU；Manager 仍不參與 PPU 本地 Job execution。
 - `pytest` 是統一 Python test runner。
 
 ## Python 結構
@@ -123,7 +123,7 @@ software/python/
 │   └── protocol.py           # Protocol v3.3 / PLASMA33
 ├── plasma_handlers/
 ├── plasma_interfaces/
-├── plasma_manager/           # fleet observation + narrow Phase-0 PS diagnostic relay
+├── plasma_manager/           # fleet observation + explicit Managed PPU routing
 ├── plasma_server/
 │   ├── site_manager.py
 │   ├── site_worker.py
@@ -190,34 +190,67 @@ docs/architecture/engineering-programming-workspace.md
 
 ## Plasma Manager
 
-Manager 是 optional fleet control plane。Fleet observation contract 仍為 read-only；Phase 0 只增加一條明確 allowlist 的 PS Loopback pass-through：
+Manager 是 optional fleet control plane。PPU 本身仍可 Standalone 運作；中央 Control Console 在 **Managed Mode** 則由 Manager 擁有 PPU routing ownership：
 
 ```bash
 plasma-manager --config config/manager.example.yaml
 ```
 
-目前提供：
+Manager 自身的 fleet surfaces：
 
 ```text
-GET  /api/health/live
-GET  /api/registry
-GET  /api/fleet
-POST /api/ppus/{ppu_alias}/diagnostics/loopback   # Phase 0, endpoint=ps only
+GET /api/health/live
+GET /api/registry
+GET /api/fleet
 ```
 
-Phase 0 的 command path 是：
+`/api/registry` 與 `/api/fleet` 仍是 read-only surfaces。
+
+Managed PPU relay 使用：
 
 ```text
-Central Web Console / Web BFF
+/api/ppus/{ppu_alias}/gateway/<allowlisted PPU API path>
+```
+
+目前明確 allowlist 的 route family 涵蓋中央 Programming workflow 所需的：
+
+- PPU health/readiness/node/status；
+- Engineering session 與 target catalog；
+- Programming Asset cache check/upload；
+- Job submit/status/cancel/readback；
+- server-side Batch create/status/cancel；
+- Gateway communication-policy read；
+- authenticated Principal introspection；
+- PS real-path Loopback。
+
+Managed command path：
+
+```text
+Control Console
+        -> BFF
         -> Plasma Manager
         -> enrolled PPU Gateway
         -> Plasma Server
-        -> PS diagnostic handler
+        -> local execution / diagnostic dispatch
 ```
 
-Manager 只從自己的 registry 依 `ppu_alias` 解析目的 PPU，不接受 caller 指定任意 URL，也沒有 generic HTTP proxy。成功回應會加入 `manager.relay = "pass-through"`、`ppu_alias` 與 Manager RTT；Manager 同時輸出不含 payload 的 `manager_ps_loopback_relay` event，作為 request 確實跨過 Manager boundary 的 runtime evidence。
+Manager 只從自己的 registry 依 `ppu_alias` 解析目的 PPU，不接受 caller 指定任意 URL，也不是 generic HTTP proxy。未 allowlist 的 path/method 在接觸 PPU 前 fail closed。
 
-除這條 PS diagnostic relay 外，Manager 仍不提供 Job command routing、Batch/central scheduling、Programming Image distribution、automatic discovery 或 authentication policy。PL/IC Loopback 也不在此 Phase 0 範圍內。
+BFF 與 Manager 僅轉送明確需要的 headers，例如 `Authorization`、`Idempotency-Key`、`Content-Type`、`Accept`。PPU secure Gateway 仍是 Principal／permission／Facility-PPU-Site scope／replay 的 execution authorization authority；Manager 不授權硬體操作，也不保存 plaintext Bearer credential。
+
+Programming Asset/Image Phase 1 同樣經 BFF -> Manager -> PPU。Binary payload 維持 byte-preserving 並受 bounded request/response limit 約束，不另建 Manager-specific Base64 Image protocol。
+
+PS Loopback 使用和 Programming 相同的 Managed PPU relay family；成功回應包含 `manager.relay = "pass-through"`、`ppu_alias` 與 Manager RTT，供 Browser 驗證確實跨過 Manager boundary。Legacy fixed PS Loopback route可保留相容性，但中央 Console 不再依賴它作為不同於 Programming 的 transport。
+
+Manager 目前**不**提供 arbitrary Fleet write proxy、central scheduler、automatic discovery、OIDC/auth policy owner 或 PL/IC Loopback。這些能力若要加入，仍需要獨立 architecture/security contract。
+
+詳見：
+
+```text
+docs/architecture/control-plane-routing-architecture.md
+docs/architecture/manager-optional-control-plane.md
+docs/architecture/remote-write-security-boundary.md
+```
 
 ## CLI
 
@@ -297,12 +330,12 @@ logs/YYYY-MM-DD/
 
 ## 已知限制
 
-- 尚無完整 authentication、TLS、authorization 或 anti-replay 機制。
+- Canonical Gateway 預設部署並不強制啟用完整 authentication/TLS；secure Gateway 是 opt-in path，production exposure 仍需部署層 security design。
 - Job persistence 仍以檔案為主；高工作量需重新評估資料層。
 - TCP 目前一個 request 對一個 connection，沒有長連線 multiplexing/server-push。
 - 只有 raw binary Image Asset normalization 已實作。
 - Programming Recipe/Package 尚未成為 executable contract。
 - Server restart 可辨識未完成 Job，但不會自動重做 programming。
-- Manager 目前仍以 read-only aggregation 為主；唯一 write-like 例外是 Phase 0 PS Loopback pass-through，尚不是一般化 command/orchestration contract。
+- Manager 的 managed routing 是明確 allowlist，不是 generic proxy，也不是 central scheduler；automatic discovery、central auth policy、HA/cluster 與 PL/IC diagnostics 仍未實作。
 - OpenOCD binary staging、adapter isolation 與實體 target 尚未完整驗證。
 - FPGA register map、AXI/FIFO、SWD engine、power-good 與安全關電仍屬後續硬體整合。
