@@ -9,6 +9,6 @@ Operational integration-host deployment behavior is defined by `scripts/plasmact
 - Public API smoke acceptance: [Render Public Smoke Acceptance](render-public-smoke.md).
 - Public browser acceptance: [Render Public Browser Acceptance](render-public-browser.md).
 
-The current `scripts/plasmactl` contract remains an integration-host contract. It must not be treated as the future Control Station or Z2 product installer. The product Control Station is one OS-neutral role with platform adapters for macOS `launchd`, Linux `systemd`, and Windows Service Control Manager.
+The current `scripts/plasmactl` contract remains an integration-host contract. It must not be treated as the future Control Station or Z2 product installer. The product Control Station is one OS-neutral role with platform adapters for macOS `launchd`, Linux `systemd`, and Windows Service Control Manager (SCM).
 
 Deployment, restart, service mutation, public checkpoint creation and rollback are protected operations. Documentation and tests do not authorize executing them; follow the repository Two-Gate Model and the approved plan for the exact environment and action.
