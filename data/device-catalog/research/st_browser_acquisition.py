@@ -78,6 +78,7 @@ class STBrowserAcquirer:
         self._playwright: Any = None
         self._browser: Any = None
         self._context: Any = None
+        self._rotate_browser_after_fetch = False
         self._timeout_error: type[BaseException] | tuple[type[BaseException], ...] = Exception
         self._playwright_error: type[BaseException] | tuple[type[BaseException], ...] = Exception
 
@@ -97,9 +98,8 @@ class STBrowserAcquirer:
         self._playwright_error = PlaywrightError
         self._playwright = sync_playwright().start()
         try:
-            self._browser = self._playwright.chromium.launch(headless=self.headless)
-            self.browser_version = self._browser.version
-            self._context = self._browser.new_context()
+            self._launch_browser()
+            self._rotate_browser_after_fetch = True
         except PlaywrightError as exc:
             self._playwright.stop()
             self._playwright = None
@@ -107,22 +107,33 @@ class STBrowserAcquirer:
         return self
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self._close_browser_context()
+        if self._playwright is not None:
+            self._playwright.stop()
+        self._playwright = None
+        self._rotate_browser_after_fetch = False
+
+    def _launch_browser(self) -> None:
+        if self._playwright is None:
+            raise AcquisitionError("browser acquirer must be used as a context manager")
+        self._browser = self._playwright.chromium.launch(headless=self.headless)
+        self.browser_version = self._browser.version
+        self._context = self._browser.new_context()
+
+    def _close_browser_context(self) -> None:
         if self._context is not None:
             self._context.close()
         if self._browser is not None:
             self._browser.close()
-        if self._playwright is not None:
-            self._playwright.stop()
         self._context = None
         self._browser = None
-        self._playwright = None
 
     def fetch(self, source_url: str, timeout_seconds: float) -> tuple[bytes, str, None, None]:
         validate_source_url(source_url)
         if timeout_seconds <= 0:
             raise AcquisitionError("browser acquisition timeout must be positive")
         if self._context is None:
-            raise AcquisitionError("browser acquirer must be used as a context manager")
+            self._launch_browser()
 
         timeout_ms = int(timeout_seconds * 1000)
         page = self._context.new_page()
@@ -133,8 +144,13 @@ class STBrowserAcquirer:
             if response is not None and response.status >= 400:
                 raise AcquisitionError(f"browser navigation returned HTTP {response.status}")
 
-            page.get_by_role("heading", name=QUALITY_HEADING, exact=True).wait_for(
-                state="visible", timeout=timeout_ms
+            # ST currently renders several responsive copies of this evidence
+            # section, with the matching heading nodes attached but hidden until
+            # their layout/tab is activated.  Attachment is the stable rendered-DOM
+            # readiness signal; the scoped evidence parser still fails closed if the
+            # exact section or commercial part numbers are absent.
+            page.get_by_text(QUALITY_HEADING, exact=True).wait_for(
+                state="attached", timeout=timeout_ms
             )
             body_text = page.locator("body").inner_text(timeout=timeout_ms)
             folded = body_text.casefold()
@@ -155,3 +171,9 @@ class STBrowserAcquirer:
             raise AcquisitionError(f"browser acquisition failed: {exc}") from exc
         finally:
             page.close()
+            # ST's CDN has repeatedly failed later navigations on a reused
+            # Chromium HTTP/2 connection.  A fresh, clean browser process per
+            # bounded target avoids connection reuse without changing headers,
+            # profiles, timeouts, or evidence semantics.
+            if self._rotate_browser_after_fetch:
+                self._close_browser_context()

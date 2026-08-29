@@ -17,7 +17,7 @@ This does **not** prove that ST blocks every raw HTTP client permanently. It is 
 ST official product page
         |
         v
-real Chromium browser (Playwright)
+real headed Chromium browser (Playwright)
         |
         v
 rendered DOM
@@ -72,6 +72,23 @@ python -m playwright install chromium
 
 It is not added to Plasma Server, Web Gateway, Web Console, PPU runtime, FPGA, or deployment dependencies.
 
+Headed Chromium is the default for live ST acquisition. In the observed Codex
+environment, headless Chromium failed at the ST/CDN HTTP/2 boundary while a clean
+headed context received HTTP 200 and rendered the product evidence. The adapter
+does not reuse a personal browser profile, add impersonation headers, bypass a
+challenge, or weaken any evidence gate. `--headless` remains available for
+explicit transport diagnosis.
+
+The ST page currently attaches responsive copies of the Quality and Reliability
+section to the rendered DOM while keeping inactive layouts hidden. Acquisition
+waits for the exact section label to be attached, then relies on the existing
+section-scoped parser to reject missing or foreign commercial part numbers.
+
+Each bounded target uses a fresh clean Chromium process. Reusing the first
+process caused subsequent ST navigations to fail at an HTTP/2 connection boundary;
+process isolation prevents that connection reuse without changing request headers,
+browser profiles, timeouts, candidate expectations, or provenance semantics.
+
 ## Controlled execution sequence
 
 Live execution is performed by Codex in its execution environment, not by GitHub Actions.
@@ -92,8 +109,8 @@ The run must fail closed if:
 
 - navigation redirects outside approved ST product URLs
 - browser navigation returns HTTP error
-- Quality and Reliability is not visible
-- Part Number is not visible
+- Quality and Reliability is not attached to the rendered DOM
+- the scoped Part Number evidence is absent or cannot be parsed
 - a CAPTCHA/access-denied/challenge marker is visible
 - the rendered DOM exceeds the bounded response limit
 - exact commercial candidates cannot be extracted
