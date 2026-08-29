@@ -1,0 +1,59 @@
+.loopbackResultsWrap tbody tr + tr td {
+  border-top: 1px solid var(--line);
+}
+
+.loopbackResultsWrap td {
+  padding: 9px 10px;
+  color: var(--text-soft);
+  font: 10px var(--font-mono);
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.loopbackResultsWrap td:last-child {
+  white-space: normal;
+  min-width: 220px;
+}
+
+.loopbackResultBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  min-height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.loopbackResultBadge.pass {
+  border-color: color-mix(in srgb, #2c9a63 62%, var(--line));
+  background: color-mix(in srgb, #2c9a63 10%, var(--panel));
+  color: #237f52;
+}
+
+.loopbackResultBadge.fail,
+.loopbackResultBadge.error,
+.loopbackResultBadge.timeout {
+  border-color: color-mix(in srgb, #c64f4f 60%, var(--line));
+  background: color-mix(in srgb, #c64f4f 9%, var(--panel));
+  color: #a83f3f;
+}
+
+.loopbackExecutionState {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.loopbackExecutionState strong {
+  color: var(--cyan);
+}
+
+.loopbackCaseError {
+  color: #a83f3f;
+}
