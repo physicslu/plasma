@@ -1,17 +1,23 @@
-from __future__ import annotations
+from pathlib import Path
 
-import unittest
+import pytest
 
-from plasma_manager.config import ManagerConfig, PPURegistryEntry
-
-
-class ManagerConfigCompatibilityTests(unittest.TestCase):
-    def test_existing_positional_ppus_argument_keeps_its_position(self):
-        ppus = (PPURegistryEntry(endpoint="http://ppu-a"),)
-        config = ManagerConfig("127.0.0.1", 18180, 2.0, 2.0, ppus)
-        self.assertEqual(config.ppus, ppus)
-        self.assertIsNone(config.observation_db_path)
+from plasma_manager.config import ManagerConfigError, load_manager_config
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_manager_config_rejects_duplicate_ppu_aliases(tmp_path: Path) -> None:
+    config = tmp_path / "manager.yaml"
+    config.write_text(
+        """
+manager:
+  host: 127.0.0.1
+ppus:
+  - alias: ppu-a
+    endpoint: http://127.0.0.1:18080
+  - alias: ppu-a
+    endpoint: http://127.0.0.1:18081
+""".lstrip(),
+        encoding="utf-8",
+    )
+    with pytest.raises(ManagerConfigError, match="PPU aliases must be unique"):
+        load_manager_config(config)
