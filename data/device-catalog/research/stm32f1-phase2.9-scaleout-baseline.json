@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29",
+  "source_authority": "STMicroelectronics official product page Quality and Reliability",
+  "baseline_kind": "research_expected_exact_icpn_set_not_canonical_admission",
+  "expected_targets": 8,
+  "expected_exact_icpn_candidates": 26,
+  "targets": {
+    "STM32F100CB": [
+      "STM32F100CBT6B",
+      "STM32F100CBT6BTR",
+      "STM32F100CBT7B",
+      "STM32F100CBT7BTR"
+    ],
+    "STM32F100VE": [
+      "STM32F100VET6",
+      "STM32F100VET6B",
+      "STM32F100VET6BTR",
+      "STM32F100VET7B"
+    ],
+    "STM32F101RE": [
+      "STM32F101RET6",
+      "STM32F101RET6TR"
+    ],
+    "STM32F101ZE": [
+      "STM32F101ZET6"
+    ],
+    "STM32F102CB": [
+      "STM32F102CBT6",
+      "STM32F102CBT6TR"
+    ],
+    "STM32F103RC": [
+      "STM32F103RCT6",
+      "STM32F103RCT6TR",
+      "STM32F103RCT7",
+      "STM32F103RCT7TR",
+      "STM32F103RCY6TR"
+    ],
+    "STM32F105VB": [
+      "STM32F105VBH6",
+      "STM32F105VBH6TR",
+      "STM32F105VBH7",
+      "STM32F105VBT6",
+      "STM32F105VBT7"
+    ],
+    "STM32F107RC": [
+      "STM32F107RCT6",
+      "STM32F107RCT6TR",
+      "STM32F107RCT7"
+    ]
+  }
+}
