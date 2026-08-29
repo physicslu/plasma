@@ -1,0 +1,133 @@
+name: Product release format acceptance
+
+on:
+  push:
+    paths:
+      - "release/**"
+      - "scripts/product-release.py"
+      - "software/python/pyproject.toml"
+      - "software/python/tests/test_product_release.py"
+      - "software/web/package.json"
+      - ".github/workflows/product-release.yml"
+      - "docs/deployment/product-release-format.md"
+      - "docs/deployment/product-deployment-foundation.md"
+      - "docs/deployment/README.md"
+      - "docs/README.md"
+  pull_request:
+    paths:
+      - "release/**"
+      - "scripts/product-release.py"
+      - "software/python/pyproject.toml"
+      - "software/python/tests/test_product_release.py"
+      - "software/web/package.json"
+      - ".github/workflows/product-release.yml"
+      - "docs/deployment/product-release-format.md"
+      - "docs/deployment/product-deployment-foundation.md"
+      - "docs/deployment/README.md"
+      - "docs/README.md"
+
+permissions:
+  contents: read
+
+jobs:
+  release-format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run release-format regression tests
+        run: |
+          python -m pip install pytest
+          python -m pytest -q software/python/tests/test_product_release.py
+      - name: Build representative release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="$RUNNER_TEMP/runtime"
+          defaults="$RUNNER_TEMP/defaults"
+          output="$RUNNER_TEMP/releases"
+          mkdir -p "$runtime/bin" "$defaults"
+          printf 'representative runtime payload\n' > "$runtime/bin/plasma-runtime.txt"
+          printf '{"mode":"product"}\n' > "$defaults/plasma-defaults.json"
+          sha="$(git rev-parse HEAD)"
+
+          python scripts/product-release.py build \
+            --role control-station \
+            --platform linux \
+            --architecture x86_64 \
+            --runtime-dir "$runtime" \
+            --config-defaults-dir "$defaults" \
+            --output-dir "$output" \
+            --git-sha "$sha" \
+            --build-timestamp 2026-08-30T00:00:00Z
+
+          python scripts/product-release.py build \
+            --role control-station \
+            --platform windows \
+            --architecture x86_64 \
+            --runtime-dir "$runtime" \
+            --config-defaults-dir "$defaults" \
+            --output-dir "$output" \
+            --git-sha "$sha" \
+            --build-timestamp 2026-08-30T00:00:00Z
+
+          python scripts/product-release.py build \
+            --role ppu \
+            --platform linux \
+            --architecture armv7l \
+            --runtime-dir "$runtime" \
+            --config-defaults-dir "$defaults" \
+            --output-dir "$output" \
+            --git-sha "$sha" \
+            --build-timestamp 2026-08-30T00:00:00Z
+      - name: Verify from a clean directory without repository data
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(python -c 'import json; print(json.load(open("release/product.json"))["product_version"])')"
+          clean="$RUNNER_TEMP/clean-verifier"
+          source="$RUNNER_TEMP/releases"
+          mkdir -p "$clean"
+          cp scripts/product-release.py "$clean/product-release.py"
+          cp "$source/plasma-control-station-$version-linux-x86_64.tar.gz" "$clean/"
+          cp "$source/plasma-control-station-$version-linux-x86_64.tar.gz.sha256" "$clean/"
+          cp "$source/plasma-control-station-$version-windows-x86_64.zip" "$clean/"
+          cp "$source/plasma-control-station-$version-windows-x86_64.zip.sha256" "$clean/"
+          cp "$source/plasma-ppu-$version-linux-armv7l.tar.gz" "$clean/"
+          cp "$source/plasma-ppu-$version-linux-armv7l.tar.gz.sha256" "$clean/"
+
+          cd "$clean"
+          python product-release.py verify \
+            "plasma-control-station-$version-linux-x86_64.tar.gz" \
+            --expect-role control-station \
+            --expect-platform linux \
+            --expect-architecture x86_64 \
+            --expect-version "$version" \
+            --extract-to linux-clean
+          python product-release.py verify \
+            "plasma-control-station-$version-windows-x86_64.zip" \
+            --expect-role control-station \
+            --expect-platform windows \
+            --expect-architecture x86_64 \
+            --expect-version "$version" \
+            --extract-to windows-clean
+          python product-release.py verify \
+            "plasma-ppu-$version-linux-armv7l.tar.gz" \
+            --expect-role ppu \
+            --expect-platform linux \
+            --expect-architecture armv7l \
+            --expect-version "$version" \
+            --extract-to ppu-clean
+
+          test -f linux-clean/plasma-release/release.json
+          test -f linux-clean/plasma-release/SHA256SUMS
+          test -f linux-clean/plasma-release/runtime/bin/plasma-runtime.txt
+          test -f windows-clean/plasma-release/runtime/bin/plasma-runtime.txt
+          test -f ppu-clean/plasma-release/runtime/bin/plasma-runtime.txt
+          test ! -e linux-clean/plasma-release/.git
+          test ! -e linux-clean/plasma-release/node_modules

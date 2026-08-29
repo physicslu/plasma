@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "product": "plasma",
+  "product_version": "0.1.0",
+  "role_contracts": {
+    "control-station": {
+      "web_rest_api": "3"
+    },
+    "ppu": {
+      "plasma_protocol": "3.3",
+      "web_rest_api": "3"
+    }
+  }
+}
