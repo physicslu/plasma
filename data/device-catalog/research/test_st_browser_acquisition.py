@@ -9,16 +9,23 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
+from evaluate_stm32f1_live_pilot import evaluate_live_pilot  # noqa: E402
 from run_stm32f1_browser_pilot import CONTROL_BASE_DEVICE, select_targets  # noqa: E402
-from st_browser_acquisition import STBrowserAcquirer  # noqa: E402
-from st_product_page_acquisition import (  # noqa: E402
-    AcquisitionError,
-    MAX_RESPONSE_BYTES,
-    build_evidence_record,
+from st_browser_acquisition import (  # noqa: E402
+    BROWSER_TRANSPORT,
+    STBrowserAcquirer,
+    build_browser_evidence_record,
 )
+from st_product_page_acquisition import AcquisitionError, MAX_RESPONSE_BYTES  # noqa: E402
 from stm32f1_acquisition_pilot import PilotTarget  # noqa: E402
 
 TARGET_URL = "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c8.html"
+EXPECTED_ICPNS = [
+    "STM32F100C8T6B",
+    "STM32F100C8T6BTR",
+    "STM32F100C8T7B",
+    "STM32F100C8T7BTR",
+]
 RENDERED_HTML = """<!doctype html>
 <html><body>
 <h2>Quality and Reliability</h2>
@@ -125,32 +132,108 @@ def acquirer_for(page: FakePage) -> STBrowserAcquirer:
 
 
 class BrowserAcquisitionTests(unittest.TestCase):
-    def test_rendered_dom_flows_into_existing_evidence_parser(self) -> None:
+    def test_rendered_dom_has_explicit_non_raw_provenance(self) -> None:
         page = FakePage()
         body, final_url, etag, last_modified = acquirer_for(page).fetch(TARGET_URL, 5.0)
         self.assertTrue(page.closed)
         self.assertEqual(final_url, TARGET_URL)
         self.assertIsNone(etag)
         self.assertIsNone(last_modified)
-        evidence = build_evidence_record(
+        evidence = build_browser_evidence_record(
             body=body,
             source_url=TARGET_URL,
             final_url=final_url,
             base_device="STM32F100C8",
             retrieved_at_utc="2026-08-29T12:00:00Z",
         )
-        self.assertEqual(
-            evidence["exact_icpns"],
-            [
-                "STM32F100C8T6B",
-                "STM32F100C8T6BTR",
-                "STM32F100C8T7B",
-                "STM32F100C8T7BTR",
-            ],
-        )
+        self.assertEqual(evidence["exact_icpns"], EXPECTED_ICPNS)
+        self.assertEqual(evidence["acquisition_transport"], BROWSER_TRANSPORT)
+        self.assertRegex(str(evidence["rendered_dom_sha256"]), r"^[0-9a-f]{64}$")
+        self.assertNotIn("raw_sha256", evidence)
         self.assertEqual(page.wait_until, "domcontentloaded")
         self.assertEqual(page.role_request, ("heading", "Quality and Reliability", True))
         self.assertEqual(page.text_request, ("Part Number", True))
+
+    def test_browser_evidence_can_be_scale_ready_without_claiming_raw_http(self) -> None:
+        evidence = build_browser_evidence_record(
+            body=RENDERED_HTML.encode("utf-8"),
+            source_url=TARGET_URL,
+            final_url=TARGET_URL,
+            base_device=CONTROL_BASE_DEVICE,
+            retrieved_at_utc="2026-08-29T12:00:00Z",
+        )
+        baseline = {
+            "schema_version": 1,
+            "pilot_id": "browser-unit-test",
+            "canonical_dataset_admission": False,
+            "targets": [{"base_device": CONTROL_BASE_DEVICE, "exact_icpns": EXPECTED_ICPNS}],
+        }
+        summary = {
+            "schema_version": 1,
+            "pilot_id": "browser-unit-test",
+            "attempted": 1,
+            "acquisition_success": 1,
+            "acquisition_failure": 0,
+            "exact_icpn_candidates": 4,
+            "canonical_mapping": {"unique": 1, "ambiguous": 0, "unmapped": 0},
+            "openocd_cfg_mapping": {"mapped": 1, "total": 1},
+            "manual_intervention_required": 0,
+            "acquisition_transport": BROWSER_TRANSPORT,
+            "results": [
+                {
+                    "base_device": CONTROL_BASE_DEVICE,
+                    "acquisition_status": "success",
+                    "canonical_mapping": {
+                        "status": "unique",
+                        "target_configs": ["stm32f1x.cfg"],
+                    },
+                    "evidence": evidence,
+                }
+            ],
+        }
+        report = evaluate_live_pilot(summary=summary, baseline=baseline)
+        self.assertTrue(report["scale_ready"])
+        self.assertEqual(report["transport_evidence"]["transport"], BROWSER_TRANSPORT)
+        self.assertEqual(report["transport_evidence"]["valid_records"], 1)
+
+    def test_browser_evaluator_rejects_fake_raw_sha_claim(self) -> None:
+        evidence = build_browser_evidence_record(
+            body=RENDERED_HTML.encode("utf-8"),
+            source_url=TARGET_URL,
+            final_url=TARGET_URL,
+            base_device=CONTROL_BASE_DEVICE,
+            retrieved_at_utc="2026-08-29T12:00:00Z",
+        )
+        evidence["raw_sha256"] = evidence["rendered_dom_sha256"]
+        baseline = {
+            "schema_version": 1,
+            "pilot_id": "browser-unit-test",
+            "canonical_dataset_admission": False,
+            "targets": [{"base_device": CONTROL_BASE_DEVICE, "exact_icpns": EXPECTED_ICPNS}],
+        }
+        summary = {
+            "schema_version": 1,
+            "pilot_id": "browser-unit-test",
+            "attempted": 1,
+            "acquisition_success": 1,
+            "acquisition_failure": 0,
+            "exact_icpn_candidates": 4,
+            "canonical_mapping": {"unique": 1, "ambiguous": 0, "unmapped": 0},
+            "openocd_cfg_mapping": {"mapped": 1, "total": 1},
+            "manual_intervention_required": 0,
+            "acquisition_transport": BROWSER_TRANSPORT,
+            "results": [
+                {
+                    "base_device": CONTROL_BASE_DEVICE,
+                    "acquisition_status": "success",
+                    "canonical_mapping": {"status": "unique", "target_configs": ["stm32f1x.cfg"]},
+                    "evidence": evidence,
+                }
+            ],
+        }
+        report = evaluate_live_pilot(summary=summary, baseline=baseline)
+        self.assertFalse(report["scale_ready"])
+        self.assertTrue(any("must not claim raw_sha256" in issue for issue in report["issues"]))
 
     def test_challenge_marker_fails_closed(self) -> None:
         page = FakePage(body_text="Access Denied - verify you are human")
@@ -210,7 +293,10 @@ class BrowserAcquisitionTests(unittest.TestCase):
     def test_browser_dependency_is_research_only_and_pinned(self) -> None:
         requirement = (HERE / "requirements-st-browser.txt").read_text(encoding="utf-8")
         self.assertIn("playwright==1.62.0", requirement)
-        self.assertNotIn("playwright", (HERE.parents[2] / "software" / "web" / "package.json").read_text(encoding="utf-8"))
+        web_package = (HERE.parents[2] / "software" / "web" / "package.json").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("playwright", web_package)
 
 
 if __name__ == "__main__":
