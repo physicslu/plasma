@@ -67,6 +67,7 @@
 
 - **Current** — [Deployment Index](deployment/README.md)
 - **Current** — [Web Runtime Hygiene](deployment/web-runtime-hygiene.md)
+- **Current** — [Manager BFF Runtime Wiring](deployment/manager-bff-runtime-wiring.md)
 - **Current** — [Render Free Public Mock Demo](deployment/render-free-public-demo.md)
 - **Current** — [Render Public Smoke Acceptance](deployment/render-public-smoke.md)
 - **Current** — [Render Public Browser Acceptance](deployment/render-public-browser.md)

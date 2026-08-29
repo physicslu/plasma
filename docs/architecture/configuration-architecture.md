@@ -1,6 +1,6 @@
 # Plasma Configuration Architecture
 
-> Status: current baseline for standalone PPU deployment, optional read-only Plasma Manager, Engineering Mock Provider, and shared Gateway communication policy.
+> Status: current baseline for standalone PPU deployment, optional Plasma Manager observation plus narrow Phase-0 PS Loopback relay, Engineering Mock Provider, and shared Gateway communication policy.
 
 This document defines ownership, source-of-truth, precedence, persistence, migration, and reconciliation rules for Plasma configuration. It intentionally avoids private account names, private hostnames, and workstation-specific absolute paths.
 
@@ -66,7 +66,7 @@ $HOME/.config/plasma/plasmactl.env
 The current deployment schema version is:
 
 ```bash
-PLASMA_CONFIG_VERSION=4
+PLASMA_CONFIG_VERSION=5
 ```
 
 Generic example:
@@ -84,9 +84,14 @@ PLASMA_VITE_PORT=5173
 PLASMA_PUBLIC_API_URL=https://example.invalid
 PLASMA_MANAGER_ENABLED=0
 PLASMA_MANAGER_CONFIG=/path/to/manager.yaml
+PLASMA_MANAGER_PPU_ALIAS=
 PLASMA_ENGINEERING_MOCK_ENABLED=0
 PLASMA_ENGINEERING_MOCK_ROOT=/path/to/runtime-state/engineering-mock
 ```
+
+`PLASMA_MANAGER_PPU_ALIAS` is the explicit PPU selected for the current narrow Manager Phase-0 BFF command path. It may remain empty when Manager is disabled. When Manager is enabled, it must identify an alias already present in `PLASMA_MANAGER_CONFIG`; deployment must not infer the first registry entry.
+
+`PLASMA_MANAGER_API_URL` is generated runtime state, not another persistent operator input. `plasmactl` derives it from the local Manager bind/port and injects it together with `PLASMA_MANAGER_PPU_ALIAS` into `plasma-vite.service`.
 
 Ownership chain:
 
@@ -217,6 +222,8 @@ reconcile derived runtime state
 
 Known historical defaults may migrate to the current canonical default. Unknown/custom values remain explicit operator overrides. Already-versioned values are not repeatedly reinterpreted.
 
+Schema v5 adds `PLASMA_MANAGER_PPU_ALIAS`. Migration preserves an existing explicit value; otherwise it adds an empty value. It does not infer a command target from Manager registry ordering. This means a pre-v5 deployment with Manager enabled must explicitly select a valid registered alias before runtime reconciliation can succeed.
+
 Wire-protocol evolution is separate from deployment-config schema versioning. Protocol v3.3 / `PLASMA33` uses one-based `site_id`; retired zero-based Channel identity is not a current migration input.
 
 ## 8. Runtime reconciliation
@@ -297,22 +304,26 @@ Conceptual status/capability shape:
 
 The exact capability schema may evolve, but ownership does not: PPU identity and capability originate from the PPU/device side.
 
-## 11. Optional multi-PPU observation
+## 11. Optional multi-PPU observation and narrow diagnostic relay
 
-The standalone path remains one PPU Console communicating with one local Gateway and Plasma Server. The repository also implements an optional read-only Plasma Manager and the PMode Factory Console:
+The standalone path remains one PPU Console communicating with one local Gateway and Plasma Server. The repository also implements an optional Plasma Manager and the PMode Factory Console:
 
 ```text
-PMode Factory Console
+Control Console
         |
         v
-Plasma Manager (optional read-only registry / aggregation)
+Plasma Manager (optional fleet control plane)
         |
         +-- PPU A Gateway -> local execution
         +-- PPU B Gateway -> local execution
         +-- PPU C Gateway -> local execution
 ```
 
-Current Manager behavior is manual registry plus read-only liveness/readiness/topology aggregation. It does not own command routing, scheduling, discovery, authentication policy, audit persistence, or PPU execution. Each PPU remains locally autonomous and owns Site scheduling, protocol timing, safety and recovery.
+Current Manager observation behavior is manual registry plus read-only liveness/readiness/topology aggregation. The only current write-like exception is the fixed Phase-0 PS Loopback pass-through for one explicitly selected registered PPU alias. It is not a generic proxy and does not establish general Job/Batch command routing.
+
+Manager does not currently own scheduling, discovery, authentication policy, Programming Asset rollout, general Fleet write orchestration, or PPU execution. Each PPU remains locally autonomous and owns Site scheduling, protocol timing, safety and recovery.
+
+For same-host Manager BFF deployment, `plasmactl` derives the local Manager URL from `PLASMA_MANAGER_CONFIG` and injects that derived URL plus the explicit `PLASMA_MANAGER_PPU_ALIAS` into the Vite runtime. An external Manager bind is not accepted as an implicit BFF route.
 
 The browser must not fan out directly to a stored list of PPU URLs as the long-term fleet architecture.
 
@@ -360,7 +371,9 @@ A future structured read-only effective-configuration/status endpoint may reduce
 | `PLASMA_VITE_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current default 5173 |
 | `PLASMA_PUBLIC_API_URL` | Facility/deployment | Deployment | `plasmactl.env` | Public API Base configuration |
 | `PLASMA_MANAGER_ENABLED` | Facility/deployment | Deployment | `plasmactl.env` | Optional; default `0` |
-| `PLASMA_MANAGER_CONFIG` | Fleet observation | Deployment | Operator-local YAML path | Required only when Manager is enabled |
+| `PLASMA_MANAGER_CONFIG` | Fleet control plane | Deployment | Operator-local YAML path | Required only when Manager is enabled |
+| `PLASMA_MANAGER_PPU_ALIAS` | Fleet command target | Deployment | `plasmactl.env` | Required with Manager enabled; must match a registered alias |
+| `PLASMA_MANAGER_API_URL` | Derived runtime | Deployment generator | Generated Vite systemd environment | Derived from local Manager config; not independent truth |
 | `PLASMA_ENGINEERING_MOCK_ENABLED` | Test runtime | Deployment | `plasmactl.env` | Optional; default `0` |
 | `PLASMA_ENGINEERING_MOCK_ROOT` | Test runtime | Deployment | Operator-local state path | Must remain outside the Git worktree |
 | `NEXT_PUBLIC_PLASMA_API_URL` | Derived runtime | Deployment generator | Generated systemd environment | Not independent truth |
@@ -380,7 +393,7 @@ A future structured read-only effective-configuration/status endpoint may reduce
 2. Keep deployment configuration versioned and reconcilable
 3. Keep topology/capability truth out of browser storage
 4. Keep canonical Site identity one-based across new layers
-5. Keep Manager observation separate from Batch command ownership
+5. Keep Manager observation and narrow diagnostic relay separate from general Batch command ownership
 6. Keep Gateway communication policy server-owned and derived budgets read-only
 7. Add effective-config observability where ambiguity remains operationally costly
 ```
