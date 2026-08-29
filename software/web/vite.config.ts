@@ -72,7 +72,7 @@ export default defineConfig(async () => {
         // namespaces are deliberately excluded so Vinext owns both same-origin
         // BFF surfaces instead of leaking control-plane requests into the PPU
         // execution API surface.
-        "^/api/(?!(?:fleet|manager)(?:/|$))": {
+        "^/api/(?!fleet(?:/|$))(?!manager(?:/|$))": {
           target: "http://127.0.0.1:18080",
           changeOrigin: true,
         },
