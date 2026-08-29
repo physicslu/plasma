@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29",
+  "targets": [
+    {
+      "base_device": "STM32F100CB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html",
+      "selection_reason": "Value-line 128 KiB LQFP48 base-device expansion adjacent to the admitted STM32F100C8 slice."
+    },
+    {
+      "base_device": "STM32F100VE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html",
+      "selection_reason": "Value-line 512 KiB 100-pin expansion exercising a larger package and density while staying inside existing STM32F1 policy codes."
+    },
+    {
+      "base_device": "STM32F101RE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html",
+      "selection_reason": "Access-line 512 KiB LQFP64 expansion beyond the admitted STM32F101C8 slice."
+    },
+    {
+      "base_device": "STM32F101ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101ze.html",
+      "selection_reason": "Access-line 512 KiB 144-pin expansion covering the Z package class already supported by policy."
+    },
+    {
+      "base_device": "STM32F102CB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html",
+      "selection_reason": "USB access-line 128 KiB expansion adjacent to the admitted STM32F102C8 slice."
+    },
+    {
+      "base_device": "STM32F103RC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html",
+      "selection_reason": "Mainstream STM32F103 256 KiB LQFP64/WLCSP commercial surface not yet admitted."
+    },
+    {
+      "base_device": "STM32F105VB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html",
+      "selection_reason": "Connectivity-line 128 KiB 100-pin expansion exercising LQFP and BGA order-code surfaces."
+    },
+    {
+      "base_device": "STM32F107RC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html",
+      "selection_reason": "Connectivity-line 256 KiB LQFP64 expansion adjacent to the admitted STM32F107VC slice."
+    }
+  ]
+}
