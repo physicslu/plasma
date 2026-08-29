@@ -182,7 +182,7 @@ function outputDownloadAnchor(target: EventTarget | null): HTMLAnchorElement | n
   try {
     const url = new URL(anchor.href, window.location.href);
     if (!isGatewayRequest(url)) return null;
-    if (!/^\/api\/(?:manager\/ppu\/)?(?:engineering\/targets\/[^/]+\/[^/]+\/api\/)?jobs\/[^/]+\/files\/[^/]+$/.test(url.pathname)) {
+    if (!/^\/api\/(?:manager\/ppu\/api\/)?(?:engineering\/targets\/[^/]+\/[^/]+\/api\/)?jobs\/[^/]+\/files\/[^/]+$/.test(url.pathname)) {
       return null;
     }
     return anchor;
