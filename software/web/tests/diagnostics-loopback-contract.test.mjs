@@ -6,6 +6,7 @@ const engineering = await readFile(new URL("../app/engineering/page.tsx", import
 const loopback = await readFile(new URL("../app/engineering/loopback-test.tsx", import.meta.url), "utf8");
 const api = await readFile(new URL("../app/engineering/diagnostics-api.ts", import.meta.url), "utf8");
 const managerBff = await readFile(new URL("../app/api/manager/diagnostics/loopback/route.ts", import.meta.url), "utf8");
+const vite = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
 const shell = await readFile(new URL("../app/engineering/diagnostics-test-page.tsx", import.meta.url), "utf8");
 const css = await readFile(new URL("../app/engineering/loopback-test.css", import.meta.url), "utf8");
 const resultCss = await readFile(new URL("../app/engineering/loopback-test-results.css", import.meta.url), "utf8");
@@ -17,10 +18,16 @@ test("Diagnostics exposes Loopback Test as an EMode tree child", () => {
   assert.match(engineering, /Loopback Test/);
 });
 
-test("loopback path uses endpoint intent and fills every upstream node", () => {
-  assert.match(loopback, /endpointIndex: Record<LoopbackEndpoint, number> = \{ ps: 1, pl: 2, ic: 3 \}/);
+test("loopback path keeps Control Console and Plasma Manager fixed while endpoints fill upstream nodes", () => {
+  assert.match(loopback, /endpointIndex: Record<LoopbackEndpoint, number> = \{ ps: 2, pl: 3, ic: 4 \}/);
+  assert.match(loopback, /\{ label: "CONTROL CONSOLE", detail: "Operator UI" \}/);
+  assert.match(loopback, /\{ label: "PLASMA MANAGER", detail: "Fleet control plane" \}/);
+  assert.match(loopback, /\{ label: "PS", detail: "Processing System", endpoint: "ps" \}/);
+  assert.match(loopback, /\{ label: "PL", detail: "Programmable Logic", endpoint: "pl" \}/);
+  assert.match(loopback, /\{ label: "IC", detail: "Diagnostic FW", endpoint: "ic" \}/);
   assert.match(loopback, /index <= selectedIndex \? "active" : ""/);
-  assert.match(loopback, /Web → PS → PL → IC → PL → PS → Web/);
+  assert.match(loopback, /Control Console → Plasma Manager → PS → PL → IC → PL → PS → Plasma Manager → Control Console/);
+  assert.doesNotMatch(loopback, /endpoint: "manager"|endpoint: "control-console"/);
   assert.doesNotMatch(loopback, /Disable/);
   assert.doesNotMatch(loopback, /\bNC\b|\bNO\b/);
 });
@@ -59,6 +66,12 @@ test("Diagnostics Test Page shell is shared while loopback keeps domain controls
   assert.doesNotMatch(shell, /LoopbackEndpoint|PRBS|Boundary/);
 });
 
+test("Manager BFF namespace stays in Vinext and receives alias binding", () => {
+  assert.ok(vite.includes('"^/api/(?!fleet(?:/|$))(?!manager(?:/|$))"'));
+  assert.match(vite, /target: "http:\/\/127\.0\.0\.1:18080"/);
+  assert.match(vite, /PLASMA_MANAGER_PPU_ALIAS:\s*process\.env\.PLASMA_MANAGER_PPU_ALIAS\s*\?\?\s*""/);
+});
+
 test("Phase 0 PS loopback crosses the Manager pass-through before the PPU", () => {
   assert.match(api, /\/api\/manager\/diagnostics\/loopback/);
   assert.doesNotMatch(api, /\/api\/engineering\/diagnostics\/loopback/);
@@ -69,7 +82,7 @@ test("Phase 0 PS loopback crosses the Manager pass-through before the PPU", () =
   assert.match(managerBff, /\/api\/ppus\/\$\{encodeURIComponent\(ppuAlias\)\}\/diagnostics\/loopback/);
   assert.match(managerBff, /LOOPBACK_HOSTS/);
   assert.doesNotMatch(managerBff, /NEXT_PUBLIC_PLASMA_API_URL/);
-  assert.match(loopback, /Browser → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → Browser/);
+  assert.match(loopback, /Control Console \(Browser\) → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → PS/);
 });
 
 test("Phase 0 still executes only the PS production real path", () => {

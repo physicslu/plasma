@@ -56,6 +56,7 @@ export default defineConfig({
       ...process.env,
       PLASMA_FLEET_UI_ENABLED: "1",
       PLASMA_MANAGER_API_URL: "http://127.0.0.1:18180",
+      PLASMA_MANAGER_PPU_ALIAS: "ppu-a",
     },
   },
 });
