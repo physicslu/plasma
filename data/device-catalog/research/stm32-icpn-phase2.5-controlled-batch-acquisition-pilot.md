@@ -68,7 +68,15 @@ CI validates:
 2. pilot manifest schema, URL/base-device correspondence and bounded target count;
 3. batch aggregation behavior for success and fail-closed cases using synthetic HTML;
 4. unique mapping of the six pilot base devices into the checked-in canonical catalog;
-5. mapping of those bases to `tcl/target/stm32f1x.cfg` capability evidence.
+5. mapping of those bases to `tcl/target/stm32f1x.cfg` capability evidence;
+6. a successful acquisition with ambiguous canonical mapping is still classified as requiring intervention.
+
+The checked-in canonical catalog deterministically resolves all six selected bases as unique `cmsis_device_name` rows and maps all six to `tcl/target/stm32f1x.cfg`:
+
+```text
+canonical mapping unique    6 / 6
+OpenOCD CFG mapping         6 / 6
+```
 
 CI does **not** claim that live ST acquisition succeeded at CI execution time.
 
@@ -88,13 +96,15 @@ openocd_cfg_mapping
 manual_intervention_required
 ```
 
-`manual_intervention_required` is raised for an acquisition failure or a non-unique canonical mapping. It is not raised merely because a candidate has not yet been admitted to the commercial dataset.
+`manual_intervention_required` is raised for any acquisition failure, non-unique canonical mapping, or missing OpenOCD CFG mapping. The CLI returns non-zero whenever this count is non-zero. It is not raised merely because a candidate has not yet been admitted to the commercial dataset.
+
+This is intentionally fail-closed: network extraction success alone is not enough to classify a pilot target as clean.
 
 ## What this pilot proves
 
 The live source inspection expands the Phase 2.4 observation from four STM32F103 pages to six additional STM32F1 bases across F100/F101/F102/F103/F105/F107. The same official evidence surface is present across all six sampled pages, including different candidate counts and suffix forms.
 
-The batch runner converts the Phase 2.4 one-page probe into a bounded, auditable research operation with explicit KPI output and no automatic dataset mutation.
+The batch runner converts the Phase 2.4 one-page probe into a bounded, auditable research operation with explicit KPI output and no automatic dataset mutation. The six selected bases also have deterministic canonical/OpenOCD capability mappings in the checked-in catalog.
 
 ## What this pilot does not prove
 
