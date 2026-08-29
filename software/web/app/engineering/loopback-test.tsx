@@ -76,7 +76,7 @@ const copy = {
     rtt: "RTT (ms)",
     result: "Result",
     details: "Details",
-    helpText: "節點實心表示包含在本次測試路徑；空心表示不包含。選 IC 時，WEB、PS、PL、IC 會全部實心。Relay 的 NC / NO 屬於底層實作，不在 UI 顯示。",
+    helpText: "節點實心表示包含在本次測試路徑；空心表示不包含。選 IC 時，WEB、PS、PL、IC 會全部實心。底層 relay / routing 狀態由系統自動推導，不在此 UI 顯示。",
   },
   "en-US": {
     eyebrow: "EMODE / DIAGNOSTICS / LOOPBACK TEST",
@@ -126,7 +126,7 @@ const copy = {
     rtt: "RTT (ms)",
     result: "Result",
     details: "Details",
-    helpText: "A filled node is included in the test path; an empty node is excluded. Selecting IC fills WEB, PS, PL and IC. Relay NC / NO state is an implementation detail and is intentionally hidden from this UI.",
+    helpText: "A filled node is included in the test path; an empty node is excluded. Selecting IC fills WEB, PS, PL and IC. Low-level relay / routing state is derived by the system and is intentionally hidden from this UI.",
   },
 } as const;
 
