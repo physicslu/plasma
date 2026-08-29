@@ -69,6 +69,12 @@ The command performs, in order:
 
 It stops on the first failed stage. It does **not** contain a canonical writer and reports `canonical_dataset_written=false`.
 
+### Execution handoff
+
+The live command must run from this PR branch/commit or a later descendant with a clean worktree and normal external network access. Install only the pinned research browser dependency and Chromium required by the existing browser adapter. Do not move this step into GitHub Actions merely to obtain network access.
+
+The resulting retained evidence directory is intended to be committed to this PR only after the real browser run passes. The `/tmp` admission plan is review input and may then be regenerated deterministically from the checked-in evidence. No canonical CSV mutation is authorized by the one-command runner.
+
 ## Browser control command contract
 
 The browser runner keeps the historical `STM32F100C8` control as its default. Phase 2.9 adds an explicit `--control-base-device` option so a bounded manifest can nominate its own control without changing historical Phase 2.6 behavior.
