@@ -15,9 +15,10 @@ from urllib.parse import parse_qs, unquote, urlparse
 from plasma_client.client import PlasmaClient
 from plasma_core.assets import ProgrammingAsset
 from plasma_core.enums import Operation
-from plasma_core.errors import PlasmaError
+from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest, validate_job_id
 
+from .diagnostics import execute_ps_loopback
 from .engineering_targets import EngineeringPPUProvider, MockEngineeringPPUProvider
 
 
@@ -530,6 +531,17 @@ class PlasmaWebHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         try:
             parsed = urlparse(self.path)
+            if parsed.path == "/api/engineering/diagnostics/loopback":
+                try:
+                    payload = _run(execute_ps_loopback(self._body(), self.client_factory))
+                except PlasmaError as exc:
+                    if exc.code in {ErrorCode.CONNECTION_FAILED, ErrorCode.CONNECTION_TIMEOUT}:
+                        self._execution_unavailable()
+                        return
+                    raise
+                self._json(HTTPStatus.OK, _with_rest_version(payload))
+                return
+
             if parsed.path == "/api/engineering/session":
                 if self.engineering_provider is None:
                     self._engineering_unavailable()
