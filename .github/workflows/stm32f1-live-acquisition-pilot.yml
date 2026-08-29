@@ -21,11 +21,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run bounded live ST acquisition pilot
-        id: live_pilot
+      - name: Diagnose single-target ST transport preflight
+        id: transport_preflight
         continue-on-error: true
         run: |
           mkdir -p .artifacts/stm32f1-live-pilot
+          python data/device-catalog/research/diagnose_st_transport.py \
+            --delay 2.0 \
+            --timeout 20 \
+            --output .artifacts/stm32f1-live-pilot/transport-diagnostic.json
+
+      - name: Run bounded live ST acquisition pilot
+        id: live_pilot
+        if: steps.transport_preflight.outcome == 'success'
+        continue-on-error: true
+        run: |
           python data/device-catalog/research/run_stm32f1_live_pilot.py \
             --delay 2.0 \
             --timeout 30 \
@@ -59,6 +69,10 @@ jobs:
       - name: Enforce live pilot scale-readiness gate
         if: always()
         run: |
+          if [ "${{ steps.transport_preflight.outcome }}" != "success" ]; then
+            echo "ST transport preflight failed; see transport-diagnostic.json in the uploaded artifact." >&2
+            exit 1
+          fi
           if [ "${{ steps.live_pilot.outcome }}" != "success" ]; then
             echo "Live acquisition pilot did not complete cleanly." >&2
             exit 1
