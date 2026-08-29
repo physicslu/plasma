@@ -13,7 +13,15 @@ import json
 import sys
 from pathlib import Path
 
-from st_browser_acquisition import STBrowserAcquirer
+from run_stm32f1_live_pilot import (
+    DEFAULT_INTER_REQUEST_DELAY_SECONDS,
+    RateLimitedFetcher,
+)
+from st_browser_acquisition import (
+    BROWSER_TRANSPORT,
+    STBrowserAcquirer,
+    build_browser_evidence_record,
+)
 from st_product_page_acquisition import AcquisitionError
 from stm32f1_acquisition_pilot import (
     DEFAULT_CATALOG,
@@ -23,10 +31,6 @@ from stm32f1_acquisition_pilot import (
     read_catalog,
     read_manifest,
     run_pilot,
-)
-from run_stm32f1_live_pilot import (
-    DEFAULT_INTER_REQUEST_DELAY_SECONDS,
-    RateLimitedFetcher,
 )
 
 CONTROL_BASE_DEVICE = "STM32F100C8"
@@ -72,9 +76,10 @@ def main(argv: list[str] | None = None) -> int:
                 targets=targets,
                 catalog_rows=catalog_rows,
                 fetcher=fetcher,
+                evidence_builder=build_browser_evidence_record,
                 timeout_seconds=args.timeout,
             )
-        summary["acquisition_transport"] = "chromium_rendered_dom"
+        summary["acquisition_transport"] = BROWSER_TRANSPORT
         summary["browser_scope"] = args.scope
         summary["canonical_dataset_admission"] = False
         args.output.parent.mkdir(parents=True, exist_ok=True)
