@@ -1,6 +1,14 @@
-"""Optional Plasma Manager fleet control plane."""
+"""Plasma Manager fleet control-plane package."""
 
-from .config import ManagerConfig, PPURegistryEntry, load_manager_config
-from .fleet import FleetAggregator
+from .client import PPUHTTPError, PPUHttpClient, PPUTransportError
+from .config import ManagerConfig, ManagerConfigError, PPURegistryEntry, load_manager_config
 
-__all__ = ["FleetAggregator", "ManagerConfig", "PPURegistryEntry", "load_manager_config"]
+__all__ = [
+    "ManagerConfig",
+    "ManagerConfigError",
+    "PPUHTTPError",
+    "PPUHttpClient",
+    "PPURegistryEntry",
+    "PPUTransportError",
+    "load_manager_config",
+]
