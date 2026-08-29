@@ -108,7 +108,7 @@ Programming Recipe 是「PPU 要做什麼」的 control-plane concept，不屬�
 - Engineering Mock Provider 支援 8 Facilities × 4 PPUs，Site 數 2/4/6/8。
 - Engineering session/PPU 可 cache 多個 Programming Assets。
 - Program/Verify 以 **Normalized Image SHA** 建立 PPU-wide active Image lease。
-- Optional `plasma_manager` 提供手動 PPU registry 與 read-only fleet aggregation；Manager 不參與 PPU 本地 Job execution。
+- Optional `plasma_manager` 提供手動 PPU registry 與 read-only fleet aggregation；Phase 0 另提供單一路徑的 PS Loopback pass-through，Manager 仍不參與 PPU 本地 Job execution。
 - `pytest` 是統一 Python test runner。
 
 ## Python 結構
@@ -123,7 +123,7 @@ software/python/
 │   └── protocol.py           # Protocol v3.3 / PLASMA33
 ├── plasma_handlers/
 ├── plasma_interfaces/
-├── plasma_manager/           # optional read-only fleet control plane
+├── plasma_manager/           # fleet observation + narrow Phase-0 PS diagnostic relay
 ├── plasma_server/
 │   ├── site_manager.py
 │   ├── site_worker.py
@@ -190,7 +190,7 @@ docs/architecture/engineering-programming-workspace.md
 
 ## Plasma Manager
 
-Manager 是 optional read-only fleet control plane：
+Manager 是 optional fleet control plane。Fleet observation contract 仍為 read-only；Phase 0 只增加一條明確 allowlist 的 PS Loopback pass-through：
 
 ```bash
 plasma-manager --config config/manager.example.yaml
@@ -199,12 +199,25 @@ plasma-manager --config config/manager.example.yaml
 目前提供：
 
 ```text
-GET /api/health/live
-GET /api/registry
-GET /api/fleet
+GET  /api/health/live
+GET  /api/registry
+GET  /api/fleet
+POST /api/ppus/{ppu_alias}/diagnostics/loopback   # Phase 0, endpoint=ps only
 ```
 
-Manager 不提供 Job command routing、central scheduling、automatic discovery 或 authentication policy。Web Console 的 PMode `/fleet` 可顯示多 PPU topology 並透過 Gateway 的 server-side Batch runtime 執行 Mock Batch；這不會把 read-only Manager 變成 write proxy。
+Phase 0 的 command path 是：
+
+```text
+Central Web Console / Web BFF
+        -> Plasma Manager
+        -> enrolled PPU Gateway
+        -> Plasma Server
+        -> PS diagnostic handler
+```
+
+Manager 只從自己的 registry 依 `ppu_alias` 解析目的 PPU，不接受 caller 指定任意 URL，也沒有 generic HTTP proxy。成功回應會加入 `manager.relay = "pass-through"`、`ppu_alias` 與 Manager RTT；Manager 同時輸出不含 payload 的 `manager_ps_loopback_relay` event，作為 request 確實跨過 Manager boundary 的 runtime evidence。
+
+除這條 PS diagnostic relay 外，Manager 仍不提供 Job command routing、Batch/central scheduling、Programming Image distribution、automatic discovery 或 authentication policy。PL/IC Loopback 也不在此 Phase 0 範圍內。
 
 ## CLI
 
@@ -290,6 +303,6 @@ logs/YYYY-MM-DD/
 - 只有 raw binary Image Asset normalization 已實作。
 - Programming Recipe/Package 尚未成為 executable contract。
 - Server restart 可辨識未完成 Job，但不會自動重做 programming。
-- Manager 目前只做 read-only aggregation 與 opt-in deployment。
+- Manager 目前仍以 read-only aggregation 為主；唯一 write-like 例外是 Phase 0 PS Loopback pass-through，尚不是一般化 command/orchestration contract。
 - OpenOCD binary staging、adapter isolation 與實體 target 尚未完整驗證。
 - FPGA register map、AXI/FIFO、SWD engine、power-good 與安全關電仍屬後續硬體整合。
