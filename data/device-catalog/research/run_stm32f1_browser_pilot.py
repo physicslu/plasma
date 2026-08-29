@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Run bounded STM32F1 acquisition through a real Chromium browser.
 
-The default scope is the single control target STM32F100C8. Use --scope pilot only
-after the control run succeeds. This tool emits candidate evidence only and never
-writes the canonical commercial ICPN dataset.
+The default scope is one control target. The historical default remains
+STM32F100C8; later bounded manifests may select another explicit control base.
+Use --scope pilot only after the control run succeeds. This tool emits candidate
+evidence only and never writes the canonical commercial ICPN dataset.
 """
 
 from __future__ import annotations
@@ -37,13 +38,18 @@ CONTROL_BASE_DEVICE = "STM32F100C8"
 PLAYWRIGHT_REQUIREMENT = "1.62.0"
 
 
-def select_targets(scope: str, targets: list[PilotTarget]) -> list[PilotTarget]:
+def select_targets(
+    scope: str,
+    targets: list[PilotTarget],
+    *,
+    control_base_device: str = CONTROL_BASE_DEVICE,
+) -> list[PilotTarget]:
     if scope == "pilot":
         return targets
-    control = [target for target in targets if target.base_device == CONTROL_BASE_DEVICE]
+    control = [target for target in targets if target.base_device == control_base_device]
     if len(control) != 1:
         raise AcquisitionError(
-            f"browser pilot requires exactly one control target {CONTROL_BASE_DEVICE}"
+            f"browser pilot requires exactly one control target {control_base_device}"
         )
     return control
 
@@ -54,6 +60,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--scope", choices=("control", "pilot"), default="control")
+    parser.add_argument(
+        "--control-base-device",
+        default=CONTROL_BASE_DEVICE,
+        help="Base device used when --scope control is selected.",
+    )
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--delay", type=float, default=DEFAULT_INTER_REQUEST_DELAY_SECONDS)
     browser_mode = parser.add_mutually_exclusive_group()
@@ -76,7 +87,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     try:
         pilot_id, manifest_targets = read_manifest(args.manifest)
-        targets = select_targets(args.scope, manifest_targets)
+        targets = select_targets(
+            args.scope,
+            manifest_targets,
+            control_base_device=args.control_base_device,
+        )
         catalog_rows = read_catalog(args.catalog)
         with STBrowserAcquirer(headless=args.headless) as acquirer:
             fetcher = RateLimitedFetcher(delay_seconds=args.delay, fetcher=acquirer.fetch)
