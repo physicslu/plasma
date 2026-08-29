@@ -180,3 +180,23 @@ This phase does not:
 Normal pull-request CI validates the browser acquisition contract with deterministic fake-page tests. It does not install Chromium and does not contact `st.com`.
 
 Live manufacturer acquisition remains an explicit research execution performed by Codex after the code path is reviewed and merged.
+
+## Phase 2.6.3 retained evidence
+
+The successful Phase 2.6.2 control run, six-target pilot and deterministic
+evaluation are retained at:
+
+```text
+data/device-catalog/research/evidence/stm32f1-phase2.6-browser-2026-08-29/
+```
+
+The package contains the small JSON evidence records, provenance, a file-digest
+manifest and a human-readable boundary statement. It deliberately excludes the
+rendered DOM bodies: the per-target `rendered_dom_sha256` and
+`evidence_section_sha256` values preserve integrity identifiers without turning
+the Git repository into a mirror of ST web content.
+
+Normal CI validates this package entirely offline with
+`validate_stm32f1_retained_evidence.py`. Retention records research evidence only;
+it does not admit any candidate into `stm32f1-commercial-icpn.csv` and cannot be
+treated as Phase 2.7 canonical admission.

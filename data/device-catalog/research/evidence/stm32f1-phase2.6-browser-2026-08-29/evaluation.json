@@ -1,0 +1,31 @@
+{
+  "candidate_baseline_match": true,
+  "candidate_drift": [],
+  "canonical_dataset_admission": false,
+  "decision": "scale_ready",
+  "expected_exact_icpn_candidates": 26,
+  "expected_targets": 6,
+  "issues": [],
+  "observed_exact_icpn_candidates": 26,
+  "pilot_id": "stm32f1-phase2.5-controlled-batch-2026-08-29",
+  "run_metadata": {
+    "git_sha": "075cb979e1c9e5fd5a75f8e11b81d0aa6bfdfaa7",
+    "repository": "physicslu/plasma",
+    "run_attempt": null,
+    "run_id": null
+  },
+  "scale_ready": true,
+  "schema_version": 1,
+  "transport_evidence": {
+    "complete": true,
+    "etag_present": 0,
+    "headers_are_optional": true,
+    "last_modified_present": 0,
+    "total": 6,
+    "transport": "chromium_rendered_dom",
+    "transport_modes": {
+      "chromium_rendered_dom": 6
+    },
+    "valid_records": 6
+  }
+}
