@@ -2,7 +2,7 @@
 
 This file is the primary operating contract for AI coding agents working on the Plasma repository. Read it before making code, configuration, deployment, hardware, or documentation changes.
 
-The default operating model is **goal-oriented autonomous execution with two standard user gates**: a **Plan Approval Gate** before implementation starts and a **Merge Approval Gate** when the work is merge-ready. Between those gates, routine engineering work should continue autonomously without asking the user to relay shell commands or approve intermediate steps. Other protected operations remain explicit human gates when applicable.
+The operating model has **exactly two user approval gate types**: a **Gate 1 — Plan Approval** before implementation starts and a **Gate 2 — Merge Approval** when the work is merge-ready. After Gate 1, engineering execution continues autonomously within the approved scope, including branch/commit/PR work, CI repair, Draft -> Ready, and any deployment/runtime/hardware acceptance explicitly included in the approved plan. There is no separate deployment, runtime, hardware, or Ready-for-review approval gate. If necessary work materially exceeds the approved scope, return to Gate 1 with a revised plan rather than inventing a third gate.
 
 ## 1. Project purpose and canonical domain
 
@@ -360,34 +360,38 @@ Do not expose internal service ports to an untrusted network as a shortcut for c
 
 ## 11. Autonomous task execution contract
 
-### 11.1 Standard two-gate workflow
+### 11.1 Exact two-gate workflow
 
-For ordinary implementation work, there are two standard user approval gates:
+There are exactly two user approval gate types:
 
 ```text
 Request
   -> read-only inspection as needed
   -> Gate 1: Plan Approval
-  -> autonomous implementation / validation / PR / CI repair
+  -> autonomous implementation / validation / PR / CI repair / Ready
   -> Gate 2: Merge Approval
   -> merge to main
+  -> approved post-merge deployment/runtime/hardware acceptance, when in plan
+  -> completion report
 ```
 
 **Gate 1 — Plan Approval before implementation starts**
 
-Before creating or changing code, configuration, tests, documentation, branches, commits, or pull requests for a new implementation task:
+Before creating or changing code, configuration, tests, documentation, branches, commits, pull requests, deployment state, or hardware state for a new task:
 
 - perform only the minimum read-only inspection needed to understand the request and current repository state;
-- give the user a concise implementation plan describing the intended scope, main files/layers likely to change, validation approach, and any material risk or architectural boundary;
+- give the user a concise plan describing scope, main files/layers likely to change, validation approach, and any deployment/runtime/hardware, destructive-Git, architecture, or security risk that is part of the task;
 - wait for explicit user approval such as `開始`, `可以`, `approve`, or equivalent before implementation begins.
 
-The user's explicit approval of a stated plan authorizes routine engineering work necessary to reach merge-ready within that approved scope.
+The user's approval authorizes autonomous execution of the stated plan. If the plan explicitly includes post-merge deployment, service restart, runtime acceptance, Z2/FPGA work, or real-target validation, those steps do not require another approval when their turn arrives.
 
 **Gate 2 — Merge Approval**
 
-After Gate 1 approval, continue autonomously through implementation, tests, commits, PR creation/update, CI observation/repair, and Ready-for-review. Do not stop merely to report intermediate progress. When the PR satisfies the merge-ready definition and merge/integration to `main` is the only remaining standard action, stop and request merge approval.
+After Gate 1 approval, continue autonomously through implementation, tests, commits, PR creation/update, CI observation/repair, and Ready-for-review. When the PR satisfies the merge-ready definition, stop and request Merge Approval.
 
-If another protected approval gate is reached before merge-ready, or an external blocker prevents safe progress, stop at that gate/blocker instead. Provide interim progress only when the user explicitly asks for it.
+After Merge Approval, merge to `main`, verify the resulting repository state, and continue any post-merge deployment/runtime/hardware acceptance already included in the Gate 1 plan. Do not stop for a third approval gate.
+
+If continuing would materially exceed the approved scope, stop and propose a revised plan. Approval of that revision is another Gate 1 decision, not a new gate type.
 
 ### 11.2 Routine autonomous work after Gate 1
 
@@ -400,52 +404,50 @@ Continue PR #N until merge-ready.
 Resolve the CI failure.
 ```
 
-combined with Gate 1 approval authorize routine engineering work necessary to reach that goal within repository and safety boundaries.
+combined with Gate 1 approval authorize routine engineering work necessary to reach the stated goal within the approved scope and repository/safety boundaries.
 
 Routine autonomous work includes:
 
 - inspect repository/history/config/tests/logs/PRs/CI;
 - fetch/read Git state;
 - fast-forward a clean local `main` when only behind `origin/main`;
-- create/switch to `agent/<feature>` branches;
+- create/switch to focused branches;
 - edit files within scope;
 - add/update tests and documentation;
 - run relevant validation/build/lint/artifact checks;
 - inspect diffs/generated output;
 - create focused commits and push feature branches;
-- create/update PRs;
+- create/update Draft PRs;
 - inspect and repair deterministic CI failures caused by the branch;
 - rerun a failed CI check once when evidence supports transient flakiness;
-- mark a PR Ready only when it is actually merge-ready.
+- mark a PR Ready automatically when it is actually merge-ready;
+- perform deployment/runtime acceptance explicitly included in the approved plan;
+- perform hardware validation explicitly included in the approved plan;
+- after Gate 2, merge and continue approved post-merge validation without creating another gate.
 
 Do not turn routine engineering procedure into user-operated command relaying when the agent can perform the work directly.
 
-## 12. Protected approval gates — STOP and ask the user
+If a connector, permission, SSH, or remote-shell limitation forces the user to perform a mechanical action, identify it as a **tooling/access exception**, not an approval gate.
 
-The Plan Approval Gate and Merge Approval Gate above are the normal software-development checkpoints. The following protected operations require explicit approval whenever applicable and may introduce an additional stop before the normal merge gate:
+## 12. Scope coverage and escalation — no third gate
 
-1. **Implementation start for a new task**
-   - begin code/config/test/documentation changes before the user approves the concise plan;
-   - create the task branch/commits/PR before Gate 1 approval.
+The Two-Gate Model remains in force for deployment, runtime, hardware, destructive Git, architecture, and security work.
 
-2. **Merge/integration to `main`**
-   - merge a PR to `main`;
-   - directly commit feature work to `main`;
-   - close/replace a PR in a way that discards reviewed work.
+The following actions must be **explicitly covered by Gate 1** before execution:
 
-3. **Deployment/runtime changes**
+1. **Deployment/runtime changes**
    - `plasmactl deploy`;
    - restart shared Plasma services to activate new code;
    - change active systemd definitions, public routing, firewall/network exposure, or shared runtime configuration.
 
-4. **Hardware-affecting operations**
+2. **Hardware-affecting operations**
    - program a real IC;
    - change DUT power/voltage;
    - load a new FPGA bitstream onto connected hardware;
    - change FPGA I/O behavior on a connected system;
    - perform any action with credible electrical/hardware risk.
 
-5. **Destructive/history-rewriting Git operations**
+3. **Destructive/history-rewriting Git operations**
    - `git reset --hard`;
    - `git clean -fd`;
    - force checkout/restore that discards user work;
@@ -453,13 +455,17 @@ The Plan Approval Gate and Merge Approval Gate above are the normal software-dev
    - force-push;
    - delete remote branches/tags that may contain user work.
 
-6. **Material architecture/security decisions**
+4. **Material architecture/security decisions**
    - incompatible protocol/API changes without an already-defined migration contract;
    - credential/access/security policy changes with nontrivial tradeoffs;
    - architecture choices with materially different cost, compatibility, safety, or maintainability consequences;
-   - substantial scope expansion beyond the approved Gate 1 plan.
+   - substantial scope expansion beyond the original request.
 
-When a protected gate is reached, stop at the safest clean checkpoint and request the smallest necessary decision.
+If one of these actions is already described in the approved Gate 1 plan, proceed autonomously when appropriate.
+
+If it becomes necessary unexpectedly and was not covered by Gate 1, stop at a safe checkpoint, explain the added scope/risk, and request a **revised Gate 1 Plan Approval**. Do not create a deployment gate, hardware gate, Ready gate, or any other third gate.
+
+Merge/integration to `main` always remains Gate 2. Direct feature commits to `main` are not a substitute for the PR + Merge Approval flow.
 
 ## 13. Merge-ready definition
 
@@ -478,7 +484,9 @@ A PR is merge-ready only when applicable conditions are true:
 - GitHub reports mergeable;
 - no validation claim exceeds observed evidence.
 
-At that point mark Ready automatically, then stop and request approval to merge.
+At that point mark Ready automatically, then stop and request Gate 2 Merge Approval.
+
+A failure of the GitHub connector to perform Draft -> Ready is a tooling exception, not a user approval gate. Ask the user to perform the mechanical transition only when the available tool cannot do it.
 
 ## 14. Git publication policy
 
@@ -504,7 +512,7 @@ agent/<short-feature-name>
 
 Never stage or commit unrelated user work. Never force-push for graph aesthetics.
 
-After GitHub merge, deployment remains a separate approval gate.
+After GitHub merge, continue any deployment/runtime/hardware acceptance that was explicitly included in the approved Gate 1 plan. Do not ask for a separate deployment approval. If deployment was not part of the approved plan, return to Gate 1 with a revised plan before doing it.
 
 ## 15. Validation policy
 
@@ -600,25 +608,32 @@ Agents must not silently turn these facts into wrong assumptions:
 
 ## 19. Communication and completion report
 
-For ordinary implementation work, the expected communication pattern is:
+The expected communication pattern is:
 
 ```text
 Gate 1: concise plan -> wait for approval
         |
         v
-Autonomous work: implementation -> validation -> PR -> CI repair -> merge-ready
+Autonomous work: implementation -> validation -> Draft PR -> CI repair -> Ready
         |
         v
-Gate 2: merge-ready report -> wait for merge approval
+Gate 2: merge-ready report -> wait for Merge Approval
+        |
+        v
+Merge -> approved post-merge deployment/runtime/hardware acceptance -> completion
 ```
 
-Do not send unsolicited routine progress reports between Gate 1 approval and Gate 2. Interrupt the user before merge-ready only for:
+Progress updates between Gate 1 and Gate 2 are informational only. They must not ask for routine approval or create extra gates.
 
-- another protected approval gate;
-- a material ambiguity that falls outside the approved plan and requires a product/architecture decision;
-- a safety/security issue;
-- missing access that genuinely blocks progress;
-- an unexpected state where continuing risks user work.
+Interrupt before Gate 2 only when:
+
+- necessary work materially exceeds the approved Gate 1 scope and requires a revised plan;
+- a material product/architecture ambiguity cannot be resolved from the approved plan;
+- a safety/security issue changes the risk boundary;
+- missing access genuinely blocks progress;
+- continuing risks unrelated user work.
+
+A revised plan returns to Gate 1. It does not create a third gate type.
 
 If the user explicitly asks for progress, report it without changing the approval-gate model.
 
@@ -639,8 +654,10 @@ Repository state:
 - PR / CI state
 - whether merge, deploy, restart, history rewrite, or hardware action occurred
 
-Next approval gate:
-- exact approval required, if any
+Next gate/action:
+- Gate 2 Merge Approval if merge-ready;
+- revised Gate 1 only if scope changed materially;
+- otherwise the next autonomous execution step.
 ```
 
 Never report a test, deployment, FPGA build, or hardware programming operation as successful unless actually executed and observed.
