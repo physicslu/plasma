@@ -36,7 +36,7 @@ Request fields:
 
 ```text
 endpoint          ps
- test_id           caller-generated run identity
+test_id           caller-generated run identity
 sequence          monotonically increasing case identity
 pattern           deterministic Browser pattern identifier
 seed              deterministic seed; empty when unused
@@ -56,7 +56,7 @@ Request metadata:
 
 ```text
 protocol_version     3.3
-a message_type        diagnostic_request
+message_type         diagnostic_request
 diagnostic_type      loopback
 diagnostic_version   1
 endpoint             ps
