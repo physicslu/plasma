@@ -33,6 +33,9 @@ __pycache__/
 software/python/.venv/
 pl/.venv/
 
+# Runtime acceptance evidence is local/deployment-host output.
+artifacts/runtime-acceptance/
+
 # Web generated files
 software/web/node_modules/
 # Playwright E2E dependencies and run artifacts are generated locally/CI only.
