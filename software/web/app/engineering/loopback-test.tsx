@@ -49,7 +49,7 @@ const copy = {
   "zh-TW": {
     eyebrow: "EMODE / DIAGNOSTICS / LOOPBACK TEST",
     title: "Loopback Test",
-    description: "Production real-path loopback 測試，用來驗證 Web → PS → PL → IC 各層資料路徑完整性。",
+    description: "Production real-path loopback 測試，用來驗證 Web 經 Plasma Manager 到 PPU 後的 PS → PL → IC 各層資料路徑完整性。",
     help: "說明",
     pathTitle: "Loopback Path",
     pathDescription: "選擇本次要測到的最遠節點；前級節點會自動包含在測試路徑中。",
@@ -83,7 +83,7 @@ const copy = {
     delayHint: "封包之間的延遲",
     startTest: "Start Test",
     reset: "Reset",
-    psReady: "Phase 1 已啟用 PS production real-path：Browser → REST Gateway → Plasma Server → Browser。此路徑不使用 MockInterface，也不會 fallback 到 Mock。",
+    psReady: "PS production real-path 已透過 Manager Phase 0 pass-through 啟用：Browser → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → Browser。此路徑不使用 MockInterface，也不會 fallback 到 Mock。",
     laterEndpoint: "PL / IC real-path 尚未實作；選擇這些 endpoint 時 Start Test 會保持停用，不會產生假的 PASS / FAIL。",
     running: "Production real-path test 執行中",
     resultsTitle: "Test Results",
@@ -96,12 +96,12 @@ const copy = {
     rtt: "RTT (ms)",
     result: "Result",
     details: "Details",
-    helpText: "節點實心表示包含在本次測試路徑；空心表示不包含。Phase 1 只有 PS endpoint 可執行。PS PASS 必須是 Browser 送出的 payload 實際穿過 REST Gateway 與 Plasma Protocol v3.3 TCP 連線，由 Plasma Server PS handler 回傳並再次由 Browser 驗證。",
+    helpText: "節點實心表示包含在本次測試路徑；空心表示不包含。目前只有 PS endpoint 可執行。PS PASS 必須是 Browser payload 實際穿過 Web BFF、Plasma Manager、PPU REST Gateway 與 Plasma Protocol v3.3 TCP 連線，由 Plasma Server PS handler 回傳；Browser 還會獨立驗證 Manager pass-through proof、PS source、Test ID、sequence、payload 與 CRC。",
   },
   "en-US": {
     eyebrow: "EMODE / DIAGNOSTICS / LOOPBACK TEST",
     title: "Loopback Test",
-    description: "Production real-path loopback test for Web → PS → PL → IC data-path integrity.",
+    description: "Production real-path loopback test for the Web-through-Manager path into PPU PS → PL → IC data-path integrity.",
     help: "Help",
     pathTitle: "Loopback Path",
     pathDescription: "Select the farthest node to test. All previous nodes are included automatically.",
@@ -135,7 +135,7 @@ const copy = {
     delayHint: "Delay between packets",
     startTest: "Start Test",
     reset: "Reset",
-    psReady: "Phase 1 enables the PS production real path: Browser → REST Gateway → Plasma Server → Browser. This path does not use MockInterface and never falls back to Mock.",
+    psReady: "The PS production real path now uses the Manager Phase 0 pass-through: Browser → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → Browser. This path does not use MockInterface and never falls back to Mock.",
     laterEndpoint: "PL / IC real-path execution is not implemented yet. Start Test stays disabled for those endpoints and no synthetic PASS / FAIL is produced.",
     running: "Production real-path test is running",
     resultsTitle: "Test Results",
@@ -148,7 +148,7 @@ const copy = {
     rtt: "RTT (ms)",
     result: "Result",
     details: "Details",
-    helpText: "A filled node is included in the test path; an empty node is excluded. Phase 1 executes only the PS endpoint. A PS PASS requires the Browser payload to traverse the REST Gateway and the Plasma Protocol v3.3 TCP connection, be returned by the Plasma Server PS handler, and be independently verified again in the Browser.",
+    helpText: "A filled node is included in the test path; an empty node is excluded. Only the PS endpoint executes today. A PS PASS requires the Browser payload to traverse the Web BFF, Plasma Manager, PPU REST Gateway and Plasma Protocol v3.3 TCP connection, be returned by the Plasma Server PS handler, and then pass independent Browser verification of the Manager relay proof, PS source, Test ID, sequence, payload and CRC.",
   },
 } as const;
 
@@ -367,7 +367,7 @@ export default function LoopbackTest() {
               rttMs,
               status: pass ? "PASS" : "FAIL",
               details: pass
-                ? `PS source confirmed · PPU RTT ${response.loopback.ppu_rtt_ms.toFixed(3)} ms · sequence ${sequence}`
+                ? `Manager RTT ${response.manager.manager_rtt_ms.toFixed(3)} ms · PPU RTT ${response.loopback.ppu_rtt_ms.toFixed(3)} ms · sequence ${sequence}`
                 : mismatch !== null
                   ? `Payload mismatch at offset ${mismatch}`
                   : "PS response metadata or CRC contract mismatch",
