@@ -126,6 +126,9 @@ def load_manager_config(path: str | Path) -> ManagerConfig:
     endpoints = [entry.endpoint for entry in ppus]
     if len(endpoints) != len(set(endpoints)):
         raise ManagerConfigError("PPU endpoints must be unique")
+    aliases = [entry.alias for entry in ppus if entry.alias is not None]
+    if len(aliases) != len(set(aliases)):
+        raise ManagerConfigError("PPU aliases must be unique when configured")
 
     return ManagerConfig(
         host=host.strip(),
