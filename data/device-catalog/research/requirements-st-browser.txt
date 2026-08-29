@@ -1,0 +1,3 @@
+# Research-only dependency for ST browser-backed source acquisition.
+# This is not a Plasma runtime dependency.
+playwright==1.62.0
