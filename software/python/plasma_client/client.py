@@ -8,6 +8,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from plasma_core.diagnostics import (
+    DIAGNOSTIC_PROTOCOL_VERSION,
+    DIAGNOSTIC_REQUEST_MESSAGE_TYPE,
+    ECHO_TRANSFORM,
+    LOOPBACK_DIAGNOSTIC_TYPE,
+    PS_LOOPBACK_ENDPOINT,
+    crc32_hex,
+)
 from plasma_core.enums import JobState, Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
@@ -41,7 +49,12 @@ class PlasmaClient:
         self.response_timeout_s = response_timeout_s
         self.limits = limits
 
-    async def send(self, frame: Frame, *, response_timeout_s: float | None = None) -> dict[str, Any]:
+    async def _exchange(
+        self,
+        frame: Frame,
+        *,
+        response_timeout_s: float | None = None,
+    ) -> Frame:
         writer: asyncio.StreamWriter | None = None
         try:
             reader, writer = await asyncio.wait_for(
@@ -88,7 +101,49 @@ class PlasmaClient:
                 original_exception=raw.get("original_exception"),
                 context=raw.get("context") or {},
             )
-        return metadata
+        return response
+
+    async def send(self, frame: Frame, *, response_timeout_s: float | None = None) -> dict[str, Any]:
+        return (await self._exchange(frame, response_timeout_s=response_timeout_s)).metadata
+
+    async def diagnostic_loopback(
+        self,
+        payload: bytes,
+        *,
+        test_id: str,
+        sequence: int,
+        endpoint: str = PS_LOOPBACK_ENDPOINT,
+        pattern: str | None = None,
+        seed: str | None = None,
+        response_timeout_s: float | None = None,
+    ) -> tuple[dict[str, Any], bytes]:
+        """Execute a real Protocol v3.3 diagnostic exchange with the Plasma Server.
+
+        This method does not submit a programming Job and does not use a Site
+        Interface. The PS loopback response must therefore come from the real
+        Plasma Server process reached over the configured TCP connection.
+        """
+        metadata: dict[str, Any] = {
+            "protocol_version": self.protocol_version,
+            "message_type": DIAGNOSTIC_REQUEST_MESSAGE_TYPE,
+            "diagnostic_type": LOOPBACK_DIAGNOSTIC_TYPE,
+            "diagnostic_version": DIAGNOSTIC_PROTOCOL_VERSION,
+            "endpoint": endpoint,
+            "test_id": test_id,
+            "sequence": sequence,
+            "transform": ECHO_TRANSFORM,
+            "payload_length": len(payload),
+            "tx_crc32": crc32_hex(payload),
+        }
+        if pattern is not None:
+            metadata["pattern"] = pattern
+        if seed is not None:
+            metadata["seed"] = seed
+        response = await self._exchange(
+            Frame(metadata=metadata, binary=payload),
+            response_timeout_s=response_timeout_s,
+        )
+        return response.metadata, response.binary
 
     async def submit(self, request: JobRequest) -> dict[str, Any]:
         timeout = max(self.response_timeout_s, request.timeout_s * (request.max_retries + 1) + 10)
