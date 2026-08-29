@@ -6,7 +6,7 @@ default_repo="$(cd "$(dirname "$script_path")/.." && pwd)"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
 config_file="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
-current_config_version=4
+current_config_version=5
 default_public_api_url="https://plasma.open4th.com"
 default_manager_config="$config_home/plasma/manager.yaml"
 
@@ -36,6 +36,7 @@ vite_port="${PLASMA_VITE_PORT:-5173}"
 public_api_url="${PLASMA_PUBLIC_API_URL:-$default_public_api_url}"
 manager_enabled="${PLASMA_MANAGER_ENABLED:-0}"
 manager_config="${PLASMA_MANAGER_CONFIG:-$default_manager_config}"
+manager_ppu_alias="${PLASMA_MANAGER_PPU_ALIAS:-}"
 engineering_mock_enabled="${PLASMA_ENGINEERING_MOCK_ENABLED:-0}"
 engineering_mock_root="${PLASMA_ENGINEERING_MOCK_ROOT:-$state_home/plasma/engineering-mock}"
 config_version="${PLASMA_CONFIG_VERSION:-1}"
@@ -92,6 +93,14 @@ validate_manager_settings() {
     die "PLASMA_MANAGER_ENABLED 只接受 0 或 1：$manager_enabled"
   [[ "$manager_config" == /* ]] || \
     die "PLASMA_MANAGER_CONFIG 必須是絕對路徑：$manager_config"
+  if [[ -n "$manager_ppu_alias" ]]; then
+    [[ "${#manager_ppu_alias}" -le 128 && "$manager_ppu_alias" =~ ^[A-Za-z0-9._:-]+$ ]] || \
+      die "PLASMA_MANAGER_PPU_ALIAS 只接受 1-128 字元的 A-Z/a-z/0-9/._:-：$manager_ppu_alias"
+  fi
+  if [[ "$manager_enabled" == "1" ]]; then
+    [[ -n "$manager_ppu_alias" ]] || \
+      die "Plasma Manager 已啟用，但 PLASMA_MANAGER_PPU_ALIAS 未設定"
+  fi
 }
 
 validate_engineering_mock_settings() {
@@ -104,6 +113,22 @@ validate_engineering_mock_settings() {
   esac
 }
 
+manager_bff_url() {
+  "$python_bin" -c '
+from plasma_manager.config import load_manager_config
+import sys
+config = load_manager_config(sys.argv[1])
+host = config.host.strip()
+if host in {"127.0.0.1", "localhost", "0.0.0.0"}:
+    host = "127.0.0.1"
+elif host in {"::1", "::"}:
+    host = "[::1]"
+else:
+    raise SystemExit("Manager BFF requires a local loopback or wildcard bind")
+print(f"http://{host}:{config.port}")
+' "$manager_config"
+}
+
 require_manager_config() {
   validate_manager_settings
   [[ "$manager_enabled" == "1" ]] || return 0
@@ -112,6 +137,17 @@ require_manager_config() {
   "$python_bin" -c \
     'from plasma_manager.config import load_manager_config; import sys; load_manager_config(sys.argv[1])' \
     "$manager_config" >/dev/null || die "Plasma Manager 設定檔驗證失敗：$manager_config"
+  "$python_bin" -c '
+from plasma_manager.config import load_manager_config
+import sys
+config = load_manager_config(sys.argv[1])
+alias = sys.argv[2]
+if alias not in {entry.alias for entry in config.ppus if entry.alias is not None}:
+    raise SystemExit(1)
+' "$manager_config" "$manager_ppu_alias" >/dev/null || \
+    die "PLASMA_MANAGER_PPU_ALIAS 未登錄於 Manager registry：$manager_ppu_alias"
+  manager_bff_url >/dev/null || \
+    die "Manager BFF 只支援本機 loopback/wildcard bind：$manager_config"
 }
 
 manager_probe_url() {
@@ -176,6 +212,12 @@ ensure_config_completeness() {
     repaired=1
   fi
 
+  if ! config_has_assignment PLASMA_MANAGER_PPU_ALIAS; then
+    replace_config_assignment PLASMA_MANAGER_PPU_ALIAS "$manager_ppu_alias"
+    PLASMA_MANAGER_PPU_ALIAS="$manager_ppu_alias"
+    repaired=1
+  fi
+
   if ! config_has_assignment PLASMA_ENGINEERING_MOCK_ENABLED; then
     replace_config_assignment PLASMA_ENGINEERING_MOCK_ENABLED "$engineering_mock_enabled"
     PLASMA_ENGINEERING_MOCK_ENABLED="$engineering_mock_enabled"
@@ -227,6 +269,11 @@ migrate_config() {
     PLASMA_ENGINEERING_MOCK_ROOT="$engineering_mock_root"
   fi
 
+  if (( config_version < 5 )); then
+    replace_config_assignment PLASMA_MANAGER_PPU_ALIAS "$manager_ppu_alias"
+    PLASMA_MANAGER_PPU_ALIAS="$manager_ppu_alias"
+  fi
+
   if (( config_version < current_config_version )); then
     replace_config_assignment PLASMA_CONFIG_VERSION "$current_config_version"
     config_version="$current_config_version"
@@ -266,6 +313,8 @@ PLASMA_PUBLIC_API_URL=$public_api_url
 PLASMA_MANAGER_ENABLED=$manager_enabled
 # Operator-local Manager registry/configuration; keep fleet endpoints outside the Git worktree.
 PLASMA_MANAGER_CONFIG=$manager_config
+# Fixed Manager Phase-0 BFF command target. Required when Manager is enabled; must match one registry alias.
+PLASMA_MANAGER_PPU_ALIAS=$manager_ppu_alias
 # Engineering Mock PPU Provider is opt-in. Keep simulation state outside the Git worktree.
 PLASMA_ENGINEERING_MOCK_ENABLED=$engineering_mock_enabled
 PLASMA_ENGINEERING_MOCK_ROOT=$engineering_mock_root
@@ -283,7 +332,8 @@ validate_unit_values() {
   validate_manager_settings
   validate_engineering_mock_settings
   for value in "$repo" "$python_bin" "$npm_bin" "$gateway_host" "$gateway_port" \
-    "$cors_origin" "$vite_host" "$vite_port" "$public_api_url" "$manager_config" "$engineering_mock_root"; do
+    "$cors_origin" "$vite_host" "$vite_port" "$public_api_url" "$manager_config" "$manager_ppu_alias" \
+    "$engineering_mock_root"; do
     [[ "$value" != *$'\n'* ]] || die "systemd 設定值不可包含換行"
   done
   [[ "$repo" != *' '* && "$python_bin" != *' '* && "$npm_bin" != *' '* && "$manager_config" != *' '* && \
@@ -292,15 +342,29 @@ validate_unit_values() {
 }
 
 write_units() {
-  local node_path public_api_environment engineering_mock_args
+  local node_path public_api_environment engineering_mock_args manager_api_environment manager_alias_environment
+  local manager_api_url vite_after vite_wants
   node_path="$(dirname "$npm_bin"):/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   public_api_environment=""
   engineering_mock_args=""
+  manager_api_environment=""
+  manager_alias_environment=""
+  manager_api_url=""
+  vite_after="network-online.target plasma-web.service"
+  vite_wants="network-online.target plasma-web.service"
   if [[ -n "$public_api_url" ]]; then
     public_api_environment="Environment=NEXT_PUBLIC_PLASMA_API_URL=$public_api_url"
   fi
   if [[ "$engineering_mock_enabled" == "1" ]]; then
     engineering_mock_args=" --engineering-mock --engineering-mock-root $engineering_mock_root"
+  fi
+  if [[ "$manager_enabled" == "1" ]]; then
+    [[ -n "$manager_ppu_alias" ]] || die "Plasma Manager BFF target alias 未設定"
+    manager_api_url="$(manager_bff_url)" || die "無法建立本機 Manager BFF URL"
+    manager_api_environment="Environment=PLASMA_MANAGER_API_URL=$manager_api_url"
+    manager_alias_environment="Environment=PLASMA_MANAGER_PPU_ALIAS=$manager_ppu_alias"
+    vite_after="$vite_after plasma-manager.service"
+    vite_wants="$vite_wants plasma-manager.service"
   fi
 
   mkdir -p "$unit_dir"
@@ -347,14 +411,16 @@ EOF
   cat >"$unit_dir/plasma-vite.service" <<EOF
 [Unit]
 Description=Plasma Vite Web Console
-After=network-online.target plasma-web.service
-Wants=network-online.target plasma-web.service
+After=$vite_after
+Wants=$vite_wants
 
 [Service]
 Type=simple
 WorkingDirectory=$web_dir
 Environment=PATH=$node_path
 $public_api_environment
+$manager_api_environment
+$manager_alias_environment
 ExecStart=$npm_bin run dev -- --host $vite_host --port $vite_port
 Restart=on-failure
 RestartSec=3
@@ -437,6 +503,7 @@ install_services() {
   say "已安裝 user systemd units，但尚未啟動，避免與目前手動程序爭用 Port"
   if [[ "$manager_enabled" == "1" ]]; then
     say "Plasma Manager 已設定為 opt-in enabled：$manager_config"
+    say "Manager BFF 固定 command target：$manager_ppu_alias"
   else
     say "Plasma Manager 保持 disabled；PPU standalone execution 不依賴 Manager"
   fi
@@ -666,7 +733,7 @@ show_status() {
   printf 'Version:  %s\n' "$(git -C "$repo" log -1 --oneline)"
   printf 'Branch:   %s\n' "$(git -C "$repo" branch --show-current)"
   printf 'Worktree: %s\n' "$(if [[ -z "$(git -C "$repo" status --porcelain)" ]]; then echo clean; else echo modified; fi)"
-  printf 'Manager:  %s\n' "$(if [[ "$manager_enabled" == "1" ]]; then echo enabled; else echo disabled; fi)"
+  printf 'Manager:  %s\n' "$(if [[ "$manager_enabled" == "1" ]]; then echo "enabled (BFF target $manager_ppu_alias)"; else echo disabled; fi)"
   printf 'Eng Mock: %s\n' "$(if [[ "$engineering_mock_enabled" == "1" ]]; then echo "enabled ($engineering_mock_root)"; else echo disabled; fi)"
   printf '\n%-24s %s\n' SERVICE STATE
   local service state load_state
