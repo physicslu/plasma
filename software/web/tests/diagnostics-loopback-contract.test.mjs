@@ -87,6 +87,7 @@ test("results render observed CRC, RTT and endpoint verification", () => {
   assert.match(loopback, /TX CRC32/);
   assert.match(loopback, /RX CRC32/);
   assert.match(loopback, /PPU RTT/);
+  assert.match(loopback, /loopbackResultBadge/);
   assert.match(resultCss, /\.loopbackResultBadge\.pass/);
   assert.match(resultCss, /\.loopbackResultBadge\.fail/);
 });
