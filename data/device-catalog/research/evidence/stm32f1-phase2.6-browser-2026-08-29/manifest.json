@@ -1,0 +1,27 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32f1-phase2.6.3-browser-20260829T130248Z-075cb97",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "99bb7b242f783ebc36d6e1e8bf79f8b89d9a66d59537c4166ce904a1bf650148"
+    },
+    {
+      "path": "control-summary.json",
+      "sha256": "2f3bdfadc59a990f899a37f19335d063a380b88396a12082997b189afa8ca0d9"
+    },
+    {
+      "path": "evaluation.json",
+      "sha256": "0dd59c902e85603b96b312126e4806d5f6bad50bc33bcdf9332fe5272077caa9"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "87411b8b6f6ca5b127568e5cae3fd4996f1818684b2f18cb828935502775630c"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "0e221078a67bdb08bf102decdc872952733f684559199e82542de695aa6d710f"
+    }
+  ],
+  "schema_version": 1
+}
