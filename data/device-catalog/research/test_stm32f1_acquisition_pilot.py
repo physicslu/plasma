@@ -15,6 +15,7 @@ from st_product_page_acquisition import AcquisitionError  # noqa: E402
 from stm32f1_acquisition_pilot import (  # noqa: E402
     PilotTarget,
     catalog_mapping,
+    pilot_is_clean,
     read_catalog,
     read_manifest,
     run_pilot,
@@ -143,8 +144,44 @@ class PilotTests(unittest.TestCase):
         )
         self.assertEqual(summary["openocd_cfg_mapping"], {"mapped": 1, "total": 2})
         self.assertEqual(summary["manual_intervention_required"], 1)
+        self.assertFalse(pilot_is_clean(summary))
         self.assertEqual(summary["results"][0]["acquisition_status"], "success")
         self.assertEqual(summary["results"][1]["acquisition_status"], "failure")
+
+    def test_successful_acquisition_with_ambiguous_mapping_is_not_clean(self) -> None:
+        target = PilotTarget(
+            "STM32F101C8",
+            "https://www.st.com/en/microcontrollers-microprocessors/stm32f101c8.html",
+            "ambiguous mapping",
+        )
+        catalog_rows = [
+            {
+                "part_number": "STM32F101C8",
+                "identifier_kind": "cmsis_device_name",
+                "target_config": "tcl/target/stm32f1x.cfg",
+            },
+            {
+                "part_number": "STM32F101C8",
+                "identifier_kind": "ordering_pattern",
+                "target_config": "tcl/target/stm32f1x.cfg",
+            },
+        ]
+
+        def fake_fetcher(url: str, timeout_seconds: float):
+            del timeout_seconds
+            return html_for("STM32F101C8T6"), url, None, None
+
+        summary = run_pilot(
+            pilot_id="test",
+            targets=[target],
+            catalog_rows=catalog_rows,
+            fetcher=fake_fetcher,
+            retrieved_at_factory=lambda: "2026-08-29T00:00:00Z",
+        )
+        self.assertEqual(summary["acquisition_failure"], 0)
+        self.assertEqual(summary["canonical_mapping"]["ambiguous"], 1)
+        self.assertEqual(summary["manual_intervention_required"], 1)
+        self.assertFalse(pilot_is_clean(summary))
 
 
 if __name__ == "__main__":
