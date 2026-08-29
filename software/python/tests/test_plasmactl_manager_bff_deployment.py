@@ -16,7 +16,7 @@ def write_manager_config(path: Path, *, host: str = "127.0.0.1", alias: str = "p
         "\n".join(
             [
                 "manager:",
-                f"  host: {host}",
+                f'  host: "{host}"',
                 "  port: 19180",
                 "  request_timeout_s: 2.0",
                 "ppus:",
