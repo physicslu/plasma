@@ -40,7 +40,12 @@ class CanonicalAdmissionTests(unittest.TestCase):
         catalog = root / CATALOG.name
         baseline = root / BASELINE.name
         fields, rows = read_csv(CANONICAL)
-        rows = [row for row in rows if "#plasma-evidence=stm32f1-phase2.6.3-" not in row["source_reference"]]
+        rows = [
+            row
+            for row in rows
+            if "#plasma-evidence=stm32f1-phase2.6.3-" not in row["source_reference"]
+            and "#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-" not in row["source_reference"]
+        ]
         with canonical.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
             writer.writeheader()
@@ -92,7 +97,7 @@ class CanonicalAdmissionTests(unittest.TestCase):
             self.assertEqual(plan["canonical_rows_before"], historical["canonical_rows_before"])
             self.assertEqual(plan["candidates"], historical["candidates"])
 
-    def test_current_post_write_state_is_49_rows_and_26_already_present(self) -> None:
+    def test_current_post_write_state_allows_later_canonical_admissions(self) -> None:
         plan = build_admission_plan(
             evidence_dir=EVIDENCE,
             canonical_path=CANONICAL,
@@ -100,7 +105,7 @@ class CanonicalAdmissionTests(unittest.TestCase):
             baseline_path=BASELINE,
         )
         _, rows = read_csv(CANONICAL)
-        self.assertEqual(len(rows), 49)
+        self.assertEqual(len(rows), 75)
         self.assertEqual(
             plan["decision_counts"],
             {"admit": 0, "already_present": 26, "manual_review_required": 0, "reject": 0},
