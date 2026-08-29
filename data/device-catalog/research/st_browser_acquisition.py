@@ -5,16 +5,20 @@ This research adapter exists because raw urllib/curl acquisition was not reliabl
 in the observed GitHub-hosted and Codex execution environments. It does not bypass
 CAPTCHA/WAF controls, does not modify request headers to impersonate a browser,
 and does not write canonical ICPN data. It returns rendered DOM HTML to the
-existing fail-closed evidence parser.
+existing fail-closed evidence parser without mislabeling rendered DOM as raw HTTP.
 """
 
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 from st_product_page_acquisition import (
     AcquisitionError,
     MAX_RESPONSE_BYTES,
+    PARSER_VERSION,
+    SCHEMA_VERSION,
+    extract_exact_icpns,
     validate_source_url,
 )
 
@@ -26,6 +30,44 @@ CHALLENGE_MARKERS = (
 )
 QUALITY_HEADING = "Quality and Reliability"
 PART_NUMBER_MARKER = "Part Number"
+BROWSER_TRANSPORT = "chromium_rendered_dom"
+
+
+def build_browser_evidence_record(
+    *,
+    body: bytes,
+    source_url: str,
+    final_url: str,
+    base_device: str,
+    retrieved_at_utc: str,
+    http_etag: str | None = None,
+    http_last_modified: str | None = None,
+) -> dict[str, object]:
+    """Build evidence whose digest explicitly represents rendered DOM, not raw HTTP."""
+
+    if http_etag is not None or http_last_modified is not None:
+        raise AcquisitionError("browser evidence must not claim raw HTTP cache headers")
+    try:
+        html_text = body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise AcquisitionError("rendered ST product DOM is not valid UTF-8") from exc
+
+    exact_icpns, section_text = extract_exact_icpns(html_text, base_device)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "parser_version": PARSER_VERSION,
+        "acquisition_transport": BROWSER_TRANSPORT,
+        "source_url": source_url,
+        "final_url": final_url,
+        "base_device": base_device,
+        "retrieved_at_utc": retrieved_at_utc,
+        "http_etag": None,
+        "http_last_modified": None,
+        "rendered_dom_sha256": hashlib.sha256(body).hexdigest(),
+        "evidence_section_sha256": hashlib.sha256(section_text.encode("utf-8")).hexdigest(),
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": exact_icpns,
+    }
 
 
 class STBrowserAcquirer:
