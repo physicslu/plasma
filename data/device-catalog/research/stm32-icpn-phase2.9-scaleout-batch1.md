@@ -103,6 +103,8 @@ Normal GitHub CI remains completely offline and deterministic. It validates:
 - generic scale-out admission planning reuses historical retained evidence without a fixed batch-size assumption;
 - all prior retained-evidence, generic admission, historical Phase 2.7, and canonical validators.
 
+GitHub Actions `Device catalog validation` run `33259499282` on head `ca5c4ce3660351242f2bf60c03a67beeb4468995` passed all steps, including `Validate STM32F1 Phase 2.9 scaleout contract`.
+
 CI must not install Chromium/Playwright or contact ST.
 
 ## Scope boundary
