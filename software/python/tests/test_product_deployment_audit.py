@@ -176,6 +176,31 @@ def test_windows_control_station_fails_without_programdata(tmp_path: Path) -> No
     assert "product-data-root" in failed
 
 
+def test_windows_arm64_is_not_claimed_as_supported_release_target(tmp_path: Path) -> None:
+    report = product_deploy.audit_control_station(
+        system="Windows",
+        architecture="ARM64",
+        version_info=(3, 11, 15),
+        home=tmp_path,
+        environment={
+            "ProgramFiles": r"C:\Program Files",
+            "ProgramData": r"C:\ProgramData",
+        },
+        lookup=lookup_from(
+            {
+                "sc": r"C:\Windows\System32\sc.exe",
+                "node": r"C:\Program Files\nodejs\node.exe",
+            }
+        ),
+        version_reader=fake_version_reader,
+        systemd_runtime=tmp_path / "unused-systemd",
+    )
+
+    assert report.ready is False
+    failed = {check.name for check in report.checks if check.status == "fail"}
+    assert "architecture" in failed
+
+
 def test_ppu_contract_does_not_require_node_npm_or_git(tmp_path: Path) -> None:
     systemd_runtime = tmp_path / "systemd"
     systemd_runtime.mkdir()
