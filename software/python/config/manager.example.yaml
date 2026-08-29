@@ -10,6 +10,8 @@ manager:
 
 # Manual enrollment is intentional in the first Manager release.
 # Each endpoint is the root URL of one autonomous PPU's Plasma Web REST Gateway.
+# Phase 0 PS Loopback command pass-through resolves the destination by alias,
+# so every PPU that will receive that command needs a stable, unique alias.
 ppus:
   - alias: ppu-a
     endpoint: http://127.0.0.1:18080
