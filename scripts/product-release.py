@@ -188,6 +188,8 @@ def _validate_relative_posix_path(value: str) -> PurePosixPath:
     pure = PurePosixPath(value)
     if pure.is_absolute() or not pure.parts or ".." in pure.parts:
         raise ReleaseError(f"unsafe release path: {value!r}")
+    if pure.as_posix() != value:
+        raise ReleaseError(f"release path is not canonical POSIX form: {value!r}")
     for segment in pure.parts:
         _validate_portable_segment(segment)
     return pure
