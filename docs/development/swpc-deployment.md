@@ -1,5 +1,7 @@
 # Plasma Integration Host Deployment Guide
 
+> **Scope:** integration/development host only. This is not the product installer contract for macOS, Linux, or Windows Control Stations, and it is not the embedded-Linux PPU installer contract. Product deployment direction is defined separately in `docs/deployment/product-deployment-foundation.md`.
+
 This guide documents the deployment contract for the Plasma integration host without publishing account names, private DNS names, or workstation-specific absolute paths.
 
 ## 1. Deployment model
@@ -14,7 +16,7 @@ GitHub main
   -> health check
 ```
 
-`plasmactl` is the operational entry point. It is intentionally separate from the PPU programming CLI named `plasma`.
+`plasmactl` is the operational entry point. It is intentionally separate from the PPU programming CLI named `plasma` and from the planned role-aware product deployment interface. Its Git-worktree and `systemctl --user` assumptions are integration-host mechanics and must not be copied into macOS/Linux/Windows Control Station installers or the Z2 PPU installer.
 
 ## 2. Repository location
 
@@ -46,7 +48,7 @@ The installer creates or uses the Python environment, installs dependencies, run
 | `plasma-server.service` | 9900 | **Plasma PPU Programming Server** — Protocol v3.3 / `PLASMA33` TCP Server |
 | `plasma-web.service` | 18080 | **Plasma Web REST Gateway** — Web REST API Contract v3; optional Engineering Mock Provider host |
 | `plasma-vite.service` | 5173 | Plasma PPU Console development/demo Web runtime |
-| `plasma-manager.service` | 18180 | **Plasma Manager** — optional read-only fleet control plane |
+| `plasma-manager.service` | 18180 | **Plasma Manager** — optional fleet control plane |
 
 The first three services are the PPU/integration baseline. `plasma-manager.service` is opt-in and is not required for standalone PPU execution. The Engineering Mock Provider is also opt-in but hosted inside `plasma-web.service`; it is not a separate systemd service.
 
@@ -72,6 +74,7 @@ The deployment contract is:
 - perform health checks after restart;
 - start/restart Manager only when `PLASMA_MANAGER_ENABLED=1`;
 - validate Manager YAML before activating an enabled Manager service;
+- require an explicit `PLASMA_MANAGER_PPU_ALIAS` that already exists in the Manager registry when Manager is enabled;
 - add Engineering Mock Provider Gateway arguments only when `PLASMA_ENGINEERING_MOCK_ENABLED=1`;
 - probe `/api/engineering/targets` after restart when Engineering Mock Provider is enabled.
 
@@ -96,10 +99,10 @@ The persistent deployment file is:
 $HOME/.config/plasma/plasmactl.env
 ```
 
-The current schema is v4. Generic example:
+The current schema is v5. Generic example:
 
 ```bash
-PLASMA_CONFIG_VERSION=4
+PLASMA_CONFIG_VERSION=5
 PLASMA_REPO=/path/to/plasma
 PLASMA_BRANCH=main
 PLASMA_NPM=/path/to/npm
@@ -112,13 +115,14 @@ PLASMA_VITE_PORT=5173
 PLASMA_PUBLIC_API_URL=https://example.invalid
 PLASMA_MANAGER_ENABLED=0
 PLASMA_MANAGER_CONFIG=/absolute/operator/local/path/manager.yaml
+PLASMA_MANAGER_PPU_ALIAS=
 PLASMA_ENGINEERING_MOCK_ENABLED=0
 PLASMA_ENGINEERING_MOCK_ROOT=/absolute/operator/local/state/engineering-mock
 ```
 
 The Web Console appends API paths to the configured API Base; do not append `/api` to the base value itself.
 
-`PLASMA_MANAGER_ENABLED=0` is the default so upgrading a standalone PPU/integration host cannot accidentally create a fleet-control dependency. `PLASMA_ENGINEERING_MOCK_ENABLED=0` is also the default; simulation must be explicit.
+`PLASMA_MANAGER_ENABLED=0` is the default so upgrading a standalone PPU/integration host cannot accidentally create a fleet-control dependency. When Manager is enabled, `PLASMA_MANAGER_PPU_ALIAS` must explicitly select an alias already present in `PLASMA_MANAGER_CONFIG`; deployment does not infer the first registry entry. `PLASMA_ENGINEERING_MOCK_ENABLED=0` is also the default; simulation must be explicit.
 
 Runtime output/log state and Manager registry/config belong outside the Git worktree.
 
@@ -131,6 +135,7 @@ Policy:
 - known obsolete generated defaults may migrate only at a defined configuration-schema transition;
 - unknown/custom values are preserved as explicit operator overrides;
 - current schema completeness checks append only missing assignments and preserve existing operator values;
+- schema v5 adds `PLASMA_MANAGER_PPU_ALIAS`; migration adds an empty value when absent and never guesses a target alias;
 - reconciliation is idempotent;
 - a configuration schema newer than the running `plasmactl` supports is rejected rather than mutated;
 - generated systemd units are derived state and regenerated from validated configuration;
@@ -138,12 +143,12 @@ Policy:
 
 ## 9. Contract and validation boundary
 
-Deployment health proves that the selected software revision starts and its configured service/API health checks pass on the integration host. It does **not** prove Z2 FPGA behavior, electrical safety, real IC programming, socket lifetime, or production validation.
+Deployment health proves that the selected software revision starts and its configured service/API health checks pass on the integration host. It does **not** prove any macOS/Linux/Windows Control Station product installer, Z2 product deployment, FPGA behavior, electrical safety, real IC programming, socket lifetime, or production validation.
 
 Current software contracts to keep aligned during deployment are:
 
 ```text
 Web REST API Contract v3   # Browser/external-facing input API
 Plasma Protocol v3.3       # internal execution wire contract
-Fleet Contract v1          # optional Manager-facing PPU observation contract
+Fleet Contract v1          # Manager-facing PPU observation/routing contract
 ```
