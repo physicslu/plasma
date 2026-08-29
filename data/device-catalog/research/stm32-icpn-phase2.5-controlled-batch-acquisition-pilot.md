@@ -6,7 +6,7 @@
 
 Phase 2.5 tests whether the Phase 2.4 official-ST-page acquisition architecture can scale beyond the four already-admitted STM32F103 base devices without turning the research process into unbounded crawling or automatic dataset promotion.
 
-The pilot is intentionally bounded to six base devices spanning distinct STM32F1 product groups:
+The pilot is intentionally bounded to six base devices spanning distinct STM32F1 product groups, and the runner enforces a hard maximum of 10 targets per manifest so this research path cannot silently become an unbounded crawler:
 
 - STM32F100C8
 - STM32F101C8
@@ -20,7 +20,7 @@ The checked-in manifest is `stm32f1-acquisition-pilot-manifest.json`. The batch 
 ## Architecture under test
 
 ```text
-bounded pilot manifest
+bounded pilot manifest (hard max: 10 targets)
         |
         v
 sequential official ST acquisition
@@ -65,7 +65,7 @@ Normal pull-request CI remains offline with respect to `st.com`.
 CI validates:
 
 1. the Phase 2.4 fail-closed product-page parser;
-2. pilot manifest schema, URL/base-device correspondence and bounded target count;
+2. pilot manifest schema, URL/base-device correspondence and the hard 10-target bound;
 3. batch aggregation behavior for success and fail-closed cases using synthetic HTML;
 4. unique mapping of the six pilot base devices into the checked-in canonical catalog;
 5. mapping of those bases to `tcl/target/stm32f1x.cfg` capability evidence;
