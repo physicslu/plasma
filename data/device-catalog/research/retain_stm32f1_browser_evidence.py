@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+"""Retain a successful bounded STM32F1 browser run as immutable research evidence."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import shutil
+import sys
+from pathlib import Path
+from typing import Any
+
+from evaluate_stm32f1_live_pilot import evaluate_live_pilot, read_baseline
+from validate_stm32f1_retained_evidence import RetainedEvidenceError, validate_retained_evidence
+
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+EXPECTED_COPY_FILES = {
+    "control-summary.json": "control",
+    "pilot-summary.json": "pilot",
+    "evaluation.json": "evaluation",
+}
+
+
+class RetentionError(RuntimeError):
+    pass
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise RetentionError(f"{path}: expected a JSON object")
+    return value
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def evidence_timestamp(summary: dict[str, Any], *, first: bool) -> str:
+    results = summary.get("results")
+    if not isinstance(results, list) or not results:
+        raise RetentionError("pilot summary has no results")
+    values: list[str] = []
+    for result in results:
+        if not isinstance(result, dict) or not isinstance(result.get("evidence"), dict):
+            raise RetentionError("pilot result lacks evidence")
+        stamp = result["evidence"].get("retrieved_at_utc")
+        if not isinstance(stamp, str) or not stamp:
+            raise RetentionError("pilot evidence lacks retrieved_at_utc")
+        values.append(stamp)
+    return min(values) if first else max(values)
+
+
+def retain(
+    *,
+    control_path: Path,
+    pilot_path: Path,
+    evaluation_path: Path,
+    baseline_path: Path,
+    output_dir: Path,
+    evidence_id: str | None = None,
+) -> dict[str, Any]:
+    if output_dir.exists():
+        raise RetentionError(f"output directory already exists: {output_dir}")
+
+    control = read_json(control_path)
+    pilot = read_json(pilot_path)
+    evaluation = read_json(evaluation_path)
+    baseline = read_baseline(baseline_path)
+    run_metadata = evaluation.get("run_metadata")
+    if not isinstance(run_metadata, dict):
+        raise RetentionError("evaluation requires run_metadata")
+    reevaluated = evaluate_live_pilot(summary=pilot, baseline=baseline, run_metadata=run_metadata)
+    if evaluation != reevaluated or evaluation.get("scale_ready") is not True:
+        raise RetentionError("evaluation is not a reproducible scale-ready result")
+    if control.get("browser_scope") != "control" or control.get("attempted") != 1 or control.get("acquisition_success") != 1:
+        raise RetentionError("control summary is not a successful 1/1 browser control")
+    if pilot.get("browser_scope") != "pilot" or pilot.get("canonical_dataset_admission") is not False:
+        raise RetentionError("pilot summary is not eligible retained evidence")
+
+    runtime = pilot.get("browser_runtime")
+    control_runtime = control.get("browser_runtime")
+    if not isinstance(runtime, dict) or runtime != control_runtime:
+        raise RetentionError("control/pilot browser runtime provenance mismatch")
+    if runtime.get("headless") is not False:
+        raise RetentionError("retained ST evidence requires headed Chromium")
+    git_sha = run_metadata.get("git_sha")
+    repository = run_metadata.get("repository")
+    if not isinstance(git_sha, str) or SHA_RE.fullmatch(git_sha) is None:
+        raise RetentionError("evaluation requires a full executed Git SHA")
+    if repository != "physicslu/plasma":
+        raise RetentionError("evaluation repository must be physicslu/plasma")
+
+    target_count = len(baseline["targets"])
+    candidate_count = sum(len(item["exact_icpns"]) for item in baseline["targets"])
+    first_stamp = evidence_timestamp(pilot, first=True)
+    last_stamp = evidence_timestamp(pilot, first=False)
+    control_stamp = evidence_timestamp(control, first=True)
+    if evidence_id is None:
+        compact = first_stamp.replace("-", "").replace(":", "")
+        evidence_id = f"{baseline['pilot_id']}-retained-{compact}-{git_sha[:7]}"
+    if not evidence_id.strip():
+        raise RetentionError("evidence_id must be non-empty")
+
+    output_dir.mkdir(parents=True)
+    try:
+        shutil.copyfile(control_path, output_dir / "control-summary.json")
+        shutil.copyfile(pilot_path, output_dir / "pilot-summary.json")
+        shutil.copyfile(evaluation_path, output_dir / "evaluation.json")
+        provenance = {
+            "schema_version": 1,
+            "manufacturer": "STMicroelectronics",
+            "source_repository": repository,
+            "executed_git_sha": git_sha,
+            "evidence_id": evidence_id,
+            "acquisition_transport": "chromium_rendered_dom",
+            "headed": True,
+            "playwright_version": runtime.get("playwright_requirement"),
+            "chromium_version": runtime.get("browser_version"),
+            "target_count": target_count,
+            "acquisition_success": pilot.get("acquisition_success"),
+            "acquisition_failure": pilot.get("acquisition_failure"),
+            "exact_icpn_candidate_count": candidate_count,
+            "evaluator_result": evaluation.get("decision"),
+            "scale_ready": True,
+            "canonical_dataset_admission": False,
+            "acquisition_time_utc": {
+                "control": control_stamp,
+                "pilot_first": first_stamp,
+                "pilot_last": last_stamp,
+            },
+            "baseline": {
+                "pilot_id": baseline["pilot_id"],
+                "schema_version": baseline["schema_version"],
+                "sha256": sha256(baseline_path),
+            },
+        }
+        (output_dir / "provenance.json").write_text(
+            json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (output_dir / "README.md").write_text(
+            "# Retained STM32F1 browser evidence\n\n"
+            f"Evidence ID: `{evidence_id}`\n\n"
+            f"Pilot: `{baseline['pilot_id']}`\n\n"
+            f"- targets: {target_count}\n"
+            f"- exact ICPN candidates: {candidate_count}\n"
+            "- acquisition transport: `chromium_rendered_dom`\n"
+            "- evaluator decision: `scale_ready`\n"
+            "- canonical dataset admission: false\n\n"
+            "This package is retained manufacturer evidence only. Canonical admission is a separate deterministic decision.\n",
+            encoding="utf-8",
+        )
+        manifest_files = []
+        for name in sorted({"control-summary.json", "pilot-summary.json", "evaluation.json", "provenance.json", "README.md"}):
+            manifest_files.append({"path": name, "sha256": sha256(output_dir / name)})
+        manifest = {
+            "schema_version": 1,
+            "evidence_id": evidence_id,
+            "canonical_dataset_admission": False,
+            "files": manifest_files,
+        }
+        (output_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        report = validate_retained_evidence(output_dir, baseline_path=baseline_path)
+    except Exception:
+        shutil.rmtree(output_dir, ignore_errors=True)
+        raise
+    return report
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--control", type=Path, required=True)
+    parser.add_argument("--pilot", type=Path, required=True)
+    parser.add_argument("--evaluation", type=Path, required=True)
+    parser.add_argument("--baseline", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--evidence-id")
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    try:
+        report = retain(
+            control_path=args.control,
+            pilot_path=args.pilot,
+            evaluation_path=args.evaluation,
+            baseline_path=args.baseline,
+            output_dir=args.output_dir,
+            evidence_id=args.evidence_id,
+        )
+    except (OSError, json.JSONDecodeError, RetentionError, RetainedEvidenceError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
