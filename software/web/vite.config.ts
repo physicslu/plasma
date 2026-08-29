@@ -13,12 +13,14 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
 // The Cloudflare/Vinext application executes server routes inside a Worker
 // runtime. Host process environment variables are not Worker bindings by
-// themselves, so explicitly bridge the approved Fleet runtime settings into
-// Worker text bindings. The route keeps its own loopback-only validation.
+// themselves, so explicitly bridge the approved Fleet and Manager BFF runtime
+// settings into Worker text bindings. The routes keep their own loopback-only
+// validation and alias-based routing boundaries.
 const fleetWorkerVars = {
   PLASMA_FLEET_UI_ENABLED: process.env.PLASMA_FLEET_UI_ENABLED ?? "0",
   PLASMA_MANAGER_API_URL:
     process.env.PLASMA_MANAGER_API_URL ?? "http://127.0.0.1:18180",
+  PLASMA_MANAGER_PPU_ALIAS: process.env.PLASMA_MANAGER_PPU_ALIAS ?? "",
 };
 
 const localBindingConfig = {
@@ -66,10 +68,11 @@ export default defineConfig(async () => {
         "plasma.open4th.com",
       ],
       proxy: {
-        // PPU-local API calls still go to the Python Gateway. /api/fleet is
-        // deliberately excluded so Vinext handles the same-origin Fleet BFF
-        // route instead of leaking it into the PPU execution API surface.
-        "^/api/(?!fleet(?:/|$))": {
+        // PPU-local API calls still go to the Python Gateway. Fleet and Manager
+        // namespaces are deliberately excluded so Vinext owns both same-origin
+        // BFF surfaces instead of leaking control-plane requests into the PPU
+        // execution API surface.
+        "^/api/(?!fleet(?:/|$))(?!manager(?:/|$))": {
           target: "http://127.0.0.1:18080",
           changeOrigin: true,
         },

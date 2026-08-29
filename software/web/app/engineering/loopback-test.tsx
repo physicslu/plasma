@@ -31,8 +31,20 @@ type LoopbackResultRow = {
   status: LoopbackResultStatus;
   details: string;
 };
+type LoopbackPathNode = {
+  label: string;
+  detail: string;
+  endpoint?: LoopbackEndpoint;
+};
 
-const endpointIndex: Record<LoopbackEndpoint, number> = { ps: 1, pl: 2, ic: 3 };
+const loopbackPathNodes: LoopbackPathNode[] = [
+  { label: "CONTROL CONSOLE", detail: "Operator UI" },
+  { label: "PLASMA MANAGER", detail: "Fleet control plane" },
+  { label: "PS", detail: "Processing System", endpoint: "ps" },
+  { label: "PL", detail: "Programmable Logic", endpoint: "pl" },
+  { label: "IC", detail: "Diagnostic FW", endpoint: "ic" },
+];
+const endpointIndex: Record<LoopbackEndpoint, number> = { ps: 2, pl: 3, ic: 4 };
 const endpointLabel: Record<LoopbackEndpoint, string> = { ps: "PS", pl: "PL", ic: "IC" };
 const patternLabels: Record<LoopbackPattern, string> = {
   prbs: "PRBS (Pseudo Random Binary Sequence)",
@@ -49,10 +61,10 @@ const copy = {
   "zh-TW": {
     eyebrow: "EMODE / DIAGNOSTICS / LOOPBACK TEST",
     title: "Loopback Test",
-    description: "Production real-path loopback 測試，用來驗證 Web 經 Plasma Manager 到 PPU 後的 PS → PL → IC 各層資料路徑完整性。",
+    description: "Production real-path loopback 測試，用來驗證 Control Console 經 Plasma Manager 到 PPU 後的 PS → PL → IC 各層資料路徑完整性。",
     help: "說明",
     pathTitle: "Loopback Path",
-    pathDescription: "選擇本次要測到的最遠節點；前級節點會自動包含在測試路徑中。",
+    pathDescription: "選擇本次要測到的最遠 endpoint；Control Console、Plasma Manager 與前級節點會自動包含在測試路徑中。",
     currentSelection: "目前選擇",
     loopbackAt: "Loopback at",
     effectivePath: "Effective Path",
@@ -83,7 +95,7 @@ const copy = {
     delayHint: "封包之間的延遲",
     startTest: "Start Test",
     reset: "Reset",
-    psReady: "PS production real-path 已透過 Manager Phase 0 pass-through 啟用：Browser → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → Browser。此路徑不使用 MockInterface，也不會 fallback 到 Mock。",
+    psReady: "PS production real-path 已透過 Manager Phase 0 pass-through 啟用：Control Console (Browser) → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → PS → Plasma Server → PPU REST Gateway → Plasma Manager → Web BFF → Control Console。此路徑不使用 MockInterface，也不會 fallback 到 Mock。",
     laterEndpoint: "PL / IC real-path 尚未實作；選擇這些 endpoint 時 Start Test 會保持停用，不會產生假的 PASS / FAIL。",
     running: "Production real-path test 執行中",
     resultsTitle: "Test Results",
@@ -96,15 +108,15 @@ const copy = {
     rtt: "RTT (ms)",
     result: "Result",
     details: "Details",
-    helpText: "節點實心表示包含在本次測試路徑；空心表示不包含。目前只有 PS endpoint 可執行。PS PASS 必須是 Browser payload 實際穿過 Web BFF、Plasma Manager、PPU REST Gateway 與 Plasma Protocol v3.3 TCP 連線，由 Plasma Server PS handler 回傳；Browser 還會獨立驗證 Manager pass-through proof、PS source、Test ID、sequence、payload 與 CRC。",
+    helpText: "節點實心表示包含在本次測試路徑；空心表示不包含。Control Console 與 Plasma Manager 是固定路徑節點，不是 endpoint；可選 endpoint 只有 PS、PL、IC。目前只有 PS endpoint 可執行。PS PASS 必須是 Control Console 的 Browser payload 實際穿過 Web BFF、Plasma Manager、PPU REST Gateway 與 Plasma Protocol v3.3 TCP 連線，由 Plasma Server PS handler 回傳；Browser 還會獨立驗證 Manager pass-through proof、PS source、Test ID、sequence、payload 與 CRC。",
   },
   "en-US": {
     eyebrow: "EMODE / DIAGNOSTICS / LOOPBACK TEST",
     title: "Loopback Test",
-    description: "Production real-path loopback test for the Web-through-Manager path into PPU PS → PL → IC data-path integrity.",
+    description: "Production real-path loopback test for the Control Console-through-Plasma Manager path into PPU PS → PL → IC data-path integrity.",
     help: "Help",
     pathTitle: "Loopback Path",
-    pathDescription: "Select the farthest node to test. All previous nodes are included automatically.",
+    pathDescription: "Select the farthest endpoint to test. Control Console, Plasma Manager and every preceding node are included automatically.",
     currentSelection: "Current Selection",
     loopbackAt: "Loopback at",
     effectivePath: "Effective Path",
@@ -135,7 +147,7 @@ const copy = {
     delayHint: "Delay between packets",
     startTest: "Start Test",
     reset: "Reset",
-    psReady: "The PS production real path now uses the Manager Phase 0 pass-through: Browser → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → Browser. This path does not use MockInterface and never falls back to Mock.",
+    psReady: "The PS production real path now uses the Manager Phase 0 pass-through: Control Console (Browser) → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → PS → Plasma Server → PPU REST Gateway → Plasma Manager → Web BFF → Control Console. This path does not use MockInterface and never falls back to Mock.",
     laterEndpoint: "PL / IC real-path execution is not implemented yet. Start Test stays disabled for those endpoints and no synthetic PASS / FAIL is produced.",
     running: "Production real-path test is running",
     resultsTitle: "Test Results",
@@ -148,7 +160,7 @@ const copy = {
     rtt: "RTT (ms)",
     result: "Result",
     details: "Details",
-    helpText: "A filled node is included in the test path; an empty node is excluded. Only the PS endpoint executes today. A PS PASS requires the Browser payload to traverse the Web BFF, Plasma Manager, PPU REST Gateway and Plasma Protocol v3.3 TCP connection, be returned by the Plasma Server PS handler, and then pass independent Browser verification of the Manager relay proof, PS source, Test ID, sequence, payload and CRC.",
+    helpText: "A filled node is included in the test path; an empty node is excluded. Control Console and Plasma Manager are fixed path nodes, not endpoints; only PS, PL and IC are selectable endpoints. Only the PS endpoint executes today. A PS PASS requires the Control Console Browser payload to traverse the Web BFF, Plasma Manager, PPU REST Gateway and Plasma Protocol v3.3 TCP connection, be returned by the Plasma Server PS handler, and then pass independent Browser verification of the Manager relay proof, PS source, Test ID, sequence, payload and CRC.",
   },
 } as const;
 
@@ -260,10 +272,10 @@ export default function LoopbackTest() {
 
   const selectedIndex = endpointIndex[endpoint];
   const effectivePath = endpoint === "ps"
-    ? "Web → PS → Web"
+    ? "Control Console → Plasma Manager → PS → Plasma Manager → Control Console"
     : endpoint === "pl"
-      ? "Web → PS → PL → PS → Web"
-      : "Web → PS → PL → IC → PL → PS → Web";
+      ? "Control Console → Plasma Manager → PS → PL → PS → Plasma Manager → Control Console"
+      : "Control Console → Plasma Manager → PS → PL → IC → PL → PS → Plasma Manager → Control Console";
 
   const transformText = endpoint === "ps"
     ? "PS: RX[i] = TX[i] (echo)"
@@ -411,25 +423,25 @@ export default function LoopbackTest() {
       {helpOpen && <DiagnosticsTestNotice>{text.helpText}</DiagnosticsTestNotice>}
 
       <DiagnosticsTestCard title={text.pathTitle} description={text.pathDescription} className="loopbackPathCard">
-        <div className="loopbackPath" aria-label="Web to IC loopback path">
-          {(["WEB", "PS", "PL", "IC"] as const).map((label, index) => (
-            <div className="loopbackPathItem" key={label}>
-              <span className="loopbackNodeLabel">{label}</span>
+        <div className="loopbackPath" aria-label="Control Console to IC loopback path">
+          {loopbackPathNodes.map((node, index) => (
+            <div className="loopbackPathItem" key={node.label}>
+              <span className="loopbackNodeLabel">{node.label}</span>
               <div className="loopbackNodeRow">
                 {index > 0 && <span className={`loopbackSegment ${index <= selectedIndex ? "active" : ""}`} aria-hidden="true" />}
-                {label === "WEB" ? (
-                  <span className="loopbackNode active" aria-label="WEB included" />
-                ) : (
+                {node.endpoint ? (
                   <button
                     type="button"
                     className={`loopbackNode ${index <= selectedIndex ? "active" : ""}`}
-                    aria-label={`${label} loopback endpoint`}
-                    aria-pressed={index === selectedIndex}
-                    onClick={() => setEndpoint(label.toLowerCase() as LoopbackEndpoint)}
+                    aria-label={`${node.label} loopback endpoint`}
+                    aria-pressed={node.endpoint === endpoint}
+                    onClick={() => setEndpoint(node.endpoint!)}
                   />
+                ) : (
+                  <span className="loopbackNode active" aria-label={`${node.label} included`} />
                 )}
               </div>
-              <small>{label === "WEB" ? "Web Console" : label === "PS" ? "Processing System" : label === "PL" ? "Programmable Logic" : "Diagnostic FW"}</small>
+              <small>{node.detail}</small>
             </div>
           ))}
         </div>

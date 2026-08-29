@@ -5,7 +5,7 @@
 
 .loopbackPath {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
   align-items: start;
   padding: 4px 12px 0;
 }
@@ -328,7 +328,7 @@ button.loopbackNode:hover {
 
 @media (max-width: 680px) {
   .loopbackPath {
-    grid-template-columns: repeat(4, minmax(82px, 1fr));
+    grid-template-columns: repeat(5, minmax(82px, 1fr));
     overflow-x: auto;
     padding-inline: 0;
   }
