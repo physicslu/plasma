@@ -60,6 +60,57 @@ class PPUHttpClient:
             raise PPUHTTPError(f"{path} JSON payload must be an object")
         return status, payload
 
+    def relay(
+        self,
+        method: str,
+        path_and_query: str,
+        *,
+        headers: dict[str, str],
+        body: bytes | None,
+        timeout_s: float,
+        max_response_bytes: int,
+    ) -> tuple[int, dict[str, str], bytes]:
+        """Relay one Manager-approved PPU REST request.
+
+        The caller owns the route allowlist. This transport never chooses a target
+        URL and never forwards arbitrary browser headers. HTTP error statuses from
+        the PPU are returned verbatim so the PPU security/error contract remains
+        authoritative; only transport/protocol failures become Manager errors.
+        """
+        request_headers = {
+            "User-Agent": "plasma-manager/1",
+            **headers,
+        }
+        request = Request(
+            f"{self.endpoint}{path_and_query}",
+            data=body,
+            headers=request_headers,
+            method=method,
+        )
+        try:
+            try:
+                response = urlopen(request, timeout=timeout_s)
+            except HTTPError as exc:
+                response = exc
+            with response:
+                status = int(response.status if hasattr(response, "status") else response.code)
+                response_headers = {
+                    key: value
+                    for key, value in response.headers.items()
+                    if key.lower() in {
+                        "content-type",
+                        "content-disposition",
+                        "cache-control",
+                    }
+                }
+                response_data = response.read(max_response_bytes + 1)
+        except (URLError, OSError, TimeoutError) as exc:
+            raise PPUTransportError(f"{path_and_query} request failed: {exc}") from exc
+
+        if len(response_data) > max_response_bytes:
+            raise PPUHTTPError(f"{path_and_query} response exceeds Manager relay limit")
+        return status, response_headers, response_data
+
     def _get(self, path: str, accepted_statuses: frozenset[int]) -> tuple[int, dict[str, Any]]:
         return self._request_json("GET", path, accepted_statuses=accepted_statuses)
 
@@ -81,10 +132,10 @@ class PPUHttpClient:
         *,
         timeout_s: float,
     ) -> tuple[int, dict[str, Any]]:
-        """Relay the one explicitly approved Phase-0 write to a PPU Gateway.
+        """Relay the legacy fixed PS loopback route.
 
-        This is deliberately not a generic proxy. The path and method are fixed so
-        a caller cannot make Manager fetch an arbitrary URL or route.
+        New Managed Mode Console traffic uses the explicit Manager PPU relay
+        allowlist. This helper remains for compatibility with the Phase-0 route.
         """
         return self._request_json(
             "POST",
