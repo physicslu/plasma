@@ -204,7 +204,7 @@ Optional fleet path:
 Fleet client
     |
     v
-Plasma Manager (read-only registry / aggregation)
+Plasma Manager (read-only registry / aggregation + narrow Phase-0 PS Loopback relay)
     |
     +--> PPU A Plasma Web REST Gateway -> local execution
     +--> PPU B Plasma Web REST Gateway -> local execution
@@ -219,7 +219,8 @@ Implementation facts:
 - Web Console uses REST polling.
 - `plasma_manager` is optional and not required for local PPU execution.
 - Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default).
-- Current Manager does not provide command routing, central scheduling, discovery, auth policy, Programming Asset rollout, or Fleet Web UI.
+- Manager fleet observation remains read-only. The only current write-like exception is fixed PS Loopback pass-through at `POST /api/ppus/{ppu_alias}/diagnostics/loopback` with `endpoint=ps`; it is not a generic proxy or general command-routing contract.
+- Current Manager does not provide Job/Batch command routing, central scheduling, discovery, auth policy, Programming Asset rollout, or general Fleet write orchestration.
 - Mock programming success does not prove hardware programming.
 
 Do not introduce FastAPI/WebSocket merely because they were discussed as future options.
@@ -297,7 +298,7 @@ Service management is defined by `scripts/plasmactl`.
 | `plasma-server.service` | 9900 | Plasma PPU Programming Server / Protocol v3.3 TCP Server |
 | `plasma-web.service` | 18080 | Plasma Web REST Gateway |
 | `plasma-vite.service` | 5173 | Plasma PPU Console development/demo runtime |
-| `plasma-manager.service` | 18180 | Optional Plasma Manager read-only fleet control plane |
+| `plasma-manager.service` | 18180 | Optional Plasma Manager fleet control plane; read-only observation plus narrow Phase-0 PS Loopback pass-through |
 
 Useful commands:
 
@@ -594,7 +595,7 @@ Agents must not silently turn these facts into wrong assumptions:
 5. Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
 6. Only binary Image Asset normalization is implemented; other declared Asset formats/types are extension points, not validated functionality.
 7. Programming Recipe/Package is an architectural direction, not yet an implemented execution contract.
-8. Plasma Manager currently implements manual read-only PPU registry/fleet aggregation plus opt-in deployment; command routing, scheduling, discovery, authentication policy, and Fleet UI remain future work.
+8. Plasma Manager currently implements manual read-only PPU registry/fleet aggregation plus opt-in deployment and one narrow Phase-0 PS Loopback pass-through. General command routing, Job/Batch scheduling, discovery, authentication policy, Programming Asset rollout, and general Fleet write orchestration remain future work.
 9. Mock/software validation does not prove Z2/FPGA/OpenOCD/real-target behavior.
 
 ## 19. Communication and completion report
