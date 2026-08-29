@@ -1,0 +1,69 @@
+name: STM32F1 live acquisition pilot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stm32f1-live-acquisition-pilot
+  cancel-in-progress: false
+
+jobs:
+  capture-live-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run bounded live ST acquisition pilot
+        id: live_pilot
+        continue-on-error: true
+        run: |
+          mkdir -p .artifacts/stm32f1-live-pilot
+          python data/device-catalog/research/run_stm32f1_live_pilot.py \
+            --delay 2.0 \
+            --timeout 30 \
+            --output .artifacts/stm32f1-live-pilot/live-summary.json
+
+      - name: Evaluate transport evidence and candidate drift
+        id: evaluate
+        if: always() && hashFiles('.artifacts/stm32f1-live-pilot/live-summary.json') != ''
+        continue-on-error: true
+        run: |
+          python data/device-catalog/research/evaluate_stm32f1_live_pilot.py \
+            --summary .artifacts/stm32f1-live-pilot/live-summary.json \
+            --output .artifacts/stm32f1-live-pilot/live-evaluation.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --repository "$GITHUB_REPOSITORY" \
+            --git-sha "$GITHUB_SHA"
+
+      - name: Upload live evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32f1-live-pilot-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            .artifacts/stm32f1-live-pilot/*.json
+            data/device-catalog/research/stm32f1-acquisition-pilot-manifest.json
+            data/device-catalog/research/stm32f1-acquisition-pilot-baseline.json
+
+      - name: Enforce live pilot scale-readiness gate
+        if: always()
+        run: |
+          if [ "${{ steps.live_pilot.outcome }}" != "success" ]; then
+            echo "Live acquisition pilot did not complete cleanly." >&2
+            exit 1
+          fi
+          if [ "${{ steps.evaluate.outcome }}" != "success" ]; then
+            echo "Live evidence requires manual review; see uploaded artifact." >&2
+            exit 1
+          fi
