@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,7 +12,8 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from evaluate_stm32f1_live_pilot import read_baseline  # noqa: E402
+from evaluate_stm32f1_live_pilot import evaluate_live_pilot, read_baseline  # noqa: E402
+from retain_stm32f1_browser_evidence import retain  # noqa: E402
 from stm32f1_acquisition_pilot import catalog_mapping, read_catalog, read_manifest  # noqa: E402
 from stm32f1_admission_policy import MANUFACTURER, build_canonical_row  # noqa: E402
 
@@ -30,6 +32,12 @@ EXPECTED_BASES = [
     "STM32F107RC",
 ]
 EXPECTED_CANDIDATE_COUNT = 26
+RUNTIME = {
+    "engine": "chromium",
+    "browser_version": "151.0.7922.34",
+    "playwright_requirement": "1.62.0",
+    "headless": False,
+}
 
 
 class Phase29ScaleoutTests(unittest.TestCase):
@@ -38,6 +46,74 @@ class Phase29ScaleoutTests(unittest.TestCase):
         return {
             item["base_device"]: item["exact_icpns"]
             for item in baseline["targets"]
+        }
+
+    def _synthetic_pilot(self) -> dict[str, object]:
+        pilot_id, targets = read_manifest(MANIFEST)
+        catalog_rows = read_catalog(CATALOG)
+        baseline_by_base = self._baseline_by_base()
+        results = []
+        for index, target in enumerate(targets):
+            stamp = f"2026-08-29T15:1{index}:00Z"
+            mapping = catalog_mapping(target.base_device, catalog_rows)
+            results.append(
+                {
+                    "base_device": target.base_device,
+                    "source_url": target.source_url,
+                    "selection_reason": target.selection_reason,
+                    "canonical_mapping": mapping,
+                    "acquisition_status": "success",
+                    "evidence": {
+                        "schema_version": 1,
+                        "parser_version": 1,
+                        "acquisition_transport": "chromium_rendered_dom",
+                        "base_device": target.base_device,
+                        "source_url": target.source_url,
+                        "final_url": target.source_url,
+                        "retrieved_at_utc": stamp,
+                        "http_etag": None,
+                        "http_last_modified": None,
+                        "evidence_surface": "quality_and_reliability_part_number",
+                        "rendered_dom_sha256": f"{index + 1:064x}",
+                        "evidence_section_sha256": f"{index + 101:064x}",
+                        "exact_icpns": baseline_by_base[target.base_device],
+                    },
+                }
+            )
+        return {
+            "schema_version": 1,
+            "pilot_id": pilot_id,
+            "attempted": 8,
+            "acquisition_success": 8,
+            "acquisition_failure": 0,
+            "exact_icpn_candidates": EXPECTED_CANDIDATE_COUNT,
+            "canonical_mapping": {"unique": 8, "ambiguous": 0, "unmapped": 0},
+            "openocd_cfg_mapping": {"mapped": 8, "total": 8},
+            "manual_intervention_required": 0,
+            "results": results,
+            "acquisition_transport": "chromium_rendered_dom",
+            "browser_scope": "pilot",
+            "browser_runtime": RUNTIME,
+            "canonical_dataset_admission": False,
+        }
+
+    def _synthetic_control(self, pilot: dict[str, object]) -> dict[str, object]:
+        first = pilot["results"][0]
+        return {
+            "schema_version": 1,
+            "pilot_id": pilot["pilot_id"],
+            "attempted": 1,
+            "acquisition_success": 1,
+            "acquisition_failure": 0,
+            "exact_icpn_candidates": len(first["evidence"]["exact_icpns"]),
+            "canonical_mapping": {"unique": 1, "ambiguous": 0, "unmapped": 0},
+            "openocd_cfg_mapping": {"mapped": 1, "total": 1},
+            "manual_intervention_required": 0,
+            "results": [first],
+            "acquisition_transport": "chromium_rendered_dom",
+            "browser_scope": "control",
+            "browser_runtime": RUNTIME,
+            "canonical_dataset_admission": False,
         }
 
     def test_manifest_is_bounded_and_matches_expected_batch(self) -> None:
@@ -110,6 +186,49 @@ class Phase29ScaleoutTests(unittest.TestCase):
         self.assertNotIn("rendered_dom_sha256", serialized)
         self.assertNotIn("evidence_section_sha256", serialized)
         self.assertNotIn("scale_ready", serialized)
+
+    def test_dynamic_retention_accepts_eight_target_scale_ready_package(self) -> None:
+        pilot = self._synthetic_pilot()
+        control = self._synthetic_control(pilot)
+        baseline = read_baseline(BASELINE)
+        run_metadata = {
+            "run_id": None,
+            "run_attempt": None,
+            "repository": "physicslu/plasma",
+            "git_sha": "a" * 40,
+        }
+        evaluation = evaluate_live_pilot(
+            summary=pilot,
+            baseline=baseline,
+            run_metadata=run_metadata,
+        )
+        self.assertTrue(evaluation["scale_ready"])
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            control_path = root / "control.json"
+            pilot_path = root / "pilot.json"
+            evaluation_path = root / "evaluation.json"
+            for path, value in (
+                (control_path, control),
+                (pilot_path, pilot),
+                (evaluation_path, evaluation),
+            ):
+                path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            evidence_dir = root / "retained"
+            report = retain(
+                control_path=control_path,
+                pilot_path=pilot_path,
+                evaluation_path=evaluation_path,
+                baseline_path=BASELINE,
+                output_dir=evidence_dir,
+                evidence_id="phase2.9-eight-target-unit-evidence",
+            )
+            self.assertEqual(report["targets"], 8)
+            self.assertEqual(report["exact_icpn_candidates"], EXPECTED_CANDIDATE_COUNT)
+            self.assertTrue(report["scale_ready"])
+            provenance = json.loads((evidence_dir / "provenance.json").read_text(encoding="utf-8"))
+            self.assertEqual(provenance["target_count"], 8)
+            self.assertEqual(provenance["baseline"]["pilot_id"], baseline["pilot_id"])
 
 
 if __name__ == "__main__":
