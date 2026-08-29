@@ -162,7 +162,8 @@ def run_pilot(
             result["acquisition_status"] = "failure"
             result["error"] = str(exc)
 
-        if result["acquisition_status"] != "success" or mapping["status"] != "unique":
+        mapping_ready = mapping["status"] == "unique" and bool(mapping["target_configs"])
+        if result["acquisition_status"] != "success" or not mapping_ready:
             manual_intervention_required += 1
         results.append(result)
 
@@ -183,6 +184,10 @@ def run_pilot(
         "manual_intervention_required": manual_intervention_required,
         "results": results,
     }
+
+
+def pilot_is_clean(summary: dict[str, object]) -> bool:
+    return summary.get("manual_intervention_required") == 0
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -210,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
             args.output.write_text(payload, encoding="utf-8")
         else:
             sys.stdout.write(payload)
-        return 0 if summary["acquisition_failure"] == 0 else 1
+        return 0 if pilot_is_clean(summary) else 1
     except (AcquisitionError, OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
