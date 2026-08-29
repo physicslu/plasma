@@ -1,0 +1,295 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 8,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 8,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 8,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 26,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 8,
+    "total": 8
+  },
+  "pilot_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F100CB",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F100CB",
+        "evidence_section_sha256": "4d7b3cedd9a24bce2f18ae8f5a9d38de5c983c0a7f9a1f324b03e26c34ba08e7",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F100CBT6B",
+          "STM32F100CBT6BTR",
+          "STM32F100CBT7B",
+          "STM32F100CBT7BTR"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "6d6409858c7345d52e3749109f892f527877790531a42a6c685a128a6fd80ab4",
+        "retrieved_at_utc": "2026-08-29T16:13:36Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html"
+      },
+      "selection_reason": "Value-line 128 KiB LQFP48 base-device expansion adjacent to the admitted STM32F100C8 slice.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F100VE",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F100VE",
+        "evidence_section_sha256": "fd86530c3b6e8aba330a1b99e49c970ab8555b09e3dd2f904896a54e02f08ad6",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F100VET6",
+          "STM32F100VET6B",
+          "STM32F100VET6BTR",
+          "STM32F100VET7B"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "5600472948fe322f24589d84910b86fb740c9a39cbbeb7a3edecfc638defcf1e",
+        "retrieved_at_utc": "2026-08-29T16:13:40Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html"
+      },
+      "selection_reason": "Value-line 512 KiB 100-pin expansion exercising a larger package and density while staying inside existing STM32F1 policy codes.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F101RE",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F101RE",
+        "evidence_section_sha256": "5e9b4cd611362644327c4a29a1e63ba5406aefd37d0c05e7a65ee05f422a3a5b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F101RET6",
+          "STM32F101RET6TR"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "60c7070e99a23053b1486e8faf219b826febee8fdb17cc7183ad6a5f26047023",
+        "retrieved_at_utc": "2026-08-29T16:13:44Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html"
+      },
+      "selection_reason": "Access-line 512 KiB LQFP64 expansion beyond the admitted STM32F101C8 slice.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F101ZE",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F101ZE",
+        "evidence_section_sha256": "5d62a1878539466002937e50057ec3c7b6fa5a55b505f8794dea290899735c4e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F101ZET6"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101ze.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "bbe4f8764447aac8ca2ef72bb174a4dac5133a495c9f289f5c055a8ec3c43610",
+        "retrieved_at_utc": "2026-08-29T16:13:47Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101ze.html"
+      },
+      "selection_reason": "Access-line 512 KiB 144-pin expansion covering the Z package class already supported by policy.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101ze.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F102CB",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F102CB",
+        "evidence_section_sha256": "6ad44f1da3632c0b92ecb65e2e72f577b8b178bcdd7bd1996f90203d83f6cdd5",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F102CBT6",
+          "STM32F102CBT6TR"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "b5f8bf92019ec4e2cab4844d6ec73e700d4221e559beacb93b288184cf98fcc7",
+        "retrieved_at_utc": "2026-08-29T16:13:51Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html"
+      },
+      "selection_reason": "USB access-line 128 KiB expansion adjacent to the admitted STM32F102C8 slice.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F103RC",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F103RC",
+        "evidence_section_sha256": "4c75854eaf17ea15ddf9aeaa23dabdf377449c24ed5d2a4eb66ce253620ce085",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F103RCT6",
+          "STM32F103RCT6TR",
+          "STM32F103RCT7",
+          "STM32F103RCT7TR",
+          "STM32F103RCY6TR"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "f91088f1c7a930ae55ba6610cbb217d90d70be188940d9c6a2331eb08f7bfba2",
+        "retrieved_at_utc": "2026-08-29T16:13:55Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html"
+      },
+      "selection_reason": "Mainstream STM32F103 256 KiB LQFP64/WLCSP commercial surface not yet admitted.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F105VB",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F105VB",
+        "evidence_section_sha256": "174f260be1354a8704edaa9ab587ba8ac7e590f1bb6c62f1ee09c2d007ceff57",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F105VBH6",
+          "STM32F105VBH6TR",
+          "STM32F105VBH7",
+          "STM32F105VBT6",
+          "STM32F105VBT7"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "2869237628ab07f7db7a32d5899ce2be51170bdc476b1d941a9769ba5f635c03",
+        "retrieved_at_utc": "2026-08-29T16:13:58Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html"
+      },
+      "selection_reason": "Connectivity-line 128 KiB 100-pin expansion exercising LQFP and BGA order-code surfaces.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F107RC",
+      "canonical_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F107RC",
+        "evidence_section_sha256": "194da79e1cbe174a73e943a27e087cd06d759b5ef5e061d7f0d2b7ab05dfe58d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F107RCT6",
+          "STM32F107RCT6TR",
+          "STM32F107RCT7"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "7762f597f41a8f486e21912004cb6a8ecffd6fa6a9ee75b4f16c077b0aff5995",
+        "retrieved_at_utc": "2026-08-29T16:14:06Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html"
+      },
+      "selection_reason": "Connectivity-line 256 KiB LQFP64 expansion adjacent to the admitted STM32F107VC slice.",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html"
+    }
+  ],
+  "schema_version": 1
+}

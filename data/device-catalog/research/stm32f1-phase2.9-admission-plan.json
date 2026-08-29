@@ -1,0 +1,1177 @@
+{
+  "candidate_count": 26,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4d7b3cedd9a24bce2f18ae8f5a9d38de5c983c0a7f9a1f324b03e26c34ba08e7",
+        "rendered_dom_sha256": "6d6409858c7345d52e3749109f892f527877790531a42a6c685a128a6fd80ab4",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html"
+      },
+      "base_device": "STM32F100CB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F100CBT6B",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F100CB",
+        "cmsis_device_name": "STM32F100CB",
+        "existing_identifier": "STM32F100CB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F100CBT6B",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "B",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32F100",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4d7b3cedd9a24bce2f18ae8f5a9d38de5c983c0a7f9a1f324b03e26c34ba08e7",
+        "rendered_dom_sha256": "6d6409858c7345d52e3749109f892f527877790531a42a6c685a128a6fd80ab4",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html"
+      },
+      "base_device": "STM32F100CB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F100CBT6BTR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F100CB",
+        "cmsis_device_name": "STM32F100CB",
+        "existing_identifier": "STM32F100CB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F100CBT6BTR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "BTR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32F100",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4d7b3cedd9a24bce2f18ae8f5a9d38de5c983c0a7f9a1f324b03e26c34ba08e7",
+        "rendered_dom_sha256": "6d6409858c7345d52e3749109f892f527877790531a42a6c685a128a6fd80ab4",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html"
+      },
+      "base_device": "STM32F100CB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F100CBT7B",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F100CB",
+        "cmsis_device_name": "STM32F100CB",
+        "existing_identifier": "STM32F100CB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F100CBT7B",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "B",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32F100",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4d7b3cedd9a24bce2f18ae8f5a9d38de5c983c0a7f9a1f324b03e26c34ba08e7",
+        "rendered_dom_sha256": "6d6409858c7345d52e3749109f892f527877790531a42a6c685a128a6fd80ab4",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html"
+      },
+      "base_device": "STM32F100CB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F100CBT7BTR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F100CB",
+        "cmsis_device_name": "STM32F100CB",
+        "existing_identifier": "STM32F100CB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F100CBT7BTR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "BTR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32F100",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100cb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "fd86530c3b6e8aba330a1b99e49c970ab8555b09e3dd2f904896a54e02f08ad6",
+        "rendered_dom_sha256": "5600472948fe322f24589d84910b86fb740c9a39cbbeb7a3edecfc638defcf1e",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html"
+      },
+      "base_device": "STM32F100VE",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F100VET6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F100VE",
+        "cmsis_device_name": "STM32F100VE",
+        "existing_identifier": "STM32F100VE",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F100VET6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "100",
+        "series": "STM32F100",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "fd86530c3b6e8aba330a1b99e49c970ab8555b09e3dd2f904896a54e02f08ad6",
+        "rendered_dom_sha256": "5600472948fe322f24589d84910b86fb740c9a39cbbeb7a3edecfc638defcf1e",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html"
+      },
+      "base_device": "STM32F100VE",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F100VET6B",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F100VE",
+        "cmsis_device_name": "STM32F100VE",
+        "existing_identifier": "STM32F100VE",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F100VET6B",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "B",
+        "package": "LQFP",
+        "pin_count": "100",
+        "series": "STM32F100",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "fd86530c3b6e8aba330a1b99e49c970ab8555b09e3dd2f904896a54e02f08ad6",
+        "rendered_dom_sha256": "5600472948fe322f24589d84910b86fb740c9a39cbbeb7a3edecfc638defcf1e",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html"
+      },
+      "base_device": "STM32F100VE",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F100VET6BTR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F100VE",
+        "cmsis_device_name": "STM32F100VE",
+        "existing_identifier": "STM32F100VE",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F100VET6BTR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "BTR",
+        "package": "LQFP",
+        "pin_count": "100",
+        "series": "STM32F100",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "fd86530c3b6e8aba330a1b99e49c970ab8555b09e3dd2f904896a54e02f08ad6",
+        "rendered_dom_sha256": "5600472948fe322f24589d84910b86fb740c9a39cbbeb7a3edecfc638defcf1e",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html"
+      },
+      "base_device": "STM32F100VE",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F100VET7B",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F100VE",
+        "cmsis_device_name": "STM32F100VE",
+        "existing_identifier": "STM32F100VE",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F100VET7B",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "B",
+        "package": "LQFP",
+        "pin_count": "100",
+        "series": "STM32F100",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100ve.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "5e9b4cd611362644327c4a29a1e63ba5406aefd37d0c05e7a65ee05f422a3a5b",
+        "rendered_dom_sha256": "60c7070e99a23053b1486e8faf219b826febee8fdb17cc7183ad6a5f26047023",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html"
+      },
+      "base_device": "STM32F101RE",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F101RET6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F101RE",
+        "cmsis_device_name": "STM32F101RE",
+        "existing_identifier": "STM32F101RE",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F101RET6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F101",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "5e9b4cd611362644327c4a29a1e63ba5406aefd37d0c05e7a65ee05f422a3a5b",
+        "rendered_dom_sha256": "60c7070e99a23053b1486e8faf219b826febee8fdb17cc7183ad6a5f26047023",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html"
+      },
+      "base_device": "STM32F101RE",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F101RET6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F101RE",
+        "cmsis_device_name": "STM32F101RE",
+        "existing_identifier": "STM32F101RE",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F101RET6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F101",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101re.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "5d62a1878539466002937e50057ec3c7b6fa5a55b505f8794dea290899735c4e",
+        "rendered_dom_sha256": "bbe4f8764447aac8ca2ef72bb174a4dac5133a495c9f289f5c055a8ec3c43610",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101ze.html"
+      },
+      "base_device": "STM32F101ZE",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F101ZET6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F101ZE",
+        "cmsis_device_name": "STM32F101ZE",
+        "existing_identifier": "STM32F101ZE",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F101ZET6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "144",
+        "series": "STM32F101",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101ze.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "6ad44f1da3632c0b92ecb65e2e72f577b8b178bcdd7bd1996f90203d83f6cdd5",
+        "rendered_dom_sha256": "b5f8bf92019ec4e2cab4844d6ec73e700d4221e559beacb93b288184cf98fcc7",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html"
+      },
+      "base_device": "STM32F102CB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F102CBT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F102CB",
+        "cmsis_device_name": "STM32F102CB",
+        "existing_identifier": "STM32F102CB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F102CBT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32F102",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "6ad44f1da3632c0b92ecb65e2e72f577b8b178bcdd7bd1996f90203d83f6cdd5",
+        "rendered_dom_sha256": "b5f8bf92019ec4e2cab4844d6ec73e700d4221e559beacb93b288184cf98fcc7",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html"
+      },
+      "base_device": "STM32F102CB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F102CBT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F102CB",
+        "cmsis_device_name": "STM32F102CB",
+        "existing_identifier": "STM32F102CB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F102CBT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32F102",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102cb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4c75854eaf17ea15ddf9aeaa23dabdf377449c24ed5d2a4eb66ce253620ce085",
+        "rendered_dom_sha256": "f91088f1c7a930ae55ba6610cbb217d90d70be188940d9c6a2331eb08f7bfba2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html"
+      },
+      "base_device": "STM32F103RC",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F103RCT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F103RC",
+        "cmsis_device_name": "STM32F103RC",
+        "existing_identifier": "STM32F103RC",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F103RCT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F103",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4c75854eaf17ea15ddf9aeaa23dabdf377449c24ed5d2a4eb66ce253620ce085",
+        "rendered_dom_sha256": "f91088f1c7a930ae55ba6610cbb217d90d70be188940d9c6a2331eb08f7bfba2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html"
+      },
+      "base_device": "STM32F103RC",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F103RCT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F103RC",
+        "cmsis_device_name": "STM32F103RC",
+        "existing_identifier": "STM32F103RC",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F103RCT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F103",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4c75854eaf17ea15ddf9aeaa23dabdf377449c24ed5d2a4eb66ce253620ce085",
+        "rendered_dom_sha256": "f91088f1c7a930ae55ba6610cbb217d90d70be188940d9c6a2331eb08f7bfba2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html"
+      },
+      "base_device": "STM32F103RC",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F103RCT7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F103RC",
+        "cmsis_device_name": "STM32F103RC",
+        "existing_identifier": "STM32F103RC",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F103RCT7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F103",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4c75854eaf17ea15ddf9aeaa23dabdf377449c24ed5d2a4eb66ce253620ce085",
+        "rendered_dom_sha256": "f91088f1c7a930ae55ba6610cbb217d90d70be188940d9c6a2331eb08f7bfba2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html"
+      },
+      "base_device": "STM32F103RC",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F103RCT7TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F103RC",
+        "cmsis_device_name": "STM32F103RC",
+        "existing_identifier": "STM32F103RC",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F103RCT7TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F103",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "4c75854eaf17ea15ddf9aeaa23dabdf377449c24ed5d2a4eb66ce253620ce085",
+        "rendered_dom_sha256": "f91088f1c7a930ae55ba6610cbb217d90d70be188940d9c6a2331eb08f7bfba2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html"
+      },
+      "base_device": "STM32F103RC",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F103RCY6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F103RC",
+        "cmsis_device_name": "STM32F103RC",
+        "existing_identifier": "STM32F103RC",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F103RCY6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP64",
+        "pin_count": "64",
+        "series": "STM32F103",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103rc.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "174f260be1354a8704edaa9ab587ba8ac7e590f1bb6c62f1ee09c2d007ceff57",
+        "rendered_dom_sha256": "2869237628ab07f7db7a32d5899ce2be51170bdc476b1d941a9769ba5f635c03",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html"
+      },
+      "base_device": "STM32F105VB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F105VBH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F105VB",
+        "cmsis_device_name": "STM32F105VB",
+        "existing_identifier": "STM32F105VB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F105VBH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "series": "STM32F105",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "174f260be1354a8704edaa9ab587ba8ac7e590f1bb6c62f1ee09c2d007ceff57",
+        "rendered_dom_sha256": "2869237628ab07f7db7a32d5899ce2be51170bdc476b1d941a9769ba5f635c03",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html"
+      },
+      "base_device": "STM32F105VB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F105VBH6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F105VB",
+        "cmsis_device_name": "STM32F105VB",
+        "existing_identifier": "STM32F105VB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F105VBH6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "TR",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "series": "STM32F105",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "174f260be1354a8704edaa9ab587ba8ac7e590f1bb6c62f1ee09c2d007ceff57",
+        "rendered_dom_sha256": "2869237628ab07f7db7a32d5899ce2be51170bdc476b1d941a9769ba5f635c03",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html"
+      },
+      "base_device": "STM32F105VB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F105VBH7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F105VB",
+        "cmsis_device_name": "STM32F105VB",
+        "existing_identifier": "STM32F105VB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F105VBH7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LFBGA",
+        "pin_count": "100",
+        "series": "STM32F105",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "174f260be1354a8704edaa9ab587ba8ac7e590f1bb6c62f1ee09c2d007ceff57",
+        "rendered_dom_sha256": "2869237628ab07f7db7a32d5899ce2be51170bdc476b1d941a9769ba5f635c03",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html"
+      },
+      "base_device": "STM32F105VB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F105VBT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F105VB",
+        "cmsis_device_name": "STM32F105VB",
+        "existing_identifier": "STM32F105VB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F105VBT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "100",
+        "series": "STM32F105",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "174f260be1354a8704edaa9ab587ba8ac7e590f1bb6c62f1ee09c2d007ceff57",
+        "rendered_dom_sha256": "2869237628ab07f7db7a32d5899ce2be51170bdc476b1d941a9769ba5f635c03",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html"
+      },
+      "base_device": "STM32F105VB",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F105VBT7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F105VB",
+        "cmsis_device_name": "STM32F105VB",
+        "existing_identifier": "STM32F105VB",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F105VBT7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "100",
+        "series": "STM32F105",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105vb.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "194da79e1cbe174a73e943a27e087cd06d759b5ef5e061d7f0d2b7ab05dfe58d",
+        "rendered_dom_sha256": "7762f597f41a8f486e21912004cb6a8ecffd6fa6a9ee75b4f16c077b0aff5995",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html"
+      },
+      "base_device": "STM32F107RC",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F107RCT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F107RC",
+        "cmsis_device_name": "STM32F107RC",
+        "existing_identifier": "STM32F107RC",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F107RCT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F107",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "194da79e1cbe174a73e943a27e087cd06d759b5ef5e061d7f0d2b7ab05dfe58d",
+        "rendered_dom_sha256": "7762f597f41a8f486e21912004cb6a8ecffd6fa6a9ee75b4f16c077b0aff5995",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html"
+      },
+      "base_device": "STM32F107RC",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F107RCT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F107RC",
+        "cmsis_device_name": "STM32F107RC",
+        "existing_identifier": "STM32F107RC",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F107RCT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F107",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "evidence_section_sha256": "194da79e1cbe174a73e943a27e087cd06d759b5ef5e061d7f0d2b7ab05dfe58d",
+        "rendered_dom_sha256": "7762f597f41a8f486e21912004cb6a8ecffd6fa6a9ee75b4f16c077b0aff5995",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html"
+      },
+      "base_device": "STM32F107RC",
+      "base_mapping": {
+        "identifier_kind": "cmsis_device_name",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f1x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F107RCT7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F107RC",
+        "cmsis_device_name": "STM32F107RC",
+        "existing_identifier": "STM32F107RC",
+        "existing_identifier_kind": "cmsis_device_name",
+        "family": "STM32F1",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F107RCT7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_pattern",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F107",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107rc.html#plasma-evidence=stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 49,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 26,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d",
+  "inputs": {
+    "baseline": "stm32f1-phase2.9-scaleout-baseline.json",
+    "baseline_sha256": "3075e533b7dd3ca72bebb48789284548f084a11de33fb1b18450fd4c4f1ff179",
+    "canonical_dataset": "stm32f1-commercial-icpn.csv",
+    "canonical_input_sha256": "549bf81cd9e32adbf9e43235294c2bd49e773fee8263841928465049a3fa71fd",
+    "mapping_catalog": "openocd-parts-canonical.csv",
+    "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "retained_evidence_directory": "stm32f1-phase2.9-scaleout-batch1-live-2026-08-29"
+  },
+  "issues": [],
+  "scaleout_baseline_pilot_id": "stm32f1-phase2.9-scaleout-batch1-2026-08-29",
+  "scaleout_expected_candidate_count": 26,
+  "schema_version": 1,
+  "source_provenance": {
+    "evidence_manifest_sha256": "d3eb4dcfdc86470eef5af183478b5301fe208b1096988a8130302c66f739af33",
+    "executed_git_sha": "396213d9d7dc4c3cfa40278e64d922e75ae20c3d",
+    "repository": "physicslu/plasma"
+  }
+}
