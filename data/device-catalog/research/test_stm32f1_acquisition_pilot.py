@@ -15,6 +15,7 @@ from st_product_page_acquisition import AcquisitionError  # noqa: E402
 from stm32f1_acquisition_pilot import (  # noqa: E402
     PilotTarget,
     catalog_mapping,
+    read_catalog,
     read_manifest,
     run_pilot,
 )
@@ -36,6 +37,16 @@ class PilotTests(unittest.TestCase):
         self.assertEqual(len(targets), 6)
         self.assertEqual(len({target.base_device for target in targets}), 6)
         self.assertEqual(len({target.source_url for target in targets}), 6)
+
+    def test_checked_in_manifest_maps_uniquely_to_stm32f1_openocd_capability(self) -> None:
+        _, targets = read_manifest(HERE / "stm32f1-acquisition-pilot-manifest.json")
+        catalog_rows = read_catalog(HERE / "openocd-parts-canonical.csv")
+        for target in targets:
+            with self.subTest(base_device=target.base_device):
+                mapping = catalog_mapping(target.base_device, catalog_rows)
+                self.assertEqual(mapping["status"], "unique")
+                self.assertEqual(mapping["identifier_kind"], "cmsis_device_name")
+                self.assertEqual(mapping["target_configs"], ["tcl/target/stm32f1x.cfg"])
 
     def test_manifest_rejects_duplicate_base_device(self) -> None:
         payload = {
