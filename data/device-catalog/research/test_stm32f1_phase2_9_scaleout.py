@@ -14,13 +14,20 @@ if str(HERE) not in sys.path:
 
 from evaluate_stm32f1_live_pilot import evaluate_live_pilot, read_baseline  # noqa: E402
 from retain_stm32f1_browser_evidence import retain  # noqa: E402
+from run_stm32f1_phase2_9_scaleout import command_plan  # noqa: E402
 from stm32f1_acquisition_pilot import catalog_mapping, read_catalog, read_manifest  # noqa: E402
 from stm32f1_admission_policy import MANUFACTURER, build_canonical_row  # noqa: E402
+from stm32f1_scaleout_admission import (  # noqa: E402
+    build_scaleout_plan,
+    scaleout_plan_is_clean,
+)
 
 MANIFEST = HERE / "stm32f1-phase2.9-scaleout-manifest.json"
 BASELINE = HERE / "stm32f1-phase2.9-scaleout-baseline.json"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 CANONICAL = HERE / "stm32f1-commercial-icpn.csv"
+HISTORICAL_BASELINE = HERE / "stm32f1-acquisition-pilot-baseline.json"
+HISTORICAL_EVIDENCE = HERE / "evidence" / "stm32f1-phase2.6-browser-2026-08-29"
 EXPECTED_BASES = [
     "STM32F100CB",
     "STM32F100VE",
@@ -229,6 +236,46 @@ class Phase29ScaleoutTests(unittest.TestCase):
             provenance = json.loads((evidence_dir / "provenance.json").read_text(encoding="utf-8"))
             self.assertEqual(provenance["target_count"], 8)
             self.assertEqual(provenance["baseline"]["pilot_id"], baseline["pilot_id"])
+
+    def test_one_command_plan_is_headed_fail_closed_and_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            commands = command_plan(
+                python=sys.executable,
+                manifest=MANIFEST,
+                baseline=BASELINE,
+                catalog=CATALOG,
+                canonical=CANONICAL,
+                control_base="STM32F100CB",
+                scratch=root / "scratch",
+                evidence_dir=root / "evidence",
+                admission_plan=root / "admission-plan.json",
+                git_sha="b" * 40,
+            )
+        self.assertEqual(len(commands), 5)
+        self.assertIn("--headed", commands[0])
+        self.assertIn("--headed", commands[1])
+        self.assertNotIn("--headless", commands[0])
+        self.assertNotIn("--headless", commands[1])
+        self.assertIn("STM32F100CB", commands[0])
+        self.assertIn("b" * 40, commands[2])
+        self.assertTrue(commands[3][1].endswith("retain_stm32f1_browser_evidence.py"))
+        self.assertTrue(commands[4][1].endswith("stm32f1_scaleout_admission.py"))
+        self.assertNotIn("write_canonical_dataset", " ".join(" ".join(command) for command in commands))
+
+    def test_scaleout_planner_reuses_historical_retained_evidence_without_hardcoded_batch(self) -> None:
+        plan = build_scaleout_plan(
+            evidence_dir=HISTORICAL_EVIDENCE,
+            baseline_path=HISTORICAL_BASELINE,
+            canonical_path=CANONICAL,
+            catalog_path=CATALOG,
+        )
+        self.assertTrue(scaleout_plan_is_clean(plan))
+        self.assertEqual(plan["candidate_count"], 26)
+        self.assertEqual(plan["scaleout_expected_candidate_count"], 26)
+        self.assertEqual(plan["decision_counts"]["already_present"], 26)
+        self.assertEqual(plan["decision_counts"]["admit"], 0)
+        self.assertEqual(plan["conflicts"], 0)
 
 
 if __name__ == "__main__":
