@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import copy
 import sys
 import unittest
 from pathlib import Path
@@ -13,6 +12,7 @@ if str(HERE) not in sys.path:
 from evaluate_stm32f1_live_pilot import evaluate_live_pilot, read_baseline  # noqa: E402
 from run_stm32f1_live_pilot import RateLimitedFetcher  # noqa: E402
 from st_product_page_acquisition import AcquisitionError  # noqa: E402
+from stm32f1_acquisition_pilot import read_manifest  # noqa: E402
 
 
 class LivePilotTests(unittest.TestCase):
@@ -78,6 +78,14 @@ class LivePilotTests(unittest.TestCase):
         self.assertEqual(
             sum(len(target["exact_icpns"]) for target in self.baseline["targets"]),
             26,
+        )
+
+    def test_baseline_target_set_matches_checked_in_pilot_manifest(self) -> None:
+        pilot_id, manifest_targets = read_manifest(HERE / "stm32f1-acquisition-pilot-manifest.json")
+        self.assertEqual(self.baseline["pilot_id"], pilot_id)
+        self.assertEqual(
+            {target["base_device"] for target in self.baseline["targets"]},
+            {target.base_device for target in manifest_targets},
         )
 
     def test_clean_live_summary_is_scale_ready_without_optional_cache_headers(self) -> None:
