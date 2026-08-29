@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f1-phase2.5-controlled-batch-2026-08-29",
+  "targets": [
+    {
+      "base_device": "STM32F100C8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c8.html",
+      "selection_reason": "Value-line control sample outside the already-admitted STM32F103 slice."
+    },
+    {
+      "base_device": "STM32F101C8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f101c8.html",
+      "selection_reason": "Access-line sample with the same memory/package class but a different STM32F1 subfamily."
+    },
+    {
+      "base_device": "STM32F102C8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f102c8.html",
+      "selection_reason": "USB access-line sample to exercise a less common STM32F1 product group."
+    },
+    {
+      "base_device": "STM32F103ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f103ze.html",
+      "selection_reason": "High-density STM32F103 sample with a larger package/order-code surface than the existing C8/CB/RB/RE slice."
+    },
+    {
+      "base_device": "STM32F105RC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f105rc.html",
+      "selection_reason": "Connectivity-line sample with order-code suffix variants not present in the current admitted dataset."
+    },
+    {
+      "base_device": "STM32F107VC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f107vc.html",
+      "selection_reason": "Connectivity-line Ethernet-capable sample with a different package class and commercial code set."
+    }
+  ]
+}
