@@ -13,9 +13,12 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
+from device_catalog_admission_framework import plan_is_clean as framework_plan_is_clean  # noqa: E402
+from stm32f1_admission_policy import build_canonical_row  # noqa: E402
 from stm32f1_canonical_admission import (  # noqa: E402
     AdmissionError,
     build_admission_plan,
+    plan_is_clean,
     read_csv,
     write_canonical_dataset,
 )
@@ -24,11 +27,12 @@ EVIDENCE = HERE / "evidence" / "stm32f1-phase2.6-browser-2026-08-29"
 CANONICAL = HERE / "stm32f1-commercial-icpn.csv"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 BASELINE = HERE / "stm32f1-acquisition-pilot-baseline.json"
+HISTORICAL_PLAN = HERE / "stm32f1-phase2.7-admission-plan.json"
 
 
 class CanonicalAdmissionTests(unittest.TestCase):
     def _workspace(self, root: Path) -> tuple[Path, Path, Path, Path]:
-        evidence = root / "evidence"
+        evidence = root / EVIDENCE.name
         evidence.mkdir()
         for source in EVIDENCE.iterdir():
             (evidence / source.name).write_bytes(source.read_bytes())
@@ -68,9 +72,68 @@ class CanonicalAdmissionTests(unittest.TestCase):
             plan = self._plan(self._workspace(Path(temp)))
             self.assertEqual(plan["decision_counts"], {"admit": 26, "already_present": 0, "manual_review_required": 0, "reject": 0})
             self.assertEqual(plan["conflicts"], 0)
-            packages = {item["icpn"]: item["proposed_canonical_row"]["package"] for item in plan["candidates"]}
-            self.assertEqual(packages["STM32F103ZEH6"], "LFBGA")
-            self.assertEqual(packages["STM32F107VCH6"], "LFBGA")
+            rows = {item["icpn"]: item["proposed_canonical_row"] for item in plan["candidates"]}
+            self.assertEqual(rows["STM32F103ZEH6"]["package"], "LFBGA")
+            self.assertEqual(rows["STM32F107VCH6"]["package"], "LFBGA")
+            self.assertEqual(rows["STM32F100C8T7B"]["temperature_grade"], "-40 to 105 C")
+            self.assertEqual(rows["STM32F100C8T7B"]["pin_count"], "48")
+            self.assertEqual(rows["STM32F100C8T7B"]["flash_size"], "64 KiB")
+            self.assertEqual(rows["STM32F103ZEH6"]["pin_count"], "144")
+            self.assertEqual(rows["STM32F103ZEH6"]["flash_size"], "512 KiB")
+
+    def test_historical_phase27_plan_semantics_are_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            plan = self._plan(self._workspace(Path(temp)))
+            historical = json.loads(HISTORICAL_PLAN.read_text(encoding="utf-8"))
+            self.assertEqual(plan["evidence_id"], historical["evidence_id"])
+            self.assertEqual(plan["source_provenance"], historical["source_provenance"])
+            self.assertEqual(plan["decision_counts"], historical["decision_counts"])
+            self.assertEqual(plan["conflicts"], historical["conflicts"])
+            self.assertEqual(plan["canonical_rows_before"], historical["canonical_rows_before"])
+            self.assertEqual(plan["candidates"], historical["candidates"])
+
+    def test_current_post_write_state_is_49_rows_and_26_already_present(self) -> None:
+        plan = build_admission_plan(
+            evidence_dir=EVIDENCE,
+            canonical_path=CANONICAL,
+            catalog_path=CATALOG,
+            baseline_path=BASELINE,
+        )
+        _, rows = read_csv(CANONICAL)
+        self.assertEqual(len(rows), 49)
+        self.assertEqual(
+            plan["decision_counts"],
+            {"admit": 0, "already_present": 26, "manual_review_required": 0, "reject": 0},
+        )
+
+    def test_historical_26_candidate_gate_is_not_in_generic_framework(self) -> None:
+        synthetic = {
+            "candidate_count": 1,
+            "decision_counts": {"admit": 1, "already_present": 0, "manual_review_required": 0, "reject": 0},
+            "conflicts": 0,
+            "issues": [],
+        }
+        self.assertTrue(framework_plan_is_clean(synthetic))
+        self.assertFalse(plan_is_clean(synthetic))
+
+    def test_stm32f1_policy_rejects_base_device_as_exact_icpn(self) -> None:
+        fields, _ = read_csv(CANONICAL)
+        candidate = {
+            "manufacturer": "STMicroelectronics",
+            "base_device": "STM32F100C8",
+            "icpn": "STM32F100C8",
+            "authoritative_evidence": {
+                "evidence_id": "e1",
+                "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f100c8.html",
+            },
+            "base_mapping": {
+                "status": "unique",
+                "identifier_kind": "cmsis_device_name",
+                "target_configs": ["tcl/target/stm32f1x.cfg"],
+            },
+        }
+        with self.assertRaisesRegex(Exception, "invalid exact commercial ICPN"):
+            build_canonical_row(candidate, fields)
 
     def test_plan_is_deterministic_for_identical_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
