@@ -23,6 +23,47 @@ Required remaining work:
 - add human credential rotation, revocation and session-lifecycle UX;
 - define centralized multi-PPU identity management through Plasma Manager without making standalone PPU authorization depend on Manager availability.
 
+## Deferred architecture evolution
+
+### Split Programming Image Data Plane
+
+**Status:** TODO / future architecture optimization
+
+**Layer:** Control plane / Programming data plane
+
+**Reason:** Managed Mode currently sends Programming Asset/Image traffic through the same `Control Console -> BFF -> Manager -> PPU Gateway` routing ownership as Programming commands. This deliberately favors one trustworthy production route over premature data-plane separation. A direct or otherwise separate Image data channel should be introduced only when measured fleet bandwidth, concurrency, latency, memory pressure or reliability shows that Manager relay is a material bottleneck.
+
+Required work before any split data plane may become canonical:
+
+- measure Manager CPU, RAM, network utilization, Image throughput, concurrent PPU transfers, command latency and failure behavior at intended fleet scale;
+- define an explicit Image data-channel contract that does not let the caller choose an arbitrary PPU URL;
+- keep Manager authoritative for managed PPU identity/routing policy even if the Image bytes no longer transit Manager;
+- preserve PPU identity binding, authorization, auditability, bounded transfer semantics and fail-closed behavior;
+- preserve source Asset SHA-256, PPU cache identity and the Job/Batch reference to the exact Asset/Image consumed by execution;
+- define retry, resume, cache, timeout and partial-transfer recovery semantics before deployment;
+- prove that control commands such as status/cancel retain predictable latency while Image transfers are active.
+
+### Loopback Coverage for a Split Image Data Plane
+
+**Status:** TODO / mandatory companion to any future split Image data plane
+
+**Layer:** Diagnostics / Programming data plane
+
+**Reason:** If Programming later uses separate Control and Image data paths, a Control Path Loopback PASS alone no longer proves that the Programming Image route is healthy. Diagnostics must cover every production path that Programming depends on; otherwise Plasma could again report diagnostic PASS while Programming fails on an untested transport boundary.
+
+Required work:
+
+- add an Image Path diagnostic that uses the real production Programming Asset upload/cache API rather than a diagnostic-only upload route;
+- verify `Console -> production Image data channel -> PPU Asset Service/Cache` with byte count, content integrity and SHA-256 evidence;
+- verify that the uploaded/cached Asset identity is the same `asset_sha256` referenced by the Job or Batch that consumes it;
+- preserve production authentication, PPU identity binding, timeout, retry, cache and error behavior during the diagnostic;
+- report Control Path and Image Data Path evidence separately so a shallow PASS cannot be presented as complete Programming readiness;
+- define complete Programming-path readiness as requiring all production-path evidence that the selected operation depends on.
+
+Architectural invariant:
+
+> If Programming is split into a Control Path and an Image Data Path, diagnostics must cover both production paths. Plasma must never claim complete Programming Route PASS from a Control Path Loopback alone.
+
 ## Deferred product capability
 
 ### Real Provider and Physical IC Quantity Handoff
