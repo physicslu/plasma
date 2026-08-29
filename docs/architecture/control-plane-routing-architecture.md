@@ -22,7 +22,7 @@ PPU Gateway @ selected PPU
 Plasma Server
 ```
 
-The implementation is software/CI validated. Integration-host runtime acceptance is a separate evidence layer; Z2, PS <-> PL, FPGA, electrical and real-IC behavior remain unproven until their own acceptance is executed.
+The implementation is covered by software/CI validation. Integration-host runtime acceptance is a separate evidence layer; Z2, PS <-> PL, FPGA, electrical and real-IC behavior remain unproven until their own acceptance is executed.
 
 Standalone PPU operation remains a separate supported mode and does not require Manager.
 
@@ -222,12 +222,11 @@ PMode and EMode share the same Workspace API base. Managed routing no longer use
 
 ## Programming Asset / Image route — Phase 1
 
-Programming Asset/Image bytes intentionally use the same managed routing ownership:
+Programming Asset/Image traffic intentionally uses the same managed routing ownership:
 
 ```text
 Control Console
       |
-      | binary Programming Asset / Image
       v
 BFF
       |
@@ -238,27 +237,39 @@ Plasma Manager
 PPU Gateway
       |
       v
-PPU Asset Service / Cache
+Programming Asset / Batch contract
       |
       v
-Programming Runtime
+PPU cache / Programming Runtime
 ```
 
-The implementation preserves binary content instead of converting the transfer to a Manager-specific Base64 protocol. Both BFF and Manager impose bounded request/response sizes.
+There are currently **two production Web REST representations** above that common route, and they must not be conflated:
+
+1. **EMode / individual Engineering Job** — the browser performs Programming Asset cache check/upload using `application/octet-stream`; Jobs subsequently reference `asset_sha256`.
+2. **PMode / server-side Batch** — the existing Batch REST contract carries one bounded Programming Asset inside the Batch JSON as `asset_base64`, together with declared size and SHA-256. The PPU Gateway decodes the Asset, validates its size/hash, and caches it for the Batch targets before execution.
+
+Manager does **not** introduce or transform either representation. BFF and Manager forward the incoming request body without decoding/re-encoding the Programming Asset. In particular, the PMode Base64 envelope is an existing Batch API contract, not a Manager-specific transport protocol.
+
+Current PMode UI limits a selected Image to 4 MiB. Even with Base64 expansion and JSON metadata this remains below the current 24 MiB BFF/Manager request bound. This is a bounded Phase-1 compatibility choice, not a claim that inline Base64 is the preferred large-fleet data plane.
 
 Integrity/provenance remains defined by the production Asset contract:
 
 ```text
+EMode:
 Browser-computed source SHA-256
-        =
-PPU Programming Asset cache identity
-        =
-Job-referenced asset_sha256
+        = PPU Programming Asset cache identity
+        = Job-referenced asset_sha256
+
+PMode Batch:
+Browser-computed source SHA-256 + declared size
+        -> Batch JSON asset envelope
+        -> PPU Gateway decode + size/SHA validation
+        -> per-target PPU cache / Batch execution
 ```
 
 For normalized Images, source Asset SHA and Normalized Image SHA remain distinct identities as defined by the Programming data model.
 
-A direct-to-PPU Image data plane is not part of this phase. It may be introduced only if measured fleet throughput, latency, concurrency or reliability demonstrates that Manager relay is a material bottleneck, and only if identity binding, authorization, integrity and diagnostic coverage remain intact.
+Refactoring PMode to a pre-upload/reference-only Batch contract is not required to establish managed routing ownership and is deliberately not hidden inside this routing change. A different data plane should be introduced only when measured fleet throughput, latency, concurrency or reliability demonstrates a material need, and only if identity binding, authorization, integrity and diagnostic coverage remain intact.
 
 ## Loopback route
 
