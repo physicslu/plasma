@@ -23,6 +23,7 @@
 - **Current** — [Web Product Modes](architecture/web-product-modes.md)
 - **Current** — [Web REST API Contract](architecture/web-rest-api-contract.md)
 - **Current** — [Configuration Architecture](architecture/configuration-architecture.md)
+- **Plan** — [Production Operation Topology](architecture/production-operation-topology.md)：單台與多台 PPU 共用 `Central Web Console -> Plasma Manager -> PPU` 的核准目標拓撲；目前 Manager write path 尚未實作。
 - **Current** — [Batch Domain Model](architecture/batch-domain-model.md)
 - **Current** — [Server-side Batch Runtime](architecture/server-side-batch-runtime.md)
 - **Current** — [Batch Persistence and Gateway Restart Recovery](architecture/batch-persistence-recovery.md)
