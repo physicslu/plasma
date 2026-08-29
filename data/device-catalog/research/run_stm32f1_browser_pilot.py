@@ -34,6 +34,7 @@ from stm32f1_acquisition_pilot import (
 )
 
 CONTROL_BASE_DEVICE = "STM32F100C8"
+PLAYWRIGHT_REQUIREMENT = "1.62.0"
 
 
 def select_targets(scope: str, targets: list[PilotTarget]) -> list[PilotTarget]:
@@ -79,8 +80,15 @@ def main(argv: list[str] | None = None) -> int:
                 evidence_builder=build_browser_evidence_record,
                 timeout_seconds=args.timeout,
             )
+            browser_version = acquirer.browser_version
         summary["acquisition_transport"] = BROWSER_TRANSPORT
         summary["browser_scope"] = args.scope
+        summary["browser_runtime"] = {
+            "engine": "chromium",
+            "browser_version": browser_version,
+            "playwright_requirement": PLAYWRIGHT_REQUIREMENT,
+            "headless": not args.headed,
+        }
         summary["canonical_dataset_admission"] = False
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(
