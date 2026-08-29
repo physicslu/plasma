@@ -91,6 +91,12 @@ def main() -> int:
             ambiguous.append(icpn)
         if row.get("mapping_status") == "unmapped":
             unmapped.append(icpn)
+        if row.get("mapping_status") == "deterministic_pattern" and not (
+            row.get("base_device")
+            == row.get("cmsis_device_name")
+            == row.get("existing_identifier")
+        ):
+            fail(errors, f"line {line_number}: deterministic identity chain is inconsistent")
 
         cmsis = row.get("cmsis_device_name", "")
         if cmsis:
@@ -102,17 +108,19 @@ def main() -> int:
             if match["identifier_kind"] == row.get("existing_identifier_kind")
             and match["target_config"] == row.get("openocd_target_config")
         ]
-        if exact_matches:
+        if len(exact_matches) == 1:
             plasma_mapped += 1
             if row.get("openocd_target_config"):
                 openocd_mapped += 1
+        elif len(exact_matches) > 1:
+            fail(errors, f"line {line_number}: asserted Plasma mapping is not unique")
         elif row.get("mapping_status") not in {"ambiguous", "unmapped"}:
             fail(errors, f"line {line_number}: asserted Plasma mapping is not in canonical catalog")
 
         if row.get("openocd_target_config") == icpn:
             fail(errors, f"line {line_number}: commercial identity conflated with OpenOCD capability")
-        if row.get("source_type", "").startswith("openocd"):
-            fail(errors, f"line {line_number}: OpenOCD used as commercial identity authority")
+        if not row.get("source_type", "").startswith("official_st_"):
+            fail(errors, f"line {line_number}: non-ST source used as commercial identity authority")
 
     if duplicates:
         fail(errors, f"duplicate ICPNs: {duplicates}")
