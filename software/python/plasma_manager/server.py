@@ -415,7 +415,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             HTTPStatus.METHOD_NOT_ALLOWED,
             {
                 "ok": False,
-                "error": {"message": "Plasma Manager accepts only explicit read APIs, the legacy PS loopback route, and allowlisted Managed PPU routes"},
+                "error": {"message": "Plasma Manager read-only fleet surfaces reject mutation; only the legacy PS loopback route and explicit allowlisted Managed PPU routes accept writes"},
             },
         )
 
