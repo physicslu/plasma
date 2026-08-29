@@ -29,7 +29,6 @@ CHALLENGE_MARKERS = (
     "request rejected",
 )
 QUALITY_HEADING = "Quality and Reliability"
-PART_NUMBER_MARKER = "Part Number"
 BROWSER_TRANSPORT = "chromium_rendered_dom"
 
 
@@ -75,6 +74,7 @@ class STBrowserAcquirer:
 
     def __init__(self, *, headless: bool = True) -> None:
         self.headless = headless
+        self.browser_version: str | None = None
         self._playwright: Any = None
         self._browser: Any = None
         self._context: Any = None
@@ -98,11 +98,12 @@ class STBrowserAcquirer:
         self._playwright = sync_playwright().start()
         try:
             self._browser = self._playwright.chromium.launch(headless=self.headless)
+            self.browser_version = self._browser.version
             self._context = self._browser.new_context()
-        except Exception:
+        except PlaywrightError as exc:
             self._playwright.stop()
             self._playwright = None
-            raise
+            raise AcquisitionError(f"failed to launch Chromium: {exc}") from exc
         return self
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
@@ -133,9 +134,6 @@ class STBrowserAcquirer:
                 raise AcquisitionError(f"browser navigation returned HTTP {response.status}")
 
             page.get_by_role("heading", name=QUALITY_HEADING, exact=True).wait_for(
-                state="visible", timeout=timeout_ms
-            )
-            page.get_by_text(PART_NUMBER_MARKER, exact=True).first.wait_for(
                 state="visible", timeout=timeout_ms
             )
             body_text = page.locator("body").inner_text(timeout=timeout_ms)
