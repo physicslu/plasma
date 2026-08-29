@@ -57,6 +57,7 @@
 - **Current** — [Mock Runtime Operator Guide](development/mock-runtime-operator-guide.md)
 - **Current** — [Operator Acceptance Test Matrix](development/operator-acceptance-test-matrix.md)
 - **Current** — [Programming Image Observability Test Plan](development/programming-image-observability-test-plan.md)
+- **Current** — [Runtime Acceptance](testing/runtime-acceptance.md)
 - **Current** — [FPGA Development Guide](development/fpga-development-guide.md)
 - **Current** — [FPGA Verification Guide](development/fpga-verification-guide.md)
 - **Reference** — [Mock Runtime Foundation Notes](development/mock-runtime-foundation-notes.md)
