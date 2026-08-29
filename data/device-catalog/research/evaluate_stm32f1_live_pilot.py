@@ -23,6 +23,9 @@ BASELINE_SCHEMA_VERSION = 1
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ROOT = Path(__file__).resolve().parent
 DEFAULT_BASELINE = ROOT / "stm32f1-acquisition-pilot-baseline.json"
+RAW_HTTP_TRANSPORT = "raw_http"
+BROWSER_TRANSPORT = "chromium_rendered_dom"
+ALLOWED_TRANSPORTS = {RAW_HTTP_TRANSPORT, BROWSER_TRANSPORT}
 
 
 class LivePilotEvaluationError(RuntimeError):
@@ -101,6 +104,9 @@ def evaluate_live_pilot(
     }
     expected_target_count = len(expected_by_base)
     expected_candidate_count = sum(len(values) for values in expected_by_base.values())
+    summary_transport = summary.get("acquisition_transport", RAW_HTTP_TRANSPORT)
+    if summary_transport not in ALLOWED_TRANSPORTS:
+        issues.append("unsupported acquisition_transport")
 
     if summary.get("schema_version") != 1:
         issues.append("unexpected pilot summary schema_version")
@@ -150,6 +156,7 @@ def evaluate_live_pilot(
     last_modified_present = 0
     valid_transport_evidence = 0
     observed_candidate_count = 0
+    transport_modes: dict[str, int] = {}
 
     for base_device, expected_candidates in expected_by_base.items():
         result = result_by_base.get(base_device)
@@ -170,6 +177,14 @@ def evaluate_live_pilot(
             continue
 
         transport_ok = True
+        evidence_transport = evidence.get("acquisition_transport", RAW_HTTP_TRANSPORT)
+        transport_modes[str(evidence_transport)] = transport_modes.get(str(evidence_transport), 0) + 1
+        if evidence_transport not in ALLOWED_TRANSPORTS:
+            issues.append(f"{base_device}: unsupported evidence acquisition_transport")
+            transport_ok = False
+        if evidence_transport != summary_transport:
+            issues.append(f"{base_device}: evidence transport does not match summary transport")
+            transport_ok = False
         if evidence.get("base_device") != base_device:
             issues.append(f"{base_device}: evidence base_device mismatch")
             transport_ok = False
@@ -180,9 +195,19 @@ def evaluate_live_pilot(
         if not _valid_timestamp(evidence.get("retrieved_at_utc")):
             issues.append(f"{base_device}: invalid retrieved_at_utc")
             transport_ok = False
-        if not _valid_sha256(evidence.get("raw_sha256")):
-            issues.append(f"{base_device}: invalid raw_sha256")
-            transport_ok = False
+
+        if evidence_transport == BROWSER_TRANSPORT:
+            if not _valid_sha256(evidence.get("rendered_dom_sha256")):
+                issues.append(f"{base_device}: invalid rendered_dom_sha256")
+                transport_ok = False
+            if evidence.get("raw_sha256") is not None:
+                issues.append(f"{base_device}: browser evidence must not claim raw_sha256")
+                transport_ok = False
+        else:
+            if not _valid_sha256(evidence.get("raw_sha256")):
+                issues.append(f"{base_device}: invalid raw_sha256")
+                transport_ok = False
+
         if not _valid_sha256(evidence.get("evidence_section_sha256")):
             issues.append(f"{base_device}: invalid evidence_section_sha256")
             transport_ok = False
@@ -235,6 +260,8 @@ def evaluate_live_pilot(
             "valid_records": valid_transport_evidence,
             "total": expected_target_count,
             "complete": transport_evidence_complete,
+            "transport": summary_transport,
+            "transport_modes": transport_modes,
             "etag_present": etag_present,
             "last_modified_present": last_modified_present,
             "headers_are_optional": True,
