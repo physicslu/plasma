@@ -1,6 +1,6 @@
 # Plasma Configuration Architecture
 
-> Status: current baseline for standalone PPU deployment, optional read-only Plasma Manager, Engineering Mock Provider, and shared Gateway communication policy.
+> Status: current configuration baseline plus the approved production operator topology defined in [Production Operation Topology](production-operation-topology.md). Current Manager write capability remains read-only unless explicitly stated otherwise.
 
 This document defines ownership, source-of-truth, precedence, persistence, migration, and reconciliation rules for Plasma configuration. It intentionally avoids private account names, private hostnames, and workstation-specific absolute paths.
 
@@ -104,6 +104,8 @@ active processes
 
 Manual edits to generated units are not a supported long-term configuration mechanism.
 
+The current `plasmactl` integration-host profile co-locates Server, Gateway and Vite development/demo runtime. That is a current deployment implementation, not a requirement that every production PPU run the same service set. The approved target separates Management Host and PPU roles; explicit production deployment profiles remain implementation work.
+
 ## 5. Canonical PPU configuration
 
 Current PPU configuration uses `ppu`, `server`, and one-based `sites`:
@@ -159,7 +161,7 @@ valid explicit browser API override
 deployed default API Base
 ```
 
-This value is not topology truth and must not evolve into a browser-owned PPU registry.
+This value is not topology truth and must not evolve into a browser-owned PPU registry. In the approved production topology, PPU inventory belongs behind the Manager/control-plane boundary rather than in browser-local storage.
 
 ### PPU capability
 
@@ -277,7 +279,7 @@ job execution state
 
 ## 10. PPU identity and capability
 
-Higher-level software must consume PPU identity/capability reported by the PPU side rather than inventing topology in the browser.
+Higher-level software must consume PPU identity/capability reported by the PPU side rather than inventing topology in the browser or Manager registry metadata.
 
 Conceptual status/capability shape:
 
@@ -297,9 +299,11 @@ Conceptual status/capability shape:
 
 The exact capability schema may evolve, but ownership does not: PPU identity and capability originate from the PPU/device side.
 
-## 11. Optional multi-PPU observation
+## 11. Current Manager behavior and approved production topology
 
-The standalone path remains one PPU Console communicating with one local Gateway and Plasma Server. The repository also implements an optional read-only Plasma Manager and the PMode Factory Console:
+### Current implementation
+
+The repository currently implements an optional read-only Plasma Manager and the PMode Factory Console:
 
 ```text
 PMode Factory Console
@@ -312,7 +316,34 @@ Plasma Manager (optional read-only registry / aggregation)
         +-- PPU C Gateway -> local execution
 ```
 
-Current Manager behavior is manual registry plus read-only liveness/readiness/topology aggregation. It does not own command routing, scheduling, discovery, authentication policy, audit persistence, or PPU execution. Each PPU remains locally autonomous and owns Site scheduling, protocol timing, safety and recovery.
+Current Manager behavior is manual registry plus read-only liveness/readiness/topology aggregation. It does not currently own command routing, scheduling, discovery, authentication policy, audit persistence, or PPU execution. Each PPU owns Site scheduling, protocol timing, safety and recovery.
+
+### Approved production target
+
+Normal production operation uses one topology for one PPU and many PPUs:
+
+```text
+Central Web Console
+        |
+        v
+Plasma Manager
+        |
+        +-- PPU #1 Gateway -> local execution
+        +-- PPU #2 Gateway -> local execution
+        +-- ...
+```
+
+For one PPU, the same model reduces to:
+
+```text
+Central Web Console -> Plasma Manager -> PPU #1
+```
+
+Central Web Console and Manager may be physically co-located on one management host or separated later. They remain logically distinct.
+
+Direct PPU Gateway/CLI access is retained for engineering, commissioning, diagnostics, maintenance and recovery. It is not a second canonical production workflow and must not create a second source of topology or configuration truth.
+
+Future Manager programming-command routing requires separate security and execution contracts. The approved topology must not be misread as evidence that the current read-only Manager already provides writes.
 
 The browser must not fan out directly to a stored list of PPU URLs as the long-term fleet architecture.
 
@@ -343,6 +374,7 @@ What Facility / PPU identity is active?
 What Site topology/capability is active?
 What Gateway policy revision is active?
 What derived PPU response budget is effective?
+What Management Host / Manager topology is effective?
 ```
 
 A future structured read-only effective-configuration/status endpoint may reduce ambiguity, but its API contract should be designed deliberately rather than inferred from UI convenience.
@@ -358,9 +390,9 @@ A future structured read-only effective-configuration/status endpoint may reduce
 | `PLASMA_GATEWAY_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current deployment default 18080 |
 | `PLASMA_VITE_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Development/demo Web binding |
 | `PLASMA_VITE_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current default 5173 |
-| `PLASMA_PUBLIC_API_URL` | Facility/deployment | Deployment | `plasmactl.env` | Public API Base configuration |
-| `PLASMA_MANAGER_ENABLED` | Facility/deployment | Deployment | `plasmactl.env` | Optional; default `0` |
-| `PLASMA_MANAGER_CONFIG` | Fleet observation | Deployment | Operator-local YAML path | Required only when Manager is enabled |
+| `PLASMA_PUBLIC_API_URL` | Facility/deployment | Deployment | `plasmactl.env` | Current public API Base configuration |
+| `PLASMA_MANAGER_ENABLED` | Facility/deployment | Deployment | `plasmactl.env` | Current optional Manager switch; default `0` |
+| `PLASMA_MANAGER_CONFIG` | Fleet observation | Deployment | Operator-local YAML path | Required only when current Manager is enabled |
 | `PLASMA_ENGINEERING_MOCK_ENABLED` | Test runtime | Deployment | `plasmactl.env` | Optional; default `0` |
 | `PLASMA_ENGINEERING_MOCK_ROOT` | Test runtime | Deployment | Operator-local state path | Must remain outside the Git worktree |
 | `NEXT_PUBLIC_PLASMA_API_URL` | Derived runtime | Deployment generator | Generated systemd environment | Not independent truth |
@@ -380,9 +412,10 @@ A future structured read-only effective-configuration/status endpoint may reduce
 2. Keep deployment configuration versioned and reconcilable
 3. Keep topology/capability truth out of browser storage
 4. Keep canonical Site identity one-based across new layers
-5. Keep Manager observation separate from Batch command ownership
-6. Keep Gateway communication policy server-owned and derived budgets read-only
-7. Add effective-config observability where ambiguity remains operationally costly
+5. Preserve current Manager read-only truth while implementing the approved production topology deliberately
+6. Keep PPU execution ownership local even when Manager becomes the normal operator routing boundary
+7. Keep Gateway communication policy server-owned and derived budgets read-only
+8. Add effective-config observability where ambiguity remains operationally costly
 ```
 
 Do not build a large generic configuration framework merely because configuration exists. Add abstraction only when repeated concrete requirements justify it.
@@ -394,9 +427,11 @@ Do not build a large generic configuration framework merely because configuratio
 - May individual Sites expose different programming interfaces?
 - What registry/enrollment mechanism will Plasma Manager use?
 - How are PPUs authenticated, removed, and recovered after reconnect?
+- What exact authenticated write/orchestration contract will connect Manager to PPU?
 - What belongs in target-profile data versus PPU capability data?
 - Which configuration changes require restart versus safe hot reload?
 - What effective-configuration information is safe to expose through an API?
-- When should the browser API Base override be removed or restricted for production?
+- When should the transitional browser API Base override be removed or restricted for production?
+- What explicit deployment profiles should replace integration-host co-location for Management Host and Z2 PPU roles?
 
 Resolve these questions from system requirements and executable constraints, not from convenience of a particular UI implementation.
