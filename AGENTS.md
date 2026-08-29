@@ -2,7 +2,7 @@
 
 This file is the primary operating contract for AI coding agents working on the Plasma repository. Read it before making code, configuration, deployment, hardware, or documentation changes.
 
-The default operating model is **goal-oriented autonomous execution with explicit approval gates**. Routine engineering work should continue without asking the user to relay shell commands or approve every intermediate step. Protected operations remain explicit human gates.
+The default operating model is **goal-oriented autonomous execution with two standard user gates**: a **Plan Approval Gate** before implementation starts and a **Merge Approval Gate** when the work is merge-ready. Between those gates, routine engineering work should continue autonomously without asking the user to relay shell commands or approve intermediate steps. Other protected operations remain explicit human gates when applicable.
 
 ## 1. Project purpose and canonical domain
 
@@ -359,6 +359,37 @@ Do not expose internal service ports to an untrusted network as a shortcut for c
 
 ## 11. Autonomous task execution contract
 
+### 11.1 Standard two-gate workflow
+
+For ordinary implementation work, there are two standard user approval gates:
+
+```text
+Request
+  -> read-only inspection as needed
+  -> Gate 1: Plan Approval
+  -> autonomous implementation / validation / PR / CI repair
+  -> Gate 2: Merge Approval
+  -> merge to main
+```
+
+**Gate 1 — Plan Approval before implementation starts**
+
+Before creating or changing code, configuration, tests, documentation, branches, commits, or pull requests for a new implementation task:
+
+- perform only the minimum read-only inspection needed to understand the request and current repository state;
+- give the user a concise implementation plan describing the intended scope, main files/layers likely to change, validation approach, and any material risk or architectural boundary;
+- wait for explicit user approval such as `開始`, `可以`, `approve`, or equivalent before implementation begins.
+
+The user's explicit approval of a stated plan authorizes routine engineering work necessary to reach merge-ready within that approved scope.
+
+**Gate 2 — Merge Approval**
+
+After Gate 1 approval, continue autonomously through implementation, tests, commits, PR creation/update, CI observation/repair, and Ready-for-review. Do not stop merely to report intermediate progress. When the PR satisfies the merge-ready definition and merge/integration to `main` is the only remaining standard action, stop and request merge approval.
+
+If another protected approval gate is reached before merge-ready, or an external blocker prevents safe progress, stop at that gate/blocker instead. Provide interim progress only when the user explicitly asks for it.
+
+### 11.2 Routine autonomous work after Gate 1
+
 Requests such as:
 
 ```text
@@ -368,7 +399,7 @@ Continue PR #N until merge-ready.
 Resolve the CI failure.
 ```
 
-authorize routine engineering work necessary to reach that goal within repository and safety boundaries.
+combined with Gate 1 approval authorize routine engineering work necessary to reach that goal within repository and safety boundaries.
 
 Routine autonomous work includes:
 
@@ -390,26 +421,30 @@ Do not turn routine engineering procedure into user-operated command relaying wh
 
 ## 12. Protected approval gates — STOP and ask the user
 
-Explicit user approval is required before:
+The Plan Approval Gate and Merge Approval Gate above are the normal software-development checkpoints. The following protected operations require explicit approval whenever applicable and may introduce an additional stop before the normal merge gate:
 
-1. **Merge/integration to `main`**
+1. **Implementation start for a new task**
+   - begin code/config/test/documentation changes before the user approves the concise plan;
+   - create the task branch/commits/PR before Gate 1 approval.
+
+2. **Merge/integration to `main`**
    - merge a PR to `main`;
    - directly commit feature work to `main`;
    - close/replace a PR in a way that discards reviewed work.
 
-2. **Deployment/runtime changes**
+3. **Deployment/runtime changes**
    - `plasmactl deploy`;
    - restart shared Plasma services to activate new code;
    - change active systemd definitions, public routing, firewall/network exposure, or shared runtime configuration.
 
-3. **Hardware-affecting operations**
+4. **Hardware-affecting operations**
    - program a real IC;
    - change DUT power/voltage;
    - load a new FPGA bitstream onto connected hardware;
    - change FPGA I/O behavior on a connected system;
    - perform any action with credible electrical/hardware risk.
 
-4. **Destructive/history-rewriting Git operations**
+5. **Destructive/history-rewriting Git operations**
    - `git reset --hard`;
    - `git clean -fd`;
    - force checkout/restore that discards user work;
@@ -417,11 +452,11 @@ Explicit user approval is required before:
    - force-push;
    - delete remote branches/tags that may contain user work.
 
-5. **Material architecture/security decisions**
+6. **Material architecture/security decisions**
    - incompatible protocol/API changes without an already-defined migration contract;
    - credential/access/security policy changes with nontrivial tradeoffs;
    - architecture choices with materially different cost, compatibility, safety, or maintainability consequences;
-   - substantial scope expansion beyond the assigned goal.
+   - substantial scope expansion beyond the approved Gate 1 plan.
 
 When a protected gate is reached, stop at the safest clean checkpoint and request the smallest necessary decision.
 
@@ -564,15 +599,29 @@ Agents must not silently turn these facts into wrong assumptions:
 
 ## 19. Communication and completion report
 
-Report at meaningful engineering checkpoints rather than after every routine command. Interrupt the user immediately only for:
+For ordinary implementation work, the expected communication pattern is:
 
-- a protected approval gate;
-- a material ambiguity requiring a product/architecture decision;
+```text
+Gate 1: concise plan -> wait for approval
+        |
+        v
+Autonomous work: implementation -> validation -> PR -> CI repair -> merge-ready
+        |
+        v
+Gate 2: merge-ready report -> wait for merge approval
+```
+
+Do not send unsolicited routine progress reports between Gate 1 approval and Gate 2. Interrupt the user before merge-ready only for:
+
+- another protected approval gate;
+- a material ambiguity that falls outside the approved plan and requires a product/architecture decision;
 - a safety/security issue;
 - missing access that genuinely blocks progress;
 - an unexpected state where continuing risks user work.
 
-At completion/merge-ready/blocker, report at minimum:
+If the user explicitly asks for progress, report it without changing the approval-gate model.
+
+At Gate 2 / completion / blocker, report at minimum:
 
 ```text
 Changed:
