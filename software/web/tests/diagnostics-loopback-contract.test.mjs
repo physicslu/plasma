@@ -67,7 +67,7 @@ test("Diagnostics Test Page shell is shared while loopback keeps domain controls
 });
 
 test("Manager BFF namespace stays in Vinext and receives alias binding", () => {
-  assert.ok(vite.includes('"^/api/(?!(?:fleet|manager)(?:/|$))"'));
+  assert.ok(vite.includes('"^/api/(?!fleet(?:/|$))(?!manager(?:/|$))"'));
   assert.match(vite, /target: "http:\/\/127\.0\.0\.1:18080"/);
   assert.match(vite, /PLASMA_MANAGER_PPU_ALIAS:\s*process\.env\.PLASMA_MANAGER_PPU_ALIAS\s*\?\?\s*""/);
 });
