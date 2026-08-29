@@ -144,16 +144,19 @@ ppu-b -> configured PPU B Gateway
 
 A managed request is relayed only through explicit allowlisted domain route families. Manager is **not** a generic arbitrary-method/arbitrary-URL HTTP proxy.
 
-Current managed route families support the central Programming workflow for:
+Current managed route families support the central PPU workflow for:
 
 - PPU health/status and target discovery;
 - Engineering sessions;
 - Programming Asset/Image check and upload;
 - Job submit/status/cancel/readback;
 - server-side Batch submit/status/cancel;
-- Gateway communication-policy reads needed by observation;
+- Gateway communication-policy read/write;
+- Engineering Mock runtime settings read/write when that PPU runtime exposes the Mock feature;
 - authenticated Principal introspection;
 - PS real-path Loopback.
+
+The Gateway/Mock settings writes remain subject to the PPU secure Gateway's `GATEWAY_SETTINGS_WRITE` and `MOCK_SETTINGS_WRITE` authorization/idempotency contracts. Manager merely preserves and routes that evidence.
 
 The fleet registry and fleet observation resources themselves remain read-only surfaces. Unsupported write routes fail closed.
 
@@ -196,12 +199,15 @@ Control Console
  -> BFF
  -> Manager
  -> selected PPU Gateway
- -> PPU Asset Service / Cache
+ -> Programming Asset / Batch contract
+ -> PPU cache / Programming Runtime
 ```
 
-The relay preserves binary bytes and the existing production integrity/provenance contract. It does not convert Image transfer into a separate Manager-specific Base64 protocol.
+The common routing owner does not require one wire representation for every workflow. EMode individual Engineering Jobs use binary Programming Asset cache upload plus `asset_sha256` Job references. PMode server-side Batch preserves its existing bounded JSON Asset envelope containing `asset_base64`, declared size and SHA-256; the PPU Gateway decodes and validates that envelope before caching/execution.
 
-This is a deliberate simplicity decision: first establish one trustworthy route owner. A later direct-to-PPU data plane requires measured evidence of a material Manager bottleneck and must preserve authorization, identity binding, Asset integrity and diagnostic coverage.
+Manager does not introduce or translate either representation. BFF and Manager forward the incoming body without decoding/re-encoding the Asset. Current PMode limits a selected Image to 4 MiB, so the Base64-expanded Batch body remains below the current 24 MiB managed request bound.
+
+This is a deliberate Phase-1 compatibility decision: first establish one trustworthy route owner without silently redesigning the Batch data contract. A later direct-to-PPU or pre-upload/reference-only data plane requires measured evidence of a material bottleneck and must preserve authorization, identity binding, Asset integrity and diagnostic coverage.
 
 ## Failure-domain rule
 
@@ -244,8 +250,9 @@ Current invariants include:
 | Manager fleet registry/observation | Implemented, read-only surfaces |
 | Manager PS Loopback relay | Implemented through shared managed route; legacy fixed route retained for compatibility |
 | Managed Programming Job routing | Implemented as explicit allowlisted relay |
-| Managed Programming Asset/Image relay | Implemented, bounded and byte-preserving |
+| Managed Programming Asset/Image relay | Implemented, bounded; EMode binary upload and PMode bounded Batch envelope retain their existing PPU contracts |
 | Managed Batch routing | Implemented for current server-side Batch REST family |
+| Managed Gateway/Mock settings | Explicit allowlisted read/write routes; PPU secure Gateway remains authorization authority |
 | Manager arbitrary reverse proxy | Prohibited |
 | PL Loopback | Not implemented; fail closed |
 | IC Loopback | Not implemented; fail closed |
