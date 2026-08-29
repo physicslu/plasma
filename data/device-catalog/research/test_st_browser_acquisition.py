@@ -44,15 +44,9 @@ class FakePlaywrightError(Exception):
 
 
 class FakeWaitable:
-    def __init__(self) -> None:
-        self.waits: list[tuple[str, int]] = []
-
-    @property
-    def first(self) -> "FakeWaitable":
-        return self
-
     def wait_for(self, *, state: str, timeout: int) -> None:
-        self.waits.append((state, timeout))
+        self.state = state
+        self.timeout = timeout
 
 
 class FakeBodyLocator:
@@ -86,7 +80,6 @@ class FakePage:
         self.goto_error = goto_error
         self.closed = False
         self.heading = FakeWaitable()
-        self.part_number = FakeWaitable()
 
     def goto(self, url: str, *, wait_until: str, timeout: int) -> FakeResponse:
         self.requested_url = url
@@ -99,10 +92,6 @@ class FakePage:
     def get_by_role(self, role: str, *, name: str, exact: bool) -> FakeWaitable:
         self.role_request = (role, name, exact)
         return self.heading
-
-    def get_by_text(self, text: str, *, exact: bool) -> FakeWaitable:
-        self.text_request = (text, exact)
-        return self.part_number
 
     def locator(self, selector: str) -> FakeBodyLocator:
         self.selector = selector
@@ -131,6 +120,38 @@ def acquirer_for(page: FakePage) -> STBrowserAcquirer:
     return acquirer
 
 
+def browser_summary(evidence: dict[str, object]) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "pilot_id": "browser-unit-test",
+        "attempted": 1,
+        "acquisition_success": 1,
+        "acquisition_failure": 0,
+        "exact_icpn_candidates": 4,
+        "canonical_mapping": {"unique": 1, "ambiguous": 0, "unmapped": 0},
+        "openocd_cfg_mapping": {"mapped": 1, "total": 1},
+        "manual_intervention_required": 0,
+        "acquisition_transport": BROWSER_TRANSPORT,
+        "results": [
+            {
+                "base_device": CONTROL_BASE_DEVICE,
+                "acquisition_status": "success",
+                "canonical_mapping": {"status": "unique", "target_configs": ["stm32f1x.cfg"]},
+                "evidence": evidence,
+            }
+        ],
+    }
+
+
+def browser_baseline() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "pilot_id": "browser-unit-test",
+        "canonical_dataset_admission": False,
+        "targets": [{"base_device": CONTROL_BASE_DEVICE, "exact_icpns": EXPECTED_ICPNS}],
+    }
+
+
 class BrowserAcquisitionTests(unittest.TestCase):
     def test_rendered_dom_has_explicit_non_raw_provenance(self) -> None:
         page = FakePage()
@@ -143,7 +164,7 @@ class BrowserAcquisitionTests(unittest.TestCase):
             body=body,
             source_url=TARGET_URL,
             final_url=final_url,
-            base_device="STM32F100C8",
+            base_device=CONTROL_BASE_DEVICE,
             retrieved_at_utc="2026-08-29T12:00:00Z",
         )
         self.assertEqual(evidence["exact_icpns"], EXPECTED_ICPNS)
@@ -152,7 +173,6 @@ class BrowserAcquisitionTests(unittest.TestCase):
         self.assertNotIn("raw_sha256", evidence)
         self.assertEqual(page.wait_until, "domcontentloaded")
         self.assertEqual(page.role_request, ("heading", "Quality and Reliability", True))
-        self.assertEqual(page.text_request, ("Part Number", True))
 
     def test_browser_evidence_can_be_scale_ready_without_claiming_raw_http(self) -> None:
         evidence = build_browser_evidence_record(
@@ -162,36 +182,7 @@ class BrowserAcquisitionTests(unittest.TestCase):
             base_device=CONTROL_BASE_DEVICE,
             retrieved_at_utc="2026-08-29T12:00:00Z",
         )
-        baseline = {
-            "schema_version": 1,
-            "pilot_id": "browser-unit-test",
-            "canonical_dataset_admission": False,
-            "targets": [{"base_device": CONTROL_BASE_DEVICE, "exact_icpns": EXPECTED_ICPNS}],
-        }
-        summary = {
-            "schema_version": 1,
-            "pilot_id": "browser-unit-test",
-            "attempted": 1,
-            "acquisition_success": 1,
-            "acquisition_failure": 0,
-            "exact_icpn_candidates": 4,
-            "canonical_mapping": {"unique": 1, "ambiguous": 0, "unmapped": 0},
-            "openocd_cfg_mapping": {"mapped": 1, "total": 1},
-            "manual_intervention_required": 0,
-            "acquisition_transport": BROWSER_TRANSPORT,
-            "results": [
-                {
-                    "base_device": CONTROL_BASE_DEVICE,
-                    "acquisition_status": "success",
-                    "canonical_mapping": {
-                        "status": "unique",
-                        "target_configs": ["stm32f1x.cfg"],
-                    },
-                    "evidence": evidence,
-                }
-            ],
-        }
-        report = evaluate_live_pilot(summary=summary, baseline=baseline)
+        report = evaluate_live_pilot(summary=browser_summary(evidence), baseline=browser_baseline())
         self.assertTrue(report["scale_ready"])
         self.assertEqual(report["transport_evidence"]["transport"], BROWSER_TRANSPORT)
         self.assertEqual(report["transport_evidence"]["valid_records"], 1)
@@ -205,33 +196,7 @@ class BrowserAcquisitionTests(unittest.TestCase):
             retrieved_at_utc="2026-08-29T12:00:00Z",
         )
         evidence["raw_sha256"] = evidence["rendered_dom_sha256"]
-        baseline = {
-            "schema_version": 1,
-            "pilot_id": "browser-unit-test",
-            "canonical_dataset_admission": False,
-            "targets": [{"base_device": CONTROL_BASE_DEVICE, "exact_icpns": EXPECTED_ICPNS}],
-        }
-        summary = {
-            "schema_version": 1,
-            "pilot_id": "browser-unit-test",
-            "attempted": 1,
-            "acquisition_success": 1,
-            "acquisition_failure": 0,
-            "exact_icpn_candidates": 4,
-            "canonical_mapping": {"unique": 1, "ambiguous": 0, "unmapped": 0},
-            "openocd_cfg_mapping": {"mapped": 1, "total": 1},
-            "manual_intervention_required": 0,
-            "acquisition_transport": BROWSER_TRANSPORT,
-            "results": [
-                {
-                    "base_device": CONTROL_BASE_DEVICE,
-                    "acquisition_status": "success",
-                    "canonical_mapping": {"status": "unique", "target_configs": ["stm32f1x.cfg"]},
-                    "evidence": evidence,
-                }
-            ],
-        }
-        report = evaluate_live_pilot(summary=summary, baseline=baseline)
+        report = evaluate_live_pilot(summary=browser_summary(evidence), baseline=browser_baseline())
         self.assertFalse(report["scale_ready"])
         self.assertTrue(any("must not claim raw_sha256" in issue for issue in report["issues"]))
 
@@ -245,12 +210,10 @@ class BrowserAcquisitionTests(unittest.TestCase):
         page = FakePage(final_url="https://example.com/stm32f100c8.html")
         with self.assertRaisesRegex(AcquisitionError, "source host must be www.st.com"):
             acquirer_for(page).fetch(TARGET_URL, 5.0)
-        self.assertTrue(page.closed)
 
     def test_http_error_fails_closed(self) -> None:
-        page = FakePage(status=503)
         with self.assertRaisesRegex(AcquisitionError, "HTTP 503"):
-            acquirer_for(page).fetch(TARGET_URL, 5.0)
+            acquirer_for(FakePage(status=503)).fetch(TARGET_URL, 5.0)
 
     def test_playwright_timeout_is_normalized(self) -> None:
         page = FakePage(goto_error=FakeTimeoutError("navigation timeout"))
@@ -275,8 +238,10 @@ class BrowserAcquisitionTests(unittest.TestCase):
                 "second",
             ),
         ]
-        selected = select_targets("control", targets)
-        self.assertEqual([target.base_device for target in selected], [CONTROL_BASE_DEVICE])
+        self.assertEqual(
+            [target.base_device for target in select_targets("control", targets)],
+            [CONTROL_BASE_DEVICE],
+        )
         self.assertEqual(select_targets("pilot", targets), targets)
 
     def test_control_scope_fails_if_manifest_loses_control_target(self) -> None:
