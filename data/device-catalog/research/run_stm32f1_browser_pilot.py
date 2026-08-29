@@ -56,11 +56,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--scope", choices=("control", "pilot"), default="control")
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--delay", type=float, default=DEFAULT_INTER_REQUEST_DELAY_SECONDS)
-    parser.add_argument(
-        "--headed",
+    browser_mode = parser.add_mutually_exclusive_group()
+    browser_mode.add_argument(
+        "--headless",
         action="store_true",
-        help="Run Chromium headed for interactive diagnosis; headless is the default.",
+        help="Opt into headless Chromium for transport diagnosis.",
     )
+    browser_mode.add_argument(
+        "--headed",
+        dest="headless",
+        action="store_false",
+        help="Run headed Chromium (the default for live ST acquisition).",
+    )
+    parser.set_defaults(headless=False)
     return parser.parse_args(argv)
 
 
@@ -70,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         pilot_id, manifest_targets = read_manifest(args.manifest)
         targets = select_targets(args.scope, manifest_targets)
         catalog_rows = read_catalog(args.catalog)
-        with STBrowserAcquirer(headless=not args.headed) as acquirer:
+        with STBrowserAcquirer(headless=args.headless) as acquirer:
             fetcher = RateLimitedFetcher(delay_seconds=args.delay, fetcher=acquirer.fetch)
             summary = run_pilot(
                 pilot_id=pilot_id,
@@ -87,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             "engine": "chromium",
             "browser_version": browser_version,
             "playwright_requirement": PLAYWRIGHT_REQUIREMENT,
-            "headless": not args.headed,
+            "headless": args.headless,
         }
         summary["canonical_dataset_admission"] = False
         args.output.parent.mkdir(parents=True, exist_ok=True)

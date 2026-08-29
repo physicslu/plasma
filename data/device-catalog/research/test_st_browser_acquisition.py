@@ -10,7 +10,11 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 from evaluate_stm32f1_live_pilot import evaluate_live_pilot  # noqa: E402
-from run_stm32f1_browser_pilot import CONTROL_BASE_DEVICE, select_targets  # noqa: E402
+from run_stm32f1_browser_pilot import (  # noqa: E402
+    CONTROL_BASE_DEVICE,
+    parse_args,
+    select_targets,
+)
 from st_browser_acquisition import (  # noqa: E402
     BROWSER_TRANSPORT,
     STBrowserAcquirer,
@@ -89,8 +93,8 @@ class FakePage:
             raise self.goto_error
         return FakeResponse(self.status)
 
-    def get_by_role(self, role: str, *, name: str, exact: bool) -> FakeWaitable:
-        self.role_request = (role, name, exact)
+    def get_by_text(self, text: str, *, exact: bool) -> FakeWaitable:
+        self.text_request = (text, exact)
         return self.heading
 
     def locator(self, selector: str) -> FakeBodyLocator:
@@ -172,7 +176,14 @@ class BrowserAcquisitionTests(unittest.TestCase):
         self.assertRegex(str(evidence["rendered_dom_sha256"]), r"^[0-9a-f]{64}$")
         self.assertNotIn("raw_sha256", evidence)
         self.assertEqual(page.wait_until, "domcontentloaded")
-        self.assertEqual(page.role_request, ("heading", "Quality and Reliability", True))
+        self.assertEqual(page.text_request, ("Quality and Reliability", True))
+        self.assertEqual(page.heading.state, "attached")
+
+    def test_live_browser_defaults_to_headed_with_explicit_headless_opt_in(self) -> None:
+        default_args = parse_args(["--output", "/tmp/control.json"])
+        self.assertFalse(default_args.headless)
+        headless_args = parse_args(["--headless", "--output", "/tmp/control.json"])
+        self.assertTrue(headless_args.headless)
 
     def test_browser_evidence_can_be_scale_ready_without_claiming_raw_http(self) -> None:
         evidence = build_browser_evidence_record(
