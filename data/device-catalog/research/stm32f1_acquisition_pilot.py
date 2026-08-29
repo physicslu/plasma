@@ -42,6 +42,7 @@ class PilotTarget:
 
 FetchResult = tuple[bytes, str, str | None, str | None]
 Fetcher = Callable[[str, float], FetchResult]
+EvidenceBuilder = Callable[..., dict[str, object]]
 
 
 def utc_now() -> str:
@@ -126,6 +127,7 @@ def run_pilot(
     targets: list[PilotTarget],
     catalog_rows: list[dict[str, str]],
     fetcher: Fetcher = fetch_html,
+    evidence_builder: EvidenceBuilder = build_evidence_record,
     timeout_seconds: float = 30.0,
     retrieved_at_factory: Callable[[], str] = utc_now,
 ) -> dict[str, object]:
@@ -150,7 +152,7 @@ def run_pilot(
         }
         try:
             body, final_url, etag, last_modified = fetcher(target.source_url, timeout_seconds)
-            evidence = build_evidence_record(
+            evidence = evidence_builder(
                 body=body,
                 source_url=target.source_url,
                 final_url=final_url,
