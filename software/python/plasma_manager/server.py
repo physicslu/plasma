@@ -159,13 +159,12 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
 
         manager_rtt_ms = round((time.monotonic() - started) * 1000, 3)
         if status == HTTPStatus.OK and payload.get("ok") is True:
-            manager_meta = {
+            payload = dict(payload)
+            payload["manager"] = {
                 "relay": "pass-through",
                 "ppu_alias": alias,
                 "manager_rtt_ms": manager_rtt_ms,
             }
-            payload = dict(payload)
-            payload["manager"] = manager_meta
         self._json(status, payload)
 
     def _read_only(self) -> None:
