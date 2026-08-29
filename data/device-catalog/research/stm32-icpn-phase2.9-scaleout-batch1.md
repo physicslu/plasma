@@ -2,7 +2,7 @@
 
 ## Decision
 
-Phase 2.9 begins STM32F1 scale-out only after the Phase 2.8 generic admission framework was validated. This batch is deliberately bounded to eight untreated STM32F1 base devices rather than sweeping the remaining family.
+Phase 2.9 begins STM32F1 scale-out only after the Phase 2.8 generic admission framework was validated. This batch is deliberately bounded to eight previously untreated STM32F1 base devices rather than sweeping the remaining family.
 
 The selected bases are:
 
@@ -15,49 +15,74 @@ The selected bases are:
 - `STM32F105VB`
 - `STM32F107RC`
 
-All eight already have one unique CMSIS/OpenOCD mapping to `tcl/target/stm32f1x.cfg`. The batch also stays inside the STM32F1 policy's currently validated C/R/V/Z package classes and B/C/E flash-density codes so that this phase tests scale-out mechanics rather than mixing in a new metadata grammar.
+All eight have one unique CMSIS/OpenOCD mapping to `tcl/target/stm32f1x.cfg`. The batch stays inside the STM32F1 policy's validated package and flash-density grammar so this phase tests bounded scale-out mechanics rather than introducing new metadata semantics.
 
 ## Research baseline
 
-`stm32f1-phase2.9-scaleout-baseline.json` records the expected exact commercial ICPN surface observed on the official ST product pages on 2026-08-29. It contains 26 expected exact ICPNs across the eight targets.
+`stm32f1-phase2.9-scaleout-baseline.json` records 26 expected exact commercial ICPNs across the eight targets.
 
-This baseline is **research expectation only**. It is not retained browser evidence, does not contain rendered-DOM or evidence-section digests, and must never be used directly for canonical admission.
+The baseline is research expectation only. It is not retained browser evidence, contains no rendered-DOM or evidence-section digests, and is not itself eligible for canonical admission.
 
-## Required live sequence
+## Live evidence result
 
-Live execution remains outside normal GitHub CI.
+The approved headed-Chromium sequence completed successfully on executed Git SHA `396213d9d7dc4c3cfa40278e64d922e75ae20c3d`.
 
-1. Run headed Chromium against one explicit control target, `STM32F100CB`.
-2. Stop immediately if the control target fails, redirects outside the approved ST product URL, exposes an access challenge, or cannot produce valid scoped evidence.
-3. Only after the control succeeds, run the complete eight-target manifest with a fresh Chromium process per target.
-4. Evaluate the resulting summary against `stm32f1-phase2.9-scaleout-baseline.json` using the existing live-pilot evaluator.
-5. Require all of the following before retention:
-   - 8/8 acquisition success;
-   - unique canonical/base mapping for 8/8;
-   - OpenOCD CFG mapping for 8/8;
-   - valid `chromium_rendered_dom` provenance for 8/8;
-   - 26 exact ICPNs;
-   - exact baseline match;
-   - zero candidate drift;
-   - `scale_ready=true`;
-   - `canonical_dataset_admission=false`.
-6. Retain the successful evidence package with immutable digests and runtime provenance.
-7. Build a read-only admission plan from the retained package.
-8. Only after human/review confirmation of that plan may a separate canonical-write step occur.
-9. Admission remains deterministic/offline and fails closed on duplicates, conflicts, mapping ambiguity, evidence integrity failures, or policy rejection.
-10. After a future canonical write, re-run the planner and require newly admitted rows to become `already_present`; a second writer application must be `no_op`.
+- Chromium: `151.0.7922.34`
+- control `STM32F100CB`: 1/1 success
+- full pilot: 8/8 success
+- acquisition transport: `chromium_rendered_dom` for 8/8
+- exact ICPN candidates: 26
+- candidate baseline exact match: true
+- candidate drift: 0
+- `scale_ready=true`
+- live evidence retains `canonical_dataset_admission=false`
+
+Retained evidence ID:
+
+`stm32f1-phase2.9-scaleout-batch1-2026-08-29-retained-20260829T161336Z-396213d`
+
+The retained package is stored under:
+
+`evidence/stm32f1-phase2.9-scaleout-batch1-live-2026-08-29/`
+
+The retained evidence remains manufacturer evidence only. Canonical admission is a separate deterministic decision.
+
+## Admission result
+
+`stm32f1-phase2.9-admission-plan.json` is retained as the immutable pre-write audit artifact. It records:
+
+- canonical rows before admission: 49
+- candidate count: 26
+- `admit`: 26
+- `already_present`: 0
+- `manual_review_required`: 0
+- `reject`: 0
+- conflicts: 0
+- issues: none
+
+The canonical dataset was then advanced from 49 rows to 75 rows using exactly the row semantics captured by that admission plan.
+
+Post-admission validation requires all 26 Phase 2.9 rows to match their checked-in `proposed_canonical_row` exactly. Rebuilding the Phase 2.9 plan from retained evidence against the current 75-row canonical dataset must classify all 26 as `already_present`, with zero admits, rejects, manual-review decisions, conflicts, or issues.
+
+The generic admission writer contract is also tested by reconstructing the bound 49-row pre-write state from the current canonical dataset, applying the checked-in Phase 2.9 plan once, and applying the same plan a second time. The required results are:
+
+1. first application: `status=written`, 49 → 75, 26 added;
+2. second application: `status=no_op`, 75 → 75, zero added.
+
+## Historical admission compatibility
+
+Phase 2.7 remains an immutable historical audit artifact, not a permanent assertion that the canonical dataset must remain exactly 49 rows.
+
+Historical validation now separates two invariants:
+
+1. the original Phase 2.7 pre-write state can still be reconstructed and reproduces the checked-in historical plan exactly;
+2. the current canonical dataset may contain later valid admissions, provided every Phase 2.7 admitted row remains byte-for-byte semantically identical and the historical planner still classifies all 26 historical candidates as `already_present`.
+
+This prevents later bounded admissions from invalidating historical evidence while still detecting deletion, mutation, duplication, or semantic conflict in previously admitted rows.
 
 ## One-command live runbook
 
-`run_stm32f1_phase2_9_scaleout.py` executes the approved sequence in a clean Git worktree:
-
-```bash
-python data/device-catalog/research/run_stm32f1_phase2_9_scaleout.py \
-  --evidence-dir data/device-catalog/research/evidence/stm32f1-phase2.9-scaleout-batch1-<timestamp> \
-  --admission-plan /tmp/stm32f1-phase2.9-admission-plan.json
-```
-
-The command performs, in order:
+`run_stm32f1_phase2_9_scaleout.py` remains a read-only live-acquisition orchestrator. It performs:
 
 1. clean-worktree and full Git-SHA binding;
 2. headed-Chromium control run for `STM32F100CB`;
@@ -67,45 +92,28 @@ The command performs, in order:
 6. immediate offline retained-evidence validation;
 7. read-only scale-out admission planning against the current canonical dataset.
 
-It stops on the first failed stage. It does **not** contain a canonical writer and reports `canonical_dataset_written=false`.
-
-### Execution handoff
-
-The live command must run from this PR branch/commit or a later descendant with a clean worktree and normal external network access. Install only the pinned research browser dependency and Chromium required by the existing browser adapter. Do not move this step into GitHub Actions merely to obtain network access.
-
-The resulting retained evidence directory is intended to be committed to this PR only after the real browser run passes. The `/tmp` admission plan is review input and may then be regenerated deterministically from the checked-in evidence. No canonical CSV mutation is authorized by the one-command runner.
-
-## Browser control command contract
-
-The browser runner keeps the historical `STM32F100C8` control as its default. Phase 2.9 adds an explicit `--control-base-device` option so a bounded manifest can nominate its own control without changing historical Phase 2.6 behavior.
-
-For this batch, the live control is `STM32F100CB` and the full pilot uses `stm32f1-phase2.9-scaleout-manifest.json`.
-
-## Retention and admission generalization
-
-The retained-evidence validator no longer assumes the historical six-target / 26-candidate Phase 2.6 package. Target identity and candidate count are derived from the selected validated baseline. Compatibility with the historical Phase 2.6 package remains mandatory.
-
-`stm32f1_scaleout_admission.py` is a read-only wrapper over the Phase 2.8 generic admission framework. It derives the expected candidate count from the retained evidence baseline rather than introducing a new batch-size constant. The historical Phase 2.7 26-candidate invariant remains isolated in the historical admission wrapper.
+It stops on the first failed stage. It does not contain a canonical writer and reports `canonical_dataset_written=false`. Canonical mutation remains a separate reviewed action.
 
 ## CI boundary
 
-Normal GitHub CI remains completely offline and deterministic. It validates:
+Normal GitHub CI remains offline and deterministic. It does not install Chromium/Playwright and does not contact ST.
 
-- the eight-target manifest contract;
-- manifest/baseline identity;
-- the 26-candidate research baseline shape;
-- absence of duplicates and overlap with the current 49-row canonical dataset;
+The CI contract now validates:
+
+- the eight-target manifest and baseline identity;
+- the 26-candidate baseline shape;
 - unique OpenOCD/CMSIS mapping for every selected base;
-- compatibility of all 26 expected commercial identities with the existing STM32F1 admission policy;
-- historical browser-control defaults plus the new explicit-control option;
-- dynamic eight-target evidence retention contract;
-- one-command orchestration is headed, fail-fast, Git-SHA-bound, and read-only with respect to canonical data;
-- generic scale-out admission planning reuses historical retained evidence without a fixed batch-size assumption;
-- all prior retained-evidence, generic admission, historical Phase 2.7, and canonical validators.
+- compatibility of all 26 commercial identities with the existing STM32F1 policy;
+- historical browser-control defaults plus the explicit Phase 2.9 control;
+- retained live evidence integrity and provenance;
+- generic admission framework behavior;
+- historical Phase 2.7 reproducibility and compatibility with later canonical admissions;
+- the 75-row canonical dataset with no duplicate ICPNs and complete authoritative provenance;
+- exact equality between the 26 Phase 2.9 proposed rows and current canonical rows;
+- post-admission Phase 2.9 re-planning as 26/26 `already_present`;
+- single-apply plus second-run `no_op` writer idempotency.
 
-GitHub Actions `Device catalog validation` run `33259499282` on head `ca5c4ce3660351242f2bf60c03a67beeb4468995` passed all steps, including `Validate STM32F1 Phase 2.9 scaleout contract`.
-
-CI must not install Chromium/Playwright or contact ST.
+GitHub Actions `Device catalog validation` run `33263108854` passed all validation steps on head `008308832ec933210374a96a1c364ad07903a457` before this documentation-only update.
 
 ## Scope boundary
 
