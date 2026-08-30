@@ -21,7 +21,35 @@ Exact ICPN
 
 The production hardware gate remains closed.
 
-## 2. Core invariant
+## 2. Current system boundary: PS only
+
+The current IC Support execution path stops at the programmer's **PS software layer**. Phase 3.8 and the next OpenOCD hardware-validation phase are PS/OpenOCD work.
+
+The intended near-term physical path is:
+
+```text
+Plasma PS runtime
+  -> OpenOCD compiled-plan executor
+  -> OpenOCD process
+  -> debug/programming adapter
+  -> target IC
+```
+
+The FPGA PL is **not** part of this path yet. No Phase 3.8 acceptance criterion depends on PL logic, PL registers, a PL programming engine, or PS-to-PL command transport.
+
+A future Plasma-native PPU path may later be:
+
+```text
+ResolvedICSupport
+  -> Native PPU backend
+  -> PS driver
+  -> PL programming engine
+  -> target IC
+```
+
+but that is a separate future phase and must not be inferred from OpenOCD readiness.
+
+## 3. Core invariant
 
 ```text
 software executor validated
@@ -29,6 +57,8 @@ software executor validated
 hardware runtime enabled
     !=
 physical programming validated
+    !=
+PL-native programming implemented
 ```
 
 `SiteExecutionRouter` therefore continues to report the production OpenOCD route as:
@@ -40,7 +70,7 @@ hardware_runtime_ready: false
 
 A real Site Job still fails before JobRegistry insertion, PPU lease reservation, SiteWorker queueing or interface execution.
 
-## 3. No default process launcher
+## 4. No default process launcher
 
 `OpenOCDPlanExecutor` intentionally has no default process launcher.
 
@@ -48,7 +78,7 @@ Constructing the executor in normal runtime code is insufficient to start a proc
 
 CI explicitly injects `asyncio.create_subprocess_exec`, but redirects the executable to a fake OpenOCD Python process. Phase 3.8 does not configure, invoke or probe a physical adapter or IC.
 
-## 4. Canonical-plan verification
+## 5. Canonical-plan verification
 
 Before any software-validation process can launch, the executor recompiles the canonical plan from:
 
@@ -74,7 +104,7 @@ This protects at least:
 
 A modified or stale plan is rejected before process launch.
 
-## 5. Isolated artifact staging
+## 6. Isolated artifact staging
 
 The executor creates a fresh temporary workspace for each process execution.
 
@@ -91,7 +121,7 @@ READ outputs are also assigned executor-generated paths. After the fake process 
 
 The temporary workspace is removed on success, process failure, timeout and task cancellation. Timeout and cancellation both terminate a still-running child process before returning control.
 
-## 6. Command/process boundary
+## 7. Command/process boundary
 
 The executor uses argv-based process launch; no shell is involved.
 
@@ -111,7 +141,7 @@ Plan artifact tokens such as `${PLASMA_IMAGE_BIN}` are replaced only with execut
 
 `adapter_serial` is constrained to a conservative character set before it can enter an OpenOCD command string.
 
-## 7. Fake-process CI acceptance
+## 8. Fake-process CI acceptance
 
 The Phase 3.8 regression executes a real subprocess, but the process is a fake OpenOCD Python program. It validates:
 
@@ -131,9 +161,9 @@ The Phase 3.8 regression executes a real subprocess, but the process is a fake O
 - invalid timeout rejection before launch;
 - no-launcher fail-closed behavior.
 
-This test proves the software process boundary. It does not prove that OpenOCD accepts every command against STM32F103 silicon.
+This test proves the PS software process boundary. It does not prove that OpenOCD accepts every command against STM32F103 silicon and does not validate any PL path.
 
-## 8. Direct OpenOCD interface remains non-executable
+## 9. Direct OpenOCD interface remains non-executable
 
 `OpenOCDInterface` no longer owns an internal subprocess primitive in Phase 3.8.
 
@@ -150,7 +180,7 @@ remain fail-closed. `safe_shutdown()` is also a no-op while the hardware runtime
 
 Therefore the only Phase 3.8 process ingress is the explicitly injected software-validation `OpenOCDPlanExecutor`.
 
-## 9. Coverage meaning after Phase 3.8
+## 10. Coverage meaning after Phase 3.8
 
 The catalog and evidence baseline remains unchanged:
 
@@ -166,13 +196,13 @@ OpenOCD hardware-runtime-ready exact ICPNs:   0
 Native PPU runtime-ready exact ICPNs:         0
 ```
 
-The software-executor count must not be presented as physical programming support.
+The software-executor count must not be presented as physical programming support. Native PPU readiness remains a separate future PL-related metric and is not advanced by this phase.
 
-## 10. Next gate
+## 11. Next gate
 
-A later separately approved hardware phase may evaluate whether this executor can be promoted to real OpenOCD runtime use. That phase must independently validate at least:
+A later separately approved hardware phase may evaluate whether this **PS/OpenOCD** executor can be promoted to real OpenOCD runtime use. That phase must independently validate at least:
 
-- installed OpenOCD version and scripts;
+- installed OpenOCD version and scripts on the PS-side runtime host;
 - adapter/interface configuration;
 - target detection;
 - reset/halt behavior;
@@ -180,9 +210,11 @@ A later separately approved hardware phase may evaluate whether this executor ca
 - cleanup/reset behavior after success, failure, timeout and cancellation;
 - evidence retention for the physical test.
 
+No PL involvement is required for that gate.
+
 Until that gate passes, `hardware_runtime_ready` remains false.
 
-## 11. Non-goals
+## 12. Non-goals
 
 Phase 3.8 does not:
 
@@ -191,6 +223,7 @@ Phase 3.8 does not:
 - make production OpenOCD Jobs executable;
 - run a real OpenOCD binary against hardware;
 - access a debug adapter, Z2, FPGA or IC;
-- implement the Plasma Native PPU driver;
+- implement or validate PS-to-PL programming transport;
+- implement the Plasma Native PPU driver or PL programming engine;
 - create PPU or Socket validation evidence;
 - deploy or restart Plasma services.
