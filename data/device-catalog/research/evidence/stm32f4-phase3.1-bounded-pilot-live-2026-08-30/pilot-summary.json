@@ -34,7 +34,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F401CCUx",
@@ -42,7 +44,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F401CCUx",
@@ -50,7 +54,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F401CCUx",
@@ -58,7 +64,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F401CCYx",
@@ -66,13 +74,17 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         }
       ],
       "canonical_mapping": {
         "candidate_count": 5,
         "status": "unique",
-        "target_configs": ["tcl/target/stm32f4x.cfg"]
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
       },
       "evidence": {
         "acquisition_transport": "chromium_rendered_dom",
@@ -108,7 +120,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F407VGTx",
@@ -116,7 +130,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F407VGTx",
@@ -124,7 +140,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F407VGTx",
@@ -132,13 +150,17 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         }
       ],
       "canonical_mapping": {
         "candidate_count": 4,
         "status": "unique",
-        "target_configs": ["tcl/target/stm32f4x.cfg"]
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
       },
       "evidence": {
         "acquisition_transport": "chromium_rendered_dom",
@@ -173,7 +195,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F411CEUx",
@@ -181,7 +205,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F411CEUx",
@@ -189,7 +215,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F411CEYx",
@@ -197,7 +225,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F411CEYx",
@@ -205,13 +235,17 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         }
       ],
       "canonical_mapping": {
         "candidate_count": 5,
         "status": "unique",
-        "target_configs": ["tcl/target/stm32f4x.cfg"]
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
       },
       "evidence": {
         "acquisition_transport": "chromium_rendered_dom",
@@ -247,7 +281,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F429ZITx",
@@ -255,7 +291,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F429ZITx",
@@ -263,7 +301,9 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         },
         {
           "existing_identifier": "STM32F429ZIYx",
@@ -271,13 +311,17 @@
           "identifier_kind": "ordering_pattern",
           "match_count": 1,
           "status": "unique",
-          "target_configs": ["tcl/target/stm32f4x.cfg"]
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
         }
       ],
       "canonical_mapping": {
         "candidate_count": 4,
         "status": "unique",
-        "target_configs": ["tcl/target/stm32f4x.cfg"]
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
       },
       "evidence": {
         "acquisition_transport": "chromium_rendered_dom",
