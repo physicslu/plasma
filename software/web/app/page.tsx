@@ -6,19 +6,16 @@ import "./site-matrix-routing.css";
 
 export default function Home() {
   const { hydrated, apiBase, apiMode, managedPpuAlias } = useWorkspaceSession();
+  const routingMode = hydrated ? apiMode : "managed";
+  const routingKey = hydrated ? `${apiMode}|${apiBase}` : "routing-unresolved";
 
-  if (!hydrated) {
-    return (
-      <main className="siteMatrixRoutingBootstrap" aria-busy="true">
-        Resolving Control Station routing…
-      </main>
-    );
-  }
-
-  const routingKey = `${apiMode}|${apiBase}`;
   return (
-    <div data-site-matrix-routing-mode={apiMode}>
-      {apiMode === "managed" && (
+    <div
+      data-site-matrix-routing-mode={routingMode}
+      data-routing-hydrated={hydrated ? "true" : "false"}
+      aria-busy={hydrated ? undefined : true}
+    >
+      {hydrated && apiMode === "managed" && (
         <div className="siteMatrixManagedRouteNotice" role="status">
           Managed routing · Plasma Manager · {managedPpuAlias ?? "selected PPU"}
         </div>
