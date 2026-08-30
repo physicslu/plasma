@@ -7,7 +7,12 @@ on:
     paths:
       - "data/ic-support/**"
       - "software/python/plasma_core/ic_support.py"
+      - "software/python/plasma_handlers/programming.py"
+      - "software/python/plasma_handlers/stm32.py"
+      - "software/python/plasma_server/execution_router.py"
+      - "software/python/plasma_server/site_manager.py"
       - "software/python/tests/test_ic_support_resolver.py"
+      - "software/python/tests/test_execution_router.py"
       - "docs/architecture/ic-support-profile-architecture.md"
       - "docs/architecture/ic-support-coverage-normalization.md"
       - "docs/architecture/ic-support-runtime-resolver.md"
@@ -16,7 +21,12 @@ on:
     paths:
       - "data/ic-support/**"
       - "software/python/plasma_core/ic_support.py"
+      - "software/python/plasma_handlers/programming.py"
+      - "software/python/plasma_handlers/stm32.py"
+      - "software/python/plasma_server/execution_router.py"
+      - "software/python/plasma_server/site_manager.py"
       - "software/python/tests/test_ic_support_resolver.py"
+      - "software/python/tests/test_execution_router.py"
       - "docs/architecture/ic-support-profile-architecture.md"
       - "docs/architecture/ic-support-coverage-normalization.md"
       - "docs/architecture/ic-support-runtime-resolver.md"
@@ -49,10 +59,14 @@ jobs:
         run: python data/ic-support/coverage_inventory.py --summary
       - name: Test production IC Support coverage normalization
         run: python data/ic-support/test_coverage_inventory.py
+      - name: Install Plasma runtime dependencies
+        run: python -m pip install -e software/python
       - name: Resolve runtime IC Support pilot
-        run: PYTHONPATH=software/python python -m plasma_core.ic_support --summary
+        run: python -m plasma_core.ic_support --summary
       - name: Test runtime IC Support resolver
-        run: PYTHONPATH=software/python python software/python/tests/test_ic_support_resolver.py
+        run: python software/python/tests/test_ic_support_resolver.py
+      - name: Test resolver-driven execution admission
+        run: python software/python/tests/test_execution_router.py
       - name: Test isolated extraction contract
         run: python data/ic-support/benchmarks/stm32f103c/test_extraction_contract.py
       - name: Test blind extraction workspace
