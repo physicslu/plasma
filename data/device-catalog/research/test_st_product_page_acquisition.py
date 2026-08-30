@@ -103,10 +103,7 @@ class ProductPageAcquisitionTests(unittest.TestCase):
         )
         self.assertEqual(record["schema_version"], 1)
         self.assertEqual(record["parser_version"], 2)
-        self.assertEqual(
-            record["evidence_surface"],
-            "quality_and_reliability_part_number_marketing_status",
-        )
+        self.assertEqual(record["evidence_surface"], "quality_and_reliability_part_number")
         self.assertEqual(len(record["raw_sha256"]), 64)
         self.assertEqual(len(record["evidence_section_sha256"]), 64)
         self.assertEqual(len(record["exact_icpns"]), 4)
