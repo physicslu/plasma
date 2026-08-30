@@ -183,11 +183,13 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
         }
       }
 
-      try {
-        window.localStorage.setItem(API_MODE_STORAGE_KEY, nextMode);
-        window.localStorage.setItem(API_STORAGE_KEY, saved);
-      } catch {
-        // Storage is optional.
+      if (nextMode === "managed") {
+        try {
+          window.localStorage.setItem(API_MODE_STORAGE_KEY, nextMode);
+          window.localStorage.setItem(API_STORAGE_KEY, saved);
+        } catch {
+          // Storage is optional.
+        }
       }
 
       if (!cancelled) {
