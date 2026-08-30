@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -66,10 +67,15 @@ class STM32F4Phase31PostAdmissionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             canonical = root / "stm32f4-commercial-icpn.csv"
+            live_named_evidence = root / "evidence"
             self._empty_canonical(canonical)
+            shutil.copytree(EVIDENCE, live_named_evidence)
 
+            # The live admission artifact binds the logical evidence directory basename
+            # (`evidence`). Recreate that path identity while keeping the retained files
+            # byte-identical; do not normalize or replace the immutable live-plan digest.
             plan = build_admission_plan(
-                evidence_dir=EVIDENCE,
+                evidence_dir=live_named_evidence,
                 baseline_path=BASELINE,
                 catalog_path=CATALOG,
                 canonical_path=canonical,
