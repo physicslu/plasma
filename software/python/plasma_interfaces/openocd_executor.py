@@ -258,6 +258,15 @@ class OpenOCDPlanExecutor:
                 if "process" in locals():
                     await self._terminate_process(process)
                 raise
+            except TimeoutError as exc:
+                if "process" in locals():
+                    await self._terminate_process(process)
+                raise PlasmaError(
+                    ErrorCode.OPERATION_TIMEOUT,
+                    "OpenOCD compiled plan timed out",
+                    recoverable=True,
+                    original_exception=exc,
+                ) from exc
             except FileNotFoundError as exc:
                 raise PlasmaError(
                     ErrorCode.INTERFACE_FAILURE,
@@ -268,15 +277,6 @@ class OpenOCDPlanExecutor:
                 raise PlasmaError(
                     ErrorCode.INTERFACE_FAILURE,
                     "OpenOCD compiled-plan process could not be launched",
-                    original_exception=exc,
-                ) from exc
-            except TimeoutError as exc:
-                if "process" in locals():
-                    await self._terminate_process(process)
-                raise PlasmaError(
-                    ErrorCode.OPERATION_TIMEOUT,
-                    "OpenOCD compiled plan timed out",
-                    recoverable=True,
                     original_exception=exc,
                 ) from exc
 
