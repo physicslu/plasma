@@ -27,6 +27,9 @@ let authenticationRequired = false;
 let securityDetected = false;
 let credentialRevision = 0;
 let gatewayRoutingResolved = false;
+let resolvedGatewayApiBase: string | null = null;
+let releaseGatewayRouting!: () => void;
+const gatewayRoutingReady = new Promise<void>(resolve => { releaseGatewayRouting = resolve; });
 let stateSnapshot: SecurityTransportState = SERVER_SNAPSHOT;
 let uninstallTransport: (() => void) | null = null;
 
@@ -66,8 +69,11 @@ export function getSecurityTransportServerState(): SecurityTransportState {
   return SERVER_SNAPSHOT;
 }
 
-export function markGatewayRoutingResolved(): void {
+export function markGatewayRoutingResolved(apiBase: string): void {
+  resolvedGatewayApiBase = apiBase;
+  if (gatewayRoutingResolved) return;
   gatewayRoutingResolved = true;
+  releaseGatewayRouting();
 }
 
 export function setSecurityBearerToken(token: string): void {
@@ -101,7 +107,7 @@ function savedGatewayApiBase(): string | null {
 
 function configuredGatewayOrigins(): Set<string> {
   const origins = new Set<string>();
-  for (const candidate of [DEFAULT_API_BASE, savedGatewayApiBase()]) {
+  for (const candidate of [DEFAULT_API_BASE, savedGatewayApiBase(), resolvedGatewayApiBase]) {
     if (!candidate) continue;
     try {
       origins.add(new URL(candidate).origin);
@@ -117,12 +123,17 @@ function directGatewayPath(pathname: string): boolean {
   return gatewayPathPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-function isGatewayPath(pathname: string): boolean {
-  if (directGatewayPath(pathname)) return true;
+function directGatewayPathname(pathname: string): string | null {
+  if (directGatewayPath(pathname)) return pathname;
   if (pathname.startsWith(`${MANAGED_PPU_PREFIX}/`)) {
-    return directGatewayPath(pathname.slice(MANAGED_PPU_PREFIX.length));
+    const directPath = pathname.slice(MANAGED_PPU_PREFIX.length);
+    if (directGatewayPath(directPath)) return directPath;
   }
-  return false;
+  return null;
+}
+
+function isGatewayPath(pathname: string): boolean {
+  return directGatewayPathname(pathname) !== null;
 }
 
 function isGatewayRequest(url: URL): boolean {
@@ -221,13 +232,28 @@ export function installSecurityTransport(): () => void {
 
   const originalFetch = window.fetch.bind(window);
   const wrappedFetch: typeof window.fetch = async (input, init) => {
-    const rawUrl = typeof Request !== "undefined" && input instanceof Request ? input.url : String(input);
-    const url = new URL(rawUrl, window.location.href);
-    if (!isGatewayRequest(url)) return await originalFetch(input, init);
-    if (!gatewayRoutingResolved) return routingUnresolvedResponse();
+    let currentInput: RequestInfo | URL = input;
+    let rawUrl = typeof Request !== "undefined" && currentInput instanceof Request ? currentInput.url : String(currentInput);
+    let url = new URL(rawUrl, window.location.href);
+    const unresolvedDirectPath = directGatewayPathname(url.pathname);
 
-    const method = requestMethod(input, init);
-    const headers = mergedHeaders(input, init);
+    if (!gatewayRoutingResolved && unresolvedDirectPath !== null) {
+      const unresolvedMethod = requestMethod(currentInput, init);
+      if (isStateChanging(unresolvedMethod)) return routingUnresolvedResponse();
+      await gatewayRoutingReady;
+      if (!resolvedGatewayApiBase) return routingUnresolvedResponse();
+      const rebasedUrl = `${resolvedGatewayApiBase}${unresolvedDirectPath}${url.search}`;
+      currentInput = typeof Request !== "undefined" && currentInput instanceof Request
+        ? new Request(rebasedUrl, currentInput)
+        : rebasedUrl;
+      rawUrl = typeof Request !== "undefined" && currentInput instanceof Request ? currentInput.url : String(currentInput);
+      url = new URL(rawUrl, window.location.href);
+    }
+
+    if (!isGatewayRequest(url)) return await originalFetch(currentInput, init);
+
+    const method = requestMethod(currentInput, init);
+    const headers = mergedHeaders(currentInput, init);
     if (securityDetected && bearerToken && !headers.has("Authorization")) {
       headers.set("Authorization", `Bearer ${bearerToken}`);
     }
@@ -239,12 +265,12 @@ export function installSecurityTransport(): () => void {
     }
 
     const nextInit: RequestInit = { ...init, headers };
-    const request = typeof Request !== "undefined" && input instanceof Request
-      ? new Request(input, nextInit)
-      : input;
+    const request = typeof Request !== "undefined" && currentInput instanceof Request
+      ? new Request(currentInput, nextInit)
+      : currentInput;
 
     try {
-      const response = await originalFetch(request, request === input ? nextInit : undefined);
+      const response = await originalFetch(request, request === currentInput ? nextInit : undefined);
       const errorCode = await securityErrorCode(response);
       if (response.status === 401 && errorCode === "E4101") {
         const changed = !securityDetected || !authenticationRequired;
