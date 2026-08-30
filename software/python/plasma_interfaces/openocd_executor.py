@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import math
 import os
 import re
 import tempfile
@@ -63,19 +64,29 @@ class OpenOCDPlanExecutor:
             )
         return self._process_launcher
 
+    @staticmethod
+    def _validate_argv_text(value: object, *, field: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED, f"OpenOCD {field} is required")
+        if "\x00" in value or "\n" in value or "\r" in value:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"OpenOCD {field} contains invalid characters")
+        return value
+
     def _validate_runtime_options(self) -> None:
-        if not isinstance(self.interface_cfg, str) or not self.interface_cfg.strip():
-            raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED, "OpenOCD interface_cfg is required")
-        if not isinstance(self.target_cfg, str) or not self.target_cfg.strip():
-            raise PlasmaError(ErrorCode.INTERFACE_NOT_CONFIGURED, "OpenOCD target_cfg is required")
+        self._validate_argv_text(self.executable, field="executable")
+        self._validate_argv_text(self.interface_cfg, field="interface_cfg")
+        self._validate_argv_text(self.target_cfg, field="target_cfg")
         if not self.work_dir.is_dir():
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
                 "OpenOCD work_dir must exist and be a directory",
                 context={"work_dir": str(self.work_dir)},
             )
-        if self.command_timeout_s <= 0:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "OpenOCD command_timeout_s must be positive")
+        if not math.isfinite(self.command_timeout_s) or self.command_timeout_s <= 0:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "OpenOCD command_timeout_s must be a positive finite number",
+            )
         if self.adapter_serial is not None:
             serial = str(self.adapter_serial)
             if not serial or _SAFE_ADAPTER_SERIAL_PATTERN.fullmatch(serial) is None:
@@ -204,6 +215,16 @@ class OpenOCDPlanExecutor:
             arguments.extend(["-c", command])
         return arguments
 
+    @staticmethod
+    async def _terminate_process(process: asyncio.subprocess.Process) -> None:
+        if process.returncode is not None:
+            return
+        try:
+            process.kill()
+        except ProcessLookupError:
+            return
+        await process.wait()
+
     async def execute(
         self,
         plan: OpenOCDExecutionPlan,
@@ -233,16 +254,25 @@ class OpenOCDPlanExecutor:
                     process.communicate(),
                     timeout=self.command_timeout_s,
                 )
+            except asyncio.CancelledError:
+                if "process" in locals():
+                    await self._terminate_process(process)
+                raise
             except FileNotFoundError as exc:
                 raise PlasmaError(
                     ErrorCode.INTERFACE_FAILURE,
                     f"OpenOCD executable not found: {self.executable}",
                     original_exception=exc,
                 ) from exc
+            except OSError as exc:
+                raise PlasmaError(
+                    ErrorCode.INTERFACE_FAILURE,
+                    "OpenOCD compiled-plan process could not be launched",
+                    original_exception=exc,
+                ) from exc
             except TimeoutError as exc:
-                if "process" in locals() and process.returncode is None:
-                    process.kill()
-                    await process.wait()
+                if "process" in locals():
+                    await self._terminate_process(process)
                 raise PlasmaError(
                     ErrorCode.OPERATION_TIMEOUT,
                     "OpenOCD compiled plan timed out",
