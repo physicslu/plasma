@@ -1,0 +1,41 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "stm32f103c-profile-decomposition-v0",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "targets": [
+    "STM32F103C8T6",
+    "STM32F103CBT6"
+  ],
+  "allowed_input_source_ids": [
+    "st_ds5319_rev20",
+    "st_pm0075_rev2",
+    "plasma_stm32f1_catalog_main"
+  ],
+  "forbidden_repository_inputs": [
+    "data/ic-support/benchmarks/stm32f103c/ground-truth.json",
+    "data/ic-support/profiles/",
+    "data/ic-support/bindings/"
+  ],
+  "candidate_contract": {
+    "schema_version": "0.1.0",
+    "required_fields": [
+      "schema_version",
+      "benchmark_id",
+      "source_lock_id",
+      "source_digests",
+      "extractor",
+      "observed"
+    ],
+    "extractor_required_fields": [
+      "name",
+      "version"
+    ]
+  },
+  "rules": [
+    "The extraction run must not read the ground-truth answer key.",
+    "The extraction run must not read the checked-in IC Support profiles or bindings.",
+    "The run must report the exact source digests it consumed.",
+    "Missing evidence must remain explicit; unsupported inference is a failure.",
+    "Profile reuse is evaluated independently from factual field extraction."
+  ]
+}

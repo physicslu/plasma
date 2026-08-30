@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.1.0",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "benchmark_id": "stm32f103c-profile-decomposition-v0",
+  "locked_at": "2026-08-30",
+  "targets": [
+    "STM32F103C8T6",
+    "STM32F103CBT6"
+  ],
+  "discovery_provenance": {
+    "workflow_run_id": 33290579801,
+    "workflow_head_sha": "3d58c93cd6a7a025b8289f49e8a51a2eaa7982a2",
+    "artifact_name": "ic-support-source-lock-discovery",
+    "artifact_digest": "sha256:3c79d28ae632a110702d7c7ac71e044d8dbd3dc4929a0ca906937c56f0bf1731"
+  },
+  "sources": [
+    {
+      "source_id": "st_ds5319_rev20",
+      "authority": "manufacturer_official",
+      "document_number": "DS5319",
+      "revision": "20",
+      "requested_url": "https://www.st.com/resource/en/datasheet/stm32f103c8.pdf",
+      "final_url": "https://www.st.com/resource/en/datasheet/stm32f103c8.pdf",
+      "integrity": {
+        "algorithm": "sha256",
+        "digest": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc",
+        "byte_length": 1965230
+      }
+    },
+    {
+      "source_id": "st_pm0075_rev2",
+      "authority": "manufacturer_official",
+      "document_number": "PM0075",
+      "revision": "2",
+      "requested_url": "https://www.st.com/content/ccc/resource/technical/document/programming_manual/10/98/e8/d4/2b/51/4b/f5/CD00283419.pdf/files/CD00283419.pdf/jcr:content/translations/en.CD00283419.pdf",
+      "final_url": "https://www.st.com/content/ccc/resource/technical/document/programming_manual/10/98/e8/d4/2b/51/4b/f5/CD00283419.pdf/files/CD00283419.pdf/jcr:content/translations/en.CD00283419.pdf",
+      "integrity": {
+        "algorithm": "sha256",
+        "digest": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a",
+        "byte_length": 302996
+      }
+    },
+    {
+      "source_id": "plasma_stm32f1_catalog_main",
+      "authority": "plasma_canonical_catalog",
+      "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+      "integrity": {
+        "algorithm": "git_blob_sha1",
+        "digest": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed"
+      }
+    }
+  ]
+}

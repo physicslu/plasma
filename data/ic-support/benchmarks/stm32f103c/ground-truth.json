@@ -1,7 +1,8 @@
 {
   "schema_version": "0.1.0",
   "benchmark_id": "stm32f103c-profile-decomposition-v0",
-  "status": "ground_truth_pilot",
+  "status": "source_locked_ground_truth",
+  "source_lock_id": "stm32f103c-source-lock-v0",
   "targets": ["STM32F103C8T6", "STM32F103CBT6"],
   "expected": {
     "shared_profile_kinds": ["programming", "package_hardware", "option", "security"],

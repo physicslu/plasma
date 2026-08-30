@@ -1,6 +1,6 @@
 # Plasma Product Deployment Foundation
 
-> Status: **Plan**. This document defines the approved product deployment direction and the first implemented read-only readiness audit. Install, upgrade, rollback, launchd/systemd/Windows Service Control Manager activation, release packaging, and Z2 runtime acceptance are not yet implemented by this document alone.
+> Status: **Plan with implemented foundations**. This document defines the approved product deployment direction. The read-only readiness audit, Common Release Format, and common Control Station runtime are implemented; the macOS Control Station adapter now has an unsigned installer pilot. Full signing/notarization, Linux/Windows adapters, upgrade/rollback, and Z2 runtime acceptance remain separate work.
 
 ## 1. Purpose
 
@@ -95,21 +95,30 @@ The planned Control Station platform baseline is:
 | Linux | x86_64, arm64 | system-level `systemd` |
 | Windows | x86_64 | Windows Service Control Manager (SCM) |
 
-These are planned release targets, not claims that installers have already been implemented or validated on every platform.
+These are planned release targets. A passing platform-specific installer or CI result applies only to that platform and does not prove the other adapters.
 
 #### macOS persistence baseline
 
+The macOS adapter separates immutable, system-owned application releases from mutable per-user state:
+
 ```text
-~/Library/Application Support/Plasma/
+/Library/Application Support/Plasma/
 ├── releases/
+│   └── <version>/
 ├── current -> releases/<version>/
+└── install/
+
+~/Library/Application Support/Plasma/
 ├── config/
 └── state/
 
 ~/Library/Logs/Plasma/
+~/Library/LaunchAgents/
 ```
 
-The v1 macOS service baseline is per-user `launchd` LaunchAgents because the Control Station is an operator-facing desktop role.
+This split avoids requiring a root-run `.pkg` payload phase to guess an operator home directory. The package lays down immutable runtime under `/Library/Application Support/Plasma`; post-install reconciliation creates per-user mutable state and LaunchAgents for the selected operator account.
+
+The v1 macOS service baseline is per-user `launchd` LaunchAgents because the Control Station is an operator-facing desktop role. The current macOS installer pilot is unsigned and non-notarized and therefore is validation evidence, not production Apple distribution readiness.
 
 #### Linux Control Station persistence baseline
 
@@ -142,7 +151,7 @@ Conceptually:
 
 The Windows lifecycle owner is Windows Service Control Manager. The exact service-wrapper implementation is deliberately not frozen in this foundation step. A future implementation may use a native service launcher or another maintainable SCM-compatible wrapper, but **Task Scheduler is not the product service lifecycle contract**.
 
-Exact installer mechanics remain to be implemented and validated before any of these paths become Current deployment behavior.
+Linux and Windows installer mechanics remain to be implemented and validated before those platform adapters become Current deployment behavior.
 
 ### 3.2 PPU
 
@@ -232,7 +241,7 @@ The current PPU target is conceptually:
 plasma-ppu-linux-armv7l-<version>.*
 ```
 
-The exact archive/container/installer format is intentionally not frozen in this foundation PR.
+The Common Release Format is defined independently from installer containers. The macOS installer pilot additionally emits an unsigned `.pkg`; that does not freeze the future Linux or Windows installer format.
 
 ### 4.2 Common payload versus platform adapter
 
@@ -263,7 +272,7 @@ Current source facts require Python >= 3.11 for Manager and Node.js >= 22.13 for
 
 The current Web build helper uses GNU `timeout`. That dependency is another reason Control Stations should consume prebuilt validated Console artifacts rather than compile the Web application during installation. Windows should not need a Unix compatibility layer merely to install Plasma.
 
-Future release packaging may bundle Python/Node runtimes and thereby reduce external prerequisites. Until that packaging exists, the read-only audit reports the current runtime prerequisites explicitly.
+The macOS installer pilot keeps Python and Node external and resolves validated absolute executable paths for `launchd`; it does not depend on interactive shell profile initialization. Future release packaging may bundle Python/Node runtimes and thereby reduce external prerequisites.
 
 ### PPU runtime
 
@@ -313,7 +322,7 @@ plasma-deploy rollback
 plasma-deploy version
 ```
 
-Only the read-only `audit` command exists in the first foundation step. Future mutation commands must be idempotent, version-aware, fail closed, and covered by tests before activation on a real Control Station or PPU.
+Only the read-only `audit` command exists in the common product-deploy foundation. The macOS pilot currently uses dedicated packaging/service scripts to validate the platform adapter; it does not redefine the final cross-platform CLI contract. Future mutation commands must be idempotent, version-aware, fail closed, and covered by tests before activation on a real Control Station or PPU.
 
 The same operator-level lifecycle should hide platform mechanics. A normal operator should not need to know or directly invoke:
 
@@ -397,7 +406,9 @@ failure
   -> verify health
 ```
 
-A future installer must retain enough previous release state for deterministic rollback. Configuration migration needs its own forward/backward compatibility rules; rollback must never silently reinterpret incompatible persisted state.
+A future production installer must retain enough previous release state for deterministic rollback. Configuration migration needs its own forward/backward compatibility rules; rollback must never silently reinterpret incompatible persisted state.
+
+The macOS installer pilot intentionally validates installation and basic service lifecycle only; it does not claim upgrade migration or rollback.
 
 Windows may not implement the `current` abstraction as a Unix symbolic link. The product contract is **versioned side-by-side activation with deterministic rollback**; platform adapters may realize that abstraction differently while preserving the same behavior.
 
@@ -453,12 +464,12 @@ A target should be removed from the release matrix rather than retained as an un
 
 The planned implementation sequence is:
 
-1. **Foundation / audit** — role boundaries, cross-platform non-mutating readiness audit, deployment contract.
-2. **Common release format** — immutable metadata, SHA-256 validation, role/platform/architecture identity.
-3. **Control Station runtime package** — common Console/BFF + Manager payload independent of service manager.
-4. **Control Station platform adapters** — macOS launchd, Linux systemd, Windows SCM installers/service definitions.
+1. **Foundation / audit** — role boundaries, cross-platform non-mutating readiness audit, deployment contract. **Implemented.**
+2. **Common release format** — immutable metadata, SHA-256 validation, role/platform/architecture identity. **Implemented.**
+3. **Control Station runtime package** — common Console/BFF + Manager payload independent of service manager. **Implemented.**
+4. **Control Station platform adapters** — macOS launchd, Linux systemd, Windows SCM installers/service definitions. **macOS unsigned installer pilot implemented; Linux/Windows pending.**
 5. **PPU release package** — Gateway + Server artifact for embedded Linux/Z2 without Node/npm/Vite.
-6. **Install / upgrade / rollback** — role-aware platform lifecycle and deterministic recovery.
+6. **Install / upgrade / rollback** — role-aware platform lifecycle and deterministic recovery. The macOS pilot covers initial install and basic lifecycle/uninstall, not full upgrade/rollback.
 7. **Product runtime acceptance** — selected Control Station platform -> Manager -> Z2 -> PS Loopback with SWPC absent from the runtime chain.
 8. **Cross-platform Control Station acceptance** — validate each platform artifact before claiming it as supported.
 9. **Hardware acceptance** — separate PS <-> PL, Site, and real IC phases.
