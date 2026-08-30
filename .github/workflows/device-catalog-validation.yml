@@ -15,9 +15,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Check device catalog diff whitespace
+        run: git diff --check HEAD^1 HEAD
       - name: Validate STM32F1 commercial ICPN dataset
         run: python data/device-catalog/research/validate_stm32f1_commercial_icpn.py
       - name: Validate ST authoritative source acquisition parser
