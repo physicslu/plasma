@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f1-medium-density-security-v0",
+  "kind": "security",
+  "status": "pilot",
+  "scope": {"manufacturer": "STMicroelectronics", "family": "STM32F1", "density_class": "medium"},
+  "evidence": [
+    {"source_id": "st_pm0075_rev2", "sections": ["2.4.1 Read protection", "2.4.2 Write protection", "2.5 Option byte description"]}
+  ],
+  "data": {
+    "read_protection": {
+      "supported": true,
+      "unprotected_key": "0x00A5",
+      "disable_transition": {
+        "destructive": true,
+        "effect": "mass_erase_main_flash",
+        "reset_required": true
+      }
+    },
+    "write_protection": {
+      "supported": true,
+      "granularity_pages": 4,
+      "page_size_bytes": 1024,
+      "granularity_bytes": 4096
+    },
+    "irreversible_otp_efuse": {"status": "not_claimed_by_pilot"}
+  }
+}

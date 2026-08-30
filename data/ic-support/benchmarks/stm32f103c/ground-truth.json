@@ -1,0 +1,61 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "stm32f103c-profile-decomposition-v0",
+  "status": "ground_truth_pilot",
+  "targets": ["STM32F103C8T6", "STM32F103CBT6"],
+  "expected": {
+    "shared_profile_kinds": ["programming", "package_hardware", "option", "security"],
+    "different_profile_kinds": ["memory_geometry"],
+    "parts": {
+      "STM32F103C8T6": {
+        "base_device": "STM32F103C8",
+        "flash_size_bytes": 65536,
+        "page_size_bytes": 1024,
+        "page_count": 64,
+        "profiles": {
+          "programming": "stm32f1-medium-density-flash-v0",
+          "memory_geometry": "stm32f103c8-64k-v0",
+          "package_hardware": "stm32f103-lqfp48-debug-v0",
+          "option": "stm32f1-option-bytes-v0",
+          "security": "stm32f1-medium-density-security-v0"
+        }
+      },
+      "STM32F103CBT6": {
+        "base_device": "STM32F103CB",
+        "flash_size_bytes": 131072,
+        "page_size_bytes": 1024,
+        "page_count": 128,
+        "profiles": {
+          "programming": "stm32f1-medium-density-flash-v0",
+          "memory_geometry": "stm32f103cb-128k-v0",
+          "package_hardware": "stm32f103-lqfp48-debug-v0",
+          "option": "stm32f1-option-bytes-v0",
+          "security": "stm32f1-medium-density-security-v0"
+        }
+      }
+    },
+    "programming_contract": {
+      "program_granularity_bytes": 2,
+      "unlock_keys": ["0x45670123", "0xCDEF89AB"],
+      "write_erase_requires_hsi": true
+    },
+    "option_contract": {
+      "region_start": "0x1FFFF800",
+      "region_size_bytes": 16,
+      "encoding": "byte_plus_complement"
+    },
+    "security_contract": {
+      "read_unprotect_is_destructive": true,
+      "write_protection_granularity_bytes": 4096
+    },
+    "revision_overrides": {
+      "STM32F103C8T6": [],
+      "STM32F103CBT6": []
+    }
+  },
+  "evidence_source_ids": [
+    "st_ds5319_rev20",
+    "st_pm0075_rev2",
+    "plasma_stm32f1_catalog_main"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f103-lqfp48-debug-v0",
+  "kind": "package_hardware",
+  "status": "pilot_partial",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "series": "STM32F103",
+    "package": "LQFP",
+    "pin_count": 48
+  },
+  "evidence": [
+    {"source_id": "st_ds5319_rev20", "sections": ["Features", "Package illustrations", "Debug mode"]}
+  ],
+  "data": {
+    "package": "LQFP",
+    "pin_count": 48,
+    "debug_programming_interfaces": ["SWD", "JTAG"],
+    "pin_level_minimum_programming_hardware": {
+      "status": "pending_evidence",
+      "required_before_runtime_use": true
+    }
+  }
+}
