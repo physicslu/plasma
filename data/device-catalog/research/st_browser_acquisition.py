@@ -18,7 +18,7 @@ from st_product_page_acquisition import (
     MAX_RESPONSE_BYTES,
     PARSER_VERSION,
     SCHEMA_VERSION,
-    extract_exact_icpns,
+    extract_part_number_records,
     validate_source_url,
 )
 
@@ -51,7 +51,13 @@ def build_browser_evidence_record(
     except UnicodeDecodeError as exc:
         raise AcquisitionError("rendered ST product DOM is not valid UTF-8") from exc
 
-    exact_icpns, section_text = extract_exact_icpns(html_text, base_device)
+    records, section_text = extract_part_number_records(html_text, base_device)
+    exact_icpns = [str(record["icpn"]) for record in records if record["active"] is True]
+    excluded = [
+        {"icpn": str(record["icpn"]), "marketing_status": str(record["marketing_status"])}
+        for record in records
+        if record["active"] is not True
+    ]
     return {
         "schema_version": SCHEMA_VERSION,
         "parser_version": PARSER_VERSION,
@@ -64,7 +70,9 @@ def build_browser_evidence_record(
         "http_last_modified": None,
         "rendered_dom_sha256": hashlib.sha256(body).hexdigest(),
         "evidence_section_sha256": hashlib.sha256(section_text.encode("utf-8")).hexdigest(),
-        "evidence_surface": "quality_and_reliability_part_number",
+        "evidence_surface": "quality_and_reliability_part_number_marketing_status",
+        "part_number_records": records,
+        "excluded_non_active_part_numbers": excluded,
         "exact_icpns": exact_icpns,
     }
 
@@ -146,9 +154,9 @@ class STBrowserAcquirer:
 
             # ST currently renders several responsive copies of this evidence
             # section, with the matching heading nodes attached but hidden until
-            # their layout/tab is activated.  Attachment is the stable rendered-DOM
+            # their layout/tab is activated. Attachment is the stable rendered-DOM
             # readiness signal; the scoped evidence parser still fails closed if the
-            # exact section or commercial part numbers are absent.
+            # exact section, Marketing Status, or Active commercial part numbers are absent.
             page.get_by_text(QUALITY_HEADING, exact=True).wait_for(
                 state="attached", timeout=timeout_ms
             )
@@ -172,7 +180,7 @@ class STBrowserAcquirer:
         finally:
             page.close()
             # ST's CDN has repeatedly failed later navigations on a reused
-            # Chromium HTTP/2 connection.  A fresh, clean browser process per
+            # Chromium HTTP/2 connection. A fresh, clean browser process per
             # bounded target avoids connection reuse without changing headers,
             # profiles, timeouts, or evidence semantics.
             if self._rotate_browser_after_fetch:
