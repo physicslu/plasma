@@ -25,7 +25,34 @@ CANONICAL_HEADER = (
 
 
 def _git_blob_sha(data: bytes) -> str:
-    return hashlib.sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()  # noqa: S324
+    return hashlib.sha1(
+        f"blob {len(data)}\0".encode("ascii") + data,
+        usedforsecurity=False,
+    ).hexdigest()
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _manifest_payload(data: bytes, *, git_blob_sha: str | None = None, sha256: str | None = None) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "catalog_id": "test-icpn",
+        "catalog_version": "1.0.0-test",
+        "status": "production",
+        "selection_policy": "admitted_exact_manufacturer_part_number_only",
+        "sources": [
+            {
+                "manufacturer": "STMicroelectronics",
+                "family": "STM32F1",
+                "path": "catalog.csv",
+                "row_count": 1,
+                "git_blob_sha": git_blob_sha if git_blob_sha is not None else _git_blob_sha(data),
+                "sha256": sha256 if sha256 is not None else _sha256(data),
+            }
+        ],
+    }
 
 
 class DeviceCatalogRuntimePathTests(unittest.TestCase):
@@ -45,62 +72,55 @@ class DeviceCatalogRuntimePathTests(unittest.TestCase):
             )
             data = source.read_bytes()
             manifest = root_path / "manifest.json"
-            manifest.write_text(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "catalog_id": "test-icpn",
-                        "catalog_version": "1.0.0-test",
-                        "status": "production",
-                        "selection_policy": "admitted_exact_manufacturer_part_number_only",
-                        "sources": [
-                            {
-                                "manufacturer": "STMicroelectronics",
-                                "family": "STM32F1",
-                                "path": "catalog.csv",
-                                "row_count": 1,
-                                "git_blob_sha": _git_blob_sha(data),
-                            }
-                        ],
-                    }
-                ),
-                encoding="utf-8",
-            )
+            manifest.write_text(json.dumps(_manifest_payload(data)), encoding="utf-8")
 
             catalog = DeviceCatalog.from_manifest(manifest)
 
             self.assertEqual(catalog.size, 1)
             self.assertEqual(catalog.search("STM32F103C8T6")[0].icpn, "STM32F103C8T6")
 
-    def test_manifest_rejects_source_mutation_without_binding_update(self) -> None:
+    def test_manifest_rejects_git_blob_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             root_path = Path(root)
             source = root_path / "catalog.csv"
             source.write_text(CANONICAL_HEADER, encoding="utf-8")
+            data = source.read_bytes()
             manifest = root_path / "manifest.json"
             manifest.write_text(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "catalog_id": "test-icpn",
-                        "catalog_version": "1.0.0-test",
-                        "status": "production",
-                        "selection_policy": "admitted_exact_manufacturer_part_number_only",
-                        "sources": [
-                            {
-                                "manufacturer": "STMicroelectronics",
-                                "family": "STM32F1",
-                                "path": "catalog.csv",
-                                "row_count": 1,
-                                "git_blob_sha": "0" * 40,
-                            }
-                        ],
-                    }
-                ),
+                json.dumps(_manifest_payload(data, git_blob_sha="0" * 40)),
                 encoding="utf-8",
             )
 
             with self.assertRaisesRegex(DeviceCatalogIntegrityError, "Git blob mismatch"):
+                DeviceCatalog.from_manifest(manifest)
+
+    def test_manifest_rejects_sha256_mismatch_even_when_git_blob_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            source = root_path / "catalog.csv"
+            source.write_text(CANONICAL_HEADER, encoding="utf-8")
+            data = source.read_bytes()
+            manifest = root_path / "manifest.json"
+            manifest.write_text(
+                json.dumps(_manifest_payload(data, sha256="0" * 64)),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(DeviceCatalogIntegrityError, "SHA-256 mismatch"):
+                DeviceCatalog.from_manifest(manifest)
+
+    def test_manifest_rejects_invalid_digest_shapes_before_loading_source(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            source = root_path / "catalog.csv"
+            source.write_text(CANONICAL_HEADER, encoding="utf-8")
+            data = source.read_bytes()
+            manifest = root_path / "manifest.json"
+            payload = _manifest_payload(data)
+            payload["sources"][0]["sha256"] = "not-a-digest"  # type: ignore[index]
+            manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(DeviceCatalogIntegrityError, "invalid sha256"):
                 DeviceCatalog.from_manifest(manifest)
 
     def test_render_start_exports_checkout_production_manifest(self) -> None:
