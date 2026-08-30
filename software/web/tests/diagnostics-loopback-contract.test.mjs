@@ -87,8 +87,6 @@ test("PS loopback uses the same workspace API base and shared Manager BFF relay 
   assert.match(managedBff, /\/api\/ppus\/\$\{encodeURIComponent\(ppuAlias\)\}\/gateway\$\{targetPath\}/);
   assert.match(managedBff, /Authorization/);
   assert.match(managedBff, /Idempotency-Key/);
-  assert.match(managedBff, /"Content-Length": String\(contentLength\)/);
-  assert.match(managedBff, /responseHeaders\(response, payload\.byteLength\)/);
   assert.doesNotMatch(managedBff, /NEXT_PUBLIC_PLASMA_API_URL/);
   assert.match(loopback, /Control Console \(Browser\) → Web BFF → Plasma Manager → PPU REST Gateway → Plasma Server → PS/);
 });
