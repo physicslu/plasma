@@ -11,7 +11,7 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 IC_SUPPORT_ROOT = HERE.parents[1]
 SOURCE_LOCK = HERE / "source-lock.json"
-GROUND_TRUTH = HERE / "ground-truth.json"
+EXTRACTION_GROUND_TRUTH = HERE / "extraction-ground-truth.json"
 CONTRACT = HERE / "extraction-contract.json"
 COMPARE_PATH = IC_SUPPORT_ROOT / "compare_benchmark.py"
 
@@ -59,7 +59,7 @@ def expected_source_digests(lock: dict[str, Any]) -> dict[str, str]:
 def validate_candidate(candidate: dict[str, Any]) -> list[str]:
     contract = load(CONTRACT)
     lock = load(SOURCE_LOCK)
-    truth = load(GROUND_TRUTH)
+    truth = load(EXTRACTION_GROUND_TRUTH)
     errors: list[str] = []
 
     required = contract["candidate_contract"]["required_fields"]
@@ -112,7 +112,7 @@ def main() -> int:
         for error in errors:
             print(f"- {error}")
         return 1
-    print("IC Support extraction candidate PASS: source lock and ground truth match")
+    print("IC Support extraction candidate PASS: source lock and extraction ground truth match")
     return 0
 
 
