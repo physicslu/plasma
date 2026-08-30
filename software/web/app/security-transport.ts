@@ -69,9 +69,16 @@ export function getSecurityTransportServerState(): SecurityTransportState {
   return SERVER_SNAPSHOT;
 }
 
-export function markGatewayRoutingResolved(apiBase: string): void {
-  resolvedGatewayApiBase = apiBase;
+export function markGatewayRoutingResolved(): void {
   if (gatewayRoutingResolved) return;
+  const selectedApiBase = savedGatewayApiBase();
+  try {
+    resolvedGatewayApiBase = selectedApiBase
+      ? new URL(selectedApiBase).toString().replace(/\/$/, "")
+      : DEFAULT_API_BASE;
+  } catch {
+    resolvedGatewayApiBase = DEFAULT_API_BASE;
+  }
   gatewayRoutingResolved = true;
   releaseGatewayRouting();
 }
