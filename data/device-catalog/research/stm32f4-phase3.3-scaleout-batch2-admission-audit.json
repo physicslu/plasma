@@ -1,0 +1,45 @@
+{
+  "admission_base_devices": [
+    "STM32F407ZE",
+    "STM32F415VG",
+    "STM32F427VG",
+    "STM32F427ZG",
+    "STM32F437VG"
+  ],
+  "admission_plan_sha256": "551c88acd298f4e641b588edfc5375babb85e12601e477e016e853b9a448ba9b",
+  "baseline_sha256": "c638c057ecbaeef81a62a7c38bd25e61955d1d02288798092e7711bd72a57a72",
+  "batch_id": "stm32f4-phase3.3-scaleout-batch2-2026-08-30",
+  "candidate_count": 15,
+  "canonical_input_sha256": "53eab00aeac54b05fc620f065ea8d727436fe620ffbb100f09a457dda4557b3f",
+  "canonical_rows_after": 49,
+  "canonical_rows_before": 34,
+  "canonical_sha256_after": "38cb7ae955771a38360f994ccaf9cbd04061b3694fa0667f5389ac8d37064159",
+  "decision_counts": {
+    "admit": 15,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_manifest_sha256": "2e5deb1865bc6ee1fd1e1482cd5a24a5d6286586a67c6d6d9b25a82f1b444b42",
+  "executed_git_sha": "cb883bb1312ba05bfe3c2adc29911f0ecc9e7ae5",
+  "icpns": [
+    "STM32F407ZET6",
+    "STM32F407ZET6TR",
+    "STM32F407ZET7",
+    "STM32F415VGT6",
+    "STM32F415VGT6TR",
+    "STM32F415VGT7",
+    "STM32F415VGT7TR",
+    "STM32F427VGT6",
+    "STM32F427VGT6TR",
+    "STM32F427ZGT6",
+    "STM32F427ZGT6TR",
+    "STM32F437VGT6",
+    "STM32F437VGT6TR",
+    "STM32F437VGT7",
+    "STM32F437VGT7TR"
+  ],
+  "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "phase": "3.3",
+  "schema_version": 1
+}
