@@ -1,0 +1,65 @@
+name: STM32F4 Phase 3.1 live evidence
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32f4*"
+      - "data/device-catalog/research/run_stm32f4_browser_pilot.py"
+      - ".github/workflows/stm32f4-phase3.1-live-evidence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  acquire-live-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned Playwright Chromium
+        run: |
+          python -m pip install "playwright==1.62.0"
+          python -m playwright install --with-deps chromium
+      - name: Resolve executed Git SHA
+        run: echo "EXECUTED_GIT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Run headed Chromium control and bounded pilot
+        run: |
+          mkdir -p phase3.1-live
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
+            --scope control --headed \
+            --output phase3.1-live/control-summary.json
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
+            --scope pilot --headed \
+            --output phase3.1-live/pilot-summary.json
+      - name: Evaluate and retain evidence
+        run: |
+          python data/device-catalog/research/evaluate_stm32f4_pilot.py \
+            --summary phase3.1-live/pilot-summary.json \
+            --baseline data/device-catalog/research/stm32f4-phase3.1-pilot-baseline.json \
+            --repository physicslu/plasma \
+            --git-sha "$EXECUTED_GIT_SHA" \
+            --output phase3.1-live/evaluation.json
+          python data/device-catalog/research/retain_stm32f4_browser_evidence.py \
+            --control phase3.1-live/control-summary.json \
+            --pilot phase3.1-live/pilot-summary.json \
+            --evaluation phase3.1-live/evaluation.json \
+            --baseline data/device-catalog/research/stm32f4-phase3.1-pilot-baseline.json \
+            --output-dir phase3.1-live/evidence
+      - name: Build read-only admission plan
+        run: |
+          python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir phase3.1-live/evidence \
+            --baseline data/device-catalog/research/stm32f4-phase3.1-pilot-baseline.json \
+            --catalog data/device-catalog/research/openocd-parts-canonical.csv \
+            --canonical data/device-catalog/research/stm32f4-commercial-icpn.csv \
+            --output phase3.1-live/admission-plan.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32f4-phase3.1-live-evidence
+          path: phase3.1-live/
+          if-no-files-found: error
