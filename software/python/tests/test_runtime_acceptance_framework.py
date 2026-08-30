@@ -47,6 +47,23 @@ def test_runtime_acceptance_cli_exposes_expected_scenarios_without_network() -> 
     assert "--allow-real-hardware" in output
 
 
+def test_emode_runtime_acceptance_uses_current_server_side_batch_contract() -> None:
+    source = (HARNESS / "emode_programming.py").read_text(encoding="utf-8")
+    assert '"/api/batches"' in source
+    assert "server-side-batch-envelope" in source
+    assert "api/programming-assets/check" not in source
+    assert 'f"{client.target_url(target)}/api/jobs"' not in source
+
+
+def test_managed_runtime_acceptance_fails_closed_on_direct_gateway_base() -> None:
+    source = RUNNER.read_text(encoding="utf-8")
+    assert "require_managed_bff" in source
+    assert "/api/manager/ppu" in source
+    assert "direct Gateway routes are not Managed Mode evidence" in source
+    assert 'payload.get("managed") is not True' in source
+    assert 'payload.get("ppu_alias")' in source
+
+
 def test_runtime_acceptance_evidence_is_not_repository_source() -> None:
     gitignore = (REPO / ".gitignore").read_text(encoding="utf-8")
     assert "artifacts/runtime-acceptance/" in gitignore
