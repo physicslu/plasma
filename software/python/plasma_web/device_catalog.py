@@ -62,11 +62,19 @@ def _repository_root() -> Path:
 
 def _git_blob_sha(data: bytes) -> str:
     header = f"blob {len(data)}\0".encode("ascii")
-    return hashlib.sha1(header + data).hexdigest()  # noqa: S324 - Git object identity, not a security primitive
+    return hashlib.sha1(header + data, usedforsecurity=False).hexdigest()
 
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _is_lower_hex_digest(value: object, length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == length
+        and all(character in "0123456789abcdef" for character in value)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,8 +268,13 @@ class DeviceCatalog:
             relative_path = raw_source.get("path")
             expected_rows = raw_source.get("row_count")
             expected_blob = raw_source.get("git_blob_sha")
-            if not all(isinstance(value, str) and value for value in (manufacturer, family, relative_path, expected_blob)):
+            expected_sha256 = raw_source.get("sha256")
+            if not all(isinstance(value, str) and value for value in (manufacturer, family, relative_path)):
                 raise DeviceCatalogIntegrityError(f"catalog source {index} has invalid identity fields")
+            if not _is_lower_hex_digest(expected_blob, 40):
+                raise DeviceCatalogIntegrityError(f"catalog source {index} has invalid git_blob_sha")
+            if not _is_lower_hex_digest(expected_sha256, 64):
+                raise DeviceCatalogIntegrityError(f"catalog source {index} has invalid sha256")
             if isinstance(expected_rows, bool) or not isinstance(expected_rows, int) or expected_rows < 1:
                 raise DeviceCatalogIntegrityError(f"catalog source {index} has invalid row_count")
 
@@ -276,6 +289,10 @@ class DeviceCatalog:
                     f"admitted catalog source Git blob mismatch: {relative_path} expected={expected_blob} actual={actual_blob}"
                 )
             source_sha256 = _sha256(data)
+            if source_sha256 != expected_sha256:
+                raise DeviceCatalogIntegrityError(
+                    f"admitted catalog source SHA-256 mismatch: {relative_path} expected={expected_sha256} actual={source_sha256}"
+                )
             source_digests.append((relative_path, source_sha256))
             records = _parse_admitted_source(
                 data,
