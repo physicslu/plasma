@@ -42,7 +42,7 @@ function runBrowserApiMigration(script, initial) {
 }
 
 test("uses the Plasma Web REST Gateway instead of browser-side job simulation", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
   assert.doesNotMatch(page, /setInterval\s*\(/);
@@ -61,7 +61,7 @@ test("uses the Plasma Web REST Gateway instead of browser-side job simulation", 
 });
 
 test("derives PPU identity and Site topology from canonical status instead of fixed eight-site assumptions", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
   assert.match(api, /export type PPUSnapshot/);
@@ -100,7 +100,7 @@ test("uses canonical Site requests only", async () => {
 });
 
 test("keeps live log messages English and marks error severity explicitly", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
 
   assert.match(page, /type LogLevel = "info" \| "error"/);
   assert.match(page, /const logStageLabels: Record<Stage, string>/);
@@ -189,7 +189,7 @@ test("executes browser API migration behavior for legacy, invalid, default, cust
 });
 
 test("supports selected-site batch jobs and per-site controls", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
 
   assert.match(page, /visibleSiteIds/);
   assert.match(page, /waitForTerminalJob/);
@@ -230,7 +230,7 @@ test("supports selected-site batch jobs and per-site controls", async () => {
 });
 
 test("uses an explicit batch lifecycle and a cancel barrier at dispatch", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
   const lifecycle = await readFile(new URL("../app/batch-lifecycle.ts", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
 
@@ -258,7 +258,7 @@ test("uses an explicit batch lifecycle and a cancel barrier at dispatch", async 
 });
 
 test("keeps batch cancellation authoritative without rewriting the final job result", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
 
   assert.match(page, /type BatchSiteState = "running" \| "cancelling" \| "success" \| "cancelled" \| "failed"/);
   assert.match(page, /batchSiteStates/);

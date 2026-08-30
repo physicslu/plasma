@@ -11,7 +11,8 @@ type SecurityErrorPayload = {
   error?: { error_code?: string };
 };
 
-const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_PLASMA_API_URL ?? "https://plasma.open4th.com";
+type GatewayRoutingMode = "managed" | "standalone";
+
 const MANAGED_PPU_PREFIX = "/api/manager/ppu";
 const MAX_AMBIGUOUS_COMMANDS = 256;
 const listeners = new Set<Listener>();
@@ -27,6 +28,7 @@ let authenticationRequired = false;
 let securityDetected = false;
 let credentialRevision = 0;
 let gatewayRoutingResolved = false;
+let gatewayRoutingMode: GatewayRoutingMode = "standalone";
 let resolvedGatewayApiBase: string | null = null;
 let releaseGatewayRouting!: () => void;
 const gatewayRoutingReady = new Promise<void>(resolve => { releaseGatewayRouting = resolve; });
@@ -69,16 +71,11 @@ export function getSecurityTransportServerState(): SecurityTransportState {
   return SERVER_SNAPSHOT;
 }
 
-export function markGatewayRoutingResolved(): void {
+export function markGatewayRoutingResolved(apiBase: string, mode: GatewayRoutingMode): void {
+  const normalized = new URL(apiBase).toString().replace(/\/$/, "");
+  resolvedGatewayApiBase = normalized;
+  gatewayRoutingMode = mode;
   if (gatewayRoutingResolved) return;
-  const selectedApiBase = savedGatewayApiBase();
-  try {
-    resolvedGatewayApiBase = selectedApiBase
-      ? new URL(selectedApiBase).toString().replace(/\/$/, "")
-      : DEFAULT_API_BASE;
-  } catch {
-    resolvedGatewayApiBase = DEFAULT_API_BASE;
-  }
   gatewayRoutingResolved = true;
   releaseGatewayRouting();
 }
@@ -103,29 +100,6 @@ export function clearSecurityBearerToken(): void {
   emit();
 }
 
-function savedGatewayApiBase(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem("plasma-api-base");
-  } catch {
-    return null;
-  }
-}
-
-function configuredGatewayOrigins(): Set<string> {
-  const origins = new Set<string>();
-  for (const candidate of [DEFAULT_API_BASE, savedGatewayApiBase(), resolvedGatewayApiBase]) {
-    if (!candidate) continue;
-    try {
-      origins.add(new URL(candidate).origin);
-    } catch {
-      // Invalid saved API values are handled by the normal API-base migration.
-    }
-  }
-  if (typeof window !== "undefined") origins.add(window.location.origin);
-  return origins;
-}
-
 function directGatewayPath(pathname: string): boolean {
   return gatewayPathPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
@@ -144,7 +118,14 @@ function isGatewayPath(pathname: string): boolean {
 }
 
 function isGatewayRequest(url: URL): boolean {
-  return configuredGatewayOrigins().has(url.origin) && isGatewayPath(url.pathname);
+  if (!isGatewayPath(url.pathname)) return false;
+  if (gatewayRoutingMode === "managed") return true;
+  if (!resolvedGatewayApiBase) return false;
+  try {
+    return url.origin === new URL(resolvedGatewayApiBase).origin;
+  } catch {
+    return false;
+  }
 }
 
 function routingUnresolvedResponse(): Response {
@@ -201,6 +182,18 @@ function mergedHeaders(input: RequestInfo | URL, init?: RequestInit): Headers {
   return headers;
 }
 
+function rebaseInput(
+  input: RequestInfo | URL,
+  directPath: string,
+  search: string,
+): RequestInfo | URL {
+  if (!resolvedGatewayApiBase) return input;
+  const rebasedUrl = `${resolvedGatewayApiBase}${directPath}${search}`;
+  return typeof Request !== "undefined" && input instanceof Request
+    ? new Request(rebasedUrl, input)
+    : rebasedUrl;
+}
+
 async function securityErrorCode(response: Response): Promise<string | undefined> {
   if (response.status !== 401 && response.status !== 409) return undefined;
   try {
@@ -242,17 +235,26 @@ export function installSecurityTransport(): () => void {
     let currentInput: RequestInfo | URL = input;
     let rawUrl = typeof Request !== "undefined" && currentInput instanceof Request ? currentInput.url : String(currentInput);
     let url = new URL(rawUrl, window.location.href);
-    const unresolvedDirectPath = directGatewayPathname(url.pathname);
+    let directPath = directGatewayPathname(url.pathname);
 
-    if (!gatewayRoutingResolved && unresolvedDirectPath !== null) {
+    if (!gatewayRoutingResolved && directPath !== null) {
       const unresolvedMethod = requestMethod(currentInput, init);
       if (isStateChanging(unresolvedMethod)) return routingUnresolvedResponse();
       await gatewayRoutingReady;
       if (!resolvedGatewayApiBase) return routingUnresolvedResponse();
-      const rebasedUrl = `${resolvedGatewayApiBase}${unresolvedDirectPath}${url.search}`;
-      currentInput = typeof Request !== "undefined" && currentInput instanceof Request
-        ? new Request(rebasedUrl, currentInput)
-        : rebasedUrl;
+      currentInput = rebaseInput(currentInput, directPath, url.search);
+      rawUrl = typeof Request !== "undefined" && currentInput instanceof Request ? currentInput.url : String(currentInput);
+      url = new URL(rawUrl, window.location.href);
+      directPath = directGatewayPathname(url.pathname);
+    }
+
+    if (
+      gatewayRoutingResolved
+      && gatewayRoutingMode === "managed"
+      && resolvedGatewayApiBase
+      && directPath !== null
+    ) {
+      currentInput = rebaseInput(currentInput, directPath, url.search);
       rawUrl = typeof Request !== "undefined" && currentInput instanceof Request ? currentInput.url : String(currentInput);
       url = new URL(rawUrl, window.location.href);
     }

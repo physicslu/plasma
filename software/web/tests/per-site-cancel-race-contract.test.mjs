@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("keeps per-Site cancel intent authoritative across operation-completion races", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
   const lifecycle = await readFile(new URL("../app/batch-lifecycle.ts", import.meta.url), "utf8");
 
   assert.match(lifecycle, /cancelRequested\?: boolean/);
@@ -32,7 +32,7 @@ test("keeps per-Site cancel intent authoritative across operation-completion rac
 });
 
 test("keeps global batch cancellation distinct from per-Site cancellation", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
   const lifecycle = await readFile(new URL("../app/batch-lifecycle.ts", import.meta.url), "utf8");
 
   assert.match(lifecycle, /private cancelBarrier = false/);

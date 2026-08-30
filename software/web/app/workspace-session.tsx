@@ -197,7 +197,7 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
         setApiBaseState(saved);
         setApiMode(nextMode);
         setManagedPpuAlias(nextManagedPpuAlias);
-        markGatewayRoutingResolved();
+        markGatewayRoutingResolved(saved, nextMode);
         setHydrated(true);
       }
     })();
@@ -214,6 +214,7 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     setApiBaseState(normalized);
     setApiMode(mode);
     if (mode === "standalone") setManagedPpuAlias(null);
+    markGatewayRoutingResolved(normalized, mode);
     try {
       window.localStorage.setItem(API_STORAGE_KEY, normalized);
       window.localStorage.setItem(API_MODE_STORAGE_KEY, mode);

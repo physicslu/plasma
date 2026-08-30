@@ -1,4 +1,4 @@
-import { DEFAULT_API_BASE, normalizeApiBase } from "./plasma-api";
+import { normalizeApiBase } from "./plasma-api";
 
 export type DeviceIdentifierKind = "manufacturer_part_number" | string;
 
@@ -52,21 +52,17 @@ export type DeviceSearchResponse = {
   results: DeviceSearchResult[];
 };
 
-export function configuredDeviceApiBase(): string {
-  if (typeof window === "undefined") return DEFAULT_API_BASE;
-  try {
-    const saved = window.localStorage.getItem("plasma-api-base");
-    return saved ? normalizeApiBase(saved) : DEFAULT_API_BASE;
-  } catch {
-    return DEFAULT_API_BASE;
-  }
-}
+export type DeviceSearchOptions = {
+  apiBase: string;
+  limit?: number;
+  signal?: AbortSignal;
+};
 
 export async function searchDevices(
   query: string,
-  options: { apiBase?: string; limit?: number; signal?: AbortSignal } = {},
+  options: DeviceSearchOptions,
 ): Promise<DeviceSearchResponse> {
-  const apiBase = normalizeApiBase(options.apiBase ?? configuredDeviceApiBase());
+  const apiBase = normalizeApiBase(options.apiBase);
   const limit = options.limit ?? 20;
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   const response = await fetch(`${apiBase}/api/devices/search?${params.toString()}`, {

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("keeps PPU and Site as the canonical Web vocabulary", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
   const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 

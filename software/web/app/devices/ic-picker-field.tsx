@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  configuredDeviceApiBase,
   searchDevices,
   type DeviceSearchResult,
 } from "../device-catalog-api";
 import "./ic-picker-field.css";
 
 export type ICPickerFieldProps = {
-  apiBase?: string;
+  apiBase: string;
   value: DeviceSearchResult | null;
   onChange: (device: DeviceSearchResult | null) => void;
   disabled?: boolean;
@@ -27,7 +26,6 @@ export function ICPickerField({
   const [results, setResults] = useState<DeviceSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const resolvedApiBase = useMemo(() => apiBase ?? configuredDeviceApiBase(), [apiBase]);
 
   useEffect(() => {
     const normalized = query.trim();
@@ -39,7 +37,7 @@ export function ICPickerField({
       setLoading(true);
       try {
         const response = await searchDevices(normalized, {
-          apiBase: resolvedApiBase,
+          apiBase,
           limit: 8,
           signal: controller.signal,
         });
@@ -58,7 +56,7 @@ export function ICPickerField({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, resolvedApiBase, value]);
+  }, [apiBase, query, value]);
 
   function choose(device: DeviceSearchResult) {
     const label = device.icpn ?? device.identifier;

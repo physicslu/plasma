@@ -19,6 +19,19 @@ async function expectManagedBrowserRouting(page: import("@playwright/test").Page
     .not.toBe(staleDirectGateway);
 }
 
+function observeGatewayRouting(page: import("@playwright/test").Page) {
+  const leakedGatewayRequests: string[] = [];
+  const managedStatusRequests: string[] = [];
+  page.on("request", request => {
+    const url = request.url();
+    if (url.startsWith(staleDirectGateway) || url.startsWith(defaultRemoteGateway)) {
+      leakedGatewayRequests.push(url);
+    }
+    if (url.includes("/api/manager/ppu/api/status")) managedStatusRequests.push(url);
+  });
+  return { leakedGatewayRequests, managedStatusRequests };
+}
+
 test("Managed Control Station overrides stale standalone Browser routing", async ({ page }) => {
   await seedLegacyStandaloneRouting(page);
   await page.route("**/api/manager/ppu", async route => {
@@ -35,16 +48,7 @@ test("Managed Control Station overrides stale standalone Browser routing", async
 
 test("Gateway reads stay inside the Browser until Managed routing discovery resolves", async ({ page }) => {
   await seedLegacyStandaloneRouting(page);
-
-  const leakedGatewayRequests: string[] = [];
-  const managedStatusRequests: string[] = [];
-  page.on("request", request => {
-    const url = request.url();
-    if (url.startsWith(staleDirectGateway) || url.startsWith(defaultRemoteGateway)) {
-      leakedGatewayRequests.push(url);
-    }
-    if (url.includes("/api/manager/ppu/api/status")) managedStatusRequests.push(url);
-  });
+  const { leakedGatewayRequests, managedStatusRequests } = observeGatewayRouting(page);
 
   let releaseDiscovery!: () => void;
   const discoveryReleased = new Promise<void>(resolve => { releaseDiscovery = resolve; });
@@ -100,6 +104,47 @@ test("Gateway reads stay inside the Browser until Managed routing discovery reso
   await expectManagedBrowserRouting(page);
   expect(leakedGatewayRequests).toEqual([]);
   expect(managedStatusRequests.length).toBeGreaterThanOrEqual(2);
+});
+
+test("Managed routing stays exclusive during steady-state polling", async ({ page }) => {
+  await seedLegacyStandaloneRouting(page);
+  const { leakedGatewayRequests, managedStatusRequests } = observeGatewayRouting(page);
+
+  await page.route("**/api/manager/ppu/api/status", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, sites: [] }),
+    });
+  });
+  await page.route("**/api/manager/ppu", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, managed: true, configured: true, ppu_alias: "swpc" }),
+    });
+  });
+
+  await page.goto("/");
+  await expectManagedBrowserRouting(page);
+
+  const statusCountAfterBootstrap = managedStatusRequests.length;
+  await page.waitForTimeout(1_600);
+
+  expect(leakedGatewayRequests).toEqual([]);
+  expect(managedStatusRequests.length).toBeGreaterThan(statusCountAfterBootstrap);
+
+  const directAttempt = await page.evaluate(async directGateway => {
+    const response = await fetch(`${directGateway}/api/status`, { cache: "no-store" });
+    return { status: response.status, ok: response.ok, url: response.url };
+  }, staleDirectGateway);
+
+  expect(directAttempt).toEqual({
+    status: 200,
+    ok: true,
+    url: expect.stringContaining("/api/manager/ppu/api/status"),
+  });
+  expect(leakedGatewayRequests).toEqual([]);
 });
 
 test("Managed Control Station remains fail-closed when the BFF routing config is incomplete", async ({ page }) => {

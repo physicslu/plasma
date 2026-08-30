@@ -66,6 +66,27 @@ Architectural invariant:
 
 ## Deferred product capability
 
+### UI Configuration Profiles — Save / Load
+
+**Status:** TODO / future product capability
+
+**Layer:** Control Station / Settings / configuration management
+
+**Reason:** Plasma Settings will grow beyond one-off browser controls. Operators and engineers need a deterministic way to save a known-good configuration and later restore it without manually re-entering every field. This must be implemented as configuration management, not as an unversioned localStorage dump.
+
+Required work:
+
+- define which settings are profile-owned versus runtime/session-owned, PPU-owned, Manager-owned or security-sensitive;
+- provide Settings UI actions to save a named configuration profile and load/activate an existing profile;
+- define a versioned profile schema with validation, defaults and forward migration rules;
+- preserve configuration ownership boundaries so loading a UI profile cannot bypass Manager routing, backend authorization or PPU-specific constraints;
+- exclude secrets and credentials from portable profile data unless a separate approved secure-secret contract exists;
+- define profile scope explicitly, including whether a profile is Control-Station-local, user-specific, Facility-specific, PPU-specific or portable;
+- provide deterministic import/export only after schema/version/validation semantics are defined;
+- show the active profile, unsaved changes and load/save failures clearly in the UI;
+- add backend or durable local persistence based on the final ownership decision rather than treating browser localStorage as the canonical store;
+- add tests for save/load round-trip, invalid or stale profile rejection, schema migration, partial failure and Managed/Standalone routing invariants.
+
 ### Real Provider and Physical IC Quantity Handoff
 
 **Status:** TODO / deferred from the current 1-4 technical-debt sequence
