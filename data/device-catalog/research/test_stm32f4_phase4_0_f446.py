@@ -12,11 +12,16 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 from stm32f4_acquisition_pilot import read_manifest  # noqa: E402
-from stm32f4_admission_policy import TARGET_CONFIG, resolve_ordering_pattern_mapping  # noqa: E402
+from stm32f4_admission_policy import (  # noqa: E402
+    TARGET_CONFIG,
+    build_canonical_row,
+    resolve_ordering_pattern_mapping,
+)
 
 BASELINE = HERE / "stm32f4-phase4.0-f446-batch1-baseline.json"
 MANIFEST = HERE / "stm32f4-phase4.0-f446-batch1-manifest.json"
 CATALOG = HERE / "openocd-parts-canonical.csv"
+CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
 CONTROL_BASE = "STM32F401CC"
 F446_BASES = {"STM32F446VC", "STM32F446VE", "STM32F446ZC", "STM32F446ZE"}
 EXPECTED_NEW_ICPNS = 23
@@ -29,6 +34,10 @@ class STM32F4Phase40F446Tests(unittest.TestCase):
     def _catalog_rows(self) -> list[dict[str, str]]:
         with CATALOG.open(newline="", encoding="utf-8") as handle:
             return list(csv.DictReader(handle))
+
+    def _canonical_fields(self) -> list[str]:
+        with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle).fieldnames or [])
 
     def test_baseline_is_bounded_active_only_and_excludes_proposal(self) -> None:
         baseline = self._baseline()
@@ -86,6 +95,39 @@ class STM32F4Phase40F446Tests(unittest.TestCase):
                     mapped += 1
         self.assertEqual(failures, [], "\n" + "\n".join(failures))
         self.assertEqual(mapped, EXPECTED_NEW_ICPNS)
+
+    def test_f446_package_pin_and_flash_semantics_are_deterministic(self) -> None:
+        catalog_rows = self._catalog_rows()
+        fields = self._canonical_fields()
+        cases = {
+            "STM32F446ZCH6": ("STM32F446ZC", "UFBGA", "144", "256 KiB"),
+            "STM32F446ZCJ6": ("STM32F446ZC", "UFBGA", "144", "256 KiB"),
+            "STM32F446ZCT6": ("STM32F446ZC", "LQFP", "144", "256 KiB"),
+            "STM32F446ZEH7TR": ("STM32F446ZE", "UFBGA", "144", "512 KiB"),
+            "STM32F446ZEJ7TR": ("STM32F446ZE", "UFBGA", "144", "512 KiB"),
+            "STM32F446ZET7TR": ("STM32F446ZE", "LQFP", "144", "512 KiB"),
+            "STM32F446VCT6": ("STM32F446VC", "LQFP", "100", "256 KiB"),
+            "STM32F446VET6": ("STM32F446VE", "LQFP", "100", "512 KiB"),
+        }
+        for icpn, (base, package, pins, flash) in cases.items():
+            with self.subTest(icpn=icpn):
+                candidate = {
+                    "manufacturer": "STMicroelectronics",
+                    "base_device": base,
+                    "icpn": icpn,
+                    "authoritative_evidence": {
+                        "evidence_id": "phase4.0-f446-package-policy-contract",
+                        "source_url": (
+                            "https://www.st.com/en/microcontrollers-microprocessors/"
+                            f"{base.lower()}.html"
+                        ),
+                    },
+                    "base_mapping": resolve_ordering_pattern_mapping(icpn, catalog_rows),
+                }
+                row = build_canonical_row(candidate, fields)
+                self.assertEqual(row["package"], package)
+                self.assertEqual(row["pin_count"], pins)
+                self.assertEqual(row["flash_size"], flash)
 
 
 if __name__ == "__main__":
