@@ -206,8 +206,19 @@ def prepare_workspace(
             record["searchable_text_sha256"] = sha256_file(text_path)
         manifest_sources.append(record)
 
+    write_prompt(workspace, contract)
+    locked_files = []
+    for relative in [
+        "contracts/source-lock.json",
+        "contracts/extraction-contract.json",
+        "contracts/extraction-observed.schema.json",
+        "PROMPT.md",
+    ]:
+        path = workspace / relative
+        locked_files.append({"file": relative, "sha256": sha256_file(path)})
+
     manifest = {
-        "schema_version": "0.1.0",
+        "schema_version": "0.2.0",
         "benchmark_id": lock["benchmark_id"],
         "source_lock_id": lock["source_lock_id"],
         "isolation": {
@@ -217,12 +228,12 @@ def prepare_workspace(
             "repository_bindings_copied": False,
             "os_sandbox_enforced": False,
         },
+        "locked_files": locked_files,
         "sources": manifest_sources,
     }
     (workspace / "workspace-manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
-    write_prompt(workspace, contract)
 
     git = require_command("git")
     subprocess.run([git, "-C", str(workspace), "init", "-q"], check=True)
@@ -243,6 +254,17 @@ def verify_workspace(workspace: Path, repo_root: Path = DEFAULT_REPO_ROOT) -> di
     if not manifest_path.is_file():
         raise WorkspaceError(f"workspace manifest missing: {manifest_path}")
     manifest = load_json(manifest_path)
+    for locked in manifest.get("locked_files", []):
+        if not isinstance(locked, dict):
+            raise WorkspaceError("workspace manifest locked-file entry is invalid")
+        relative = locked.get("file")
+        expected = locked.get("sha256")
+        if not isinstance(relative, str) or not isinstance(expected, str):
+            raise WorkspaceError("workspace manifest locked-file metadata is invalid")
+        path = workspace / relative
+        if sha256_file(path) != expected:
+            raise WorkspaceError(f"{path}: locked workspace file digest mismatch")
+
     for source in manifest.get("sources", []):
         if not isinstance(source, dict):
             raise WorkspaceError("workspace manifest source entry is invalid")
