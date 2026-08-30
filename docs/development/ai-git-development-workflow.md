@@ -30,7 +30,9 @@ Draft PR
         ↓
 CI Validation / CI Repair
         ↓
-Draft -> Ready for review  ← automatic agent action
+Attempt Draft -> Ready for review  ← automatic agent action
+        ↓
+Ready succeeds OR tooling defect recorded
         ↓
 Final Diff / Mergeability Review
         ↓
@@ -93,11 +95,15 @@ After Merge Approval, the agent merges and verifies the resulting `main` state. 
 
 ## Draft -> Ready Policy
 
-`Draft -> Ready for review` is a **mechanical PR lifecycle transition** and must be performed automatically when all merge-ready preconditions that can be checked before human merge approval are satisfied.
+`Draft -> Ready for review` is a **mechanical PR lifecycle transition** and must be attempted automatically when all merge-ready preconditions that can be checked before human merge approval are satisfied.
 
 The agent must not turn this transition into a third gate.
 
-If a GitHub connector or permission defect prevents the agent from changing Draft -> Ready, that is a **tooling exception**, not an approval gate. The agent may ask the user to perform the mechanical action, but must not describe the click as an additional approval decision.
+If a GitHub connector or permission defect prevents the agent from changing Draft -> Ready, that is a **tooling exception**, not an approval gate. Record the concrete tooling error and continue evaluating the PR against the normal merge-ready definition.
+
+When the PR is otherwise merge-ready, a failed Ready transition **must not block Gate 2** and must not require the user to perform a manual Ready click merely to continue the workflow. After explicit Gate 2 Merge Approval, the agent should attempt the normal merge operation using the verified PR head SHA. Only if GitHub repository rules or the merge API itself rejects the merge because the PR remains Draft should the agent ask the user for that specific mechanical Ready action.
+
+A known example is a connector-side GraphQL schema failure while marking Ready, such as an invalid `Repository.fullDatabaseId` field. Such a connector defect does not change the PR's engineering readiness.
 
 ## Scope Escalation Policy
 
@@ -154,7 +160,7 @@ After Gate 1, AI agents own routine execution within scope:
 - documentation;
 - branch/commit/PR maintenance;
 - CI observation and repair;
-- Ready-for-review transition.
+- Ready-for-review transition attempt and tooling-defect handling.
 
 Humans retain product authority through Plan Approval and Merge Approval.
 
@@ -191,7 +197,9 @@ PR must accurately state:
 - known limitations;
 - explicit out-of-scope items.
 
-When implementation, relevant validation, CI, diff review, and mergeability are satisfactory, change Draft -> Ready automatically.
+When implementation, relevant validation, CI, diff review, and mergeability are satisfactory, attempt Draft -> Ready automatically.
+
+If that transition fails because of a connector or permission defect but the PR otherwise satisfies the merge-ready definition, record the tooling exception and proceed to Gate 2. Do not require a manual Ready click unless GitHub later proves that the Draft state actually blocks the approved merge operation.
 
 ### 6. Merge Main
 
@@ -203,6 +211,8 @@ Merge requires:
 - PR mergeable;
 - no evidence claim beyond what was actually tested;
 - explicit Gate 2 Merge Approval.
+
+A successful Ready-for-review mutation is not an independent engineering-readiness requirement. After Gate 2 approval, use the verified PR head SHA when invoking merge so that a moved head fails closed.
 
 ### 7. Post-merge Deployment and Acceptance
 
@@ -229,8 +239,11 @@ Missing permissions, connector bugs, unavailable SSH/remote-shell access, or oth
 That interaction is not automatically an approval gate. Distinguish clearly between:
 
 - **approval decision** — only Gate 1 or Gate 2;
-- **mechanical assistance** — user performs an action because the agent lacks tool access;
+- **mechanical assistance** — user performs an action because the agent lacks tool access and no equivalent supported operation exists;
+- **non-blocking lifecycle defect** — a mechanical state transition such as Ready fails, but an independent supported merge path still exists; proceed to Gate 2 and use that path after approval;
 - **scope revision** — requires another Gate 1 approval because the plan changed materially.
+
+Prefer an available, semantically equivalent supported operation over asking the user to perform redundant mechanical work.
 
 ## AI Agent Requirement
 
@@ -241,6 +254,7 @@ AI agents must:
 3. Preserve architecture and safety contracts.
 4. Continue autonomously after Gate 1 within approved scope.
 5. Run relevant validation before merge-ready.
-6. Change Draft -> Ready automatically when merge-ready.
+6. Attempt Draft -> Ready automatically when merge-ready; if that transition is blocked by a tooling defect, record it and continue to Gate 2 when the PR is otherwise merge-ready.
 7. Stop for user approval only at Gate 1 or Gate 2; unexpected scope expansion returns to Gate 1 rather than creating a third gate.
-8. Never claim deployment, runtime, FPGA, or hardware success without observed evidence.
+8. After Gate 2 approval, use an available supported merge path and ask for mechanical user assistance only if the merge operation itself proves it is required.
+9. Never claim deployment, runtime, FPGA, or hardware success without observed evidence.

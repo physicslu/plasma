@@ -420,14 +420,15 @@ Routine autonomous work includes:
 - create/update Draft PRs;
 - inspect and repair deterministic CI failures caused by the branch;
 - rerun a failed CI check once when evidence supports transient flakiness;
-- mark a PR Ready automatically when it is actually merge-ready;
+- attempt to mark a PR Ready automatically when it is actually merge-ready;
+- if Ready is blocked by a connector/tooling defect, record the defect and continue to Gate 2 when the PR otherwise satisfies the merge-ready definition;
 - perform deployment/runtime acceptance explicitly included in the approved plan;
 - perform hardware validation explicitly included in the approved plan;
 - after Gate 2, merge and continue approved post-merge validation without creating another gate.
 
 Do not turn routine engineering procedure into user-operated command relaying when the agent can perform the work directly.
 
-If a connector, permission, SSH, or remote-shell limitation forces the user to perform a mechanical action, identify it as a **tooling/access exception**, not an approval gate.
+If a connector, permission, SSH, or remote-shell limitation forces the user to perform a mechanical action, identify it as a **tooling/access exception**, not an approval gate. Prefer an available semantically equivalent supported operation over asking the user to perform redundant mechanical work.
 
 ## 12. Scope coverage and escalation — no third gate
 
@@ -484,9 +485,9 @@ A PR is merge-ready only when applicable conditions are true:
 - GitHub reports mergeable;
 - no validation claim exceeds observed evidence.
 
-At that point mark Ready automatically, then stop and request Gate 2 Merge Approval.
+At that point attempt Ready automatically, then stop and request Gate 2 Merge Approval.
 
-A failure of the GitHub connector to perform Draft -> Ready is a tooling exception, not a user approval gate. Ask the user to perform the mechanical transition only when the available tool cannot do it.
+A failure of the GitHub connector to perform Draft -> Ready is a tooling exception, not a user approval gate and not an engineering-readiness failure. If the PR otherwise satisfies the merge-ready definition, proceed to Gate 2 without requiring the user to perform a manual Ready click. After explicit Gate 2 approval, use the verified PR head SHA and attempt the supported merge operation. Ask the user for a mechanical Ready action only if GitHub repository rules or the merge API itself proves that Draft state blocks the approved merge.
 
 ## 14. Git publication policy
 
