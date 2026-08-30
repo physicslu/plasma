@@ -55,6 +55,17 @@ def test_emode_runtime_acceptance_uses_current_server_side_batch_contract() -> N
     assert 'f"{client.target_url(target)}/api/jobs"' not in source
 
 
+def test_managed_job_cancel_uses_server_batch_as_operator_authority() -> None:
+    source = (HARNESS / "job_cancel.py").read_text(encoding="utf-8")
+    assert '"/api/batches"' in source
+    assert 'f"/api/batches/{encoded_batch}/cancel"' in source
+    assert 'cancel_snapshot.get("cancel_requested") is not True' in source
+    assert 'final_batch.get("state") != "cancelled"' in source
+    assert 'final_sites[0].get("state") != "cancelled"' in source
+    assert 'final_job.get("state") != "cancelled"' in source
+    assert 'f"{client.target_url(target)}/api/jobs/{encoded}/cancel"' not in source
+
+
 def test_managed_runtime_acceptance_fails_closed_on_direct_gateway_base() -> None:
     source = RUNNER.read_text(encoding="utf-8")
     assert "require_managed_bff" in source
