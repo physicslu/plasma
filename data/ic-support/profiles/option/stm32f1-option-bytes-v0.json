@@ -1,0 +1,19 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f1-option-bytes-v0",
+  "kind": "option",
+  "status": "pilot",
+  "scope": {"manufacturer": "STMicroelectronics", "family": "STM32F1", "density_class": "medium"},
+  "evidence": [
+    {"source_id": "st_pm0075_rev2", "sections": ["2.3.5 Option byte programming", "2.5 Option byte description", "Table 7. Option byte format", "Table 8. Option byte organization"]}
+  ],
+  "data": {
+    "region_start": "0x1FFFF800",
+    "region_size_bytes": 16,
+    "logical_option_bytes": 8,
+    "encoding": "byte_plus_complement",
+    "unlock_register": "FLASH_OPTKEYR",
+    "unlock_keys": ["0x45670123", "0xCDEF89AB"],
+    "reload": "system_reset"
+  }
+}
