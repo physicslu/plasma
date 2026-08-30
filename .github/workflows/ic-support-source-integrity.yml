@@ -2,13 +2,6 @@ name: IC Support official source integrity
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - agent/ic-support-source-lock
-    paths:
-      - "data/ic-support/evidence/**"
-      - "data/ic-support/benchmarks/stm32f103c/source-lock.json"
-      - ".github/workflows/ic-support-source-integrity.yml"
 
 permissions:
   contents: read
