@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 
 class PPUHTTPError(RuntimeError):
@@ -12,6 +12,14 @@ class PPUHTTPError(RuntimeError):
 
 class PPUTransportError(PPUHTTPError):
     """Raised when Manager cannot establish or complete HTTP transport to a PPU."""
+
+
+# Manager-to-PPU traffic is a product-managed private network path. Inheriting a
+# desktop/server host's ambient HTTP proxy can redirect credentials and payloads,
+# change failure semantics, or block startup on OS proxy discovery. Use an explicit
+# direct opener for every PPU request; proxying this control-plane path is not part of
+# the Plasma deployment contract.
+_DIRECT_HTTP = build_opener(ProxyHandler({}))
 
 
 class PPUHttpClient:
@@ -39,7 +47,10 @@ class PPUHttpClient:
             method=method,
         )
         try:
-            with urlopen(request, timeout=self.timeout_s if timeout_s is None else timeout_s) as response:
+            with _DIRECT_HTTP.open(
+                request,
+                timeout=self.timeout_s if timeout_s is None else timeout_s,
+            ) as response:
                 status = response.status
                 response_data = response.read()
         except HTTPError as exc:
@@ -89,7 +100,7 @@ class PPUHttpClient:
         )
         try:
             try:
-                response = urlopen(request, timeout=timeout_s)
+                response = _DIRECT_HTTP.open(request, timeout=timeout_s)
             except HTTPError as exc:
                 response = exc
             with response:
