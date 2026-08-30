@@ -158,6 +158,41 @@ jobs:
             --admit-base STM32F446ZC \
             --admit-base STM32F446ZE \
             --output phase40-evidence/admission-plan.json
+      - name: Generate and validate F446 canonical candidate
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path('data/device-catalog/research')
+          sys.path.insert(0, str(root))
+          from device_catalog_admission_framework import write_canonical_dataset
+
+          canonical = root / 'stm32f4-commercial-icpn.csv'
+          plan = json.loads(Path('phase40-evidence/admission-plan.json').read_text(encoding='utf-8'))
+          result = write_canonical_dataset(plan=plan, canonical_path=canonical)
+          if result != {
+              'status': 'written',
+              'rows_before': 49,
+              'rows_after': 72,
+              'added': sorted(item['icpn'] for item in plan['candidates']),
+          }:
+              raise SystemExit(f'unexpected canonical write result: {result!r}')
+          payload = canonical.read_bytes()
+          Path('phase40-evidence/stm32f4-commercial-icpn.csv').write_bytes(payload)
+          Path('phase40-evidence/canonical-output.json').write_text(
+              json.dumps({
+                  'rows_before': 49,
+                  'rows_after': 72,
+                  'sha256': hashlib.sha256(payload).hexdigest(),
+                  'added': result['added'],
+              }, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          python data/device-catalog/research/validate_stm32f4_commercial_icpn.py
       - name: Upload retained-evidence inputs
         uses: actions/upload-artifact@v4
         with:
