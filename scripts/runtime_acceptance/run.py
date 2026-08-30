@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import urllib.parse
 from pathlib import Path
 
 from common import AcceptanceError, Client, DEFAULT_BASE_URL
@@ -63,6 +64,24 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
+def require_managed_bff(client: Client) -> str:
+    parsed = urllib.parse.urlparse(client.base_url)
+    if not parsed.path.rstrip("/").endswith("/api/manager/ppu"):
+        raise AcceptanceError(
+            "managed-software acceptance requires a BFF /api/manager/ppu base URL; "
+            "direct Gateway routes are not Managed Mode evidence"
+        )
+    status, payload = client.request("GET", "")
+    if (
+        status != 200
+        or payload.get("ok") is not True
+        or payload.get("managed") is not True
+        or not payload.get("ppu_alias")
+    ):
+        raise AcceptanceError("Control Station BFF did not prove managed=true with a selected PPU alias")
+    return str(payload["ppu_alias"])
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     client = Client(
@@ -76,7 +95,14 @@ def main(argv: list[str] | None = None) -> int:
     for name in selected:
         print(f"\n=== {name} ===")
         try:
+            ppu_alias = require_managed_bff(client) if args.environment == "managed-software" else None
             result = SCENARIOS[name](client)
+            if ppu_alias is not None:
+                result["managed_route"] = {
+                    "bff": "/api/manager/ppu",
+                    "managed": True,
+                    "ppu_alias": ppu_alias,
+                }
             path = client.write_evidence(name, result)
             summary[name] = result
             print(f"PASS {name}")
