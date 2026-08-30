@@ -85,6 +85,33 @@ python3 scripts/ppu-release.py \
 
 The target PPU does not need Git, npm, Node.js, Vite, or a source checkout merely to run the packaged PPU runtime.
 
+## GitHub Actions release artifact
+
+`.github/workflows/ppu-release.yml` provides the CI build boundary for the same canonical `ppu/linux/armv7l` release. It runs on relevant pull requests and can also be started explicitly with `workflow_dispatch`.
+
+The workflow:
+
+```text
+checkout
+  -> install Python build/test dependencies
+  -> PPU packaging regression tests
+  -> build + validate ppu-runtime
+  -> build canonical linux-armv7l release
+  -> Common Release Format clean verification
+  -> closed hardware-boundary verification
+  -> detached SHA-256 verification
+  -> upload GitHub Actions artifact
+```
+
+The uploaded Actions artifact is a transport envelope containing exactly the deployable release archive and its detached digest:
+
+```text
+plasma-ppu-<version>-linux-armv7l.tar.gz
+plasma-ppu-<version>-linux-armv7l.tar.gz.sha256
+```
+
+Pull-request artifacts are validation evidence for the PR merge ref and must not be confused with a released `main` build. For a Z2 deployment candidate, run the workflow explicitly against the intended `main` revision and retain the resulting artifact/SHA evidence. This workflow does not deploy to a Z2 and does not create a GitHub Release.
+
 ## Z2 deployment prerequisites
 
 Before mutating the Z2, run the existing read-only PPU readiness audit on the target and record the result:
