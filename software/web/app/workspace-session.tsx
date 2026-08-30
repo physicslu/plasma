@@ -22,6 +22,7 @@ import {
 import {
   getSecurityTransportServerState,
   getSecurityTransportState,
+  markGatewayRoutingResolved,
   subscribeSecurityTransport,
 } from "./security-transport";
 
@@ -196,6 +197,7 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
         setApiBaseState(saved);
         setApiMode(nextMode);
         setManagedPpuAlias(nextManagedPpuAlias);
+        markGatewayRoutingResolved();
         setHydrated(true);
       }
     })();
