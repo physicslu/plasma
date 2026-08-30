@@ -8,7 +8,7 @@ export async function GET(): Promise<Response> {
     return Response.json(
       {
         ok: false,
-        managed: false,
+        managed: true,
         configured: false,
         error: { code: "manager_bff_misconfigured", message: "Managed PPU routing mode is invalid" },
       },
