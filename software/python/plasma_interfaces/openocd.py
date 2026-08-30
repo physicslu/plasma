@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -10,11 +9,13 @@ from .base import BaseInterface, ProgressCallback
 
 
 class OpenOCDInterface(BaseInterface):
-    """OpenOCD process boundary.
+    """OpenOCD Site configuration boundary.
 
-    Phase 3.7 keeps direct programming operations fail-closed. Target-specific
-    commands are compiled separately into a dry-run execution plan and are not
-    executable until a later plan executor is independently validated.
+    Phase 3.8 intentionally keeps this interface non-executable. OpenOCD
+    process execution is isolated in ``OpenOCDPlanExecutor`` and that executor
+    has no default process launcher. Production routing therefore remains
+    fail-closed until a later hardware-validation phase explicitly promotes the
+    compiled-plan executor into the real runtime.
     """
 
     def __init__(self, options: dict[str, Any]) -> None:
@@ -34,62 +35,14 @@ class OpenOCDInterface(BaseInterface):
             )
 
     @staticmethod
-    def _raise_plan_executor_not_ready() -> None:
+    def _raise_hardware_runtime_not_ready() -> None:
         raise PlasmaError(
             ErrorCode.INTERFACE_NOT_CONFIGURED,
-            "OpenOCD programming requires a validated compiled-plan executor",
+            "OpenOCD hardware runtime is not enabled; use the software-validation compiled-plan executor only",
         )
 
-    async def _run(self, commands: list[str]) -> tuple[str, str]:
-        """Low-level process primitive retained for future validated plan execution."""
-        self._require_configured()
-        arguments = [self.executable, "-f", str(self.interface_cfg), "-f", str(self.target_cfg)]
-        if self.adapter_serial:
-            arguments.extend(["-c", f"adapter serial {self.adapter_serial}"])
-        for command in commands:
-            arguments.extend(["-c", command])
-        arguments.extend(["-c", "shutdown"])
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *arguments,
-                cwd=self.work_dir,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.command_timeout_s)
-        except FileNotFoundError as exc:
-            raise PlasmaError(
-                ErrorCode.INTERFACE_FAILURE,
-                f"OpenOCD executable not found: {self.executable}",
-                original_exception=exc,
-            ) from exc
-        except TimeoutError as exc:
-            if "process" in locals() and process.returncode is None:
-                process.kill()
-                await process.wait()
-            raise PlasmaError(
-                ErrorCode.OPERATION_TIMEOUT,
-                "OpenOCD command timed out",
-                recoverable=True,
-                original_exception=exc,
-            ) from exc
-        decoded_stdout = stdout.decode(errors="replace")
-        decoded_stderr = stderr.decode(errors="replace")
-        if process.returncode != 0:
-            raise PlasmaError(
-                ErrorCode.INTERFACE_FAILURE,
-                f"OpenOCD exited with code {process.returncode}",
-                recoverable=True,
-                context={
-                    "return_code": process.returncode,
-                    "stdout": decoded_stdout[-4000:],
-                    "stderr": decoded_stderr[-4000:],
-                },
-            )
-        return decoded_stdout, decoded_stderr
-
     async def erase(self, progress: ProgressCallback | None = None) -> None:
-        self._raise_plan_executor_not_ready()
+        self._raise_hardware_runtime_not_ready()
 
     async def program(
         self,
@@ -97,7 +50,7 @@ class OpenOCDInterface(BaseInterface):
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
-        self._raise_plan_executor_not_ready()
+        self._raise_hardware_runtime_not_ready()
 
     async def verify(
         self,
@@ -105,7 +58,7 @@ class OpenOCDInterface(BaseInterface):
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
-        self._raise_plan_executor_not_ready()
+        self._raise_hardware_runtime_not_ready()
 
     async def read(
         self,
@@ -113,11 +66,10 @@ class OpenOCDInterface(BaseInterface):
         length: int,
         progress: ProgressCallback | None = None,
     ) -> bytes:
-        self._raise_plan_executor_not_ready()
+        self._raise_hardware_runtime_not_ready()
 
     async def safe_shutdown(self) -> None:
-        if self._configured:
-            try:
-                await self._run(["init", "reset run"])
-            except PlasmaError:
-                pass
+        # No subprocess is allowed through this interface in Phase 3.8.
+        # A real hardware shutdown/reset policy belongs to the later validated
+        # runtime executor, not to a latent direct-process escape hatch.
+        return None
