@@ -34,6 +34,7 @@ BROWSER_TRANSPORT = "chromium_rendered_dom"
 # GitHub-hosted Chromium runners. Forcing HTTP/1.1 changes transport negotiation
 # only; it does not alter request headers, evidence scope, or parser semantics.
 CHROMIUM_LAUNCH_ARGS = ["--disable-http2"]
+DEFAULT_NAVIGATION_ATTEMPTS = 2
 
 
 def build_browser_evidence_record(
@@ -84,8 +85,16 @@ def build_browser_evidence_record(
 class STBrowserAcquirer:
     """Context-managed Chromium acquisition adapter."""
 
-    def __init__(self, *, headless: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        headless: bool = True,
+        navigation_attempts: int = DEFAULT_NAVIGATION_ATTEMPTS,
+    ) -> None:
+        if navigation_attempts < 1:
+            raise AcquisitionError("browser navigation attempts must be at least 1")
         self.headless = headless
+        self.navigation_attempts = navigation_attempts
         self.browser_version: str | None = None
         self._playwright: Any = None
         self._browser: Any = None
@@ -143,6 +152,10 @@ class STBrowserAcquirer:
         self._context = None
         self._browser = None
 
+    def _fresh_browser_after_navigation_failure(self) -> None:
+        self._close_browser_context()
+        self._launch_browser()
+
     def fetch(self, source_url: str, timeout_seconds: float) -> tuple[bytes, str, None, None]:
         validate_source_url(source_url)
         if timeout_seconds <= 0:
@@ -151,10 +164,37 @@ class STBrowserAcquirer:
             self._launch_browser()
 
         timeout_ms = int(timeout_seconds * 1000)
-        page = self._context.new_page()
+        page: Any = None
+        response: Any = None
+        final_url = source_url
+
+        for attempt in range(1, self.navigation_attempts + 1):
+            page = self._context.new_page()
+            try:
+                response = page.goto(source_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                final_url = page.url
+                break
+            except self._timeout_error as exc:
+                page.close()
+                page = None
+                if attempt >= self.navigation_attempts:
+                    raise AcquisitionError(
+                        f"browser acquisition timed out after {attempt} navigation attempt(s): {exc}"
+                    ) from exc
+                self._fresh_browser_after_navigation_failure()
+            except self._playwright_error as exc:
+                page.close()
+                page = None
+                if attempt >= self.navigation_attempts:
+                    raise AcquisitionError(
+                        f"browser acquisition failed after {attempt} navigation attempt(s): {exc}"
+                    ) from exc
+                self._fresh_browser_after_navigation_failure()
+
+        if page is None:
+            raise AcquisitionError("browser acquisition navigation produced no page")
+
         try:
-            response = page.goto(source_url, wait_until="domcontentloaded", timeout=timeout_ms)
-            final_url = page.url
             validate_source_url(final_url)
             if response is not None and response.status >= 400:
                 raise AcquisitionError(f"browser navigation returned HTTP {response.status}")
@@ -181,13 +221,14 @@ class STBrowserAcquirer:
                 raise AcquisitionError(f"rendered page exceeds {MAX_RESPONSE_BYTES} bytes")
             return body, final_url, None, None
         except self._timeout_error as exc:
-            raise AcquisitionError(f"browser acquisition timed out: {exc}") from exc
+            raise AcquisitionError(f"browser evidence readiness timed out: {exc}") from exc
         except self._playwright_error as exc:
-            raise AcquisitionError(f"browser acquisition failed: {exc}") from exc
+            raise AcquisitionError(f"browser evidence extraction failed: {exc}") from exc
         finally:
             page.close()
             # A fresh, clean browser process per bounded target avoids transport
             # connection reuse without changing headers, profiles, timeouts, or
-            # evidence semantics.
+            # evidence semantics. Navigation retries above also force a fresh
+            # process, but only for transport-level Page.goto failures.
             if self._rotate_browser_after_fetch:
                 self._close_browser_context()
