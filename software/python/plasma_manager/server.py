@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import socketserver
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -63,6 +64,21 @@ _MANAGED_POST_PATTERNS = tuple(
         rf"^/api/engineering/targets/{_SEGMENT}/{_SEGMENT}/api/jobs/{_SEGMENT}/cancel$",
     )
 )
+
+
+class PlasmaManagerHTTPServer(ThreadingHTTPServer):
+    """Threaded Manager HTTP server whose bind path never depends on DNS."""
+
+    def server_bind(self) -> None:
+        # HTTPServer.server_bind() performs socket.getfqdn(host) after the socket
+        # bind. That reverse-DNS step can block service startup on hosts where DNS
+        # is unavailable or slow even though the local socket itself is usable.
+        # Plasma Manager service identity is configured explicitly, so DNS-derived
+        # server_name adds no product value and must not be a startup dependency.
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = str(host)
+        self.server_port = int(port)
 
 
 class PlasmaManagerHandler(BaseHTTPRequestHandler):
@@ -464,7 +480,7 @@ def serve(config: ManagerConfig) -> None:
     PlasmaManagerHandler.aggregator = aggregator
     PlasmaManagerHandler.poller = poller
     PlasmaManagerHandler.config = config
-    server = ThreadingHTTPServer((config.host, config.port), PlasmaManagerHandler)
+    server = PlasmaManagerHTTPServer((config.host, config.port), PlasmaManagerHandler)
     # Product liveness is owned by the Manager process itself, not by PPU transport.
     # Prime the fleet cache immediately, but do that first poll in the background so
     # an offline or slow PPU cannot prevent /api/health/live from becoming available.
