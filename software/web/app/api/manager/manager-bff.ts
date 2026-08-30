@@ -48,9 +48,10 @@ function forwardedHeaders(request: Request): Headers {
   return headers;
 }
 
-function responseHeaders(response: Response): Headers {
+function responseHeaders(response: Response, contentLength: number): Headers {
   const headers = new Headers({
     "Cache-Control": response.headers.get("Cache-Control") ?? "no-store",
+    "Content-Length": String(contentLength),
     "X-Content-Type-Options": "nosniff",
   });
   for (const name of ["Content-Type", "Content-Disposition"]) {
@@ -104,7 +105,7 @@ export async function relayManagerPpuRequest(request: Request, targetPath: strin
     const payload = await response.arrayBuffer();
     return new Response(payload, {
       status: response.status,
-      headers: responseHeaders(response),
+      headers: responseHeaders(response, payload.byteLength),
     });
   } catch {
     return json(503, {
