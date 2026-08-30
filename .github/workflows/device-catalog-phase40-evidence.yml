@@ -30,7 +30,7 @@ jobs:
           from pathlib import Path
 
           root = Path('data/device-catalog/research')
-          out = Path('.phase40-evidence')
+          out = Path('phase40-evidence')
           out.mkdir(parents=True, exist_ok=True)
           sys.path.insert(0, str(root))
 
@@ -135,6 +135,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: phase40-f446-live-evidence
-          path: .phase40-evidence
+          path: phase40-evidence
           if-no-files-found: error
           retention-days: 7
