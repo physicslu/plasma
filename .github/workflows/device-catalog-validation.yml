@@ -73,6 +73,8 @@ jobs:
             --evidence-dir data/device-catalog/research/evidence/stm32f4-phase3.3-scaleout-batch2-live-2026-08-30 \
             --baseline data/device-catalog/research/stm32f4-phase3.3-scaleout-batch2-baseline.json
           python data/device-catalog/research/test_stm32f4_phase3_3_scaleout_batch2.py
+      - name: Validate STM32F4 Phase 4.0 F446 mapping gate
+        run: python data/device-catalog/research/test_stm32f4_phase4_0_f446.py
       - name: Report admitted production source SHA-256
         run: |
           sha256sum data/device-catalog/research/stm32f1-commercial-icpn.csv
