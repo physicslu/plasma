@@ -15,7 +15,8 @@ from plasma_interfaces.base import BaseInterface
 RESOLVED_IC_SUPPORT_METADATA_KEY = "resolved_ic_support"
 MOCK_ROUTE = "mock_workflow"
 OPENOCD_ROUTE = "openocd"
-SUPPORTED_PROGRAMMING_PROFILES = frozenset({"stm32f1-medium-density-flash-v0"})
+PLASMA_NATIVE_ROUTE = "plasma_native"
+ROUTABLE_PROGRAMMING_PROFILES = frozenset({"stm32f1-medium-density-flash-v0"})
 
 
 def normalize_openocd_target_config(value: object) -> str | None:
@@ -36,10 +37,13 @@ def normalize_openocd_target_config(value: object) -> str | None:
 
 
 class SiteExecutionRouter:
-    """Admit one Job onto one Site and select a handler from IC Support truth.
+    """Resolve one Job route, then admit only implementation-ready execution.
 
-    Mock remains a workflow simulator and does not create hardware-support
-    evidence. Non-Mock execution must resolve an exact ICPN before queueing.
+    Mock is a workflow simulator and does not create hardware-support evidence.
+    Non-Mock routing must resolve an exact ICPN and backend identity before the
+    Job can be considered for queue admission. Phase 3.6 intentionally keeps
+    real hardware execution closed until the selected backend implementation is
+    independently proven runtime-ready.
     """
 
     def __init__(
@@ -54,7 +58,7 @@ class SiteExecutionRouter:
         self._generic_handler = ProgrammingOperationHandler(interface)
         self._profile_handlers: dict[str, BaseHandler] = {
             profile_id: ProgrammingOperationHandler(interface)
-            for profile_id in SUPPORTED_PROGRAMMING_PROFILES
+            for profile_id in ROUTABLE_PROGRAMMING_PROFILES
         }
 
     @staticmethod
@@ -64,6 +68,17 @@ class SiteExecutionRouter:
                 ErrorCode.INVALID_ARGUMENT,
                 f"metadata.{RESOLVED_IC_SUPPORT_METADATA_KEY} is server-owned",
             )
+
+    @staticmethod
+    def _route_payload(request: JobRequest) -> dict[str, Any]:
+        route = request.metadata.get(RESOLVED_IC_SUPPORT_METADATA_KEY)
+        if not isinstance(route, dict):
+            raise PlasmaError(
+                ErrorCode.INTERNAL_ERROR,
+                "request does not contain a server-resolved IC Support route",
+                context={"job_id": request.job_id, "site_id": request.site_id},
+            )
+        return route
 
     def _decorate(
         self,
@@ -79,18 +94,19 @@ class SiteExecutionRouter:
             },
         )
 
-    def _admit_mock(self, request: JobRequest) -> JobRequest:
+    def _resolve_mock(self, request: JobRequest) -> JobRequest:
         return self._decorate(
             request,
             route={
                 "mode": MOCK_ROUTE,
                 "target": request.target,
                 "hardware_support_claimed": False,
-                "runtime_ready": True,
+                "workflow_runtime_ready": True,
+                "hardware_runtime_ready": False,
             },
         )
 
-    def _resolved_route(self, request: JobRequest) -> tuple[str, dict[str, Any]]:
+    def _resolved_support(self, request: JobRequest) -> tuple[str, dict[str, Any]]:
         if self.resolver is None:
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
@@ -111,10 +127,10 @@ class SiteExecutionRouter:
             )
 
         programming_profile_id = support.programming_profile.profile_id
-        if programming_profile_id not in SUPPORTED_PROGRAMMING_PROFILES:
+        if programming_profile_id not in ROUTABLE_PROGRAMMING_PROFILES:
             raise PlasmaError(
                 ErrorCode.OPERATION_UNSUPPORTED,
-                f"Programming Profile is not execution-routed: {programming_profile_id}",
+                f"Programming Profile has no execution route: {programming_profile_id}",
                 context={
                     "site_id": self.site.id,
                     "site_interface": self.site.interface,
@@ -125,8 +141,8 @@ class SiteExecutionRouter:
 
         return programming_profile_id, support.to_runtime_payload()
 
-    def _admit_openocd(self, request: JobRequest) -> JobRequest:
-        programming_profile_id, support_payload = self._resolved_route(request)
+    def _resolve_openocd(self, request: JobRequest) -> JobRequest:
+        programming_profile_id, support_payload = self._resolved_support(request)
         expected_target = normalize_openocd_target_config(
             support_payload["backends"]["openocd"]["target_config"]
         )
@@ -160,50 +176,70 @@ class SiteExecutionRouter:
                 "mode": OPENOCD_ROUTE,
                 "selected_programming_profile_id": programming_profile_id,
                 "selected_openocd_target_config": configured_target,
-                # Phase 3.6 proves deterministic admission/routing only. The
-                # current OpenOCD Program/Verify/Read implementation remains
-                # hardware-specific and is not promoted to full runtime-ready.
-                "runtime_ready": False,
+                "backend_implementation_state": "routing_only",
+                "hardware_runtime_ready": False,
             },
         )
 
-    def _admit_fpga(self, request: JobRequest) -> JobRequest:
-        programming_profile_id, support_payload = self._resolved_route(request)
-        raise PlasmaError(
-            ErrorCode.OPERATION_UNSUPPORTED,
-            "Plasma Native PPU execution is not implemented for the resolved Programming Profile",
-            context={
-                "site_id": self.site.id,
-                "target": request.target,
-                "programming_profile_id": programming_profile_id,
-                "native_backend_state": support_payload["backends"]["plasma_native"]["state"],
+    def _resolve_fpga(self, request: JobRequest) -> JobRequest:
+        programming_profile_id, support_payload = self._resolved_support(request)
+        return self._decorate(
+            request,
+            route={
+                **support_payload,
+                "mode": PLASMA_NATIVE_ROUTE,
+                "selected_programming_profile_id": programming_profile_id,
+                "backend_implementation_state": "not_implemented",
+                "hardware_runtime_ready": False,
             },
         )
 
-    def admit(self, request: JobRequest) -> JobRequest:
+    def resolve_route(self, request: JobRequest) -> JobRequest:
+        """Resolve server-owned target/profile/backend identity without execution."""
         self._server_owned_metadata(request)
         if self.site.interface == "mock":
-            return self._admit_mock(request)
+            return self._resolve_mock(request)
         if self.site.interface == "openocd":
-            return self._admit_openocd(request)
+            return self._resolve_openocd(request)
         if self.site.interface == "fpga":
-            return self._admit_fpga(request)
+            return self._resolve_fpga(request)
         raise PlasmaError(
             ErrorCode.CONFIG_INVALID,
             f"unsupported interface for execution routing: {self.site.interface}",
         )
 
-    def handler_for(self, request: JobRequest) -> BaseHandler:
-        route = request.metadata.get(RESOLVED_IC_SUPPORT_METADATA_KEY)
-        if not isinstance(route, dict):
+    def admit(self, request: JobRequest) -> JobRequest:
+        """Admit only routes whose selected execution implementation is ready."""
+        resolved = self.resolve_route(request)
+        route = self._route_payload(resolved)
+        if route.get("mode") == MOCK_ROUTE:
+            return resolved
+        if route.get("hardware_runtime_ready") is not True:
             raise PlasmaError(
-                ErrorCode.INTERNAL_ERROR,
-                "Job reached SiteWorker without resolved execution route",
-                context={"site_id": self.site.id, "job_id": request.job_id},
+                ErrorCode.INTERFACE_NOT_CONFIGURED,
+                "resolved hardware backend is not runtime-ready",
+                context={
+                    "site_id": self.site.id,
+                    "site_interface": self.site.interface,
+                    "target": request.target,
+                    "route_mode": route.get("mode"),
+                    "programming_profile_id": route.get("selected_programming_profile_id"),
+                    "backend_implementation_state": route.get("backend_implementation_state"),
+                },
             )
+        return resolved
+
+    def handler_for(self, request: JobRequest) -> BaseHandler:
+        route = self._route_payload(request)
         mode = route.get("mode")
         if mode == MOCK_ROUTE:
             return self._generic_handler
+        if route.get("hardware_runtime_ready") is not True:
+            raise PlasmaError(
+                ErrorCode.INTERNAL_ERROR,
+                "non-ready hardware route reached SiteWorker",
+                context={"site_id": self.site.id, "job_id": request.job_id, "route_mode": mode},
+            )
         if mode != OPENOCD_ROUTE:
             raise PlasmaError(
                 ErrorCode.INTERNAL_ERROR,
