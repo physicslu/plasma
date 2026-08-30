@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "../i18n";
 import {
-  configuredDeviceApiBase,
   searchDevices,
   type DeviceSearchResult,
 } from "../device-catalog-api";
@@ -13,7 +12,7 @@ export type ICSelectorUsage = "lookup" | "picker";
 
 export type ICSelectorProps = {
   usage?: ICSelectorUsage;
-  apiBase?: string;
+  apiBase: string;
   onSelect?: (device: DeviceSearchResult) => void;
 };
 
@@ -49,15 +48,13 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const resolvedApiBase = useMemo(() => apiBase ?? configuredDeviceApiBase(), [apiBase]);
-
   useEffect(() => {
     const controller = new AbortController();
-    void searchDevices("", { apiBase: resolvedApiBase, limit: 1, signal: controller.signal })
+    void searchDevices("", { apiBase, limit: 1, signal: controller.signal })
       .then(payload => setCatalogSize(payload.catalog_size))
       .catch(() => undefined);
     return () => controller.abort();
-  }, [resolvedApiBase]);
+  }, [apiBase]);
 
   useEffect(() => {
     const normalized = query.trim();
@@ -69,7 +66,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       setError(null);
       try {
         const payload = await searchDevices(normalized, {
-          apiBase: resolvedApiBase,
+          apiBase,
           limit: 30,
           signal: controller.signal,
         });
@@ -88,7 +85,7 @@ export function ICSelector({ usage = "lookup", apiBase, onSelect }: ICSelectorPr
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, resolvedApiBase]);
+  }, [apiBase, query]);
 
   function updateQuery(value: string) {
     setQuery(value);
