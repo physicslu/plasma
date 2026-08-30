@@ -89,7 +89,7 @@ Input Programming Image artifacts are:
 
 READ outputs are also assigned executor-generated paths. After the fake process exits successfully, every expected output must exist and have the exact size declared by the plan before it is returned as a named read section.
 
-The temporary workspace is removed on success, process failure and timeout.
+The temporary workspace is removed on success, process failure, timeout and task cancellation. Timeout and cancellation both terminate a still-running child process before returning control.
 
 ## 6. Command/process boundary
 
@@ -123,10 +123,12 @@ The Phase 3.8 regression executes a real subprocess, but the process is a fake O
 - stdout/stderr capture;
 - non-zero exit propagation;
 - timeout kill behavior;
+- task-cancellation kill behavior;
 - missing output detection;
 - wrong-size output detection;
 - workspace cleanup;
 - tampered-plan rejection before launch;
+- invalid timeout rejection before launch;
 - no-launcher fail-closed behavior.
 
 This test proves the software process boundary. It does not prove that OpenOCD accepts every command against STM32F103 silicon.
