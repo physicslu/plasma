@@ -1,0 +1,27 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32f4-phase3.1-bounded-pilot-2026-08-30-retained-20260830T023035Z-b42d460",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "58e614bf2706d7a328c54012500a01395929852da46c9444180bc972f18aea1b"
+    },
+    {
+      "path": "control-summary.json",
+      "sha256": "b6c6b70113155d5ac611fe418d157af54779612d4130423684a3a6e701d0b6af"
+    },
+    {
+      "path": "evaluation.json",
+      "sha256": "7f44ce9c7f91f79eb0304d2436612ec10374651b53d0277e51bcaa8f5c6a4b4c"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "c5b5fed817967e0a74c6930627482852430aed6f5a58c60f802bb4b6ca448fc6"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "10171a34baae0964fd0d4b4117739f8be78dea94fd0a992c23b31ae991772365"
+    }
+  ],
+  "schema_version": 1
+}
