@@ -10,14 +10,16 @@
       "family": "STM32F1",
       "path": "../research/stm32f1-commercial-icpn.csv",
       "row_count": 75,
-      "git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed"
+      "git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed",
+      "sha256": "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
     },
     {
       "manufacturer": "STMicroelectronics",
       "family": "STM32F4",
       "path": "../research/stm32f4-commercial-icpn.csv",
       "row_count": 18,
-      "git_blob_sha": "6472cbb9863f88485ec179410fa2e9b342b1435b"
+      "git_blob_sha": "6472cbb9863f88485ec179410fa2e9b342b1435b",
+      "sha256": "4f8a941690b4550ff0fab24d446628492ca9bb40afb2e5a7b9901de6da3319f9"
     }
   ]
 }
