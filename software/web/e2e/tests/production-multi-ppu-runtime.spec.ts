@@ -55,7 +55,7 @@ async function chooseTarget(page: Page) {
   const target = page.getByLabel("Target IC");
   await target.fill(targetIc);
   await expect(page.getByRole("listbox", { name: "Target IC search results" })).toBeVisible();
-  await page.getByRole("option", { name: new RegExp(targetIc) }).click();
+  await page.getByRole("option", { name: new RegExp(`^${targetIc}(?:\\s|$)`) }).click();
 }
 
 async function openTwoPpuProductionSet(page: Page) {
