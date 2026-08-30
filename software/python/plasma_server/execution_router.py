@@ -29,9 +29,10 @@ class SiteExecutionRouter:
 
     Mock is a workflow simulator and does not create hardware-support evidence.
     Non-Mock routing must resolve an exact ICPN and backend identity before the
-    Job can be considered for queue admission. Phase 3.7 adds deterministic
-    OpenOCD dry-run plan compilation while keeping real hardware execution
-    closed until an executor is independently proven runtime-ready.
+    Job can be considered for queue admission. Phase 3.8 has a software-only
+    OpenOCD compiled-plan executor for fake-process validation, but production
+    hardware admission remains closed until physical validation promotes that
+    executor into the runtime.
     """
 
     def __init__(
@@ -148,7 +149,7 @@ class SiteExecutionRouter:
                 "mode": OPENOCD_ROUTE,
                 "selected_programming_profile_id": programming_profile_id,
                 "selected_openocd_target_config": plan.target_config,
-                "backend_implementation_state": "plan_compiled_not_executable",
+                "backend_implementation_state": "plan_compiled_software_executor_only",
                 "openocd_execution_plan": plan.to_dict(),
                 "hardware_runtime_ready": False,
             },
