@@ -57,7 +57,7 @@ def inspect_source(source: dict[str, object]) -> dict[str, object]:
     }
 
 
-def discover() -> int:
+def discover(output: Path | None) -> int:
     rows: list[dict[str, object]] = []
     for source in load_sources():
         if source.get("authority") != "manufacturer_official":
@@ -67,6 +67,8 @@ def discover() -> int:
         print("SOURCE_LOCK " + json.dumps(row, sort_keys=True))
     if not rows:
         raise SourceIntegrityError("no manufacturer_official sources found")
+    if output is not None:
+        output.write_text(json.dumps({"sources": rows}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return 0
 
 
@@ -103,9 +105,10 @@ def verify() -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Discover or verify official IC Support source hashes")
     parser.add_argument("mode", choices=["discover", "verify"])
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
-        return discover() if args.mode == "discover" else verify()
+        return discover(args.output) if args.mode == "discover" else verify()
     except (OSError, SourceIntegrityError) as exc:
         print(f"source-integrity: {exc}", file=sys.stderr)
         return 2
