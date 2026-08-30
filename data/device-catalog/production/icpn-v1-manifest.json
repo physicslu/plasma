@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "catalog_id": "plasma-icpn",
+  "catalog_version": "1.0.0",
+  "status": "production",
+  "selection_policy": "admitted_exact_manufacturer_part_number_only",
+  "sources": [
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F1",
+      "path": "../research/stm32f1-commercial-icpn.csv",
+      "row_count": 75,
+      "git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F4",
+      "path": "../research/stm32f4-commercial-icpn.csv",
+      "row_count": 18,
+      "git_blob_sha": "6472cbb9863f88485ec179410fa2e9b342b1435b"
+    }
+  ]
+}
