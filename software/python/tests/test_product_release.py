@@ -190,8 +190,13 @@ def test_build_rejects_non_product_or_nonportable_payload_paths(
 def test_build_rejects_casefold_path_collision(tmp_path: Path) -> None:
     runtime = tmp_path / "runtime"
     runtime.mkdir()
-    (runtime / "Alpha.txt").write_text("A\n", encoding="utf-8")
-    (runtime / "alpha.txt").write_text("a\n", encoding="utf-8")
+    upper = runtime / "Alpha.txt"
+    lower = runtime / "alpha.txt"
+    upper.write_text("A\n", encoding="utf-8")
+    lower.write_text("a\n", encoding="utf-8")
+
+    if upper.samefile(lower):
+        pytest.skip("filesystem is case-insensitive; distinct casefold collision cannot be constructed")
 
     with pytest.raises(product_release.ReleaseError, match="cross-platform path collision"):
         product_release.build_release(
