@@ -13,6 +13,15 @@ function json(status: number, payload: object): Response {
   });
 }
 
+export function managerRoutingRequired(): boolean {
+  const mode = (process.env.PLASMA_CONTROL_STATION_MODE ?? "").trim();
+  if (!mode) return false;
+  if (mode !== "managed") {
+    throw new Error("PLASMA_CONTROL_STATION_MODE must be managed when configured");
+  }
+  return true;
+}
+
 export function managerApiBase(): string {
   const configured = process.env.PLASMA_MANAGER_API_URL ?? DEFAULT_MANAGER_API_URL;
   const url = new URL(configured);
