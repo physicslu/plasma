@@ -9,13 +9,20 @@ on:
       - "software/python/plasma_core/ic_support.py"
       - "software/python/plasma_handlers/programming.py"
       - "software/python/plasma_handlers/stm32.py"
+      - "software/python/plasma_interfaces/openocd.py"
+      - "software/python/plasma_interfaces/openocd_plan.py"
+      - "software/python/plasma_interfaces/openocd_executor.py"
       - "software/python/plasma_server/execution_router.py"
       - "software/python/plasma_server/site_manager.py"
       - "software/python/tests/test_ic_support_resolver.py"
       - "software/python/tests/test_execution_router.py"
+      - "software/python/tests/test_openocd_plan.py"
+      - "software/python/tests/test_openocd_executor.py"
       - "docs/architecture/ic-support-profile-architecture.md"
       - "docs/architecture/ic-support-coverage-normalization.md"
       - "docs/architecture/ic-support-runtime-resolver.md"
+      - "docs/architecture/ic-support-openocd-plan-compiler.md"
+      - "docs/architecture/ic-support-openocd-plan-executor.md"
       - ".github/workflows/ic-support-validation.yml"
   pull_request:
     paths:
@@ -23,13 +30,20 @@ on:
       - "software/python/plasma_core/ic_support.py"
       - "software/python/plasma_handlers/programming.py"
       - "software/python/plasma_handlers/stm32.py"
+      - "software/python/plasma_interfaces/openocd.py"
+      - "software/python/plasma_interfaces/openocd_plan.py"
+      - "software/python/plasma_interfaces/openocd_executor.py"
       - "software/python/plasma_server/execution_router.py"
       - "software/python/plasma_server/site_manager.py"
       - "software/python/tests/test_ic_support_resolver.py"
       - "software/python/tests/test_execution_router.py"
+      - "software/python/tests/test_openocd_plan.py"
+      - "software/python/tests/test_openocd_executor.py"
       - "docs/architecture/ic-support-profile-architecture.md"
       - "docs/architecture/ic-support-coverage-normalization.md"
       - "docs/architecture/ic-support-runtime-resolver.md"
+      - "docs/architecture/ic-support-openocd-plan-compiler.md"
+      - "docs/architecture/ic-support-openocd-plan-executor.md"
       - ".github/workflows/ic-support-validation.yml"
 
 permissions:
@@ -65,6 +79,10 @@ jobs:
         run: python -m plasma_core.ic_support --summary
       - name: Test runtime IC Support resolver
         run: python software/python/tests/test_ic_support_resolver.py
+      - name: Test profile-driven OpenOCD plan compiler
+        run: python software/python/tests/test_openocd_plan.py
+      - name: Test software-only OpenOCD plan executor
+        run: python software/python/tests/test_openocd_executor.py
       - name: Test resolver-driven execution admission
         run: python software/python/tests/test_execution_router.py
       - name: Test isolated extraction contract
