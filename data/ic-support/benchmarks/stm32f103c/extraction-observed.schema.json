@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/stm32f103c/extraction-observed-v0",
+  "title": "STM32F103C blind extraction observed projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_relationships",
+    "parts",
+    "programming_contract",
+    "option_contract",
+    "security_contract"
+  ],
+  "properties": {
+    "profile_relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "programming",
+        "memory_geometry",
+        "package_hardware",
+        "option",
+        "security"
+      ],
+      "properties": {
+        "programming": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "memory_geometry": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "package_hardware": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "option": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "security": {"type": "string", "enum": ["shared", "different", "unknown"]}
+      }
+    },
+    "parts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["STM32F103C8T6", "STM32F103CBT6"],
+      "properties": {
+        "STM32F103C8T6": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["base_device", "flash_size_bytes", "page_size_bytes", "page_count"],
+          "properties": {
+            "base_device": {"type": ["string", "null"]},
+            "flash_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+            "page_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+            "page_count": {"type": ["integer", "null"], "minimum": 1}
+          }
+        },
+        "STM32F103CBT6": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["base_device", "flash_size_bytes", "page_size_bytes", "page_count"],
+          "properties": {
+            "base_device": {"type": ["string", "null"]},
+            "flash_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+            "page_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+            "page_count": {"type": ["integer", "null"], "minimum": 1}
+          }
+        }
+      }
+    },
+    "programming_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program_granularity_bytes", "unlock_keys", "write_erase_requires_hsi"],
+      "properties": {
+        "program_granularity_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "unlock_keys": {"type": ["array", "null"], "items": {"type": "string"}},
+        "write_erase_requires_hsi": {"type": ["boolean", "null"]}
+      }
+    },
+    "option_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_start", "region_size_bytes", "encoding"],
+      "properties": {
+        "region_start": {"type": ["string", "null"]},
+        "region_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "encoding": {"type": ["string", "null"]}
+      }
+    },
+    "security_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_unprotect_is_destructive", "write_protection_granularity_bytes"],
+      "properties": {
+        "read_unprotect_is_destructive": {"type": ["boolean", "null"]},
+        "write_protection_granularity_bytes": {"type": ["integer", "null"], "minimum": 1}
+      }
+    }
+  }
+}
