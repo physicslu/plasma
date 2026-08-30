@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Retain a successful bounded STM32F1 browser run as immutable research evidence."""
+"""Retain a successful bounded STM32F1 browser run as immutable research evidence.
+
+Generic manifest construction and file digests are owned by the device-catalog evidence
+framework. This adapter owns STM32F1/ST runtime/evaluation semantics and provenance fields.
+"""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import shutil
@@ -12,14 +15,17 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from device_catalog_evidence_framework import build_manifest, sha256
 from evaluate_stm32f1_live_pilot import evaluate_live_pilot, read_baseline
 from validate_stm32f1_retained_evidence import RetainedEvidenceError, validate_retained_evidence
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-EXPECTED_COPY_FILES = {
-    "control-summary.json": "control",
-    "pilot-summary.json": "pilot",
-    "evaluation.json": "evaluation",
+RETAINED_FILES = {
+    "control-summary.json",
+    "pilot-summary.json",
+    "evaluation.json",
+    "provenance.json",
+    "README.md",
 }
 
 
@@ -32,10 +38,6 @@ def read_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise RetentionError(f"{path}: expected a JSON object")
     return value
-
-
-def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def evidence_timestamp(summary: dict[str, Any], *, first: bool) -> str:
@@ -152,15 +154,11 @@ def retain(
             "This package is retained manufacturer evidence only. Canonical admission is a separate deterministic decision.\n",
             encoding="utf-8",
         )
-        manifest_files = []
-        for name in sorted({"control-summary.json", "pilot-summary.json", "evaluation.json", "provenance.json", "README.md"}):
-            manifest_files.append({"path": name, "sha256": sha256(output_dir / name)})
-        manifest = {
-            "schema_version": 1,
-            "evidence_id": evidence_id,
-            "canonical_dataset_admission": False,
-            "files": manifest_files,
-        }
+        manifest = build_manifest(
+            output_dir,
+            evidence_id=evidence_id,
+            retained_files=RETAINED_FILES,
+        )
         (output_dir / "manifest.json").write_text(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )

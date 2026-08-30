@@ -15,9 +15,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Check device catalog diff whitespace
+        run: git diff --check HEAD^1 HEAD
       - name: Validate STM32F1 commercial ICPN dataset
         run: python data/device-catalog/research/validate_stm32f1_commercial_icpn.py
       - name: Validate ST authoritative source acquisition parser
@@ -30,10 +34,14 @@ jobs:
         run: python data/device-catalog/research/test_st_transport_diagnostic.py
       - name: Validate ST browser acquisition contract
         run: python data/device-catalog/research/test_st_browser_acquisition.py
+      - name: Validate generic device catalog evidence framework
+        run: python data/device-catalog/research/test_device_catalog_evidence_framework.py
       - name: Validate retained STM32F1 browser evidence
         run: |
           python data/device-catalog/research/validate_stm32f1_retained_evidence.py
           python data/device-catalog/research/test_stm32f1_retained_evidence.py
+      - name: Validate generic device catalog pipeline framework
+        run: python data/device-catalog/research/test_device_catalog_pipeline_framework.py
       - name: Validate generic device catalog admission framework
         run: python data/device-catalog/research/test_device_catalog_admission_framework.py
       - name: Validate STM32F1 canonical admission
