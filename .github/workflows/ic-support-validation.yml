@@ -1,0 +1,35 @@
+name: IC Support validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "data/ic-support/**"
+      - "docs/architecture/ic-support-profile-architecture.md"
+      - ".github/workflows/ic-support-validation.yml"
+  pull_request:
+    paths:
+      - "data/ic-support/**"
+      - "docs/architecture/ic-support-profile-architecture.md"
+      - ".github/workflows/ic-support-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-ic-support:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check IC Support diff whitespace
+        run: git diff --check origin/main...HEAD
+      - name: Validate IC Support pilot
+        run: python data/ic-support/validate.py
+      - name: Compare STM32F103C benchmark
+        run: python data/ic-support/compare_benchmark.py
+      - name: Run IC Support regression
+        run: python data/ic-support/test_ic_support.py
