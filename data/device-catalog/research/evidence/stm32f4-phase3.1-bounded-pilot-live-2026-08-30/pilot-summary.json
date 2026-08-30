@@ -1,0 +1,307 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 4,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 4,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 4,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 18,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 4,
+    "total": 4
+  },
+  "pilot_id": "stm32f4-phase3.1-bounded-pilot-2026-08-30",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F401CC",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F401CCFx",
+          "icpn": "STM32F401CCF6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F401CCYx",
+          "icpn": "STM32F401CCY6TT",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": ["tcl/target/stm32f4x.cfg"]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F401CC",
+        "evidence_section_sha256": "c4917b5bfb0555b556890cfccc058de3af0942e3291b9de2893bd192389022de",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F401CCF6TR",
+          "STM32F401CCU6",
+          "STM32F401CCU6TR",
+          "STM32F401CCU7",
+          "STM32F401CCY6TT"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "be11516716c28c0290442d728b7d79cc1380795f8ac9efbbbb0d1d8497343095",
+        "retrieved_at_utc": "2026-08-30T02:30:35Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html"
+      },
+      "selection_reason": "48/49-pin 256-KiB access-line target with UFQFPN and WLCSP package variants",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F407VG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F407VGTx",
+          "icpn": "STM32F407VGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F407VGTx",
+          "icpn": "STM32F407VGT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F407VGTx",
+          "icpn": "STM32F407VGT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F407VGTx",
+          "icpn": "STM32F407VGT7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": ["tcl/target/stm32f4x.cfg"]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F407VG",
+        "evidence_section_sha256": "e3daba5130cbaeb5e25f92a858a091247854ba6c0e421854e1123fc1191007b1",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F407VGT6",
+          "STM32F407VGT6TR",
+          "STM32F407VGT7",
+          "STM32F407VGT7TR"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407vg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "03521f461755d32f4268ddda4c24ca318aa0deade943780b295c33e2b403c88c",
+        "retrieved_at_utc": "2026-08-30T02:30:39Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407vg.html"
+      },
+      "selection_reason": "100-pin 1-MiB foundation-line target with established STM32F4 OpenOCD ordering-pattern mapping",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407vg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F411CE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F411CEUx",
+          "icpn": "STM32F411CEU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F411CEUx",
+          "icpn": "STM32F411CEU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F411CEUx",
+          "icpn": "STM32F411CEU7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F411CEYx",
+          "icpn": "STM32F411CEY3TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F411CEYx",
+          "icpn": "STM32F411CEY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": ["tcl/target/stm32f4x.cfg"]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F411CE",
+        "evidence_section_sha256": "53a6c309eb0d1bbbf98df961dc948b6270a82e89b2be294bb416711af22d8f42",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F411CEU6",
+          "STM32F411CEU6TR",
+          "STM32F411CEU7",
+          "STM32F411CEY3TR",
+          "STM32F411CEY6TR"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f411ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "f095ac6d28b84001ff6e361a00063ab857edb6a2866a3cd76d8021a2e3d93903",
+        "retrieved_at_utc": "2026-08-30T02:30:45Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f411ce.html"
+      },
+      "selection_reason": "48/49-pin 512-KiB target covering UFQFPN, WLCSP and temperature-grade 3 semantics",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f411ce.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F429ZI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F429ZITx",
+          "icpn": "STM32F429ZIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F429ZITx",
+          "icpn": "STM32F429ZIT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F429ZITx",
+          "icpn": "STM32F429ZIT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        },
+        {
+          "existing_identifier": "STM32F429ZIYx",
+          "icpn": "STM32F429ZIY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": ["tcl/target/stm32f4x.cfg"]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": ["tcl/target/stm32f4x.cfg"]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F429ZI",
+        "evidence_section_sha256": "dcdd0209cb87e159d767cebeda51263ee0e2f4fea4c0111ec3a350e0bb0e56bf",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F429ZIT6",
+          "STM32F429ZIT6TR",
+          "STM32F429ZIT7",
+          "STM32F429ZIY6TR"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429zi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "69d7ec0d1edbfa9bd52d2e20f05ba20c1cfb71323f1836e1d572004ada702f77",
+        "retrieved_at_utc": "2026-08-30T02:30:55Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429zi.html"
+      },
+      "selection_reason": "high-pin-count 2-MiB target covering LQFP144 and WLCSP143 package semantics",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429zi.html"
+    }
+  ],
+  "schema_version": 1
+}
