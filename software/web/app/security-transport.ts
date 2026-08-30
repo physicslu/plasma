@@ -26,6 +26,7 @@ let bearerToken: string | null = null;
 let authenticationRequired = false;
 let securityDetected = false;
 let credentialRevision = 0;
+let gatewayRoutingResolved = false;
 let stateSnapshot: SecurityTransportState = SERVER_SNAPSHOT;
 let uninstallTransport: (() => void) | null = null;
 
@@ -63,6 +64,10 @@ export function getSecurityTransportState(): SecurityTransportState {
 
 export function getSecurityTransportServerState(): SecurityTransportState {
   return SERVER_SNAPSHOT;
+}
+
+export function markGatewayRoutingResolved(): void {
+  gatewayRoutingResolved = true;
 }
 
 export function setSecurityBearerToken(token: string): void {
@@ -122,6 +127,25 @@ function isGatewayPath(pathname: string): boolean {
 
 function isGatewayRequest(url: URL): boolean {
   return configuredGatewayOrigins().has(url.origin) && isGatewayPath(url.pathname);
+}
+
+function routingUnresolvedResponse(): Response {
+  return Response.json(
+    {
+      ok: false,
+      error: {
+        error_code: "routing_unresolved",
+        message: "Gateway routing is not resolved yet",
+      },
+    },
+    {
+      status: 503,
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    },
+  );
 }
 
 function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
@@ -200,6 +224,7 @@ export function installSecurityTransport(): () => void {
     const rawUrl = typeof Request !== "undefined" && input instanceof Request ? input.url : String(input);
     const url = new URL(rawUrl, window.location.href);
     if (!isGatewayRequest(url)) return await originalFetch(input, init);
+    if (!gatewayRoutingResolved) return routingUnresolvedResponse();
 
     const method = requestMethod(input, init);
     const headers = mergedHeaders(input, init);
