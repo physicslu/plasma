@@ -23,7 +23,7 @@ At startup the production loader:
 1. reads the manifest;
 2. requires `status = production` and the exact-ICPN-only selection policy;
 3. resolves each admitted source relative to the manifest;
-4. verifies the source Git blob identity and declared row count;
+4. verifies each source by both Git blob identity and SHA-256 content digest, then verifies the declared row count;
 5. validates the admitted canonical CSV schema and required provenance fields;
 6. rejects duplicate `(manufacturer, ICPN)` identities across sources;
 7. computes a SHA-256 runtime catalog revision from the bound source content digests;
@@ -68,7 +68,7 @@ The runtime catalog revision is a SHA-256 derived from the admitted source conte
 v1 uses **release-bound updates**, not hot reload. Updating the catalog requires:
 
 1. complete the normal manufacturer/family evidence and canonical admission flow;
-2. update the production manifest source list / row counts / content binding;
+2. update the production manifest source list / row counts / Git blob and SHA-256 content bindings;
 3. pass historical family regressions;
 4. pass production manifest/runtime tests;
 5. pass API and Web IC Selector tests;
