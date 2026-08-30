@@ -1,0 +1,48 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f1-medium-density-flash-v0",
+  "kind": "programming",
+  "status": "pilot",
+  "scope": {
+    "manufacturer": "STMicroelectronics",
+    "family": "STM32F1",
+    "density_class": "medium"
+  },
+  "evidence": [
+    {
+      "source_id": "st_pm0075_rev2",
+      "sections": [
+        "1.2 Flash module organization",
+        "2.3.1 Key values",
+        "2.3.2 Unlocking the Flash memory",
+        "2.3.3 Main Flash memory programming",
+        "2.3.4 Flash memory erase",
+        "3.9 Flash register map"
+      ]
+    }
+  ],
+  "data": {
+    "flash_register_base": "0x40022000",
+    "registers": {
+      "FLASH_ACR": "0x40022000",
+      "FLASH_KEYR": "0x40022004",
+      "FLASH_OPTKEYR": "0x40022008",
+      "FLASH_SR": "0x4002200C",
+      "FLASH_CR": "0x40022010",
+      "FLASH_AR": "0x40022014",
+      "FLASH_OBR": "0x4002201C",
+      "FLASH_WRPR": "0x40022020"
+    },
+    "unlock_keys": ["0x45670123", "0xCDEF89AB"],
+    "program_granularity_bytes": 2,
+    "program_sequence": [
+      "ensure_unlocked",
+      "set_FLASH_CR_PG",
+      "write_halfword",
+      "wait_FLASH_SR_BSY_clear",
+      "read_back_and_verify"
+    ],
+    "erase_capabilities": ["page_erase", "mass_erase"],
+    "write_erase_requires_hsi": true
+  }
+}
