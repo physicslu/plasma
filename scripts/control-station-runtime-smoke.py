@@ -120,9 +120,8 @@ def _probe_manager_bootstrap(
     socket_probe = (
         "import sys; "
         "sys.path.insert(0, sys.argv[1]); "
-        "from http.server import ThreadingHTTPServer; "
-        "from plasma_manager.server import PlasmaManagerHandler; "
-        "server=ThreadingHTTPServer(('127.0.0.1', 0), PlasmaManagerHandler); "
+        "from plasma_manager.server import PlasmaManagerHandler, PlasmaManagerHTTPServer; "
+        "server=PlasmaManagerHTTPServer(('127.0.0.1', 0), PlasmaManagerHandler); "
         "print(server.server_port); "
         "server.server_close()"
     )
