@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build a deterministic read-only STM32F1 scale-out admission plan.
 
-Unlike the historical Phase 2.7 wrapper, this planner has no fixed 26-candidate
-batch assumption. The expected size is derived from the validated baseline.
-It never writes the canonical dataset.
+STM32F1 owns evidence/policy adaptation. Generic evidence-to-admission composition is
+owned by device_catalog_pipeline_framework, and canonical decision/write mechanics are
+owned by device_catalog_admission_framework.
 """
 
 from __future__ import annotations
@@ -14,13 +14,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from device_catalog_admission_framework import (
-    AdmissionError,
-    build_admission_plan as build_framework_plan,
-    file_sha256,
-    plan_is_clean as framework_plan_is_clean,
-    read_csv,
-    read_json,
+from device_catalog_admission_framework import AdmissionError, file_sha256, read_csv, read_json
+from device_catalog_pipeline_framework import (
+    AdmissionInputs,
+    PipelineError,
+    build_pipeline_plan,
+    pipeline_plan_is_clean,
 )
 from evaluate_stm32f1_live_pilot import read_baseline
 from stm32f1_admission_policy import build_candidate_inputs, build_canonical_row
@@ -35,18 +34,18 @@ def expected_candidate_count(baseline: dict[str, Any]) -> int:
     return sum(len(target["exact_icpns"]) for target in baseline["targets"])
 
 
-def build_scaleout_plan(
+def build_scaleout_inputs(
     *,
     evidence_dir: Path,
     baseline_path: Path,
-    canonical_path: Path,
     catalog_path: Path,
-) -> dict[str, Any]:
+) -> tuple[AdmissionInputs, dict[str, Any]]:
+    """STM32F1 adapter: validated retained evidence -> normalized admission inputs."""
+
     retained = validate_retained_evidence(evidence_dir, baseline_path=baseline_path)
     baseline = read_baseline(baseline_path)
     provenance = read_json(evidence_dir / "provenance.json")
     summary = read_json(evidence_dir / "pilot-summary.json")
-    fields, canonical_rows = read_csv(canonical_path)
     _, catalog_rows = read_csv(catalog_path)
 
     evidence_id = provenance.get("evidence_id")
@@ -66,27 +65,48 @@ def build_scaleout_plan(
             f"retained candidate count {len(candidate_inputs)} does not match baseline {expected}"
         )
 
-    plan = build_framework_plan(
-        candidate_inputs=candidate_inputs,
-        canonical_fields=fields,
-        canonical_rows=canonical_rows,
-        source_provenance={
-            "evidence_id": evidence_id,
-            "repository": provenance.get("source_repository"),
-            "executed_git_sha": provenance.get("executed_git_sha"),
-            "evidence_manifest_sha256": file_sha256(evidence_dir / "manifest.json"),
-        },
-        input_bindings={
-            "retained_evidence_directory": evidence_dir.name,
-            "canonical_dataset": canonical_path.name,
-            "mapping_catalog": catalog_path.name,
-            "mapping_catalog_sha256": file_sha256(catalog_path),
-            "baseline": baseline_path.name,
-            "baseline_sha256": file_sha256(baseline_path),
-        },
-        row_builder=build_canonical_row,
+    return (
+        AdmissionInputs(
+            evidence_id=evidence_id,
+            candidate_inputs=candidate_inputs,
+            source_provenance={
+                "repository": provenance.get("source_repository"),
+                "executed_git_sha": provenance.get("executed_git_sha"),
+                "evidence_manifest_sha256": file_sha256(evidence_dir / "manifest.json"),
+            },
+            input_bindings={
+                "retained_evidence_directory": evidence_dir.name,
+                "mapping_catalog": catalog_path.name,
+                "mapping_catalog_sha256": file_sha256(catalog_path),
+                "baseline": baseline_path.name,
+                "baseline_sha256": file_sha256(baseline_path),
+            },
+            expected_candidate_count=expected,
+        ),
+        baseline,
     )
-    plan["scaleout_expected_candidate_count"] = expected
+
+
+def build_scaleout_plan(
+    *,
+    evidence_dir: Path,
+    baseline_path: Path,
+    canonical_path: Path,
+    catalog_path: Path,
+) -> dict[str, Any]:
+    admission_inputs, baseline = build_scaleout_inputs(
+        evidence_dir=evidence_dir,
+        baseline_path=baseline_path,
+        catalog_path=catalog_path,
+    )
+    plan = build_pipeline_plan(
+        canonical_path=canonical_path,
+        row_builder=build_canonical_row,
+        admission_inputs=admission_inputs,
+    )
+    plan["inputs"]["canonical_dataset"] = canonical_path.name
+    # Historical Phase 2.9 keys remain as compatibility/audit aliases.
+    plan["scaleout_expected_candidate_count"] = admission_inputs.expected_candidate_count
     plan["scaleout_baseline_pilot_id"] = baseline["pilot_id"]
     return plan
 
@@ -96,8 +116,9 @@ def scaleout_plan_is_clean(plan: dict[str, Any]) -> bool:
     return (
         isinstance(expected, int)
         and expected >= 0
+        and plan.get("pipeline_expected_candidate_count") == expected
         and plan.get("candidate_count") == expected
-        and framework_plan_is_clean(plan)
+        and pipeline_plan_is_clean(plan)
     )
 
 
@@ -136,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
             "canonical_dataset_written": False,
         }, indent=2, sort_keys=True))
         return 0
-    except (OSError, json.JSONDecodeError, AdmissionError, RuntimeError) as exc:
+    except (OSError, json.JSONDecodeError, AdmissionError, PipelineError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
