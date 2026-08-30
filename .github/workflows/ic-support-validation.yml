@@ -7,11 +7,13 @@ on:
     paths:
       - "data/ic-support/**"
       - "docs/architecture/ic-support-profile-architecture.md"
+      - "docs/architecture/ic-support-coverage-normalization.md"
       - ".github/workflows/ic-support-validation.yml"
   pull_request:
     paths:
       - "data/ic-support/**"
       - "docs/architecture/ic-support-profile-architecture.md"
+      - "docs/architecture/ic-support-coverage-normalization.md"
       - ".github/workflows/ic-support-validation.yml"
 
 permissions:
@@ -37,6 +39,10 @@ jobs:
         run: python data/ic-support/compare_benchmark.py
       - name: Run IC Support regression
         run: python data/ic-support/test_ic_support.py
+      - name: Report production IC Support coverage
+        run: python data/ic-support/coverage_inventory.py --summary
+      - name: Test production IC Support coverage normalization
+        run: python data/ic-support/test_coverage_inventory.py
       - name: Test isolated extraction contract
         run: python data/ic-support/benchmarks/stm32f103c/test_extraction_contract.py
       - name: Test blind extraction workspace

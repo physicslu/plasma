@@ -37,6 +37,7 @@
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Current** — [Device Support and Validation](architecture/device-support-validation.md)
 - **Plan** — [IC Support Reusable Profile Architecture](architecture/ic-support-profile-architecture.md)
+- **Current** — [IC Support Coverage Normalization](architecture/ic-support-coverage-normalization.md)：以 derived inventory 將 production exact ICPN 正規化為 Base Device、Programming Profile 與 backend readiness，避免把商業料號數量誤當成燒錄演算法數量。
 - **Current** — [Mock Runtime v1.1](architecture/mock-runtime-v1.1.md)
 - **Current** — [Mock Synthetic Image Contract](architecture/mock-synthetic-image.md)
 - **Current** — [Optional Manager Control Plane](architecture/manager-optional-control-plane.md)
