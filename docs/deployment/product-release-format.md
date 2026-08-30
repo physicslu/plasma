@@ -1,6 +1,6 @@
 # Plasma Product Release Format v1
 
-> Status: **Plan / implementation in PR #222**. This document defines the first machine-verifiable Plasma product release contract. It does not define or claim host installation, service registration, upgrade activation, Z2 runtime acceptance, FPGA behavior, or real IC programming.
+> Status: **Current**. PR #222 established the first machine-verifiable Plasma product release contract. This document does not define or claim host installation, service registration, upgrade activation, Z2 runtime acceptance, FPGA behavior, or real IC programming.
 
 ## 1. Purpose
 
@@ -214,7 +214,7 @@ installer-specific checks
 
 SHA-256 proves integrity, not publisher authenticity. v1 must not be described as signed software distribution.
 
-Future distribution security may add platform-appropriate authenticity mechanisms, for example macOS code signing/notarization, Windows Authenticode, and signed Linux/release metadata. Those are outside PR #222.
+Future distribution security may add platform-appropriate authenticity mechanisms, for example macOS code signing/notarization, Windows Authenticode, and signed Linux/release metadata. Those are outside the Release Format v1 integrity scope.
 
 ## 9. Extraction safety
 
@@ -330,7 +330,7 @@ real IC programming PASS
 
 ## 13. Next phases
 
-After this release contract is merged, later work can build real role-specific runtime payloads:
+With this release contract established, later work can build real role-specific runtime payloads:
 
 ```text
 Common Release Format
