@@ -1,4 +1,4 @@
-name: Device catalog Phase 4.0 live evidence
+name: Device catalog Phase 4.0 retained admission proof
 
 on:
   pull_request:
@@ -7,149 +7,23 @@ permissions:
   contents: read
 
 jobs:
-  acquire-f446-evidence:
+  prove-f446-admission:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install browser acquisition dependencies
+      - name: Validate frozen F446 retained evidence
         run: |
-          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
-          python -m playwright install --with-deps chromium
-      - name: Acquire and validate F446 evidence
-        env:
-          PHASE40_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PHASE40_RUN_ID: ${{ github.run_id }}
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-f446-batch1-live-2026-08-30 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json
+      - name: Build admission plan from frozen retained evidence
         run: |
-          xvfb-run -a python - <<'PY'
-          import json
-          import os
-          import sys
-          from pathlib import Path
-
-          root = Path('data/device-catalog/research')
-          out = Path('phase40-evidence')
-          out.mkdir(parents=True, exist_ok=True)
-          sys.path.insert(0, str(root))
-
-          from st_browser_acquisition import (
-              BROWSER_TRANSPORT,
-              CHROMIUM_LAUNCH_ARGS,
-              STBrowserAcquirer,
-              build_browser_evidence_record,
-          )
-          from stm32f4_acquisition_pilot import read_catalog, read_manifest, run_pilot
-
-          manifest_path = root / 'stm32f4-phase4.0-f446-batch1-manifest.json'
-          baseline_path = root / 'stm32f4-phase4.0-f446-batch1-baseline.json'
-          catalog = root / 'openocd-parts-canonical.csv'
-          pilot_id, targets = read_manifest(manifest_path)
-          baseline = json.loads(baseline_path.read_text(encoding='utf-8'))
-          expected = {item['base_device']: item['exact_icpns'] for item in baseline['targets']}
-
-          with STBrowserAcquirer(headless=False) as acquirer:
-              summary = run_pilot(
-                  pilot_id=pilot_id,
-                  targets=targets,
-                  catalog_rows=read_catalog(catalog),
-                  fetcher=acquirer.fetch,
-                  evidence_builder=build_browser_evidence_record,
-                  timeout_seconds=45.0,
-              )
-              browser_version = acquirer.browser_version
-
-          runtime = {
-              'engine': 'chromium',
-              'browser_version': browser_version,
-              'playwright_requirement': '1.62.0',
-              'headless': False,
-              'launch_args': CHROMIUM_LAUNCH_ARGS,
-          }
-          summary['acquisition_transport'] = BROWSER_TRANSPORT
-          summary['browser_scope'] = 'pilot'
-          summary['browser_runtime'] = runtime
-          summary['canonical_dataset_admission'] = False
-
-          observed = {}
-          excluded = []
-          for result in summary.get('results', []):
-              base = result.get('base_device')
-              evidence = result.get('evidence') or {}
-              observed[base] = evidence.get('exact_icpns', [])
-              excluded.extend({'base_device': base, **item} for item in evidence.get('excluded_non_active_part_numbers', []))
-
-          issues = []
-          if summary.get('acquisition_failure') != 0 or summary.get('manual_intervention_required') != 0:
-              issues.append('live acquisition is not clean')
-          if observed != expected:
-              issues.append(f'candidate baseline drift: expected={expected!r} observed={observed!r}')
-          expected_excluded = {(item['base_device'], item['icpn'], item['marketing_status']) for item in baseline['excluded_non_active_observations']}
-          observed_excluded = {
-              (item['base_device'], item['icpn'], str(item['marketing_status']).split()[0])
-              for item in excluded
-          }
-          if not expected_excluded.issubset(observed_excluded):
-              issues.append(f'non-active audit drift: expected={expected_excluded!r} observed={observed_excluded!r}')
-
-          control_result = next(result for result in summary['results'] if result['base_device'] == 'STM32F401CC')
-          control_count = len(control_result['evidence']['exact_icpns'])
-          control = {
-              'schema_version': summary['schema_version'],
-              'pilot_id': summary['pilot_id'],
-              'attempted': 1,
-              'acquisition_success': 1,
-              'acquisition_failure': 0,
-              'exact_icpn_candidates': control_count,
-              'canonical_mapping': {'unique': 1, 'ambiguous': 0, 'unmapped': 0},
-              'openocd_cfg_mapping': {'mapped': 1, 'total': 1},
-              'manual_intervention_required': 0,
-              'results': [control_result],
-              'acquisition_transport': BROWSER_TRANSPORT,
-              'browser_scope': 'control',
-              'browser_runtime': runtime,
-              'canonical_dataset_admission': False,
-          }
-
-          acquisition = {
-              'repository': 'physicslu/plasma',
-              'head_sha': os.environ['PHASE40_HEAD_SHA'],
-              'workflow_run_id': os.environ['PHASE40_RUN_ID'],
-              'baseline_file': str(baseline_path),
-              'manifest_file': str(manifest_path),
-              'excluded_non_active_observations': excluded,
-          }
-
-          for name, payload in (
-              ('pilot-summary.json', summary),
-              ('control-summary.json', control),
-              ('acquisition-metadata.json', acquisition),
-          ):
-              (out / name).write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-
-          if issues:
-              raise SystemExit('\n'.join(issues))
-          PY
-      - name: Evaluate and retain F446 evidence
-        env:
-          PHASE40_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          python data/device-catalog/research/evaluate_stm32f4_pilot.py \
-            --summary phase40-evidence/pilot-summary.json \
-            --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json \
-            --output phase40-evidence/evaluation.json \
-            --git-sha "$PHASE40_HEAD_SHA"
-          python data/device-catalog/research/retain_stm32f4_browser_evidence.py \
-            --control phase40-evidence/control-summary.json \
-            --pilot phase40-evidence/pilot-summary.json \
-            --evaluation phase40-evidence/evaluation.json \
-            --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json \
-            --output-dir phase40-retained
-      - name: Build read-only F446 admission plan
-        run: |
+          mkdir -p phase40-output
           python data/device-catalog/research/stm32f4_admission.py \
-            --evidence-dir phase40-retained \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-f446-batch1-live-2026-08-30 \
             --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json \
             --catalog data/device-catalog/research/openocd-parts-canonical.csv \
             --canonical data/device-catalog/research/stm32f4-commercial-icpn.csv \
@@ -157,8 +31,8 @@ jobs:
             --admit-base STM32F446VE \
             --admit-base STM32F446ZC \
             --admit-base STM32F446ZE \
-            --output phase40-evidence/admission-plan.json
-      - name: Generate and validate F446 canonical candidate
+            --output phase40-output/admission-plan.json
+      - name: Generate and validate canonical candidate
         run: |
           python - <<'PY'
           import hashlib
@@ -171,18 +45,22 @@ jobs:
           from device_catalog_admission_framework import write_canonical_dataset
 
           canonical = root / 'stm32f4-commercial-icpn.csv'
-          plan = json.loads(Path('phase40-evidence/admission-plan.json').read_text(encoding='utf-8'))
+          plan = json.loads(Path('phase40-output/admission-plan.json').read_text(encoding='utf-8'))
           result = write_canonical_dataset(plan=plan, canonical_path=canonical)
-          if result != {
+          expected_added = sorted(
+              item['icpn'] for item in plan['candidates'] if item['decision'] == 'admit'
+          )
+          expected = {
               'status': 'written',
               'rows_before': 49,
               'rows_after': 72,
-              'added': sorted(item['icpn'] for item in plan['candidates']),
-          }:
+              'added': expected_added,
+          }
+          if result != expected:
               raise SystemExit(f'unexpected canonical write result: {result!r}')
           payload = canonical.read_bytes()
-          Path('phase40-evidence/stm32f4-commercial-icpn.csv').write_bytes(payload)
-          Path('phase40-evidence/canonical-output.json').write_text(
+          Path('phase40-output/stm32f4-commercial-icpn.csv').write_bytes(payload)
+          Path('phase40-output/canonical-output.json').write_text(
               json.dumps({
                   'rows_before': 49,
                   'rows_after': 72,
@@ -193,12 +71,10 @@ jobs:
           )
           PY
           python data/device-catalog/research/validate_stm32f4_commercial_icpn.py
-      - name: Upload retained-evidence inputs
+      - name: Upload deterministic Phase 4 output
         uses: actions/upload-artifact@v4
         with:
-          name: phase40-f446-live-evidence
-          path: |
-            phase40-evidence
-            phase40-retained
+          name: phase40-f446-frozen-admission
+          path: phase40-output
           if-no-files-found: error
           retention-days: 7
