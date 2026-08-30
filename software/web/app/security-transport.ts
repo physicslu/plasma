@@ -118,10 +118,14 @@ function isGatewayPath(pathname: string): boolean {
 }
 
 function isGatewayRequest(url: URL): boolean {
-  // Canonical Plasma Gateway paths are transport-owned regardless of the URL
-  // a component happened to construct. In Managed Mode this is what prevents a
-  // stale/private component apiBase from bypassing the Manager after bootstrap.
-  return isGatewayPath(url.pathname);
+  if (!isGatewayPath(url.pathname)) return false;
+  if (gatewayRoutingMode === "managed") return true;
+  if (!resolvedGatewayApiBase) return false;
+  try {
+    return url.origin === new URL(resolvedGatewayApiBase).origin;
+  } catch {
+    return false;
+  }
 }
 
 function routingUnresolvedResponse(): Response {
@@ -180,7 +184,6 @@ function mergedHeaders(input: RequestInfo | URL, init?: RequestInit): Headers {
 
 function rebaseInput(
   input: RequestInfo | URL,
-  init: RequestInit | undefined,
   directPath: string,
   search: string,
 ): RequestInfo | URL {
@@ -239,7 +242,7 @@ export function installSecurityTransport(): () => void {
       if (isStateChanging(unresolvedMethod)) return routingUnresolvedResponse();
       await gatewayRoutingReady;
       if (!resolvedGatewayApiBase) return routingUnresolvedResponse();
-      currentInput = rebaseInput(currentInput, init, directPath, url.search);
+      currentInput = rebaseInput(currentInput, directPath, url.search);
       rawUrl = typeof Request !== "undefined" && currentInput instanceof Request ? currentInput.url : String(currentInput);
       url = new URL(rawUrl, window.location.href);
       directPath = directGatewayPathname(url.pathname);
@@ -251,7 +254,7 @@ export function installSecurityTransport(): () => void {
       && resolvedGatewayApiBase
       && directPath !== null
     ) {
-      currentInput = rebaseInput(currentInput, init, directPath, url.search);
+      currentInput = rebaseInput(currentInput, directPath, url.search);
       rawUrl = typeof Request !== "undefined" && currentInput instanceof Request ? currentInput.url : String(currentInput);
       url = new URL(rawUrl, window.location.href);
     }
