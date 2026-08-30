@@ -51,7 +51,10 @@ def _request_json(
     except HTTPError as exc:
         raw = exc.read()
         status = int(exc.code)
-    except URLError as exc:
+    except (URLError, TimeoutError) as exc:
+        # Readiness probes are intentionally retryable within the outer deadline.
+        # Windows can take longer than the per-request timeout on the first BFF
+        # request even after the standalone server has bound its socket.
         raise SmokeError(f"request failed: {url}: {exc}") from exc
     try:
         decoded = json.loads(raw)
