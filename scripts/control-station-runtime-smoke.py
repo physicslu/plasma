@@ -52,9 +52,6 @@ def _request_json(
         raw = exc.read()
         status = int(exc.code)
     except (URLError, TimeoutError) as exc:
-        # Readiness probes are intentionally retryable within the outer deadline.
-        # Windows can take longer than the per-request timeout on the first BFF
-        # request even after the standalone server has bound its socket.
         raise SmokeError(f"request failed: {url}: {exc}") from exc
     try:
         decoded = json.loads(raw)
@@ -178,6 +175,52 @@ def _wait_for_console(port: int, process: subprocess.Popen[bytes], deadline_s: f
     )
 
 
+def _node_console_observation(
+    port: int,
+    *,
+    node_executable: str,
+    cwd: Path,
+    env: dict[str, str],
+) -> str:
+    """Capture a browser-like Fetch observation without changing smoke pass criteria."""
+    script = r"""
+const url = process.argv[1];
+const payload = { endpoint: "ps", timeout_ms: 100, payload: "runtime-smoke-node-probe" };
+try {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(5000),
+  });
+  const body = await response.text();
+  console.log(JSON.stringify({
+    status: response.status,
+    contentLength: response.headers.get("content-length"),
+    contentType: response.headers.get("content-type"),
+    body,
+  }));
+} catch (error) {
+  console.error(error?.stack ?? String(error));
+  process.exit(2);
+}
+"""
+    try:
+        completed = subprocess.run(
+            [node_executable, "--input-type=module", "-e", script, f"http://127.0.0.1:{port}/api/manager/diagnostics/loopback"],
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return f"Node Fetch probe timed out: {exc.stdout or ''}"
+    return f"Node Fetch probe code={completed.returncode}: {completed.stdout.strip()}"
+
+
 def _terminate(process: subprocess.Popen[bytes] | None) -> None:
     """Best-effort cleanup that must never hide the primary smoke result."""
     if process is None or process.poll() is not None:
@@ -280,7 +323,16 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
                 stdout=console_log,
                 stderr=subprocess.STDOUT,
             )
-            _wait_for_console(console_port, console_process)
+            try:
+                _wait_for_console(console_port, console_process)
+            except SmokeError as exc:
+                node_observation = _node_console_observation(
+                    console_port,
+                    node_executable=resolved_node,
+                    cwd=console_dir,
+                    env=console_env,
+                )
+                raise SmokeError(f"{exc}\n{node_observation}") from exc
             print("Control Station packaged Console/BFF -> Manager relay: PASS", flush=True)
         except Exception as exc:
             manager_log.flush()
