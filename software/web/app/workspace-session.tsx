@@ -45,10 +45,14 @@ export type WorkspaceSessionAuditEntry = {
 
 type SessionState = { apiBase: string; sessionId: string; credentialRevision: number };
 type SessionRequest = { apiBase: string; credentialRevision: number; promise: Promise<string> };
+type ApiMode = "managed" | "standalone";
+type ManagedRoutingDiscovery = { managed: boolean; alias: string | null } | null;
 
 type WorkspaceSessionContextValue = {
   hydrated: boolean;
   apiBase: string;
+  apiMode: ApiMode;
+  managedPpuAlias: string | null;
   setApiBase: (value: string) => string;
   engineeringSessionId: string | null;
   ensureEngineeringSession: (apiBase?: string) => Promise<string>;
@@ -84,8 +88,6 @@ const WorkspaceSessionContext = createContext<WorkspaceSessionContextValue | nul
 const API_STORAGE_KEY = "plasma-api-base";
 const API_MODE_STORAGE_KEY = "plasma-api-mode";
 
-type ApiMode = "managed" | "standalone";
-
 function nowTime(): string {
   return new Date().toLocaleTimeString("en-GB", { hour12: false });
 }
@@ -94,12 +96,23 @@ function managedApiBase(): string {
   return `${window.location.origin}/api/manager/ppu`;
 }
 
-async function managedRoutingConfigured(): Promise<boolean> {
+async function discoverManagedRouting(): Promise<ManagedRoutingDiscovery> {
   try {
-    const response = await fetch("/api/manager/ppu", { cache: "no-store" });
-    return response.ok;
+    const response = await fetch("/api/manager/ppu", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== "object") return null;
+    const record = payload as Record<string, unknown>;
+    const managed = record.managed === true;
+    const alias = typeof record.ppu_alias === "string" && record.ppu_alias.trim()
+      ? record.ppu_alias.trim()
+      : null;
+    if (response.ok && (record.ok !== true || !managed || !alias)) return null;
+    return { managed, alias };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -111,6 +124,8 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
   );
   const [hydrated, setHydrated] = useState(false);
   const [apiBase, setApiBaseState] = useState(DEFAULT_API_BASE);
+  const [apiMode, setApiMode] = useState<ApiMode>("standalone");
+  const [managedPpuAlias, setManagedPpuAlias] = useState<string | null>(null);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [sessionAuditEntries, setSessionAuditEntries] = useState<WorkspaceSessionAuditEntry[]>([]);
   const sessionStateRef = useRef<SessionState | null>(null);
@@ -137,40 +152,48 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
     let cancelled = false;
     void (async () => {
       let saved = DEFAULT_API_BASE;
-      let mode: ApiMode | null = null;
+      let storedMode: ApiMode | null = null;
       let stored: string | null = null;
       try {
         const rawMode = window.localStorage.getItem(API_MODE_STORAGE_KEY);
-        if (rawMode === "managed" || rawMode === "standalone") mode = rawMode;
+        if (rawMode === "managed" || rawMode === "standalone") storedMode = rawMode;
         stored = window.localStorage.getItem(API_STORAGE_KEY);
       } catch {
         // Storage is optional. Runtime discovery remains authoritative.
       }
 
-      if (mode === "standalone") {
-        try {
-          if (stored) saved = normalizeApiBase(stored);
-        } catch {
-          saved = DEFAULT_API_BASE;
-        }
-      } else if (mode === "managed" || await managedRoutingConfigured()) {
+      const discovery = await discoverManagedRouting();
+      let nextMode: ApiMode = "standalone";
+      let nextManagedPpuAlias: string | null = null;
+
+      if (discovery?.managed === true) {
         saved = managedApiBase();
-        try {
-          window.localStorage.setItem(API_MODE_STORAGE_KEY, "managed");
-          window.localStorage.setItem(API_STORAGE_KEY, saved);
-        } catch {
-          // Storage is optional.
-        }
+        nextMode = "managed";
+        nextManagedPpuAlias = discovery.alias;
+      } else if (discovery === null && storedMode === "managed") {
+        // A previously managed Control Station remains fail-closed when the
+        // same-origin BFF discovery request is temporarily unavailable.
+        saved = managedApiBase();
+        nextMode = "managed";
       } else {
         try {
-          if (stored) saved = normalizeApiBase(stored);
+          if (stored && storedMode !== "managed") saved = normalizeApiBase(stored);
         } catch {
           saved = DEFAULT_API_BASE;
         }
       }
 
+      try {
+        window.localStorage.setItem(API_MODE_STORAGE_KEY, nextMode);
+        window.localStorage.setItem(API_STORAGE_KEY, saved);
+      } catch {
+        // Storage is optional.
+      }
+
       if (!cancelled) {
         setApiBaseState(saved);
+        setApiMode(nextMode);
+        setManagedPpuAlias(nextManagedPpuAlias);
         setHydrated(true);
       }
     })();
@@ -179,14 +202,20 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
 
   const setApiBase = useCallback((value: string): string => {
     const normalized = normalizeApiBase(value);
-    const mode: ApiMode = normalized === managedApiBase() ? "managed" : "standalone";
+    const managedBase = managedApiBase();
+    if (apiMode === "managed" && normalized !== managedBase) {
+      throw new Error("Managed Control Station routing is locked to the selected Manager PPU");
+    }
+    const mode: ApiMode = normalized === managedBase ? "managed" : "standalone";
     setApiBaseState(normalized);
+    setApiMode(mode);
+    if (mode === "standalone") setManagedPpuAlias(null);
     try {
       window.localStorage.setItem(API_STORAGE_KEY, normalized);
       window.localStorage.setItem(API_MODE_STORAGE_KEY, mode);
     } catch { /* storage is optional */ }
     return normalized;
-  }, []);
+  }, [apiMode]);
 
   const appendSessionAudit = useCallback((message: string) => {
     setSessionAuditEntries(current => [...current, {
@@ -268,6 +297,8 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
   const value = useMemo<WorkspaceSessionContextValue>(() => ({
     hydrated,
     apiBase,
+    apiMode,
+    managedPpuAlias,
     setApiBase,
     engineeringSessionId,
     ensureEngineeringSession,
@@ -297,6 +328,8 @@ export function WorkspaceSessionProvider({ children }: { children: ReactNode }) 
   }), [
     hydrated,
     apiBase,
+    apiMode,
+    managedPpuAlias,
     setApiBase,
     engineeringSessionId,
     ensureEngineeringSession,
