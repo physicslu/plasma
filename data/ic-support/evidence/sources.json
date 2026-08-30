@@ -46,14 +46,14 @@
       "source_id": "plasma_stm32f1_catalog_main",
       "manufacturer": "Plasma",
       "document_number": "stm32f1-commercial-icpn.csv",
-      "revision": "main@df4df891f9b16e26218a213d68b6055b23444e94",
+      "revision": "git-blob:b9f5e265fb5307c19b3a2a9f85f200711663e5ed",
       "document_date": "2026-08-30",
       "title": "Plasma retained STM32F1 commercial ICPN catalog",
       "authority": "plasma_canonical_catalog",
       "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
       "integrity": {
-        "status": "git_object_pinned",
-        "git_commit": "df4df891f9b16e26218a213d68b6055b23444e94"
+        "status": "git_blob_pinned",
+        "git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed"
       },
       "used_for": [
         "commercial_identity_binding",
