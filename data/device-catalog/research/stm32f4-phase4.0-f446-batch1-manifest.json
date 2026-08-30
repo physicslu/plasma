@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-f446-batch1-2026-08-30",
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+      "selection_reason": "retained control; detects official ST active-orderable drift while Phase 4.0 expands STM32F446"
+    },
+    {
+      "base_device": "STM32F446VC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446vc.html",
+      "selection_reason": "256-KiB F446 LQFP100 base device with existing V/T package semantics"
+    },
+    {
+      "base_device": "STM32F446VE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446ve.html",
+      "selection_reason": "512-KiB F446 LQFP100 base device with existing V/T package semantics"
+    },
+    {
+      "base_device": "STM32F446ZC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446zc.html",
+      "selection_reason": "256-KiB F446 LQFP/UFBGA144 base device; Active rows are admitted candidates while Proposal rows remain explicitly excluded"
+    },
+    {
+      "base_device": "STM32F446ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446ze.html",
+      "selection_reason": "512-KiB F446 LQFP/UFBGA144 base device; tests H/J/T package coverage under official ST evidence"
+    }
+  ]
+}
