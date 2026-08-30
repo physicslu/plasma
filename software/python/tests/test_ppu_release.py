@@ -47,5 +47,5 @@ def test_ppu_release_builds_and_verifies_linux_armv7l_artifact(tmp_path: Path) -
         expect_architecture="armv7l",
     )
     assert manifest["role"] == "ppu"
-    assert manifest["target"] == {"platform": "linux", "architecture": "armv7l"}
+    assert manifest["target"] == "linux-armv7l"
     assert manifest["contracts"] == {"plasma_protocol": "3.3", "web_rest_api": "3"}
