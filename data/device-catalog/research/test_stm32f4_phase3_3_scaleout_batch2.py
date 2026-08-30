@@ -19,30 +19,24 @@ from device_catalog_pipeline_framework import pipeline_plan_is_clean  # noqa: E4
 from stm32f4_admission import build_admission_plan  # noqa: E402
 from validate_stm32f4_retained_evidence import validate_retained_evidence  # noqa: E402
 
-EVIDENCE = HERE / "evidence" / "stm32f4-phase3.3-scaleout-batch1-live-2026-08-30"
-BASELINE = HERE / "stm32f4-phase3.3-scaleout-batch1-baseline.json"
+EVIDENCE = HERE / "evidence" / "stm32f4-phase3.3-scaleout-batch2-live-2026-08-30"
+BASELINE = HERE / "stm32f4-phase3.3-scaleout-batch2-baseline.json"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
-AUDIT = HERE / "stm32f4-phase3.3-admission-audit.json"
-PHASE31_AUDIT = HERE / "stm32f4-phase3.1-admission-audit.json"
-NEW_BASES = {"STM32F401CB", "STM32F407VE", "STM32F407ZG", "STM32F411CC", "STM32F429ZG"}
+AUDIT = HERE / "stm32f4-phase3.3-scaleout-batch2-admission-audit.json"
+NEW_BASES = {"STM32F407ZE", "STM32F415VG", "STM32F427VG", "STM32F427ZG", "STM32F437VG"}
 
 
-class STM32F4Phase33ScaleoutTests(unittest.TestCase):
+class STM32F4Phase33ScaleoutBatch2Tests(unittest.TestCase):
     def _audit(self) -> dict[str, object]:
         return json.loads(AUDIT.read_text(encoding="utf-8"))
 
-    def _phase31_icpns(self) -> set[str]:
-        payload = json.loads(PHASE31_AUDIT.read_text(encoding="utf-8"))
-        return set(payload["icpns"])
-
-    def _snapshot_canonical(self, output: Path, icpns: set[str], expected_count: int) -> None:
+    def _prewrite_canonical(self, output: Path, new_icpns: set[str]) -> None:
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if row["icpn"] in icpns]
-        self.assertEqual(len(rows), expected_count)
-        self.assertEqual({row["icpn"] for row in rows}, icpns)
+            rows = [row for row in reader if row["icpn"] not in new_icpns]
+        self.assertEqual(len(rows), 34)
         with output.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
             writer.writeheader()
@@ -51,7 +45,7 @@ class STM32F4Phase33ScaleoutTests(unittest.TestCase):
     def test_retained_evidence_is_scale_ready(self) -> None:
         report = validate_retained_evidence(EVIDENCE, baseline_path=BASELINE)
         self.assertEqual(report["targets"], 6)
-        self.assertEqual(report["exact_icpn_candidates"], 21)
+        self.assertEqual(report["exact_icpn_candidates"], 20)
         self.assertTrue(report["candidate_baseline_match"])
         self.assertEqual(report["candidate_drift"], 0)
         self.assertTrue(report["scale_ready"])
@@ -66,29 +60,29 @@ class STM32F4Phase33ScaleoutTests(unittest.TestCase):
             admission_base_devices=NEW_BASES,
         )
         self.assertTrue(pipeline_plan_is_clean(plan))
-        self.assertEqual(plan["candidate_count"], 16)
+        self.assertEqual(plan["candidate_count"], 15)
         self.assertEqual(plan["decision_counts"]["admit"], 0)
-        self.assertEqual(plan["decision_counts"]["already_present"], 16)
+        self.assertEqual(plan["decision_counts"]["already_present"], 15)
         self.assertEqual(plan["decision_counts"]["manual_review_required"], 0)
         self.assertEqual(plan["decision_counts"]["reject"], 0)
         self.assertEqual(plan["conflicts"], 0)
         self.assertEqual(plan["issues"], [])
 
-    def test_live_plan_replays_18_to_34_and_writer_is_idempotent(self) -> None:
+    def test_materialization_plan_replays_34_to_49_and_writer_is_idempotent(self) -> None:
         audit = self._audit()
-        batch1_icpns = set(audit["icpns"])
-        phase31_icpns = self._phase31_icpns()
+        new_icpns = set(audit["icpns"])
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             canonical = root / "stm32f4-commercial-icpn.csv"
-            historical = root / "stm32f4-phase3.3-batch1-historical.csv"
-            live_named_evidence = root / "evidence"
-            self._snapshot_canonical(canonical, phase31_icpns, 18)
-            self._snapshot_canonical(historical, phase31_icpns | batch1_icpns, 34)
-            shutil.copytree(EVIDENCE, live_named_evidence)
+            materialized_named_evidence = root / EVIDENCE.name
+            self._prewrite_canonical(canonical, new_icpns)
+            shutil.copytree(EVIDENCE, materialized_named_evidence)
 
+            # The retained audit binds the materialization plan, whose input contract
+            # includes evidence_dir.name. Recreate that logical basename exactly rather
+            # than recomputing or replacing the immutable admission-plan digest.
             plan = build_admission_plan(
-                evidence_dir=live_named_evidence,
+                evidence_dir=materialized_named_evidence,
                 baseline_path=BASELINE,
                 catalog_path=CATALOG,
                 canonical_path=canonical,
@@ -96,23 +90,23 @@ class STM32F4Phase33ScaleoutTests(unittest.TestCase):
             )
             serialized = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode("utf-8")
             self.assertEqual(hashlib.sha256(serialized).hexdigest(), audit["admission_plan_sha256"])
-            self.assertEqual(plan["canonical_rows_before"], 18)
-            self.assertEqual(plan["candidate_count"], 16)
-            self.assertEqual(plan["decision_counts"]["admit"], 16)
+            self.assertEqual(plan["canonical_rows_before"], 34)
+            self.assertEqual(plan["candidate_count"], 15)
+            self.assertEqual(plan["decision_counts"]["admit"], 15)
             self.assertTrue(pipeline_plan_is_clean(plan))
 
             first = write_canonical_dataset(plan=plan, canonical_path=canonical)
             self.assertEqual(first["status"], "written")
-            self.assertEqual(first["rows_before"], 18)
-            self.assertEqual(first["rows_after"], 34)
-            self.assertEqual(len(first["added"]), 16)
+            self.assertEqual(first["rows_before"], 34)
+            self.assertEqual(first["rows_after"], 49)
+            self.assertEqual(len(first["added"]), 15)
 
             second = write_canonical_dataset(plan=plan, canonical_path=canonical)
             self.assertEqual(second["status"], "no_op")
-            self.assertEqual(second["rows_before"], 34)
-            self.assertEqual(second["rows_after"], 34)
+            self.assertEqual(second["rows_before"], 49)
+            self.assertEqual(second["rows_after"], 49)
             self.assertEqual(second["added"], [])
-            self.assertEqual(canonical.read_bytes(), historical.read_bytes())
+            self.assertEqual(canonical.read_bytes(), CANONICAL.read_bytes())
             self.assertEqual(hashlib.sha256(canonical.read_bytes()).hexdigest(), audit["canonical_sha256_after"])
 
 

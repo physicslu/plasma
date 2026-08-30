@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase3.3-scaleout-batch2-2026-08-30",
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+      "selection_reason": "retained control; proves exact-ICPN drift protection while batch2 expands adjacent STM32F4 coverage"
+    },
+    {
+      "base_device": "STM32F407ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ze.html",
+      "selection_reason": "512-KiB F407 LQFP144 variant using already-supported Z/T package semantics"
+    },
+    {
+      "base_device": "STM32F415VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f415vg.html",
+      "selection_reason": "1-MiB crypto-enabled F415 LQFP100 variant using already-supported V/T package semantics"
+    },
+    {
+      "base_device": "STM32F427VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427vg.html",
+      "selection_reason": "1-MiB F427 LQFP100 variant extending advanced-line coverage without new package policy"
+    },
+    {
+      "base_device": "STM32F427ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427zg.html",
+      "selection_reason": "1-MiB F427 LQFP144 variant extending advanced-line coverage without new package policy"
+    },
+    {
+      "base_device": "STM32F437VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vg.html",
+      "selection_reason": "1-MiB crypto-enabled F437 LQFP100 variant using already-supported V/T package semantics"
+    }
+  ]
+}
