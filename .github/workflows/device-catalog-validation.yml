@@ -50,3 +50,14 @@ jobs:
           python data/device-catalog/research/test_stm32f1_canonical_admission.py
       - name: Validate STM32F1 Phase 2.9 scaleout contract
         run: python data/device-catalog/research/test_stm32f1_phase2_9_scaleout.py
+      - name: Validate STM32F4 Phase 3.1 family adapter and synthetic pipeline
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase3_1_policy.py
+          python data/device-catalog/research/test_stm32f4_phase3_1_pipeline.py
+      - name: Validate STM32F4 Phase 3.1 retained evidence and canonical lifecycle
+        run: |
+          python data/device-catalog/research/validate_stm32f4_commercial_icpn.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase3.1-bounded-pilot-live-2026-08-30 \
+            --baseline data/device-catalog/research/stm32f4-phase3.1-pilot-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase3_1_post_admission.py

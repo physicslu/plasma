@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase3.1-bounded-pilot-2026-08-30",
+  "observation_kind": "official_st_source_surface_baseline",
+  "observed_date": "2026-08-30",
+  "canonical_dataset_admission": false,
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "exact_icpns": [
+        "STM32F401CCF6TR",
+        "STM32F401CCU6",
+        "STM32F401CCU6TR",
+        "STM32F401CCU7",
+        "STM32F401CCY6TT"
+      ]
+    },
+    {
+      "base_device": "STM32F407VG",
+      "exact_icpns": [
+        "STM32F407VGT6",
+        "STM32F407VGT6TR",
+        "STM32F407VGT7",
+        "STM32F407VGT7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F411CE",
+      "exact_icpns": [
+        "STM32F411CEU6",
+        "STM32F411CEU6TR",
+        "STM32F411CEU7",
+        "STM32F411CEY3TR",
+        "STM32F411CEY6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F429ZI",
+      "exact_icpns": [
+        "STM32F429ZIT6",
+        "STM32F429ZIT6TR",
+        "STM32F429ZIT7",
+        "STM32F429ZIY6TR"
+      ]
+    }
+  ]
+}
