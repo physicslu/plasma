@@ -11,7 +11,7 @@ const facilityId = process.env.MOCK_CD_PRODUCTION_FACILITY_ID ?? "mock-facility-
 const ppuOne = process.env.MOCK_CD_PRODUCTION_PPU_ONE ?? `${facilityId}-ppu-01`;
 const ppuTwo = process.env.MOCK_CD_PRODUCTION_PPU_TWO ?? `${facilityId}-ppu-02`;
 const gateway = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
-const targetIc = "ADUC7019BCPZ62I";
+const targetIc = "STM32F407VGT6";
 const browserJobPath = /^\/api\/engineering\/targets\/([^/]+)\/([^/]+)\/api\/jobs$/;
 
 type RuntimeOperationSettings = {
