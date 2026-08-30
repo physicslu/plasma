@@ -5,7 +5,9 @@ import threading
 import unittest
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.request import ProxyHandler
 
+import plasma_manager.client as client_module
 from plasma_manager.client import PPUHTTPError, PPUHttpClient
 
 
@@ -61,6 +63,15 @@ class ManagerPPUHttpClientTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join()
+
+    def test_ppu_transport_explicitly_disables_host_proxies(self):
+        proxy_handlers = [
+            handler
+            for handler in client_module._DIRECT_HTTP.handlers
+            if isinstance(handler, ProxyHandler)
+        ]
+        self.assertEqual(len(proxy_handlers), 1)
+        self.assertEqual(proxy_handlers[0].proxies, {})
 
     def test_liveness_uses_real_http_transport(self):
         status, payload = self.client.liveness()
