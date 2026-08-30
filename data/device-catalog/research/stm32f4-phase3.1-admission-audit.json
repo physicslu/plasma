@@ -1,0 +1,41 @@
+{
+  "admission_plan_sha256": "b2bb003b238db1b6f5274f2011cc40d2f8764f21222f29837708c2ae3f4bd2fe",
+  "baseline_sha256": "1ab213c82305464fdf7450d430278e60fb2d9f016d33b92d790d116bc85abee6",
+  "candidate_count": 18,
+  "canonical_input_sha256": "a57ec095b1af22963ef5415d7f3cbc1cd4a920dc6e06a9817dca4d029b714971",
+  "canonical_rows_before": 0,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 18,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase3.1-bounded-pilot-2026-08-30-retained-20260830T023035Z-b42d460",
+  "evidence_manifest_sha256": "d5701403ef9f8fecd478e103cbb08a6fbaa54510859b99657753d95f7347805d",
+  "executed_git_sha": "b42d460459911ddcb347fc470661a931fd911ce1",
+  "family": "STM32F4",
+  "icpns": [
+    "STM32F401CCF6TR",
+    "STM32F401CCU6",
+    "STM32F401CCU6TR",
+    "STM32F401CCU7",
+    "STM32F401CCY6TT",
+    "STM32F407VGT6",
+    "STM32F407VGT6TR",
+    "STM32F407VGT7",
+    "STM32F407VGT7TR",
+    "STM32F411CEU6",
+    "STM32F411CEU6TR",
+    "STM32F411CEU7",
+    "STM32F411CEY3TR",
+    "STM32F411CEY6TR",
+    "STM32F429ZIT6",
+    "STM32F429ZIT6TR",
+    "STM32F429ZIT7",
+    "STM32F429ZIY6TR"
+  ],
+  "issues": [],
+  "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "schema_version": 1
+}
