@@ -157,6 +157,10 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
         clean_env = dict(os.environ)
         for name in ("PYTHONPATH", "PYTHONHOME", "NODE_PATH", "NPM_CONFIG_PREFIX"):
             clean_env.pop(name, None)
+        # The acceptance topology is entirely loopback-local. Ensure the packaged
+        # Manager's initial fleet poll cannot be diverted by runner/host proxy settings.
+        clean_env["NO_PROXY"] = "127.0.0.1,localhost"
+        clean_env["no_proxy"] = "127.0.0.1,localhost"
         try:
             manager_process = subprocess.Popen(
                 [sys.executable, str(manager_entry), "--config", str(manager_config)],
