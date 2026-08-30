@@ -77,6 +77,9 @@ print(os.environ.get("FAKE_OPENOCD_STDERR", "fake-openocd-stderr"), file=sys.std
 sleep_s = float(os.environ.get("FAKE_OPENOCD_SLEEP_S", "0"))
 if sleep_s:
     time.sleep(sleep_s)
+completed = os.environ.get("FAKE_OPENOCD_COMPLETED")
+if completed:
+    open(completed, "w", encoding="utf-8").write("completed")
 raise SystemExit(int(os.environ.get("FAKE_OPENOCD_EXIT_CODE", "0")))
 '''
 
@@ -104,6 +107,19 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
             configured_target_config=TARGET_CFG,
         )
 
+    @staticmethod
+    def _fake_launcher(script: Path, launched: list[tuple[str, ...]]):
+        async def launcher(*arguments, **kwargs):
+            launched.append(tuple(str(value) for value in arguments))
+            return await asyncio.create_subprocess_exec(
+                sys.executable,
+                str(script),
+                *arguments[1:],
+                **kwargs,
+            )
+
+        return launcher
+
     async def _execute(
         self,
         root: Path,
@@ -117,16 +133,6 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
         script.write_text(textwrap.dedent(FAKE_OPENOCD), encoding="utf-8")
         log = root / "fake-openocd-log.json"
         launched: list[tuple[str, ...]] = []
-
-        async def launcher(*arguments, **kwargs):
-            launched.append(tuple(str(value) for value in arguments))
-            return await asyncio.create_subprocess_exec(
-                sys.executable,
-                str(script),
-                *arguments[1:],
-                **kwargs,
-            )
-
         executor = OpenOCDPlanExecutor(
             {
                 "executable": "fake-openocd",
@@ -135,7 +141,7 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
                 "work_dir": str(root),
                 "command_timeout_s": timeout_s,
             },
-            process_launcher=launcher,
+            process_launcher=self._fake_launcher(script, launched),
         )
         selected_plan = plan or self._plan(request)
         process_env = {"FAKE_OPENOCD_LOG": str(log), **(env or {})}
@@ -252,16 +258,64 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
             root_path = Path(root)
             request = self._request(Operation.PROGRAM, image=b"timeout-image")
             log = root_path / "fake-openocd-log.json"
+            completed = root_path / "completed.txt"
             with self.assertRaises(PlasmaError) as caught:
                 await self._execute(
                     root_path,
                     request,
                     timeout_s=0.05,
-                    env={"FAKE_OPENOCD_SLEEP_S": "2"},
+                    env={
+                        "FAKE_OPENOCD_SLEEP_S": "2",
+                        "FAKE_OPENOCD_COMPLETED": str(completed),
+                    },
                 )
             self.assertEqual(caught.exception.code, ErrorCode.OPERATION_TIMEOUT)
             record = json.loads(log.read_text(encoding="utf-8"))
             self.assertFalse(Path(record["workspace"]).exists())
+            self.assertFalse(completed.exists())
+
+    async def test_task_cancellation_kills_fake_process_and_cleans_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            script = root_path / "fake_openocd.py"
+            script.write_text(textwrap.dedent(FAKE_OPENOCD), encoding="utf-8")
+            log = root_path / "fake-openocd-log.json"
+            completed = root_path / "completed.txt"
+            launched: list[tuple[str, ...]] = []
+            request = self._request(Operation.PROGRAM, image=b"cancel-image")
+            plan = self._plan(request)
+            executor = OpenOCDPlanExecutor(
+                {
+                    "executable": "fake-openocd",
+                    "interface_cfg": INTERFACE_CFG,
+                    "target_cfg": TARGET_CFG,
+                    "work_dir": str(root_path),
+                    "command_timeout_s": 5.0,
+                },
+                process_launcher=self._fake_launcher(script, launched),
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "FAKE_OPENOCD_LOG": str(log),
+                    "FAKE_OPENOCD_SLEEP_S": "2",
+                    "FAKE_OPENOCD_COMPLETED": str(completed),
+                },
+            ):
+                task = asyncio.create_task(executor.execute(plan, self.support, request))
+                for _ in range(100):
+                    if log.exists():
+                        break
+                    await asyncio.sleep(0.01)
+                self.assertTrue(log.exists(), "fake process did not reach its lifecycle checkpoint")
+                record = json.loads(log.read_text(encoding="utf-8"))
+                task.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await task
+
+            self.assertEqual(len(launched), 1)
+            self.assertFalse(Path(record["workspace"]).exists())
+            self.assertFalse(completed.exists())
 
     async def test_missing_read_artifact_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as root:
@@ -286,6 +340,30 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_FAILURE)
             self.assertEqual(caught.exception.context["actual_size_bytes"], 1)
+
+    async def test_non_finite_timeout_is_rejected_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            launched = False
+
+            async def launcher(*_arguments, **_kwargs):
+                nonlocal launched
+                launched = True
+                raise AssertionError("invalid timeout must not launch")
+
+            request = self._request(Operation.ERASE)
+            executor = OpenOCDPlanExecutor(
+                {
+                    "interface_cfg": INTERFACE_CFG,
+                    "target_cfg": TARGET_CFG,
+                    "work_dir": root,
+                    "command_timeout_s": float("nan"),
+                },
+                process_launcher=launcher,
+            )
+            with self.assertRaises(PlasmaError) as caught:
+                await executor.execute(self._plan(request), self.support, request)
+            self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
+            self.assertFalse(launched)
 
     async def test_direct_interface_safe_shutdown_cannot_spawn_openocd(self) -> None:
         interface = OpenOCDInterface(
