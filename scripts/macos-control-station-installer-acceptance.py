@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -147,6 +148,22 @@ def _assert_launchagent(user_id: int, label: str) -> None:
         raise InstallerAcceptanceError(f"LaunchAgent is not loaded: {label}\n{result.stdout}")
 
 
+def _assert_system_owned_immutable(path: Path, *, follow_symlinks: bool = True) -> None:
+    info = path.stat() if follow_symlinks else path.lstat()
+    if info.st_uid != 0:
+        raise InstallerAcceptanceError(f"immutable system path is not root-owned: {path} uid={info.st_uid}")
+    if stat.S_IMODE(info.st_mode) & 0o022:
+        raise InstallerAcceptanceError(
+            f"immutable system path is group/world writable: {path} mode={oct(stat.S_IMODE(info.st_mode))}"
+        )
+
+
+def _assert_user_owned(path: Path, user_id: int) -> None:
+    info = path.stat()
+    if info.st_uid != user_id:
+        raise InstallerAcceptanceError(f"mutable user path has wrong owner: {path} uid={info.st_uid} expected={user_id}")
+
+
 def run_acceptance(pkg: Path) -> None:
     if sys.platform != "darwin":
         raise InstallerAcceptanceError("macOS installer acceptance requires Darwin")
@@ -174,9 +191,29 @@ def run_acceptance(pkg: Path) -> None:
     current = PRODUCT_ROOT / "current"
     if not current.is_symlink():
         raise InstallerAcceptanceError("installer did not create the current release symlink")
-    for required in (current / "runtime" / "console" / "server.js", current / "runtime" / "manager" / "manager.pyz", PRODUCT_ROOT / "install" / "node-path", PRODUCT_ROOT / "install" / "python-path", launch_root / "com.plasma.manager.plist", launch_root / "com.plasma.console.plist"):
+    immutable_paths = (
+        current / "runtime" / "console" / "server.js",
+        current / "runtime" / "manager" / "manager.pyz",
+        PRODUCT_ROOT / "install" / "node-path",
+        PRODUCT_ROOT / "install" / "python-path",
+    )
+    user_paths = (
+        launch_root / "com.plasma.manager.plist",
+        launch_root / "com.plasma.console.plist",
+        mutable_root / "config" / "manager.yaml",
+        mutable_root / "config" / "selected-ppu-alias",
+    )
+    for required in (*immutable_paths, *user_paths):
         if not required.exists():
             raise InstallerAcceptanceError(f"installed path is missing: {required}")
+
+    _assert_system_owned_immutable(PRODUCT_ROOT)
+    _assert_system_owned_immutable(current, follow_symlinks=False)
+    for path in immutable_paths:
+        _assert_system_owned_immutable(path)
+    for path in user_paths:
+        _assert_user_owned(path, user_id)
+    print("macOS installer ownership boundary: PASS", flush=True)
 
     node_path = Path((PRODUCT_ROOT / "install" / "node-path").read_text(encoding="utf-8").strip())
     python_path = Path((PRODUCT_ROOT / "install" / "python-path").read_text(encoding="utf-8").strip())
