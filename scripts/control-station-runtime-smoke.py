@@ -103,14 +103,29 @@ def _wait_for_console(port: int, process: subprocess.Popen[bytes], deadline_s: f
 
 
 def _terminate(process: subprocess.Popen[bytes] | None) -> None:
+    """Best-effort cleanup that must never hide the primary smoke result."""
     if process is None or process.poll() is not None:
         return
-    process.terminate()
+    try:
+        process.terminate()
+    except OSError:
+        return
+    try:
+        process.wait(timeout=5)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        process.kill()
+    except OSError:
+        return
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=5)
+        # Windows runners can retain descendants/handles briefly after the direct
+        # process is killed. Cleanup failure is not runtime acceptance evidence and
+        # must not overwrite the actual Manager/BFF smoke result.
+        return
 
 
 def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
@@ -161,6 +176,7 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
         # Manager's initial fleet poll cannot be diverted by runner/host proxy settings.
         clean_env["NO_PROXY"] = "127.0.0.1,localhost"
         clean_env["no_proxy"] = "127.0.0.1,localhost"
+        clean_env["PYTHONUNBUFFERED"] = "1"
         try:
             manager_process = subprocess.Popen(
                 [sys.executable, str(manager_entry), "--config", str(manager_config)],
@@ -170,6 +186,7 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
                 stderr=subprocess.STDOUT,
             )
             _wait_for_manager(manager_port, manager_process)
+            print("Control Station packaged Manager readiness: PASS", flush=True)
 
             console_env = {
                 **clean_env,
@@ -187,6 +204,7 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
                 stderr=subprocess.STDOUT,
             )
             _wait_for_console(console_port, console_process)
+            print("Control Station packaged Console/BFF -> Manager relay: PASS", flush=True)
         except Exception as exc:
             manager_log.flush()
             console_log.flush()
