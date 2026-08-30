@@ -99,7 +99,7 @@ def test_validate_runtime_rejects_missing_manager(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    (system_name, machine, expected),
+    "system_name,machine,expected",
     [
         ("Darwin", "arm64", ("macos", "arm64")),
         ("Darwin", "x86_64", ("macos", "x86_64")),
