@@ -183,34 +183,32 @@ def generate_wix_source(*, release_root: Path, program_data_seed: Path, version:
         <Directory Id="PlasmaLogs" Name="logs" />
       </Directory>
     </StandardDirectory>
-    <Feature Id="MainFeature" Title="Plasma Control Station" Level="1">
-      <Files Directory="PlasmaVersion" Include="{root}\\**">
-        <Exclude Files="{manager_exe}" />
-        <Exclude Files="{console_exe}" />
-      </Files>
-      <Component Id="ManagerServiceComponent" Directory="PlasmaBin" Guid="A8D35F44-1410-4D2C-817D-797CE88EFA3B">
-        <File Id="ManagerServiceExe" Source="{manager_exe}" KeyPath="yes" />
-        <ServiceInstall Name="{SERVICE_MANAGER}" DisplayName="Plasma Manager" Description="Plasma Control Station fleet Manager"
-                        Start="auto" Type="ownProcess" ErrorControl="normal" />
-        <ServiceControl Name="{SERVICE_MANAGER}" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
-      </Component>
-      <Component Id="ConsoleServiceComponent" Directory="PlasmaBin" Guid="2D6936ED-E228-427E-B579-7E58EC896335">
-        <File Id="ConsoleServiceExe" Source="{console_exe}" KeyPath="yes" />
-        <ServiceInstall Name="{SERVICE_CONSOLE}" DisplayName="Plasma Control Station" Description="Plasma operator Console and same-host BFF"
-                        Start="auto" Type="ownProcess" ErrorControl="normal">
-          <ServiceDependency Id="{SERVICE_MANAGER}" />
-        </ServiceInstall>
-        <ServiceControl Name="{SERVICE_CONSOLE}" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
-      </Component>
-      <Component Id="ManagerConfigComponent" Directory="PlasmaConfig" Guid="974EBC1C-94C2-40D3-B41E-EBA0A629EE34" Permanent="yes" NeverOverwrite="yes">
-        <File Source="{manager_seed}" Name="manager.yaml" KeyPath="yes" />
-      </Component>
-      <Component Id="SelectedAliasComponent" Directory="PlasmaConfig" Guid="9B132C47-B3B2-423D-A848-175FEAA11B82" Permanent="yes" NeverOverwrite="yes">
-        <File Source="{alias_seed}" Name="selected-ppu-alias" KeyPath="yes" />
-      </Component>
-      <Component Id="StateDirectoryComponent" Directory="PlasmaState" Guid="00834C43-DAA7-4EC5-8E57-29E5479E9EC0" Permanent="yes" KeyPath="yes"><CreateFolder /></Component>
-      <Component Id="LogDirectoryComponent" Directory="PlasmaLogs" Guid="05D1C6F2-447C-4B91-9E2A-A399D9B7EB9C" Permanent="yes" KeyPath="yes"><CreateFolder /></Component>
-    </Feature>
+    <Files Directory="PlasmaVersion" Include="{root}\\**">
+      <Exclude Files="{manager_exe}" />
+      <Exclude Files="{console_exe}" />
+    </Files>
+    <Component Id="ManagerServiceComponent" Directory="PlasmaBin" Guid="A8D35F44-1410-4D2C-817D-797CE88EFA3B">
+      <File Id="ManagerServiceExe" Source="{manager_exe}" KeyPath="yes" />
+      <ServiceInstall Name="{SERVICE_MANAGER}" DisplayName="Plasma Manager" Description="Plasma Control Station fleet Manager"
+                      Start="auto" Type="ownProcess" ErrorControl="normal" />
+      <ServiceControl Name="{SERVICE_MANAGER}" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+    </Component>
+    <Component Id="ConsoleServiceComponent" Directory="PlasmaBin" Guid="2D6936ED-E228-427E-B579-7E58EC896335">
+      <File Id="ConsoleServiceExe" Source="{console_exe}" KeyPath="yes" />
+      <ServiceInstall Name="{SERVICE_CONSOLE}" DisplayName="Plasma Control Station" Description="Plasma operator Console and same-host BFF"
+                      Start="auto" Type="ownProcess" ErrorControl="normal">
+        <ServiceDependency Id="{SERVICE_MANAGER}" />
+      </ServiceInstall>
+      <ServiceControl Name="{SERVICE_CONSOLE}" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+    </Component>
+    <Component Id="ManagerConfigComponent" Directory="PlasmaConfig" Guid="974EBC1C-94C2-40D3-B41E-EBA0A629EE34" Permanent="yes" NeverOverwrite="yes">
+      <File Source="{manager_seed}" Name="manager.yaml" KeyPath="yes" />
+    </Component>
+    <Component Id="SelectedAliasComponent" Directory="PlasmaConfig" Guid="9B132C47-B3B2-423D-A848-175FEAA11B82" Permanent="yes" NeverOverwrite="yes">
+      <File Source="{alias_seed}" Name="selected-ppu-alias" KeyPath="yes" />
+    </Component>
+    <Component Id="StateDirectoryComponent" Directory="PlasmaState" Guid="00834C43-DAA7-4EC5-8E57-29E5479E9EC0" Permanent="yes" KeyPath="yes"><CreateFolder /></Component>
+    <Component Id="LogDirectoryComponent" Directory="PlasmaLogs" Guid="05D1C6F2-447C-4B91-9E2A-A399D9B7EB9C" Permanent="yes" KeyPath="yes"><CreateFolder /></Component>
   </Package>
 </Wix>
 '''
