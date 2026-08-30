@@ -600,7 +600,7 @@ Agents must not silently turn these facts into wrong assumptions:
 1. Python supports >=3.11; CI and integration host may use different allowed minor versions.
 2. Integration deployment uses Plasma Web REST Gateway port 18080 while `plasma_web.gateway` retains a code-level local default of 8080.
 3. Gateway is standard-library HTTP + REST polling, not FastAPI/WebSocket.
-4. Web stack includes React/TypeScript plus Next.js/Vinex and Vite tooling; inspect `package.json` before stack assumptions.
+4. Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before stack assumptions.
 5. Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
 6. Only binary Image Asset normalization is implemented; other declared Asset formats/types are extension points, not validated functionality.
 7. Programming Recipe/Package is an architectural direction, not yet an implemented execution contract.
