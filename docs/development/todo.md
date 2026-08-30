@@ -23,6 +23,36 @@ Required remaining work:
 - add human credential rotation, revocation and session-lifecycle UX;
 - define centralized multi-PPU identity management through Plasma Manager without making standalone PPU authorization depend on Manager availability.
 
+### Device Catalog Retained-Evidence Artifact Provenance
+
+**Status:** TODO / follow-up after PR #245
+
+**Layer:** Device Catalog / evidence supply chain
+
+**Reason:** Phase 4.0 retained the machine-produced STM32F446 evidence contents and their per-file SHA-256 values, but the repository provenance does not bind that retained package to the originating GitHub Actions artifact. Artifact `phase40-f446-live-evidence` (`9733100989`) from workflow run `33314782199` has archive SHA-256 `352203fcc4cbf6cb956794c1569a7b40f3ffa294ce3e10e4251df38b5308281a`; after the temporary artifact expires, the repository alone cannot prove that the retained files came from that exact archive.
+
+Required work:
+
+- define a versioned artifact-source record for retained Device Catalog evidence;
+- record the repository, workflow run ID, artifact ID, artifact name, acquisition head SHA, archive SHA-256 and acquisition timestamp;
+- bind the artifact-source record into the retained evidence manifest so the manifest transitively covers both retained files and their acquisition artifact;
+- make offline validation verify the artifact-source schema and expected archive digest without requiring network access or a non-expired GitHub artifact;
+- preserve the distinction between the immutable archive digest and the individual retained-file digests;
+- add regression tests that reject missing, malformed or mismatched artifact provenance for evidence packages created after the new contract takes effect;
+- define an explicit compatibility rule for historical evidence packages rather than retroactively fabricating unavailable artifact metadata;
+- document the operator procedure for capturing artifact metadata before the temporary GitHub artifact expires.
+
+Acceptance invariant:
+
+```text
+machine-produced acquisition artifact
+    -> immutable archive digest and workflow identity
+    -> retained evidence manifest
+    -> offline admission replay
+```
+
+A retained evidence package must not claim machine-produced artifact provenance unless that chain is independently verifiable from repository data.
+
 ## Deferred architecture evolution
 
 ### Split Programming Image Data Plane
