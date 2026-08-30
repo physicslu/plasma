@@ -1,6 +1,6 @@
 # Control Station Runtime Packaging
 
-> Status: **Current**. PR #224 established the Control Station application-runtime payload and its macOS/Linux/Windows clean-runtime acceptance. This document defines the common runtime boundary; host installation belongs to platform adapters such as the separate macOS installer pilot.
+> Status: **Current**. PR #224 established the Control Station application-runtime payload and its macOS/Linux/Windows clean-runtime acceptance. This document defines the common runtime boundary; host installation belongs to separate platform adapters such as the macOS and Windows installer pilots.
 
 ## 1. Purpose
 
@@ -210,9 +210,9 @@ PASS
 
 The deliberately unreachable PPU proves the Console/BFF -> Manager process boundary without claiming a PPU, Z2, PS, PL, or IC acceptance result.
 
-## 9. Current evidence established by PR #224
+## 9. Common-runtime evidence
 
-Passing acceptance supports these claims:
+Passing common-runtime acceptance supports these claims:
 
 ```text
 Control Station Runtime Package PASS
@@ -223,21 +223,7 @@ Clean extraction runtime startup PASS
 Console/BFF -> Manager local route PASS
 ```
 
-The common runtime evidence alone does not support these claims:
-
-```text
-Linux installer PASS
-Windows installer PASS
-systemd/Windows SCM activation PASS
-upgrade/rollback PASS
-bundled Node interpreter PASS
-bundled Python interpreter PASS
-PPU/Z2 deployment PASS
-PS <-> PL PASS
-real IC programming PASS
-```
-
-macOS installer evidence is owned by the separate [macOS Control Station Installer Pilot](macos-control-station-installer-pilot.md), not by the common runtime acceptance itself.
+The common-runtime evidence alone does not prove a platform installer or service adapter. macOS installer evidence is owned by the separate [macOS Control Station Installer Pilot](macos-control-station-installer-pilot.md); Windows MSI/SCM evidence is owned by the separate [Windows Control Station Installer Pilot](windows-control-station-installer-pilot.md). Linux installer/systemd, upgrade/rollback, bundled interpreters, PPU/Z2, PS <-> PL, and real-IC behavior remain separate evidence boundaries.
 
 ## 10. Platform adapter boundary
 
@@ -246,11 +232,11 @@ Platform adapters consume the same common application contract:
 ```text
 Control Station runtime payload
         |
-        +-- macOS launchd adapter      # unsigned installer pilot implemented
+        +-- macOS launchd adapter      # unsigned .pkg pilot implemented
         +-- Linux systemd adapter      # pending
-        +-- Windows SCM adapter        # pending
+        +-- Windows SCM adapter        # unsigned MSI pilot implemented
 ```
 
 The adapters own filesystem placement, service definitions, privileges, install lifecycle and host-specific logging integration. They must not fork the Console/BFF or Manager application behavior by operating system.
 
-The macOS pilot deliberately keeps Node.js and Python external, records validated absolute executable paths for `launchd`, and separates immutable system-owned runtime from per-user mutable config/state/logs. Signing/notarization and full upgrade/rollback remain outside that pilot.
+The macOS and Windows pilots deliberately keep Node.js and Python external. macOS records validated absolute executable paths for `launchd`; Windows resolves supported system-wide runtime locations from its SCM launch wrappers. Both separate immutable application payload from mutable configuration/state/logs. Signing and full upgrade/rollback remain outside these pilots.
