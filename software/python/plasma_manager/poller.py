@@ -26,15 +26,24 @@ class FleetPoller:
         self._last_refresh_monotonic: float | None = None
         self._last_refresh_error: str | None = None
 
-    def start(self) -> None:
-        """Prime the cache once, then refresh it periodically in the background."""
+    def start(self, *, prime_cache: bool = True) -> None:
+        """Start periodic polling.
+
+        By default the historical contract is preserved: one refresh primes the
+        cache synchronously before ``start`` returns. Product service startup can
+        set ``prime_cache=False`` so PPU transport latency cannot block Manager
+        liveness; in that mode the first refresh runs immediately in the poller
+        thread and later refreshes continue at the configured interval.
+        """
         with self._lifecycle_lock:
             if self._thread is not None and self._thread.is_alive():
                 return
             self._stop_event.clear()
-            self.refresh()
+            if prime_cache:
+                self.refresh()
             self._thread = Thread(
                 target=self._run,
+                args=(not prime_cache,),
                 name="plasma-manager-fleet-poller",
                 daemon=True,
             )
@@ -83,7 +92,14 @@ class FleetPoller:
         }
         return snapshot
 
-    def _run(self) -> None:
+    def _run(self, refresh_immediately: bool = False) -> None:
+        if refresh_immediately and not self._stop_event.is_set():
+            try:
+                self.refresh()
+            except Exception:
+                # Service startup must not depend on PPU reachability. Preserve the
+                # refresh error and retry after the configured interval.
+                pass
         while not self._stop_event.wait(self.poll_interval_s):
             try:
                 self.refresh()
