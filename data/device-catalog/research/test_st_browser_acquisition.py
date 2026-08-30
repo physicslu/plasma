@@ -33,7 +33,13 @@ EXPECTED_ICPNS = [
 RENDERED_HTML = """<!doctype html>
 <html><body>
 <h2>Quality and Reliability</h2>
-<div>Part Number STM32F100C8T6B STM32F100C8T6BTR STM32F100C8T7B STM32F100C8T7BTR</div>
+<table>
+  <tr><th>Part Number</th><th>Marketing Status</th><th>Grade</th></tr>
+  <tr><td>STM32F100C8T6B</td><td>Active Product is in volume production.</td><td>Industrial</td></tr>
+  <tr><td>STM32F100C8T6BTR</td><td>Active Product is in volume production.</td><td>Industrial</td></tr>
+  <tr><td>STM32F100C8T7B</td><td>Active Product is in volume production.</td><td>Industrial</td></tr>
+  <tr><td>STM32F100C8T7BTR</td><td>Active Product is in volume production.</td><td>Industrial</td></tr>
+</table>
 <h2>Documentation</h2>
 </body></html>
 """
@@ -73,7 +79,7 @@ class FakePage:
         *,
         final_url: str = TARGET_URL,
         html: str = RENDERED_HTML,
-        body_text: str = "Quality and Reliability Part Number STM32F100C8T6B",
+        body_text: str = "Quality and Reliability Part Number Marketing Status STM32F100C8T6B Active",
         status: int = 200,
         goto_error: Exception | None = None,
     ) -> None:
@@ -173,6 +179,8 @@ class BrowserAcquisitionTests(unittest.TestCase):
         )
         self.assertEqual(evidence["exact_icpns"], EXPECTED_ICPNS)
         self.assertEqual(evidence["acquisition_transport"], BROWSER_TRANSPORT)
+        self.assertEqual(len(evidence["part_number_records"]), 4)
+        self.assertEqual(evidence["excluded_non_active_part_numbers"], [])
         self.assertRegex(str(evidence["rendered_dom_sha256"]), r"^[0-9a-f]{64}$")
         self.assertNotIn("raw_sha256", evidence)
         self.assertEqual(page.wait_until, "domcontentloaded")
