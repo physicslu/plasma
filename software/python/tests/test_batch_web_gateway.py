@@ -111,7 +111,7 @@ class BatchWebGatewayTests(unittest.TestCase):
         self.runtime.gateway_settings.update({"ppu_request_timeout_ms": 10_000, "ppu_retry_count": 3})
 
     def test_batch_resolves_and_freezes_canonical_target_device(self):
-        record = get_default_device_catalog().search("ADUC7019BCPZ62I", limit=1)[0]
+        record = get_default_device_catalog().search("STM32F407VGT6", limit=1)[0]
         status, payload = self.request(
             "POST",
             "/api/batches",
@@ -142,7 +142,7 @@ class BatchWebGatewayTests(unittest.TestCase):
         final = self.wait_terminal(payload["batch"]["batch_id"])
         self.assertEqual(final["target_device"], target)
 
-    def test_batch_rejects_target_device_not_in_canonical_catalog(self):
+    def test_batch_rejects_research_only_target_device_not_in_production_catalog(self):
         status, payload = self.request(
             "POST",
             "/api/batches",
@@ -157,8 +157,8 @@ class BatchWebGatewayTests(unittest.TestCase):
                     "failed_site_stop_threshold": None,
                 },
                 "target_device": {
-                    "vendor": "Not A Vendor",
-                    "identifier": "NOT-A-DEVICE",
+                    "vendor": "Analog Devices",
+                    "identifier": "ADUC7019BCPZ62I",
                 },
             },
         )

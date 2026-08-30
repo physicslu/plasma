@@ -36,15 +36,33 @@ test("IC lookup remains outside the canonical Product Mode navigation", async ()
   assert.doesNotMatch(demo, /blockLockedNavigation/);
 });
 
-test("IC Selector presents catalog evidence without inventing physical verification", async () => {
+test("IC Selector presents admitted exact ICPN evidence without inventing physical verification", async () => {
   const selector = await source("../app/devices/ic-selector.tsx");
   const api = await source("../app/device-catalog-api.ts");
 
   assert.match(api, /\/api\/devices\/search/);
-  assert.match(selector, /OCD Candidate/);
+  assert.match(api, /catalog_verification/);
+  assert.match(api, /revision_sha256/);
+  assert.match(selector, /ICPN CATALOG · PRODUCTION ADMITTED/);
+  assert.match(selector, /Exact ICPN/);
+  assert.match(selector, /OCD Mapped/);
+  assert.match(selector, /Catalog Revision/);
+  assert.match(selector, /Authority/);
   assert.match(selector, /PPU ·/);
   assert.match(selector, /Socket ·/);
-  assert.match(selector, /No evidence/);
-  assert.match(selector, /OpenOCD mapping 不等於 PPU 或 Socket 驗證/);
-  assert.doesNotMatch(selector, /\?\.toLocaleString\(\) \?\? "7,657"/);
+  assert.match(selector, /無實體證據/);
+  assert.match(selector, /仍不等於 PPU 或 Socket 實體驗證/);
+  assert.match(selector, /research candidate 不會出現在這裡/);
+  assert.doesNotMatch(selector, /OCD Candidate/);
+  assert.doesNotMatch(selector, /LPC845/);
+  assert.doesNotMatch(selector, /nRF52840/);
+});
+
+test("shared PMode and EMode picker is constrained to admitted exact ICPNs", async () => {
+  const picker = await source("../app/devices/ic-picker-field.tsx");
+
+  assert.match(picker, /Search admitted ICPN/);
+  assert.match(picker, /Exact ICPN ·/);
+  assert.match(picker, /OCD Mapped/);
+  assert.doesNotMatch(picker, /IC identifier/);
 });

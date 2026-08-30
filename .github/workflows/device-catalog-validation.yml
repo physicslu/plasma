@@ -61,3 +61,14 @@ jobs:
             --evidence-dir data/device-catalog/research/evidence/stm32f4-phase3.1-bounded-pilot-live-2026-08-30 \
             --baseline data/device-catalog/research/stm32f4-phase3.1-pilot-baseline.json
           python data/device-catalog/research/test_stm32f4_phase3_1_post_admission.py
+      - name: Report admitted production source SHA-256
+        run: |
+          sha256sum data/device-catalog/research/stm32f1-commercial-icpn.csv
+          sha256sum data/device-catalog/research/stm32f4-commercial-icpn.csv
+      - name: Validate ICPN v1 production manifest and runtime view
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m plasma_web.device_catalog \
+            --manifest data/device-catalog/production/icpn-v1-manifest.json \
+            --json

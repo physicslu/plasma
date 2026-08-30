@@ -1,11 +1,6 @@
 import { DEFAULT_API_BASE, normalizeApiBase } from "./plasma-api";
 
-export type DeviceIdentifierKind =
-  | "manufacturer_part_number"
-  | "cmsis_device_name"
-  | "ordering_pattern"
-  | "family_alias"
-  | string;
+export type DeviceIdentifierKind = "manufacturer_part_number" | string;
 
 export type DeviceSearchResult = {
   vendor: string;
@@ -16,17 +11,34 @@ export type DeviceSearchResult = {
   identifier_kind: DeviceIdentifierKind;
   icpn: string | null;
   package: string | null;
+  pin_count: string | null;
+  flash_size: string | null;
+  temperature_grade: string | null;
+  option_suffix: string | null;
+  base_device: string | null;
   cpu_architectures: string[];
   backend: {
     type: string;
     distribution: string;
     target_config: string;
     mapping_status: string;
+    mapping_method: string | null;
+  };
+  catalog_verification: {
+    status: string | null;
+    source_type: string | null;
+    source_authority: string | null;
+    source_reference: string | null;
   };
   physical_validation: {
     engineering_status: string;
     ppu_status: string;
     socket_status: string;
+  };
+  catalog: {
+    scope: string;
+    version: string | null;
+    revision_sha256: string | null;
   };
   catalog_origin: string;
 };

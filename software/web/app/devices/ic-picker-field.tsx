@@ -21,7 +21,7 @@ export function ICPickerField({
   value,
   onChange,
   disabled = false,
-  placeholder = "Search ICPN / IC identifier...",
+  placeholder = "Search admitted ICPN...",
 }: ICPickerFieldProps) {
   const [query, setQuery] = useState(value?.icpn ?? value?.identifier ?? "");
   const [results, setResults] = useState<DeviceSearchResult[]>([]);
@@ -106,7 +106,9 @@ export function ICPickerField({
             >
               <b>{device.icpn ?? device.identifier}</b>
               <span>{device.vendor} · {device.family}</span>
-              <small>{device.identifier_kind === "manufacturer_part_number" ? "Exact ICPN" : device.identifier_kind.replaceAll("_", " ")}</small>
+              <small>
+                Exact ICPN · {device.backend.mapping_status === "mapped" ? "OCD Mapped" : device.backend.mapping_status}
+              </small>
             </button>
           ))}
         </div>
