@@ -1,6 +1,6 @@
 # Control Station Runtime Packaging
 
-> Status: **Implementation in PR #223**. This document defines the Control Station application-runtime payload and its clean-runtime acceptance. It does not implement host installation, launchd/systemd/Windows SCM registration, upgrade activation, rollback, Z2 deployment, FPGA behavior, or real IC programming.
+> Status: **Implementation in PR #224**. This document defines the Control Station application-runtime payload and its clean-runtime acceptance. It does not implement host installation, launchd/systemd/Windows SCM registration, upgrade activation, rollback, Z2 deployment, FPGA behavior, or real IC programming.
 
 ## 1. Purpose
 
@@ -210,7 +210,7 @@ PASS
 
 The deliberately unreachable PPU proves the Console/BFF -> Manager process boundary without claiming a PPU, Z2, PS, PL, or IC acceptance result.
 
-## 9. What a passing PR #223 proves
+## 9. What a passing PR #224 proves
 
 A passing PR supports these claims:
 
