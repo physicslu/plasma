@@ -13,6 +13,7 @@ from plasma_interfaces.base import BaseInterface, ProgressCallback
 from plasma_server.execution_router import (
     MOCK_ROUTE,
     OPENOCD_ROUTE,
+    PLASMA_NATIVE_ROUTE,
     RESOLVED_IC_SUPPORT_METADATA_KEY,
     RoutedProgrammingHandler,
     SiteExecutionRouter,
@@ -86,9 +87,11 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
         route = admitted.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
         self.assertEqual(route["mode"], MOCK_ROUTE)
         self.assertFalse(route["hardware_support_claimed"])
+        self.assertTrue(route["workflow_runtime_ready"])
+        self.assertFalse(route["hardware_runtime_ready"])
         self.assertIsInstance(router.handler_for(admitted), object)
 
-    def test_openocd_route_resolves_f103_and_binds_programming_profile(self) -> None:
+    def test_openocd_route_resolves_f103_profile_but_is_not_execution_ready(self) -> None:
         site = SiteConfig(
             id=1,
             enabled=True,
@@ -99,20 +102,28 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         router = SiteExecutionRouter(site, self.interface, self.resolver)
-        admitted = router.admit(
-            JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103CBT6")
-        )
-        route = admitted.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
+        request = JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103CBT6")
+        resolved = router.resolve_route(request)
+        route = resolved.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
         self.assertEqual(route["mode"], OPENOCD_ROUTE)
         self.assertEqual(
             route["selected_programming_profile_id"],
             "stm32f1-medium-density-flash-v0",
         )
         self.assertEqual(route["selected_openocd_target_config"], "target/stm32f1x.cfg")
-        self.assertFalse(route["runtime_ready"])
-        self.assertIsInstance(router.handler_for(admitted), object)
+        self.assertEqual(route["backend_implementation_state"], "routing_only")
+        self.assertFalse(route["hardware_runtime_ready"])
 
-    def test_unbound_f4_is_rejected_before_real_execution(self) -> None:
+        with self.assertRaises(PlasmaError) as caught:
+            router.admit(request)
+        self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
+        self.assertEqual(caught.exception.context["route_mode"], OPENOCD_ROUTE)
+        self.assertEqual(
+            caught.exception.context["programming_profile_id"],
+            "stm32f1-medium-density-flash-v0",
+        )
+
+    def test_unbound_f4_is_rejected_before_real_route_is_created(self) -> None:
         site = SiteConfig(
             id=1,
             enabled=True,
@@ -124,13 +135,13 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
         )
         router = SiteExecutionRouter(site, self.interface, self.resolver)
         with self.assertRaises(PlasmaError) as caught:
-            router.admit(
+            router.resolve_route(
                 JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F407VGT6")
             )
         self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
         self.assertEqual(caught.exception.context["ic_support_state"], "unresolved")
 
-    def test_openocd_target_mismatch_fails_closed(self) -> None:
+    def test_openocd_target_mismatch_fails_before_runtime_readiness_gate(self) -> None:
         site = SiteConfig(
             id=1,
             enabled=True,
@@ -142,7 +153,7 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
         )
         router = SiteExecutionRouter(site, self.interface, self.resolver)
         with self.assertRaises(PlasmaError) as caught:
-            router.admit(
+            router.resolve_route(
                 JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103C8T6")
             )
         self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
@@ -151,18 +162,24 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
             "target/stm32f1x.cfg",
         )
 
-    def test_native_fpga_route_fails_before_interface_execution(self) -> None:
+    def test_native_fpga_route_resolves_profile_then_fails_runtime_readiness(self) -> None:
         site = SiteConfig(id=1, enabled=True, interface="fpga")
         router = SiteExecutionRouter(site, self.interface, self.resolver)
-        with self.assertRaises(PlasmaError) as caught:
-            router.admit(
-                JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103C8T6")
-            )
-        self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
+        request = JobRequest(site_id=1, operation=Operation.ERASE, target="STM32F103C8T6")
+        resolved = router.resolve_route(request)
+        route = resolved.metadata[RESOLVED_IC_SUPPORT_METADATA_KEY]
+        self.assertEqual(route["mode"], PLASMA_NATIVE_ROUTE)
         self.assertEqual(
-            caught.exception.context["programming_profile_id"],
+            route["selected_programming_profile_id"],
             "stm32f1-medium-density-flash-v0",
         )
+        self.assertEqual(route["backend_implementation_state"], "not_implemented")
+        self.assertFalse(route["hardware_runtime_ready"])
+
+        with self.assertRaises(PlasmaError) as caught:
+            router.admit(request)
+        self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
+        self.assertEqual(caught.exception.context["route_mode"], PLASMA_NATIVE_ROUTE)
 
     def test_client_cannot_supply_server_owned_resolution_metadata(self) -> None:
         site = SiteConfig(id=1, enabled=True, interface="mock")
@@ -178,7 +195,7 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
 
-    async def test_site_manager_admission_happens_before_registry_or_execution_lease(self) -> None:
+    async def test_site_manager_unresolved_target_fails_before_registry_or_execution_lease(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             root_path = Path(root)
             config = PlasmaConfig(
@@ -219,6 +236,53 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
                         )
                     )
                 self.assertEqual(caught.exception.code, ErrorCode.OPERATION_UNSUPPORTED)
+                self.assertEqual(manager.registry.all(), [])
+                self.assertFalse(manager.execution_lease_snapshot()["busy"])
+            finally:
+                await manager.shutdown()
+
+    async def test_site_manager_resolved_but_unready_backend_also_fails_before_queue(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            config = PlasmaConfig(
+                server=ServerConfig(
+                    host="127.0.0.1",
+                    port=0,
+                    output_root=root_path / "output",
+                    log_root=root_path / "logs",
+                    max_supported_sites=1,
+                    max_concurrent_jobs=1,
+                ),
+                sites=[
+                    SiteConfig(
+                        id=1,
+                        enabled=True,
+                        interface="openocd",
+                        openocd={
+                            "interface_cfg": "interface/cmsis-dap.cfg",
+                            "target_cfg": "target/stm32f1x.cfg",
+                        },
+                    )
+                ],
+            )
+            manager = SiteManager(
+                config,
+                interface_factory=lambda _site: self.interface,
+                ic_support_resolver=self.resolver,
+            )
+            await manager.start()
+            try:
+                with self.assertRaises(PlasmaError) as caught:
+                    manager.enqueue(
+                        JobRequest(
+                            site_id=1,
+                            operation=Operation.ERASE,
+                            target="STM32F103C8T6",
+                            job_id="resolved-not-ready",
+                        )
+                    )
+                self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
+                self.assertEqual(caught.exception.context["route_mode"], OPENOCD_ROUTE)
                 self.assertEqual(manager.registry.all(), [])
                 self.assertFalse(manager.execution_lease_snapshot()["busy"])
             finally:
