@@ -126,6 +126,21 @@ class ICSupportResolverTests(unittest.TestCase):
             with self.assertRaisesRegex(ICSupportIntegrityError, "has kind 'memory_geometry'"):
                 ICSupportResolver.from_root(test_root)
 
+    def test_malformed_revision_override_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            test_root = Path(root) / "ic-support"
+            shutil.copytree(IC_SUPPORT_ROOT, test_root)
+            binding = test_root / "bindings" / "stm32f103c-pilot-v0.json"
+            payload = json.loads(binding.read_text(encoding="utf-8"))
+            payload["bindings"][0]["revision_overrides"] = ["not-an-object"]
+            binding.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                ICSupportIntegrityError,
+                r"revision_overrides\[0\] must be an object",
+            ):
+                ICSupportResolver.from_root(test_root)
+
     def test_default_cached_resolver_uses_current_source_tree(self) -> None:
         resolver = get_default_ic_support_resolver()
         self.assertEqual(resolver.size, 2)
