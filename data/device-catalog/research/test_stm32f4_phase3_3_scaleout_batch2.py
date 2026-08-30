@@ -68,18 +68,21 @@ class STM32F4Phase33ScaleoutBatch2Tests(unittest.TestCase):
         self.assertEqual(plan["conflicts"], 0)
         self.assertEqual(plan["issues"], [])
 
-    def test_live_plan_replays_34_to_49_and_writer_is_idempotent(self) -> None:
+    def test_materialization_plan_replays_34_to_49_and_writer_is_idempotent(self) -> None:
         audit = self._audit()
         new_icpns = set(audit["icpns"])
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             canonical = root / "stm32f4-commercial-icpn.csv"
-            live_named_evidence = root / "evidence"
+            materialized_named_evidence = root / EVIDENCE.name
             self._prewrite_canonical(canonical, new_icpns)
-            shutil.copytree(EVIDENCE, live_named_evidence)
+            shutil.copytree(EVIDENCE, materialized_named_evidence)
 
+            # The retained audit binds the materialization plan, whose input contract
+            # includes evidence_dir.name. Recreate that logical basename exactly rather
+            # than recomputing or replacing the immutable admission-plan digest.
             plan = build_admission_plan(
-                evidence_dir=live_named_evidence,
+                evidence_dir=materialized_named_evidence,
                 baseline_path=BASELINE,
                 catalog_path=CATALOG,
                 canonical_path=canonical,
