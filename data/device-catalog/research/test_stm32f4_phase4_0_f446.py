@@ -39,12 +39,18 @@ class STM32F4Phase40F446Tests(unittest.TestCase):
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             return list(csv.DictReader(handle).fieldnames or [])
 
-    def test_baseline_is_bounded_active_only_and_excludes_proposal(self) -> None:
+    def test_baseline_is_bounded_active_only_and_records_lifecycle_drift(self) -> None:
         baseline = self._baseline()
         self.assertEqual(baseline["pilot_id"], "stm32f4-phase4.0-f446-batch1-2026-08-30")
         self.assertFalse(baseline["canonical_dataset_admission"])
         targets = baseline["targets"]
         self.assertEqual({target["base_device"] for target in targets}, {CONTROL_BASE, *F446_BASES})
+
+        control_values = next(
+            target["exact_icpns"] for target in targets if target["base_device"] == CONTROL_BASE
+        )
+        self.assertEqual(len(control_values), 4)
+        self.assertNotIn("STM32F401CCF6TR", control_values)
 
         new_values = [
             icpn
@@ -61,11 +67,21 @@ class STM32F4Phase40F446Tests(unittest.TestCase):
             excluded,
             [
                 {
+                    "base_device": "STM32F401CC",
+                    "icpn": "STM32F401CCF6TR",
+                    "marketing_status": "Preview",
+                    "admission": False,
+                    "lifecycle_note": (
+                        "previously admitted production identity; retained pending explicit "
+                        "de-admission policy"
+                    ),
+                },
+                {
                     "base_device": "STM32F446ZC",
                     "icpn": "STM32F446ZCT7",
                     "marketing_status": "Proposal",
                     "admission": False,
-                }
+                },
             ],
         )
 
