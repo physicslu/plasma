@@ -30,6 +30,10 @@ CHALLENGE_MARKERS = (
 )
 QUALITY_HEADING = "Quality and Reliability"
 BROWSER_TRANSPORT = "chromium_rendered_dom"
+# ST's CDN has produced deterministic net::ERR_HTTP2_PROTOCOL_ERROR failures on
+# GitHub-hosted Chromium runners. Forcing HTTP/1.1 changes transport negotiation
+# only; it does not alter request headers, evidence scope, or parser semantics.
+CHROMIUM_LAUNCH_ARGS = ["--disable-http2"]
 
 
 def build_browser_evidence_record(
@@ -124,7 +128,10 @@ class STBrowserAcquirer:
     def _launch_browser(self) -> None:
         if self._playwright is None:
             raise AcquisitionError("browser acquirer must be used as a context manager")
-        self._browser = self._playwright.chromium.launch(headless=self.headless)
+        self._browser = self._playwright.chromium.launch(
+            headless=self.headless,
+            args=CHROMIUM_LAUNCH_ARGS,
+        )
         self.browser_version = self._browser.version
         self._context = self._browser.new_context()
 
@@ -179,9 +186,8 @@ class STBrowserAcquirer:
             raise AcquisitionError(f"browser acquisition failed: {exc}") from exc
         finally:
             page.close()
-            # ST's CDN has repeatedly failed later navigations on a reused
-            # Chromium HTTP/2 connection. A fresh, clean browser process per
-            # bounded target avoids connection reuse without changing headers,
-            # profiles, timeouts, or evidence semantics.
+            # A fresh, clean browser process per bounded target avoids transport
+            # connection reuse without changing headers, profiles, timeouts, or
+            # evidence semantics.
             if self._rotate_browser_after_fetch:
                 self._close_browser_context()
