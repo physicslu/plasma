@@ -6,8 +6,8 @@ from typing import Any
 from plasma_core.config import SiteConfig
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.ic_support import ICSupportResolver
-from plasma_core.models import JobRequest
-from plasma_handlers.base import BaseHandler
+from plasma_core.models import ExecutionOutput, JobRequest
+from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
 
@@ -46,7 +46,7 @@ class SiteExecutionRouter:
         self,
         site: SiteConfig,
         interface: BaseInterface,
-        resolver: ICSupportResolver,
+        resolver: ICSupportResolver | None,
     ) -> None:
         self.site = site
         self.interface = interface
@@ -91,6 +91,12 @@ class SiteExecutionRouter:
         )
 
     def _resolved_route(self, request: JobRequest) -> tuple[str, dict[str, Any]]:
+        if self.resolver is None:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "non-Mock Site has no IC Support resolver",
+                context={"site_id": self.site.id, "site_interface": self.site.interface},
+            )
         support = self.resolver.resolve_exact(request.target)
         if support is None:
             raise PlasmaError(
@@ -135,7 +141,7 @@ class SiteExecutionRouter:
                     "expected_target_config": expected_target,
                 },
             )
-        if configured_target.casefold() != str(expected_target).casefold():
+        if expected_target is None or configured_target.casefold() != expected_target.casefold():
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
                 "OpenOCD target_cfg conflicts with resolved IC Support",
@@ -213,3 +219,14 @@ class SiteExecutionRouter:
                 f"no handler is registered for Programming Profile {profile_id!r}",
                 context={"site_id": self.site.id, "job_id": request.job_id},
             ) from exc
+
+
+class RoutedProgrammingHandler(BaseHandler):
+    """Preserve SiteWorker's one-handler contract while routing per Job."""
+
+    def __init__(self, interface: BaseInterface, router: SiteExecutionRouter) -> None:
+        super().__init__(interface)
+        self.router = router
+
+    async def execute(self, request: JobRequest, stage_callback: StageCallback) -> ExecutionOutput:
+        return await self.router.handler_for(request).execute(request, stage_callback)
