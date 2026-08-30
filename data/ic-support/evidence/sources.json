@@ -1,13 +1,6 @@
 {
   "schema_version": "0.1.0",
-  "status": "source_locked_pilot",
-  "source_lock_provenance": {
-    "discovered_at": "2026-08-30",
-    "workflow_run_id": 33290579801,
-    "workflow_head_sha": "3d58c93cd6a7a025b8289f49e8a51a2eaa7982a2",
-    "artifact_name": "ic-support-source-lock-discovery",
-    "artifact_digest": "sha256:3c79d28ae632a110702d7c7ac71e044d8dbd3dc4929a0ca906937c56f0bf1731"
-  },
+  "status": "pilot",
   "sources": [
     {
       "source_id": "st_ds5319_rev20",
@@ -19,9 +12,8 @@
       "authority": "manufacturer_official",
       "url": "https://www.st.com/resource/en/datasheet/stm32f103c8.pdf",
       "integrity": {
-        "status": "sha256_pinned",
-        "sha256": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc",
-        "byte_length": 1965230
+        "status": "not_content_pinned",
+        "sha256": null
       },
       "used_for": [
         "device_scope",
@@ -40,9 +32,8 @@
       "authority": "manufacturer_official",
       "url": "https://www.st.com/content/ccc/resource/technical/document/programming_manual/10/98/e8/d4/2b/51/4b/f5/CD00283419.pdf/files/CD00283419.pdf/jcr:content/translations/en.CD00283419.pdf",
       "integrity": {
-        "status": "sha256_pinned",
-        "sha256": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a",
-        "byte_length": 302996
+        "status": "not_content_pinned",
+        "sha256": null
       },
       "used_for": [
         "programming_algorithm",
