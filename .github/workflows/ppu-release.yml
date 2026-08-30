@@ -1,0 +1,134 @@
+name: PPU release artifact
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/ppu-release.yml"
+      - "scripts/ppu-runtime.py"
+      - "scripts/ppu-release.py"
+      - "scripts/product-release.py"
+      - "release/**"
+      - "data/device-catalog/production/**"
+      - "software/python/pyproject.toml"
+      - "software/python/plasma_core/**"
+      - "software/python/plasma_interfaces/**"
+      - "software/python/plasma_handlers/**"
+      - "software/python/plasma_server/**"
+      - "software/python/plasma_client/**"
+      - "software/python/plasma_web/**"
+      - "software/python/tests/test_ppu_runtime.py"
+      - "software/python/tests/test_ppu_release.py"
+      - "software/python/tests/test_product_release.py"
+      - "docs/deployment/ppu-runtime-packaging.md"
+
+permissions:
+  contents: read
+
+jobs:
+  build-ppu-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PPU build and test dependencies
+        run: python -m pip install ./software/python pytest
+
+      - name: Run PPU packaging regression tests
+        run: >-
+          python -m pytest -q
+          software/python/tests/test_ppu_runtime.py
+          software/python/tests/test_ppu_release.py
+          software/python/tests/test_product_release.py
+
+      - name: Build and validate PPU runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="$RUNNER_TEMP/plasma-ppu-runtime"
+          python scripts/ppu-runtime.py build --output-dir "$runtime"
+          python scripts/ppu-runtime.py validate "$runtime"
+
+      - name: Build canonical linux-armv7l PPU release
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="$RUNNER_TEMP/plasma-ppu-runtime"
+          output="$RUNNER_TEMP/plasma-ppu-release"
+          sha="$(git rev-parse HEAD)"
+          version="$(python -c 'import json; print(json.load(open("release/product.json"))["product_version"])')"
+
+          python scripts/ppu-release.py \
+            --runtime-dir "$runtime" \
+            --output-dir "$output" \
+            --git-sha "$sha"
+
+          archive="$output/plasma-ppu-$version-linux-armv7l.tar.gz"
+          sidecar="$archive.sha256"
+          test -f "$archive"
+          test -f "$sidecar"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "sidecar=$sidecar" >> "$GITHUB_OUTPUT"
+
+      - name: Verify release and closed hardware boundary from clean extraction
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.release.outputs.archive }}
+        run: |
+          set -euo pipefail
+          clean="$RUNNER_TEMP/plasma-ppu-verify"
+
+          python scripts/product-release.py verify \
+            "$ARCHIVE" \
+            --expect-role ppu \
+            --expect-platform linux \
+            --expect-architecture armv7l \
+            --expect-version "${{ steps.release.outputs.version }}" \
+            --extract-to "$clean"
+
+          python scripts/ppu-runtime.py validate "$clean/plasma-release/runtime"
+
+          python - "$clean/plasma-release/runtime/ppu-runtime.json" <<'PY'
+          import json
+          import sys
+
+          manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+          expected = {
+              "loads_fpga": False,
+              "accesses_pl": False,
+              "changes_target_power": False,
+              "programs_real_ic": False,
+          }
+          if manifest.get("hardware_boundary") != expected:
+              raise SystemExit(f"hardware boundary is not closed: {manifest.get('hardware_boundary')!r}")
+          PY
+
+      - name: Verify detached SHA-256 sidecar
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.release.outputs.archive }}
+          SIDECAR: ${{ steps.release.outputs.sidecar }}
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$ARCHIVE")"
+          sha256sum --check "$(basename "$SIDECAR")"
+
+      - name: Upload PPU release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-ppu-linux-armv7l-${{ github.sha }}
+          path: |
+            ${{ steps.release.outputs.archive }}
+            ${{ steps.release.outputs.sidecar }}
+          if-no-files-found: error
+          retention-days: 14
