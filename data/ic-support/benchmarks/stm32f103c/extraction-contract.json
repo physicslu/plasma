@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "benchmark_id": "stm32f103c-profile-decomposition-v0",
   "source_lock_id": "stm32f103c-source-lock-v0",
   "targets": [
@@ -11,13 +11,17 @@
     "st_pm0075_rev2",
     "plasma_stm32f1_catalog_main"
   ],
+  "observed_schema_id": "plasma://ic-support/stm32f103c/extraction-observed-v0",
+  "observed_schema_path": "data/ic-support/benchmarks/stm32f103c/extraction-observed.schema.json",
+  "evaluation_ground_truth_path": "data/ic-support/benchmarks/stm32f103c/extraction-ground-truth.json",
   "forbidden_repository_inputs": [
     "data/ic-support/benchmarks/stm32f103c/ground-truth.json",
+    "data/ic-support/benchmarks/stm32f103c/extraction-ground-truth.json",
     "data/ic-support/profiles/",
     "data/ic-support/bindings/"
   ],
   "candidate_contract": {
-    "schema_version": "0.1.0",
+    "schema_version": "0.2.0",
     "required_fields": [
       "schema_version",
       "benchmark_id",
@@ -32,10 +36,13 @@
     ]
   },
   "rules": [
-    "The extraction run must not read the ground-truth answer key.",
+    "The extraction run must use a fresh context and must not read either ground-truth answer key.",
     "The extraction run must not read the checked-in IC Support profiles or bindings.",
+    "The extraction run may use the observed schema because it exposes structure and types but no expected values.",
     "The run must report the exact source digests it consumed.",
-    "Missing evidence must remain explicit; unsupported inference is a failure.",
-    "Profile reuse is evaluated independently from factual field extraction."
+    "Missing evidence must remain explicit as null or unknown where the observed schema permits it; unsupported inference is a failure.",
+    "Plasma-internal profile IDs are not part of the blind extraction score.",
+    "Profile reuse is evaluated as shared/different behavior independently from factual field extraction.",
+    "Revision overrides are not scored until a locked errata/revision source is added."
   ]
 }

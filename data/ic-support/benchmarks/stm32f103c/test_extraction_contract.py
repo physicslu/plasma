@@ -8,10 +8,11 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-IC_SUPPORT_ROOT = HERE.parents[1]
-COMPARE_PATH = IC_SUPPORT_ROOT / "compare_benchmark.py"
 VALIDATOR_PATH = HERE / "validate_extraction_candidate.py"
 LOCK_PATH = HERE / "source-lock.json"
+TRUTH_PATH = HERE / "extraction-ground-truth.json"
+CONTRACT_PATH = HERE / "extraction-contract.json"
+SCHEMA_PATH = HERE / "extraction-observed.schema.json"
 
 
 def load_module(path: Path, name: str):
@@ -23,20 +24,29 @@ def load_module(path: Path, name: str):
 
 
 def main() -> int:
-    compare = load_module(COMPARE_PATH, "ic_support_compare_contract_test")
     validator = load_module(VALIDATOR_PATH, "ic_support_candidate_contract_test")
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    truth = json.loads(TRUTH_PATH.read_text(encoding="utf-8"))
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+    assert schema["$id"] == contract["observed_schema_id"]
+    forbidden = set(contract["forbidden_repository_inputs"])
+    assert "data/ic-support/benchmarks/stm32f103c/extraction-ground-truth.json" in forbidden
+    assert "data/ic-support/benchmarks/stm32f103c/ground-truth.json" in forbidden
+    assert "profiles" not in json.dumps(schema).lower()
+    assert "stm32f1-medium-density-flash-v0" not in json.dumps(schema)
 
     candidate = {
-        "schema_version": "0.1.0",
+        "schema_version": contract["candidate_contract"]["schema_version"],
         "benchmark_id": lock["benchmark_id"],
         "source_lock_id": lock["source_lock_id"],
         "source_digests": validator.expected_source_digests(lock),
         "extractor": {
             "name": "contract-selftest",
-            "version": "1"
+            "version": "2"
         },
-        "observed": compare.build_projection()
+        "observed": copy.deepcopy(truth["expected"])
     }
     assert validator.validate_candidate(candidate) == []
 
@@ -50,6 +60,9 @@ def main() -> int:
     wrong_fact["observed"]["parts"]["STM32F103C8T6"]["flash_size_bytes"] = 131072
     errors = validator.validate_candidate(wrong_fact)
     assert any("flash_size_bytes" in error for error in errors)
+
+    leaked_profile_id = json.dumps(candidate)
+    assert "stm32f1-medium-density-flash-v0" not in leaked_profile_id
 
     print("IC Support extraction contract tests PASS")
     return 0
