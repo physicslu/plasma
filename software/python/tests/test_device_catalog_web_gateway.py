@@ -32,38 +32,61 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         connection.close()
         return status, payload
 
-    def test_exact_icpn_search_exposes_catalog_without_ppu_runtime(self) -> None:
-        status, payload = self.request("/api/devices/search?q=ADUC7019BCPZ62I&limit=5")
+    def test_exact_admitted_icpn_search_exposes_production_catalog_without_ppu_runtime(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F103C8T6&limit=5")
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["rest_contract_version"], "3")
-        self.assertEqual(payload["catalog_size"], 7657)
-        self.assertEqual(payload["results"][0]["icpn"], "ADUC7019BCPZ62I")
-        self.assertEqual(payload["results"][0]["identifier_kind"], "manufacturer_part_number")
-        self.assertEqual(payload["results"][0]["physical_validation"]["ppu_status"], "no_evidence")
-        self.assertEqual(payload["results"][0]["physical_validation"]["socket_status"], "no_evidence")
+        self.assertEqual(payload["catalog_size"], 93)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32F103C8T6")
+        self.assertEqual(result["identifier_kind"], "manufacturer_part_number")
+        self.assertEqual(result["catalog"]["scope"], "production_admitted")
+        self.assertEqual(result["catalog"]["version"], "1.0.0")
+        self.assertEqual(len(result["catalog"]["revision_sha256"]), 64)
+        self.assertTrue(result["catalog_verification"]["status"].startswith("verified_"))
+        self.assertEqual(result["backend"]["mapping_status"], "mapped")
+        self.assertEqual(result["physical_validation"]["engineering_status"], "no_evidence")
+        self.assertEqual(result["physical_validation"]["ppu_status"], "no_evidence")
+        self.assertEqual(result["physical_validation"]["socket_status"], "no_evidence")
 
     def test_search_is_case_insensitive(self) -> None:
-        status, payload = self.request("/api/devices/search?q=aduc7019bcpz62i")
+        status, payload = self.request("/api/devices/search?q=stm32f103c8t6")
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["results"][0]["identifier"], "ADUC7019BCPZ62I")
+        self.assertEqual(payload["results"][0]["identifier"], "STM32F103C8T6")
 
-    def test_empty_query_is_valid_for_autocomplete_idle_state(self) -> None:
-        status, payload = self.request("/api/devices/search?q=")
+    def test_family_and_vendor_queries_return_only_admitted_rows(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STMicroelectronics%20STM32F4&limit=100")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 18)
+        self.assertEqual({item["family"] for item in payload["results"]}, {"STM32F4"})
+        self.assertTrue(all(item["icpn"] for item in payload["results"]))
+
+    def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:
+        status, payload = self.request("/api/devices/search?q=ADUC7019BCPZ62I")
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 0)
         self.assertEqual(payload["results"], [])
 
+    def test_empty_query_is_valid_for_catalog_metadata_idle_state(self) -> None:
+        status, payload = self.request("/api/devices/search?q=")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["catalog_size"], 93)
+        self.assertEqual(payload["count"], 0)
+        self.assertEqual(payload["results"], [])
+
     def test_invalid_limit_fails_closed(self) -> None:
-        status, payload = self.request("/api/devices/search?q=ADUC&limit=101")
+        status, payload = self.request("/api/devices/search?q=STM32&limit=101")
 
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
 
-    def test_engineering_job_target_device_resolves_to_canonical_job_target(self) -> None:
-        record = get_default_device_catalog().search("ADUC7019BCPZ62I", limit=1)[0]
+    def test_engineering_job_target_device_resolves_to_admitted_exact_icpn(self) -> None:
+        record = get_default_device_catalog().search("STM32F407VGT6", limit=1)[0]
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
 
         request = handler._job_request(
@@ -79,12 +102,13 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
             allow_inline_asset=False,
         )
 
-        self.assertEqual(request.target, record.icpn or record.identifier)
+        self.assertEqual(request.target, "STM32F407VGT6")
         self.assertEqual(request.metadata["target_device"]["vendor"], record.vendor)
         self.assertEqual(request.metadata["target_device"]["identifier"], record.identifier)
-        self.assertEqual(request.metadata["target_device"]["identifier_kind"], record.identifier_kind)
+        self.assertEqual(request.metadata["target_device"]["identifier_kind"], "manufacturer_part_number")
+        self.assertEqual(request.metadata["target_device"]["icpn"], "STM32F407VGT6")
 
-    def test_engineering_job_target_device_fails_closed_when_not_canonical(self) -> None:
+    def test_engineering_job_target_device_fails_closed_when_not_admitted(self) -> None:
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
 
         with self.assertRaisesRegex(ValueError, "canonical Device Catalog record"):
@@ -93,8 +117,8 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
                     "site_id": 1,
                     "operation": "erase",
                     "target_device": {
-                        "vendor": "UNKNOWN-VENDOR",
-                        "identifier": "NOT-A-REAL-DEVICE",
+                        "vendor": "Analog Devices",
+                        "identifier": "ADUC7019BCPZ62I",
                     },
                 },
                 client_id="plasma-web-engineering",

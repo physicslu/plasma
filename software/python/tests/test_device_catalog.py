@@ -7,7 +7,7 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalog, get_default_device_catalog
 
 
-COLUMNS = [
+LEGACY_COLUMNS = [
     "vendor",
     "family",
     "subfamily",
@@ -23,7 +23,7 @@ COLUMNS = [
 ]
 
 
-def _write_catalog(path: Path) -> None:
+def _write_legacy_catalog(path: Path) -> None:
     rows = [
         ["Vendor A", "F1", "", "S1", "ABC123", "manufacturer_part_number", json.dumps(["ARM Cortex-M"]), "tcl/target/a.cfg", "upstream-openocd", "mapped", "not_verified", "test.csv"],
         ["Vendor A", "F1", "", "S1", "ABC1234", "cmsis_device_name", json.dumps(["ARM Cortex-M"]), "tcl/target/a.cfg", "upstream-openocd", "mapping_candidate", "not_verified", "test.csv"],
@@ -32,13 +32,13 @@ def _write_catalog(path: Path) -> None:
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(COLUMNS)
+        writer.writerow(LEGACY_COLUMNS)
         writer.writerows(rows)
 
 
-def test_search_ranks_exact_then_prefix_then_partial_case_insensitively(tmp_path: Path) -> None:
+def test_explicit_legacy_search_ranks_exact_then_prefix_then_partial_case_insensitively(tmp_path: Path) -> None:
     path = tmp_path / "catalog.csv"
-    _write_catalog(path)
+    _write_legacy_catalog(path)
     catalog = DeviceCatalog.from_csv(path)
 
     matches = catalog.search("abc123")
@@ -48,7 +48,7 @@ def test_search_ranks_exact_then_prefix_then_partial_case_insensitively(tmp_path
 
 def test_resolve_uses_server_catalog_identity_case_insensitively(tmp_path: Path) -> None:
     path = tmp_path / "catalog.csv"
-    _write_catalog(path)
+    _write_legacy_catalog(path)
     catalog = DeviceCatalog.from_csv(path)
 
     record = catalog.resolve("vendor a", "abc123")
@@ -59,25 +59,9 @@ def test_resolve_uses_server_catalog_identity_case_insensitively(tmp_path: Path)
     assert catalog.resolve("Vendor A", "missing") is None
 
 
-def test_icpn_requires_authoritative_exact_part_number_kind(tmp_path: Path) -> None:
-    path = tmp_path / "catalog.csv"
-    _write_catalog(path)
-    catalog = DeviceCatalog.from_csv(path)
-
-    exact, device_name = catalog.search("ABC123", limit=2)
-
-    assert exact.icpn == "ABC123"
-    assert device_name.icpn is None
-    assert device_name.to_payload()["physical_validation"] == {
-        "engineering_status": "not_verified",
-        "ppu_status": "no_evidence",
-        "socket_status": "no_evidence",
-    }
-
-
 def test_empty_query_returns_no_results(tmp_path: Path) -> None:
     path = tmp_path / "catalog.csv"
-    _write_catalog(path)
+    _write_legacy_catalog(path)
     catalog = DeviceCatalog.from_csv(path)
 
     assert catalog.search("   ") == []
@@ -85,7 +69,7 @@ def test_empty_query_returns_no_results(tmp_path: Path) -> None:
 
 def test_search_limit_is_bounded(tmp_path: Path) -> None:
     path = tmp_path / "catalog.csv"
-    _write_catalog(path)
+    _write_legacy_catalog(path)
     catalog = DeviceCatalog.from_csv(path)
 
     for invalid in (0, 101, True):
@@ -97,8 +81,64 @@ def test_search_limit_is_bounded(tmp_path: Path) -> None:
             raise AssertionError(f"invalid limit was accepted: {invalid!r}")
 
 
-def test_checked_in_canonical_catalog_is_loadable() -> None:
+def test_checked_in_production_catalog_contains_only_93_admitted_exact_icpns() -> None:
     catalog = get_default_device_catalog()
 
-    assert catalog.size == 7657
-    assert catalog.search("ADUC7019BCPZ62I", limit=1)[0].icpn == "ADUC7019BCPZ62I"
+    assert catalog.size == 93
+    assert catalog.catalog_id == "plasma-icpn"
+    assert catalog.catalog_version == "1.0.0"
+    assert catalog.status == "production"
+    assert catalog.revision_sha256 is not None
+    assert len(catalog.revision_sha256) == 64
+    assert all(record.production_admitted for record in catalog.records)
+    assert all(record.identifier_kind == "manufacturer_part_number" for record in catalog.records)
+    assert all(record.icpn == record.identifier for record in catalog.records)
+    assert {record.family for record in catalog.records} == {"STM32F1", "STM32F4"}
+
+
+def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
+    catalog = get_default_device_catalog()
+
+    exact = catalog.search("stm32f407vgt6", limit=1)[0]
+    family = catalog.search("STM32F4", limit=100)
+    combined = catalog.search("STMicroelectronics STM32F4", limit=100)
+
+    assert exact.identifier == "STM32F407VGT6"
+    assert exact.package == "LQFP"
+    assert exact.target_config == "tcl/target/stm32f4x.cfg"
+    assert exact.mapping_status == "mapped"
+    assert len(family) == 18
+    assert len(combined) == 18
+
+
+def test_production_payload_separates_catalog_verification_from_physical_validation() -> None:
+    record = get_default_device_catalog().search("STM32F103C8T6", limit=1)[0]
+    payload = record.to_payload()
+
+    assert payload["icpn"] == "STM32F103C8T6"
+    assert payload["catalog"]["scope"] == "production_admitted"
+    assert payload["catalog"]["version"] == "1.0.0"
+    assert payload["catalog_verification"]["status"].startswith("verified_")
+    assert payload["backend"]["mapping_status"] == "mapped"
+    assert payload["physical_validation"] == {
+        "engineering_status": "no_evidence",
+        "ppu_status": "no_evidence",
+        "socket_status": "no_evidence",
+    }
+
+
+def test_production_metadata_reports_vendor_family_taxonomy() -> None:
+    metadata = get_default_device_catalog().metadata
+
+    assert metadata["catalog_size"] == 93
+    assert metadata["source_count"] == 2
+    assert metadata["taxonomy"] == [
+        {
+            "vendor": "STMicroelectronics",
+            "count": 93,
+            "families": [
+                {"family": "STM32F1", "count": 75},
+                {"family": "STM32F4", "count": 18},
+            ],
+        }
+    ]
