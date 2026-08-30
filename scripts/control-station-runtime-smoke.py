@@ -45,8 +45,6 @@ def _request_json(
         headers["Content-Type"] = "application/json"
     request = Request(url, data=body, headers=headers, method=method)
     try:
-        # The Control Station BFF/Manager path is intentionally loopback-only.
-        # CI or host proxy settings must never redirect local runtime probes.
         with _DIRECT_HTTP.open(request, timeout=timeout) as response:
             raw = response.read()
             status = int(response.status)
@@ -62,6 +60,78 @@ def _request_json(
     if not isinstance(decoded, dict):
         raise SmokeError(f"response JSON root is not an object: {url}")
     return status, decoded
+
+
+def _run_probe(
+    args: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    label: str,
+    timeout_s: float = 10.0,
+) -> None:
+    try:
+        completed = subprocess.run(
+            args,
+            cwd=cwd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=timeout_s,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = exc.stdout or ""
+        raise SmokeError(f"{label} timed out\n{output}") from exc
+    if completed.returncode != 0:
+        raise SmokeError(
+            f"{label} failed with code {completed.returncode}\n{completed.stdout}"
+        )
+    print(f"{label}: PASS", flush=True)
+
+
+def _probe_manager_bootstrap(
+    manager_entry: Path,
+    manager_config: Path,
+    *,
+    temp_root: Path,
+    env: dict[str, str],
+) -> None:
+    _run_probe(
+        [sys.executable, str(manager_entry), "--help"],
+        cwd=temp_root,
+        env=env,
+        label="Control Station packaged Manager import/argparse probe",
+    )
+    config_probe = (
+        "import sys; "
+        "sys.path.insert(0, sys.argv[1]); "
+        "from plasma_manager.config import load_manager_config; "
+        "load_manager_config(sys.argv[2]); "
+        "print('config-ok')"
+    )
+    _run_probe(
+        [sys.executable, "-c", config_probe, str(manager_entry), str(manager_config)],
+        cwd=temp_root,
+        env=env,
+        label="Control Station packaged Manager config probe",
+    )
+    socket_probe = (
+        "import sys; "
+        "sys.path.insert(0, sys.argv[1]); "
+        "from http.server import ThreadingHTTPServer; "
+        "from plasma_manager.server import PlasmaManagerHandler; "
+        "server=ThreadingHTTPServer(('127.0.0.1', 0), PlasmaManagerHandler); "
+        "print(server.server_port); "
+        "server.server_close()"
+    )
+    _run_probe(
+        [sys.executable, "-c", socket_probe, str(manager_entry)],
+        cwd=temp_root,
+        env=env,
+        label="Control Station packaged Manager socket-bind probe",
+    )
 
 
 def _wait_for_manager(port: int, process: subprocess.Popen[bytes], deadline_s: float = 20.0) -> None:
@@ -122,9 +192,6 @@ def _terminate(process: subprocess.Popen[bytes] | None) -> None:
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        # Windows runners can retain descendants/handles briefly after the direct
-        # process is killed. Cleanup failure is not runtime acceptance evidence and
-        # must not overwrite the actual Manager/BFF smoke result.
         return
 
 
@@ -172,12 +239,16 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
         clean_env = dict(os.environ)
         for name in ("PYTHONPATH", "PYTHONHOME", "NODE_PATH", "NPM_CONFIG_PREFIX"):
             clean_env.pop(name, None)
-        # The acceptance topology is entirely loopback-local. Ensure the packaged
-        # Manager's initial fleet poll cannot be diverted by runner/host proxy settings.
         clean_env["NO_PROXY"] = "127.0.0.1,localhost"
         clean_env["no_proxy"] = "127.0.0.1,localhost"
         clean_env["PYTHONUNBUFFERED"] = "1"
         try:
+            _probe_manager_bootstrap(
+                manager_entry,
+                manager_config,
+                temp_root=temp_root,
+                env=clean_env,
+            )
             manager_process = subprocess.Popen(
                 [sys.executable, str(manager_entry), "--config", str(manager_config)],
                 cwd=temp_root,
