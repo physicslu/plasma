@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,13 @@ def require(condition: bool, message: str) -> None:
         raise ValidationError(message)
 
 
+def git_blob_sha(path: Path) -> str:
+    require(path.is_file(), f"Git-blob-pinned evidence path not found: {path}")
+    payload = path.read_bytes()
+    header = f"blob {len(payload)}\0".encode("ascii")
+    return hashlib.sha1(header + payload).hexdigest()
+
+
 def source_ids() -> set[str]:
     payload = load_json(SOURCE_FILE)
     sources = payload.get("sources")
@@ -61,9 +69,19 @@ def source_ids() -> set[str]:
         require(isinstance(integrity, dict), f"{sid}: integrity object is required")
         status = integrity.get("status")
         require(
-            status in {"not_content_pinned", "git_object_pinned"},
+            status in {"not_content_pinned", "git_blob_pinned"},
             f"{sid}: unsupported integrity status {status!r}",
         )
+        if status == "git_blob_pinned":
+            evidence_path = source.get("path")
+            expected_sha = integrity.get("git_blob_sha")
+            require(isinstance(evidence_path, str) and evidence_path, f"{sid}: path is required for git_blob_pinned evidence")
+            require(
+                isinstance(expected_sha, str) and len(expected_sha) == 40,
+                f"{sid}: 40-character git_blob_sha is required",
+            )
+            actual_sha = git_blob_sha(REPO_ROOT / evidence_path)
+            require(actual_sha == expected_sha, f"{sid}: pinned Git blob drift: expected {expected_sha}, got {actual_sha}")
     require(len(ids) == len(set(ids)), "source_id values must be unique")
     return set(ids)
 
