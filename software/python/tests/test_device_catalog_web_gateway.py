@@ -37,7 +37,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["rest_contract_version"], "3")
-        self.assertEqual(payload["catalog_size"], 93)
+        self.assertEqual(payload["catalog_size"], 109)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F103C8T6")
         self.assertEqual(result["identifier_kind"], "manufacturer_part_number")
@@ -60,9 +60,18 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=STMicroelectronics%20STM32F4&limit=100")
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["count"], 18)
+        self.assertEqual(payload["count"], 34)
         self.assertEqual({item["family"] for item in payload["results"]}, {"STM32F4"})
         self.assertTrue(all(item["icpn"] for item in payload["results"]))
+
+    def test_new_scaleout_icpn_is_exposed_only_after_admission(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F429ZGY6TR&limit=5")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        self.assertEqual(payload["results"][0]["icpn"], "STM32F429ZGY6TR")
+        self.assertEqual(payload["results"][0]["family"], "STM32F4")
+        self.assertEqual(payload["results"][0]["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
 
     def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:
         status, payload = self.request("/api/devices/search?q=ADUC7019BCPZ62I")
@@ -75,7 +84,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=")
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], 93)
+        self.assertEqual(payload["catalog_size"], 109)
         self.assertEqual(payload["count"], 0)
         self.assertEqual(payload["results"], [])
 
