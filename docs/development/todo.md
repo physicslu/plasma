@@ -23,6 +23,26 @@ Required remaining work:
 - add human credential rotation, revocation and session-lifecycle UX;
 - define centralized multi-PPU identity management through Plasma Manager without making standalone PPU authorization depend on Manager availability.
 
+### macOS Control Station Static Asset / Font Packaging 404
+
+**Status:** TODO / observed during installed Control Station acceptance after PR #242
+
+**Layer:** Control Station Web runtime / Common Release Format / macOS installer
+
+**Reason:** Real installed-Control-Station browser acceptance observed `.woff2` and related static-asset requests returning HTTP 404 from `127.0.0.1:18000`. Managed routing itself passed: the Browser remained on the Manager-owned route and did not leak direct PPU Gateway traffic. This packaging/serving defect must therefore remain a separate deployment debt item rather than being misclassified as a routing failure.
+
+Required work:
+
+- capture the exact missing font/static-asset URLs and map each reference back to the generated Web build output;
+- determine whether the loss occurs during Web build, standalone runtime assembly, Common Release Format packaging, macOS installer staging, or installed static-file serving;
+- ensure every asset referenced by installed HTML/CSS/JS is present under the immutable installed runtime with the same hashed path/name expected by the browser;
+- verify CJK/local font packaging explicitly, including `.woff2` files, rather than relying only on source-tree or development-server behavior;
+- extend packaged-runtime and macOS installer acceptance to request referenced static assets and fail deterministically on unexpected 404 responses;
+- add an installed-browser smoke assertion that no required `/assets/...` or font request returns 404 during normal page load;
+- preserve the Single Routing Owner invariant while fixing asset serving: static-asset repair must not reintroduce Browser-owned PPU/Gateway routing or direct Gateway fallback.
+
+Closure evidence must include a rebuilt/installed macOS package and real browser Network evidence showing required static/font assets load successfully without the previously observed 404 class.
+
 ## Deferred architecture evolution
 
 ### Split Programming Image Data Plane

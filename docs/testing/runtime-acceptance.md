@@ -68,24 +68,36 @@ It does not prove PS <-> PL.
 
 ### `emode-programming`
 
-Proves direct Engineering Programming through the managed prefix:
+Proves Engineering Programming uses the current server-owned Batch execution boundary through the managed prefix:
 
 ```text
 Engineering target discovery
     -> Engineering session
-    -> Programming Asset cache check
-    -> cache MISS/upload when required
-    -> SHA-256 binding
-    -> Job submission
-    -> authoritative terminal success
-    -> same-session same-Image cache HIT
+    -> POST /api/batches with one immutable Programming Image
+    -> server-side Batch execution
+    -> authoritative Batch/Site terminal success
+    -> underlying Job/Image SHA-256 binding
 ```
+
+The browser/runtime acceptance client does not sequence Programming Asset cache calls and per-Site Jobs for EMode; those execution semantics belong to the server-side Batch Runtime.
 
 ### `job-cancel`
 
-Uses a deterministic long-running Mock Program Job, observes authoritative `running`, submits an idempotent cancel command, and requires the Job to converge to authoritative terminal `cancelled`.
+Proves the production operator cancellation authority rather than a test-only direct Job shortcut. The scenario creates a deterministic long-running one-Site server Batch, observes both the Batch Site and its underlying Job in authoritative `running`, then submits:
 
-The cancel request sends `{}` as its JSON command envelope. A zero-byte POST is not used.
+```text
+POST /api/batches/{batch_id}/cancel
+```
+
+through the managed BFF prefix. It requires the cancel response to record `cancel_requested=true` and then requires all three execution layers to converge coherently:
+
+```text
+Batch -> cancelled
+Site  -> cancelled
+Job   -> cancelled
+```
+
+The low-level PPU `POST /api/jobs/{job_id}/cancel` remains an internal execution mechanism used by the Batch Runtime; it is not the operator authority for this acceptance scenario. The cancel request sends `{}` as its JSON command envelope. A zero-byte POST is not used.
 
 ### `pmode-batch`
 
@@ -148,6 +160,7 @@ Evidence includes, when applicable:
 - Engineering session ID;
 - Programming Image SHA-256;
 - Job and Batch IDs;
+- submission/cancel route and terminal Batch/Site/Job state;
 - concurrency/statistics evidence;
 - Mock Runtime restore evidence.
 
