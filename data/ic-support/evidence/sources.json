@@ -1,0 +1,66 @@
+{
+  "schema_version": "0.1.0",
+  "status": "pilot",
+  "sources": [
+    {
+      "source_id": "st_ds5319_rev20",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "DS5319",
+      "revision": "20",
+      "document_date": "2025-07",
+      "title": "STM32F103x8 STM32F103xB datasheet",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f103c8.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "device_scope",
+        "flash_capacity",
+        "package_family",
+        "debug_interfaces"
+      ]
+    },
+    {
+      "source_id": "st_pm0075_rev2",
+      "manufacturer": "STMicroelectronics",
+      "document_number": "PM0075",
+      "revision": "2",
+      "document_date": "2012-08",
+      "title": "STM32F10xxx Flash memory microcontrollers programming manual",
+      "authority": "manufacturer_official",
+      "url": "https://www.st.com/content/ccc/resource/technical/document/programming_manual/10/98/e8/d4/2b/51/4b/f5/CD00283419.pdf/files/CD00283419.pdf/jcr:content/translations/en.CD00283419.pdf",
+      "integrity": {
+        "status": "not_content_pinned",
+        "sha256": null
+      },
+      "used_for": [
+        "programming_algorithm",
+        "memory_organization",
+        "option_bytes",
+        "security"
+      ]
+    },
+    {
+      "source_id": "plasma_stm32f1_catalog_main",
+      "manufacturer": "Plasma",
+      "document_number": "stm32f1-commercial-icpn.csv",
+      "revision": "main@df4df891f9b16e26218a213d68b6055b23444e94",
+      "document_date": "2026-08-30",
+      "title": "Plasma retained STM32F1 commercial ICPN catalog",
+      "authority": "plasma_canonical_catalog",
+      "path": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+      "integrity": {
+        "status": "git_object_pinned",
+        "git_commit": "df4df891f9b16e26218a213d68b6055b23444e94"
+      },
+      "used_for": [
+        "commercial_identity_binding",
+        "package",
+        "flash_capacity",
+        "openocd_mapping"
+      ]
+    }
+  ]
+}

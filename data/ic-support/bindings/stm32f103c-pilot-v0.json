@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1.0",
+  "binding_set_id": "stm32f103c-pilot-v0",
+  "status": "pilot",
+  "catalog_source": "data/device-catalog/research/stm32f1-commercial-icpn.csv",
+  "evidence": [
+    {"source_id": "plasma_stm32f1_catalog_main"}
+  ],
+  "bindings": [
+    {
+      "icpn": "STM32F103C8T6",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "base_device": "STM32F103C8",
+        "package": "LQFP",
+        "pin_count": 48,
+        "flash_size": "64 KiB",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg"
+      },
+      "profiles": {
+        "programming": "stm32f1-medium-density-flash-v0",
+        "memory_geometry": "stm32f103c8-64k-v0",
+        "package_hardware": "stm32f103-lqfp48-debug-v0",
+        "option": "stm32f1-option-bytes-v0",
+        "security": "stm32f1-medium-density-security-v0"
+      },
+      "revision_overrides": []
+    },
+    {
+      "icpn": "STM32F103CBT6",
+      "expected_catalog": {
+        "manufacturer": "STMicroelectronics",
+        "base_device": "STM32F103CB",
+        "package": "LQFP",
+        "pin_count": 48,
+        "flash_size": "128 KiB",
+        "openocd_target_config": "tcl/target/stm32f1x.cfg"
+      },
+      "profiles": {
+        "programming": "stm32f1-medium-density-flash-v0",
+        "memory_geometry": "stm32f103cb-128k-v0",
+        "package_hardware": "stm32f103-lqfp48-debug-v0",
+        "option": "stm32f1-option-bytes-v0",
+        "security": "stm32f1-medium-density-security-v0"
+      },
+      "revision_overrides": []
+    }
+  ]
+}

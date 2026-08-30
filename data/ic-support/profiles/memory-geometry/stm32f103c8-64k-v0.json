@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "stm32f103c8-64k-v0",
+  "kind": "memory_geometry",
+  "status": "pilot",
+  "scope": {"manufacturer": "STMicroelectronics", "base_device": "STM32F103C8"},
+  "evidence": [
+    {"source_id": "st_ds5319_rev20", "sections": ["Features", "Table 1. Device summary"]},
+    {"source_id": "st_pm0075_rev2", "sections": ["1.2 Flash module organization", "Table 3. Flash module organization (medium-density devices)"]}
+  ],
+  "data": {
+    "main_flash_start": "0x08000000",
+    "main_flash_size_bytes": 65536,
+    "main_flash_end": "0x0800FFFF",
+    "page_size_bytes": 1024,
+    "page_count": 64,
+    "erase_granularity_bytes": 1024,
+    "program_granularity_bytes": 2
+  }
+}

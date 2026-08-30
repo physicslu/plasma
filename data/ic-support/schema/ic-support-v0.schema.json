@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plasma.local/schemas/ic-support-v0.schema.json",
+  "title": "Plasma IC Support Phase A v0",
+  "description": "Pilot schema for reusable IC Support profiles and exact-ICPN bindings. Device Catalog remains the commercial identity source of truth.",
+  "oneOf": [
+    {"$ref": "#/$defs/profile"},
+    {"$ref": "#/$defs/binding_set"}
+  ],
+  "$defs": {
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "sections": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "profile_id", "kind", "status", "scope", "evidence", "data"],
+      "properties": {
+        "schema_version": {"const": "0.1.0"},
+        "profile_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "kind": {"enum": ["programming", "memory_geometry", "package_hardware", "option", "security"]},
+        "status": {"type": "string", "pattern": "^pilot"},
+        "scope": {"type": "object", "minProperties": 1},
+        "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence_ref"}},
+        "data": {"type": "object", "minProperties": 1}
+      }
+    },
+    "profile_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["programming", "memory_geometry", "package_hardware", "option", "security"],
+      "properties": {
+        "programming": {"type": "string", "minLength": 1},
+        "memory_geometry": {"type": "string", "minLength": 1},
+        "package_hardware": {"type": "string", "minLength": 1},
+        "option": {"type": "string", "minLength": 1},
+        "security": {"type": "string", "minLength": 1}
+      }
+    },
+    "revision_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "evidence", "overrides"],
+      "properties": {
+        "revision": {"type": "string", "minLength": 1},
+        "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence_ref"}},
+        "overrides": {"type": "object", "minProperties": 1}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["icpn", "expected_catalog", "profiles", "revision_overrides"],
+      "properties": {
+        "icpn": {"type": "string", "minLength": 1},
+        "expected_catalog": {"type": "object", "minProperties": 1},
+        "profiles": {"$ref": "#/$defs/profile_refs"},
+        "revision_overrides": {"type": "array", "items": {"$ref": "#/$defs/revision_override"}}
+      }
+    },
+    "binding_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "binding_set_id", "status", "catalog_source", "evidence", "bindings"],
+      "properties": {
+        "schema_version": {"const": "0.1.0"},
+        "binding_set_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "status": {"const": "pilot"},
+        "catalog_source": {"type": "string", "minLength": 1},
+        "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence_ref"}},
+        "bindings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/binding"}}
+      }
+    }
+  }
+}
