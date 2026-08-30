@@ -1,0 +1,115 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 1,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 1,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "control",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 1,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 5,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 1,
+    "total": 1
+  },
+  "pilot_id": "stm32f4-phase3.3-scaleout-batch1-2026-08-30",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F401CC",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F401CCFx",
+          "icpn": "STM32F401CCF6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCYx",
+          "icpn": "STM32F401CCY6TT",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F401CC",
+        "evidence_section_sha256": "c4917b5bfb0555b556890cfccc058de3af0942e3291b9de2893bd192389022de",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F401CCF6TR",
+          "STM32F401CCU6",
+          "STM32F401CCU6TR",
+          "STM32F401CCU7",
+          "STM32F401CCY6TT"
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 1,
+        "rendered_dom_sha256": "21be2528962c2395ec249c568de115ff006d9061b5b0da397ad8e8fa0e746a31",
+        "retrieved_at_utc": "2026-08-30T04:03:15Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html"
+      },
+      "selection_reason": "Phase 3.1 retained control; proves no exact-ICPN drift while scale-out adds adjacent F4 coverage",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html"
+    }
+  ],
+  "schema_version": 1
+}
