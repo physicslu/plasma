@@ -15,11 +15,14 @@ import time
 from pathlib import Path
 from typing import Sequence
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 
 class SmokeError(RuntimeError):
     pass
+
+
+_DIRECT_HTTP = build_opener(ProxyHandler({}))
 
 
 def _free_port() -> int:
@@ -42,7 +45,9 @@ def _request_json(
         headers["Content-Type"] = "application/json"
     request = Request(url, data=body, headers=headers, method=method)
     try:
-        with urlopen(request, timeout=timeout) as response:
+        # The Control Station BFF/Manager path is intentionally loopback-only.
+        # CI or host proxy settings must never redirect local runtime probes.
+        with _DIRECT_HTTP.open(request, timeout=timeout) as response:
             raw = response.read()
             status = int(response.status)
     except HTTPError as exc:
