@@ -9,15 +9,16 @@ from typing import Any
 from plasma_core.config import PlasmaConfig, SiteConfig
 from plasma_core.enums import Operation, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
+from plasma_core.ic_support import ICSupportResolver, get_default_ic_support_resolver
 from plasma_core.job_logging import OutputManager, ServerEventLogger
 from plasma_core.models import JobRequest, JobResult, iso_now
 from plasma_core.protocol import PROTOCOL_VERSION
-from plasma_handlers.stm32 import STM32F103Handler
 from plasma_interfaces.base import BaseInterface
 from plasma_interfaces.fpga import FPGAInterface
 from plasma_interfaces.mock import MockActivityTracker, MockInterface
 from plasma_interfaces.openocd import OpenOCDInterface
 
+from .execution_router import RoutedProgrammingHandler, SiteExecutionRouter
 from .job_manager import JobRegistry, JobRuntime
 from .site_worker import SiteWorker
 
@@ -53,6 +54,7 @@ class SiteManager:
         config: PlasmaConfig,
         interface_factory: InterfaceFactory | None = None,
         mock_tracker: MockActivityTracker | None = None,
+        ic_support_resolver: ICSupportResolver | None = None,
     ) -> None:
         config.validate()
         self.config = config
@@ -61,7 +63,16 @@ class SiteManager:
         self.registry = JobRegistry()
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
+        requires_ic_support = any(
+            site.enabled and site.interface != "mock" for site in config.sites
+        )
+        self.ic_support_resolver = (
+            ic_support_resolver
+            if ic_support_resolver is not None
+            else get_default_ic_support_resolver() if requires_ic_support else None
+        )
         self.interfaces: dict[int, BaseInterface] = {}
+        self.execution_routers: dict[int, SiteExecutionRouter] = {}
         self.workers: dict[int, SiteWorker] = {}
         self._execution_lock = threading.RLock()
         self._execution_lease: PPUExecutionLease | None = None
@@ -76,7 +87,9 @@ class SiteManager:
                 else self._default_interface(site, mock_tracker)
             )
             self.interfaces[site.id] = interface
-            handler = STM32F103Handler(interface)
+            router = SiteExecutionRouter(site, interface, self.ic_support_resolver)
+            self.execution_routers[site.id] = router
+            handler = RoutedProgrammingHandler(interface, router)
             self.workers[site.id] = SiteWorker(
                 site,
                 handler,
@@ -274,6 +287,7 @@ class SiteManager:
         if request.operation in {Operation.STATUS, Operation.CANCEL}:
             raise PlasmaError(ErrorCode.OPERATION_UNSUPPORTED, "status/cancel are control operations")
         worker = self._resolve_site(request.site_id)
+        request = self.execution_routers[request.site_id].admit(request)
         if worker.queue.full():
             raise PlasmaError(
                 ErrorCode.SITE_BUSY,
