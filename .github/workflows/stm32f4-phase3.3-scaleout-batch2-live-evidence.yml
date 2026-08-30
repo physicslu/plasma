@@ -64,7 +64,6 @@ jobs:
             --canonical data/device-catalog/research/stm32f4-commercial-icpn.csv \
             --admit-base STM32F407ZE \
             --admit-base STM32F415VG \
-            --admit-base STM32F415ZG \
             --admit-base STM32F427VG \
             --admit-base STM32F427ZG \
             --admit-base STM32F437VG \
