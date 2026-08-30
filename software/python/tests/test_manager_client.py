@@ -5,7 +5,9 @@ import threading
 import unittest
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from unittest.mock import patch
 
+import plasma_manager.client as client_module
 from plasma_manager.client import PPUHTTPError, PPUHttpClient
 
 
@@ -61,6 +63,18 @@ class ManagerPPUHttpClientTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join()
+
+    def test_ppu_transport_uses_explicit_direct_opener(self):
+        with patch.object(
+            client_module._DIRECT_HTTP,
+            "open",
+            wraps=client_module._DIRECT_HTTP.open,
+        ) as direct_open:
+            status, payload = self.client.liveness()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["gateway"], "alive")
+        direct_open.assert_called_once()
 
     def test_liveness_uses_real_http_transport(self):
         status, payload = self.client.liveness()

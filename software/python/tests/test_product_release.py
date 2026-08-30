@@ -160,15 +160,9 @@ def test_unsupported_target_fails_closed(tmp_path: Path) -> None:
         Path("node_modules/pkg/index.js"),
         Path("tests/test_runtime.py"),
         Path("nested/.git/config"),
-        Path("CON.txt"),
-        Path("bad:name.txt"),
-        Path("trailing."),
     ],
 )
-def test_build_rejects_non_product_or_nonportable_payload_paths(
-    tmp_path: Path,
-    relative: Path,
-) -> None:
+def test_build_rejects_non_product_payload_paths(tmp_path: Path, relative: Path) -> None:
     runtime = tmp_path / "runtime"
     path = runtime / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -187,11 +181,22 @@ def test_build_rejects_non_product_or_nonportable_payload_paths(
         )
 
 
+@pytest.mark.parametrize("relative", ["CON.txt", "bad:name.txt", "trailing."])
+def test_canonical_path_rejects_windows_nonportable_names(relative: str) -> None:
+    with pytest.raises(product_release.ReleaseError):
+        product_release._validate_relative_posix_path(relative)
+
+
 def test_build_rejects_casefold_path_collision(tmp_path: Path) -> None:
     runtime = tmp_path / "runtime"
     runtime.mkdir()
-    (runtime / "Alpha.txt").write_text("A\n", encoding="utf-8")
-    (runtime / "alpha.txt").write_text("a\n", encoding="utf-8")
+    upper = runtime / "Alpha.txt"
+    lower = runtime / "alpha.txt"
+    upper.write_text("A\n", encoding="utf-8")
+    lower.write_text("a\n", encoding="utf-8")
+
+    if upper.samefile(lower):
+        pytest.skip("filesystem is case-insensitive; distinct casefold collision cannot be constructed")
 
     with pytest.raises(product_release.ReleaseError, match="cross-platform path collision"):
         product_release.build_release(
