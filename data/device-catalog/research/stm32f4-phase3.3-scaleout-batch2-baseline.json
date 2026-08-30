@@ -33,12 +33,6 @@
       ]
     },
     {
-      "base_device": "STM32F415ZG",
-      "exact_icpns": [
-        "STM32F415ZGT6"
-      ]
-    },
-    {
       "base_device": "STM32F427VG",
       "exact_icpns": [
         "STM32F427VGT6",
