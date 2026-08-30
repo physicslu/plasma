@@ -39,3 +39,5 @@ jobs:
         run: python data/ic-support/test_ic_support.py
       - name: Test isolated extraction contract
         run: python data/ic-support/benchmarks/stm32f103c/test_extraction_contract.py
+      - name: Test blind extraction workspace
+        run: python data/ic-support/benchmarks/stm32f103c/test_blind_workspace.py
