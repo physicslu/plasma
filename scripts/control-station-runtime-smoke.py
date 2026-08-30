@@ -149,76 +149,73 @@ def _wait_for_manager(port: int, process: subprocess.Popen[bytes], deadline_s: f
     raise SmokeError("Manager readiness timed out")
 
 
-def _wait_for_console(port: int, process: subprocess.Popen[bytes], deadline_s: float = 30.0) -> None:
-    deadline = time.monotonic() + deadline_s
-    url = f"http://127.0.0.1:{port}/api/manager/diagnostics/loopback"
-    payload = {"endpoint": "ps", "timeout_ms": 100, "payload": "runtime-smoke"}
-    last_observation = "no response observed"
-    while time.monotonic() < deadline:
-        if process.poll() is not None:
-            raise SmokeError(f"Console exited before readiness with code {process.returncode}")
-        try:
-            status, response = _request_json(url, method="POST", payload=payload, timeout=2.0)
-            last_observation = f"status={status} body={json.dumps(response, sort_keys=True)}"
-            error = response.get("error")
-            if (
-                status == 504
-                and isinstance(error, dict)
-                and error.get("code") == "ppu_transport_error"
-            ):
-                return
-        except SmokeError as exc:
-            last_observation = str(exc)
-        time.sleep(0.2)
-    raise SmokeError(
-        f"Console/BFF -> Manager runtime smoke timed out; last observation: {last_observation}"
-    )
-
-
-def _node_console_observation(
+def _wait_for_console_fetch(
     port: int,
+    process: subprocess.Popen[bytes],
     *,
     node_executable: str,
     cwd: Path,
     env: dict[str, str],
-) -> str:
-    """Capture a browser-like Fetch observation without changing smoke pass criteria."""
+    deadline_s: float = 30.0,
+) -> None:
+    if process.poll() is not None:
+        raise SmokeError(f"Console exited before readiness with code {process.returncode}")
     script = r"""
 const url = process.argv[1];
-const payload = { endpoint: "ps", timeout_ms: 100, payload: "runtime-smoke-node-probe" };
-try {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(5000),
-  });
-  const body = await response.text();
-  console.log(JSON.stringify({
-    status: response.status,
-    contentLength: response.headers.get("content-length"),
-    contentType: response.headers.get("content-type"),
-    body,
-  }));
-} catch (error) {
-  console.error(error?.stack ?? String(error));
-  process.exit(2);
+const deadline = Date.now() + Number(process.argv[2]);
+const payload = { endpoint: "ps", timeout_ms: 100, payload: "runtime-smoke" };
+let last = "no response observed";
+while (Date.now() < deadline) {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(2000),
+    });
+    const text = await response.text();
+    last = `status=${response.status} body=${text}`;
+    let decoded = null;
+    try { decoded = JSON.parse(text); } catch {}
+    if (response.status === 504 && decoded?.error?.code === "ppu_transport_error") {
+      console.log(last);
+      process.exit(0);
+    }
+  } catch (error) {
+    last = error?.message ?? String(error);
+  }
+  await new Promise((resolve) => setTimeout(resolve, 200));
 }
+console.error(last);
+process.exit(2);
 """
     try:
         completed = subprocess.run(
-            [node_executable, "--input-type=module", "-e", script, f"http://127.0.0.1:{port}/api/manager/diagnostics/loopback"],
+            [
+                node_executable,
+                "--input-type=module",
+                "-e",
+                script,
+                f"http://127.0.0.1:{port}/api/manager/diagnostics/loopback",
+                str(int(deadline_s * 1000)),
+            ],
             cwd=cwd,
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            timeout=10,
+            timeout=deadline_s + 5,
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        return f"Node Fetch probe timed out: {exc.stdout or ''}"
-    return f"Node Fetch probe code={completed.returncode}: {completed.stdout.strip()}"
+        raise SmokeError(f"Console/BFF browser-style Fetch smoke timed out\n{exc.stdout or ''}") from exc
+    if completed.returncode != 0:
+        raise SmokeError(
+            "Console/BFF -> Manager browser-style Fetch smoke failed; "
+            f"last observation: {completed.stdout.strip()}"
+        )
+    if process.poll() is not None:
+        raise SmokeError(f"Console exited during relay smoke with code {process.returncode}")
 
 
 def _terminate(process: subprocess.Popen[bytes] | None) -> None:
@@ -323,16 +320,13 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
                 stdout=console_log,
                 stderr=subprocess.STDOUT,
             )
-            try:
-                _wait_for_console(console_port, console_process)
-            except SmokeError as exc:
-                node_observation = _node_console_observation(
-                    console_port,
-                    node_executable=resolved_node,
-                    cwd=console_dir,
-                    env=console_env,
-                )
-                raise SmokeError(f"{exc}\n{node_observation}") from exc
+            _wait_for_console_fetch(
+                console_port,
+                console_process,
+                node_executable=resolved_node,
+                cwd=console_dir,
+                env=console_env,
+            )
             print("Control Station packaged Console/BFF -> Manager relay: PASS", flush=True)
         except Exception as exc:
             manager_log.flush()
