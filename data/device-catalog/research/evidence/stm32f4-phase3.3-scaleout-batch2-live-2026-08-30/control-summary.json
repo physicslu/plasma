@@ -28,19 +28,76 @@
       "acquisition_status": "success",
       "base_device": "STM32F401CC",
       "candidate_mappings": [
-        {"existing_identifier": "STM32F401CCFx", "icpn": "STM32F401CCF6TR", "identifier_kind": "ordering_pattern", "match_count": 1, "status": "unique", "target_configs": ["tcl/target/stm32f4x.cfg"]},
-        {"existing_identifier": "STM32F401CCUx", "icpn": "STM32F401CCU6", "identifier_kind": "ordering_pattern", "match_count": 1, "status": "unique", "target_configs": ["tcl/target/stm32f4x.cfg"]},
-        {"existing_identifier": "STM32F401CCUx", "icpn": "STM32F401CCU6TR", "identifier_kind": "ordering_pattern", "match_count": 1, "status": "unique", "target_configs": ["tcl/target/stm32f4x.cfg"]},
-        {"existing_identifier": "STM32F401CCUx", "icpn": "STM32F401CCU7", "identifier_kind": "ordering_pattern", "match_count": 1, "status": "unique", "target_configs": ["tcl/target/stm32f4x.cfg"]},
-        {"existing_identifier": "STM32F401CCYx", "icpn": "STM32F401CCY6TT", "identifier_kind": "ordering_pattern", "match_count": 1, "status": "unique", "target_configs": ["tcl/target/stm32f4x.cfg"]}
+        {
+          "existing_identifier": "STM32F401CCFx",
+          "icpn": "STM32F401CCF6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCYx",
+          "icpn": "STM32F401CCY6TT",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
       ],
-      "canonical_mapping": {"candidate_count": 5, "status": "unique", "target_configs": ["tcl/target/stm32f4x.cfg"]},
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
       "evidence": {
         "acquisition_transport": "chromium_rendered_dom",
         "base_device": "STM32F401CC",
         "evidence_section_sha256": "c4917b5bfb0555b556890cfccc058de3af0942e3291b9de2893bd192389022de",
         "evidence_surface": "quality_and_reliability_part_number",
-        "exact_icpns": ["STM32F401CCF6TR", "STM32F401CCU6", "STM32F401CCU6TR", "STM32F401CCU7", "STM32F401CCY6TT"],
+        "exact_icpns": [
+          "STM32F401CCF6TR",
+          "STM32F401CCU6",
+          "STM32F401CCU6TR",
+          "STM32F401CCU7",
+          "STM32F401CCY6TT"
+        ],
         "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
         "http_etag": null,
         "http_last_modified": null,
