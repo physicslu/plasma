@@ -131,10 +131,39 @@ jobs:
           if issues:
               raise SystemExit('\n'.join(issues))
           PY
+      - name: Evaluate and retain F446 evidence
+        env:
+          PHASE40_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python data/device-catalog/research/evaluate_stm32f4_pilot.py \
+            --summary phase40-evidence/pilot-summary.json \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json \
+            --output phase40-evidence/evaluation.json \
+            --git-sha "$PHASE40_HEAD_SHA"
+          python data/device-catalog/research/retain_stm32f4_browser_evidence.py \
+            --control phase40-evidence/control-summary.json \
+            --pilot phase40-evidence/pilot-summary.json \
+            --evaluation phase40-evidence/evaluation.json \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json \
+            --output-dir phase40-retained
+      - name: Build read-only F446 admission plan
+        run: |
+          python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir phase40-retained \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json \
+            --catalog data/device-catalog/research/openocd-parts-canonical.csv \
+            --canonical data/device-catalog/research/stm32f4-commercial-icpn.csv \
+            --admit-base STM32F446VC \
+            --admit-base STM32F446VE \
+            --admit-base STM32F446ZC \
+            --admit-base STM32F446ZE \
+            --output phase40-evidence/admission-plan.json
       - name: Upload retained-evidence inputs
         uses: actions/upload-artifact@v4
         with:
           name: phase40-f446-live-evidence
-          path: phase40-evidence
+          path: |
+            phase40-evidence
+            phase40-retained
           if-no-files-found: error
           retention-days: 7
