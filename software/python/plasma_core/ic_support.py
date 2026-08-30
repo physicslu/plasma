@@ -238,6 +238,13 @@ class ICSupportResolver:
                     f"{canonical_icpn}: profile kinds must be exactly {list(EXPECTED_PROFILE_KINDS)}",
                 )
                 _require(isinstance(revision_overrides, list), f"{canonical_icpn}: revision_overrides must be an array")
+                normalized_overrides: list[dict[str, Any]] = []
+                for override_index, override in enumerate(revision_overrides):
+                    _require(
+                        isinstance(override, dict),
+                        f"{canonical_icpn}: revision_overrides[{override_index}] must be an object",
+                    )
+                    normalized_overrides.append(copy.deepcopy(override))
 
                 selected: dict[str, ResolvedProfile] = {}
                 for kind in EXPECTED_PROFILE_KINDS:
@@ -257,7 +264,7 @@ class ICSupportResolver:
                     binding_status=binding_status,
                     expected_catalog=copy.deepcopy(expected_catalog),
                     profiles=selected,
-                    revision_overrides=tuple(copy.deepcopy(item) for item in revision_overrides),
+                    revision_overrides=tuple(normalized_overrides),
                 )
 
         _require(records, f"no IC Support exact-ICPN bindings found under {bindings_root}")
