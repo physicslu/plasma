@@ -167,8 +167,9 @@ class STBrowserAcquirer:
         page: Any = None
         response: Any = None
         final_url = source_url
+        attempts = self.navigation_attempts if self._rotate_browser_after_fetch else 1
 
-        for attempt in range(1, self.navigation_attempts + 1):
+        for attempt in range(1, attempts + 1):
             page = self._context.new_page()
             try:
                 response = page.goto(source_url, wait_until="domcontentloaded", timeout=timeout_ms)
@@ -177,18 +178,14 @@ class STBrowserAcquirer:
             except self._timeout_error as exc:
                 page.close()
                 page = None
-                if attempt >= self.navigation_attempts:
-                    raise AcquisitionError(
-                        f"browser acquisition timed out after {attempt} navigation attempt(s): {exc}"
-                    ) from exc
+                if attempt >= attempts:
+                    raise AcquisitionError(f"browser acquisition timed out: {exc}") from exc
                 self._fresh_browser_after_navigation_failure()
             except self._playwright_error as exc:
                 page.close()
                 page = None
-                if attempt >= self.navigation_attempts:
-                    raise AcquisitionError(
-                        f"browser acquisition failed after {attempt} navigation attempt(s): {exc}"
-                    ) from exc
+                if attempt >= attempts:
+                    raise AcquisitionError(f"browser acquisition failed: {exc}") from exc
                 self._fresh_browser_after_navigation_failure()
 
         if page is None:
