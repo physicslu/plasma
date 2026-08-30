@@ -36,6 +36,7 @@
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Current** — [Device Support and Validation](architecture/device-support-validation.md)
+- **Plan** — [IC Support Reusable Profile Architecture](architecture/ic-support-profile-architecture.md)
 - **Current** — [Mock Runtime v1.1](architecture/mock-runtime-v1.1.md)
 - **Current** — [Mock Synthetic Image Contract](architecture/mock-synthetic-image.md)
 - **Current** — [Optional Manager Control Plane](architecture/manager-optional-control-plane.md)
