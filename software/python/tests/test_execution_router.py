@@ -91,7 +91,7 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(route["hardware_runtime_ready"])
         self.assertIsInstance(router.handler_for(admitted), object)
 
-    def test_openocd_route_resolves_f103_profile_but_is_not_execution_ready(self) -> None:
+    def test_openocd_route_compiles_f103_geometry_but_is_not_execution_ready(self) -> None:
         site = SiteConfig(
             id=1,
             enabled=True,
@@ -111,8 +111,22 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
             "stm32f1-medium-density-flash-v0",
         )
         self.assertEqual(route["selected_openocd_target_config"], "target/stm32f1x.cfg")
-        self.assertEqual(route["backend_implementation_state"], "routing_only")
+        self.assertEqual(route["backend_implementation_state"], "plan_compiled_not_executable")
         self.assertFalse(route["hardware_runtime_ready"])
+        plan = route["openocd_execution_plan"]
+        self.assertEqual(plan["memory_geometry_profile_id"], "stm32f103cb-128k-v0")
+        self.assertEqual(plan["memory"]["main_flash_size_bytes"], 128 * 1024)
+        self.assertEqual(
+            plan["commands"],
+            [
+                "init",
+                "reset init",
+                "flash erase_address 0x08000000 0x00020000",
+                "shutdown",
+            ],
+        )
+        self.assertTrue(plan["plan_only"])
+        self.assertFalse(plan["hardware_runtime_ready"])
 
         with self.assertRaises(PlasmaError) as caught:
             router.admit(request)
@@ -121,6 +135,10 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             caught.exception.context["programming_profile_id"],
             "stm32f1-medium-density-flash-v0",
+        )
+        self.assertEqual(
+            caught.exception.context["backend_implementation_state"],
+            "plan_compiled_not_executable",
         )
 
     def test_unbound_f4_is_rejected_before_real_route_is_created(self) -> None:
@@ -241,7 +259,7 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 await manager.shutdown()
 
-    async def test_site_manager_resolved_but_unready_backend_also_fails_before_queue(self) -> None:
+    async def test_site_manager_compiled_but_unready_backend_also_fails_before_queue(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             root_path = Path(root)
             config = PlasmaConfig(
@@ -278,11 +296,15 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
                             site_id=1,
                             operation=Operation.ERASE,
                             target="STM32F103C8T6",
-                            job_id="resolved-not-ready",
+                            job_id="compiled-not-ready",
                         )
                     )
                 self.assertEqual(caught.exception.code, ErrorCode.INTERFACE_NOT_CONFIGURED)
                 self.assertEqual(caught.exception.context["route_mode"], OPENOCD_ROUTE)
+                self.assertEqual(
+                    caught.exception.context["backend_implementation_state"],
+                    "plan_compiled_not_executable",
+                )
                 self.assertEqual(manager.registry.all(), [])
                 self.assertFalse(manager.execution_lease_snapshot()["busy"])
             finally:

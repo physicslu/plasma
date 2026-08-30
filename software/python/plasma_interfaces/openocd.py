@@ -12,8 +12,9 @@ from .base import BaseInterface, ProgressCallback
 class OpenOCDInterface(BaseInterface):
     """OpenOCD process boundary.
 
-    This v0.1 class validates per-Site configuration and process/error
-    handling. Target-specific command templates require hardware validation.
+    Phase 3.7 keeps direct programming operations fail-closed. Target-specific
+    commands are compiled separately into a dry-run execution plan and are not
+    executable until a later plan executor is independently validated.
     """
 
     def __init__(self, options: dict[str, Any]) -> None:
@@ -32,7 +33,15 @@ class OpenOCDInterface(BaseInterface):
                 "OpenOCD interface_cfg and target_cfg are required",
             )
 
+    @staticmethod
+    def _raise_plan_executor_not_ready() -> None:
+        raise PlasmaError(
+            ErrorCode.INTERFACE_NOT_CONFIGURED,
+            "OpenOCD programming requires a validated compiled-plan executor",
+        )
+
     async def _run(self, commands: list[str]) -> tuple[str, str]:
+        """Low-level process primitive retained for future validated plan execution."""
         self._require_configured()
         arguments = [self.executable, "-f", str(self.interface_cfg), "-f", str(self.target_cfg)]
         if self.adapter_serial:
@@ -80,11 +89,7 @@ class OpenOCDInterface(BaseInterface):
         return decoded_stdout, decoded_stderr
 
     async def erase(self, progress: ProgressCallback | None = None) -> None:
-        if progress:
-            await progress(0, 100)
-        await self._run(["init", "reset halt", "flash erase_address 0x08000000 0x10000"])
-        if progress:
-            await progress(100, 100)
+        self._raise_plan_executor_not_ready()
 
     async def program(
         self,
@@ -92,10 +97,7 @@ class OpenOCDInterface(BaseInterface):
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
-        raise PlasmaError(
-            ErrorCode.INTERFACE_NOT_CONFIGURED,
-            "image staging for OpenOCD requires hardware-specific configuration",
-        )
+        self._raise_plan_executor_not_ready()
 
     async def verify(
         self,
@@ -103,10 +105,7 @@ class OpenOCDInterface(BaseInterface):
         address: int = 0,
         progress: ProgressCallback | None = None,
     ) -> None:
-        raise PlasmaError(
-            ErrorCode.INTERFACE_NOT_CONFIGURED,
-            "image staging for OpenOCD requires hardware-specific configuration",
-        )
+        self._raise_plan_executor_not_ready()
 
     async def read(
         self,
@@ -114,10 +113,7 @@ class OpenOCDInterface(BaseInterface):
         length: int,
         progress: ProgressCallback | None = None,
     ) -> bytes:
-        raise PlasmaError(
-            ErrorCode.INTERFACE_NOT_CONFIGURED,
-            "OpenOCD read-back requires hardware-specific configuration",
-        )
+        self._raise_plan_executor_not_ready()
 
     async def safe_shutdown(self) -> None:
         if self._configured:

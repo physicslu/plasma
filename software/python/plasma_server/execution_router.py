@@ -5,45 +5,33 @@ from typing import Any
 
 from plasma_core.config import SiteConfig
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.ic_support import ICSupportResolver
+from plasma_core.ic_support import ICSupportResolver, ResolvedICSupport
 from plasma_core.models import ExecutionOutput, JobRequest
 from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
+from plasma_interfaces.openocd_plan import (
+    OPENOCD_PLAN_PROGRAMMING_PROFILES,
+    OpenOCDPlanCompiler,
+    normalize_openocd_target_config,
+)
 
 
 RESOLVED_IC_SUPPORT_METADATA_KEY = "resolved_ic_support"
 MOCK_ROUTE = "mock_workflow"
 OPENOCD_ROUTE = "openocd"
 PLASMA_NATIVE_ROUTE = "plasma_native"
-ROUTABLE_PROGRAMMING_PROFILES = frozenset({"stm32f1-medium-density-flash-v0"})
-
-
-def normalize_openocd_target_config(value: object) -> str | None:
-    """Normalize OpenOCD target paths to the canonical target/<file>.cfg form."""
-    if not isinstance(value, str) or not value.strip():
-        return None
-    normalized = value.strip().replace("\\", "/")
-    lowered = normalized.casefold()
-    marker = "/target/"
-    index = lowered.rfind(marker)
-    if index >= 0:
-        return "target/" + normalized[index + len(marker) :]
-    if lowered.startswith("tcl/target/"):
-        return normalized[4:]
-    if lowered.startswith("target/"):
-        return normalized
-    return normalized
+ROUTABLE_PROGRAMMING_PROFILES = OPENOCD_PLAN_PROGRAMMING_PROFILES
 
 
 class SiteExecutionRouter:
-    """Resolve one Job route, then admit only implementation-ready execution.
+    """Resolve one Job route, compile backend plans, then gate real execution.
 
     Mock is a workflow simulator and does not create hardware-support evidence.
     Non-Mock routing must resolve an exact ICPN and backend identity before the
-    Job can be considered for queue admission. Phase 3.6 intentionally keeps
-    real hardware execution closed until the selected backend implementation is
-    independently proven runtime-ready.
+    Job can be considered for queue admission. Phase 3.7 adds deterministic
+    OpenOCD dry-run plan compilation while keeping real hardware execution
+    closed until an executor is independently proven runtime-ready.
     """
 
     def __init__(
@@ -51,10 +39,12 @@ class SiteExecutionRouter:
         site: SiteConfig,
         interface: BaseInterface,
         resolver: ICSupportResolver | None,
+        openocd_plan_compiler: OpenOCDPlanCompiler | None = None,
     ) -> None:
         self.site = site
         self.interface = interface
         self.resolver = resolver
+        self.openocd_plan_compiler = openocd_plan_compiler or OpenOCDPlanCompiler()
         self._generic_handler = ProgrammingOperationHandler(interface)
         self._profile_handlers: dict[str, BaseHandler] = {
             profile_id: ProgrammingOperationHandler(interface)
@@ -106,7 +96,10 @@ class SiteExecutionRouter:
             },
         )
 
-    def _resolved_support(self, request: JobRequest) -> tuple[str, dict[str, Any]]:
+    def _resolved_support(
+        self,
+        request: JobRequest,
+    ) -> tuple[str, ResolvedICSupport, dict[str, Any]]:
         if self.resolver is None:
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
@@ -139,50 +132,30 @@ class SiteExecutionRouter:
                 },
             )
 
-        return programming_profile_id, support.to_runtime_payload()
+        return programming_profile_id, support, support.to_runtime_payload()
 
     def _resolve_openocd(self, request: JobRequest) -> JobRequest:
-        programming_profile_id, support_payload = self._resolved_support(request)
-        expected_target = normalize_openocd_target_config(
-            support_payload["backends"]["openocd"]["target_config"]
+        programming_profile_id, support, support_payload = self._resolved_support(request)
+        plan = self.openocd_plan_compiler.compile(
+            support,
+            request,
+            configured_target_config=self.site.openocd.get("target_cfg"),
         )
-        configured_target = normalize_openocd_target_config(self.site.openocd.get("target_cfg"))
-        if configured_target is None:
-            raise PlasmaError(
-                ErrorCode.INTERFACE_NOT_CONFIGURED,
-                f"SITE{self.site.id} OpenOCD target_cfg is required",
-                context={
-                    "site_id": self.site.id,
-                    "target": request.target,
-                    "expected_target_config": expected_target,
-                },
-            )
-        if expected_target is None or configured_target.casefold() != expected_target.casefold():
-            raise PlasmaError(
-                ErrorCode.CONFIG_INVALID,
-                "OpenOCD target_cfg conflicts with resolved IC Support",
-                context={
-                    "site_id": self.site.id,
-                    "target": request.target,
-                    "configured_target_config": configured_target,
-                    "expected_target_config": expected_target,
-                    "programming_profile_id": programming_profile_id,
-                },
-            )
         return self._decorate(
             request,
             route={
                 **support_payload,
                 "mode": OPENOCD_ROUTE,
                 "selected_programming_profile_id": programming_profile_id,
-                "selected_openocd_target_config": configured_target,
-                "backend_implementation_state": "routing_only",
+                "selected_openocd_target_config": plan.target_config,
+                "backend_implementation_state": "plan_compiled_not_executable",
+                "openocd_execution_plan": plan.to_dict(),
                 "hardware_runtime_ready": False,
             },
         )
 
     def _resolve_fpga(self, request: JobRequest) -> JobRequest:
-        programming_profile_id, support_payload = self._resolved_support(request)
+        programming_profile_id, _support, support_payload = self._resolved_support(request)
         return self._decorate(
             request,
             route={
