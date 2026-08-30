@@ -49,7 +49,9 @@ test("Managed Site Matrix exposes no editable direct Gateway control", async () 
     source("../app/site-matrix-routing.css"),
   ]);
 
-  assert.match(rootPage, /data-site-matrix-routing-mode=\{apiMode\}/);
+  assert.match(rootPage, /const routingMode = hydrated \? apiMode : "managed"/);
+  assert.match(rootPage, /data-site-matrix-routing-mode=\{routingMode\}/);
+  assert.match(rootPage, /data-routing-hydrated=\{hydrated \? "true" : "false"\}/);
   assert.match(rootPage, /Managed routing · Plasma Manager/);
   assert.match(routingCss, /\[data-site-matrix-routing-mode="managed"\] \.connection input/);
   assert.match(routingCss, /\[data-site-matrix-routing-mode="managed"\] \.connection button/);
