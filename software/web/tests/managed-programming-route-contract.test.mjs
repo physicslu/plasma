@@ -8,14 +8,32 @@ const securityTransport = await readFile(new URL("../app/security-transport.ts",
 const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
 const managedRoute = await readFile(new URL("../app/api/manager/ppu/[...path]/route.ts", import.meta.url), "utf8");
 const managedConfig = await readFile(new URL("../app/api/manager/ppu/route.ts", import.meta.url), "utf8");
+const macConsoleLauncher = await readFile(new URL("../../../packaging/macos/run-console.sh", import.meta.url), "utf8");
 
-test("managed deployments migrate legacy direct Gateway selection to the Manager-owned API base", () => {
+test("Control Station bootstrap makes BFF managed discovery authoritative over legacy localStorage", () => {
   assert.match(workspace, /return `\$\{window\.location\.origin\}\/api\/manager\/ppu`/);
-  assert.match(workspace, /fetch\("\/api\/manager\/ppu"/);
-  assert.match(workspace, /plasma-api-mode/);
-  assert.match(workspace, /rawMode === "managed" \|\| rawMode === "standalone"/);
-  assert.match(workspace, /mode === "standalone"/);
-  assert.match(workspace, /mode === "managed" \|\| await managedRoutingConfigured\(\)/);
+  assert.match(workspace, /const discovery = await discoverManagedRouting\(\)/);
+  assert.match(workspace, /if \(discovery\?\.managed === true\)/);
+  assert.match(workspace, /nextMode = "managed"/);
+  assert.match(workspace, /window\.localStorage\.setItem\(API_MODE_STORAGE_KEY, nextMode\)/);
+  assert.doesNotMatch(workspace, /if \(storedMode === "standalone"\)/);
+});
+
+test("Managed Control Station stays fail-closed and cannot switch to a direct Gateway", () => {
+  assert.match(workspace, /discovery === null && storedMode === "managed"/);
+  assert.match(workspace, /apiMode === "managed" && normalized !== managedBase/);
+  assert.match(workspace, /Managed Control Station routing is locked to the selected Manager PPU/);
+  assert.match(workspace, /apiMode,/);
+  assert.match(workspace, /managedPpuAlias,/);
+});
+
+test("macOS Control Station declares managed routing intent independently from Browser storage", () => {
+  assert.match(macConsoleLauncher, /PLASMA_CONTROL_STATION_MODE="managed"/);
+  assert.match(managerBff, /PLASMA_CONTROL_STATION_MODE/);
+  assert.match(managerBff, /managerRoutingRequired/);
+  assert.match(managedConfig, /managed: managedRequired/);
+  assert.match(managedConfig, /configured: false/);
+  assert.match(managedConfig, /configured: true/);
 });
 
 test("PMode and EMode keep one shared WorkspaceSession apiBase", () => {
