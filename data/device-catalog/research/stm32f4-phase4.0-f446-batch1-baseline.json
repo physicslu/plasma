@@ -8,7 +8,6 @@
     {
       "base_device": "STM32F401CC",
       "exact_icpns": [
-        "STM32F401CCF6TR",
         "STM32F401CCU6",
         "STM32F401CCU6TR",
         "STM32F401CCU7",
@@ -60,6 +59,13 @@
     }
   ],
   "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F401CC",
+      "icpn": "STM32F401CCF6TR",
+      "marketing_status": "Preview",
+      "admission": false,
+      "lifecycle_note": "previously admitted production identity; retained pending explicit de-admission policy"
+    },
     {
       "base_device": "STM32F446ZC",
       "icpn": "STM32F446ZCT7",
