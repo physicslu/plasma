@@ -28,7 +28,7 @@ jobs:
       - name: Phase 4.0 temporary F446 retained-evidence probe
         if: github.event_name == 'pull_request'
         run: |
-          python - <<'PY'
+          xvfb-run -a python - <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -36,7 +36,12 @@ jobs:
           root = Path('data/device-catalog/research')
           sys.path.insert(0, str(root))
 
-          from st_browser_acquisition import STBrowserAcquirer, build_browser_evidence_record
+          from st_browser_acquisition import (
+              BROWSER_TRANSPORT,
+              CHROMIUM_LAUNCH_ARGS,
+              STBrowserAcquirer,
+              build_browser_evidence_record,
+          )
           from stm32f4_acquisition_pilot import read_catalog, read_manifest, run_pilot
 
           manifest = root / 'stm32f4-phase4.0-f446-batch1-manifest.json'
@@ -50,7 +55,7 @@ jobs:
               for item in baseline['targets']
           }
 
-          with STBrowserAcquirer(headless=True) as acquirer:
+          with STBrowserAcquirer(headless=False) as acquirer:
               summary = run_pilot(
                   pilot_id=pilot_id,
                   targets=targets,
@@ -59,6 +64,18 @@ jobs:
                   evidence_builder=build_browser_evidence_record,
                   timeout_seconds=45.0,
               )
+              browser_version = acquirer.browser_version
+
+          summary['acquisition_transport'] = BROWSER_TRANSPORT
+          summary['browser_scope'] = 'pilot'
+          summary['browser_runtime'] = {
+              'engine': 'chromium',
+              'browser_version': browser_version,
+              'playwright_requirement': '1.62.0',
+              'headless': False,
+              'launch_args': CHROMIUM_LAUNCH_ARGS,
+          }
+          summary['canonical_dataset_admission'] = False
 
           issues = []
           if summary.get('acquisition_failure') != 0:
