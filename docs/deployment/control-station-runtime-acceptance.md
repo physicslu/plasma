@@ -1,6 +1,6 @@
 # Control Station Runtime Acceptance Evidence
 
-> Status: **PR #223 acceptance definition**. CI evidence is produced by `.github/workflows/control-station-runtime.yml` and is valid only for the commit that the workflow tests.
+> Status: **PR #224 acceptance definition**. CI evidence is produced by `.github/workflows/control-station-runtime.yml` and is valid only for the commit that the workflow tests.
 
 The acceptance runner is:
 
