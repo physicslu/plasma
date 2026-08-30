@@ -7,6 +7,7 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
 const { d1, r2 } = hostingConfig;
+const isProductBuild = process.env.PLASMA_PRODUCT_BUILD === "1";
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -50,6 +51,15 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async () => {
+  if (isProductBuild) {
+    // Product packaging is a self-hosted Node runtime. Do not pull Wrangler,
+    // Cloudflare Worker bindings, or the integration-host proxy into this
+    // build. next.config.ts enables Vinext standalone output for this mode.
+    return {
+      plugins: [vinext()],
+    };
+  }
+
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= "false";
