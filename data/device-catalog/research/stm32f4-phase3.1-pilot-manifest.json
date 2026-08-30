@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase3.1-bounded-pilot-2026-08-30",
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+      "selection_reason": "48/49-pin 256-KiB access-line target with UFQFPN and WLCSP package variants"
+    },
+    {
+      "base_device": "STM32F407VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407vg.html",
+      "selection_reason": "100-pin 1-MiB foundation-line target with established STM32F4 OpenOCD ordering-pattern mapping"
+    },
+    {
+      "base_device": "STM32F411CE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f411ce.html",
+      "selection_reason": "48/49-pin 512-KiB target covering UFQFPN, WLCSP and temperature-grade 3 semantics"
+    },
+    {
+      "base_device": "STM32F429ZI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429zi.html",
+      "selection_reason": "high-pin-count 2-MiB target covering LQFP144 and WLCSP143 package semantics"
+    }
+  ]
+}
