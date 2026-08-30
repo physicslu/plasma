@@ -31,7 +31,11 @@ jobs:
         run: git diff --check origin/main...HEAD
       - name: Validate IC Support pilot
         run: python data/ic-support/validate.py
+      - name: Validate STM32F103C source lock
+        run: python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
       - name: Compare STM32F103C benchmark
         run: python data/ic-support/compare_benchmark.py
       - name: Run IC Support regression
         run: python data/ic-support/test_ic_support.py
+      - name: Test isolated extraction contract
+        run: python data/ic-support/benchmarks/stm32f103c/test_extraction_contract.py

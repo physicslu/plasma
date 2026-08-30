@@ -1,6 +1,6 @@
 # IC Support Reusable Profile Architecture
 
-Status: **Plan / Phase A pilot implemented as research data only**
+Status: **Plan / Phase A source-locked pilot implemented as research data only**
 
 ## 1. Decision
 
@@ -125,7 +125,7 @@ This tests two independent properties:
 
 A result can therefore be factually correct yet architecturally wrong if it duplicates an identical Programming Profile per ICPN.
 
-## 6. Ground-truth evidence
+## 6. Ground-truth evidence and source lock
 
 Phase A uses:
 
@@ -133,11 +133,27 @@ Phase A uses:
 - ST `PM0075 Rev 2` for medium-density Flash organization, register map, unlock/program/erase behavior, Option Bytes and protection behavior.
 - Plasma's retained STM32F1 commercial ICPN catalog for exact commercial identity binding.
 
-The ST source records currently identify document number/revision/URL but the remote PDF bytes are not yet content-addressed in this repository. Therefore the checked-in benchmark is explicitly a **pilot ground truth**, not the final immutable benchmark baseline.
+Evidence identity and benchmark integrity are deliberately separated:
 
-Before scale-out, the evidence pipeline must retain or otherwise SHA-256 pin the exact manufacturer document bytes used to establish ground truth.
+```text
+sources.json
+  -> source identity / revision / authority / retrieval location
 
-## 7. Deterministic validation
+source-lock.json
+  -> exact bytes or exact Git blob used by this benchmark
+```
+
+For `stm32f103c-source-lock-v0`:
+
+- DS5319 Rev 20 is pinned by SHA-256 and byte length from the official ST PDF bytes.
+- PM0075 Rev 2 is pinned by SHA-256 and byte length from the official ST PDF bytes.
+- the retained STM32F1 commercial catalog is pinned by exact Git blob SHA.
+
+The manufacturer PDFs are not redistributed in Git. `source_integrity.py verify` can re-download the official URLs and fail if the current bytes differ from the checked-in source lock. This networked check is intentionally separate from ordinary deterministic CI.
+
+The checked-in `ground-truth.json` is now explicitly bound to `stm32f103c-source-lock-v0`; changing source bytes therefore requires a new reviewed lock/ground-truth relationship rather than silently mutating the benchmark.
+
+## 7. Deterministic validation and extraction isolation
 
 `data/ic-support/validate.py` must fail closed on:
 
@@ -152,7 +168,19 @@ Before scale-out, the evidence pipeline must retain or otherwise SHA-256 pin the
 - invented revision overrides;
 - promotion of incomplete pin-level minimum hardware into runtime-ready status.
 
-`compare_benchmark.py` creates a stable projection independent of file layout and compares it against the checked-in STM32F103C ground truth. A future Harness/AI run must emit the same projection; it must not modify the answer key.
+`benchmarks/stm32f103c/validate_source_lock.py` additionally checks that source lock, Ground Truth, extraction contract and retained catalog blob all agree.
+
+`compare_benchmark.py` creates a stable projection independent of file layout and compares it against the checked-in STM32F103C ground truth.
+
+A real Harness/AI benchmark run has a stricter rule: it must follow `extraction-contract.json` and must not be given the answer key. Specifically, the extraction process may consume only the locked source set and target ICPNs; it must not read:
+
+- `ground-truth.json`;
+- checked-in IC Support profiles;
+- checked-in IC Support bindings.
+
+The candidate must report the exact source digests it consumed. `validate_extraction_candidate.py` rejects a candidate produced from a different source lock even if its observed values happen to match.
+
+This session is not treated as a valid blind extraction run because the existing Ground Truth and profiles were already visible while the benchmark contract was being developed.
 
 ## 8. Runtime boundary
 
@@ -171,15 +199,15 @@ That phase must separately address the current fixed `STM32F103Handler` ownershi
 
 ## 9. Scale-out gates
 
-The architecture may expand beyond STM32F103C only after all of the following are true:
+Before expanding the architecture beyond the current STM32F103C pilot, the following conditions apply:
 
-1. official source documents are content-pinned;
-2. the pilot validator and benchmark remain deterministic/offline;
-3. a Harness/AI extraction run can be compared without sharing its generated answer with ground truth creation;
-4. unresolved fields remain explicit instead of inferred;
-5. profile reuse rules have both positive and negative test cases.
+1. **Source lock — satisfied for the current C8/CB benchmark.** The exact DS5319 Rev 20, PM0075 Rev 2 and retained catalog inputs are content/blob pinned.
+2. **Deterministic validation — satisfied for the current pilot contract.** Ordinary benchmark validation remains offline and deterministic.
+3. **Independent extraction — not yet satisfied.** A fresh Harness/AI run must execute without Ground Truth/profile/binding leakage and produce a candidate carrying the exact source lock.
+4. **Unresolved fields remain explicit.** Missing minimum pin-level hardware evidence remains fail-closed rather than inferred.
+5. **Profile reuse has positive and negative tests.** Shared behavior and intentionally different memory geometry are both regression tested.
 
-Suggested next challenge after C8/CB is to add STM32F103R/V or another density class specifically to force a boundary change rather than merely add volume.
+The next scientific step is therefore **not** bulk STM32F1 expansion. It is one isolated extraction run against the locked STM32F103C benchmark. Only after that result is understood should the target expand to STM32F103R/V or another density class that forces a meaningful profile-boundary decision.
 
 ## 10. Non-goals of Phase A
 
@@ -190,4 +218,5 @@ Suggested next challenge after C8/CB is to add STM32F103R/V or another density c
 - no Z2/PPU/Socket/real-IC test claim;
 - no bulk migration of the 7,000+ catalog identifiers;
 - no OTP/eFuse support claim;
-- no security operation approval gate implementation yet.
+- no security operation approval gate implementation yet;
+- no claim that contract self-tests are equivalent to a blind Harness/AI extraction benchmark.
