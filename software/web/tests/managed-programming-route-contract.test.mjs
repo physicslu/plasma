@@ -19,6 +19,18 @@ test("Control Station bootstrap makes BFF managed discovery authoritative over l
   assert.doesNotMatch(workspace, /if \(storedMode === "standalone"\)/);
 });
 
+test("Gateway transport isolates bootstrap reads until WorkspaceSession resolves routing", () => {
+  assert.match(securityTransport, /let gatewayRoutingResolved = false/);
+  assert.match(securityTransport, /const gatewayRoutingReady = new Promise/);
+  assert.match(securityTransport, /const unresolvedDirectPath = directGatewayPathname\(url\.pathname\)/);
+  assert.match(securityTransport, /if \(!gatewayRoutingResolved && unresolvedDirectPath !== null\)/);
+  assert.match(securityTransport, /if \(isStateChanging\(unresolvedMethod\)\) return routingUnresolvedResponse\(\)/);
+  assert.match(securityTransport, /await gatewayRoutingReady/);
+  assert.match(securityTransport, /const rebasedUrl = `\$\{resolvedGatewayApiBase\}\$\{unresolvedDirectPath\}\$\{url\.search\}`/);
+  assert.match(workspace, /markGatewayRoutingResolved\(\);\s*setHydrated\(true\)/);
+  assert.match(workspace, /fetch\("\/api\/manager\/ppu"/);
+});
+
 test("Managed Control Station stays fail-closed and cannot switch to a direct Gateway", () => {
   assert.match(workspace, /discovery === null && storedMode === "managed"/);
   assert.match(workspace, /apiMode === "managed" && normalized !== managedBase/);
