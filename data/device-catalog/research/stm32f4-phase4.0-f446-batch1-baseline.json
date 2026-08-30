@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-f446-batch1-2026-08-30",
+  "observation_kind": "official_st_active_orderable_surface_baseline",
+  "observed_date": "2026-08-30",
+  "canonical_dataset_admission": false,
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "exact_icpns": [
+        "STM32F401CCU6",
+        "STM32F401CCU6TR",
+        "STM32F401CCU7",
+        "STM32F401CCY6TT"
+      ]
+    },
+    {
+      "base_device": "STM32F446VC",
+      "exact_icpns": [
+        "STM32F446VCT6",
+        "STM32F446VCT6TR",
+        "STM32F446VCT7"
+      ]
+    },
+    {
+      "base_device": "STM32F446VE",
+      "exact_icpns": [
+        "STM32F446VET6",
+        "STM32F446VET6TR",
+        "STM32F446VET7"
+      ]
+    },
+    {
+      "base_device": "STM32F446ZC",
+      "exact_icpns": [
+        "STM32F446ZCH6",
+        "STM32F446ZCH7",
+        "STM32F446ZCJ6",
+        "STM32F446ZCJ7",
+        "STM32F446ZCT6",
+        "STM32F446ZCT6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F446ZE",
+      "exact_icpns": [
+        "STM32F446ZEH6",
+        "STM32F446ZEH6TR",
+        "STM32F446ZEH7",
+        "STM32F446ZEH7TR",
+        "STM32F446ZEJ6",
+        "STM32F446ZEJ6TR",
+        "STM32F446ZEJ7",
+        "STM32F446ZEJ7TR",
+        "STM32F446ZET6",
+        "STM32F446ZET7",
+        "STM32F446ZET7TR"
+      ]
+    }
+  ],
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F401CC",
+      "icpn": "STM32F401CCF6TR",
+      "marketing_status": "Preview",
+      "admission": false,
+      "lifecycle_note": "previously admitted production identity; retained pending explicit de-admission policy"
+    },
+    {
+      "base_device": "STM32F446ZC",
+      "icpn": "STM32F446ZCT7",
+      "marketing_status": "Proposal",
+      "admission": false
+    }
+  ]
+}

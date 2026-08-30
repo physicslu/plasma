@@ -18,7 +18,7 @@ from st_product_page_acquisition import (
     MAX_RESPONSE_BYTES,
     PARSER_VERSION,
     SCHEMA_VERSION,
-    extract_exact_icpns,
+    extract_part_number_records,
     validate_source_url,
 )
 
@@ -30,6 +30,11 @@ CHALLENGE_MARKERS = (
 )
 QUALITY_HEADING = "Quality and Reliability"
 BROWSER_TRANSPORT = "chromium_rendered_dom"
+# ST's CDN has produced deterministic net::ERR_HTTP2_PROTOCOL_ERROR failures on
+# GitHub-hosted Chromium runners. Forcing HTTP/1.1 changes transport negotiation
+# only; it does not alter request headers, evidence scope, or parser semantics.
+CHROMIUM_LAUNCH_ARGS = ["--disable-http2"]
+DEFAULT_NAVIGATION_ATTEMPTS = 2
 
 
 def build_browser_evidence_record(
@@ -51,7 +56,13 @@ def build_browser_evidence_record(
     except UnicodeDecodeError as exc:
         raise AcquisitionError("rendered ST product DOM is not valid UTF-8") from exc
 
-    exact_icpns, section_text = extract_exact_icpns(html_text, base_device)
+    records, section_text = extract_part_number_records(html_text, base_device)
+    exact_icpns = [str(record["icpn"]) for record in records if record["active"] is True]
+    excluded = [
+        {"icpn": str(record["icpn"]), "marketing_status": str(record["marketing_status"])}
+        for record in records
+        if record["active"] is not True
+    ]
     return {
         "schema_version": SCHEMA_VERSION,
         "parser_version": PARSER_VERSION,
@@ -65,6 +76,8 @@ def build_browser_evidence_record(
         "rendered_dom_sha256": hashlib.sha256(body).hexdigest(),
         "evidence_section_sha256": hashlib.sha256(section_text.encode("utf-8")).hexdigest(),
         "evidence_surface": "quality_and_reliability_part_number",
+        "part_number_records": records,
+        "excluded_non_active_part_numbers": excluded,
         "exact_icpns": exact_icpns,
     }
 
@@ -72,8 +85,16 @@ def build_browser_evidence_record(
 class STBrowserAcquirer:
     """Context-managed Chromium acquisition adapter."""
 
-    def __init__(self, *, headless: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        headless: bool = True,
+        navigation_attempts: int = DEFAULT_NAVIGATION_ATTEMPTS,
+    ) -> None:
+        if navigation_attempts < 1:
+            raise AcquisitionError("browser navigation attempts must be at least 1")
         self.headless = headless
+        self.navigation_attempts = navigation_attempts
         self.browser_version: str | None = None
         self._playwright: Any = None
         self._browser: Any = None
@@ -116,7 +137,10 @@ class STBrowserAcquirer:
     def _launch_browser(self) -> None:
         if self._playwright is None:
             raise AcquisitionError("browser acquirer must be used as a context manager")
-        self._browser = self._playwright.chromium.launch(headless=self.headless)
+        self._browser = self._playwright.chromium.launch(
+            headless=self.headless,
+            args=CHROMIUM_LAUNCH_ARGS,
+        )
         self.browser_version = self._browser.version
         self._context = self._browser.new_context()
 
@@ -128,6 +152,10 @@ class STBrowserAcquirer:
         self._context = None
         self._browser = None
 
+    def _fresh_browser_after_navigation_failure(self) -> None:
+        self._close_browser_context()
+        self._launch_browser()
+
     def fetch(self, source_url: str, timeout_seconds: float) -> tuple[bytes, str, None, None]:
         validate_source_url(source_url)
         if timeout_seconds <= 0:
@@ -136,19 +164,43 @@ class STBrowserAcquirer:
             self._launch_browser()
 
         timeout_ms = int(timeout_seconds * 1000)
-        page = self._context.new_page()
+        page: Any = None
+        response: Any = None
+        final_url = source_url
+        attempts = self.navigation_attempts if self._rotate_browser_after_fetch else 1
+
+        for attempt in range(1, attempts + 1):
+            page = self._context.new_page()
+            try:
+                response = page.goto(source_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                final_url = page.url
+                break
+            except self._timeout_error as exc:
+                page.close()
+                page = None
+                if attempt >= attempts:
+                    raise AcquisitionError(f"browser acquisition timed out: {exc}") from exc
+                self._fresh_browser_after_navigation_failure()
+            except self._playwright_error as exc:
+                page.close()
+                page = None
+                if attempt >= attempts:
+                    raise AcquisitionError(f"browser acquisition failed: {exc}") from exc
+                self._fresh_browser_after_navigation_failure()
+
+        if page is None:
+            raise AcquisitionError("browser acquisition navigation produced no page")
+
         try:
-            response = page.goto(source_url, wait_until="domcontentloaded", timeout=timeout_ms)
-            final_url = page.url
             validate_source_url(final_url)
             if response is not None and response.status >= 400:
                 raise AcquisitionError(f"browser navigation returned HTTP {response.status}")
 
             # ST currently renders several responsive copies of this evidence
             # section, with the matching heading nodes attached but hidden until
-            # their layout/tab is activated.  Attachment is the stable rendered-DOM
+            # their layout/tab is activated. Attachment is the stable rendered-DOM
             # readiness signal; the scoped evidence parser still fails closed if the
-            # exact section or commercial part numbers are absent.
+            # exact section, Marketing Status, or Active commercial part numbers are absent.
             page.get_by_text(QUALITY_HEADING, exact=True).wait_for(
                 state="attached", timeout=timeout_ms
             )
@@ -166,14 +218,14 @@ class STBrowserAcquirer:
                 raise AcquisitionError(f"rendered page exceeds {MAX_RESPONSE_BYTES} bytes")
             return body, final_url, None, None
         except self._timeout_error as exc:
-            raise AcquisitionError(f"browser acquisition timed out: {exc}") from exc
+            raise AcquisitionError(f"browser evidence readiness timed out: {exc}") from exc
         except self._playwright_error as exc:
-            raise AcquisitionError(f"browser acquisition failed: {exc}") from exc
+            raise AcquisitionError(f"browser evidence extraction failed: {exc}") from exc
         finally:
             page.close()
-            # ST's CDN has repeatedly failed later navigations on a reused
-            # Chromium HTTP/2 connection.  A fresh, clean browser process per
-            # bounded target avoids connection reuse without changing headers,
-            # profiles, timeouts, or evidence semantics.
+            # A fresh, clean browser process per bounded target avoids transport
+            # connection reuse without changing headers, profiles, timeouts, or
+            # evidence semantics. Navigation retries above also force a fresh
+            # process, but only for transport-level Page.goto failures.
             if self._rotate_browser_after_fetch:
                 self._close_browser_context()

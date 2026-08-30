@@ -33,6 +33,7 @@ TEMPERATURE_BY_CODE = {
 PACKAGE_BY_CODE = {
     "F": "WLCSP",
     "H": "UFBGA",
+    "J": "UFBGA",
     "T": "LQFP",
     "U": "UFQFPN",
     "Y": "WLCSP",
@@ -154,6 +155,8 @@ def _package_and_pins(pin_code: str, package_code: str) -> tuple[str, str]:
         ("C", "F"): "49",
         ("C", "Y"): "49",
         ("V", "T"): "100",
+        ("Z", "H"): "144",
+        ("Z", "J"): "144",
         ("Z", "T"): "144",
         ("Z", "Y"): "143",
     }

@@ -20,11 +20,12 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 SCHEMA_VERSION = 1
-PARSER_VERSION = 1
+PARSER_VERSION = 2
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 APPROVED_HOST = "www.st.com"
 ICPN_TOKEN_RE = re.compile(r"\bSTM32[A-Z0-9]+\b")
 BASE_DEVICE_RE = re.compile(r"^STM32[A-Z0-9]+$")
+ACTIVE_MARKETING_STATUS = "active"
 
 
 class AcquisitionError(RuntimeError):
@@ -32,7 +33,7 @@ class AcquisitionError(RuntimeError):
 
 
 class QualitySectionParser(HTMLParser):
-    """Collect visible text from the Quality and Reliability H2 section."""
+    """Collect text and table cells from the Quality and Reliability H2 section."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -42,7 +43,12 @@ class QualitySectionParser(HTMLParser):
         self._in_quality = False
         self._quality_seen = False
         self._done = False
+        self._row_depth = 0
+        self._cell_depth = 0
+        self._row_cells: list[str] = []
+        self._cell_parts: list[str] = []
         self.section_parts: list[str] = []
+        self.table_rows: list[list[str]] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         del attrs
@@ -52,9 +58,31 @@ class QualitySectionParser(HTMLParser):
         if tag == "h2" and self._hidden_depth == 0:
             self._heading_depth += 1
             self._heading_parts = []
+            return
+        if self._hidden_depth or not self._in_quality:
+            return
+        if tag == "tr":
+            if self._row_depth == 0:
+                self._row_cells = []
+            self._row_depth += 1
+        elif tag in {"th", "td"} and self._row_depth:
+            self._cell_depth += 1
+            if self._cell_depth == 1:
+                self._cell_parts = []
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if tag in {"th", "td"} and self._cell_depth:
+            if self._cell_depth == 1:
+                self._row_cells.append(normalize_text(" ".join(self._cell_parts)))
+                self._cell_parts = []
+            self._cell_depth -= 1
+        elif tag == "tr" and self._row_depth:
+            self._row_depth -= 1
+            if self._row_depth == 0 and self._row_cells:
+                self.table_rows.append(list(self._row_cells))
+                self._row_cells = []
+
         if tag == "h2" and self._heading_depth:
             heading = normalize_text(" ".join(self._heading_parts))
             self._heading_depth -= 1
@@ -76,6 +104,8 @@ class QualitySectionParser(HTMLParser):
             return
         if self._in_quality:
             self.section_parts.append(data)
+            if self._cell_depth:
+                self._cell_parts.append(data)
 
     @property
     def quality_seen(self) -> bool:
@@ -101,7 +131,10 @@ def validate_base_device(base_device: str) -> None:
         raise AcquisitionError(f"invalid STM32 base device: {base_device!r}")
 
 
-def extract_exact_icpns(html_text: str, base_device: str) -> tuple[list[str], str]:
+def _extract_quality_part_number_records(
+    html_text: str,
+    base_device: str,
+) -> tuple[list[dict[str, object]], str]:
     validate_base_device(base_device)
     parser = QualitySectionParser()
     parser.feed(html_text)
@@ -113,6 +146,8 @@ def extract_exact_icpns(html_text: str, base_device: str) -> tuple[list[str], st
     section_text = normalize_text(" ".join(parser.section_parts))
     if "Part Number" not in section_text:
         raise AcquisitionError("Part Number marker not found in Quality and Reliability section")
+    if "Marketing Status" not in section_text:
+        raise AcquisitionError("Marketing Status marker not found in Quality and Reliability section")
 
     all_tokens = list(dict.fromkeys(ICPN_TOKEN_RE.findall(section_text)))
     foreign_tokens = [token for token in all_tokens if not token.startswith(base_device)]
@@ -121,15 +156,67 @@ def extract_exact_icpns(html_text: str, base_device: str) -> tuple[list[str], st
             "unexpected foreign STM32 token(s) in evidence section: " + ", ".join(foreign_tokens)
         )
 
-    exact_icpns = [token for token in all_tokens if token.startswith(base_device) and token != base_device]
-    if not exact_icpns:
-        raise AcquisitionError(f"no exact commercial ICPN candidates found for {base_device}")
+    header: list[str] | None = None
+    part_index = -1
+    status_index = -1
+    header_row_index = -1
+    for index, row in enumerate(parser.table_rows):
+        normalized = [normalize_text(cell) for cell in row]
+        if "Part Number" in normalized and "Marketing Status" in normalized:
+            header = normalized
+            part_index = normalized.index("Part Number")
+            status_index = normalized.index("Marketing Status")
+            header_row_index = index
+            break
+    if header is None:
+        raise AcquisitionError(
+            "Quality and Reliability table with Part Number and Marketing Status columns not found"
+        )
 
-    for icpn in exact_icpns:
-        if not ICPN_TOKEN_RE.fullmatch(icpn):
-            raise AcquisitionError(f"invalid ICPN token: {icpn}")
+    by_icpn: dict[str, dict[str, object]] = {}
+    for row in parser.table_rows[header_row_index + 1 :]:
+        if len(row) <= max(part_index, status_index):
+            continue
+        tokens = ICPN_TOKEN_RE.findall(row[part_index])
+        if not tokens:
+            continue
+        if len(tokens) != 1:
+            raise AcquisitionError("Quality and Reliability row contains multiple STM32 part numbers")
+        icpn = tokens[0]
+        if not icpn.startswith(base_device):
+            raise AcquisitionError(f"unexpected foreign STM32 token in table row: {icpn}")
+        if icpn == base_device:
+            continue
+        marketing_status = normalize_text(row[status_index])
+        if not marketing_status:
+            raise AcquisitionError(f"{icpn}: Marketing Status is empty")
+        record = {
+            "icpn": icpn,
+            "marketing_status": marketing_status,
+            "active": marketing_status.casefold().startswith(ACTIVE_MARKETING_STATUS),
+        }
+        existing = by_icpn.get(icpn)
+        if existing is not None and existing != record:
+            raise AcquisitionError(f"{icpn}: conflicting duplicate Marketing Status rows")
+        by_icpn[icpn] = record
 
-    return exact_icpns, section_text
+    if not by_icpn:
+        raise AcquisitionError(f"no exact commercial ICPN records found for {base_device}")
+    active_records = [record for record in by_icpn.values() if record["active"] is True]
+    if not active_records:
+        raise AcquisitionError(f"no Active commercial ICPN candidates found for {base_device}")
+    return list(by_icpn.values()), section_text
+
+
+def extract_part_number_records(html_text: str, base_device: str) -> tuple[list[dict[str, object]], str]:
+    """Return audited Q&R part-number rows including Marketing Status."""
+    return _extract_quality_part_number_records(html_text, base_device)
+
+
+def extract_exact_icpns(html_text: str, base_device: str) -> tuple[list[str], str]:
+    """Return only exact ICPNs whose official ST Marketing Status is Active."""
+    records, section_text = _extract_quality_part_number_records(html_text, base_device)
+    return [str(record["icpn"]) for record in records if record["active"] is True], section_text
 
 
 def fetch_html(source_url: str, timeout_seconds: float) -> tuple[bytes, str, str | None, str | None]:
@@ -173,7 +260,13 @@ def build_evidence_record(
     except UnicodeDecodeError as exc:
         raise AcquisitionError("ST product page is not valid UTF-8") from exc
 
-    exact_icpns, section_text = extract_exact_icpns(html_text, base_device)
+    records, section_text = extract_part_number_records(html_text, base_device)
+    exact_icpns = [str(record["icpn"]) for record in records if record["active"] is True]
+    excluded = [
+        {"icpn": str(record["icpn"]), "marketing_status": str(record["marketing_status"])}
+        for record in records
+        if record["active"] is not True
+    ]
     return {
         "schema_version": SCHEMA_VERSION,
         "parser_version": PARSER_VERSION,
@@ -186,6 +279,8 @@ def build_evidence_record(
         "raw_sha256": hashlib.sha256(body).hexdigest(),
         "evidence_section_sha256": hashlib.sha256(section_text.encode("utf-8")).hexdigest(),
         "evidence_surface": "quality_and_reliability_part_number",
+        "part_number_records": records,
+        "excluded_non_active_part_numbers": excluded,
         "exact_icpns": exact_icpns,
     }
 
