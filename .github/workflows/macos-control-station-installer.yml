@@ -7,6 +7,8 @@ on:
       - "scripts/macos-control-station-pkg.py"
       - "scripts/macos-control-station-installer-acceptance.py"
       - "scripts/control-station-runtime.py"
+      - "scripts/control-station-release.py"
+      - "scripts/product-release.py"
       - "software/web/**"
       - "software/python/plasma_manager/**"
       - "software/python/pyproject.toml"
@@ -20,6 +22,8 @@ on:
       - "scripts/macos-control-station-pkg.py"
       - "scripts/macos-control-station-installer-acceptance.py"
       - "scripts/control-station-runtime.py"
+      - "scripts/control-station-release.py"
+      - "scripts/product-release.py"
       - "software/web/**"
       - "software/python/plasma_manager/**"
       - "software/python/pyproject.toml"
@@ -64,11 +68,25 @@ jobs:
           python -m pytest -q
           software/python/tests/test_macos_control_station_installer.py
           software/python/tests/test_control_station_runtime.py
-      - name: Build unsigned macOS installer pilot
-        run: >-
-          python scripts/macos-control-station-pkg.py
-          --runtime-dir "${{ runner.temp }}/plasma-control-station-runtime"
-          --output-dir "${{ runner.temp }}/plasma-macos-installer"
+      - name: Build and verify Common Release Format input
+        run: |
+          ARCH="$(uname -m)"
+          python scripts/control-station-release.py \
+            --runtime-dir "${{ runner.temp }}/plasma-control-station-runtime" \
+            --output-dir "${{ runner.temp }}/plasma-control-station-release" \
+            --platform macos \
+            --architecture "$ARCH" \
+            --git-sha "$(git rev-parse HEAD)"
+          RELEASE="$(find "${{ runner.temp }}/plasma-control-station-release" -maxdepth 1 -name '*.tar.gz' -print -quit)"
+          test -n "$RELEASE"
+          test -f "$RELEASE.sha256"
+      - name: Build unsigned macOS installer pilot from verified release
+        run: |
+          RELEASE="$(find "${{ runner.temp }}/plasma-control-station-release" -maxdepth 1 -name '*.tar.gz' -print -quit)"
+          test -n "$RELEASE"
+          python scripts/macos-control-station-pkg.py \
+            --release-artifact "$RELEASE" \
+            --output-dir "${{ runner.temp }}/plasma-macos-installer"
       - name: Expose stable external runtimes to installer pilot
         run: |
           sudo mkdir -p /usr/local/bin
