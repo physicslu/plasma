@@ -24,6 +24,7 @@ BASELINE = HERE / "stm32f4-phase3.3-scaleout-batch1-baseline.json"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
 AUDIT = HERE / "stm32f4-phase3.3-admission-audit.json"
+PHASE31_AUDIT = HERE / "stm32f4-phase3.1-admission-audit.json"
 NEW_BASES = {"STM32F401CB", "STM32F407VE", "STM32F407ZG", "STM32F411CC", "STM32F429ZG"}
 
 
@@ -31,12 +32,17 @@ class STM32F4Phase33ScaleoutTests(unittest.TestCase):
     def _audit(self) -> dict[str, object]:
         return json.loads(AUDIT.read_text(encoding="utf-8"))
 
-    def _prewrite_canonical(self, output: Path, new_icpns: set[str]) -> None:
+    def _phase31_icpns(self) -> set[str]:
+        payload = json.loads(PHASE31_AUDIT.read_text(encoding="utf-8"))
+        return set(payload["icpns"])
+
+    def _snapshot_canonical(self, output: Path, icpns: set[str], expected_count: int) -> None:
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if row["icpn"] not in new_icpns]
-        self.assertEqual(len(rows), 18)
+            rows = [row for row in reader if row["icpn"] in icpns]
+        self.assertEqual(len(rows), expected_count)
+        self.assertEqual({row["icpn"] for row in rows}, icpns)
         with output.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
             writer.writeheader()
@@ -70,12 +76,15 @@ class STM32F4Phase33ScaleoutTests(unittest.TestCase):
 
     def test_live_plan_replays_18_to_34_and_writer_is_idempotent(self) -> None:
         audit = self._audit()
-        new_icpns = set(audit["icpns"])
+        batch1_icpns = set(audit["icpns"])
+        phase31_icpns = self._phase31_icpns()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             canonical = root / "stm32f4-commercial-icpn.csv"
+            historical = root / "stm32f4-phase3.3-batch1-historical.csv"
             live_named_evidence = root / "evidence"
-            self._prewrite_canonical(canonical, new_icpns)
+            self._snapshot_canonical(canonical, phase31_icpns, 18)
+            self._snapshot_canonical(historical, phase31_icpns | batch1_icpns, 34)
             shutil.copytree(EVIDENCE, live_named_evidence)
 
             plan = build_admission_plan(
@@ -103,7 +112,7 @@ class STM32F4Phase33ScaleoutTests(unittest.TestCase):
             self.assertEqual(second["rows_before"], 34)
             self.assertEqual(second["rows_after"], 34)
             self.assertEqual(second["added"], [])
-            self.assertEqual(canonical.read_bytes(), CANONICAL.read_bytes())
+            self.assertEqual(canonical.read_bytes(), historical.read_bytes())
             self.assertEqual(hashlib.sha256(canonical.read_bytes()).hexdigest(), audit["canonical_sha256_after"])
 
 
