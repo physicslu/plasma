@@ -81,10 +81,10 @@ def test_search_limit_is_bounded(tmp_path: Path) -> None:
             raise AssertionError(f"invalid limit was accepted: {invalid!r}")
 
 
-def test_checked_in_production_catalog_contains_only_93_admitted_exact_icpns() -> None:
+def test_checked_in_production_catalog_contains_only_109_admitted_exact_icpns() -> None:
     catalog = get_default_device_catalog()
 
-    assert catalog.size == 93
+    assert catalog.size == 109
     assert catalog.catalog_id == "plasma-icpn"
     assert catalog.catalog_version == "1.0.0"
     assert catalog.status == "production"
@@ -100,6 +100,7 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     catalog = get_default_device_catalog()
 
     exact = catalog.search("stm32f407vgt6", limit=1)[0]
+    new_batch = catalog.search("stm32f429zgy6tr", limit=1)[0]
     family = catalog.search("STM32F4", limit=100)
     combined = catalog.search("STMicroelectronics STM32F4", limit=100)
 
@@ -107,8 +108,11 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert exact.package == "LQFP"
     assert exact.target_config == "tcl/target/stm32f4x.cfg"
     assert exact.mapping_status == "mapped"
-    assert len(family) == 18
-    assert len(combined) == 18
+    assert new_batch.identifier == "STM32F429ZGY6TR"
+    assert new_batch.package == "WLCSP"
+    assert new_batch.target_config == "tcl/target/stm32f4x.cfg"
+    assert len(family) == 34
+    assert len(combined) == 34
 
 
 def test_production_payload_separates_catalog_verification_from_physical_validation() -> None:
@@ -130,15 +134,15 @@ def test_production_payload_separates_catalog_verification_from_physical_validat
 def test_production_metadata_reports_vendor_family_taxonomy() -> None:
     metadata = get_default_device_catalog().metadata
 
-    assert metadata["catalog_size"] == 93
+    assert metadata["catalog_size"] == 109
     assert metadata["source_count"] == 2
     assert metadata["taxonomy"] == [
         {
             "vendor": "STMicroelectronics",
-            "count": 93,
+            "count": 109,
             "families": [
                 {"family": "STM32F1", "count": 75},
-                {"family": "STM32F4", "count": 18},
+                {"family": "STM32F4", "count": 34},
             ],
         }
     ]
