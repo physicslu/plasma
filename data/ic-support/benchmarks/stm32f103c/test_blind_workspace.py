@@ -107,6 +107,23 @@ def main() -> int:
         assert manifest["isolation"]["workspace_outside_repository"] is True
         assert manifest["isolation"]["repository_ground_truth_copied"] is False
         assert manifest["isolation"]["os_sandbox_enforced"] is False
+        assert {item["file"] for item in manifest["locked_files"]} == {
+            "contracts/source-lock.json",
+            "contracts/extraction-contract.json",
+            "contracts/extraction-observed.schema.json",
+            "PROMPT.md",
+        }
+
+        prompt = workspace / "PROMPT.md"
+        original_prompt = prompt.read_bytes()
+        prompt.write_text("tampered prompt\n", encoding="utf-8")
+        try:
+            runner.verify_workspace(workspace, repo_root=repo)
+        except runner.WorkspaceError:
+            pass
+        else:
+            raise AssertionError("tampered benchmark contract/prompt was accepted")
+        prompt.write_bytes(original_prompt)
 
         copied.write_bytes(b"tampered")
         try:
