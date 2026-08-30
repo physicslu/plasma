@@ -120,6 +120,53 @@ def load_programming_bindings(
     return bindings
 
 
+def summarize_base_device(
+    manufacturer: str,
+    base_device: str,
+    members: list[dict[str, str]],
+    bindings: dict[str, dict[str, str]],
+) -> dict[str, Any]:
+    require(members, f"{base_device}: base-device group must not be empty")
+    families = {row["family"] for row in members}
+    flash_sizes = {row["flash_size"] for row in members}
+    openocd_targets = {row["openocd_target_config"] for row in members if row.get("openocd_target_config")}
+    require(len(families) == 1, f"{base_device}: base device spans multiple families: {sorted(families)}")
+    require(len(flash_sizes) == 1, f"{base_device}: base device has conflicting Flash sizes: {sorted(flash_sizes)}")
+    require(
+        len(openocd_targets) <= 1,
+        f"{base_device}: base device has conflicting OpenOCD targets: {sorted(openocd_targets)}",
+    )
+
+    bound_profile_ids = {
+        bindings[row["icpn"]]["programming_profile_id"]
+        for row in members
+        if row["icpn"] in bindings
+    }
+    require(
+        len(bound_profile_ids) <= 1,
+        f"{base_device}: bound exact ICPNs disagree on programming profile: {sorted(bound_profile_ids)}",
+    )
+
+    if bound_profile_ids:
+        profile_state = "partially_or_fully_bound"
+        profile_id = next(iter(bound_profile_ids))
+    else:
+        profile_state = "unresolved"
+        profile_id = None
+
+    return {
+        "manufacturer": manufacturer,
+        "family": next(iter(families)),
+        "base_device": base_device,
+        "exact_icpn_count": len(members),
+        "flash_size": next(iter(flash_sizes)),
+        "openocd_target_config": next(iter(openocd_targets)) if openocd_targets else None,
+        "programming_profile_state": profile_state,
+        "programming_profile_id": profile_id,
+        "bound_exact_icpn_count": sum(1 for row in members if row["icpn"] in bindings),
+    }
+
+
 def build_inventory() -> dict[str, Any]:
     manifest, rows = load_production_catalog()
     production_icpns = {row["icpn"] for row in rows}
@@ -182,47 +229,10 @@ def build_inventory() -> dict[str, Any]:
             }
         )
 
-    base_devices: list[dict[str, Any]] = []
-    for (manufacturer, base_device), members in sorted(base_rows.items()):
-        families = {row["family"] for row in members}
-        flash_sizes = {row["flash_size"] for row in members}
-        openocd_targets = {row["openocd_target_config"] for row in members if row.get("openocd_target_config")}
-        require(len(families) == 1, f"{base_device}: base device spans multiple families: {sorted(families)}")
-        require(len(flash_sizes) == 1, f"{base_device}: base device has conflicting Flash sizes: {sorted(flash_sizes)}")
-        require(
-            len(openocd_targets) <= 1,
-            f"{base_device}: base device has conflicting OpenOCD targets: {sorted(openocd_targets)}",
-        )
-
-        bound_profile_ids = {
-            bindings[row["icpn"]]["programming_profile_id"]
-            for row in members
-            if row["icpn"] in bindings
-        }
-        require(
-            len(bound_profile_ids) <= 1,
-            f"{base_device}: bound exact ICPNs disagree on programming profile: {sorted(bound_profile_ids)}",
-        )
-
-        if bound_profile_ids:
-            profile_state = "partially_or_fully_bound"
-            profile_id = next(iter(bound_profile_ids))
-        else:
-            profile_state = "unresolved"
-            profile_id = None
-        base_devices.append(
-            {
-                "manufacturer": manufacturer,
-                "family": next(iter(families)),
-                "base_device": base_device,
-                "exact_icpn_count": len(members),
-                "flash_size": next(iter(flash_sizes)),
-                "openocd_target_config": next(iter(openocd_targets)) if openocd_targets else None,
-                "programming_profile_state": profile_state,
-                "programming_profile_id": profile_id,
-                "bound_exact_icpn_count": sum(1 for row in members if row["icpn"] in bindings),
-            }
-        )
+    base_devices = [
+        summarize_base_device(manufacturer, base_device, members, bindings)
+        for (manufacturer, base_device), members in sorted(base_rows.items())
+    ]
 
     programming_profile_ids = sorted({binding["programming_profile_id"] for binding in bindings.values()})
     inventory_rows.sort(key=lambda item: (item["family"], item["base_device"], item["icpn"]))
