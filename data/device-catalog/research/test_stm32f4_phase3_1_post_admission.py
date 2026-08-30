@@ -37,6 +37,21 @@ class STM32F4Phase31PostAdmissionTests(unittest.TestCase):
         with path.open("w", newline="", encoding="utf-8") as handle:
             csv.writer(handle, lineterminator="\n").writerow(fields)
 
+    def _historical_phase31_canonical(self, path: Path) -> None:
+        """Reconstruct the immutable Phase 3.1 18-row snapshot from today's superset."""
+
+        phase31_icpns = set(self._audit()["icpns"])
+        with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            fields = list(reader.fieldnames or [])
+            rows = [row for row in reader if row.get("icpn") in phase31_icpns]
+        self.assertEqual(len(rows), EXPECTED_COUNT)
+        self.assertEqual({row["icpn"] for row in rows}, phase31_icpns)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+
     def test_retained_live_evidence_is_byte_integrity_valid_and_scale_ready(self) -> None:
         report = validate_retained_evidence(EVIDENCE, baseline_path=BASELINE)
         self.assertEqual(report["targets"], 4)
@@ -67,8 +82,10 @@ class STM32F4Phase31PostAdmissionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             canonical = root / "stm32f4-commercial-icpn.csv"
+            historical = root / "stm32f4-phase3.1-historical.csv"
             live_named_evidence = root / "evidence"
             self._empty_canonical(canonical)
+            self._historical_phase31_canonical(historical)
             shutil.copytree(EVIDENCE, live_named_evidence)
 
             # The live admission artifact binds the logical evidence directory basename
@@ -105,7 +122,9 @@ class STM32F4Phase31PostAdmissionTests(unittest.TestCase):
             self.assertEqual(second["rows_after"], EXPECTED_COUNT)
             self.assertEqual(second["added"], [])
 
-            self.assertEqual(canonical.read_bytes(), CANONICAL.read_bytes())
+            # Compare against the immutable Phase 3.1 subset, not today's growing
+            # canonical superset. The original live plan SHA above remains unchanged.
+            self.assertEqual(canonical.read_bytes(), historical.read_bytes())
 
 
 if __name__ == "__main__":
