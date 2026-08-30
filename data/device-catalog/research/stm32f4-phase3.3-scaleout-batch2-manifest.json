@@ -18,11 +18,6 @@
       "selection_reason": "1-MiB crypto-enabled F415 LQFP100 variant using already-supported V/T package semantics"
     },
     {
-      "base_device": "STM32F415ZG",
-      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f415zg.html",
-      "selection_reason": "1-MiB crypto-enabled F415 LQFP144 variant using already-supported Z/T package semantics"
-    },
-    {
       "base_device": "STM32F427VG",
       "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427vg.html",
       "selection_reason": "1-MiB F427 LQFP100 variant extending advanced-line coverage without new package policy"
