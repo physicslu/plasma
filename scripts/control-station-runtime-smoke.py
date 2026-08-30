@@ -156,11 +156,13 @@ def _wait_for_console(port: int, process: subprocess.Popen[bytes], deadline_s: f
     deadline = time.monotonic() + deadline_s
     url = f"http://127.0.0.1:{port}/api/manager/diagnostics/loopback"
     payload = {"endpoint": "ps", "timeout_ms": 100, "payload": "runtime-smoke"}
+    last_observation = "no response observed"
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise SmokeError(f"Console exited before readiness with code {process.returncode}")
         try:
             status, response = _request_json(url, method="POST", payload=payload, timeout=2.0)
+            last_observation = f"status={status} body={json.dumps(response, sort_keys=True)}"
             error = response.get("error")
             if (
                 status == 504
@@ -168,10 +170,12 @@ def _wait_for_console(port: int, process: subprocess.Popen[bytes], deadline_s: f
                 and error.get("code") == "ppu_transport_error"
             ):
                 return
-        except SmokeError:
-            pass
+        except SmokeError as exc:
+            last_observation = str(exc)
         time.sleep(0.2)
-    raise SmokeError("Console/BFF -> Manager runtime smoke timed out")
+    raise SmokeError(
+        f"Console/BFF -> Manager runtime smoke timed out; last observation: {last_observation}"
+    )
 
 
 def _terminate(process: subprocess.Popen[bytes] | None) -> None:
