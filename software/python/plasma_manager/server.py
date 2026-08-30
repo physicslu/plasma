@@ -465,7 +465,10 @@ def serve(config: ManagerConfig) -> None:
     PlasmaManagerHandler.poller = poller
     PlasmaManagerHandler.config = config
     server = ThreadingHTTPServer((config.host, config.port), PlasmaManagerHandler)
-    poller.start()
+    # Product liveness is owned by the Manager process itself, not by PPU transport.
+    # Prime the fleet cache immediately, but do that first poll in the background so
+    # an offline or slow PPU cannot prevent /api/health/live from becoming available.
+    poller.start(prime_cache=False)
     print(f"Plasma Manager listening on http://{config.host}:{config.port}")
     try:
         server.serve_forever()
