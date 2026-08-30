@@ -278,7 +278,7 @@ def build_evidence_record(
         "http_last_modified": http_last_modified,
         "raw_sha256": hashlib.sha256(body).hexdigest(),
         "evidence_section_sha256": hashlib.sha256(section_text.encode("utf-8")).hexdigest(),
-        "evidence_surface": "quality_and_reliability_part_number_marketing_status",
+        "evidence_surface": "quality_and_reliability_part_number",
         "part_number_records": records,
         "excluded_non_active_part_numbers": excluded,
         "exact_icpns": exact_icpns,
