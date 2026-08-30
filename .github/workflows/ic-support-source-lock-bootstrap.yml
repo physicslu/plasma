@@ -20,4 +20,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Discover official PDF hashes
-        run: python data/ic-support/evidence/source_integrity.py discover
+        run: python data/ic-support/evidence/source_integrity.py discover --output source-lock-discovery.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ic-support-source-lock-discovery
+          path: source-lock-discovery.json
+          if-no-files-found: error
