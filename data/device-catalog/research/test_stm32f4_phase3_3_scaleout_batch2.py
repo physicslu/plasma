@@ -24,6 +24,7 @@ BASELINE = HERE / "stm32f4-phase3.3-scaleout-batch2-baseline.json"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
 AUDIT = HERE / "stm32f4-phase3.3-scaleout-batch2-admission-audit.json"
+PHASE40_AUDIT = HERE / "stm32f4-phase4.0-f446-batch1-admission-audit.json"
 NEW_BASES = {"STM32F407ZE", "STM32F415VG", "STM32F427VG", "STM32F427ZG", "STM32F437VG"}
 
 
@@ -31,8 +32,32 @@ class STM32F4Phase33ScaleoutBatch2Tests(unittest.TestCase):
     def _audit(self) -> dict[str, object]:
         return json.loads(AUDIT.read_text(encoding="utf-8"))
 
-    def _prewrite_canonical(self, output: Path, new_icpns: set[str]) -> None:
+    def _phase40_icpns(self) -> set[str]:
+        audit = json.loads(PHASE40_AUDIT.read_text(encoding="utf-8"))
+        values = set(audit["icpns"])
+        self.assertEqual(len(values), 23)
+        return values
+
+    def _historical_post_batch2_canonical(self, output: Path) -> None:
+        """Reconstruct the immutable 49-row catalog state at Phase 3.3 batch2 close.
+
+        Today's production catalog may contain later admissions. Historical replay must
+        exclude those later rows rather than treating the current catalog size as a
+        permanent Phase 3.3 invariant.
+        """
+        post_batch2_icpns = self._phase40_icpns()
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            fields = list(reader.fieldnames or [])
+            rows = [row for row in reader if row["icpn"] not in post_batch2_icpns]
+        self.assertEqual(len(rows), 49)
+        with output.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def _prewrite_canonical(self, output: Path, historical_after: Path, new_icpns: set[str]) -> None:
+        with historical_after.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
             rows = [row for row in reader if row["icpn"] not in new_icpns]
@@ -74,8 +99,14 @@ class STM32F4Phase33ScaleoutBatch2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             canonical = root / "stm32f4-commercial-icpn.csv"
+            historical_after = root / "stm32f4-phase3.3-after.csv"
             materialized_named_evidence = root / EVIDENCE.name
-            self._prewrite_canonical(canonical, new_icpns)
+            self._historical_post_batch2_canonical(historical_after)
+            self.assertEqual(
+                hashlib.sha256(historical_after.read_bytes()).hexdigest(),
+                audit["canonical_sha256_after"],
+            )
+            self._prewrite_canonical(canonical, historical_after, new_icpns)
             shutil.copytree(EVIDENCE, materialized_named_evidence)
 
             # The retained audit binds the materialization plan, whose input contract
@@ -106,7 +137,7 @@ class STM32F4Phase33ScaleoutBatch2Tests(unittest.TestCase):
             self.assertEqual(second["rows_before"], 49)
             self.assertEqual(second["rows_after"], 49)
             self.assertEqual(second["added"], [])
-            self.assertEqual(canonical.read_bytes(), CANONICAL.read_bytes())
+            self.assertEqual(canonical.read_bytes(), historical_after.read_bytes())
             self.assertEqual(hashlib.sha256(canonical.read_bytes()).hexdigest(), audit["canonical_sha256_after"])
 
 
