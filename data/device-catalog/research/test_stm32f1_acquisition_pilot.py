@@ -23,10 +23,14 @@ from stm32f1_acquisition_pilot import (  # noqa: E402
 
 
 def html_for(*icpns: str) -> bytes:
-    rows = "".join(f"<tr><td>{icpn}</td></tr>" for icpn in icpns)
+    rows = "".join(
+        f"<tr><td>{icpn}</td><td>Active Product is in volume production.</td></tr>"
+        for icpn in icpns
+    )
     return (
         "<html><body><h2>Quality and Reliability</h2>"
-        f"<table><thead><tr><th>Part Number</th></tr></thead><tbody>{rows}</tbody></table>"
+        "<table><thead><tr><th>Part Number</th><th>Marketing Status</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
         "<h2>Sample &amp; Buy</h2></body></html>"
     ).encode("utf-8")
 
