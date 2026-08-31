@@ -1,0 +1,42 @@
+{
+  "added": [
+    "STM32F412ZGJ6",
+    "STM32F412ZGJ6TR",
+    "STM32F412ZGJ7",
+    "STM32F412ZGT6",
+    "STM32F412ZGT6TR",
+    "STM32F413CGU6",
+    "STM32F413ZGJ6",
+    "STM32F413ZGJ6TR",
+    "STM32F413ZGT6"
+  ],
+  "admission_plan_sha256": "37591f9e8375329ab06169ccddf567259939ea2cc38ed4f6aca79044e6bdbc27",
+  "canonical_dataset_written": true,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 9,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_artifact_id": "9747959504",
+  "evidence_id": "stm32f4-phase4.0-foundation-batch6-2026-08-31-retained-20260831T063818Z-c3edb20",
+  "final_csv_sha256": "4a6bf6ffbf384ce3d9c91d318b6793c710d621d6f9e11f0a6c5b50206a5acb2a",
+  "final_git_blob_sha": "434443479cd8a7d5b87b723a9fde93806c4faddd",
+  "issues": [],
+  "new_exact_icpns": 9,
+  "phase": "stm32f4-phase4.0-foundation-batch6",
+  "post_rows": 133,
+  "pre_csv_sha256": "22f999adb9627231df7b332650271320d96f1957913481a5cb7a57155d9d1b6b",
+  "pre_git_blob_sha": "c0bb4971fa44eb818f423fc2a85efa1ffc06e81f",
+  "pre_rows": 124,
+  "proposal_artifact_id": "9748055114",
+  "proposal_workflow_run_id": "33365292387",
+  "publish_recovery": {
+    "correction": "read immutable added list from hash-bound proposal report instead of assuming an admission-plan decisions field",
+    "failed_run_id": "33365419968",
+    "failure_stage": "audit serialization before commit",
+    "repository_write_occurred": false
+  },
+  "schema_version": 1
+}
