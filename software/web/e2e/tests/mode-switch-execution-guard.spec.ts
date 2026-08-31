@@ -427,7 +427,7 @@ test("restoring an already successful Batch clears its stale execution lease", a
   api.finishBatch("success");
   await page.addInitScript(() => {
     sessionStorage.setItem("plasma-production-active-batch-v1", JSON.stringify({
-      apiBase: "https://plasma.open4th.com",
+      apiBase: "",
       batchId: "batch-mode-guard",
     }));
   });
