@@ -12,6 +12,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "windows-control-station-msi.py"
 ACCEPTANCE_SCRIPT = REPO_ROOT / "scripts" / "windows-control-station-installer-acceptance.py"
+PRODUCT_BUILD_SCRIPT = REPO_ROOT / "software" / "web" / "scripts" / "build-product.mjs"
+VINEXT_PATCH_SCRIPT = REPO_ROOT / "software" / "web" / "scripts" / "patch-vinext-windows-static-assets.mjs"
 
 
 def _load():
@@ -84,9 +86,19 @@ def test_windows_service_launchers_only_use_bundled_runtimes() -> None:
     assert "$null -ne $aliasContent" in console
     assert "([string]$aliasContent).Trim()" in console
     assert "$env:PLASMA_FLEET_UI_ENABLED = '1'" in console
-    assert "$consoleRoot = Split-Path -Parent $server" in console
-    assert "Push-Location -LiteralPath $consoleRoot" in console
-    assert "Pop-Location" in console
+
+
+def test_product_build_applies_version_pinned_vinext_windows_asset_patch() -> None:
+    package = json.loads((REPO_ROOT / "software" / "web" / "package.json").read_text(encoding="utf-8"))
+    build_source = PRODUCT_BUILD_SCRIPT.read_text(encoding="utf-8")
+    patch_source = VINEXT_PATCH_SCRIPT.read_text(encoding="utf-8")
+
+    assert package["devDependencies"]["vinext"] == "0.0.50"
+    assert 'PINNED_VINEXT_VERSION = "0.0.50"' in patch_source
+    assert 'path.relative(base, batch[j]).split(path.sep).join("/")' in patch_source
+    assert "matches.length !== 1" in patch_source
+    assert "patchVinextWindowsStaticAssets" in build_source
+    assert "Applied pinned vinext Windows static-asset compatibility patch" in build_source
 
 
 def test_windows_acceptance_requires_packaged_css_and_javascript_assets() -> None:
