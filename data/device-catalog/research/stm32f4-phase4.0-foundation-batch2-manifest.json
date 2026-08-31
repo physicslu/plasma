@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch2-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+      "selection_reason": "retained lifecycle-drift control; verifies Active-only extraction while the next F4 batch expands adjacent policy-ready devices"
+    },
+    {
+      "base_device": "STM32F405VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405vg.html",
+      "selection_reason": "policy-ready 1-MiB LQFP100 gap with existing V/T package semantics and official ST Active/NRND rows"
+    },
+    {
+      "base_device": "STM32F405ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405zg.html",
+      "selection_reason": "policy-ready 1-MiB LQFP144 gap with existing Z/T package semantics and official ST Active/NRND rows"
+    },
+    {
+      "base_device": "STM32F415ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f415zg.html",
+      "selection_reason": "policy-ready 1-MiB LQFP144 F415 gap adjacent to the already admitted STM32F415VG control family"
+    },
+    {
+      "base_device": "STM32F417VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417vg.html",
+      "selection_reason": "policy-ready 1-MiB LQFP100 F417 gap using existing V/T package semantics"
+    },
+    {
+      "base_device": "STM32F417ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417zg.html",
+      "selection_reason": "policy-ready 1-MiB LQFP144 F417 gap using existing Z/T package semantics"
+    }
+  ]
+}
