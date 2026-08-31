@@ -118,22 +118,29 @@ jobs:
           }
           & (Join-Path $nodeTarget 'node.exe') --version
 
-          # Exercise the real-host case that exposed PR #249's blind spot:
-          # Python may be installed system-wide at a custom location rather than
-          # C:\Program Files\Python31x and may not be present in the service PATH.
-          # PEP 514 HKLM registration is the machine-owned discovery contract.
+          # This hosted runner is disposable. Remove its preinstalled PythonCore
+          # registrations so this fixture cannot pass by selecting an unrelated
+          # machine Python (for example the runner image's newer 3.14 runtime).
+          # Then expose exactly one custom-path machine Python through PEP 514.
+          foreach ($pythonCore in @(
+            'HKLM:\SOFTWARE\Python\PythonCore',
+            'HKLM:\SOFTWARE\WOW6432Node\Python\PythonCore'
+          )) {
+            Remove-Item -LiteralPath $pythonCore -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
           $pythonRoot = Split-Path $python -Parent
           $pythonKey = 'HKLM:\SOFTWARE\Python\PythonCore\3.12\InstallPath'
           New-Item -Path $pythonKey -Force | Out-Null
           Set-Item -Path $pythonKey -Value $pythonRoot
           New-ItemProperty -Path $pythonKey -Name ExecutablePath -Value $python -PropertyType String -Force | Out-Null
-          Write-Host "Registered machine-wide Python for SCM acceptance: $python"
+          Write-Host "Registered isolated machine-wide Python for SCM acceptance: $python"
 
           $managerProbe = @(& .\packaging\windows\run-manager.ps1 -PreflightOnly)
           $managerProbe | ForEach-Object { Write-Host $_ }
           $expectedManagerProbe = "Plasma Manager Python runtime: $python"
           if ($managerProbe -notcontains $expectedManagerProbe) {
-            throw "Manager preflight did not resolve the HKLM-registered Python: expected '$expectedManagerProbe'"
+            throw "Manager preflight did not resolve the isolated HKLM-registered Python: expected '$expectedManagerProbe'"
           }
 
           & .\packaging\windows\run-console.ps1 -PreflightOnly
