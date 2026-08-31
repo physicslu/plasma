@@ -13,7 +13,7 @@ It consumes the same Control Station application runtime as macOS/Linux. It does
 ```text
 verified Control Station release
   -> pinned WinSW service adapter
-  -> pinned WiX v4 build tool
+  -> pinned WiX v5 build tool
   -> unsigned MSI
   -> %ProgramFiles% immutable versioned runtime
   -> %ProgramData% mutable config/state/logs
@@ -83,11 +83,11 @@ Bundling Node/Python is deferred because it changes redistribution, security-upd
 2. validates the packaged common runtime;
 3. verifies the pinned WinSW binary digest;
 4. stages the Windows service wrapper, PowerShell launchers and third-party license;
-5. emits WiX v4 authoring;
+5. emits WiX v5 authoring using built-in `Files` harvesting for the immutable runtime tree;
 6. builds `plasma-control-station-<version>-windows-x86_64.msi`;
 7. emits a detached `.sha256` sidecar.
 
-WiX Toolset `4.0.6` is pinned as a build dependency. WiX is build-host tooling and is not installed on the Control Station by the MSI.
+WiX Toolset `5.0.2` is pinned as a build dependency. WiX v5 is required because built-in `Files` harvesting is a WiX v5 feature; WiX v4 and earlier require a separate harvesting mechanism. WiX is build-host tooling and is not installed on the Control Station by the MSI.
 
 ## CI acceptance
 
