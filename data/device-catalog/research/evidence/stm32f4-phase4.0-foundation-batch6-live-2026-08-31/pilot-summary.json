@@ -1,0 +1,399 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 4,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 4,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 4,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 11,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 2,
+      "acquisition_success": 2,
+      "attempt": 1,
+      "clean": false,
+      "failed_targets": [
+        {
+          "base_device": "STM32F412CG",
+          "error": "browser evidence readiness timed out: Locator.wait_for: Timeout 45000ms exceeded.\nCall log:\n  - waiting for get_by_text(\"Quality and Reliability\", exact=True)\n"
+        },
+        {
+          "base_device": "STM32F413CG",
+          "error": "browser evidence readiness timed out: Locator.wait_for: Timeout 45000ms exceeded.\nCall log:\n  - waiting for get_by_text(\"Quality and Reliability\", exact=True)\n"
+        }
+      ]
+    },
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 4,
+      "attempt": 2,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 2,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 4,
+    "total": 4
+  },
+  "pilot_id": "stm32f4-phase4.0-foundation-batch6-2026-08-31",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F412CG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F412CGUx",
+          "icpn": "STM32F412CGU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412CGUx",
+          "icpn": "STM32F412CGU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F412CG",
+        "evidence_section_sha256": "ed46cc2eda9618b6366932a45f6b428434646b5286b0965d173d8449e830c4dd",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F412CGU6",
+          "STM32F412CGU6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F412CGU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412CGU6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "fd1ad99108612abc6aefeb46e7a432f460afac4dbd19477e8e4ac577b8ca2ace",
+        "retrieved_at_utc": "2026-08-31T06:38:18Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412cg.html"
+      },
+      "selection_reason": "production-admitted lifecycle control in the same F412/F413 technical cluster; verifies extraction and mapping stability while expanding adjacent policy-ready coverage",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412cg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F412ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F412ZGJx",
+          "icpn": "STM32F412ZGJ6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412ZGJx",
+          "icpn": "STM32F412ZGJ6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412ZGJx",
+          "icpn": "STM32F412ZGJ7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412ZGTx",
+          "icpn": "STM32F412ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412ZGTx",
+          "icpn": "STM32F412ZGT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F412ZG",
+        "evidence_section_sha256": "38b7471c223d78ce311e3353714e5324fe33c0893bfe580121fbee08498a540d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F412ZGJ6",
+          "STM32F412ZGJ6TR",
+          "STM32F412ZGJ7",
+          "STM32F412ZGT6",
+          "STM32F412ZGT6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F412ZGJ6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412ZGJ6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412ZGJ7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412ZGT6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "799372a4ae3dea10e46ffe463f70dce882545ff8747d5903f328bf096fd8e036",
+        "retrieved_at_utc": "2026-08-31T06:38:23Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412zg.html"
+      },
+      "selection_reason": "fresh-inventory policy-ready STM32F412 gap extending an already admitted family without changing admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F413CG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F413CGUx",
+          "icpn": "STM32F413CGU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F413CG",
+        "evidence_section_sha256": "93b68ff0dbab2e37d0364c6817e738d35ee1bff9d3138bdb7740fa76d5dedd83",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F413CGU6"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F413CGU3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F413CGU3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F413CGU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b9e546509ed373e7a954022a818e571e1c0c5fd6e15d5ddf09f64864c6402031",
+        "retrieved_at_utc": "2026-08-31T06:38:27Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413cg.html"
+      },
+      "selection_reason": "fresh-inventory policy-ready STM32F413 gap selected as part of a coherent F412/F413 bounded evidence batch",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413cg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F413ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F413ZGJx",
+          "icpn": "STM32F413ZGJ6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F413ZGJx",
+          "icpn": "STM32F413ZGJ6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F413ZGTx",
+          "icpn": "STM32F413ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F413ZG",
+        "evidence_section_sha256": "81881e9ce4d564348c6280fa5f0b425a6d659442778e710b864e4ff503e51172",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F413ZGJ6",
+          "STM32F413ZGJ6TR",
+          "STM32F413ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F413ZGJ3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "icpn": "STM32F413ZGT3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F413ZGJ3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F413ZGJ6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F413ZGJ6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32F413ZGT3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F413ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "cda78b514bbfb92db676930f7b1ba7031fd5ce28c2ce5f59b455926874a890ba",
+        "retrieved_at_utc": "2026-08-31T06:38:30Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413zg.html"
+      },
+      "selection_reason": "fresh-inventory policy-ready STM32F413 gap paired with STM32F413CG to cover adjacent package variants under the current admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413zg.html"
+    }
+  ],
+  "schema_version": 1
+}
