@@ -47,6 +47,16 @@ def test_winsw_hash_fails_closed(tmp_path: Path) -> None:
         module.verify_winsw(winsw)
 
 
+def test_windows_service_launchers_cover_empty_alias_and_python_probe_regressions() -> None:
+    manager = (REPO_ROOT / "packaging" / "windows" / "run-manager.ps1").read_text(encoding="utf-8")
+    console = (REPO_ROOT / "packaging" / "windows" / "run-console.ps1").read_text(encoding="utf-8")
+    assert "& $candidate --version" in manager
+    assert "-replace '^Python\\s+', ''" in manager
+    assert "-c 'import sys;" not in manager
+    assert "$null -ne $aliasContent" in console
+    assert "([string]$aliasContent).Trim()" in console
+
+
 def test_stage_and_wix_source_keep_scm_and_mutable_config_boundaries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     module = _load()
     repo = tmp_path / "repo"
