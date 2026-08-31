@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch4-2026-08-31",
+  "observation_kind": "official_st_active_orderable_surface_baseline",
+  "observed_date": "2026-08-31",
+  "canonical_dataset_admission": false,
+  "targets": [
+    {
+      "base_device": "STM32F429ZG",
+      "exact_icpns": [
+        "STM32F429ZGT6",
+        "STM32F429ZGT6TR",
+        "STM32F429ZGY6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F427VI",
+      "exact_icpns": [
+        "STM32F427VIT6",
+        "STM32F427VIT6TR",
+        "STM32F427VIT7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F427ZI",
+      "exact_icpns": [
+        "STM32F427ZIT6",
+        "STM32F427ZIT6TR",
+        "STM32F427ZIT7",
+        "STM32F427ZIT7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F429VE",
+      "exact_icpns": [
+        "STM32F429VET6",
+        "STM32F429VET6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F429VG",
+      "exact_icpns": [
+        "STM32F429VGT6",
+        "STM32F429VGT6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F429VI",
+      "exact_icpns": [
+        "STM32F429VIT6",
+        "STM32F429VIT6TR"
+      ]
+    }
+  ],
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F427VI",
+      "icpn": "STM32F427VIT7",
+      "marketing_status": "Proposal",
+      "admission": false
+    }
+  ]
+}
