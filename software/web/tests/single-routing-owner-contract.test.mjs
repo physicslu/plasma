@@ -40,6 +40,8 @@ test("Managed transport rebases canonical Gateway paths after routing resolves",
   assert.match(transport, /directGatewayPathname\(url\.pathname\)/);
   assert.match(transport, /rebaseInput\(currentInput, directPath, url\.search\)/);
   assert.match(transport, /url\.origin === new URL\(resolvedGatewayApiBase\)\.origin/);
+  assert.match(transport, /const trimmed = apiBase\.trim\(\)/);
+  assert.match(transport, /: window\.location\.origin/);
   assert.doesNotMatch(transport, /savedGatewayApiBase/);
 });
 
