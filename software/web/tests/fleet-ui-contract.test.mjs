@@ -190,7 +190,8 @@ test("fleet BFF source keeps Manager loopback-only and latest-job summaries brow
   assert.doesNotMatch(contract, /output_files/);
   assert.doesNotMatch(contract, /firmware/);
   assert.match(vite, /\^\/api\/\(\?!fleet/);
-  assert.match(vite, /target: "http:\/\/127\.0\.0\.1:18080"/);
+  assert.match(vite, /PLASMA_GATEWAY_PROXY_URL\s*\?\?\s*"http:\/\/127\.0\.0\.1:18080"/);
+  assert.match(vite, /target: localGatewayProxyTarget/);
   assert.match(vite, /PLASMA_FLEET_UI_ENABLED:\s*process\.env\.PLASMA_FLEET_UI_ENABLED\s*\?\?\s*"0"/);
   assert.match(vite, /PLASMA_CONTROL_STATION_MODE:\s*process\.env\.PLASMA_CONTROL_STATION_MODE\s*\?\?\s*""/);
   assert.match(vite, /PLASMA_MANAGER_API_URL:\s*process\.env\.PLASMA_MANAGER_API_URL/);
