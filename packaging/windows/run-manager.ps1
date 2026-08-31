@@ -1,3 +1,7 @@
+param(
+    [switch]$PreflightOnly
+)
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
@@ -10,6 +14,17 @@ function Test-VersionAtLeast([string]$Version, [int]$Major, [int]$Minor, [int]$P
     $actual = [Version]::new([int]$match.Groups[1].Value, [int]$match.Groups[2].Value, $actualPatch)
     $required = [Version]::new($Major, $Minor, $Patch)
     return $actual -ge $required
+}
+
+function Get-MachinePathCandidates([string]$ExecutableName) {
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    if ([string]::IsNullOrWhiteSpace($machinePath)) { return }
+    foreach ($entry in $machinePath -split ';') {
+        if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+        $directory = [Environment]::ExpandEnvironmentVariables($entry.Trim().Trim('"'))
+        if ([string]::IsNullOrWhiteSpace($directory)) { continue }
+        Join-Path $directory $ExecutableName
+    }
 }
 
 function Get-MachineRegisteredPythonCandidates {
@@ -43,8 +58,7 @@ function Resolve-Python {
         "$env:ProgramFiles\Python311\python.exe"
     )
     $candidates += @(Get-MachineRegisteredPythonCandidates)
-    $command = Get-Command python.exe -ErrorAction SilentlyContinue
-    if ($command) { $candidates += $command.Source }
+    $candidates += @(Get-MachinePathCandidates 'python.exe')
     foreach ($rawCandidate in $candidates | Select-Object -Unique) {
         if ($null -eq $rawCandidate) { continue }
         $candidate = ([string]$rawCandidate).Trim().Trim('"')
@@ -55,16 +69,18 @@ function Resolve-Python {
         $version = ([string]$versionOutput).Trim() -replace '^Python\s+', ''
         if (Test-VersionAtLeast $version 3 11 0) { return $candidate }
     }
-    throw 'Python >= 3.11 was not found in Program Files, HKLM PEP 514 registration, or the service PATH. Per-user-only Python installations are not supported by the LocalSystem service.'
+    throw 'Python >= 3.11 was not found in Program Files, HKLM PEP 514 registration, or the machine PATH. Per-user-only Python installations are not supported by the LocalSystem service.'
 }
+
+$python = Resolve-Python
+Write-Output "Plasma Manager Python runtime: $python"
+if ($PreflightOnly) { exit 0 }
 
 $programDataRoot = Join-Path $env:ProgramData 'Plasma'
 $configPath = Join-Path $programDataRoot 'config\manager.yaml'
 if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
     throw "Manager config is missing: $configPath"
 }
-$python = Resolve-Python
-Write-Output "Plasma Manager Python runtime: $python"
 $runtime = Join-Path $PSScriptRoot '..\runtime\manager\manager.pyz'
 & $python $runtime --config $configPath
 exit $LASTEXITCODE
