@@ -96,7 +96,7 @@ jobs:
       - name: Install pinned WiX Toolset build CLI
         shell: pwsh
         run: |
-          dotnet tool install --global wix --version 4.0.6
+          dotnet tool install --global wix --version 5.0.2
           wix --version
       - name: Build unsigned Windows MSI pilot
         shell: pwsh
