@@ -50,8 +50,13 @@ def test_winsw_hash_fails_closed(tmp_path: Path) -> None:
 def test_windows_service_launchers_cover_empty_alias_and_python_probe_regressions() -> None:
     manager = (REPO_ROOT / "packaging" / "windows" / "run-manager.ps1").read_text(encoding="utf-8")
     console = (REPO_ROOT / "packaging" / "windows" / "run-console.ps1").read_text(encoding="utf-8")
+    assert "Get-MachineRegisteredPythonCandidates" in manager
+    assert "HKLM:\\SOFTWARE\\Python\\PythonCore" in manager
+    assert "HKLM:\\SOFTWARE\\WOW6432Node\\Python\\PythonCore" in manager
+    assert "ExecutablePath" in manager
     assert "& $candidate --version" in manager
     assert "-replace '^Python\\s+', ''" in manager
+    assert "Per-user-only Python installations are not supported" in manager
     assert "-c 'import sys;" not in manager
     assert "$null -ne $aliasContent" in console
     assert "([string]$aliasContent).Trim()" in console
