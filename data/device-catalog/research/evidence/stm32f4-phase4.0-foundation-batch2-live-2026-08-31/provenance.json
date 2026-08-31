@@ -1,0 +1,55 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_time_utc": {
+    "control": "2026-08-31T01:35:57Z",
+    "pilot_first": "2026-08-31T01:35:57Z",
+    "pilot_last": "2026-08-31T01:36:17Z"
+  },
+  "acquisition_transport": "chromium_rendered_dom",
+  "baseline": {
+    "pilot_id": "stm32f4-phase4.0-foundation-batch2-2026-08-31",
+    "schema_version": 1,
+    "sha256": "a5fb7b5462288449b5ade9866eaf84964a25862014bbc298f1b0008c8797dc1a"
+  },
+  "canonical_dataset_admission": false,
+  "chromium_version": "151.0.7922.34",
+  "evaluator_result": "scale_ready",
+  "evidence_id": "stm32f4-phase4.0-foundation-batch2-2026-08-31-retained-20260831T013557Z-8979938",
+  "exact_icpn_candidate_count": 17,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F401CC",
+      "icpn": "STM32F401CCF6TR",
+      "marketing_status": "Preview Product is in design stage. EN"
+    },
+    {
+      "base_device": "STM32F405VG",
+      "icpn": "STM32F405VGT6V",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "base_device": "STM32F405VG",
+      "icpn": "STM32F405VGT6W",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "base_device": "STM32F405ZG",
+      "icpn": "STM32F405ZGT6V",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "base_device": "STM32F405ZG",
+      "icpn": "STM32F405ZGT6W",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "executed_git_sha": "897993899aae3e9796a20463f22eb5bd73f70844",
+  "headed": true,
+  "manufacturer": "STMicroelectronics",
+  "playwright_version": "1.62.0",
+  "scale_ready": true,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 6
+}
