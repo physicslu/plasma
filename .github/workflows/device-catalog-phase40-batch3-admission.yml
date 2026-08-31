@@ -47,7 +47,7 @@ jobs:
           plan_path = Path('phase40-batch3-admission/admission-plan.json')
           plan = json.loads(plan_path.read_text(encoding='utf-8'))
           expected = {'admit': 11, 'already_present': 0, 'manual_review_required': 0, 'reject': 0}
-          if plan.get('decision_counts') != expected or plan.get('conflicts') != [] or plan.get('candidate_count') != 11:
+          if plan.get('decision_counts') != expected or plan.get('conflicts') != 0 or plan.get('candidate_count') != 11:
               raise SystemExit(f'unclean batch3 admission plan: {plan.get("decision_counts")} conflicts={plan.get("conflicts")}')
           source = root / 'stm32f4-commercial-icpn.csv'
           out = Path('phase40-batch3-admission/stm32f4-commercial-icpn.after.csv')
