@@ -160,10 +160,9 @@ def _write_smoke_config(program_data: Path) -> None:
     (config / "selected-ppu-alias").write_text("installer-smoke-ppu\n", encoding="utf-8")
 
 
-def _browser_fetch(deadline_s: float = 25) -> None:
-    node = shutil.which("node.exe") or shutil.which("node")
-    if not node:
-        raise InstallerAcceptanceError("Node.js is unavailable to run browser-style Fetch smoke")
+def _browser_fetch(node: Path, deadline_s: float = 25) -> None:
+    if not node.is_file():
+        raise InstallerAcceptanceError(f"bundled Node.js is unavailable for browser-style Fetch smoke: {node}")
     script = r'''const url = process.argv[1];
 const deadline = Date.now() + Number(process.argv[2]);
 const payload = { endpoint: "ps", timeout_ms: 100, payload: "windows-installer-smoke" };
@@ -190,7 +189,7 @@ while (Date.now() < deadline) {
 console.error(last);
 process.exit(2);'''
     result = _run(
-        [node, "--input-type=module", "-e", script,
+        [str(node), "--input-type=module", "-e", script,
          f"http://127.0.0.1:{CONSOLE_PORT}/api/manager/diagnostics/loopback", str(int(deadline_s * 1000))],
         check=False, timeout=deadline_s + 10,
     )
@@ -204,6 +203,38 @@ def _find_release(program_files: Path) -> Path:
     if len(candidates) != 1:
         raise InstallerAcceptanceError(f"expected one installed release, found {len(candidates)} under {releases}")
     return candidates[0]
+
+
+def _assert_bundled_runtime_contract(release: Path) -> tuple[Path, Path]:
+    manifest_path = release / "windows-installer.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise InstallerAcceptanceError(f"cannot read installed Windows manifest: {exc}") from exc
+    if manifest.get("runtime_ownership") != "bundled":
+        raise InstallerAcceptanceError("installed Windows manifest does not declare bundled runtime ownership")
+    if "external_prerequisites" in manifest:
+        raise InstallerAcceptanceError("installed Windows manifest still declares external runtime prerequisites")
+
+    python = release / "host-runtime" / "python" / "python.exe"
+    node = release / "host-runtime" / "node" / "node.exe"
+    for path in (python, node):
+        if not path.is_file():
+            raise InstallerAcceptanceError(f"bundled runtime executable is missing: {path}")
+
+    manager_probe = _powershell(f"& '{release / 'bin' / 'run-manager.ps1'}' -PreflightOnly")
+    expected_python = f"Plasma Manager bundled Python runtime: {python.resolve()}"
+    if expected_python not in manager_probe.stdout:
+        raise InstallerAcceptanceError(
+            f"Manager launcher did not bind to installed bundled Python: {manager_probe.stdout.strip()}"
+        )
+    console_probe = _powershell(f"& '{release / 'bin' / 'run-console.ps1'}' -PreflightOnly")
+    expected_node = f"Plasma Console bundled Node.js runtime: {node.resolve()}"
+    if expected_node not in console_probe.stdout:
+        raise InstallerAcceptanceError(
+            f"Console launcher did not bind to installed bundled Node.js: {console_probe.stdout.strip()}"
+        )
+    return python, node
 
 
 def run_acceptance(msi: Path) -> None:
@@ -223,6 +254,8 @@ def run_acceptance(msi: Path) -> None:
     release = _find_release(program_files)
     required = (
         release / "runtime" / "console" / "server.js", release / "runtime" / "manager" / "manager.pyz",
+        release / "host-runtime" / "python" / "python.exe", release / "host-runtime" / "python" / "LICENSE.txt",
+        release / "host-runtime" / "node" / "node.exe", release / "host-runtime" / "node" / "LICENSE.txt",
         release / "bin" / "plasma-manager-service.exe", release / "bin" / "plasma-manager-service.xml",
         release / "bin" / "plasma-console-service.exe", release / "bin" / "plasma-console-service.xml",
         release / "THIRD_PARTY_LICENSES" / "WinSW.txt", program_data / "config" / "manager.yaml",
@@ -231,21 +264,23 @@ def run_acceptance(msi: Path) -> None:
     for path in required:
         if not path.exists():
             raise InstallerAcceptanceError(f"installed path is missing: {path}")
+    _, bundled_node = _assert_bundled_runtime_contract(release)
     if _service_state(MANAGER_SERVICE) != "Running" or _service_state(CONSOLE_SERVICE) != "Running":
         raise InstallerAcceptanceError("MSI did not register and start both SCM services")
     _wait_manager()
     _wait_console()
+    print("Windows installer self-contained runtime binding: PASS", flush=True)
     print("Windows installer initial SCM launch: PASS", flush=True)
 
     _write_smoke_config(program_data)
     _stop_services()
     _start_services()
-    _browser_fetch()
+    _browser_fetch(bundled_node)
     print("Windows installer Browser -> Console/BFF -> Manager: PASS", flush=True)
 
     _stop_services()
     _start_services()
-    _browser_fetch()
+    _browser_fetch(bundled_node)
     print("Windows installer SCM restart persistence: PASS", flush=True)
 
     _stop_services()
