@@ -4,7 +4,6 @@ import "./globals.css";
 import "./details.css";
 import "./global-nav.css";
 import "./security-transport.css";
-import { DEFAULT_API_BASE } from "./plasma-api";
 import { GlobalNav } from "./global-nav";
 import { I18nProvider } from "./i18n";
 import { SecurityTransportProvider } from "./security-transport-provider";
@@ -16,34 +15,17 @@ const apiBaseStorageMigration = `
 (() => {
   try {
     const versionKey = "plasma-api-base-version";
-    const migrationComplete = window.localStorage.getItem(versionKey) === "2";
+    const migrationComplete = window.localStorage.getItem(versionKey) === "3";
     const apiKey = "plasma-api-base";
-    const configuredDefaultApiBase = ${JSON.stringify(DEFAULT_API_BASE)};
-    const defaultApiBase = configuredDefaultApiBase
-      ? new URL(configuredDefaultApiBase).toString().replace(/\\/$/, "")
-      : window.location.origin;
-    const savedApi = window.localStorage.getItem(apiKey);
-    if (savedApi) {
-      try {
-        const normalized = new URL(savedApi).toString().replace(/\\/$/, "");
-        const legacyApiBases = new Set([
-          "https://swpc.tail820e64.ts.net",
-          "https://swpc.tail820e64.ts.net:8443",
-          "http://127.0.0.1:8080",
-        ]);
-        if (normalized === defaultApiBase || (!migrationComplete && legacyApiBases.has(normalized))) {
-          window.localStorage.removeItem(apiKey);
-        }
-      } catch {
-        window.localStorage.removeItem(apiKey);
-      }
-    }
-
     if (!migrationComplete) {
-      window.localStorage.setItem(versionKey, "2");
+      // Schema v3 retires Browser-owned direct Gateway endpoints. Clear any
+      // previously stored absolute endpoint and let runtime routing resolve to
+      // same-origin standalone or Manager-owned managed transport.
+      window.localStorage.removeItem(apiKey);
+      window.localStorage.setItem(versionKey, "3");
     }
   } catch {
-    // Storage may be unavailable; the normal DEFAULT_API_BASE path still works.
+    // Storage is optional; runtime routing remains authoritative.
   }
 })();
 `;
