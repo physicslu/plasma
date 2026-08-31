@@ -154,6 +154,23 @@ def _assert_console_static_assets() -> None:
             )
 
 
+def _assert_clean_install_managed_routing() -> None:
+    status, payload = _request_json(f"http://127.0.0.1:{CONSOLE_PORT}/api/manager/ppu")
+    if status != 503:
+        raise InstallerAcceptanceError(
+            f"clean-install Manager routing discovery returned HTTP {status}; expected 503 without a selected PPU"
+        )
+    if payload.get("managed") is not True or payload.get("configured") is not False:
+        raise InstallerAcceptanceError(
+            f"clean-install Console is not fail-closed in managed mode: {payload}"
+        )
+    error = payload.get("error")
+    if not isinstance(error, dict) or error.get("code") != "manager_bff_misconfigured":
+        raise InstallerAcceptanceError(
+            f"clean-install managed routing returned an unexpected error contract: {payload}"
+        )
+
+
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -324,9 +341,11 @@ def run_acceptance(msi: Path) -> None:
     _wait_manager()
     _wait_console()
     _assert_console_static_assets()
+    _assert_clean_install_managed_routing()
     print("Windows installer self-contained runtime binding: PASS", flush=True)
     print("Windows installer initial SCM launch: PASS", flush=True)
     print("Windows installer Console static assets: PASS", flush=True)
+    print("Windows installer clean-install managed routing: PASS", flush=True)
 
     _write_smoke_config(program_data)
     _stop_services()
