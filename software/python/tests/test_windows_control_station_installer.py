@@ -25,7 +25,7 @@ def test_windows_installer_contract_constants_are_pinned() -> None:
     module = _load()
     assert module.WINSW_VERSION == "2.12.0"
     assert module.WINSW_X64_SHA256 == "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da"
-    assert module.WIX_TOOLSET_VERSION == "4.0.6"
+    assert module.WIX_TOOLSET_VERSION == "5.0.2"
     assert module.normalize_architecture("AMD64") == "x86_64"
     with pytest.raises(module.WindowsInstallerError):
         module.normalize_architecture("arm64")
@@ -91,6 +91,7 @@ def test_stage_and_wix_source_keep_scm_and_mutable_config_boundaries(tmp_path: P
         output_path=wxs,
     )
     text = wxs.read_text(encoding="utf-8")
+    assert '<Files Directory="PlasmaVersion"' in text
     assert 'Name="PlasmaManager"' in text
     assert 'Name="PlasmaControlStationConsole"' in text
     assert 'ServiceDependency Id="PlasmaManager"' in text
