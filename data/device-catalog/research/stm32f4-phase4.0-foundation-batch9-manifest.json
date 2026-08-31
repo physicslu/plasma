@@ -11,6 +11,26 @@
       "base_device": "STM32F429ZE",
       "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ze.html",
       "selection_reason": "fresh post-Batch8 policy-ready STM32F429 gap selected as a bounded same-series flash-density variant under the current admission policy"
+    },
+    {
+      "base_device": "STM32F469VE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ve.html",
+      "selection_reason": "fresh post-Batch8 policy-ready STM32F469 gap selected for the bounded new-series introduction under the current admission policy"
+    },
+    {
+      "base_device": "STM32F469VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469vg.html",
+      "selection_reason": "fresh post-Batch8 policy-ready STM32F469 V-package capacity variant grouped with its adjacent F469 peers"
+    },
+    {
+      "base_device": "STM32F469VI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469vi.html",
+      "selection_reason": "fresh post-Batch8 policy-ready STM32F469 V-package capacity variant grouped with its adjacent F469 peers"
+    },
+    {
+      "base_device": "STM32F469ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ze.html",
+      "selection_reason": "fresh post-Batch8 policy-ready STM32F469 Z-package variant included within the six-target acquisition bound"
     }
   ]
 }
