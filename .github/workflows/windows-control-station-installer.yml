@@ -106,21 +106,28 @@ jobs:
             --release-artifact $release.FullName `
             --winsw-exe "${{ runner.temp }}\WinSW-x64.exe" `
             --output-dir "${{ runner.temp }}\plasma-windows-installer"
-      - name: Expose stable system-wide external runtimes to SCM pilot
+      - name: Expose machine-wide external runtimes to SCM pilot
         shell: pwsh
         run: |
           $node = (Get-Command node.exe).Source
           $python = (Get-Command python.exe).Source
+
           $nodeTarget = Join-Path $env:ProgramFiles 'nodejs'
-          $pythonTarget = Join-Path $env:ProgramFiles 'Python312'
           if (-not (Test-Path $nodeTarget)) {
             New-Item -ItemType Junction -Path $nodeTarget -Target (Split-Path $node -Parent) | Out-Null
           }
-          if (-not (Test-Path $pythonTarget)) {
-            New-Item -ItemType Junction -Path $pythonTarget -Target (Split-Path $python -Parent) | Out-Null
-          }
           & (Join-Path $nodeTarget 'node.exe') --version
-          & (Join-Path $pythonTarget 'python.exe') --version
+
+          # Exercise the real-host case that exposed PR #249's blind spot:
+          # Python may be installed system-wide at a custom location rather than
+          # C:\Program Files\Python31x and may not be present in the service PATH.
+          # PEP 514 HKLM registration is the machine-owned discovery contract.
+          $pythonRoot = Split-Path $python -Parent
+          $pythonKey = 'HKLM:\SOFTWARE\Python\PythonCore\3.12\InstallPath'
+          New-Item -Path $pythonKey -Force | Out-Null
+          Set-Item -Path $pythonKey -Value $pythonRoot
+          New-ItemProperty -Path $pythonKey -Name ExecutablePath -Value $python -PropertyType String -Force | Out-Null
+          Write-Host "Registered machine-wide Python for SCM acceptance: $python"
       - name: Install, launch, restart, stop/start, and uninstall
         shell: pwsh
         run: |
