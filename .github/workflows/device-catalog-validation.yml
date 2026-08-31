@@ -80,6 +80,24 @@ jobs:
             --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-f446-batch1-live-2026-08-30 \
             --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json
           python data/device-catalog/research/test_stm32f4_phase4_0_f446_post_admission.py
+      - name: Inventory STM32F4 production coverage gaps
+        run: |
+          python data/device-catalog/research/stm32f4_coverage_gap_inventory.py \
+            --output /tmp/stm32f4-coverage-gap.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/stm32f4-coverage-gap.json').read_text())
+          print(json.dumps({
+              'production_base_devices': report['production']['base_device_count'],
+              'production_exact_icpns': report['production']['exact_icpn_rows'],
+              'openocd_base_devices': report['openocd_ordering_pattern_base_device_count'],
+              'gap_base_devices': report['gap']['base_device_count'],
+              'policy_ready_count': report['gap']['policy_ready_count'],
+              'policy_blocked_count': report['gap']['policy_blocked_count'],
+              'policy_ready_bases': [item['base_device'] for item in report['gap']['policy_ready']],
+          }, indent=2, sort_keys=True))
+          PY
       - name: Report admitted production source SHA-256
         run: |
           sha256sum data/device-catalog/research/stm32f1-commercial-icpn.csv
