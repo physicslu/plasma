@@ -1,0 +1,133 @@
+name: Device catalog Phase 4.0 foundation batch4 controlled publish
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-validated-admission:
+    if: github.event.pull_request.number == 257 && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Rebuild and bind validated admission proposal
+        env:
+          EXPECTED_PLAN_SHA256: 3b705e296c0d6770360f51ceef1f147171a4ac147cc43877bfe5fd2f52dab84f
+          EXPECTED_CSV_SHA256: f90a3a5dd94e1d43ae2ddc208c372bdfd7fdb99cc03c5848b34f3c242a051687
+          PROPOSAL_RUN_ID: "33358153417"
+          PROPOSAL_ARTIFACT_ID: "9745794283"
+        run: |
+          set -euo pipefail
+          mkdir -p phase40-foundation-batch4-publish
+          python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch4-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch4-baseline.json \
+            --canonical data/device-catalog/research/stm32f4-commercial-icpn.csv \
+            --admit-base STM32F427VI \
+            --admit-base STM32F427ZI \
+            --admit-base STM32F429VE \
+            --admit-base STM32F429VG \
+            --admit-base STM32F429VI \
+            --output phase40-foundation-batch4-publish/admission-plan.json
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import shutil
+          import sys
+          from pathlib import Path
+
+          root = Path('data/device-catalog/research')
+          out = Path('phase40-foundation-batch4-publish')
+          sys.path.insert(0, str(root))
+          from device_catalog_admission_framework import write_canonical_dataset
+          import validate_stm32f4_commercial_icpn as canonical_validator
+
+          plan_path = out / 'admission-plan.json'
+          plan = json.loads(plan_path.read_text(encoding='utf-8'))
+          expected_counts = {'admit': 13, 'already_present': 0, 'manual_review_required': 0, 'reject': 0}
+          if plan.get('candidate_count') != 13 or plan.get('decision_counts') != expected_counts:
+              raise SystemExit(f'admission decision drift: {plan.get("decision_counts")}')
+          if plan.get('conflicts') != 0 or plan.get('issues') != [] or plan.get('canonical_rows_before') != 101:
+              raise SystemExit('admission preconditions drifted')
+
+          plan_sha = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+          if plan_sha != os.environ['EXPECTED_PLAN_SHA256']:
+              raise SystemExit(f'plan SHA drift: {plan_sha}')
+
+          source = root / 'stm32f4-commercial-icpn.csv'
+          proposed = out / 'stm32f4-commercial-icpn.proposed.csv'
+          shutil.copyfile(source, proposed)
+          report = write_canonical_dataset(plan=plan, canonical_path=proposed)
+          if report.get('rows_before') != 101 or report.get('rows_after') != 114 or len(report.get('added', [])) != 13:
+              raise SystemExit(f'writer accounting drift: {report}')
+          proposed_sha = hashlib.sha256(proposed.read_bytes()).hexdigest()
+          if proposed_sha != os.environ['EXPECTED_CSV_SHA256']:
+              raise SystemExit(f'proposed CSV SHA drift: {proposed_sha}')
+
+          canonical_validator.CANONICAL = proposed
+          validation = canonical_validator.validate()
+          if validation.get('errors') or validation.get('rows') != 114 or validation.get('unique_icpns') != 114:
+              raise SystemExit(f'proposed canonical invalid: {validation}')
+
+          shutil.copyfile(proposed, source)
+          data = source.read_bytes()
+          git_blob_sha = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+
+          manifest_path = Path('data/device-catalog/production/icpn-v1-manifest.json')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          f4 = next(item for item in manifest['sources'] if item['family'] == 'STM32F4')
+          if f4.get('row_count') != 101 or f4.get('sha256') != 'affa1b94e569a771eb7b5672fadf3ad17c8914f0d5adab27bbe23386cb88364e':
+              raise SystemExit(f'production manifest F4 baseline drift: {f4}')
+          f4['row_count'] = 114
+          f4['git_blob_sha'] = git_blob_sha
+          f4['sha256'] = proposed_sha
+          manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+          audit = {
+              'schema_version': 1,
+              'phase': 'STM32F4 Phase 4.0 foundation batch4',
+              'evidence_id': 'stm32f4-phase4.0-foundation-batch4-2026-08-31-retained-20260831T044040Z-226ad4d',
+              'proposal_workflow_run_id': os.environ['PROPOSAL_RUN_ID'],
+              'proposal_artifact_id': os.environ['PROPOSAL_ARTIFACT_ID'],
+              'source_rows': 101,
+              'admitted_rows': 13,
+              'production_rows_after': 114,
+              'decision_counts': expected_counts,
+              'plan_sha256': plan_sha,
+              'canonical_sha256': proposed_sha,
+              'canonical_git_blob_sha': git_blob_sha,
+              'canonical_dataset_written': True,
+          }
+          (root / 'stm32f4-phase4.0-foundation-batch4-admission-audit.json').write_text(
+              json.dumps(audit, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(audit, indent=2, sort_keys=True))
+          PY
+      - name: Validate published branch state
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python data/device-catalog/research/validate_stm32f4_commercial_icpn.py
+          python -m plasma_web.device_catalog --manifest data/device-catalog/production/icpn-v1-manifest.json --json
+          git diff --check
+      - name: Commit validated catalog promotion to PR branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/device-catalog/research/stm32f4-commercial-icpn.csv \
+            data/device-catalog/research/stm32f4-phase4.0-foundation-batch4-admission-audit.json \
+            data/device-catalog/production/icpn-v1-manifest.json
+          git diff --cached --quiet && { echo "no publish changes produced"; exit 1; }
+          git commit -m "device-catalog: admit STM32F4 foundation batch4"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
