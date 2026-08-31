@@ -49,15 +49,6 @@ $env:PORT = '18000'
 $env:PLASMA_FLEET_UI_ENABLED = '1'
 $env:PLASMA_MANAGER_API_URL = 'http://127.0.0.1:18180'
 $env:PLASMA_MANAGER_PPU_ALIAS = $alias
-$server = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\runtime\console\server.js')).Path
-$consoleRoot = Split-Path -Parent $server
-
-Push-Location -LiteralPath $consoleRoot
-try {
-    & $node $server
-    $exitCode = $LASTEXITCODE
-}
-finally {
-    Pop-Location
-}
-exit $exitCode
+$server = Join-Path $PSScriptRoot '..\runtime\console\server.js'
+& $node $server
+exit $LASTEXITCODE
