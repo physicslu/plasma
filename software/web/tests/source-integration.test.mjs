@@ -132,8 +132,7 @@ test("uses same-origin as the default Browser route with no fixed remote Gateway
 
   assert.equal(webDefault, "");
   assert.equal(deploymentDefault, "");
-  assert.match(api, /if \(!trimmed\)/);
-  assert.match(api, /return window\.location\.origin/);
+  assert.match(api, /if \(!trimmed\) return ""/);
   assert.doesNotMatch(api, /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?\s*"https?:\/\//);
 });
 
