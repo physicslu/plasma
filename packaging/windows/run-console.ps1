@@ -30,7 +30,10 @@ function Resolve-Node {
 $programDataRoot = Join-Path $env:ProgramData 'Plasma'
 $aliasPath = Join-Path $programDataRoot 'config\selected-ppu-alias'
 $alias = ''
-if (Test-Path -LiteralPath $aliasPath -PathType Leaf) { $alias = (Get-Content -Raw -LiteralPath $aliasPath).Trim() }
+if (Test-Path -LiteralPath $aliasPath -PathType Leaf) {
+    $aliasContent = Get-Content -Raw -LiteralPath $aliasPath
+    if ($null -ne $aliasContent) { $alias = ([string]$aliasContent).Trim() }
+}
 $env:HOST = '127.0.0.1'
 $env:PORT = '18000'
 $env:PLASMA_MANAGER_API_URL = 'http://127.0.0.1:18180'
