@@ -1,0 +1,27 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32f4-phase4.0-gap-batch3-2026-08-31-retained-20260831T030223Z-9477540",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "64a81e096fa5d51387d851dee3b2259f8490f4343a123a40971628c89ea74bf4"
+    },
+    {
+      "path": "control-summary.json",
+      "sha256": "570088027b2e33d96e923d75f82a3b024fea3ba246b906138b19faeea00375d4"
+    },
+    {
+      "path": "evaluation.json",
+      "sha256": "02be287872ee4c0d437bbc150c6256d6cbe6a3b3c981beaa939a8f633aeec8a4"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "988346e121de1b34e566014273d117b367e911a2777999f71513d640acdbea36"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "c116d4df7dce00f08bac2ccb28d16517c365be03ecbc6625d3c5ae2c72f0f051"
+    }
+  ],
+  "schema_version": 1
+}
