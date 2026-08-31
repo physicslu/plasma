@@ -175,19 +175,18 @@ def main() -> None:
             env={
                 "PLASMA_FLEET_UI_ENABLED": "1",
                 "PLASMA_MANAGER_API_URL": f"http://127.0.0.1:{cd.MANAGER_PORT}",
-                "NEXT_PUBLIC_PLASMA_API_URL": f"http://127.0.0.1:{cd.PPUS[0]['gateway_port']}",
+                "PLASMA_GATEWAY_PROXY_URL": f"http://127.0.0.1:{cd.PPUS[0]['gateway_port']}",
             },
         )
         processes.append(("web", web))
         web_fleet = cd.wait_json(
             f"http://127.0.0.1:{cd.WEB_PORT}/api/fleet",
             lambda value: value.get("ok") is True,
-            host="plasma.open4th.com",
             timeout_s=45.0,
             label="Web Fleet BFF",
         )
         cd.validate_web_fleet(web_fleet)
-        cd.assert_public_routes()
+        cd.assert_local_routes()
         cd.assert_processes_alive(processes)
 
         runtime = {
