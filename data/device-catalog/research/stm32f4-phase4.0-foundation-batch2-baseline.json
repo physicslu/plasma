@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch2-2026-08-31",
+  "observation_kind": "official_st_active_orderable_surface_baseline",
+  "observed_date": "2026-08-31",
+  "canonical_dataset_admission": false,
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "exact_icpns": [
+        "STM32F401CCU6",
+        "STM32F401CCU6TR",
+        "STM32F401CCU7",
+        "STM32F401CCY6TT"
+      ]
+    },
+    {
+      "base_device": "STM32F405VG",
+      "exact_icpns": [
+        "STM32F405VGT6",
+        "STM32F405VGT6TR",
+        "STM32F405VGT7",
+        "STM32F405VGT7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F405ZG",
+      "exact_icpns": [
+        "STM32F405ZGT6",
+        "STM32F405ZGT6TR",
+        "STM32F405ZGT7",
+        "STM32F405ZGT7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F415ZG",
+      "exact_icpns": [
+        "STM32F415ZGT6"
+      ]
+    },
+    {
+      "base_device": "STM32F417VG",
+      "exact_icpns": [
+        "STM32F417VGT6",
+        "STM32F417VGT6TR",
+        "STM32F417VGT7"
+      ]
+    },
+    {
+      "base_device": "STM32F417ZG",
+      "exact_icpns": [
+        "STM32F417ZGT6"
+      ]
+    }
+  ],
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F401CC",
+      "icpn": "STM32F401CCF6TR",
+      "marketing_status": "Preview",
+      "admission": false
+    },
+    {
+      "base_device": "STM32F405VG",
+      "icpn": "STM32F405VGT6V",
+      "marketing_status": "NRND",
+      "admission": false
+    },
+    {
+      "base_device": "STM32F405VG",
+      "icpn": "STM32F405VGT6W",
+      "marketing_status": "NRND",
+      "admission": false
+    },
+    {
+      "base_device": "STM32F405ZG",
+      "icpn": "STM32F405ZGT6V",
+      "marketing_status": "NRND",
+      "admission": false
+    },
+    {
+      "base_device": "STM32F405ZG",
+      "icpn": "STM32F405ZGT6W",
+      "marketing_status": "NRND",
+      "admission": false
+    }
+  ]
+}
