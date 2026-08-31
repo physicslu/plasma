@@ -42,7 +42,8 @@ def test_web_default_and_storage_migration_are_same_origin_owned() -> None:
 def test_swpc_local_gateway_and_mock_path_remain_available_behind_same_origin() -> None:
     vite = _source("software/web/vite.config.ts")
     deployment = _source("scripts/plasmactl")
-    assert 'target: "http://127.0.0.1:18080"' in vite
+    assert 'process.env.PLASMA_GATEWAY_PROXY_URL ?? "http://127.0.0.1:18080"' in vite
+    assert "target: localGatewayProxyTarget" in vite
     assert 'engineering_mock_args=" --engineering-mock --engineering-mock-root $engineering_mock_root"' in deployment
     assert 'default_public_api_url=""' in deployment
     assert "current_config_version=6" in deployment
