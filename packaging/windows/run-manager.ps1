@@ -3,16 +3,13 @@ Set-StrictMode -Version Latest
 
 function Test-VersionAtLeast([string]$Version, [int]$Major, [int]$Minor, [int]$Patch) {
     $clean = $Version.Trim().TrimStart('v','V')
-    $parts = $clean.Split('.')
-    if ($parts.Count -lt 2) { return $false }
-    $values = @(0,0,0)
-    for ($i = 0; $i -lt [Math]::Min(3, $parts.Count); $i++) {
-        $token = ($parts[$i] -replace '[^0-9].*$', '')
-        if (-not [int]::TryParse($token, [ref]$values[$i])) { return $false }
-    }
-    if ($values[0] -ne $Major) { return $values[0] -gt $Major }
-    if ($values[1] -ne $Minor) { return $values[1] -gt $Minor }
-    return $values[2] -ge $Patch
+    $match = [regex]::Match($clean, '^(\d+)\.(\d+)(?:\.(\d+))?')
+    if (-not $match.Success) { return $false }
+    $actualPatch = 0
+    if ($match.Groups[3].Success) { $actualPatch = [int]$match.Groups[3].Value }
+    $actual = [Version]::new([int]$match.Groups[1].Value, [int]$match.Groups[2].Value, $actualPatch)
+    $required = [Version]::new($Major, $Minor, $Patch)
+    return $actual -ge $required
 }
 
 function Resolve-Python {
