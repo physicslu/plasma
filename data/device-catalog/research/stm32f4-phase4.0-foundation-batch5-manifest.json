@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch5-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F437VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vg.html",
+      "selection_reason": "production-admitted lifecycle control in the same F437/F439 technical cluster; verifies extraction and mapping stability while expanding adjacent policy-ready coverage"
+    },
+    {
+      "base_device": "STM32F437VI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vi.html",
+      "selection_reason": "policy-ready STM32F437 gap selected as part of a coherent F437/F439 bounded evidence batch"
+    },
+    {
+      "base_device": "STM32F437ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437zg.html",
+      "selection_reason": "policy-ready STM32F437 gap paired with F437VI to cover adjacent package variants under the current admission policy"
+    },
+    {
+      "base_device": "STM32F437ZI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437zi.html",
+      "selection_reason": "policy-ready STM32F437 gap extending the same technical cluster without changing admission policy"
+    },
+    {
+      "base_device": "STM32F439VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vg.html",
+      "selection_reason": "policy-ready STM32F439 gap adjacent to the admitted STM32F437VG lifecycle control"
+    },
+    {
+      "base_device": "STM32F439VI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vi.html",
+      "selection_reason": "policy-ready STM32F439 gap completing the five-new-target bounded batch while preserving a single-cluster evidence focus"
+    }
+  ]
+}
