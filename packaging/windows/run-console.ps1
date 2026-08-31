@@ -47,6 +47,7 @@ if (Test-Path -LiteralPath $aliasPath -PathType Leaf) {
 $env:HOST = '127.0.0.1'
 $env:PORT = '18000'
 $env:PLASMA_FLEET_UI_ENABLED = '1'
+$env:PLASMA_CONTROL_STATION_MODE = 'managed'
 $env:PLASMA_MANAGER_API_URL = 'http://127.0.0.1:18180'
 $env:PLASMA_MANAGER_PPU_ALIAS = $alias
 $server = Join-Path $PSScriptRoot '..\runtime\console\server.js'
