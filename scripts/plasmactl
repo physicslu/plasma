@@ -104,7 +104,7 @@ validate_manager_settings() {
 }
 
 validate_engineering_mock_settings() {
-  [[ "$engineering_mock_enabled" == "0" || "$engineering_mock_enabled == "1" ]] || \
+  [[ "$engineering_mock_enabled" == "0" || "$engineering_mock_enabled" == "1" ]] || \
     die "PLASMA_ENGINEERING_MOCK_ENABLED 只接受 0 或 1：$engineering_mock_enabled"
   [[ "$engineering_mock_root" == /* ]] || \
     die "PLASMA_ENGINEERING_MOCK_ROOT 必須是絕對路徑：$engineering_mock_root"
