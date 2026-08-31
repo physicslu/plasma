@@ -36,11 +36,11 @@ def test_plasmactl_generates_canonical_systemd_descriptions(tmp_path: Path) -> N
     assert "Description=Plasma Web REST Gateway" in gateway_unit
 
 
-def test_plasmactl_operator_text_uses_canonical_gateway_name() -> None:
+def test_plasmactl_operator_text_uses_canonical_gateway_name_without_remote_default() -> None:
     source = PLASMACTL.read_text(encoding="utf-8")
 
     assert '"Plasma Web REST Gateway"' in source
-    assert "default Plasma Web REST Gateway" in source
+    assert "default Plasma Web REST Gateway" not in source
 
     for legacy_text in (
         "Plasma multi-channel programming server",
