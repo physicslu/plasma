@@ -57,7 +57,7 @@ jobs:
               before = list(csv.DictReader(f))
           with out.open(newline='', encoding='utf-8') as f:
               after = list(csv.DictReader(f))
-          if len(before) != 85 or len(after) != 96 or result.get('rows_written') != 96:
+          if len(before) != 85 or len(after) != 96 or result.get('rows_after') != 96:
               raise SystemExit(f'unexpected canonical materialization: before={len(before)} after={len(after)} result={result}')
           metadata = {
               'canonical_rows_before': len(before),
