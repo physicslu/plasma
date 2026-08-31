@@ -35,6 +35,19 @@ EXPECTED_CANONICAL_SHA256 = "affa1b94e569a771eb7b5672fadf3ad17c8914f0d5adab27bbe
 EXPECTED_PREWRITE_PLAN_SHA256 = "05cbd105b923f1b363dedf59f0d2348a70e2daee88915206f929c31ba1821de0"
 EXPECTED_CANONICAL_GIT_BLOB = "b13f219a2496184ee4443d44164e9e449fb77529"
 PREVIEW_CONTROL = "STM32F401CCF6TR"
+PRE_BATCH3_EVIDENCE_IDS = {
+    "stm32f4-phase3.1-bounded-pilot-2026-08-30-retained-20260830T023035Z-b42d460",
+    "stm32f4-phase3.3-scaleout-batch1-2026-08-30-retained-20260830T040319Z-db7f090",
+    "stm32f4-phase3.3-scaleout-batch2-2026-08-30-retained-20260830T063333Z-cb883bb",
+    "stm32f4-phase4.0-f446-batch1-2026-08-30-retained-20260830T134444Z-e9e8e60",
+    "stm32f4-phase4.0-foundation-batch2-2026-08-31-retained-20260831T013557Z-8979938",
+}
+
+
+def _row_evidence_id(row: dict[str, str]) -> str:
+    marker = "#plasma-evidence="
+    reference = row.get("source_reference", "")
+    return reference.split(marker, 1)[1] if marker in reference else ""
 
 
 class STM32F4Phase40FoundationBatch3PostAdmissionTests(unittest.TestCase):
@@ -47,11 +60,11 @@ class STM32F4Phase40FoundationBatch3PostAdmissionTests(unittest.TestCase):
             for icpn in target["exact_icpns"]
         }
 
-    def _prewrite_canonical(self, output: Path, new_icpns: set[str]) -> None:
+    def _prewrite_canonical(self, output: Path) -> None:
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if row["icpn"] not in new_icpns]
+            rows = [row for row in reader if _row_evidence_id(row) in PRE_BATCH3_EVIDENCE_IDS]
         self.assertEqual(len(rows), 85)
         with output.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
@@ -104,7 +117,11 @@ class STM32F4Phase40FoundationBatch3PostAdmissionTests(unittest.TestCase):
         self.assertEqual(plan["decision_counts"]["reject"], 0)
         self.assertEqual(plan["conflicts"], 0)
         self.assertEqual(plan["issues"], [])
-        self.assertEqual(hashlib.sha256(CANONICAL.read_bytes()).hexdigest(), EXPECTED_CANONICAL_SHA256)
+
+        with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            current_icpns = {row["icpn"] for row in csv.DictReader(handle)}
+        self.assertTrue(self._baseline_new_icpns() <= current_icpns)
+        self.assertGreaterEqual(len(current_icpns), 101)
 
     def test_materialization_replays_85_to_101_and_is_byte_identical(self) -> None:
         new_icpns = self._baseline_new_icpns()
@@ -113,7 +130,7 @@ class STM32F4Phase40FoundationBatch3PostAdmissionTests(unittest.TestCase):
             root = Path(temp)
             canonical = root / "stm32f4-commercial-icpn.csv"
             named_evidence = root / EVIDENCE.name
-            self._prewrite_canonical(canonical, new_icpns)
+            self._prewrite_canonical(canonical)
             shutil.copytree(EVIDENCE, named_evidence)
 
             plan = build_admission_plan(
@@ -141,7 +158,6 @@ class STM32F4Phase40FoundationBatch3PostAdmissionTests(unittest.TestCase):
             self.assertEqual(second["rows_before"], 101)
             self.assertEqual(second["rows_after"], 101)
             self.assertEqual(second["added"], [])
-            self.assertEqual(canonical.read_bytes(), CANONICAL.read_bytes())
             self.assertEqual(hashlib.sha256(canonical.read_bytes()).hexdigest(), EXPECTED_CANONICAL_SHA256)
 
     def test_preview_control_remains_in_production(self) -> None:
