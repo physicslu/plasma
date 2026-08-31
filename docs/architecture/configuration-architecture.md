@@ -1,6 +1,6 @@
 # Plasma Configuration Architecture
 
-> Status: current baseline for standalone PPU deployment, optional Plasma Manager observation plus narrow Phase-0 PS Loopback relay, Engineering Mock Provider, and shared Gateway communication policy.
+> Status: current baseline for standalone integration-host deployment, managed Control Station routing, optional Plasma Manager, Engineering Mock Provider, and shared Gateway communication policy.
 
 This document defines ownership, source-of-truth, precedence, persistence, migration, and reconciliation rules for Plasma configuration. It intentionally avoids private account names, private hostnames, and workstation-specific absolute paths.
 
@@ -17,6 +17,31 @@ Every permanent configuration value needs explicit answers for:
 5. **Version/Migration** — how does persisted old state move to a new schema?
 
 Generated systemd units, environment blocks, browser bootstrap values, derived response budgets, and other derived configuration are not independent sources of truth. They must be reproducible from authoritative input.
+
+A second first-principle invariant applies to Browser routing:
+
+> The Browser owns user interaction, not deployment topology.
+
+A formal Control Station therefore routes:
+
+```text
+Browser
+  -> same-origin Console/BFF
+  -> Plasma Manager
+  -> selected PPU
+```
+
+A standalone integration host routes:
+
+```text
+Browser
+  -> same-origin Web endpoint
+  -> local Vite proxy
+  -> local Plasma Web REST Gateway
+  -> local PPU / Engineering Mock Provider
+```
+
+Neither topology requires a hard-coded remote Gateway URL in Browser source code.
 
 ## 2. Canonical domain
 
@@ -41,7 +66,8 @@ The word **Facility** is used for a factory/lab/deployment location. **Site** is
 | Domain | Examples | Owner | Authoritative source |
 |---|---|---|---|
 | Product defaults | timeout, size limit | Source code | Checked-in code/config |
-| Facility/deployment | service ports, repository path, public API URL | Deployment operator | Persistent deployment config |
+| Facility/deployment | service ports, repository path, Manager enablement | Deployment operator | Persistent deployment config |
+| Browser routing mode | managed vs standalone | Runtime/deployment | Same-origin discovery plus generated service environment |
 | PPU identity | PPU ID, model, serial identity, facility association | Device provisioning | Device-local persistent identity |
 | PPU capability | Site count, supported operations/interfaces, FPGA/Image capability | PPU runtime/hardware | Device-reported capability |
 | Gateway communication policy | PPU request timeout and retry count | Plasma Web REST Gateway | Persistent Gateway settings YAML |
@@ -53,7 +79,7 @@ The word **Facility** is used for a factory/lab/deployment location. **Site** is
 | User preference | theme, layout, visible Sites | Browser/user | Browser-local preference storage |
 | Secrets/credentials | certificates, tokens, private keys | Security/deployment layer | Protected secret storage |
 
-A browser may cache presentation preferences, but it must not become authoritative for PPU inventory, Site topology, Site capability, hardware capability, Gateway retry policy, or Gateway response budget.
+A browser may cache presentation preferences, but it must not become authoritative for PPU inventory, Site topology, Site capability, hardware capability, Gateway retry policy, Gateway response budget, Manager selection, or PPU endpoint URLs.
 
 ## 4. Deployment configuration
 
@@ -66,7 +92,7 @@ $HOME/.config/plasma/plasmactl.env
 The current deployment schema version is:
 
 ```bash
-PLASMA_CONFIG_VERSION=5
+PLASMA_CONFIG_VERSION=6
 ```
 
 Generic example:
@@ -81,7 +107,7 @@ PLASMA_GATEWAY_PORT=18080
 PLASMA_CORS_ORIGIN='*'
 PLASMA_VITE_HOST=127.0.0.1
 PLASMA_VITE_PORT=5173
-PLASMA_PUBLIC_API_URL=https://example.invalid
+PLASMA_PUBLIC_API_URL=
 PLASMA_MANAGER_ENABLED=0
 PLASMA_MANAGER_CONFIG=/path/to/manager.yaml
 PLASMA_MANAGER_PPU_ALIAS=
@@ -89,9 +115,11 @@ PLASMA_ENGINEERING_MOCK_ENABLED=0
 PLASMA_ENGINEERING_MOCK_ROOT=/path/to/runtime-state/engineering-mock
 ```
 
-`PLASMA_MANAGER_PPU_ALIAS` is the explicit PPU selected for the current narrow Manager Phase-0 BFF command path. It may remain empty when Manager is disabled. When Manager is enabled, it must identify an alias already present in `PLASMA_MANAGER_CONFIG`; deployment must not infer the first registry entry.
+`PLASMA_PUBLIC_API_URL` is retained only as a compatibility field in schema v6 and is empty by default. It is no longer the Browser's topology owner. New deployments use same-origin Browser routing.
 
-`PLASMA_MANAGER_API_URL` is generated runtime state, not another persistent operator input. `plasmactl` derives it from the local Manager bind/port and injects it together with `PLASMA_MANAGER_PPU_ALIAS` into `plasma-vite.service`.
+`PLASMA_MANAGER_PPU_ALIAS` is the explicit PPU selected for the Manager BFF command path. It may remain empty when Manager is disabled. When Manager is enabled, it must identify an alias already present in `PLASMA_MANAGER_CONFIG`; deployment must not infer the first registry entry.
+
+`PLASMA_MANAGER_API_URL`, `PLASMA_CONTROL_STATION_MODE`, and `PLASMA_FLEET_UI_ENABLED` are generated runtime environment, not independent persistent operator inputs. For Manager-enabled integration-host deployment, `plasmactl` derives the local Manager URL and emits managed-mode environment into `plasma-vite.service`.
 
 Ownership chain:
 
@@ -102,7 +130,7 @@ persistent Facility/deployment configuration
        ↓ authoritative deployment value
 validation / migration
        ↓
-generated systemd units
+generated service environment
        ↓
 active processes
 ```
@@ -136,7 +164,7 @@ sites:
 
 The current loader accepts canonical `ppu`, `server`, and `sites` fields only. Retired `programmer` / `channels` configuration and zero-based identity are rejected rather than silently translated.
 
-## 6. Precedence rules
+## 6. Routing and precedence rules
 
 There is no universal precedence chain for every setting. Precedence is domain-specific.
 
@@ -150,21 +178,27 @@ There is no universal precedence chain for every setting. Precedence is domain-s
 ### Browser/user preference
 
 ```text
-1. valid browser-local preference
+1. valid browser-local presentation preference
 2. UI product default
 ```
 
-### Transitional browser API override
+### Browser API routing
 
-The prototype may allow an operator-entered API Base for development convenience:
+Direct Browser ownership of a remote Gateway endpoint is retired.
+
+Standalone integration-host mode uses the Browser's current origin. Local Vite routing proxies PPU-local API namespaces to the local Gateway, currently `127.0.0.1:18080` by default.
+
+Managed Control Station mode uses the same-origin Manager/BFF namespace. The Browser does not receive or edit the selected PPU Gateway URL.
 
 ```text
-valid explicit browser API override
-    ↓
-deployed default API Base
+standalone:
+Browser -> same origin -> local proxy -> Gateway
+
+managed:
+Browser -> same origin -> Console/BFF -> Manager -> selected PPU
 ```
 
-This value is not topology truth and must not evolve into a browser-owned PPU registry.
+An old Browser-local absolute API Base is migration input only. It is not retained as current topology truth.
 
 ### PPU capability
 
@@ -196,13 +230,7 @@ The Browser may derive an outer HTTP watchdog from `ppu_response_budget_ms` plus
 
 Configuration that survives a software upgrade requires an explicit schema/version strategy.
 
-A migration must be:
-
-- deterministic;
-- bounded to known old schemas/values;
-- idempotent;
-- non-destructive to unknown operator overrides unless the schema contract explicitly requires it;
-- covered by regression tests.
+A migration must be deterministic, bounded, idempotent, fail closed on unsupported future schemas, and covered by regression tests. Operator-owned values may be intentionally retired only when a new schema explicitly changes ownership.
 
 Migration flow:
 
@@ -220,9 +248,11 @@ persist new schema
 reconcile derived runtime state
 ```
 
-Known historical defaults may migrate to the current canonical default. Unknown/custom values remain explicit operator overrides. Already-versioned values are not repeatedly reinterpreted.
+Schema v5 added `PLASMA_MANAGER_PPU_ALIAS`. Migration preserved an existing explicit value; otherwise it added an empty value. It did not infer a command target from Manager registry ordering.
 
-Schema v5 adds `PLASMA_MANAGER_PPU_ALIAS`. Migration preserves an existing explicit value; otherwise it adds an empty value. It does not infer a command target from Manager registry ordering. This means a pre-v5 deployment with Manager enabled must explicitly select a valid registered alias before runtime reconciliation can succeed.
+Schema v6 retires Browser-owned direct Gateway endpoints. Migration deliberately clears `PLASMA_PUBLIC_API_URL`, including prior custom values, because those values represented an ownership model that no longer exists. The local Gateway and Engineering Mock Provider are not removed; they remain reachable through same-origin integration-host routing.
+
+Browser storage has a parallel migration boundary. Browser API-base storage schema v3 clears previously stored absolute API endpoints so runtime routing can resolve to same-origin standalone or Manager-owned managed transport.
 
 Wire-protocol evolution is separate from deployment-config schema versioning. Protocol v3.3 / `PLASMA33` uses one-based `site_id`; retired zero-based Channel identity is not a current migration input.
 
@@ -265,13 +295,16 @@ theme
 visible-Site preference
 layout preference
 language preference
-transitional development API Base override
 ```
+
+A legacy Browser API Base may appear only as migration input and must be cleared by the current storage migration.
 
 The following must not become authoritative browser state:
 
 ```text
 PPU inventory
+PPU endpoint URLs
+selected PPU routing truth
 PPU Site count
 Site enable/disable truth
 PPU hardware interfaces/capability
@@ -304,28 +337,42 @@ Conceptual status/capability shape:
 
 The exact capability schema may evolve, but ownership does not: PPU identity and capability originate from the PPU/device side.
 
-## 11. Optional multi-PPU observation and narrow diagnostic relay
+## 11. Control Station, Manager, and standalone integration host
 
-The standalone path remains one PPU Console communicating with one local Gateway and Plasma Server. The repository also implements an optional Plasma Manager and the PMode Factory Console:
+The formal Control Station path is:
 
 ```text
-Control Console
+Control Station Browser
         |
         v
-Plasma Manager (optional fleet control plane)
+same-origin Console/BFF
         |
-        +-- PPU A Gateway -> local execution
-        +-- PPU B Gateway -> local execution
-        +-- PPU C Gateway -> local execution
+        v
+Plasma Manager
+        |
+        +-- selected PPU A Gateway -> local execution
+        +-- selected PPU B Gateway -> local execution
+        +-- selected PPU C Gateway -> local execution
 ```
 
-Current Manager observation behavior is manual registry plus read-only liveness/readiness/topology aggregation. The only current write-like exception is the fixed Phase-0 PS Loopback pass-through for one explicitly selected registered PPU alias. It is not a generic proxy and does not establish general Job/Batch command routing.
+The packaged Windows and macOS Control Station runtime must start in managed mode. A clean installation with no selected PPU fails closed at the Manager/BFF routing boundary; it must not silently fall back to a remote or remembered Gateway endpoint.
 
-Manager does not currently own scheduling, discovery, authentication policy, Programming Asset rollout, general Fleet write orchestration, or PPU execution. Each PPU remains locally autonomous and owns Site scheduling, protocol timing, safety and recovery.
+The standalone integration-host path remains valid for development, Engineering Mock, and PPU-local operation:
 
-For same-host Manager BFF deployment, `plasmactl` derives the local Manager URL from `PLASMA_MANAGER_CONFIG` and injects that derived URL plus the explicit `PLASMA_MANAGER_PPU_ALIAS` into the Vite runtime. An external Manager bind is not accepted as an implicit BFF route.
+```text
+Browser
+   |
+   v
+same-origin Vite runtime
+   |
+   v
+local Gateway
+   |
+   +-- Plasma Server / PPU execution
+   `-- Engineering Mock Provider when enabled
+```
 
-The browser must not fan out directly to a stored list of PPU URLs as the long-term fleet architecture.
+Manager does not move Site scheduling, protocol timing, target safety, or recovery ownership into the Browser. Each PPU remains responsible for its local execution domain.
 
 ## 12. Secrets and credentials
 
@@ -348,7 +395,8 @@ Operators should progressively be able to answer:
 ```text
 What source version is running?
 What config schema is loaded?
-What public API Base is effective?
+Is Browser routing standalone or managed?
+Which PPU alias is selected by Manager?
 What ports are active?
 What Facility / PPU identity is active?
 What Site topology/capability is active?
@@ -362,21 +410,24 @@ A future structured read-only effective-configuration/status endpoint may reduce
 
 | Key / concept | Domain | Owner | Source of Truth | Notes |
 |---|---|---|---|---|
-| `PLASMA_CONFIG_VERSION` | Facility/deployment | Deployment | `plasmactl.env` | Controls deployment migration |
+| `PLASMA_CONFIG_VERSION` | Facility/deployment | Deployment | `plasmactl.env` | Current schema v6 |
 | `PLASMA_REPO` | Facility/deployment | Deployment | `plasmactl.env` | Host-specific repository location |
 | `PLASMA_BRANCH` | Facility/deployment | Deployment | `plasmactl.env` | Normal deployment branch is `main` |
 | `PLASMA_GATEWAY_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Gateway bind input |
 | `PLASMA_GATEWAY_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current deployment default 18080 |
-| `PLASMA_VITE_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Development/demo Web binding |
+| `PLASMA_VITE_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Integration-host Web binding |
 | `PLASMA_VITE_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current default 5173 |
-| `PLASMA_PUBLIC_API_URL` | Facility/deployment | Deployment | `plasmactl.env` | Public API Base configuration |
-| `PLASMA_MANAGER_ENABLED` | Facility/deployment | Deployment | `plasmactl.env` | Optional; default `0` |
+| `PLASMA_PUBLIC_API_URL` | Compatibility | Deployment migration | `plasmactl.env` | Empty in schema v6; direct Browser endpoint ownership retired |
+| `PLASMA_MANAGER_ENABLED` | Facility/deployment | Deployment | `plasmactl.env` | Optional on integration host; default `0` |
 | `PLASMA_MANAGER_CONFIG` | Fleet control plane | Deployment | Operator-local YAML path | Required only when Manager is enabled |
-| `PLASMA_MANAGER_PPU_ALIAS` | Fleet command target | Deployment | `plasmactl.env` | Required with Manager enabled; must match a registered alias |
-| `PLASMA_MANAGER_API_URL` | Derived runtime | Deployment generator | Generated Vite systemd environment | Derived from local Manager config; not independent truth |
+| `PLASMA_MANAGER_PPU_ALIAS` | Fleet command target | Deployment | `plasmactl.env` or packaged selection file | Required for configured Manager command routing |
+| `PLASMA_MANAGER_API_URL` | Derived runtime | Deployment generator | Generated service environment | Local Manager URL; not independent truth |
+| `PLASMA_CONTROL_STATION_MODE` | Derived runtime | Packager/deployment generator | Generated service environment | `managed` for formal Control Station |
+| `PLASMA_FLEET_UI_ENABLED` | Derived runtime | Packager/deployment generator | Generated service environment | Enabled for formal Control Station |
 | `PLASMA_ENGINEERING_MOCK_ENABLED` | Test runtime | Deployment | `plasmactl.env` | Optional; default `0` |
 | `PLASMA_ENGINEERING_MOCK_ROOT` | Test runtime | Deployment | Operator-local state path | Must remain outside the Git worktree |
-| `NEXT_PUBLIC_PLASMA_API_URL` | Derived runtime | Deployment generator | Generated systemd environment | Not independent truth |
+| `NEXT_PUBLIC_PLASMA_API_URL` | Legacy/explicit build input | Deployment/build | Environment when deliberately supplied | No hard-coded remote fallback |
+| Same-origin Browser API base | Browser transport | Runtime | `window.location.origin` | Default standalone Browser route |
 | Gateway PPU timeout/retry | Gateway policy | Gateway | Persistent Gateway settings YAML | Frozen into each Batch snapshot |
 | `ppu_response_budget_ms` | Derived Gateway policy | Gateway | Calculated from timeout/retry/backoff | Read-only; not persisted/writable |
 | Browser HTTP watchdog | Derived transport guard | Browser | Gateway response budget + margin | Not a PPU policy source |
@@ -391,11 +442,12 @@ A future structured read-only effective-configuration/status endpoint may reduce
 ```text
 1. Keep configuration ownership and source-of-truth explicit
 2. Keep deployment configuration versioned and reconcilable
-3. Keep topology/capability truth out of browser storage
+3. Keep Browser routing same-origin and topology out of browser storage
 4. Keep canonical Site identity one-based across new layers
-5. Keep Manager observation and narrow diagnostic relay separate from general Batch command ownership
+5. Keep Manager control-plane routing separate from PPU-local execution ownership
 6. Keep Gateway communication policy server-owned and derived budgets read-only
-7. Add effective-config observability where ambiguity remains operationally costly
+7. Keep Engineering Mock available without reintroducing direct Browser Gateway ownership
+8. Add effective-config observability where ambiguity remains operationally costly
 ```
 
 Do not build a large generic configuration framework merely because configuration exists. Add abstraction only when repeated concrete requirements justify it.
@@ -410,6 +462,5 @@ Do not build a large generic configuration framework merely because configuratio
 - What belongs in target-profile data versus PPU capability data?
 - Which configuration changes require restart versus safe hot reload?
 - What effective-configuration information is safe to expose through an API?
-- When should the browser API Base override be removed or restricted for production?
 
 Resolve these questions from system requirements and executable constraints, not from convenience of a particular UI implementation.

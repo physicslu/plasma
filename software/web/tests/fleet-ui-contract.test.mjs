@@ -11,11 +11,11 @@ async function workerFor(name) {
 const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 
-test("public Plasma host sends root users to the product-mode landing page", async () => {
-  const worker = await workerFor("demo-root");
-  const response = await worker.fetch(new Request("https://plasma.open4th.com/", { headers: { accept: "text/html" }, redirect: "manual" }), env, ctx);
-  assert.ok([301, 302, 307, 308].includes(response.status));
-  assert.equal(new URL(response.headers.get("location"), "https://plasma.open4th.com").pathname, "/demo");
+test("root behavior no longer depends on a public deployment hostname", async () => {
+  const worker = await workerFor("host-independent-root");
+  const response = await worker.fetch(new Request("https://legacy-console.invalid/", { headers: { accept: "text/html" }, redirect: "manual" }), env, ctx);
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), />SITE MATRIX</);
 });
 
 test("non-public local root keeps the original PPU console behavior", async () => {
@@ -190,8 +190,10 @@ test("fleet BFF source keeps Manager loopback-only and latest-job summaries brow
   assert.doesNotMatch(contract, /output_files/);
   assert.doesNotMatch(contract, /firmware/);
   assert.match(vite, /\^\/api\/\(\?!fleet/);
-  assert.match(vite, /target: "http:\/\/127\.0\.0\.1:18080"/);
+  assert.match(vite, /PLASMA_GATEWAY_PROXY_URL\s*\?\?\s*"http:\/\/127\.0\.0\.1:18080"/);
+  assert.match(vite, /target: localGatewayProxyTarget/);
   assert.match(vite, /PLASMA_FLEET_UI_ENABLED:\s*process\.env\.PLASMA_FLEET_UI_ENABLED\s*\?\?\s*"0"/);
+  assert.match(vite, /PLASMA_CONTROL_STATION_MODE:\s*process\.env\.PLASMA_CONTROL_STATION_MODE\s*\?\?\s*""/);
   assert.match(vite, /PLASMA_MANAGER_API_URL:\s*process\.env\.PLASMA_MANAGER_API_URL/);
   assert.match(vite, /vars:\s*fleetWorkerVars/);
   assert.match(vite, /nodejs_compat_populate_process_env/);

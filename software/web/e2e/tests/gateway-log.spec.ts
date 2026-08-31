@@ -1,6 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-const defaultGateway = "https://plasma.open4th.com";
 const wrongGateway = "https://wrong-gateway.example.invalid";
 
 function channels() {
@@ -34,8 +33,7 @@ async function openOnlineConsole(page: Page) {
     }
 
     if (
-      url.origin === defaultGateway
-      && request.method() === "GET"
+      request.method() === "GET"
       && url.pathname === "/api/status"
       && !url.searchParams.has("job")
     ) {
@@ -53,7 +51,7 @@ async function openOnlineConsole(page: Page) {
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
   await expect(page.getByLabel("Live job log")).toContainText(
-    `Plasma Web REST Gateway connected · ${defaultGateway}`,
+    "Plasma Web REST Gateway connected",
   );
 }
 

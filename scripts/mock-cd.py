@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import http.client
 import json
 import os
 import signal
@@ -259,28 +258,21 @@ def validate_web_fleet(payload: dict[str, Any]) -> None:
             raise MockCDError("unexpected current Site capacity")
 
 
-def assert_public_routes() -> None:
-    connection = http.client.HTTPConnection("127.0.0.1", WEB_PORT, timeout=3)
-    connection.request("GET", "/", headers={"Host": "plasma.open4th.com"})
-    response = connection.getresponse()
-    location = response.getheader("Location")
-    response.read()
-    connection.close()
-    if response.status not in {307, 308} or location != "/demo":
-        raise MockCDError(f"public root routing status={response.status} location={location!r}")
-    log("PASS public root -> /demo")
-
+def assert_local_routes() -> None:
     for path, marker in (
+        ("/", "SITE MATRIX"),
         ("/demo", "Choose a Demo"),
         ("/ppu", "SITE MATRIX"),
         ("/fleet", "Factory Production Console"),
     ):
-        request = Request(f"http://127.0.0.1:{WEB_PORT}{path}", headers={"Host": "plasma.open4th.com"})
+        request = Request(f"http://127.0.0.1:{WEB_PORT}{path}")
         with urlopen(request, timeout=3) as response_obj:
+            if int(response_obj.status) != 200:
+                raise MockCDError(f"{path} returned HTTP {response_obj.status}")
             html = response_obj.read().decode("utf-8", errors="replace")
         if marker not in html:
             raise MockCDError(f"{path} missing expected marker: {marker}")
-        log(f"PASS route {path}")
+        log(f"PASS same-origin route {path}")
 
 
 def dump_failure_logs() -> None:
@@ -317,7 +309,7 @@ def run() -> None:
         "two_ppu_heterogeneous_topology": "PENDING",
         "worker_binding": "PENDING",
         "browser_contract_sanitization": "PENDING",
-        "public_demo_routing": "PENDING",
+        "local_product_routing": "PENDING",
     }
     work = Path(tempfile.mkdtemp(prefix="plasma-mock-cd-"))
     try:
@@ -398,14 +390,13 @@ def run() -> None:
             env={
                 "PLASMA_FLEET_UI_ENABLED": "1",
                 "PLASMA_MANAGER_API_URL": f"http://127.0.0.1:{MANAGER_PORT}",
-                "NEXT_PUBLIC_PLASMA_API_URL": f"http://127.0.0.1:{PPUS[0]['gateway_port']}",
+                "PLASMA_GATEWAY_PROXY_URL": f"http://127.0.0.1:{PPUS[0]['gateway_port']}",
             },
         )
         processes.append(("web", web))
         web_fleet = wait_json(
             f"http://127.0.0.1:{WEB_PORT}/api/fleet",
             lambda value: value.get("ok") is True,
-            host="plasma.open4th.com",
             timeout_s=45.0,
             label="Web Fleet BFF",
         )
@@ -414,8 +405,8 @@ def run() -> None:
         scenarios["browser_contract_sanitization"] = "PASS"
         log("PASS Web Fleet browser contract sanitization")
 
-        assert_public_routes()
-        scenarios["public_demo_routing"] = "PASS"
+        assert_local_routes()
+        scenarios["local_product_routing"] = "PASS"
         assert_processes_alive(processes)
 
         write_acceptance("PASS", scenarios)

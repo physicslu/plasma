@@ -141,9 +141,9 @@ test("real Gateway reports offline and recovers cleanly", async ({ page }) => {
 
   const gatewayInput = page.getByLabel("Plasma Web REST Gateway URL");
   const connected = liveLog(page).locator("span")
-    .filter({ hasText: "Plasma Web REST Gateway connected" })
-    .filter({ hasText: gatewayUrl });
+    .filter({ hasText: "Plasma Web REST Gateway connected" });
   await expect(connected).toHaveCount(1);
+  await expect(connected.first()).not.toContainText(gatewayUrl);
 
   await gatewayInput.fill(unreachableGatewayUrl);
   await page.getByRole("button", { name: "連線" }).click();
@@ -159,6 +159,7 @@ test("real Gateway reports offline and recovers cleanly", async ({ page }) => {
   await page.getByRole("button", { name: "連線" }).click();
   await expect(page.locator(".gatewayHealth")).toContainText("Online", { timeout: 15_000 });
   await expect(connected).toHaveCount(2);
+  await expect(connected.last()).toContainText(gatewayUrl);
   await expect(offline).toHaveCount(1);
 
   const malformed = "ftp://invalid-gateway.local";

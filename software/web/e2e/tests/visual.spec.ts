@@ -161,6 +161,10 @@ async function installMockApi(page: Page, mode: VisualMode = "running") {
 
 async function openConsole(page: Page, mode: VisualMode = "running") {
   const mock = await installMockApi(page, mode);
+  await page.addInitScript(() => {
+    window.localStorage.setItem("plasma-api-base", "https://plasma.example.com");
+    window.localStorage.setItem("plasma-api-base-version", "3");
+  });
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
   await expect(page.getByLabel("PPU identity")).toContainText("z2-visual-01");

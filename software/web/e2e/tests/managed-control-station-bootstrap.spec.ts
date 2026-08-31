@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const staleDirectGateway = "https://swpc.tail820e64.ts.net:8443";
-const defaultRemoteGateway = "https://plasma.open4th.com";
+const defaultRemoteGateway = "https://legacy-gateway.invalid";
 
 async function seedLegacyStandaloneRouting(page: import("@playwright/test").Page) {
   await page.addInitScript(({ directGateway }) => {

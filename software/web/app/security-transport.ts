@@ -72,7 +72,10 @@ export function getSecurityTransportServerState(): SecurityTransportState {
 }
 
 export function markGatewayRoutingResolved(apiBase: string, mode: GatewayRoutingMode): void {
-  const normalized = new URL(apiBase).toString().replace(/\/$/, "");
+  const trimmed = apiBase.trim();
+  const normalized = trimmed
+    ? new URL(trimmed, window.location.href).toString().replace(/\/$/, "")
+    : window.location.origin;
   resolvedGatewayApiBase = normalized;
   gatewayRoutingMode = mode;
   if (gatewayRoutingResolved) return;
