@@ -43,10 +43,10 @@ run_migration_case() {
     PLASMACTL_CONFIG="$config" \
     XDG_CONFIG_HOME="$temporary/xdg-$name" \
     XDG_STATE_HOME="$temporary/state-$name" \
-    bash -c 'source "$1"; migrate_config; printf "%s\n" "$public_api_url"' _ "$plasmactl_path"
+    bash -c 'source "$1"; migrate_config; printf "RESOLVED=%s\n" "$public_api_url"' _ "$plasmactl_path"
   })"
 
-  [[ "${output##*$'\n'}" == "$expected_url" ]] || fail "$name resolved URL mismatch: $output"
+  [[ "${output##*$'\n'}" == "RESOLVED=$expected_url" ]] || fail "$name resolved URL mismatch: $output"
   assert_file_line "$config" "PLASMA_CONFIG_VERSION=$expected_version"
   assert_file_line "$config" "PLASMA_PUBLIC_API_URL=$expected_url"
   assert_file_line "$config" 'PLASMA_MANAGER_ENABLED=0'
