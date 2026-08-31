@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch7-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F439VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vg.html",
+      "selection_reason": "production-admitted lifecycle control in the same STM32F439 technical cluster; verifies extraction and mapping stability while expanding adjacent package variants"
+    },
+    {
+      "base_device": "STM32F439ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439zg.html",
+      "selection_reason": "fresh post-Batch6 policy-ready STM32F439 gap selected as a bounded adjacent package variant under the current admission policy"
+    },
+    {
+      "base_device": "STM32F439ZI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439zi.html",
+      "selection_reason": "fresh post-Batch6 policy-ready STM32F439 gap paired with STM32F439ZG to complete the nearby F439 Z-package coverage without changing admission policy"
+    }
+  ]
+}
