@@ -19,6 +19,7 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 // validation and alias-based routing boundaries.
 const fleetWorkerVars = {
   PLASMA_FLEET_UI_ENABLED: process.env.PLASMA_FLEET_UI_ENABLED ?? "0",
+  PLASMA_CONTROL_STATION_MODE: process.env.PLASMA_CONTROL_STATION_MODE ?? "",
   PLASMA_MANAGER_API_URL:
     process.env.PLASMA_MANAGER_API_URL ?? "http://127.0.0.1:18180",
   PLASMA_MANAGER_PPU_ALIAS: process.env.PLASMA_MANAGER_PPU_ALIAS ?? "",
@@ -75,7 +76,6 @@ export default defineConfig(async () => {
       allowedHosts: [
         "terminal.local",
         "swpc.tail820e64.ts.net",
-        "plasma.open4th.com",
       ],
       proxy: {
         // PPU-local API calls still go to the Python Gateway. Fleet and Manager
