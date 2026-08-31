@@ -11,10 +11,22 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "windows-control-station-msi.py"
+ACCEPTANCE_SCRIPT = REPO_ROOT / "scripts" / "windows-control-station-installer-acceptance.py"
+PRODUCT_BUILD_SCRIPT = REPO_ROOT / "software" / "web" / "scripts" / "build-product.mjs"
+VINEXT_PATCH_SCRIPT = REPO_ROOT / "software" / "web" / "scripts" / "patch-vinext-windows-static-assets.mjs"
 
 
 def _load():
     spec = importlib.util.spec_from_file_location("plasma_windows_installer", SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_acceptance():
+    spec = importlib.util.spec_from_file_location("plasma_windows_installer_acceptance", ACCEPTANCE_SCRIPT)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -73,6 +85,39 @@ def test_windows_service_launchers_only_use_bundled_runtimes() -> None:
     assert "[switch]$PreflightOnly" in console
     assert "$null -ne $aliasContent" in console
     assert "([string]$aliasContent).Trim()" in console
+    assert "$env:PLASMA_FLEET_UI_ENABLED = '1'" in console
+
+
+def test_product_build_applies_version_pinned_vinext_windows_asset_patch() -> None:
+    package = json.loads((REPO_ROOT / "software" / "web" / "package.json").read_text(encoding="utf-8"))
+    build_source = PRODUCT_BUILD_SCRIPT.read_text(encoding="utf-8")
+    patch_source = VINEXT_PATCH_SCRIPT.read_text(encoding="utf-8")
+
+    assert package["devDependencies"]["vinext"] == "0.0.50"
+    assert 'PINNED_VINEXT_VERSION = "0.0.50"' in patch_source
+    assert 'path.relative(base, batch[j]).split(path.sep).join("/")' in patch_source
+    assert "matches.length !== 1" in patch_source
+    assert "patchVinextWindowsStaticAssets" in build_source
+    assert "Applied pinned vinext Windows static-asset compatibility patch" in build_source
+
+
+def test_windows_acceptance_requires_packaged_css_and_javascript_assets() -> None:
+    module = _load_acceptance()
+    html = """
+    <html>
+      <head><link rel="stylesheet" href="/assets/app-123.css"></head>
+      <body><script type="module" src="/assets/app-456.js"></script></body>
+    </html>
+    """
+    assert module._console_asset_paths(html) == (
+        "/assets/app-123.css",
+        "/assets/app-456.js",
+    )
+
+    source = ACCEPTANCE_SCRIPT.read_text(encoding="utf-8")
+    assert "Console HTML does not reference any packaged CSS assets" in source
+    assert "Console HTML does not reference any packaged JavaScript assets" in source
+    assert "Windows installer Console static assets after SCM restart: PASS" in source
 
 
 def _fake_python_runtime(root: Path) -> Path:

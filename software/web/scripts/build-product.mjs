@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
+import { patchVinextWindowsStaticAssets } from "./patch-vinext-windows-static-assets.mjs";
+
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, "..");
 const vinextPackagePath = resolve(projectRoot, "node_modules", "vinext", "package.json");
@@ -12,6 +14,10 @@ const vinextBin =
 if (typeof vinextBin !== "string" || !vinextBin) {
   throw new Error("vinext package does not expose a vinext CLI entry point");
 }
+
+const patchedVinextRuntime = patchVinextWindowsStaticAssets(vinextPackagePath);
+console.log(`Applied pinned vinext Windows static-asset compatibility patch: ${patchedVinextRuntime}`);
+
 const vinextCli = resolve(dirname(vinextPackagePath), vinextBin);
 
 const result = spawnSync(
