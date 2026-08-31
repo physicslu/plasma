@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -26,6 +27,10 @@ def test_windows_installer_contract_constants_are_pinned() -> None:
     assert module.WINSW_VERSION == "2.12.0"
     assert module.WINSW_X64_SHA256 == "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da"
     assert module.WIX_TOOLSET_VERSION == "5.0.2"
+    assert module.BUNDLED_PYTHON_VERSION == "3.12.10"
+    assert module.BUNDLED_PYTHON_ARCHIVE_SHA256 == "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3"
+    assert module.BUNDLED_NODE_VERSION == "22.23.0"
+    assert module.BUNDLED_NODE_ARCHIVE_SHA256 == "425a5bd68cc95e8eb16bcccd0a75081b48983fc6a26f67126bd4d6c7198231e8"
     assert module.normalize_architecture("AMD64") == "x86_64"
     with pytest.raises(module.WindowsInstallerError):
         module.normalize_architecture("arm64")
@@ -47,31 +52,47 @@ def test_winsw_hash_fails_closed(tmp_path: Path) -> None:
         module.verify_winsw(winsw)
 
 
-def test_windows_service_launchers_cover_empty_alias_and_machine_runtime_regressions() -> None:
+def test_windows_service_launchers_only_use_bundled_runtimes() -> None:
     manager = (REPO_ROOT / "packaging" / "windows" / "run-manager.ps1").read_text(encoding="utf-8")
     console = (REPO_ROOT / "packaging" / "windows" / "run-console.ps1").read_text(encoding="utf-8")
 
-    assert "Get-MachineRegisteredPythonCandidates" in manager
-    assert "HKLM:\\SOFTWARE\\Python\\PythonCore" in manager
-    assert "HKLM:\\SOFTWARE\\WOW6432Node\\Python\\PythonCore" in manager
-    assert "ExecutablePath" in manager
-    assert "GetEnvironmentVariable('Path', 'Machine')" in manager
+    assert "Resolve-BundledPython" in manager
+    assert "..\\host-runtime\\python\\python.exe" in manager
+    assert "Get-MachineRegisteredPythonCandidates" not in manager
+    assert "GetEnvironmentVariable('Path', 'Machine')" not in manager
     assert "Get-Command python.exe" not in manager
-    assert "& $candidate --version" in manager
-    assert "-replace '^Python\\s+', ''" in manager
-    assert "Per-user-only Python installations are not supported" in manager
+    assert "HKLM:" not in manager
+    assert "Plasma Manager bundled Python runtime:" in manager
     assert "[switch]$PreflightOnly" in manager
-    assert "-c 'import sys;" not in manager
 
-    assert "GetEnvironmentVariable('Path', 'Machine')" in console
+    assert "Resolve-BundledNode" in console
+    assert "..\\host-runtime\\node\\node.exe" in console
+    assert "GetEnvironmentVariable('Path', 'Machine')" not in console
     assert "Get-Command node.exe" not in console
-    assert "Per-user-only Node.js installations are not supported" in console
+    assert "Plasma Console bundled Node.js runtime:" in console
     assert "[switch]$PreflightOnly" in console
     assert "$null -ne $aliasContent" in console
     assert "([string]$aliasContent).Trim()" in console
 
 
-def test_stage_and_wix_source_keep_scm_and_mutable_config_boundaries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _fake_python_runtime(root: Path) -> Path:
+    root.mkdir(parents=True)
+    for name in ("python.exe", "python3.dll", "python312.dll", "python312.zip", "LICENSE.txt"):
+        (root / name).write_bytes((name + "\n").encode())
+    (root / "python312._pth").write_text("python312.zip\n.\n#import site\n", encoding="utf-8")
+    return root
+
+
+def _fake_node_runtime(root: Path) -> Path:
+    root.mkdir(parents=True)
+    (root / "node.exe").write_bytes(b"node\n")
+    (root / "LICENSE").write_text("node license\n", encoding="utf-8")
+    return root
+
+
+def test_stage_and_wix_source_keep_scm_mutable_config_and_bundled_runtime_boundaries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     module = _load()
     repo = tmp_path / "repo"
     packaging = repo / "packaging" / "windows"
@@ -90,6 +111,8 @@ def test_stage_and_wix_source_keep_scm_and_mutable_config_boundaries(tmp_path: P
     (runtime / "manager").mkdir(parents=True)
     (runtime / "console" / "server.js").write_text("console\n", encoding="utf-8")
     (runtime / "manager" / "manager.pyz").write_bytes(b"manager")
+    python_runtime = _fake_python_runtime(tmp_path / "python-runtime")
+    node_runtime = _fake_node_runtime(tmp_path / "node-runtime")
     winsw = tmp_path / "WinSW-x64.exe"
     winsw.write_bytes(b"winsw-test")
     monkeypatch.setattr(module, "WINSW_X64_SHA256", hashlib.sha256(winsw.read_bytes()).hexdigest())
@@ -101,11 +124,26 @@ def test_stage_and_wix_source_keep_scm_and_mutable_config_boundaries(tmp_path: P
         version="1.2.3",
         source_release={"git_sha": "abc", "target": "windows-x86_64"},
         winsw_exe=winsw,
+        python_runtime_dir=python_runtime,
+        node_runtime_dir=node_runtime,
     )
     assert (release_root / "bin" / "plasma-manager-service.exe").is_file()
     assert (release_root / "bin" / "plasma-console-service.exe").is_file()
     assert (release_root / "THIRD_PARTY_LICENSES" / "WinSW.txt").is_file()
+    assert (release_root / "host-runtime" / "python" / "python.exe").is_file()
+    assert (release_root / "host-runtime" / "node" / "node.exe").is_file()
+    assert (release_root / "host-runtime" / "python" / "LICENSE.txt").is_file()
+    assert (release_root / "host-runtime" / "node" / "LICENSE.txt").is_file()
+    pth = (release_root / "host-runtime" / "python" / "python312._pth").read_text(encoding="utf-8")
+    assert "..\\..\\runtime\\manager\\manager.pyz" in pth
     assert "ppus: []" in (seed / "manager.yaml").read_text(encoding="utf-8")
+
+    manifest = json.loads((release_root / "windows-installer.json").read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == 2
+    assert manifest["runtime_ownership"] == "bundled"
+    assert "external_prerequisites" not in manifest
+    assert manifest["bundled_runtimes"]["python"]["version"] == "3.12.10"
+    assert manifest["bundled_runtimes"]["node"]["version"] == "22.23.0"
 
     wxs = tmp_path / "installer.wxs"
     module.generate_wix_source(

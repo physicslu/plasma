@@ -21,6 +21,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WINSW_VERSION = "2.12.0"
 WINSW_X64_SHA256 = "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da"
 WIX_TOOLSET_VERSION = "5.0.2"
+BUNDLED_PYTHON_VERSION = "3.12.10"
+BUNDLED_PYTHON_ARCHIVE_SHA256 = "4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3"
+BUNDLED_NODE_VERSION = "22.23.0"
+BUNDLED_NODE_ARCHIVE_SHA256 = "425a5bd68cc95e8eb16bcccd0a75081b48983fc6a26f67126bd4d6c7198231e8"
 UPGRADE_CODE = "3A273357-8467-4C07-A06E-B40F8D1531E7"
 SERVICE_MANAGER = "PlasmaManager"
 SERVICE_CONSOLE = "PlasmaControlStationConsole"
@@ -99,9 +103,54 @@ def _msi_version(version: str) -> str:
     return f"{major}.{minor}.{patch}"
 
 
+def _require_file(root: Path, relative: str, label: str) -> Path:
+    path = root / relative
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise WindowsInstallerError(f"{label} is missing: {path}")
+    return path
+
+
+def _stage_bundled_runtimes(*, release_root: Path, python_runtime_dir: Path, node_runtime_dir: Path) -> None:
+    python_runtime_dir = python_runtime_dir.resolve()
+    node_runtime_dir = node_runtime_dir.resolve()
+    if not python_runtime_dir.is_dir():
+        raise WindowsInstallerError(f"bundled Python runtime directory is missing: {python_runtime_dir}")
+    if not node_runtime_dir.is_dir():
+        raise WindowsInstallerError(f"bundled Node.js runtime directory is missing: {node_runtime_dir}")
+
+    for relative in ("python.exe", "python3.dll", "python312.dll", "python312.zip", "python312._pth", "LICENSE.txt"):
+        _require_file(python_runtime_dir, relative, "bundled Python runtime file")
+    _require_file(node_runtime_dir, "node.exe", "bundled Node.js executable")
+    node_license = node_runtime_dir / "LICENSE"
+    if not node_license.is_file():
+        node_license = node_runtime_dir / "LICENSE.txt"
+    if not node_license.is_file() or node_license.stat().st_size <= 0:
+        raise WindowsInstallerError(f"bundled Node.js license is missing under {node_runtime_dir}")
+
+    host_runtime = release_root / "host-runtime"
+    python_target = host_runtime / "python"
+    node_target = host_runtime / "node"
+    shutil.copytree(python_runtime_dir, python_target)
+    node_target.mkdir(parents=True)
+    shutil.copy2(node_runtime_dir / "node.exe", node_target / "node.exe")
+    shutil.copy2(node_license, node_target / "LICENSE.txt")
+
+    # The embeddable distribution uses python312._pth to make sys.path explicit.
+    # Add the Manager zipapp so imports from plasma_manager and bundled PyYAML are
+    # deterministic without enabling global site-packages or user environment paths.
+    pth = python_target / "python312._pth"
+    manager_zipapp = r"..\..\runtime\manager\manager.pyz"
+    lines = pth.read_text(encoding="utf-8").splitlines()
+    if manager_zipapp not in lines:
+        insert_at = next((index for index, line in enumerate(lines) if line.strip().startswith("import site")), len(lines))
+        lines.insert(insert_at, manager_zipapp)
+        pth.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def stage_payload(
     *, repo_root: Path, runtime_dir: Path, staging_root: Path, version: str,
     source_release: Mapping[str, object], winsw_exe: Path,
+    python_runtime_dir: Path, node_runtime_dir: Path,
 ) -> tuple[Path, Path]:
     if staging_root.exists():
         raise WindowsInstallerError(f"refusing to overwrite staging root: {staging_root}")
@@ -109,6 +158,11 @@ def stage_payload(
     release_root = staging_root / "release"
     bin_dir = release_root / "bin"
     shutil.copytree(runtime_dir, release_root / "runtime")
+    _stage_bundled_runtimes(
+        release_root=release_root,
+        python_runtime_dir=python_runtime_dir,
+        node_runtime_dir=node_runtime_dir,
+    )
     bin_dir.mkdir()
     packaging = repo_root / "packaging" / "windows"
     for name in ("run-manager.ps1", "run-console.ps1", "plasma-manager-service.xml", "plasma-console-service.xml"):
@@ -122,7 +176,7 @@ def stage_payload(
     licenses.mkdir()
     shutil.copy2(packaging / "LICENSE-WINSW.txt", licenses / "WinSW.txt")
     installer_manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "product": "plasma",
         "role": "control-station",
         "platform": "windows",
@@ -132,7 +186,21 @@ def stage_payload(
         "services": [SERVICE_MANAGER, SERVICE_CONSOLE],
         "program_files_root": rf"%ProgramFiles%\Plasma\releases\{version}",
         "program_data_root": r"%ProgramData%\Plasma",
-        "external_prerequisites": {"node": ">=22.13", "python": ">=3.11"},
+        "runtime_ownership": "bundled",
+        "bundled_runtimes": {
+            "python": {
+                "version": BUNDLED_PYTHON_VERSION,
+                "executable": r"host-runtime\python\python.exe",
+                "archive_sha256": BUNDLED_PYTHON_ARCHIVE_SHA256,
+                "license": r"host-runtime\python\LICENSE.txt",
+            },
+            "node": {
+                "version": BUNDLED_NODE_VERSION,
+                "executable": r"host-runtime\node\node.exe",
+                "archive_sha256": BUNDLED_NODE_ARCHIVE_SHA256,
+                "license": r"host-runtime\node\LICENSE.txt",
+            },
+        },
         "winsw": {"version": WINSW_VERSION, "sha256": WINSW_X64_SHA256, "license": r"THIRD_PARTY_LICENSES\WinSW.txt"},
         "wix_toolset_build_version": WIX_TOOLSET_VERSION,
         "source_release": {key: source_release.get(key) for key in ("artifact_sha256", "git_sha", "target", "contracts")},
@@ -216,7 +284,8 @@ def generate_wix_source(*, release_root: Path, program_data_seed: Path, version:
 
 
 def build_msi(
-    *, repo_root: Path, release_artifact: Path, winsw_exe: Path, output_dir: Path,
+    *, repo_root: Path, release_artifact: Path, winsw_exe: Path,
+    python_runtime_dir: Path, node_runtime_dir: Path, output_dir: Path,
     wix: str = "wix", system: str | None = None, machine: str | None = None,
 ) -> Path:
     if (platform.system() if system is None else system) != "Windows":
@@ -234,6 +303,7 @@ def build_msi(
         release_root, seed = stage_payload(
             repo_root=repo_root.resolve(), runtime_dir=canonical / "runtime", staging_root=work / "stage",
             version=version, source_release=manifest, winsw_exe=winsw_exe.resolve(),
+            python_runtime_dir=python_runtime_dir.resolve(), node_runtime_dir=node_runtime_dir.resolve(),
         )
         wxs = work / "installer.wxs"
         generate_wix_source(release_root=release_root, program_data_seed=seed, version=version, output_path=wxs)
@@ -251,12 +321,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the unsigned Plasma Windows Control Station MSI pilot")
     parser.add_argument("--release-artifact", required=True, type=Path)
     parser.add_argument("--winsw-exe", required=True, type=Path)
+    parser.add_argument("--python-runtime-dir", required=True, type=Path)
+    parser.add_argument("--node-runtime-dir", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--wix", default="wix")
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     args = parser.parse_args(argv)
     try:
-        print(build_msi(repo_root=args.repo_root, release_artifact=args.release_artifact, winsw_exe=args.winsw_exe, output_dir=args.output_dir, wix=args.wix))
+        print(build_msi(
+            repo_root=args.repo_root,
+            release_artifact=args.release_artifact,
+            winsw_exe=args.winsw_exe,
+            python_runtime_dir=args.python_runtime_dir,
+            node_runtime_dir=args.node_runtime_dir,
+            output_dir=args.output_dir,
+            wix=args.wix,
+        ))
     except (WindowsInstallerError, OSError) as exc:
         print(f"windows-control-station-msi: {exc}", file=sys.stderr)
         return 2
