@@ -1,0 +1,20 @@
+{
+  "admitted_rows": 16,
+  "canonical_dataset_written": true,
+  "canonical_git_blob_sha": "b13f219a2496184ee4443d44164e9e449fb77529",
+  "canonical_sha256": "affa1b94e569a771eb7b5672fadf3ad17c8914f0d5adab27bbe23386cb88364e",
+  "decision_counts": {
+    "admit": 16,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase4.0-foundation-batch3-2026-08-31-retained-20260831T035207Z-42fa641",
+  "phase": "STM32F4 Phase 4.0 foundation batch3",
+  "plan_sha256": "05cbd105b923f1b363dedf59f0d2348a70e2daee88915206f929c31ba1821de0",
+  "production_rows_after": 101,
+  "proposal_artifact_id": "9744988636",
+  "proposal_workflow_run_id": "33355504707",
+  "schema_version": 1,
+  "source_rows": 85
+}
