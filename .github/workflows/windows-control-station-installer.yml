@@ -45,7 +45,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.10"
       - uses: actions/setup-node@v4
         with:
           node-version: "22.23.0"
@@ -54,6 +54,33 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
+      - name: Fetch pinned self-contained target runtimes
+        shell: pwsh
+        run: |
+          $pythonVersion = '3.12.10'
+          $pythonZip = "${{ runner.temp }}\python-$pythonVersion-embed-amd64.zip"
+          $pythonRuntime = "${{ runner.temp }}\plasma-bundled-python"
+          Invoke-WebRequest -Uri "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip" -OutFile $pythonZip
+          $pythonActual = (Get-FileHash -Algorithm SHA256 $pythonZip).Hash.ToLowerInvariant()
+          $pythonExpected = '4acbed6dd1c744b0376e3b1cf57ce906f9dc9e95e68824584c8099a63025a3c3'
+          if ($pythonActual -ne $pythonExpected) { throw "CPython embeddable SHA-256 mismatch: $pythonActual" }
+          Expand-Archive -LiteralPath $pythonZip -DestinationPath $pythonRuntime
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/python/cpython/v$pythonVersion/LICENSE" -OutFile (Join-Path $pythonRuntime 'LICENSE.txt')
+          & (Join-Path $pythonRuntime 'python.exe') --version
+
+          $nodeVersion = '22.23.0'
+          $nodeZip = "${{ runner.temp }}\node-v$nodeVersion-win-x64.zip"
+          $nodeExtract = "${{ runner.temp }}\plasma-bundled-node-extract"
+          Invoke-WebRequest -Uri "https://nodejs.org/download/release/v$nodeVersion/node-v$nodeVersion-win-x64.zip" -OutFile $nodeZip
+          $nodeActual = (Get-FileHash -Algorithm SHA256 $nodeZip).Hash.ToLowerInvariant()
+          $nodeExpected = '425a5bd68cc95e8eb16bcccd0a75081b48983fc6a26f67126bd4d6c7198231e8'
+          if ($nodeActual -ne $nodeExpected) { throw "Node.js archive SHA-256 mismatch: $nodeActual" }
+          Expand-Archive -LiteralPath $nodeZip -DestinationPath $nodeExtract
+          $nodeRuntime = Join-Path $nodeExtract "node-v$nodeVersion-win-x64"
+          & (Join-Path $nodeRuntime 'node.exe') --version
+
+          Add-Content -Path $env:GITHUB_ENV -Value "PLASMA_BUNDLED_PYTHON_RUNTIME=$pythonRuntime"
+          Add-Content -Path $env:GITHUB_ENV -Value "PLASMA_BUNDLED_NODE_RUNTIME=$nodeRuntime"
       - name: Install build and test dependencies
         run: python -m pip install ./software/python pytest
       - name: Install Web build dependencies
@@ -98,53 +125,17 @@ jobs:
         run: |
           dotnet tool install --global wix --version 5.0.2
           wix --version
-      - name: Build unsigned Windows MSI pilot
+      - name: Build unsigned self-contained Windows MSI pilot
         shell: pwsh
         run: |
           $release = Get-ChildItem "${{ runner.temp }}\plasma-control-station-release" -Filter *.zip | Select-Object -First 1
           python scripts/windows-control-station-msi.py `
             --release-artifact $release.FullName `
             --winsw-exe "${{ runner.temp }}\WinSW-x64.exe" `
+            --python-runtime-dir "$env:PLASMA_BUNDLED_PYTHON_RUNTIME" `
+            --node-runtime-dir "$env:PLASMA_BUNDLED_NODE_RUNTIME" `
             --output-dir "${{ runner.temp }}\plasma-windows-installer"
-      - name: Expose machine-wide external runtimes to SCM pilot
-        shell: pwsh
-        run: |
-          $node = (Get-Command node.exe).Source
-          $python = (Get-Command python.exe).Source
-
-          $nodeTarget = Join-Path $env:ProgramFiles 'nodejs'
-          if (-not (Test-Path $nodeTarget)) {
-            New-Item -ItemType Junction -Path $nodeTarget -Target (Split-Path $node -Parent) | Out-Null
-          }
-          & (Join-Path $nodeTarget 'node.exe') --version
-
-          # This hosted runner is disposable. Remove its preinstalled PythonCore
-          # registrations so this fixture cannot pass by selecting an unrelated
-          # machine Python (for example the runner image's newer 3.14 runtime).
-          # Then expose exactly one custom-path machine Python through PEP 514.
-          foreach ($pythonCore in @(
-            'HKLM:\SOFTWARE\Python\PythonCore',
-            'HKLM:\SOFTWARE\WOW6432Node\Python\PythonCore'
-          )) {
-            Remove-Item -LiteralPath $pythonCore -Recurse -Force -ErrorAction SilentlyContinue
-          }
-
-          $pythonRoot = Split-Path $python -Parent
-          $pythonKey = 'HKLM:\SOFTWARE\Python\PythonCore\3.12\InstallPath'
-          New-Item -Path $pythonKey -Force | Out-Null
-          Set-Item -Path $pythonKey -Value $pythonRoot
-          New-ItemProperty -Path $pythonKey -Name ExecutablePath -Value $python -PropertyType String -Force | Out-Null
-          Write-Host "Registered isolated machine-wide Python for SCM acceptance: $python"
-
-          $managerProbe = @(& .\packaging\windows\run-manager.ps1 -PreflightOnly)
-          $managerProbe | ForEach-Object { Write-Host $_ }
-          $expectedManagerProbe = "Plasma Manager Python runtime: $python"
-          if ($managerProbe -notcontains $expectedManagerProbe) {
-            throw "Manager preflight did not resolve the isolated HKLM-registered Python: expected '$expectedManagerProbe'"
-          }
-
-          & .\packaging\windows\run-console.ps1 -PreflightOnly
-      - name: Install, launch, restart, stop/start, and uninstall
+      - name: Install, launch, restart, stop/start, and uninstall without host runtime prerequisites
         shell: pwsh
         run: |
           $msi = Get-ChildItem "${{ runner.temp }}\plasma-windows-installer" -Filter *.msi | Select-Object -First 1
