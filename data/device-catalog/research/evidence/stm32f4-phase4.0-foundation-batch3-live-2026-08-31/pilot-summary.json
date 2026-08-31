@@ -1,0 +1,576 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 6,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 6,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 20,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 6,
+      "attempt": 1,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 1,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 6,
+    "total": 6
+  },
+  "pilot_id": "stm32f4-phase4.0-foundation-batch3-2026-08-31",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F401CC",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCUx",
+          "icpn": "STM32F401CCU7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CCYx",
+          "icpn": "STM32F401CCY6TT",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F401CC",
+        "evidence_section_sha256": "c4917b5bfb0555b556890cfccc058de3af0942e3291b9de2893bd192389022de",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F401CCU6",
+          "STM32F401CCU6TR",
+          "STM32F401CCU7",
+          "STM32F401CCY6TT"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F401CCF6TR",
+            "marketing_status": "Preview Product is in design stage. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F401CCF6TR",
+            "marketing_status": "Preview Product is in design stage. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F401CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F401CCU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F401CCU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F401CCY6TT",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6d91b0df781f336747217b1e8f52197acdd58d3b5c544e05867ed4f97a9eddd9",
+        "retrieved_at_utc": "2026-08-31T03:52:07Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html"
+      },
+      "selection_reason": "retained lifecycle-drift control; verifies Active-only extraction while batch3 expands adjacent policy-ready STM32F4 coverage",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F401CD",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F401CDUx",
+          "icpn": "STM32F401CDU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CDUx",
+          "icpn": "STM32F401CDU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CDYx",
+          "icpn": "STM32F401CDY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F401CD",
+        "evidence_section_sha256": "419f4e6c7ae17771165bf6267857ea3666f8bfcd0b227a335375c0a73b4da92e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F401CDU6",
+          "STM32F401CDU6TR",
+          "STM32F401CDY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cd.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F401CDU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F401CDU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F401CDY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "af8a1493cae8dd3afc17e328b567bb5071f5800cf2a53fc9a7dd7549e6820a04",
+        "retrieved_at_utc": "2026-08-31T03:52:11Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cd.html"
+      },
+      "selection_reason": "policy-ready STM32F401 384-KiB gap adjacent to the existing F401 control family",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cd.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F401CE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F401CEUx",
+          "icpn": "STM32F401CEU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F401CEYx",
+          "icpn": "STM32F401CEY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F401CE",
+        "evidence_section_sha256": "624d25f230cb96879f81b64833e2120146ac876ab614afdcba4fd6ca5b0e99f2",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F401CEU6",
+          "STM32F401CEY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F401CEU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F401CEY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "1ce373e8b5bbc602b33807d3a6bdc2f41941b9945480bce8433ef10fe887b360",
+        "retrieved_at_utc": "2026-08-31T03:52:15Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401ce.html"
+      },
+      "selection_reason": "policy-ready STM32F401 512-KiB gap with existing C-package semantics",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401ce.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F412CE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F412CEUx",
+          "icpn": "STM32F412CEU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412CEUx",
+          "icpn": "STM32F412CEU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412CEUx",
+          "icpn": "STM32F412CEU7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412CEUx",
+          "icpn": "STM32F412CEU7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F412CE",
+        "evidence_section_sha256": "7c281c3e17f822e566106bb13f3194c278b87eea36751bd7650cca9a661229f7",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F412CEU6",
+          "STM32F412CEU6TR",
+          "STM32F412CEU7",
+          "STM32F412CEU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ce.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F412CEU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412CEU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412CEU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412CEU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "10b8e3b6bcb427573d1a4c3a2e9dabf997666218058583d2bdad0f04ebd4bd81",
+        "retrieved_at_utc": "2026-08-31T03:52:19Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ce.html"
+      },
+      "selection_reason": "policy-ready STM32F412 512-KiB UFQFPN48 gap and first bounded F412 coverage",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ce.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F412CG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F412CGUx",
+          "icpn": "STM32F412CGU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412CGUx",
+          "icpn": "STM32F412CGU6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F412CG",
+        "evidence_section_sha256": "ed46cc2eda9618b6366932a45f6b428434646b5286b0965d173d8449e830c4dd",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F412CGU6",
+          "STM32F412CGU6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412cg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F412CGU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412CGU6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "27dad8428aa656701e10d5e9e4812d2be320ac89d6ce9b6b5bbb0c5d0429e6a7",
+        "retrieved_at_utc": "2026-08-31T03:52:23Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412cg.html"
+      },
+      "selection_reason": "policy-ready STM32F412 1-MiB UFQFPN48 gap paired with F412CE for flash-size coverage",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412cg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F412ZE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F412ZEJx",
+          "icpn": "STM32F412ZEJ3",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412ZEJx",
+          "icpn": "STM32F412ZEJ6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412ZETx",
+          "icpn": "STM32F412ZET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412ZETx",
+          "icpn": "STM32F412ZET7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F412ZETx",
+          "icpn": "STM32F412ZET7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F412ZE",
+        "evidence_section_sha256": "4487b86b4efbff108b532b213117cad459265e68c3b85fb7d4972a094654fa3d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F412ZEJ3",
+          "STM32F412ZEJ6",
+          "STM32F412ZET6",
+          "STM32F412ZET7",
+          "STM32F412ZET7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ze.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F412ZEJ3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412ZEJ6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412ZET6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412ZET7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F412ZET7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "f63254518550d5be2e91879e376e97e15dabdc3203bea5e6187428271a3595f1",
+        "retrieved_at_utc": "2026-08-31T03:52:27Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ze.html"
+      },
+      "selection_reason": "policy-ready STM32F412 512-KiB 144-pin gap broadening package coverage while remaining within current admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ze.html"
+    }
+  ],
+  "schema_version": 1
+}

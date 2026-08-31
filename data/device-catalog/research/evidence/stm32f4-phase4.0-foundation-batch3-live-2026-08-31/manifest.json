@@ -1,0 +1,27 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32f4-phase4.0-foundation-batch3-2026-08-31-retained-20260831T035207Z-42fa641",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "f19671d9510c7df55c0b4c8d0caf5a1feaf89770b6df2ade8851854a05c18492"
+    },
+    {
+      "path": "control-summary.json",
+      "sha256": "637ef8f8d01fe14243b9854d9ab135a9709b1fb91fe6b005c53df34430084997"
+    },
+    {
+      "path": "evaluation.json",
+      "sha256": "aaea6929d56b983d2d3df2c819575744d130ead8f5d6d163b6891273668c0b61"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "c7cfc0af12f6b3583660a754ea737e894c37209074f1cd81a14911578ddc5291"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "3de0e013508dfd4397f6d2e97cd32a34319a896cd265ca29c5ef1fd975bfbb16"
+    }
+  ],
+  "schema_version": 1
+}

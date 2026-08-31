@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch3-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+      "selection_reason": "retained lifecycle-drift control; verifies Active-only extraction while batch3 expands adjacent policy-ready STM32F4 coverage"
+    },
+    {
+      "base_device": "STM32F401CD",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cd.html",
+      "selection_reason": "policy-ready STM32F401 384-KiB gap adjacent to the existing F401 control family"
+    },
+    {
+      "base_device": "STM32F401CE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401ce.html",
+      "selection_reason": "policy-ready STM32F401 512-KiB gap with existing C-package semantics"
+    },
+    {
+      "base_device": "STM32F412CE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ce.html",
+      "selection_reason": "policy-ready STM32F412 512-KiB UFQFPN48 gap and first bounded F412 coverage"
+    },
+    {
+      "base_device": "STM32F412CG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412cg.html",
+      "selection_reason": "policy-ready STM32F412 1-MiB UFQFPN48 gap paired with F412CE for flash-size coverage"
+    },
+    {
+      "base_device": "STM32F412ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ze.html",
+      "selection_reason": "policy-ready STM32F412 512-KiB 144-pin gap broadening package coverage while remaining within current admission policy"
+    }
+  ]
+}
