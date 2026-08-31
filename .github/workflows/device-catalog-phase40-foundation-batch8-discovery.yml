@@ -132,7 +132,7 @@ jobs:
               raise SystemExit('\n'.join(issues))
 
           control_result = next(
-              result for result in summary['results'] if result['base_device'] == 'STM32F439VG'
+              result for result in summary['results'] if result['base_device'] == 'STM32F417VG'
           )
           control = {
               'schema_version': summary['schema_version'],
