@@ -6,8 +6,8 @@ default_repo="$(cd "$(dirname "$script_path")/.." && pwd)"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
 config_file="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
-current_config_version=5
-default_public_api_url="https://plasma.open4th.com"
+current_config_version=6
+default_public_api_url=""
 default_manager_config="$config_home/plasma/manager.yaml"
 
 if [[ -f "$config_file" ]]; then
@@ -104,7 +104,7 @@ validate_manager_settings() {
 }
 
 validate_engineering_mock_settings() {
-  [[ "$engineering_mock_enabled" == "0" || "$engineering_mock_enabled" == "1" ]] || \
+  [[ "$engineering_mock_enabled" == "0" || "$engineering_mock_enabled == "1" ]] || \
     die "PLASMA_ENGINEERING_MOCK_ENABLED 只接受 0 或 1：$engineering_mock_enabled"
   [[ "$engineering_mock_root" == /* ]] || \
     die "PLASMA_ENGINEERING_MOCK_ROOT 必須是絕對路徑：$engineering_mock_root"
@@ -249,7 +249,7 @@ migrate_config() {
         PLASMA_PUBLIC_API_URL="$public_api_url"
         ;;
       *)
-        # Unknown values are treated as an explicit operator override and preserved.
+        # Unknown values were historically treated as explicit operator overrides.
         ;;
     esac
     replace_config_assignment PLASMA_PUBLIC_API_URL "$public_api_url"
@@ -274,6 +274,15 @@ migrate_config() {
     PLASMA_MANAGER_PPU_ALIAS="$manager_ppu_alias"
   fi
 
+  if (( config_version < 6 )); then
+    # Schema v6 retires Browser-owned direct Gateway endpoints. The integration
+    # host keeps the Gateway and Engineering Mock Provider behind same-origin
+    # Vite routing; managed Control Stations route through Manager/BFF.
+    public_api_url=""
+    PLASMA_PUBLIC_API_URL=""
+    replace_config_assignment PLASMA_PUBLIC_API_URL "$public_api_url"
+  fi
+
   if (( config_version < current_config_version )); then
     replace_config_assignment PLASMA_CONFIG_VERSION "$current_config_version"
     config_version="$current_config_version"
@@ -285,9 +294,9 @@ migrate_config() {
 
   if (( migrated )); then
     if [[ "$previous_public_api_url" != "$public_api_url" ]]; then
-      say "遷移舊 API Base：$previous_public_api_url → $public_api_url"
+      say "設定檔已升級至 schema v$current_config_version；Browser direct API Base 已退役，改用 same-origin routing"
     else
-      say "設定檔已升級至 schema v$current_config_version；保留 API Base：$public_api_url"
+      say "設定檔已升級至 schema v$current_config_version；API routing ownership 不變"
     fi
   fi
 }
@@ -307,7 +316,7 @@ PLASMA_GATEWAY_PORT=$gateway_port
 PLASMA_CORS_ORIGIN=$cors_origin
 PLASMA_VITE_HOST=$vite_host
 PLASMA_VITE_PORT=$vite_port
-# URL shown as the Web Console's default Plasma Web REST Gateway. Do not append /api.
+# Compatibility field. Leave empty: Browser traffic uses same-origin routing.
 PLASMA_PUBLIC_API_URL=$public_api_url
 # Plasma Manager is an optional control-plane service. Existing PPU deployments remain standalone by default.
 PLASMA_MANAGER_ENABLED=$manager_enabled
@@ -343,12 +352,14 @@ validate_unit_values() {
 
 write_units() {
   local node_path public_api_environment engineering_mock_args manager_api_environment manager_alias_environment
-  local manager_api_url vite_after vite_wants
+  local manager_mode_environment fleet_ui_environment manager_api_url vite_after vite_wants
   node_path="$(dirname "$npm_bin"):/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   public_api_environment=""
   engineering_mock_args=""
   manager_api_environment=""
   manager_alias_environment=""
+  manager_mode_environment=""
+  fleet_ui_environment=""
   manager_api_url=""
   vite_after="network-online.target plasma-web.service"
   vite_wants="network-online.target plasma-web.service"
@@ -361,6 +372,8 @@ write_units() {
   if [[ "$manager_enabled" == "1" ]]; then
     [[ -n "$manager_ppu_alias" ]] || die "Plasma Manager BFF target alias 未設定"
     manager_api_url="$(manager_bff_url)" || die "無法建立本機 Manager BFF URL"
+    manager_mode_environment="Environment=PLASMA_CONTROL_STATION_MODE=managed"
+    fleet_ui_environment="Environment=PLASMA_FLEET_UI_ENABLED=1"
     manager_api_environment="Environment=PLASMA_MANAGER_API_URL=$manager_api_url"
     manager_alias_environment="Environment=PLASMA_MANAGER_PPU_ALIAS=$manager_ppu_alias"
     vite_after="$vite_after plasma-manager.service"
@@ -419,6 +432,8 @@ Type=simple
 WorkingDirectory=$web_dir
 Environment=PATH=$node_path
 $public_api_environment
+$manager_mode_environment
+$fleet_ui_environment
 $manager_api_environment
 $manager_alias_environment
 ExecStart=$npm_bin run dev -- --host $vite_host --port $vite_port
