@@ -26,7 +26,8 @@ OpenOCD target mapping remains catalog-routing evidence only; it is not evidence
 
 ## Read-only admission proposal
 
-Proposal workflow run: `33349865580`  
+Proposal workflow run: `33349865580`
+
 Proposal artifact: `9743221103`
 
 The isolated proposal proved:
