@@ -1,7 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-const apiBase = "https://plasma.open4th.com";
-
 function canonicalStatus() {
   return {
     ok: true,
@@ -49,18 +47,18 @@ async function installStatusMock(page: Page) {
   });
 }
 
-test("restored default Gateway URL does not emit a second connected event", async ({ page }) => {
-  await page.addInitScript(({ storedApiBase }) => {
-    window.localStorage.setItem("plasma-api-base", storedApiBase);
+test("restored legacy Gateway URL migrates to same-origin without a second connected event", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("plasma-api-base", "https://legacy-gateway.invalid");
     window.localStorage.setItem("plasma-api-base-version", "2");
-  }, { storedApiBase: apiBase });
+  });
   await installStatusMock(page);
 
   await page.goto("/");
   await expect(page.locator(".gatewayHealth")).toContainText("Online");
 
   const liveLog = page.getByLabel("Live job log");
-  await expect(liveLog).toContainText(`Plasma Web REST Gateway connected · ${apiBase}`);
+  await expect(liveLog).toContainText("Plasma Web REST Gateway connected");
 
   await page.waitForTimeout(1_750);
 
