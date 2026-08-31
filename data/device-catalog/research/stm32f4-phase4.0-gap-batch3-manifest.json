@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-gap-batch3-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+      "selection_reason": "retained lifecycle-drift control for Active-only official-ST extraction"
+    },
+    {
+      "base_device": "STM32F401CD",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cd.html",
+      "selection_reason": "policy-ready STM32F401 gap using already-supported C/U and C/Y package semantics"
+    },
+    {
+      "base_device": "STM32F401CE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401ce.html",
+      "selection_reason": "policy-ready STM32F401 gap using already-supported C/U and C/Y package semantics"
+    },
+    {
+      "base_device": "STM32F417VE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ve.html",
+      "selection_reason": "policy-ready STM32F417 LQFP100 gap using existing V/T package semantics"
+    },
+    {
+      "base_device": "STM32F417ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ze.html",
+      "selection_reason": "policy-ready STM32F417 LQFP144 gap using existing Z/T package semantics"
+    },
+    {
+      "base_device": "STM32F427VI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427vi.html",
+      "selection_reason": "policy-ready STM32F427 LQFP100 gap extending the already-admitted F427 family to the existing flash-code I semantics"
+    }
+  ]
+}
