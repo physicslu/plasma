@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch8-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F417VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417vg.html",
+      "selection_reason": "production-admitted lifecycle control in the same STM32F417 technical cluster; verifies extraction and mapping stability while expanding adjacent package variants"
+    },
+    {
+      "base_device": "STM32F417VE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ve.html",
+      "selection_reason": "fresh post-Batch7 policy-ready STM32F417 gap selected as a bounded adjacent package variant under the current admission policy"
+    },
+    {
+      "base_device": "STM32F417ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ze.html",
+      "selection_reason": "fresh post-Batch7 policy-ready STM32F417 gap paired with STM32F417VE to complete the nearby F417 Z-package coverage without changing admission policy"
+    }
+  ]
+}
