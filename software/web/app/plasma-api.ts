@@ -154,8 +154,7 @@ type ApiErrorPayload = {
   error?: { message?: string; error_code?: string };
 };
 
-export const DEFAULT_API_BASE =
-  process.env.NEXT_PUBLIC_PLASMA_API_URL ?? "https://plasma.open4th.com";
+export const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_PLASMA_API_URL ?? "";
 
 export class PlasmaApiError extends Error {
   constructor(
@@ -245,7 +244,12 @@ export function getPpuExecutionActivityCount(): number {
 }
 
 export function normalizeApiBase(value: string): string {
-  const url = new URL(value.trim());
+  const trimmed = value.trim();
+  if (!trimmed) {
+    if (typeof window === "undefined") return "";
+    return window.location.origin;
+  }
+  const url = new URL(trimmed);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Plasma Web REST Gateway URL 必須使用 http:// 或 https://");
   }
