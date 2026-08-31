@@ -1,0 +1,20 @@
+{
+  "admitted_rows": 11,
+  "canonical_dataset_written": true,
+  "canonical_git_blob_sha": "660dbf7fd8eddefd7bf223f717f0ed19e4165eb6",
+  "canonical_sha256": "414f45a9e70ef6953c9d6502d7ac44dd67fca1a1e01bba14ff0d3db0b21df47d",
+  "decision_counts": {
+    "admit": 11,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase4.0-gap-batch3-2026-08-31-retained-20260831T030223Z-9477540",
+  "phase": "STM32F4 Phase 4.0 gap batch3",
+  "plan_sha256": "992df7415c1f5b2a44f6678dea927de2482a3562dcd9334f590e6fa43de933fa",
+  "production_rows_after": 96,
+  "proposal_artifact_id": "9744269945",
+  "proposal_workflow_run_id": "33353166374",
+  "schema_version": 1,
+  "source_rows": 85
+}
