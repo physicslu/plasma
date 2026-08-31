@@ -1,0 +1,35 @@
+{
+  "added": [
+    "STM32F429ZET6",
+    "STM32F429ZET6TR",
+    "STM32F469VET6",
+    "STM32F469VET6TR",
+    "STM32F469VGT6",
+    "STM32F469VIT6",
+    "STM32F469VIT6TR",
+    "STM32F469ZET6"
+  ],
+  "admission_plan_sha256": "7e015f9be2c9814ca7a7f208b29e0686911e44e804026664b6ae2d1b843b96df",
+  "canonical_dataset_written": true,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 8,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_artifact_id": "9758673074",
+  "evidence_id": "stm32f4-phase4.0-foundation-batch9-2026-08-31-retained-20260831T125555Z-4e5cc1b",
+  "final_csv_sha256": "4162766eef529f17da3d5f5d904ee1a6db6a58e805ad23ca1b1c75d20ca62e50",
+  "final_git_blob_sha": "c9677374a867ae72efd07a7673ec66cd13e7ebc4",
+  "issues": [],
+  "new_exact_icpns": 8,
+  "phase": "stm32f4-phase4.0-foundation-batch9",
+  "post_rows": 151,
+  "pre_csv_sha256": "c37c2931bd27c5754a65cc3e1d7f14702637f95153941abc650b0b30d526eae8",
+  "pre_git_blob_sha": "b59a46cc242d7d7921c287d8c656eab6e603e0d2",
+  "pre_rows": 143,
+  "proposal_artifact_id": "9758746391",
+  "proposal_workflow_run_id": "33394448145",
+  "schema_version": 1
+}
