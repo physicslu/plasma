@@ -33,7 +33,7 @@ def test_web_default_and_storage_migration_are_same_origin_owned() -> None:
     api = _source("software/web/app/plasma-api.ts")
     layout = _source("software/web/app/layout.tsx")
     assert 'process.env.NEXT_PUBLIC_PLASMA_API_URL ?? ""' in api
-    assert 'return window.location.origin;' in api
+    assert 'if (!trimmed) return "";' in api
     assert 'window.localStorage.getItem(versionKey) === "3"' in layout
     assert 'window.localStorage.removeItem(apiKey);' in layout
     assert "legacyApiBases" not in layout
