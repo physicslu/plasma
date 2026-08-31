@@ -25,8 +25,10 @@ function Resolve-Python {
     if ($command) { $candidates += $command.Source }
     foreach ($candidate in $candidates | Select-Object -Unique) {
         if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
-        $version = & $candidate -c 'import sys; print(".".join(str(v) for v in sys.version_info[:3]))' 2>$null
-        if ($LASTEXITCODE -eq 0 -and (Test-VersionAtLeast $version 3 11 0)) { return $candidate }
+        $versionOutput = & $candidate --version 2>&1
+        if ($LASTEXITCODE -ne 0) { continue }
+        $version = ([string]$versionOutput).Trim() -replace '^Python\s+', ''
+        if (Test-VersionAtLeast $version 3 11 0) { return $candidate }
     }
     throw 'Python >= 3.11 was not found in supported system-wide locations or PATH.'
 }
