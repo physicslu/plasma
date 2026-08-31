@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "pilot_id": "stm32f4-phase4.0-foundation-batch5-2026-08-31",
+  "canonical_dataset_admission": false,
   "source_workflow_run_id": "33360590983",
   "source_artifact_id": "9746559475",
   "candidate_policy": "Only exact commercial part numbers observed on the official ST product page with Marketing Status Active are candidate rows for new admission.",
