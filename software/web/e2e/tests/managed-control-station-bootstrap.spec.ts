@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const staleDirectGateway = "https://swpc.tail820e64.ts.net:8443";
-const defaultRemoteGateway = "https://plasma.open4th.com";
+const defaultRemoteGateway = "https://legacy-gateway.invalid";
 
 async function seedLegacyStandaloneRouting(page: import("@playwright/test").Page) {
   await page.addInitScript(({ directGateway }) => {
@@ -51,7 +51,8 @@ test("Gateway reads stay inside the Browser until Managed routing discovery reso
   const { leakedGatewayRequests, managedStatusRequests } = observeGatewayRouting(page);
 
   let releaseDiscovery!: () => void;
-  const discoveryReleased = new Promise<void>(resolve => { releaseDiscovery = resolve; });
+  const discoveryReleased = new Promise<void>(resolve => { releaseDiscoveryReleased = resolve; });
+  let releaseDiscoveryReleased!: () => void;
   let observeDiscovery!: () => void;
   const discoveryObserved = new Promise<void>(resolve => { observeDiscovery = resolve; });
 
@@ -88,7 +89,7 @@ test("Gateway reads stay inside the Browser until Managed routing discovery reso
   await page.waitForTimeout(50);
   expect(leakedGatewayRequests).toEqual([]);
 
-  releaseDiscovery();
+  releaseDiscoveryReleased();
   await navigation;
   const reads = await page.evaluate(async () => {
     const scope = window as typeof window & {
