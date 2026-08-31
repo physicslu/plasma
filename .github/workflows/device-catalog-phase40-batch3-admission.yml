@@ -1,0 +1,82 @@
+name: Device catalog Phase 4.0 batch3 admission
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.0-gap-batch3
+
+permissions:
+  contents: read
+
+jobs:
+  admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate retained official-ST evidence
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-gap-batch3-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-gap-batch3-baseline.json
+      - name: Build clean 11-row admission plan and materialize candidate canonical
+        run: |
+          mkdir -p phase40-batch3-admission
+          python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-gap-batch3-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-gap-batch3-baseline.json \
+            --admit-base STM32F401CD \
+            --admit-base STM32F401CE \
+            --admit-base STM32F417VE \
+            --admit-base STM32F417ZE \
+            --admit-base STM32F427VI \
+            --output phase40-batch3-admission/admission-plan.json
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path('data/device-catalog/research')
+          sys.path.insert(0, str(root))
+          from device_catalog_admission_framework import write_canonical_dataset
+
+          plan_path = Path('phase40-batch3-admission/admission-plan.json')
+          plan = json.loads(plan_path.read_text(encoding='utf-8'))
+          expected = {'admit': 11, 'already_present': 0, 'manual_review_required': 0, 'reject': 0}
+          if plan.get('decision_counts') != expected or plan.get('conflicts') != [] or plan.get('candidate_count') != 11:
+              raise SystemExit(f'unclean batch3 admission plan: {plan.get("decision_counts")} conflicts={plan.get("conflicts")}')
+          source = root / 'stm32f4-commercial-icpn.csv'
+          out = Path('phase40-batch3-admission/stm32f4-commercial-icpn.after.csv')
+          out.write_bytes(source.read_bytes())
+          result = write_canonical_dataset(canonical_path=out, plan=plan)
+          with source.open(newline='', encoding='utf-8') as f:
+              before = list(csv.DictReader(f))
+          with out.open(newline='', encoding='utf-8') as f:
+              after = list(csv.DictReader(f))
+          if len(before) != 85 or len(after) != 96 or result.get('rows_written') != 96:
+              raise SystemExit(f'unexpected canonical materialization: before={len(before)} after={len(after)} result={result}')
+          metadata = {
+              'canonical_rows_before': len(before),
+              'canonical_rows_after': len(after),
+              'canonical_sha256_before': hashlib.sha256(source.read_bytes()).hexdigest(),
+              'canonical_sha256_after': hashlib.sha256(out.read_bytes()).hexdigest(),
+              'admission_plan_sha256': hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+              'new_icpns': sorted(d['icpn'] for d in plan['decisions'] if d['decision'] == 'admit'),
+              'writer_result': result,
+          }
+          Path('phase40-batch3-admission/materialization.json').write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(metadata, indent=2, sort_keys=True))
+          PY
+      - name: Upload admission artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase40-batch3-admission
+          path: phase40-batch3-admission
+          if-no-files-found: error
+          retention-days: 7
