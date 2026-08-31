@@ -70,9 +70,27 @@ The pilot uses WinSW `2.12.0` as the thin SCM adapter. The workflow downloads th
 
 The WinSW MIT license is shipped in the installed release. The binary is not checked into Plasma source control.
 
-SCM services are installed by Windows Installer itself; Task Scheduler is not used. The Console service declares an SCM dependency on the Manager service.
+SCM services are installed by Windows Installer itself; Task Scheduler is not used. The Console service declares an SCM dependency on the Manager service. The Windows Console launcher explicitly enables the Control Station fleet UI instead of inheriting the standalone PPU default.
 
-The Console launcher establishes `runtime\console` as the process working directory before starting the standalone Vinext `server.js`. This working-directory contract is part of the packaged Web runtime: SSR can start from another directory, but Vinext resolves packaged `/assets/*` client files relative to the standalone runtime root. The launcher also enables the Control Station fleet UI explicitly instead of inheriting the standalone PPU default.
+## Vinext Windows static-asset compatibility boundary
+
+Plasma currently pins `vinext` `0.0.50`. Its production `StaticFileCache` stores the result of `path.relative()` directly as the lookup key. On Windows, that produces backslash-separated nested paths such as `assets\chunk.js`, while browser URL pathnames use forward slashes such as `/assets/chunk.js`. The result is a Windows-only failure mode where SSR HTML returns HTTP 200 but packaged CSS/JavaScript under `/assets/*` returns 404.
+
+This matches upstream Vinext issue #2696. Until Plasma upgrades to a Vinext release that contains the fix natively, `software/web/scripts/patch-vinext-windows-static-assets.mjs` applies the narrow upstream normalization before the product build:
+
+```text
+path.relative(base, file)
+  -> path.relative(base, file).split(path.sep).join("/")
+```
+
+The compatibility patch is deliberately fail-closed:
+
+- it accepts only the pinned Vinext version `0.0.50`;
+- it requires exactly one vulnerable call site;
+- an unexpected Vinext layout/version fails the product build instead of silently shipping an unverified patch;
+- the patch is applied at build time, so the immutable packaged Console runtime contains the corrected behavior and the target workstation does not mutate `node_modules`.
+
+The earlier hypothesis that the Windows service working directory caused the asset failure was rejected by CI evidence: starting from `runtime\console` still reproduced the same `/assets/*` 404. The launcher therefore does not carry a product-specific CWD workaround.
 
 ## Self-contained runtime ownership
 
@@ -133,6 +151,7 @@ WiX Toolset `5.0.2` is pinned as a build dependency. WiX v5 is required because 
 source checkout
   -> download pinned CPython embeddable archive + SHA-256 verify
   -> download pinned Node.js archive + SHA-256 verify
+  -> apply fail-closed pinned Vinext Windows asset compatibility patch
   -> common Control Station runtime build
   -> Windows Common Release Format build
   -> focused packaging tests
@@ -156,7 +175,7 @@ source checkout
   -> upload MSI + SHA-256 artifact
 ```
 
-The static-asset check closes a gap that a plain HTTP-200 Console readiness probe cannot detect: the standalone server can render SSR HTML while `/assets/*.css` and `/assets/*.js` fail if the service starts from the wrong working directory.
+The static-asset check closes a gap that a plain HTTP-200 Console readiness probe cannot detect: the standalone server can render SSR HTML while the client asset cache is unusable on Windows. It is therefore an acceptance invariant, not merely a packaging-unit assertion.
 
 The Browser/BFF smoke points Manager at a deliberately unused loopback PPU endpoint and expects the existing structured `ppu_transport_error` path. This proves the installed Console/BFF -> Manager boundary without claiming PPU or Z2 acceptance.
 
