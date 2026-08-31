@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch4-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F429ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429zg.html",
+      "selection_reason": "production-admitted lifecycle control in the same F42x group; verifies extraction and mapping stability while expanding adjacent policy-ready coverage"
+    },
+    {
+      "base_device": "STM32F427VI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427vi.html",
+      "selection_reason": "policy-ready STM32F427 gap selected as part of a coherent F427/F429 bounded evidence batch"
+    },
+    {
+      "base_device": "STM32F427ZI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427zi.html",
+      "selection_reason": "policy-ready STM32F427 gap paired with F427VI to cover adjacent package variants under the current admission policy"
+    },
+    {
+      "base_device": "STM32F429VE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ve.html",
+      "selection_reason": "policy-ready STM32F429 gap adjacent to the admitted F429ZG lifecycle control"
+    },
+    {
+      "base_device": "STM32F429VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429vg.html",
+      "selection_reason": "policy-ready STM32F429 gap chosen to extend the same technical cluster without changing admission policy"
+    },
+    {
+      "base_device": "STM32F429VI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429vi.html",
+      "selection_reason": "policy-ready STM32F429 gap completing the five-new-target bounded batch while preserving a single-series evidence focus"
+    }
+  ]
+}
