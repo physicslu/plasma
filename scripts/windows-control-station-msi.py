@@ -20,7 +20,7 @@ from xml.sax.saxutils import escape
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WINSW_VERSION = "2.12.0"
 WINSW_X64_SHA256 = "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da"
-WIX_TOOLSET_VERSION = "4.0.6"
+WIX_TOOLSET_VERSION = "5.0.2"
 UPGRADE_CODE = "3A273357-8467-4C07-A06E-B40F8D1531E7"
 SERVICE_MANAGER = "PlasmaManager"
 SERVICE_CONSOLE = "PlasmaControlStationConsole"
