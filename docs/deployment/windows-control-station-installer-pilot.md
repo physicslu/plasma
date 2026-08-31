@@ -72,6 +72,8 @@ The WinSW MIT license is shipped in the installed release. The binary is not che
 
 SCM services are installed by Windows Installer itself; Task Scheduler is not used. The Console service declares an SCM dependency on the Manager service.
 
+The Console launcher establishes `runtime\console` as the process working directory before starting the standalone Vinext `server.js`. This working-directory contract is part of the packaged Web runtime: SSR can start from another directory, but Vinext resolves packaged `/assets/*` client files relative to the standalone runtime root. The launcher also enables the Control Station fleet UI explicitly instead of inheriting the standalone PPU default.
+
 ## Self-contained runtime ownership
 
 Windows no longer treats Python or Node.js as host prerequisites. The MSI contains pinned runtimes under the immutable release tree:
@@ -142,15 +144,19 @@ source checkout
   -> assert launchers bind to installed bundled Python/Node paths
   -> SCM registration + initial service start
   -> Manager health
-  -> Console health
+  -> Console root HTML
+  -> fetch every referenced packaged CSS/JavaScript asset and require HTTP 200 + non-empty content
   -> Browser-style Fetch using installed bundled Node: Console/BFF -> Manager
   -> SCM restart persistence
+  -> revalidate packaged CSS/JavaScript assets after restart
   -> SCM stop/start
   -> MSI uninstall
   -> service removal
   -> mutable config preservation
   -> upload MSI + SHA-256 artifact
 ```
+
+The static-asset check closes a gap that a plain HTTP-200 Console readiness probe cannot detect: the standalone server can render SSR HTML while `/assets/*.css` and `/assets/*.js` fail if the service starts from the wrong working directory.
 
 The Browser/BFF smoke points Manager at a deliberately unused loopback PPU endpoint and expects the existing structured `ppu_transport_error` path. This proves the installed Console/BFF -> Manager boundary without claiming PPU or Z2 acceptance.
 
@@ -166,6 +172,7 @@ bundled CPython runtime ownership             PASS
 bundled Node.js runtime ownership             PASS
 SCM Manager service                          PASS
 SCM Console/BFF service                      PASS
+packaged Console CSS/JavaScript serving      PASS
 install / restart / stop-start / uninstall   PASS
 mutable config preservation                  PASS
 ```
