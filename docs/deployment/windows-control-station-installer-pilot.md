@@ -71,7 +71,23 @@ Node.js >= 22.13
 Python >= 3.11
 ```
 
-Service launchers resolve supported system-wide locations and fail closed when the required runtime is not available. npm, pip, Git, Vite and the source worktree are not target-runtime requirements.
+Both services run under Windows SCM as `LocalSystem`. Therefore an external runtime must be machine-visible; an interactive user's `PATH` is not a service-runtime contract.
+
+The Manager launcher resolves Python in this order:
+
+```text
+%ProgramFiles%\Python313\python.exe
+%ProgramFiles%\Python312\python.exe
+%ProgramFiles%\Python311\python.exe
+HKLM PEP 514 PythonCore registration, including custom install locations
+service-context PATH
+```
+
+This allows a machine-wide Python installation to live outside `C:\Program Files` while remaining discoverable through the standard PEP 514 machine registration. A Python installation that exists only in one user's `PATH` or HKCU is intentionally not accepted for a `LocalSystem` service, because a user-writable interpreter must not become a SYSTEM execution boundary.
+
+The Console launcher resolves Node.js from `%ProgramFiles%\nodejs\node.exe` and the service-context PATH.
+
+Service launchers validate the minimum runtime version and fail closed when a supported machine-visible runtime is unavailable. npm, pip, Git, Vite and the source worktree are not target-runtime requirements.
 
 Bundling Node/Python is deferred because it changes redistribution, security-update and installer ownership responsibilities.
 
@@ -101,6 +117,8 @@ source checkout
   -> pinned WinSW download + SHA-256 verification
   -> pinned WiX CLI install
   -> unsigned MSI build
+  -> expose Node as a machine-visible runtime
+  -> register setup-python through HKLM PEP 514 at its actual custom path
   -> MSI install
   -> SCM registration + initial service start
   -> Manager health
@@ -114,6 +132,8 @@ source checkout
   -> upload MSI + SHA-256 artifact
 ```
 
+The Python acceptance setup intentionally no longer creates a fake `%ProgramFiles%\Python312` junction. It exercises the real-host class of installation where Python is machine-wide but installed at a custom location and is discovered through HKLM PEP 514 registration.
+
 The Browser/BFF smoke points Manager at a deliberately unused loopback PPU endpoint and expects the existing structured `ppu_transport_error` path. This proves the installed Console/BFF -> Manager boundary without claiming PPU or Z2 acceptance.
 
 ## Evidence boundary
@@ -126,6 +146,7 @@ Windows MSI construction                    PASS
 ProgramFiles / ProgramData placement        PASS
 SCM Manager service                         PASS
 SCM Console/BFF service                     PASS
+machine-registered custom-path Python       PASS
 install / restart / stop-start / uninstall  PASS
 mutable config preservation                 PASS
 ```
@@ -135,6 +156,7 @@ It does not prove:
 ```text
 code signing / trusted publisher             NOT PROVEN
 bundled Node/Python                          NOT IMPLEMENTED
+per-user-only Python as LocalSystem runtime  INTENTIONALLY UNSUPPORTED
 upgrade / rollback migration                 NOT IMPLEMENTED
 real operator Windows machine                NOT PROVEN BY CI
 Manager -> real Z2                           NOT PROVEN
