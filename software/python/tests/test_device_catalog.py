@@ -40,9 +40,7 @@ def test_explicit_legacy_search_ranks_exact_then_prefix_then_partial_case_insens
     path = tmp_path / "catalog.csv"
     _write_legacy_catalog(path)
     catalog = DeviceCatalog.from_csv(path)
-
     matches = catalog.search("abc123")
-
     assert [record.identifier for record in matches] == ["ABC123", "ABC1234", "XABC123X"]
 
 
@@ -50,9 +48,7 @@ def test_resolve_uses_server_catalog_identity_case_insensitively(tmp_path: Path)
     path = tmp_path / "catalog.csv"
     _write_legacy_catalog(path)
     catalog = DeviceCatalog.from_csv(path)
-
     record = catalog.resolve("vendor a", "abc123")
-
     assert record is not None
     assert record.vendor == "Vendor A"
     assert record.identifier == "ABC123"
@@ -63,7 +59,6 @@ def test_empty_query_returns_no_results(tmp_path: Path) -> None:
     path = tmp_path / "catalog.csv"
     _write_legacy_catalog(path)
     catalog = DeviceCatalog.from_csv(path)
-
     assert catalog.search("   ") == []
 
 
@@ -71,7 +66,6 @@ def test_search_limit_is_bounded(tmp_path: Path) -> None:
     path = tmp_path / "catalog.csv"
     _write_legacy_catalog(path)
     catalog = DeviceCatalog.from_csv(path)
-
     for invalid in (0, 101, True):
         try:
             catalog.search("ABC", limit=invalid)  # type: ignore[arg-type]
@@ -81,10 +75,9 @@ def test_search_limit_is_bounded(tmp_path: Path) -> None:
             raise AssertionError(f"invalid limit was accepted: {invalid!r}")
 
 
-def test_checked_in_production_catalog_contains_only_176_admitted_exact_icpns() -> None:
+def test_checked_in_production_catalog_contains_only_189_admitted_exact_icpns() -> None:
     catalog = get_default_device_catalog()
-
-    assert catalog.size == 176
+    assert catalog.size == 189
     assert catalog.catalog_id == "plasma-icpn"
     assert catalog.catalog_version == "1.0.0"
     assert catalog.status == "production"
@@ -98,13 +91,13 @@ def test_checked_in_production_catalog_contains_only_176_admitted_exact_icpns() 
 
 def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     catalog = get_default_device_catalog()
-
     exact = catalog.search("stm32f407vgt6", limit=1)[0]
     batch1 = catalog.search("stm32f429zgy6tr", limit=1)[0]
     batch2 = catalog.search("stm32f437vgt7tr", limit=1)[0]
     phase40 = catalog.search("stm32f446zej7tr", limit=1)[0]
     foundation = catalog.search("stm32f405vgt7tr", limit=1)[0]
     foundation_batch3 = catalog.search("stm32f412zet7tr", limit=1)[0]
+    foundation_batch4 = catalog.search("stm32f427zit7tr", limit=1)[0]
     family = catalog.search("STM32F4", limit=100)
     combined = catalog.search("STMicroelectronics STM32F4", limit=100)
 
@@ -132,8 +125,12 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert foundation_batch3.pin_count == "144"
     assert foundation_batch3.flash_size == "512 KiB"
     assert foundation_batch3.target_config == "tcl/target/stm32f4x.cfg"
-    # Search results are intentionally capped at 100; metadata below proves the full
-    # production family contains 101 admitted STM32F4 rows.
+    assert foundation_batch4.identifier == "STM32F427ZIT7TR"
+    assert foundation_batch4.package == "LQFP"
+    assert foundation_batch4.pin_count == "144"
+    assert foundation_batch4.flash_size == "2048 KiB"
+    assert foundation_batch4.target_config == "tcl/target/stm32f4x.cfg"
+    # Search results remain capped at 100 while metadata proves the full 114-row F4 family.
     assert len(family) == 100
     assert len(combined) == 100
 
@@ -141,7 +138,6 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
 def test_production_payload_separates_catalog_verification_from_physical_validation() -> None:
     record = get_default_device_catalog().search("STM32F103C8T6", limit=1)[0]
     payload = record.to_payload()
-
     assert payload["icpn"] == "STM32F103C8T6"
     assert payload["catalog"]["scope"] == "production_admitted"
     assert payload["catalog"]["version"] == "1.0.0"
@@ -156,16 +152,15 @@ def test_production_payload_separates_catalog_verification_from_physical_validat
 
 def test_production_metadata_reports_vendor_family_taxonomy() -> None:
     metadata = get_default_device_catalog().metadata
-
-    assert metadata["catalog_size"] == 176
+    assert metadata["catalog_size"] == 189
     assert metadata["source_count"] == 2
     assert metadata["taxonomy"] == [
         {
             "vendor": "STMicroelectronics",
-            "count": 176,
+            "count": 189,
             "families": [
                 {"family": "STM32F1", "count": 75},
-                {"family": "STM32F4", "count": 101},
+                {"family": "STM32F4", "count": 114},
             ],
         }
     ]
