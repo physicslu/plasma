@@ -16,35 +16,25 @@ function Test-VersionAtLeast([string]$Version, [int]$Major, [int]$Minor, [int]$P
     return $actual -ge $required
 }
 
-function Get-MachinePathCandidates([string]$ExecutableName) {
-    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-    if ([string]::IsNullOrWhiteSpace($machinePath)) { return }
-    foreach ($entry in $machinePath -split ';') {
-        if ([string]::IsNullOrWhiteSpace($entry)) { continue }
-        $directory = [Environment]::ExpandEnvironmentVariables($entry.Trim().Trim('"'))
-        if ([string]::IsNullOrWhiteSpace($directory)) { continue }
-        Join-Path $directory $ExecutableName
+function Resolve-BundledNode {
+    $candidate = Join-Path $PSScriptRoot '..\host-runtime\node\node.exe'
+    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+        throw "Bundled Node.js runtime is missing from the immutable Plasma release: $candidate"
     }
+    $resolved = (Resolve-Path -LiteralPath $candidate).Path
+    $versionOutput = & $resolved --version 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Bundled Node.js runtime failed version probe: $resolved"
+    }
+    $version = ([string]$versionOutput).Trim()
+    if (-not (Test-VersionAtLeast $version 22 13 0)) {
+        throw "Bundled Node.js runtime is below the supported minimum 22.13: $version"
+    }
+    return $resolved
 }
 
-function Resolve-Node {
-    $candidates = @("$env:ProgramFiles\nodejs\node.exe")
-    $candidates += @(Get-MachinePathCandidates 'node.exe')
-    foreach ($rawCandidate in $candidates | Select-Object -Unique) {
-        if ($null -eq $rawCandidate) { continue }
-        $candidate = ([string]$rawCandidate).Trim().Trim('"')
-        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
-        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
-        $versionOutput = & $candidate --version 2>&1
-        if ($LASTEXITCODE -ne 0) { continue }
-        $version = ([string]$versionOutput).Trim()
-        if (Test-VersionAtLeast $version 22 13 0) { return $candidate }
-    }
-    throw 'Node.js >= 22.13 was not found in the system-wide Program Files location or machine PATH. Per-user-only Node.js installations are not supported by the LocalSystem service.'
-}
-
-$node = Resolve-Node
-Write-Output "Plasma Console Node.js runtime: $node"
+$node = Resolve-BundledNode
+Write-Output "Plasma Console bundled Node.js runtime: $node"
 if ($PreflightOnly) { exit 0 }
 
 $programDataRoot = Join-Path $env:ProgramData 'Plasma'
