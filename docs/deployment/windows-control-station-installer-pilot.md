@@ -80,14 +80,14 @@ The Manager launcher resolves Python in this order:
 %ProgramFiles%\Python312\python.exe
 %ProgramFiles%\Python311\python.exe
 HKLM PEP 514 PythonCore registration, including custom install locations
-service-context PATH
+machine PATH
 ```
 
 This allows a machine-wide Python installation to live outside `C:\Program Files` while remaining discoverable through the standard PEP 514 machine registration. A Python installation that exists only in one user's `PATH` or HKCU is intentionally not accepted for a `LocalSystem` service, because a user-writable interpreter must not become a SYSTEM execution boundary.
 
-The Console launcher resolves Node.js from `%ProgramFiles%\nodejs\node.exe` and the service-context PATH.
+The Console launcher resolves Node.js from `%ProgramFiles%\nodejs\node.exe` and the machine PATH. Both launchers explicitly read the machine PATH rather than inheriting the interactive installer's user PATH, so installation and SCM execution use the same prerequisite contract.
 
-Service launchers validate the minimum runtime version and fail closed when a supported machine-visible runtime is unavailable. npm, pip, Git, Vite and the source worktree are not target-runtime requirements.
+Service launchers validate the minimum runtime version and fail closed when a supported machine-visible runtime is unavailable. They also expose a `-PreflightOnly` mode so installer/runtime validation can exercise exactly the same resolver without starting the application payload. npm, pip, Git, Vite and the source worktree are not target-runtime requirements.
 
 Bundling Node/Python is deferred because it changes redistribution, security-update and installer ownership responsibilities.
 
