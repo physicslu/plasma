@@ -68,7 +68,9 @@ The production manifest is bound to the final STM32F4 CSV SHA-256 and Git blob a
 
 ## Base-drift handling
 
-The transaction started from `main` commit `1e5c680fb4632340d0c9b0cfe117ab05cd038f81`, the merge result of Batch4. Before controlled publish, `main` was rechecked and remained at the same commit, so the Device Catalog production baseline did not drift during Batch5 admission.
+The transaction started from `main` commit `1e5c680fb4632340d0c9b0cfe117ab05cd038f81`, the merge result of Batch4. Before controlled publish, `main` was rechecked and remained at the same commit, so the Device Catalog production baseline did not drift during admission.
+
+After publish and closure work, `main` advanced to `83ea3ad9d88fe87dc0439ae597eedb3b664075db` through PR #261 (`windows: fix packaged Console static asset serving`). The newer `main` production manifest was inspected directly and still reports STM32F4 row count `114`, CSV SHA-256 `f90a3a5dd94e1d43ae2ddc208c372bdfd7fdb99cc03c5848b34f3c242a051687`, and Git blob `2d8428e02f61ce5f7453ff0dc1667e150878d74c`. Therefore the base move is unrelated to Device Catalog state. Final exact-head PR CI is re-triggered after this observation so the synthetic merge is validated against the newer `main`; stale green runs from the older base are not accepted as the merge gate.
 
 ## Post-admission lifecycle proof
 
