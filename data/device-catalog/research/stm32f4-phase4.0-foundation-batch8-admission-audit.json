@@ -1,0 +1,30 @@
+{
+  "added": [
+    "STM32F417VET6",
+    "STM32F417VET6TR",
+    "STM32F417ZET6"
+  ],
+  "admission_plan_sha256": "f4f79a0850d50f3ec7f09123e901d08a201eec7300ede4eed4a1db929d8e8b5a",
+  "canonical_dataset_written": true,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 3,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_artifact_id": "9757414867",
+  "evidence_id": "stm32f4-phase4.0-foundation-batch8-2026-08-31-retained-20260831T121653Z-5299281",
+  "final_csv_sha256": "c37c2931bd27c5754a65cc3e1d7f14702637f95153941abc650b0b30d526eae8",
+  "final_git_blob_sha": "b59a46cc242d7d7921c287d8c656eab6e603e0d2",
+  "issues": [],
+  "new_exact_icpns": 3,
+  "phase": "stm32f4-phase4.0-foundation-batch8",
+  "post_rows": 143,
+  "pre_csv_sha256": "f7fbf1d8b6bcc7728f20dcb30c0b261e4b315459f05f76d6123308621f66a0a7",
+  "pre_git_blob_sha": "34ad23b2e689bab51b1819ae015e0d334f63cd85",
+  "pre_rows": 140,
+  "proposal_artifact_id": "9757487138",
+  "proposal_workflow_run_id": "33391164641",
+  "schema_version": 1
+}
