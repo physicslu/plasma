@@ -47,12 +47,26 @@ def test_winsw_hash_fails_closed(tmp_path: Path) -> None:
         module.verify_winsw(winsw)
 
 
-def test_windows_service_launchers_cover_empty_alias_and_python_probe_regressions() -> None:
+def test_windows_service_launchers_cover_empty_alias_and_machine_runtime_regressions() -> None:
     manager = (REPO_ROOT / "packaging" / "windows" / "run-manager.ps1").read_text(encoding="utf-8")
     console = (REPO_ROOT / "packaging" / "windows" / "run-console.ps1").read_text(encoding="utf-8")
+
+    assert "Get-MachineRegisteredPythonCandidates" in manager
+    assert "HKLM:\\SOFTWARE\\Python\\PythonCore" in manager
+    assert "HKLM:\\SOFTWARE\\WOW6432Node\\Python\\PythonCore" in manager
+    assert "ExecutablePath" in manager
+    assert "GetEnvironmentVariable('Path', 'Machine')" in manager
+    assert "Get-Command python.exe" not in manager
     assert "& $candidate --version" in manager
     assert "-replace '^Python\\s+', ''" in manager
+    assert "Per-user-only Python installations are not supported" in manager
+    assert "[switch]$PreflightOnly" in manager
     assert "-c 'import sys;" not in manager
+
+    assert "GetEnvironmentVariable('Path', 'Machine')" in console
+    assert "Get-Command node.exe" not in console
+    assert "Per-user-only Node.js installations are not supported" in console
+    assert "[switch]$PreflightOnly" in console
     assert "$null -ne $aliasContent" in console
     assert "([string]$aliasContent).Trim()" in console
 
