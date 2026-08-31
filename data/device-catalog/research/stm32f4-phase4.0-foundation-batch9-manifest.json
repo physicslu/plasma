@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch9-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F429ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429zg.html",
+      "selection_reason": "production-admitted lifecycle control in the same STM32F429 technical cluster; verifies extraction and mapping stability while expanding the adjacent flash-density variant"
+    },
+    {
+      "base_device": "STM32F429ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ze.html",
+      "selection_reason": "fresh post-Batch8 policy-ready STM32F429 gap selected as a bounded same-series flash-density variant under the current admission policy"
+    }
+  ]
+}
