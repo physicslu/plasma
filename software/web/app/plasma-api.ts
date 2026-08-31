@@ -245,10 +245,7 @@ export function getPpuExecutionActivityCount(): number {
 
 export function normalizeApiBase(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed) {
-    if (typeof window === "undefined") return "";
-    return window.location.origin;
-  }
+  if (!trimmed) return "";
   const url = new URL(trimmed);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Plasma Web REST Gateway URL 必須使用 http:// 或 https://");
