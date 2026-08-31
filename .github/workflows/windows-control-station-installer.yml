@@ -1,0 +1,138 @@
+name: Windows Control Station installer acceptance
+
+on:
+  push:
+    paths:
+      - "packaging/windows/**"
+      - "scripts/windows-control-station-msi.py"
+      - "scripts/windows-control-station-installer-acceptance.py"
+      - "scripts/control-station-runtime.py"
+      - "scripts/control-station-release.py"
+      - "scripts/product-release.py"
+      - "software/web/**"
+      - "software/python/plasma_manager/**"
+      - "software/python/pyproject.toml"
+      - "software/python/tests/test_windows_control_station_installer.py"
+      - "release/product.json"
+      - ".github/workflows/windows-control-station-installer.yml"
+      - "docs/deployment/**"
+  pull_request:
+    paths:
+      - "packaging/windows/**"
+      - "scripts/windows-control-station-msi.py"
+      - "scripts/windows-control-station-installer-acceptance.py"
+      - "scripts/control-station-runtime.py"
+      - "scripts/control-station-release.py"
+      - "scripts/product-release.py"
+      - "software/web/**"
+      - "software/python/plasma_manager/**"
+      - "software/python/pyproject.toml"
+      - "software/python/tests/test_windows_control_station_installer.py"
+      - "release/product.json"
+      - ".github/workflows/windows-control-station-installer.yml"
+      - "docs/deployment/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer-pilot:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.0"
+          cache: npm
+          cache-dependency-path: software/web/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Install build and test dependencies
+        run: python -m pip install ./software/python pytest
+      - name: Install Web build dependencies
+        working-directory: software/web
+        run: npm ci
+      - name: Build standalone Control Station Console
+        working-directory: software/web
+        run: npm run build:product
+      - name: Build Control Station runtime
+        run: >-
+          python scripts/control-station-runtime.py build
+          --standalone-console software/web/dist/standalone
+          --output-dir "${{ runner.temp }}\plasma-control-station-runtime"
+      - name: Run Windows installer packaging regression tests
+        run: >-
+          python -m pytest -q
+          software/python/tests/test_windows_control_station_installer.py
+          software/python/tests/test_control_station_runtime.py
+      - name: Build and verify Windows Common Release Format input
+        shell: pwsh
+        run: |
+          python scripts/control-station-release.py `
+            --runtime-dir "${{ runner.temp }}\plasma-control-station-runtime" `
+            --output-dir "${{ runner.temp }}\plasma-control-station-release" `
+            --platform windows `
+            --architecture x86_64 `
+            --git-sha "${{ github.sha }}"
+          $release = Get-ChildItem "${{ runner.temp }}\plasma-control-station-release" -Filter *.zip | Select-Object -First 1
+          if (-not $release) { throw 'Windows Control Station release artifact was not created' }
+          if (-not (Test-Path "$($release.FullName).sha256")) { throw 'release SHA-256 sidecar is missing' }
+      - name: Fetch pinned WinSW service adapter
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe'
+          $target = "${{ runner.temp }}\WinSW-x64.exe"
+          Invoke-WebRequest -Uri $url -OutFile $target
+          $actual = (Get-FileHash -Algorithm SHA256 $target).Hash.ToLowerInvariant()
+          $expected = '05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da'
+          if ($actual -ne $expected) { throw "WinSW SHA-256 mismatch: $actual" }
+      - name: Install pinned WiX Toolset build CLI
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix --version
+      - name: Build unsigned Windows MSI pilot
+        shell: pwsh
+        run: |
+          $release = Get-ChildItem "${{ runner.temp }}\plasma-control-station-release" -Filter *.zip | Select-Object -First 1
+          python scripts/windows-control-station-msi.py `
+            --release-artifact $release.FullName `
+            --winsw-exe "${{ runner.temp }}\WinSW-x64.exe" `
+            --output-dir "${{ runner.temp }}\plasma-windows-installer"
+      - name: Expose stable system-wide external runtimes to SCM pilot
+        shell: pwsh
+        run: |
+          $node = (Get-Command node.exe).Source
+          $python = (Get-Command python.exe).Source
+          $nodeTarget = Join-Path $env:ProgramFiles 'nodejs'
+          $pythonTarget = Join-Path $env:ProgramFiles 'Python312'
+          if (-not (Test-Path $nodeTarget)) {
+            New-Item -ItemType Junction -Path $nodeTarget -Target (Split-Path $node -Parent) | Out-Null
+          }
+          if (-not (Test-Path $pythonTarget)) {
+            New-Item -ItemType Junction -Path $pythonTarget -Target (Split-Path $python -Parent) | Out-Null
+          }
+          & (Join-Path $nodeTarget 'node.exe') --version
+          & (Join-Path $pythonTarget 'python.exe') --version
+      - name: Install, launch, restart, stop/start, and uninstall
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem "${{ runner.temp }}\plasma-windows-installer" -Filter *.msi | Select-Object -First 1
+          if (-not $msi) { throw 'MSI was not created' }
+          python scripts/windows-control-station-installer-acceptance.py --msi $msi.FullName
+      - name: Upload unsigned Windows installer pilot
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-control-station-windows-installer-pilot
+          path: |
+            ${{ runner.temp }}/plasma-windows-installer/*.msi
+            ${{ runner.temp }}/plasma-windows-installer/*.sha256
+          if-no-files-found: error
+          retention-days: 14
