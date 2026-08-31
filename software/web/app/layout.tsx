@@ -18,7 +18,10 @@ const apiBaseStorageMigration = `
     const versionKey = "plasma-api-base-version";
     const migrationComplete = window.localStorage.getItem(versionKey) === "2";
     const apiKey = "plasma-api-base";
-    const defaultApiBase = new URL(${JSON.stringify(DEFAULT_API_BASE)}).toString().replace(/\\/$/, "");
+    const configuredDefaultApiBase = ${JSON.stringify(DEFAULT_API_BASE)};
+    const defaultApiBase = configuredDefaultApiBase
+      ? new URL(configuredDefaultApiBase).toString().replace(/\\/$/, "")
+      : window.location.origin;
     const savedApi = window.localStorage.getItem(apiKey);
     if (savedApi) {
       try {
