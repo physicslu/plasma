@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch6-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F412CG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412cg.html",
+      "selection_reason": "production-admitted lifecycle control in the same F412/F413 technical cluster; verifies extraction and mapping stability while expanding adjacent policy-ready coverage"
+    },
+    {
+      "base_device": "STM32F412ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412zg.html",
+      "selection_reason": "fresh-inventory policy-ready STM32F412 gap extending an already admitted family without changing admission policy"
+    },
+    {
+      "base_device": "STM32F413CG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413cg.html",
+      "selection_reason": "fresh-inventory policy-ready STM32F413 gap selected as part of a coherent F412/F413 bounded evidence batch"
+    },
+    {
+      "base_device": "STM32F413ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413zg.html",
+      "selection_reason": "fresh-inventory policy-ready STM32F413 gap paired with STM32F413CG to cover adjacent package variants under the current admission policy"
+    }
+  ]
+}
