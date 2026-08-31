@@ -1,0 +1,69 @@
+name: Device catalog Phase 4.0 foundation batch5 retain evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  retain-stm32f4-foundation-batch5:
+    if: github.event.pull_request.number == 260 && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download and verify exact retained artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: "9746660760"
+          ARTIFACT_ZIP_SHA256: "668a96c350150ae075e9e81a6088063c1f0f076cb799d933a2106277ad31c9b9"
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            --output /tmp/phase40-batch5-retained.zip
+          echo "${ARTIFACT_ZIP_SHA256}  /tmp/phase40-batch5-retained.zip" | sha256sum --check --strict
+          rm -rf /tmp/phase40-batch5-retained
+          mkdir -p /tmp/phase40-batch5-retained
+          unzip -q /tmp/phase40-batch5-retained.zip -d /tmp/phase40-batch5-retained
+          test "$(find /tmp/phase40-batch5-retained -maxdepth 1 -type f | wc -l)" -eq 6
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir /tmp/phase40-batch5-retained \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch5-baseline.json
+      - name: Retain artifact bytes in repository
+        run: |
+          set -euo pipefail
+          dest="data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch5-live-2026-08-31"
+          rm -rf "${dest}"
+          mkdir -p "${dest}"
+          for name in README.md control-summary.json evaluation.json pilot-summary.json provenance.json manifest.json; do
+            cp "/tmp/phase40-batch5-retained/${name}" "${dest}/${name}"
+          done
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir "${dest}" \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch5-baseline.json
+      - name: Remove one-shot retention workflow and commit evidence
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          rm .github/workflows/device-catalog-phase40-foundation-batch5-retain.yml
+          git add \
+            data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch5-live-2026-08-31 \
+            .github/workflows/device-catalog-phase40-foundation-batch5-retain.yml
+          git diff --cached --check
+          test "$(git diff --cached --name-only | grep -c '^data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch5-live-2026-08-31/')" -eq 6
+          test "$(git diff --cached --name-only | grep -c '^\.github/workflows/device-catalog-phase40-foundation-batch5-retain.yml$')" -eq 1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "device-catalog: retain STM32F4 foundation batch5 evidence"
+          git push origin "HEAD:${HEAD_REF}"
