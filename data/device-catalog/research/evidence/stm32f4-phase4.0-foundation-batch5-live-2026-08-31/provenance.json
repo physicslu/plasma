@@ -1,0 +1,45 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_time_utc": {
+    "control": "2026-08-31T05:33:03Z",
+    "pilot_first": "2026-08-31T05:33:03Z",
+    "pilot_last": "2026-08-31T05:33:37Z"
+  },
+  "acquisition_transport": "chromium_rendered_dom",
+  "baseline": {
+    "pilot_id": "stm32f4-phase4.0-foundation-batch5-2026-08-31",
+    "schema_version": 1,
+    "sha256": "fb2796d1a87f93027c097006389a2703f5453e7f466f450f8d2606aa5bc62e64"
+  },
+  "canonical_dataset_admission": false,
+  "chromium_version": "151.0.7922.34",
+  "evaluator_result": "scale_ready",
+  "evidence_id": "stm32f4-phase4.0-foundation-batch5-2026-08-31-retained-20260831T053303Z-5f76683",
+  "exact_icpn_candidate_count": 14,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F437VI",
+      "icpn": "STM32F437VIT6WTR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "executed_git_sha": "5f7668361a6bd8e31c772fe7e3d875c7e1ac38f5",
+  "headed": true,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 6,
+      "attempt": 1,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 1,
+  "manufacturer": "STMicroelectronics",
+  "playwright_version": "1.62.0",
+  "scale_ready": true,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 6
+}

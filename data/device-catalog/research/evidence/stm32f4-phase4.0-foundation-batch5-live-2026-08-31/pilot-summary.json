@@ -1,0 +1,480 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 6,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 6,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 14,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 6,
+      "attempt": 1,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 1,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 6,
+    "total": 6
+  },
+  "pilot_id": "stm32f4-phase4.0-foundation-batch5-2026-08-31",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F437VG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F437VGTx",
+          "icpn": "STM32F437VGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437VGTx",
+          "icpn": "STM32F437VGT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437VGTx",
+          "icpn": "STM32F437VGT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437VGTx",
+          "icpn": "STM32F437VGT7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F437VG",
+        "evidence_section_sha256": "ade531dc001b667124bf1775b5e433da8ba3b488dea9c748888578e420576e34",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F437VGT6",
+          "STM32F437VGT6TR",
+          "STM32F437VGT7",
+          "STM32F437VGT7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F437VGT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437VGT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437VGT7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437VGT7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "da836a0d1c4871a230ac4ac0768a6ddc1fc4a68865e26185b6724ea003c4742f",
+        "retrieved_at_utc": "2026-08-31T05:33:03Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vg.html"
+      },
+      "selection_reason": "production-admitted lifecycle control in the same F437/F439 technical cluster; verifies extraction and mapping stability while expanding adjacent policy-ready coverage",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F437VI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F437VITx",
+          "icpn": "STM32F437VIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437VITx",
+          "icpn": "STM32F437VIT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437VITx",
+          "icpn": "STM32F437VIT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437VITx",
+          "icpn": "STM32F437VIT7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F437VI",
+        "evidence_section_sha256": "fa281461a0912bff98ca453778e0b1756db0e5e77d826f4ca0ac46dce8ab3314",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F437VIT6",
+          "STM32F437VIT6TR",
+          "STM32F437VIT7",
+          "STM32F437VIT7TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F437VIT6WTR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F437VIT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437VIT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32F437VIT6WTR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437VIT7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437VIT7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "7ee5b0733734bc0d9fef70b0066ab6efd1947683a348fcf66bf5ad31b2529d0c",
+        "retrieved_at_utc": "2026-08-31T05:33:11Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vi.html"
+      },
+      "selection_reason": "policy-ready STM32F437 gap selected as part of a coherent F437/F439 bounded evidence batch",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437vi.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F437ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F437ZGTx",
+          "icpn": "STM32F437ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F437ZG",
+        "evidence_section_sha256": "45968acf577f68bb214c9d177737ee492233aa17b0cd9fa8169b0b164fab42ea",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F437ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F437ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b8f242ba2d1f68c6e132bdc287c1e02317b9585f9739c8ed1557d8a65e5c297f",
+        "retrieved_at_utc": "2026-08-31T05:33:20Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437zg.html"
+      },
+      "selection_reason": "policy-ready STM32F437 gap paired with F437VI to cover adjacent package variants under the current admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F437ZI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F437ZITx",
+          "icpn": "STM32F437ZIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437ZITx",
+          "icpn": "STM32F437ZIT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437ZITx",
+          "icpn": "STM32F437ZIT7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F437ZI",
+        "evidence_section_sha256": "1a775868d215a2b0f5eea32739fa9cd8e11ab38b6ef351ed4d284f61e4589e7d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F437ZIT6",
+          "STM32F437ZIT7",
+          "STM32F437ZIT7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437zi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F437ZIT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437ZIT7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437ZIT7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "eb761f8ac3084c2ac45b628aeee3b2a543b1dce71fde274571328ed0f7fa2e61",
+        "retrieved_at_utc": "2026-08-31T05:33:30Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437zi.html"
+      },
+      "selection_reason": "policy-ready STM32F437 gap extending the same technical cluster without changing admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437zi.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F439VG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F439VGTx",
+          "icpn": "STM32F439VGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F439VG",
+        "evidence_section_sha256": "3f0ec72f051c979bcdea2844ecb7229870ca2a566f4cf7f1b9722785f7a18d80",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F439VGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F439VGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "db7fb76e5e92126d5a3d03913506c528cf789c77b0a4033e3ff71308b46e3733",
+        "retrieved_at_utc": "2026-08-31T05:33:34Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vg.html"
+      },
+      "selection_reason": "policy-ready STM32F439 gap adjacent to the admitted STM32F437VG lifecycle control",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F439VI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F439VITx",
+          "icpn": "STM32F439VIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F439VI",
+        "evidence_section_sha256": "92c518565d98e82f38e5c0ed9dbc69bc70118d32ed34b4b660b65ed37b1c3ac5",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F439VIT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F439VIT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "95c9cb8ab09ac5e2e02c191751ebcb32c8b55375f16fa2e092dffa952ea57a6e",
+        "retrieved_at_utc": "2026-08-31T05:33:37Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vi.html"
+      },
+      "selection_reason": "policy-ready STM32F439 gap completing the five-new-target bounded batch while preserving a single-cluster evidence focus",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439vi.html"
+    }
+  ],
+  "schema_version": 1
+}
