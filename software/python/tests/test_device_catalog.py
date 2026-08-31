@@ -81,10 +81,10 @@ def test_search_limit_is_bounded(tmp_path: Path) -> None:
             raise AssertionError(f"invalid limit was accepted: {invalid!r}")
 
 
-def test_checked_in_production_catalog_contains_only_147_admitted_exact_icpns() -> None:
+def test_checked_in_production_catalog_contains_only_160_admitted_exact_icpns() -> None:
     catalog = get_default_device_catalog()
 
-    assert catalog.size == 147
+    assert catalog.size == 160
     assert catalog.catalog_id == "plasma-icpn"
     assert catalog.catalog_version == "1.0.0"
     assert catalog.status == "production"
@@ -103,6 +103,7 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     batch1 = catalog.search("stm32f429zgy6tr", limit=1)[0]
     batch2 = catalog.search("stm32f437vgt7tr", limit=1)[0]
     phase40 = catalog.search("stm32f446zej7tr", limit=1)[0]
+    foundation = catalog.search("stm32f405vgt7tr", limit=1)[0]
     family = catalog.search("STM32F4", limit=100)
     combined = catalog.search("STMicroelectronics STM32F4", limit=100)
 
@@ -120,8 +121,13 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert phase40.package == "UFBGA"
     assert phase40.pin_count == "144"
     assert phase40.target_config == "tcl/target/stm32f4x.cfg"
-    assert len(family) == 72
-    assert len(combined) == 72
+    assert foundation.identifier == "STM32F405VGT7TR"
+    assert foundation.package == "LQFP"
+    assert foundation.pin_count == "100"
+    assert foundation.flash_size == "1024 KiB"
+    assert foundation.target_config == "tcl/target/stm32f4x.cfg"
+    assert len(family) == 85
+    assert len(combined) == 85
 
 
 def test_production_payload_separates_catalog_verification_from_physical_validation() -> None:
@@ -143,15 +149,15 @@ def test_production_payload_separates_catalog_verification_from_physical_validat
 def test_production_metadata_reports_vendor_family_taxonomy() -> None:
     metadata = get_default_device_catalog().metadata
 
-    assert metadata["catalog_size"] == 147
+    assert metadata["catalog_size"] == 160
     assert metadata["source_count"] == 2
     assert metadata["taxonomy"] == [
         {
             "vendor": "STMicroelectronics",
-            "count": 147,
+            "count": 160,
             "families": [
                 {"family": "STM32F1", "count": 75},
-                {"family": "STM32F4", "count": 72},
+                {"family": "STM32F4", "count": 85},
             ],
         }
     ]

@@ -24,32 +24,35 @@ BASELINE = HERE / "stm32f4-phase3.3-scaleout-batch2-baseline.json"
 CATALOG = HERE / "openocd-parts-canonical.csv"
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
 AUDIT = HERE / "stm32f4-phase3.3-scaleout-batch2-admission-audit.json"
-PHASE40_AUDIT = HERE / "stm32f4-phase4.0-f446-batch1-admission-audit.json"
 NEW_BASES = {"STM32F407ZE", "STM32F415VG", "STM32F427VG", "STM32F427ZG", "STM32F437VG"}
+HISTORICAL_POST_BATCH2_EVIDENCE_IDS = {
+    "stm32f4-phase3.1-bounded-pilot-2026-08-30-retained-20260830T023035Z-b42d460",
+    "stm32f4-phase3.3-scaleout-batch1-2026-08-30-retained-20260830T040319Z-db7f090",
+    "stm32f4-phase3.3-scaleout-batch2-2026-08-30-retained-20260830T063333Z-cb883bb",
+}
 
 
 class STM32F4Phase33ScaleoutBatch2Tests(unittest.TestCase):
     def _audit(self) -> dict[str, object]:
         return json.loads(AUDIT.read_text(encoding="utf-8"))
 
-    def _phase40_icpns(self) -> set[str]:
-        audit = json.loads(PHASE40_AUDIT.read_text(encoding="utf-8"))
-        values = set(audit["icpns"])
-        self.assertEqual(len(values), 23)
-        return values
-
     def _historical_post_batch2_canonical(self, output: Path) -> None:
         """Reconstruct the immutable 49-row catalog state at Phase 3.3 batch2 close.
 
-        Today's production catalog may contain later admissions. Historical replay must
-        exclude those later rows rather than treating the current catalog size as a
-        permanent Phase 3.3 invariant.
+        Reconstruction is provenance-cohort based rather than current-row-count based,
+        so later STM32F4 admissions cannot change this historical replay fixture.
         """
-        post_batch2_icpns = self._phase40_icpns()
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if row["icpn"] not in post_batch2_icpns]
+            rows = [
+                row
+                for row in reader
+                if any(
+                    evidence_id in row["source_reference"]
+                    for evidence_id in HISTORICAL_POST_BATCH2_EVIDENCE_IDS
+                )
+            ]
         self.assertEqual(len(rows), 49)
         with output.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
