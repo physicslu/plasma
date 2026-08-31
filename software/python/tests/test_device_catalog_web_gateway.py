@@ -34,10 +34,9 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
     def test_exact_admitted_icpn_search_exposes_production_catalog_without_ppu_runtime(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F103C8T6&limit=5")
-
         self.assertEqual(status, 200)
         self.assertEqual(payload["rest_contract_version"], "3")
-        self.assertEqual(payload["catalog_size"], 176)
+        self.assertEqual(payload["catalog_size"], 189)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F103C8T6")
         self.assertEqual(result["identifier_kind"], "manufacturer_part_number")
@@ -52,24 +51,19 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
     def test_search_is_case_insensitive(self) -> None:
         status, payload = self.request("/api/devices/search?q=stm32f103c8t6")
-
         self.assertEqual(status, 200)
         self.assertEqual(payload["results"][0]["identifier"], "STM32F103C8T6")
 
     def test_family_and_vendor_queries_return_only_admitted_rows(self) -> None:
         status, payload = self.request("/api/devices/search?q=STMicroelectronics%20STM32F4&limit=100")
-
         self.assertEqual(status, 200)
-        # The search contract is capped at 100 records; the full 101-row STM32F4
-        # production count is exposed through catalog metadata.
         self.assertEqual(payload["count"], 100)
-        self.assertEqual(payload["catalog_size"], 176)
+        self.assertEqual(payload["catalog_size"], 189)
         self.assertEqual({item["family"] for item in payload["results"]}, {"STM32F4"})
         self.assertTrue(all(item["icpn"] for item in payload["results"]))
 
     def test_new_scaleout_icpn_is_exposed_only_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F429ZGY6TR&limit=5")
-
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         self.assertEqual(payload["results"][0]["icpn"], "STM32F429ZGY6TR")
@@ -78,7 +72,6 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
     def test_batch2_icpn_is_exposed_only_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F437VGT7TR&limit=5")
-
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         self.assertEqual(payload["results"][0]["icpn"], "STM32F437VGT7TR")
@@ -87,7 +80,6 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
     def test_phase40_f446_icpn_is_exposed_only_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F446ZEJ7TR&limit=5")
-
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
@@ -99,7 +91,6 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
     def test_phase40_foundation_batch2_icpn_is_exposed_only_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F405VGT7TR&limit=5")
-
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
@@ -112,7 +103,6 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
     def test_phase40_foundation_batch3_icpn_is_exposed_only_after_admission(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32F412ZET7TR&limit=5")
-
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
@@ -123,44 +113,48 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["flash_size"], "512 KiB")
         self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
 
+    def test_phase40_foundation_batch4_icpn_is_exposed_only_after_admission(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F427ZIT7TR&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32F427ZIT7TR")
+        self.assertEqual(result["family"], "STM32F4")
+        self.assertEqual(result["package"], "LQFP")
+        self.assertEqual(result["pin_count"], "144")
+        self.assertEqual(result["flash_size"], "2048 KiB")
+        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
+
     def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:
         status, payload = self.request("/api/devices/search?q=ADUC7019BCPZ62I")
-
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 0)
         self.assertEqual(payload["results"], [])
 
     def test_empty_query_is_valid_for_catalog_metadata_idle_state(self) -> None:
         status, payload = self.request("/api/devices/search?q=")
-
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], 176)
+        self.assertEqual(payload["catalog_size"], 189)
         self.assertEqual(payload["count"], 0)
         self.assertEqual(payload["results"], [])
 
     def test_invalid_limit_fails_closed(self) -> None:
         status, payload = self.request("/api/devices/search?q=STM32&limit=101")
-
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"]["error_type"], "INVALID_DEVICE_SEARCH")
 
     def test_engineering_job_target_device_resolves_to_admitted_exact_icpn(self) -> None:
         record = get_default_device_catalog().search("STM32F407VGT6", limit=1)[0]
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
-
         request = handler._job_request(
             {
                 "site_id": 1,
                 "operation": "erase",
-                "target_device": {
-                    "vendor": record.vendor,
-                    "identifier": record.identifier,
-                },
+                "target_device": {"vendor": record.vendor, "identifier": record.identifier},
             },
             client_id="plasma-web-engineering",
             allow_inline_asset=False,
         )
-
         self.assertEqual(request.target, "STM32F407VGT6")
         self.assertEqual(request.metadata["target_device"]["vendor"], record.vendor)
         self.assertEqual(request.metadata["target_device"]["identifier"], record.identifier)
@@ -169,16 +163,12 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
 
     def test_engineering_job_target_device_fails_closed_when_not_admitted(self) -> None:
         handler = PlasmaWebHandler.__new__(PlasmaWebHandler)
-
         with self.assertRaisesRegex(ValueError, "canonical Device Catalog record"):
             handler._job_request(
                 {
                     "site_id": 1,
                     "operation": "erase",
-                    "target_device": {
-                        "vendor": "Analog Devices",
-                        "identifier": "ADUC7019BCPZ62I",
-                    },
+                    "target_device": {"vendor": "Analog Devices", "identifier": "ADUC7019BCPZ62I"},
                 },
                 client_id="plasma-web-engineering",
                 allow_inline_asset=False,
