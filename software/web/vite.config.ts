@@ -8,6 +8,8 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 const isProductBuild = process.env.PLASMA_PRODUCT_BUILD === "1";
+const localGatewayProxyTarget =
+  process.env.PLASMA_GATEWAY_PROXY_URL ?? "http://127.0.0.1:18080";
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -78,12 +80,11 @@ export default defineConfig(async () => {
         "swpc.tail820e64.ts.net",
       ],
       proxy: {
-        // PPU-local API calls still go to the Python Gateway. Fleet and Manager
-        // namespaces are deliberately excluded so Vinext owns both same-origin
-        // BFF surfaces instead of leaking control-plane requests into the PPU
-        // execution API surface.
+        // PPU-local API calls still go to the Python Gateway. The target is a
+        // server-side integration-host setting, never a Browser-visible API
+        // base. Fleet and Manager namespaces stay owned by Vinext BFF routes.
         "^/api/(?!fleet(?:/|$))(?!manager(?:/|$))": {
-          target: "http://127.0.0.1:18080",
+          target: localGatewayProxyTarget,
           changeOrigin: true,
         },
       },
