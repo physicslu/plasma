@@ -51,8 +51,7 @@ test("Gateway reads stay inside the Browser until Managed routing discovery reso
   const { leakedGatewayRequests, managedStatusRequests } = observeGatewayRouting(page);
 
   let releaseDiscovery!: () => void;
-  const discoveryReleased = new Promise<void>(resolve => { releaseDiscoveryReleased = resolve; });
-  let releaseDiscoveryReleased!: () => void;
+  const discoveryReleased = new Promise<void>(resolve => { releaseDiscovery = resolve; });
   let observeDiscovery!: () => void;
   const discoveryObserved = new Promise<void>(resolve => { observeDiscovery = resolve; });
 
@@ -89,7 +88,7 @@ test("Gateway reads stay inside the Browser until Managed routing discovery reso
   await page.waitForTimeout(50);
   expect(leakedGatewayRequests).toEqual([]);
 
-  releaseDiscoveryReleased();
+  releaseDiscovery();
   await navigation;
   const reads = await page.evaluate(async () => {
     const scope = window as typeof window & {
