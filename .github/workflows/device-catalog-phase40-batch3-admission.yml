@@ -65,7 +65,7 @@ jobs:
               'canonical_sha256_before': hashlib.sha256(source.read_bytes()).hexdigest(),
               'canonical_sha256_after': hashlib.sha256(out.read_bytes()).hexdigest(),
               'admission_plan_sha256': hashlib.sha256(plan_path.read_bytes()).hexdigest(),
-              'new_icpns': sorted(d['icpn'] for d in plan['decisions'] if d['decision'] == 'admit'),
+              'new_icpns': sorted(result.get('added', [])),
               'writer_result': result,
           }
           Path('phase40-batch3-admission/materialization.json').write_text(
