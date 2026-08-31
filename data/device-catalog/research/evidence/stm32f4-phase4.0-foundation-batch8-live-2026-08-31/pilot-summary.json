@@ -1,0 +1,240 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 3,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 3,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 3,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 6,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 3,
+      "attempt": 1,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 1,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 3,
+    "total": 3
+  },
+  "pilot_id": "stm32f4-phase4.0-foundation-batch8-2026-08-31",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F417VG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F417VGTx",
+          "icpn": "STM32F417VGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F417VGTx",
+          "icpn": "STM32F417VGT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F417VGTx",
+          "icpn": "STM32F417VGT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F417VG",
+        "evidence_section_sha256": "690346cc2570c1e0d04470feb00141373430e5ab6e6311aa06c57fa5cf3bbbf1",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F417VGT6",
+          "STM32F417VGT6TR",
+          "STM32F417VGT7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417vg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F417VGT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F417VGT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F417VGT7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "18b6499bc1f7df2a274b80a23481cec2297c1c12451dfc9c88f567fc14c965d6",
+        "retrieved_at_utc": "2026-08-31T12:16:53Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417vg.html"
+      },
+      "selection_reason": "production-admitted lifecycle control in the same STM32F417 technical cluster; verifies extraction and mapping stability while expanding adjacent package variants",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417vg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F417VE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F417VETx",
+          "icpn": "STM32F417VET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F417VETx",
+          "icpn": "STM32F417VET6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F417VE",
+        "evidence_section_sha256": "e45185da4911bebc5408fbf02f28107869185af56e7abab6b8467b42acf1f8de",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F417VET6",
+          "STM32F417VET6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ve.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F417VET6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F417VET6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "9ae308644a83dfee27b2e3f39534d7ff8793f4c776c7969fe8d5c5801d2c2406",
+        "retrieved_at_utc": "2026-08-31T12:16:57Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ve.html"
+      },
+      "selection_reason": "fresh post-Batch7 policy-ready STM32F417 gap selected as a bounded adjacent package variant under the current admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ve.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F417ZE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F417ZETx",
+          "icpn": "STM32F417ZET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F417ZE",
+        "evidence_section_sha256": "9724221a31f2f42da7371c928e4e4bf1c540734319ad04d8d60be85c83d6c0a6",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F417ZET6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ze.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F417ZET6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "56f8b63f42f07046b2d43cf221b8660849c1e19303550325c0740c99a5fd37fe",
+        "retrieved_at_utc": "2026-08-31T12:17:01Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ze.html"
+      },
+      "selection_reason": "fresh post-Batch7 policy-ready STM32F417 gap paired with STM32F417VE to complete the nearby F417 Z-package coverage without changing admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ze.html"
+    }
+  ],
+  "schema_version": 1
+}

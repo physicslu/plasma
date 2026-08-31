@@ -36,7 +36,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=STM32F103C8T6&limit=5")
         self.assertEqual(status, 200)
         self.assertEqual(payload["rest_contract_version"], "3")
-        self.assertEqual(payload["catalog_size"], 215)
+        self.assertEqual(payload["catalog_size"], 218)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F103C8T6")
         self.assertEqual(result["identifier_kind"], "manufacturer_part_number")
@@ -58,7 +58,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         status, payload = self.request("/api/devices/search?q=STMicroelectronics%20STM32F4&limit=100")
         self.assertEqual(status, 200)
         self.assertEqual(payload["count"], 100)
-        self.assertEqual(payload["catalog_size"], 215)
+        self.assertEqual(payload["catalog_size"], 218)
         self.assertEqual({item["family"] for item in payload["results"]}, {"STM32F4"})
         self.assertTrue(all(item["icpn"] for item in payload["results"]))
 
@@ -161,6 +161,18 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["flash_size"], "1024 KiB")
         self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
 
+    def test_phase40_foundation_batch8_icpn_is_exposed_only_after_admission(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F417VET6TR&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32F417VET6TR")
+        self.assertEqual(result["family"], "STM32F4")
+        self.assertEqual(result["package"], "LQFP")
+        self.assertEqual(result["pin_count"], "100")
+        self.assertEqual(result["flash_size"], "512 KiB")
+        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
+
     def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:
         status, payload = self.request("/api/devices/search?q=ADUC7019BCPZ62I")
         self.assertEqual(status, 200)
@@ -170,7 +182,7 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
     def test_empty_query_is_valid_for_catalog_metadata_idle_state(self) -> None:
         status, payload = self.request("/api/devices/search?q=")
         self.assertEqual(status, 200)
-        self.assertEqual(payload["catalog_size"], 215)
+        self.assertEqual(payload["catalog_size"], 218)
         self.assertEqual(payload["count"], 0)
         self.assertEqual(payload["results"], [])
 
