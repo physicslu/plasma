@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-f427-batch2-2026-08-31",
+  "targets": [
+    {
+      "base_device": "STM32F401CC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html",
+      "selection_reason": "retained control; detects official ST active-orderable lifecycle drift"
+    },
+    {
+      "base_device": "STM32F427VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427vg.html",
+      "selection_reason": "1-MiB F427 LQFP100 base device using existing V/T package semantics"
+    },
+    {
+      "base_device": "STM32F427VI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427vi.html",
+      "selection_reason": "2-MiB F427 LQFP100 base device; Active rows are candidates while Proposal rows remain excluded"
+    },
+    {
+      "base_device": "STM32F427ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427zg.html",
+      "selection_reason": "1-MiB F427 LQFP144 base device using existing Z/T package semantics"
+    },
+    {
+      "base_device": "STM32F427ZI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427zi.html",
+      "selection_reason": "2-MiB F427 LQFP144 base device using existing Z/T package semantics"
+    }
+  ]
+}
