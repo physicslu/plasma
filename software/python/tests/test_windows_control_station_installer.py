@@ -11,10 +11,20 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "scripts" / "windows-control-station-msi.py"
+ACCEPTANCE_SCRIPT = REPO_ROOT / "scripts" / "windows-control-station-installer-acceptance.py"
 
 
 def _load():
     spec = importlib.util.spec_from_file_location("plasma_windows_installer", SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_acceptance():
+    spec = importlib.util.spec_from_file_location("plasma_windows_installer_acceptance", ACCEPTANCE_SCRIPT)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -73,6 +83,29 @@ def test_windows_service_launchers_only_use_bundled_runtimes() -> None:
     assert "[switch]$PreflightOnly" in console
     assert "$null -ne $aliasContent" in console
     assert "([string]$aliasContent).Trim()" in console
+    assert "$env:PLASMA_FLEET_UI_ENABLED = '1'" in console
+    assert "$consoleRoot = Split-Path -Parent $server" in console
+    assert "Push-Location -LiteralPath $consoleRoot" in console
+    assert "Pop-Location" in console
+
+
+def test_windows_acceptance_requires_packaged_css_and_javascript_assets() -> None:
+    module = _load_acceptance()
+    html = """
+    <html>
+      <head><link rel="stylesheet" href="/assets/app-123.css"></head>
+      <body><script type="module" src="/assets/app-456.js"></script></body>
+    </html>
+    """
+    assert module._console_asset_paths(html) == (
+        "/assets/app-123.css",
+        "/assets/app-456.js",
+    )
+
+    source = ACCEPTANCE_SCRIPT.read_text(encoding="utf-8")
+    assert "Console HTML does not reference any packaged CSS assets" in source
+    assert "Console HTML does not reference any packaged JavaScript assets" in source
+    assert "Windows installer Console static assets after SCM restart: PASS" in source
 
 
 def _fake_python_runtime(root: Path) -> Path:
