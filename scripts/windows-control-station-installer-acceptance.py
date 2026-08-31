@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -14,6 +15,7 @@ import time
 from pathlib import Path
 from typing import Sequence
 from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin
 from urllib.request import ProxyHandler, Request, build_opener
 
 MANAGER_SERVICE = "PlasmaManager"
@@ -21,6 +23,10 @@ CONSOLE_SERVICE = "PlasmaControlStationConsole"
 MANAGER_PORT = 18180
 CONSOLE_PORT = 18000
 _DIRECT_HTTP = build_opener(ProxyHandler({}))
+_ASSET_REF_RE = re.compile(
+    r'''(?:href|src)=["']([^"']+\.(?:css|js)(?:\?[^"']*)?)["']''',
+    re.IGNORECASE,
+)
 
 
 class InstallerAcceptanceError(RuntimeError):
@@ -98,6 +104,54 @@ def _wait_console(deadline_s: float = 30) -> None:
             last = str(exc)
         time.sleep(0.25)
     raise InstallerAcceptanceError(f"Console did not become ready: {last}")
+
+
+def _console_asset_paths(html: str) -> tuple[str, ...]:
+    return tuple(sorted({match.group(1) for match in _ASSET_REF_RE.finditer(html)}))
+
+
+def _assert_console_static_assets() -> None:
+    root_url = f"http://127.0.0.1:{CONSOLE_PORT}/"
+    try:
+        with _DIRECT_HTTP.open(Request(root_url, headers={"Accept": "text/html"}), timeout=2) as response:
+            status = int(response.status)
+            raw = response.read()
+            charset = response.headers.get_content_charset() or "utf-8"
+    except (HTTPError, URLError, TimeoutError) as exc:
+        raise InstallerAcceptanceError(f"Console HTML request failed while checking static assets: {exc}") from exc
+    if status != 200:
+        raise InstallerAcceptanceError(f"Console HTML returned status {status} while checking static assets")
+    try:
+        html = raw.decode(charset)
+    except (LookupError, UnicodeDecodeError) as exc:
+        raise InstallerAcceptanceError(f"Console HTML could not be decoded as {charset}: {exc}") from exc
+
+    assets = _console_asset_paths(html)
+    stylesheets = [path for path in assets if path.split("?", 1)[0].lower().endswith(".css")]
+    scripts = [path for path in assets if path.split("?", 1)[0].lower().endswith(".js")]
+    if not stylesheets:
+        raise InstallerAcceptanceError("Console HTML does not reference any packaged CSS assets")
+    if not scripts:
+        raise InstallerAcceptanceError("Console HTML does not reference any packaged JavaScript assets")
+
+    for asset in assets:
+        if asset.startswith(("http://", "https://", "//")):
+            raise InstallerAcceptanceError(f"Console product HTML references a non-local static asset: {asset}")
+        asset_url = urljoin(root_url, asset)
+        try:
+            with _DIRECT_HTTP.open(Request(asset_url, headers={"Accept": "*/*"}), timeout=2) as response:
+                asset_status = int(response.status)
+                payload = response.read()
+        except HTTPError as exc:
+            raise InstallerAcceptanceError(
+                f"Console static asset returned HTTP {exc.code}: {asset}"
+            ) from exc
+        except (URLError, TimeoutError) as exc:
+            raise InstallerAcceptanceError(f"Console static asset request failed: {asset}: {exc}") from exc
+        if asset_status != 200 or not payload:
+            raise InstallerAcceptanceError(
+                f"Console static asset is not servable: {asset}: status={asset_status} bytes={len(payload)}"
+            )
 
 
 def _free_port() -> int:
@@ -269,24 +323,30 @@ def run_acceptance(msi: Path) -> None:
         raise InstallerAcceptanceError("MSI did not register and start both SCM services")
     _wait_manager()
     _wait_console()
+    _assert_console_static_assets()
     print("Windows installer self-contained runtime binding: PASS", flush=True)
     print("Windows installer initial SCM launch: PASS", flush=True)
+    print("Windows installer Console static assets: PASS", flush=True)
 
     _write_smoke_config(program_data)
     _stop_services()
     _start_services()
+    _assert_console_static_assets()
     _browser_fetch(bundled_node)
     print("Windows installer Browser -> Console/BFF -> Manager: PASS", flush=True)
 
     _stop_services()
     _start_services()
+    _assert_console_static_assets()
     _browser_fetch(bundled_node)
+    print("Windows installer Console static assets after SCM restart: PASS", flush=True)
     print("Windows installer SCM restart persistence: PASS", flush=True)
 
     _stop_services()
     if _service_state(MANAGER_SERVICE) != "Stopped" or _service_state(CONSOLE_SERVICE) != "Stopped":
         raise InstallerAcceptanceError("service stop did not reach Stopped state")
     _start_services()
+    _assert_console_static_assets()
     print("Windows installer SCM stop/start: PASS", flush=True)
 
     mutable_config = (program_data / "config" / "manager.yaml").read_text(encoding="utf-8")
