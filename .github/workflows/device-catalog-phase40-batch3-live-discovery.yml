@@ -1,0 +1,87 @@
+name: Device catalog Phase 4.0 batch3 live discovery
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.0-gap-batch3
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+      - name: Acquire official ST rendered-DOM evidence
+        run: |
+          mkdir -p phase40-batch3-discovery
+          xvfb-run -a python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path('data/device-catalog/research')
+          sys.path.insert(0, str(root))
+          from st_browser_acquisition import BROWSER_TRANSPORT, CHROMIUM_LAUNCH_ARGS, STBrowserAcquirer, build_browser_evidence_record
+          from stm32f4_acquisition_pilot import read_catalog, read_manifest, run_pilot
+
+          pilot_id, targets = read_manifest(root / 'stm32f4-phase4.0-gap-batch3-manifest.json')
+          with STBrowserAcquirer(headless=False) as acquirer:
+              summary = run_pilot(
+                  pilot_id=pilot_id,
+                  targets=targets,
+                  catalog_rows=read_catalog(root / 'openocd-parts-canonical.csv'),
+                  fetcher=acquirer.fetch,
+                  evidence_builder=build_browser_evidence_record,
+                  timeout_seconds=45.0,
+              )
+              browser_version = acquirer.browser_version
+
+          summary['acquisition_transport'] = BROWSER_TRANSPORT
+          summary['browser_scope'] = 'pilot'
+          summary['browser_runtime'] = {
+              'engine': 'chromium',
+              'browser_version': browser_version,
+              'playwright_requirement': '1.62.0',
+              'headless': False,
+              'launch_args': CHROMIUM_LAUNCH_ARGS,
+          }
+          summary['canonical_dataset_admission'] = False
+          Path('phase40-batch3-discovery/pilot-summary.json').write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps({
+              'attempted': summary.get('attempted'),
+              'acquisition_success': summary.get('acquisition_success'),
+              'acquisition_failure': summary.get('acquisition_failure'),
+              'exact_icpn_candidates': summary.get('exact_icpn_candidates'),
+              'manual_intervention_required': summary.get('manual_intervention_required'),
+          }, indent=2, sort_keys=True))
+          for result in summary.get('results', []):
+              evidence = result.get('evidence') or {}
+              print(json.dumps({
+                  'base_device': result.get('base_device'),
+                  'status': result.get('acquisition_status'),
+                  'exact_icpns': evidence.get('exact_icpns', []),
+                  'excluded_non_active_part_numbers': evidence.get('excluded_non_active_part_numbers', []),
+                  'canonical_mapping': result.get('canonical_mapping'),
+              }, sort_keys=True))
+          if summary.get('acquisition_failure') != 0 or summary.get('manual_intervention_required') != 0:
+              raise SystemExit('batch3 live discovery is not clean')
+          PY
+      - name: Upload discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase40-batch3-live-discovery
+          path: phase40-batch3-discovery
+          if-no-files-found: error
+          retention-days: 7
