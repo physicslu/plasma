@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch6-2026-08-31",
+  "source_workflow_run_id": "33364494311",
+  "source_artifact_id": "9747829175",
+  "canonical_dataset_admission": false,
+  "candidate_policy": "Only exact commercial part numbers observed on the official ST product page with Marketing Status Active are candidate rows for new admission.",
+  "lifecycle_audit_policy": "Non-Active official ST rows are retained for lifecycle audit and excluded from new admission candidates.",
+  "targets": [
+    {
+      "base_device": "STM32F412CG",
+      "role": "lifecycle_control",
+      "marketing_status": "Active",
+      "exact_icpns": [
+        "STM32F412CGU6",
+        "STM32F412CGU6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F412ZG",
+      "role": "candidate",
+      "marketing_status": "Active",
+      "exact_icpns": [
+        "STM32F412ZGJ6",
+        "STM32F412ZGJ6TR",
+        "STM32F412ZGJ7",
+        "STM32F412ZGT6",
+        "STM32F412ZGT6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F413CG",
+      "role": "candidate",
+      "marketing_status": "Active",
+      "exact_icpns": [
+        "STM32F413CGU6"
+      ]
+    },
+    {
+      "base_device": "STM32F413ZG",
+      "role": "candidate",
+      "marketing_status": "Active",
+      "exact_icpns": [
+        "STM32F413ZGJ6",
+        "STM32F413ZGJ6TR",
+        "STM32F413ZGT6"
+      ]
+    }
+  ],
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F413CG",
+      "icpn": "STM32F413CGU3",
+      "marketing_status": "Proposal",
+      "reason": "Official ST row observed as Proposal; excluded from new admission candidates."
+    },
+    {
+      "base_device": "STM32F413ZG",
+      "icpn": "STM32F413ZGJ3",
+      "marketing_status": "Proposal",
+      "reason": "Official ST row observed as Proposal; excluded from new admission candidates."
+    },
+    {
+      "base_device": "STM32F413ZG",
+      "icpn": "STM32F413ZGT3",
+      "marketing_status": "Proposal",
+      "reason": "Official ST row observed as Proposal; excluded from new admission candidates."
+    }
+  ]
+}

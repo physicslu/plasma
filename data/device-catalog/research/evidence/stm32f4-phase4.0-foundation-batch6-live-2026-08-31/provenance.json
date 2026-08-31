@@ -1,0 +1,71 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 4,
+  "acquisition_time_utc": {
+    "control": "2026-08-31T06:38:18Z",
+    "pilot_first": "2026-08-31T06:38:18Z",
+    "pilot_last": "2026-08-31T06:38:30Z"
+  },
+  "acquisition_transport": "chromium_rendered_dom",
+  "baseline": {
+    "pilot_id": "stm32f4-phase4.0-foundation-batch6-2026-08-31",
+    "schema_version": 1,
+    "sha256": "a953b35bcc13aabebfc04646c0ba0a858e84cd23ac80f848fde3b150c8664a8d"
+  },
+  "canonical_dataset_admission": false,
+  "chromium_version": "151.0.7922.34",
+  "evaluator_result": "scale_ready",
+  "evidence_id": "stm32f4-phase4.0-foundation-batch6-2026-08-31-retained-20260831T063818Z-c3edb20",
+  "exact_icpn_candidate_count": 11,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F413CG",
+      "icpn": "STM32F413CGU3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "base_device": "STM32F413ZG",
+      "icpn": "STM32F413ZGJ3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "base_device": "STM32F413ZG",
+      "icpn": "STM32F413ZGT3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "executed_git_sha": "c3edb209db6c13b57723de9a1afd2ebca4fb1dd8",
+  "headed": true,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 2,
+      "acquisition_success": 2,
+      "attempt": 1,
+      "clean": false,
+      "failed_targets": [
+        {
+          "base_device": "STM32F412CG",
+          "error": "browser evidence readiness timed out: Locator.wait_for: Timeout 45000ms exceeded.\nCall log:\n  - waiting for get_by_text(\"Quality and Reliability\", exact=True)\n"
+        },
+        {
+          "base_device": "STM32F413CG",
+          "error": "browser evidence readiness timed out: Locator.wait_for: Timeout 45000ms exceeded.\nCall log:\n  - waiting for get_by_text(\"Quality and Reliability\", exact=True)\n"
+        }
+      ]
+    },
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 4,
+      "attempt": 2,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 2,
+  "manufacturer": "STMicroelectronics",
+  "playwright_version": "1.62.0",
+  "scale_ready": true,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 4
+}
