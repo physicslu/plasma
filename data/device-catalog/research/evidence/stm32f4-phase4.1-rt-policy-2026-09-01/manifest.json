@@ -1,0 +1,23 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32f4-phase4.1-rt-policy-2026-09-01-e125390",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "11fd827597409c7210748aa794dfd6c05a64c824f1de5c7a25056b259b489905"
+    },
+    {
+      "path": "evaluation.json",
+      "sha256": "feca41344ab5d3227437c020c0a9f77eee3f20bcd5c2c02717e72a4e1903c7af"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "bd3ce8f4c6ac0472bd386d2e80132e2c64ba09f0897b2a0b520fbaa7cb56110b"
+    },
+    {
+      "path": "sources.json",
+      "sha256": "e13909ed3e8bad7b568dbba7227472613c0ac0cbbb4efe8cb4fc9c33163a84dc"
+    }
+  ],
+  "schema_version": 1
+}

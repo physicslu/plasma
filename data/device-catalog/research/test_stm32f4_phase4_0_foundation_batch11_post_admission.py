@@ -177,16 +177,31 @@ class STM32F4Phase40FoundationBatch11PostAdmissionTests(unittest.TestCase):
         self.assertEqual(sources["STM32F4"]["git_blob_sha"], EXPECTED_CANONICAL_GIT_BLOB)
         self.assertEqual(sum(source["row_count"] for source in sources.values()), 233)
 
-    def test_unchanged_policy_has_no_remaining_ready_gap(self) -> None:
+    def test_phase41_rt_policy_preserves_batch11_production_and_unlocks_only_rt(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         self.assertFalse(inventory["algorithm_equivalence_claimed"])
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
         self.assertEqual(inventory["production"]["base_device_count"], 56)
         self.assertEqual(inventory["production"]["exact_icpn_rows"], 158)
         self.assertEqual(inventory["gap"]["base_device_count"], 93)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 0)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 93)
-        self.assertEqual(inventory["gap"]["policy_ready"], [])
+        self.assertEqual(inventory["gap"]["policy_ready_count"], 11)
+        self.assertEqual(inventory["gap"]["policy_blocked_count"], 82)
+        self.assertEqual(
+            {item["base_device"] for item in inventory["gap"]["policy_ready"]},
+            {
+                "STM32F401RB",
+                "STM32F401RC",
+                "STM32F401RD",
+                "STM32F401RE",
+                "STM32F405RG",
+                "STM32F411RC",
+                "STM32F411RE",
+                "STM32F413RG",
+                "STM32F415RG",
+                "STM32F446RC",
+                "STM32F446RE",
+            },
+        )
 
 
 if __name__ == "__main__":

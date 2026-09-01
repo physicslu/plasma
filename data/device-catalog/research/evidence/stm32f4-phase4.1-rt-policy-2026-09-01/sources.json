@@ -1,0 +1,116 @@
+{
+  "evidence_id": "stm32f4-phase4.1-rt-policy-2026-09-01-e125390",
+  "family": "STM32F4",
+  "manufacturer": "STMicroelectronics",
+  "policy_claim": {
+    "package": "LQFP",
+    "package_code": "T",
+    "pin_code": "R",
+    "pin_count": "64"
+  },
+  "schema_version": 1,
+  "sources": [
+    {
+      "affected_base_devices": [
+        "STM32F401RB",
+        "STM32F401RC"
+      ],
+      "assertions": {
+        "R": "64 pins",
+        "T": "LQFP"
+      },
+      "document_id": "DS9716",
+      "document_scope": "STM32F401xB/STM32F401xC",
+      "page_locator": "Section 8, Ordering information",
+      "revision": 11,
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f401vc.pdf"
+    },
+    {
+      "affected_base_devices": [
+        "STM32F401RD",
+        "STM32F401RE"
+      ],
+      "assertions": {
+        "R": "64 pins",
+        "T": "LQFP"
+      },
+      "document_id": "DS10086",
+      "document_scope": "STM32F401xD/STM32F401xE",
+      "page_locator": "Section 8, Table 87, Ordering information scheme",
+      "revision": 5,
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f401re.pdf"
+    },
+    {
+      "affected_base_devices": [
+        "STM32F405RG"
+      ],
+      "assertions": {
+        "R": "64 pins",
+        "T": "LQFP"
+      },
+      "document_id": "DS8626",
+      "document_scope": "STM32F405xx/STM32F407xx",
+      "page_locator": "Section 8, Ordering information",
+      "revision": 12,
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f405oe.pdf"
+    },
+    {
+      "affected_base_devices": [
+        "STM32F415RG"
+      ],
+      "assertions": {
+        "R": "64 pins",
+        "T": "LQFP"
+      },
+      "document_id": "DS8597",
+      "document_scope": "STM32F415xx/STM32F417xx",
+      "page_locator": "Section 7, Ordering information",
+      "revision": 9,
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f417zg.pdf"
+    },
+    {
+      "affected_base_devices": [
+        "STM32F411RC",
+        "STM32F411RE"
+      ],
+      "assertions": {
+        "R": "64 pins",
+        "T": "LQFP"
+      },
+      "document_id": "DS10314",
+      "document_scope": "STM32F411xC/STM32F411xE",
+      "page_locator": "Section 8, Table 87, Ordering information scheme",
+      "revision": 8,
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f411re.pdf"
+    },
+    {
+      "affected_base_devices": [
+        "STM32F413RG"
+      ],
+      "assertions": {
+        "R": "64 pins",
+        "T": "LQFP"
+      },
+      "document_id": "DS11581",
+      "document_scope": "STM32F413xG/STM32F413xH",
+      "page_locator": "Section 8, Table 114, Ordering information scheme",
+      "revision": 7,
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f413rh.pdf"
+    },
+    {
+      "affected_base_devices": [
+        "STM32F446RC",
+        "STM32F446RE"
+      ],
+      "assertions": {
+        "R": "64 pins",
+        "T": "LQFP"
+      },
+      "document_id": "DS10693",
+      "document_scope": "STM32F446xC/STM32F446xE",
+      "page_locator": "Section 8, Ordering information",
+      "revision": 11,
+      "source_url": "https://www.st.com/resource/en/datasheet/stm32f446rc.pdf"
+    }
+  ]
+}

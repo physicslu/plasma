@@ -154,6 +154,10 @@ jobs:
             --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch11-live-2026-09-01 \
             --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch11-baseline.json
           python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch11_post_admission.py
+      - name: Validate STM32F4 Phase 4.1 R/T policy evidence and fail-closed delta
+        run: |
+          python data/device-catalog/research/validate_stm32f4_phase4_1_rt_policy_evidence.py
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py
       - name: Inventory STM32F4 production coverage gaps
         run: |
           python data/device-catalog/research/stm32f4_coverage_gap_inventory.py \
