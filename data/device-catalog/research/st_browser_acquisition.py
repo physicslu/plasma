@@ -11,14 +11,17 @@ existing fail-closed evidence parser without mislabeling rendered DOM as raw HTT
 from __future__ import annotations
 
 import hashlib
+import time
 from typing import Any
 
 from st_product_page_acquisition import (
     AcquisitionError,
     MAX_RESPONSE_BYTES,
     PARSER_VERSION,
+    QualitySectionParser,
     SCHEMA_VERSION,
     extract_part_number_records,
+    normalize_text,
     validate_source_url,
 )
 
@@ -30,12 +33,14 @@ CHALLENGE_MARKERS = (
 )
 QUALITY_HEADING = "Quality and Reliability"
 MARKETING_STATUS_LABEL = "Marketing Status"
+PART_NUMBER_LABEL = "Part Number"
 BROWSER_TRANSPORT = "chromium_rendered_dom"
 # ST's CDN has produced deterministic net::ERR_HTTP2_PROTOCOL_ERROR failures on
 # GitHub-hosted Chromium runners. Forcing HTTP/1.1 changes transport negotiation
 # only; it does not alter request headers, evidence scope, or parser semantics.
 CHROMIUM_LAUNCH_ARGS = ["--disable-http2"]
 DEFAULT_NAVIGATION_ATTEMPTS = 2
+EVIDENCE_READINESS_POLL_SECONDS = 0.25
 
 
 def build_browser_evidence_record(
@@ -170,18 +175,39 @@ class STBrowserAcquirer:
         )
 
     @staticmethod
-    def _wait_for_evidence_surface(page: Any, timeout_ms: int) -> None:
-        # The parser requires both the exact Quality and Reliability section and
-        # its Marketing Status data. Waiting for both closes a race where the
-        # section heading is attached before the commercial table is rendered.
-        # Marketing Status is checked first so the final locator remains the
-        # historical Quality heading in lightweight fake-page unit tests.
-        page.get_by_text(MARKETING_STATUS_LABEL, exact=True).wait_for(
-            state="attached", timeout=timeout_ms
-        )
+    def _quality_surface_ready(html_text: str) -> bool:
+        """Return true only when the parser's own Q&R evidence surface is present."""
+        parser = QualitySectionParser()
+        parser.feed(html_text)
+        parser.close()
+        if not parser.quality_seen:
+            return False
+        section_text = normalize_text(" ".join(parser.section_parts))
+        return PART_NUMBER_LABEL in section_text and MARKETING_STATUS_LABEL in section_text
+
+    @classmethod
+    def _wait_for_evidence_surface(
+        cls,
+        page: Any,
+        *,
+        timeout_seconds: float,
+        timeout_ms: int,
+    ) -> bool:
+        # The H2 attachment remains a cheap initial DOM signal. The actual ready
+        # condition is deliberately defined by the same H2-scoped parser used by
+        # evidence extraction, so Quick View / Sample & Buy duplicate labels cannot
+        # make an incomplete Quality and Reliability section look ready.
+        deadline = time.monotonic() + timeout_seconds
         page.get_by_text(QUALITY_HEADING, exact=True).wait_for(
             state="attached", timeout=timeout_ms
         )
+        while True:
+            if cls._quality_surface_ready(page.content()):
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(EVIDENCE_READINESS_POLL_SECONDS, remaining))
 
     def fetch(self, source_url: str, timeout_seconds: float) -> tuple[bytes, str, None, None]:
         validate_source_url(source_url)
@@ -205,9 +231,6 @@ class STBrowserAcquirer:
                 if response is not None and response.status >= 400:
                     raise AcquisitionError(f"browser navigation returned HTTP {response.status}")
 
-                stage = "evidence readiness"
-                self._wait_for_evidence_surface(page, timeout_ms)
-
                 stage = "evidence extraction"
                 body_text = page.locator("body").inner_text(timeout=timeout_ms)
                 folded = body_text.casefold()
@@ -217,6 +240,20 @@ class STBrowserAcquirer:
                             f"browser acquisition encountered challenge marker: {marker}"
                         )
 
+                stage = "evidence readiness"
+                if not self._wait_for_evidence_surface(
+                    page,
+                    timeout_seconds=timeout_seconds,
+                    timeout_ms=timeout_ms,
+                ):
+                    if attempt >= attempts:
+                        raise AcquisitionError(
+                            "browser evidence readiness timed out: "
+                            "Quality and Reliability Part Number / Marketing Status surface incomplete"
+                        )
+                    continue
+
+                stage = "evidence extraction"
                 html_text = page.content()
                 body = html_text.encode("utf-8")
                 if len(body) > MAX_RESPONSE_BYTES:
