@@ -6,6 +6,7 @@ const settingsApi = await readFile(new URL("../app/gateway-settings-api.ts", imp
 const settingsPanel = await readFile(new URL("../app/engineering/gateway-settings.tsx", import.meta.url), "utf8");
 const sharedSettingsUi = await readFile(new URL("../app/operator-ui/settings-ui.tsx", import.meta.url), "utf8");
 const sharedSettingsCss = await readFile(new URL("../app/operator-ui/settings-ui.css", import.meta.url), "utf8");
+const sharedSurfaceCss = await readFile(new URL("../app/operator-ui/operator-surface-primitives.css", import.meta.url), "utf8");
 const engineeringPage = await readFile(new URL("../app/engineering/page.tsx", import.meta.url), "utf8");
 const engineeringCss = await readFile(new URL("../app/engineering/engineering.css", import.meta.url), "utf8");
 const engineeringWorkspace = await readFile(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
@@ -38,15 +39,16 @@ test("Gateway uses the shared Engineering Settings UI primitives without a redun
   }
   assert.doesNotMatch(settingsPanel, /gateway-settings\.css/);
   assert.doesNotMatch(settingsPanel, /SettingsTabs/);
+  assert.match(sharedSettingsCss, /@import "\.\/operator-surface-primitives\.css"/);
 });
 
-test("Shared Settings controls lock the Mock-reference geometry", () => {
-  assert.match(sharedSettingsCss, /--settings-control-height:\s*40px/);
-  assert.match(sharedSettingsCss, /--settings-action-height:\s*40px/);
-  assert.match(sharedSettingsCss, /height:\s*var\(--settings-control-height\)/);
-  assert.match(sharedSettingsCss, /min-height:\s*var\(--settings-action-height\)/);
-  assert.match(sharedSettingsCss, /font:\s*600 14px\/1\.2 var\(--font-mono\)/);
-  assert.match(sharedSettingsCss, /font:\s*700 14px\/1\.2 var\(--font-sans\)/);
+test("Shared Settings controls consume the Loopback-aligned operator surface geometry", () => {
+  assert.match(sharedSurfaceCss, /min-height:\s*36px/);
+  assert.match(sharedSurfaceCss, /border-radius:\s*6px/);
+  assert.match(sharedSurfaceCss, /font:\s*11px var\(--font-mono\)/);
+  assert.match(sharedSurfaceCss, /\.settingsActions button,[\s\S]*min-height:\s*38px/);
+  assert.match(sharedSurfaceCss, /font:\s*700 11px\/1\.2 var\(--font-sans\)/);
+  assert.doesNotMatch(sharedSettingsCss, /--settings-control-height|--settings-action-height/);
 });
 
 test("EMode settings children share one top-aligned Settings surface and keep Gateway help on the same page", () => {
