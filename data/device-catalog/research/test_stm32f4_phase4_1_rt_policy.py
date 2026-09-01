@@ -56,19 +56,24 @@ class STM32F4Phase41RTPolicyTests(unittest.TestCase):
     def test_rt_pair_maps_only_catalog_semantics(self) -> None:
         self.assertEqual(_package_and_pins("R", "T"), ("LQFP", "64"))
 
-    def test_inventory_delta_is_exactly_eleven_ready_and_eighty_two_blocked(self) -> None:
+    def test_rt_policy_remains_effective_after_catalog_growth(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         self.assertFalse(inventory["algorithm_equivalence_claimed"])
-        self.assertEqual(inventory["production"]["exact_icpn_rows"], 158)
-        self.assertEqual(inventory["production"]["base_device_count"], 56)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
-        self.assertEqual(inventory["gap"]["base_device_count"], 93)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 11)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 82)
         self.assertEqual(
-            {item["base_device"] for item in inventory["gap"]["policy_ready"]},
-            EXPECTED_BASE_DEVICES,
+            inventory["gap"]["base_device_count"],
+            149 - inventory["production"]["base_device_count"],
         )
+        self.assertEqual(
+            inventory["gap"]["base_device_count"],
+            inventory["gap"]["policy_ready_count"] + inventory["gap"]["policy_blocked_count"],
+        )
+        with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            production_bases = {row["base_device"] for row in csv.DictReader(handle)}
+        ready_bases = {item["base_device"] for item in inventory["gap"]["policy_ready"]}
+        blocked_bases = {item["base_device"] for item in inventory["gap"]["policy_blocked"]}
+        self.assertEqual(EXPECTED_BASE_DEVICES - production_bases, EXPECTED_BASE_DEVICES & ready_bases)
+        self.assertTrue(EXPECTED_BASE_DEVICES.isdisjoint(blocked_bases))
 
     def test_all_unapproved_policy_classes_remain_fail_closed(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
@@ -79,11 +84,9 @@ class STM32F4Phase41RTPolicyTests(unittest.TestCase):
         }
         self.assertEqual(blockers, EXPECTED_REMAINING_BLOCKERS)
 
-    def test_policy_only_change_preserves_production_catalog_and_preview_audit(self) -> None:
-        self.assertEqual(hashlib.sha256(CANONICAL.read_bytes()).hexdigest(), EXPECTED_CANONICAL_SHA256)
+    def test_policy_history_and_preview_audit_survive_later_growth(self) -> None:
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             rows = {row["icpn"]: row for row in csv.DictReader(handle)}
-        self.assertEqual(len(rows), 158)
         self.assertIn(PREVIEW_AUDIT_ONLY_ICPN, rows)
 
         baseline = json.loads(F446_BASELINE.read_text(encoding="utf-8"))
@@ -95,11 +98,15 @@ class STM32F4Phase41RTPolicyTests(unittest.TestCase):
         self.assertEqual(preview["marketing_status"], "Preview")
         self.assertFalse(preview["admission"])
 
+        payload = CANONICAL.read_bytes()
+        current_sha = hashlib.sha256(payload).hexdigest()
+        current_blob = hashlib.sha1(f"blob {len(payload)}".encode() + bytes([0]) + payload).hexdigest()
         manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
         sources = {source["family"]: source for source in manifest["sources"]}
-        self.assertEqual(sources["STM32F4"]["row_count"], 158)
-        self.assertEqual(sources["STM32F4"]["sha256"], EXPECTED_CANONICAL_SHA256)
-        self.assertEqual(sum(source["row_count"] for source in sources.values()), 233)
+        self.assertEqual(sources["STM32F4"]["row_count"], len(rows))
+        self.assertEqual(sources["STM32F4"]["sha256"], current_sha)
+        self.assertEqual(sources["STM32F4"]["git_blob_sha"], current_blob)
+        self.assertEqual(sum(source["row_count"] for source in sources.values()), 75 + len(rows))
 
 
 if __name__ == "__main__":

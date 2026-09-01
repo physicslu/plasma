@@ -48,10 +48,25 @@ def _row_evidence_id(row: dict[str, str]) -> str:
 
 class STM32F4Phase40FoundationBatch11PostAdmissionTests(unittest.TestCase):
     def _prewrite_canonical(self, output: Path) -> None:
+        pre_batch11_evidence_ids = {
+            "stm32f4-phase3.1-bounded-pilot-2026-08-30-retained-20260830T023035Z-b42d460",
+            "stm32f4-phase3.3-scaleout-batch1-2026-08-30-retained-20260830T040319Z-db7f090",
+            "stm32f4-phase3.3-scaleout-batch2-2026-08-30-retained-20260830T063333Z-cb883bb",
+            "stm32f4-phase4.0-f446-batch1-2026-08-30-retained-20260830T134444Z-e9e8e60",
+            "stm32f4-phase4.0-foundation-batch2-2026-08-31-retained-20260831T013557Z-8979938",
+            "stm32f4-phase4.0-foundation-batch3-2026-08-31-retained-20260831T035207Z-42fa641",
+            "stm32f4-phase4.0-foundation-batch4-2026-08-31-retained-20260831T044040Z-226ad4d",
+            "stm32f4-phase4.0-foundation-batch5-2026-08-31-retained-20260831T053303Z-5f76683",
+            "stm32f4-phase4.0-foundation-batch6-2026-08-31-retained-20260831T063818Z-c3edb20",
+            "stm32f4-phase4.0-foundation-batch7-2026-08-31-retained-20260831T080025Z-feef382",
+            "stm32f4-phase4.0-foundation-batch8-2026-08-31-retained-20260831T121653Z-5299281",
+            "stm32f4-phase4.0-foundation-batch9-2026-08-31-retained-20260831T125555Z-4e5cc1b",
+            "stm32f4-phase4.0-foundation-batch10-2026-09-01-retained-20260901T015746Z-6ecf759",
+        }
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if _row_evidence_id(row) != EXPECTED_EVIDENCE_ID]
+            rows = [row for row in reader if _row_evidence_id(row) in pre_batch11_evidence_ids]
         self.assertEqual(len(rows), 157)
         with output.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
@@ -169,38 +184,34 @@ class STM32F4Phase40FoundationBatch11PostAdmissionTests(unittest.TestCase):
         audit = json.loads(AUDIT.read_text(encoding="utf-8"))
         self.assertEqual(audit["added"], [NEW_ICPN])
 
-    def test_production_manifest_binds_158_f4_rows_and_233_total_rows(self) -> None:
+    def test_production_manifest_preserves_batch11_after_later_growth(self) -> None:
         manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
         sources = {source["family"]: source for source in manifest["sources"]}
-        self.assertEqual(sources["STM32F4"]["row_count"], 158)
-        self.assertEqual(sources["STM32F4"]["sha256"], EXPECTED_CANONICAL_SHA256)
-        self.assertEqual(sources["STM32F4"]["git_blob_sha"], EXPECTED_CANONICAL_GIT_BLOB)
-        self.assertEqual(sum(source["row_count"] for source in sources.values()), 233)
+        with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        payload = CANONICAL.read_bytes()
+        current_sha = hashlib.sha256(payload).hexdigest()
+        current_blob = hashlib.sha1(f"blob {len(payload)}".encode() + bytes([0]) + payload).hexdigest()
+        self.assertGreaterEqual(len(rows), 158)
+        self.assertIn(NEW_ICPN, {row["icpn"] for row in rows})
+        self.assertEqual(sources["STM32F4"]["row_count"], len(rows))
+        self.assertEqual(sources["STM32F4"]["sha256"], current_sha)
+        self.assertEqual(sources["STM32F4"]["git_blob_sha"], current_blob)
+        self.assertEqual(sum(source["row_count"] for source in sources.values()), 75 + len(rows))
 
-    def test_phase41_rt_policy_preserves_batch11_production_and_unlocks_only_rt(self) -> None:
+    def test_later_growth_preserves_batch11_inventory_consistency(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         self.assertFalse(inventory["algorithm_equivalence_claimed"])
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
-        self.assertEqual(inventory["production"]["base_device_count"], 56)
-        self.assertEqual(inventory["production"]["exact_icpn_rows"], 158)
-        self.assertEqual(inventory["gap"]["base_device_count"], 93)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 11)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 82)
+        self.assertGreaterEqual(inventory["production"]["base_device_count"], 56)
+        self.assertGreaterEqual(inventory["production"]["exact_icpn_rows"], 158)
         self.assertEqual(
-            {item["base_device"] for item in inventory["gap"]["policy_ready"]},
-            {
-                "STM32F401RB",
-                "STM32F401RC",
-                "STM32F401RD",
-                "STM32F401RE",
-                "STM32F405RG",
-                "STM32F411RC",
-                "STM32F411RE",
-                "STM32F413RG",
-                "STM32F415RG",
-                "STM32F446RC",
-                "STM32F446RE",
-            },
+            inventory["gap"]["base_device_count"],
+            149 - inventory["production"]["base_device_count"],
+        )
+        self.assertEqual(
+            inventory["gap"]["base_device_count"],
+            inventory["gap"]["policy_ready_count"] + inventory["gap"]["policy_blocked_count"],
         )
 
 
