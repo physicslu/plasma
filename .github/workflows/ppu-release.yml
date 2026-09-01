@@ -129,6 +129,7 @@ jobs:
       - name: Set up QEMU for ARMv7 runtime acceptance
         uses: docker/setup-qemu-action@v4
         with:
+          image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
           platforms: arm
 
       - name: Run PPU release under ARMv7 userspace
@@ -145,7 +146,7 @@ jobs:
             --volume "$runtime:/runtime:ro" \
             --volume "$PWD/scripts/ppu-armv7-runtime-acceptance.py:/acceptance.py:ro" \
             --volume "$work:/work" \
-            arm32v7/python:3.12 \
+            arm32v7/python@sha256:45eb5cbc14fe248e7598eb23a5a61424d44e556aed3efa955dfab2ac9a67d91c \
             python /acceptance.py \
               --runtime-dir /runtime \
               --work-dir /work
