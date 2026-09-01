@@ -1,0 +1,154 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 2,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 2,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 2,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 2,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 1,
+      "acquisition_success": 1,
+      "attempt": 1,
+      "clean": false,
+      "failed_targets": [
+        {
+          "base_device": "STM32F479ZI",
+          "error": "browser evidence readiness timed out: Locator.wait_for: Timeout 45000ms exceeded.\nCall log:\n  - waiting for get_by_text(\"Quality and Reliability\", exact=True)\n"
+        }
+      ]
+    },
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 2,
+      "attempt": 2,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 2,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 2,
+    "total": 2
+  },
+  "pilot_id": "stm32f4-phase4.0-foundation-batch11-2026-09-01",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "860dfe27a1538d22935d8968ca407b598aaa0de18a9e1629889511248b634e68",
+        "retrieved_at_utc": "2026-09-01T03:05:09Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production-admitted lifecycle control from Batch10; same STM32F479 series and Z-package isolates extraction stability while checking the adjacent flash-density gap",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZITx",
+          "icpn": "STM32F479ZIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZI",
+        "evidence_section_sha256": "cc482ee8029ef3d56954c262fb3e35467b3647929b63d298df53b1eb766651d2",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZIT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZIT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "11db26f72a80423424bcf452cc14fc0984c725a66d097fd8ec45cb3202731343",
+        "retrieved_at_utc": "2026-09-01T03:05:13Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zi.html"
+      },
+      "selection_reason": "sole policy-ready Base Device remaining after Batch10 under the unchanged STM32F4 admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zi.html"
+    }
+  ],
+  "schema_version": 1
+}

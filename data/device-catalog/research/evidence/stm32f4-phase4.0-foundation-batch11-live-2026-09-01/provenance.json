@@ -1,0 +1,57 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 2,
+  "acquisition_time_utc": {
+    "control": "2026-09-01T03:05:09Z",
+    "pilot_first": "2026-09-01T03:05:09Z",
+    "pilot_last": "2026-09-01T03:05:13Z"
+  },
+  "acquisition_transport": "chromium_rendered_dom",
+  "baseline": {
+    "pilot_id": "stm32f4-phase4.0-foundation-batch11-2026-09-01",
+    "schema_version": 1,
+    "sha256": "ce78ceff37f29fe42b1eeda322094df4972ed7e6c58922d37c166f3b7327e794"
+  },
+  "canonical_dataset_admission": false,
+  "chromium_version": "151.0.7922.34",
+  "evaluator_result": "scale_ready",
+  "evidence_id": "stm32f4-phase4.0-foundation-batch11-2026-09-01-retained-20260901T030509Z-4fb6652",
+  "exact_icpn_candidate_count": 2,
+  "excluded_non_active_observations": [],
+  "executed_git_sha": "4fb6652ccb9f02dc53f22d987d59acba98855c3f",
+  "headed": true,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 1,
+      "acquisition_success": 1,
+      "attempt": 1,
+      "clean": false,
+      "failed_targets": [
+        {
+          "base_device": "STM32F479ZI",
+          "error": "browser evidence readiness timed out: Locator.wait_for: Timeout 45000ms exceeded.\nCall log:\n  - waiting for get_by_text(\"Quality and Reliability\", exact=True)\n"
+        }
+      ]
+    },
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 2,
+      "attempt": 2,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 2,
+  "locked_discovery_source": {
+    "artifact_id": "9784377080",
+    "artifact_sha256": "db546ac3dc9477fc02daaa9d0fb9114dbad436af5597c644dde5150536502950",
+    "workflow_run_id": "33464522226"
+  },
+  "manufacturer": "STMicroelectronics",
+  "playwright_version": "1.62.0",
+  "scale_ready": true,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 2,
+  "workflow_run_id": "33464822120"
+}
