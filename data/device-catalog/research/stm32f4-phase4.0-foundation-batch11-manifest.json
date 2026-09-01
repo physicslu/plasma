@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch11-2026-09-01",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production-admitted lifecycle control from Batch10; same STM32F479 series and Z-package isolates extraction stability while checking the adjacent flash-density gap"
+    },
+    {
+      "base_device": "STM32F479ZI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zi.html",
+      "selection_reason": "sole policy-ready Base Device remaining after Batch10 under the unchanged STM32F4 admission policy"
+    }
+  ]
+}
