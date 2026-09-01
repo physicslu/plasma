@@ -962,8 +962,6 @@ export default function FactoryConsoleV2() {
         targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : null,
         assetFile: imageAsset,
         allowSyntheticMockImage: syntheticMockImageAvailable,
-        readOffset: 0,
-        readLength: 256,
       });
       setGatewayHealth("online");
       applyBatchSnapshot(accepted, catalog);
