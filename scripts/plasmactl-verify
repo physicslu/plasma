@@ -236,25 +236,33 @@ verify_fleet() {
     fleet_summary=""
   fi
 
-  local root_headers root_location demo_html ppu_html fleet_html
+  local root_headers root_location demo_html ppu_headers ppu_location engineering_html fleet_html
   root_headers="$(curl --silent --show-error --max-time 5 -D - -o /dev/null -H 'Host: plasma.open4th.com' "$local_web/" 2>/dev/null || true)"
   root_location="$(printf '%s\n' "$root_headers" | awk 'BEGIN { IGNORECASE=1 } /^location:/ { gsub("\\r", ""); sub(/^[^:]*:[[:space:]]*/, ""); print; exit }')"
   if [[ "$root_location" == "/demo" ]]; then
-    verify_pass "Public-host root routing" "/ -> /demo"
+    verify_pass "Control Station root routing" "/ -> /demo"
   else
-    verify_fail "Public-host root routing" "location=${root_location:-missing}"
+    verify_fail "Control Station root routing" "location=${root_location:-missing}"
   fi
 
-  if demo_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/demo" 2>/dev/null)" && grep -Fq 'Choose a Demo' <<<"$demo_html"; then
-    verify_pass "/demo SSR" "two-demo landing"
+  if demo_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/demo" 2>/dev/null)" && grep -Fq 'Choose a Demo' <<<"$demo_html" && ! grep -Fq 'SITE MATRIX' <<<"$demo_html"; then
+    verify_pass "/demo SSR" "Control Station product entry"
   else
-    verify_fail "/demo SSR" "missing expected landing content"
+    verify_fail "/demo SSR" "missing product entry or legacy Site Matrix leaked"
   fi
 
-  if ppu_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/ppu" 2>/dev/null)" && grep -Fq 'SITE MATRIX' <<<"$ppu_html"; then
-    verify_pass "/ppu SSR" "single-PPU console"
+  ppu_headers="$(curl --silent --show-error --max-time 5 -D - -o /dev/null -H 'Host: plasma.open4th.com' "$local_web/ppu" 2>/dev/null || true)"
+  ppu_location="$(printf '%s\n' "$ppu_headers" | awk 'BEGIN { IGNORECASE=1 } /^location:/ { gsub("\\r", ""); sub(/^[^:]*:[[:space:]]*/, ""); print; exit }')"
+  if [[ "$ppu_location" == "/engineering" ]]; then
+    verify_pass "Retired /ppu routing" "/ppu -> /engineering"
   else
-    verify_fail "/ppu SSR" "missing PPU console content"
+    verify_fail "Retired /ppu routing" "location=${ppu_location:-missing}"
+  fi
+
+  if engineering_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/engineering" 2>/dev/null)" && grep -Fq 'SINGLE PPU PROGRAMMING' <<<"$engineering_html" && ! grep -Fq 'PPU CONTROL' <<<"$engineering_html"; then
+    verify_pass "/engineering SSR" "canonical Engineering Programming"
+  else
+    verify_fail "/engineering SSR" "missing Engineering Programming or legacy PPU Control leaked"
   fi
 
   if fleet_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/fleet" 2>/dev/null)" && grep -Fq 'Facility / PPU Fleet Overview' <<<"$fleet_html"; then
@@ -269,7 +277,7 @@ verify_fleet() {
 
   printf '\nManual UI acceptance (not automated here)\n'
   printf '  %s/demo\n' "$default_public_api_url"
-  printf '  %s/ppu\n' "$default_public_api_url"
+  printf '  %s/engineering\n' "$default_public_api_url"
   printf '  %s/fleet\n' "$default_public_api_url"
 
   if (( verify_failures == 0 )); then
