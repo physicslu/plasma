@@ -1,8 +1,6 @@
+@import "./operator-surface-primitives.css";
+
 .settingsPage {
-  --settings-control-height: 40px;
-  --settings-control-radius: 7px;
-  --settings-control-padding-x: 12px;
-  --settings-action-height: 40px;
   width: min(1120px, 100%);
   display: grid;
   gap: 18px;
@@ -74,7 +72,12 @@
   color: var(--cyan);
 }
 
-.settingsCard,
+.settingsCard {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
 .settingsGuide {
   display: grid;
   gap: 20px;
@@ -84,13 +87,11 @@
   background: var(--panel);
 }
 
-.settingsCardHeader h2,
 .settingsGuide > header h2 {
   margin: 5px 0 6px;
   font-size: 18px;
 }
 
-.settingsCardHeader p,
 .settingsGuide > header p,
 .settingsGuide article > p,
 .settingsGuide dd,
@@ -101,14 +102,13 @@
   line-height: 1.65;
 }
 
-.settingsCardHeader p,
 .settingsHint {
   font-size: 12px;
 }
 
 .settingsGrid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .settingsGrid[data-columns="1"] { grid-template-columns: minmax(0, 1fr); }
@@ -116,49 +116,11 @@
 .settingsGrid[data-columns="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .settingsGrid[data-columns="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-.settingsField {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.settingsField > span,
-.settingsToggle > span {
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .settingsFieldControl {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
-}
-
-.settingsPage input:not([type="checkbox"]),
-.settingsPage select {
-  width: 100%;
-  height: var(--settings-control-height);
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 0 var(--settings-control-padding-x);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--settings-control-radius);
-  background: var(--panel-2);
-  color: var(--text);
-  font: 600 14px/1.2 var(--font-mono);
-}
-
-.settingsPage input:disabled,
-.settingsPage select:disabled {
-  opacity: .62;
-  cursor: not-allowed;
-}
-
-.settingsField > small,
-.settingsFieldControl > b {
-  color: var(--muted);
-  font-size: 11px;
 }
 
 .settingsFieldControl > b {
@@ -172,6 +134,11 @@
   width: fit-content;
 }
 
+.settingsToggle > span {
+  font-size: 10px;
+  font-weight: 750;
+}
+
 .settingsToggle input[type="checkbox"] {
   width: 16px;
   height: 16px;
@@ -181,35 +148,12 @@
 .settingsActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-}
-
-.settingsActions button {
-  min-height: var(--settings-action-height);
-  box-sizing: border-box;
-  padding: 0 16px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--settings-control-radius);
-  background: var(--panel);
-  color: var(--text);
-  font: 700 14px/1.2 var(--font-sans);
-  cursor: pointer;
-}
-
-.settingsActions button[data-variant="primary"] {
-  border-color: var(--cyan);
-  background: var(--cyan);
-  color: #fff;
-}
-
-.settingsActions button:disabled {
-  cursor: default;
-  opacity: .5;
+  gap: 8px;
 }
 
 .settingsMessage {
   margin: 0;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
 }
 
