@@ -15,6 +15,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate ST browser readiness contracts
+        run: |
+          python data/device-catalog/research/test_st_browser_acquisition.py
+          python data/device-catalog/research/test_st_browser_readiness_retry.py
       - name: Install browser acquisition dependencies
         run: |
           python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
