@@ -33,7 +33,9 @@ jobs:
       - name: Validate ST transport diagnostic contract
         run: python data/device-catalog/research/test_st_transport_diagnostic.py
       - name: Validate ST browser acquisition contract
-        run: python data/device-catalog/research/test_st_browser_acquisition.py
+        run: |
+          python data/device-catalog/research/test_st_browser_acquisition.py
+          python data/device-catalog/research/test_st_browser_readiness_retry.py
       - name: Validate generic device catalog evidence framework
         run: python data/device-catalog/research/test_device_catalog_evidence_framework.py
       - name: Validate retained STM32F1 browser evidence
