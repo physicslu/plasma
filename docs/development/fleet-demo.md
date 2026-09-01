@@ -4,16 +4,19 @@ The Fleet demo is a **Management Host** feature. It is not a required Z2/PPU run
 
 ## Public demo routes
 
-On the public demo host `plasma.open4th.com`:
+The browser product routes are:
 
 ```text
-/       -> redirect to /demo
-/demo   -> choose Single PPU or Manager/Fleet demo
-/ppu    -> existing single-PPU Plasma Console
-/fleet  -> read-only Fleet UI
+/            -> redirect to /demo
+/demo        -> Control Station product entry
+/fleet       -> Production Mode
+/engineering -> Engineering Mode
+/ppu         -> compatibility redirect to /engineering
 ```
 
-The root redirect is host-scoped to `plasma.open4th.com`; localhost and other development hosts keep the existing root PPU Console behavior so current development/E2E flows do not silently change. `/ppu` is the stable explicit route for the single-PPU demo and remains independent of Manager availability.
+The former Single PPU Programming Console is retired. Root behavior is no longer host-specific: localhost, packaged Control Stations, integration hosts, and public demos all enter the Control Station product surface instead of `SITE MATRIX / PPU CONTROL`. Engineering single-PPU programming is owned by `Engineering Mode -> Programming`.
+
+`/ppu` remains only as a compatibility redirect for old bookmarks; it does not render or own a second Programming UI.
 
 ## Fleet BFF boundary
 
@@ -65,7 +68,9 @@ After an approved deployment, run:
 plasmactl verify fleet
 ```
 
-This command is read-only. It does not restart services, modify configuration, write the Manager database, or touch Z2/FPGA hardware. It checks the deployed Git state, Vite/Manager systemd state, Fleet opt-in values in both the service and actual Vite process, loopback Manager scope, Manager liveness/fleet API, the same-origin Fleet BFF, sanitized browser contract, stale/current capacity semantics, and the `/demo`, `/ppu`, `/fleet` server-rendered routes.
+This command is read-only. It does not restart services, modify configuration, write the Manager database, or touch Z2/FPGA hardware. It checks the deployed Git state, Vite/Manager systemd state, Fleet opt-in values in both the service and actual Vite process, loopback Manager scope, Manager liveness/fleet API, the same-origin Fleet BFF, sanitized browser contract, stale/current capacity semantics, and the Control Station product routes.
+
+Route acceptance requires `/` and `/demo` to resolve to the product entry, `/fleet` to resolve to Production Mode, `/engineering` to resolve to Engineering Mode, and `/ppu` to resolve to Engineering Mode without exposing `SITE MATRIX / PPU CONTROL`.
 
 The command ends with either:
 
@@ -79,7 +84,7 @@ or a non-zero exit with explicit `[FAIL]` checks. Its full output is intended to
 
 ## Z2 production boundary
 
-Do not infer from the integration-host demo that Z2 must run the Fleet stack. Intended product separation is:
+Do not infer from the integration-host demo that Z2 must run the Control Station stack. Intended product separation is:
 
 ```text
 Z2 / PPU role
@@ -87,13 +92,15 @@ Z2 / PPU role
 - Plasma Server
 - Plasma Web REST Gateway
 - PYNQ / FPGA runtime
-- production PPU Console Web artifact
+- PPU execution and diagnostics APIs
 
-Management Host role
-- Fleet Web UI
+Control Station / Management Host role
+- Product entry
+- Production Mode
+- Engineering Mode / Programming
 - Fleet BFF
 - Plasma Manager
 - optional SQLite observation store
 ```
 
-The integration workstation may co-locate both roles for development and demonstration only.
+The integration workstation may co-locate both roles for development and demonstration only. A separate PPU Programming frontend is not part of the canonical product surface.
