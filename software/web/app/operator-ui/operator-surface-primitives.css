@@ -1,0 +1,114 @@
+/*
+ * Shared presentation primitives for configuration and diagnostic operator surfaces.
+ *
+ * Loopback diagnostics and Settings keep their own workflow/layout composition, but
+ * common cards, fields and actions must consume one visual owner here instead of
+ * re-declaring near-identical local scales.
+ */
+
+.settingsCard,
+.diagnosticsTestCard {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px var(--card-shadow);
+}
+
+.settingsCardHeader h2,
+.diagnosticsTestCard > header h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.settingsCardHeader p,
+.diagnosticsTestCard > header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.settingsField,
+.diagnosticsField {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settingsField > span,
+.diagnosticsField > span {
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.settingsPage input:not([type="checkbox"]),
+.settingsPage select,
+.diagnosticsField input,
+.diagnosticsField select {
+  width: 100%;
+  min-height: 36px;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 7px 10px;
+  font: 11px var(--font-mono);
+}
+
+.settingsPage input:disabled,
+.settingsPage select:disabled,
+.diagnosticsField input:disabled,
+.diagnosticsField select:disabled {
+  opacity: .52;
+  cursor: not-allowed;
+}
+
+.settingsField > small,
+.settingsFieldControl > b,
+.diagnosticsField small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.settingsActions button,
+.loopbackExecutionActions button {
+  min-height: 38px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text-soft);
+  padding: 8px 12px;
+  font: 700 11px/1.2 var(--font-sans);
+  cursor: pointer;
+}
+
+.settingsActions button[data-variant="primary"],
+.loopbackExecutionActions button.primary {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  color: #fff;
+}
+
+.settingsActions button:disabled,
+.loopbackExecutionActions button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.settingsActions button:not(:disabled):hover,
+.loopbackExecutionActions button:not(:disabled):hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.settingsActions button[data-variant="primary"]:not(:disabled):hover,
+.loopbackExecutionActions button.primary:not(:disabled):hover {
+  color: #fff;
+}
