@@ -28,7 +28,7 @@ test("renders the Plasma Control Station product entry", async () => {
   );
   const html = await response.text();
   assert.match(html, /<html\s+lang=["']zh-Hant["']/i);
-  assert.match(html, /<title>Plasma Control Station<\/title>/i);
+  assert.match(html, /<title>Plasma Product Modes<\/title>/i);
   assert.match(html, />PLASMA</);
   assert.match(html, />選擇產品模式</);
   assert.match(html, /href="\/fleet"/);
