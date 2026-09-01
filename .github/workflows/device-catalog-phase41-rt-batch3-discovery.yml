@@ -118,8 +118,6 @@ jobs:
               'STM32F411RE',
               'STM32F413RG',
               'STM32F415RG',
-              'STM32F446RC',
-              'STM32F446RE',
           ]
           discovery = {
               'schema_version': 1,

@@ -26,16 +26,6 @@
       "base_device": "STM32F415RG",
       "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f415rg.html",
       "selection_reason": "remaining Phase 4.1 R/T policy-ready STM32F415 LQFP64 coverage gap"
-    },
-    {
-      "base_device": "STM32F446RC",
-      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446rc.html",
-      "selection_reason": "remaining Phase 4.1 R/T policy-ready STM32F446 LQFP64 coverage gap"
-    },
-    {
-      "base_device": "STM32F446RE",
-      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446re.html",
-      "selection_reason": "remaining Phase 4.1 R/T policy-ready STM32F446 LQFP64 coverage gap"
     }
   ]
 }

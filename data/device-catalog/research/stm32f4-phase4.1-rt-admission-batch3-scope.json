@@ -9,10 +9,14 @@
     "STM32F411RC",
     "STM32F411RE",
     "STM32F413RG",
-    "STM32F415RG",
+    "STM32F415RG"
+  ],
+  "deferred_to_batch4_base_devices": [
     "STM32F446RC",
     "STM32F446RE"
   ],
+  "bounded_target_count": 5,
+  "max_pilot_targets": 6,
   "pre_production_stm32f4_exact_icpns": 175,
   "pre_production_st_total_exact_icpns": 250,
   "pre_policy_ready_gap_count": 6,
