@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch11-2026-09-01",
+  "source_workflow_run_id": "33464522226",
+  "source_artifact_id": "9784377080",
+  "source_artifact_sha256": "db546ac3dc9477fc02daaa9d0fb9114dbad436af5597c644dde5150536502950",
+  "canonical_dataset_admission": false,
+  "candidate_policy": "Only exact commercial part numbers observed on the official ST product page with Marketing Status Active are candidate rows for new admission.",
+  "lifecycle_audit_policy": "Non-Active official ST rows are retained for lifecycle audit and excluded from new admission candidates.",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "role": "lifecycle_control",
+      "marketing_status": "Active",
+      "exact_icpns": [
+        "STM32F479ZGT6"
+      ]
+    },
+    {
+      "base_device": "STM32F479ZI",
+      "role": "candidate",
+      "marketing_status": "Active",
+      "exact_icpns": [
+        "STM32F479ZIT6"
+      ]
+    }
+  ],
+  "excluded_non_active_observations": []
+}
