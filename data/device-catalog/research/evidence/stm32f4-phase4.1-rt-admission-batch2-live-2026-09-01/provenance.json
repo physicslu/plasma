@@ -1,0 +1,56 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_time_utc": {
+    "control": "2026-09-01T12:50:54Z",
+    "pilot_first": "2026-09-01T12:50:59Z",
+    "pilot_last": "2026-09-01T12:51:19Z"
+  },
+  "acquisition_transport": "chromium_rendered_dom",
+  "baseline": {
+    "pilot_id": "stm32f4-phase4.1-rt-admission-batch2-2026-09-01",
+    "schema_version": 1,
+    "sha256": "eed8ed742ff9d049ccc1fb9f89b5569e1b83739b4df944349fa7263ed172aac9"
+  },
+  "canonical_dataset_admission": false,
+  "chromium_version": "151.0.7922.34",
+  "evaluator_result": "scale_ready",
+  "evidence_id": "stm32f4-phase4.1-rt-admission-batch2-2026-09-01-retained-20260901T125059Z-4e0435d",
+  "exact_icpn_candidate_count": 18,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F405RG",
+      "icpn": "STM32F405RGT6V",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "base_device": "STM32F405RG",
+      "icpn": "STM32F405RGT6W",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "executed_git_sha": "4e0435df5a43a3667bde6df558ee322218b51810",
+  "headed": true,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 6,
+      "attempt": 1,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 1,
+  "locked_discovery_source": {
+    "artifact_id": "9788381143",
+    "artifact_sha256": "35bbebc8c1cce87ad8fa3fa43f30a76bde056273eb9adcf8549cc2658bbde7d8",
+    "workflow_run_id": "33476464732"
+  },
+  "manufacturer": "STMicroelectronics",
+  "playwright_version": "1.62.0",
+  "scale_ready": true,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 6,
+  "workflow_run_id": "33509865291"
+}

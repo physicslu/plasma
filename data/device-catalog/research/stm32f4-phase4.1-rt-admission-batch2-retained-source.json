@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "workflow_run_id": "33509865291",
+  "artifact_id": "9801196525",
+  "artifact_name": "phase41-stm32f4-rt-batch2-retained",
+  "artifact_sha256": "ebd6bcf6a7eaccbf69dabba72adcaed736bbf8c29952091fe73d9bc336468e5b",
+  "evidence_id": "stm32f4-phase4.1-rt-admission-batch2-2026-09-01-retained-20260901T125059Z-4e0435d",
+  "canonical_dataset_admission": false
+}
