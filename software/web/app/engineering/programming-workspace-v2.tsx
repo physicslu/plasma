@@ -664,6 +664,10 @@ export default function ProgrammingWorkspaceV2() {
       return;
     }
     try {
+      // Validate and commit the next routing base before mutating any live
+      // Engineering runtime state. Invalid schemes or managed-routing changes
+      // must fail closed and preserve the current online session/target state.
+      const normalized = setApiBase(apiDraft);
       pendingRestore.current = selection.facilityId && selection.ppuId
         ? {
           target: { ...selection },
@@ -676,7 +680,6 @@ export default function ProgrammingWorkspaceV2() {
       setCatalogError(null);
       setConnection("connecting");
       restartSessionRequested.current = true;
-      const normalized = setApiBase(apiDraft);
       setApiDraft(normalized);
       setConnectionGeneration(current => current + 1);
     } catch (connectError) {
