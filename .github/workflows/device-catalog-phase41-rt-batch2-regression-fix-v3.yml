@@ -1,0 +1,72 @@
+name: Device catalog Phase 4.1 R/T batch2 regression fix v3
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-historical-prestate:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/device-catalog-phase4.1-rt-admission-batch2-retained'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply growth-safe patches and immutable Batch11 pre-state reconstruction
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import textwrap
+
+          # Reuse only the Python transformation block from v2; do not run its shell tests/commit.
+          v2 = Path('.github/workflows/device-catalog-phase41-rt-batch2-regression-fix-v2.yml').read_text(encoding='utf-8')
+          start_marker = "          python - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = v2.index(start_marker) + len(start_marker)
+          end = v2.index(end_marker, start)
+          transformation = textwrap.dedent(v2[start:end])
+          exec(compile(transformation, '<growth-safe-transform>', 'exec'))
+
+          batch11 = Path('data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch11_post_admission.py')
+          text = batch11.read_text(encoding='utf-8')
+          pattern = r'    def _prewrite_canonical\(self, output: Path\) -> None:\n.*?(?=\n\n    def _catalog_rows)'
+          replacement = '''    def _prewrite_canonical(self, output: Path) -> None:\n        pre_batch11_evidence_ids = {\n            "stm32f4-phase3.1-bounded-pilot-2026-08-30-retained-20260830T023035Z-b42d460",\n            "stm32f4-phase3.3-scaleout-batch1-2026-08-30-retained-20260830T040319Z-db7f090",\n            "stm32f4-phase3.3-scaleout-batch2-2026-08-30-retained-20260830T063333Z-cb883bb",\n            "stm32f4-phase4.0-f446-batch1-2026-08-30-retained-20260830T134444Z-e9e8e60",\n            "stm32f4-phase4.0-foundation-batch2-2026-08-31-retained-20260831T013557Z-8979938",\n            "stm32f4-phase4.0-foundation-batch3-2026-08-31-retained-20260831T035207Z-42fa641",\n            "stm32f4-phase4.0-foundation-batch4-2026-08-31-retained-20260831T044040Z-226ad4d",\n            "stm32f4-phase4.0-foundation-batch5-2026-08-31-retained-20260831T053303Z-5f76683",\n            "stm32f4-phase4.0-foundation-batch6-2026-08-31-retained-20260831T063818Z-c3edb20",\n            "stm32f4-phase4.0-foundation-batch7-2026-08-31-retained-20260831T080025Z-feef382",\n            "stm32f4-phase4.0-foundation-batch8-2026-08-31-retained-20260831T121653Z-5299281",\n            "stm32f4-phase4.0-foundation-batch9-2026-08-31-retained-20260831T125555Z-4e5cc1b",\n            "stm32f4-phase4.0-foundation-batch10-2026-09-01-retained-20260901T015746Z-6ecf759",\n        }\n        with CANONICAL.open(newline="", encoding="utf-8") as handle:\n            reader = csv.DictReader(handle)\n            fields = list(reader.fieldnames or [])\n            rows = [row for row in reader if _row_evidence_id(row) in pre_batch11_evidence_ids]\n        self.assertEqual(len(rows), 157)\n        with output.open("w", newline="", encoding="utf-8") as handle:\n            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\\n")\n            writer.writeheader()\n            writer.writerows(rows)'''
+          updated, count = re.subn(pattern, replacement, text, flags=re.S)
+          if count != 1:
+              raise SystemExit(f'Batch11 pre-state replacement count={count}')
+          batch11.write_text(updated, encoding='utf-8')
+          PY
+          python -m py_compile \
+            data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch10_post_admission.py \
+            data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch11_post_admission.py \
+            data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py \
+            data/device-catalog/research/test_stm32f4_phase4_1_rt_admission_batch2_post_admission.py
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch10_post_admission.py
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch11_post_admission.py
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_admission_batch2_post_admission.py
+      - name: Commit fixes and remove one-shot workflows
+        run: |
+          set -euo pipefail
+          git config user.name 'Gordon'
+          git config user.email 'physicslu@gmail.com'
+          git add \
+            .github/workflows/device-catalog-validation.yml \
+            data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch10_post_admission.py \
+            data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch11_post_admission.py \
+            data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py
+          git rm .github/workflows/device-catalog-phase41-rt-batch2-regression-fix.yml
+          git rm .github/workflows/device-catalog-phase41-rt-batch2-regression-fix-v2.yml
+          git rm .github/workflows/device-catalog-phase41-rt-batch2-regression-fix-v3.yml
+          git diff --cached --check
+          git commit -m 'device-catalog: make historical regressions growth-safe'
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
