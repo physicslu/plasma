@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.0-foundation-batch10-2026-09-01",
+  "targets": [
+    {
+      "base_device": "STM32F469ZE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ze.html",
+      "selection_reason": "production-admitted lifecycle control from Batch9; verifies official-ST extraction stability while expanding adjacent STM32F469 and STM32F479 policy-ready gaps"
+    },
+    {
+      "base_device": "STM32F469ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469zg.html",
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F469 Z-package capacity variant under the unchanged admission policy"
+    },
+    {
+      "base_device": "STM32F469ZI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469zi.html",
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F469 Z-package capacity variant under the unchanged admission policy"
+    },
+    {
+      "base_device": "STM32F479VG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479vg.html",
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F479 V-package candidate selected for bounded new-series discovery"
+    },
+    {
+      "base_device": "STM32F479VI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479vi.html",
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F479 V-package capacity variant grouped with its adjacent peer"
+    },
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F479 Z-package candidate included within the six-target acquisition bound"
+    }
+  ]
+}
