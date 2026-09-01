@@ -44,10 +44,18 @@ def test_loopback_body_is_1k_and_crc_matches() -> None:
     assert body["tx_crc32"] == crc
 
 
-def test_source_contract_keeps_runtime_mount_read_only() -> None:
+def test_result_marker_can_be_parsed_from_progress_output() -> None:
+    lab = _load_module()
+    output = "health/live: 1/1 PASS\n" + lab.RESULT_MARKER + '{"result":"PASS"}\n'
+    assert lab._parse_result(output) == {"result": "PASS"}
+
+
+def test_source_contract_keeps_container_mounts_read_only_and_reports_host_owned() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     assert 'f"{runtime_dir}:/runtime:ro"' in source
     assert 'f"{Path(__file__).resolve()}:/lab.py:ro"' in source
+    assert ":/reports" not in source
+    assert "report_path.write_text" in source
     assert '"health/live"' in source
     assert '"health/ready"' in source
     assert '"ps-loopback"' in source
