@@ -92,8 +92,6 @@ type StopPolicy = { kind: "never" } | { kind: "failed_sites"; threshold: number 
 const MAX_IMAGE_ASSET_BYTES = 16 * 1024 * 1024;
 const MAX_LOG_ENTRIES = 1000;
 const POLL_INTERVAL_MS = 500;
-const ENGINEERING_READ_OFFSET = 0;
-const ENGINEERING_READ_LENGTH = 256;
 const runningStages: Stage[] = ["queued", "erase", "program", "verify", "read"];
 const terminalStates = new Set<JobState>(["success", "failed", "error", "cancelled", "timeout", "aborted"]);
 const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
@@ -779,8 +777,6 @@ export default function ProgrammingWorkspaceV2() {
         assetFile: operation === "erase" || operation === "read" ? null : imageAsset,
         engineeringSessionId: engineeringSessionId ?? undefined,
         allowSyntheticMockImage: usesSyntheticImage,
-        offset: operation === "read" ? ENGINEERING_READ_OFFSET : undefined,
-        length: operation === "read" ? ENGINEERING_READ_LENGTH : undefined,
         targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : undefined,
         requestTimeoutMs: configuredGatewayPolicy.current.ppu_request_timeout_ms,
         onAssetEvent: logAssetEvent,
@@ -914,8 +910,6 @@ export default function ProgrammingWorkspaceV2() {
         targetDevice: targetDevice ? { vendor: targetDevice.vendor, identifier: targetDevice.identifier } : null,
         assetFile: imageAsset,
         allowSyntheticMockImage: syntheticMockImageAvailable,
-        readOffset: ENGINEERING_READ_OFFSET,
-        readLength: ENGINEERING_READ_LENGTH,
       });
       const mockRevision = accepted.mock_runtime?.profile_revision;
       appendLog(
