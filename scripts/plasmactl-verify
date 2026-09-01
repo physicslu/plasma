@@ -245,10 +245,10 @@ verify_fleet() {
     verify_fail "Control Station root routing" "location=${root_location:-missing}"
   fi
 
-  if demo_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/demo" 2>/dev/null)" && grep -Fq 'Choose a Demo' <<<"$demo_html" && ! grep -Fq 'SITE MATRIX' <<<"$demo_html"; then
+  if demo_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/demo" 2>/dev/null)" && grep -Fq 'Choose a Demo' <<<"$demo_html" && ! grep -Fq 'SITE MATRIX' <<<"$demo_html" && ! grep -Fq 'PPU CONTROL' <<<"$demo_html"; then
     verify_pass "/demo SSR" "Control Station product entry"
   else
-    verify_fail "/demo SSR" "missing product entry or legacy Site Matrix leaked"
+    verify_fail "/demo SSR" "missing product entry or legacy Single PPU UI leaked"
   fi
 
   ppu_headers="$(curl --silent --show-error --max-time 5 -D - -o /dev/null -H 'Host: plasma.open4th.com' "$local_web/ppu" 2>/dev/null || true)"
@@ -259,16 +259,16 @@ verify_fleet() {
     verify_fail "Retired /ppu routing" "location=${ppu_location:-missing}"
   fi
 
-  if engineering_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/engineering" 2>/dev/null)" && grep -Fq 'SINGLE PPU PROGRAMMING' <<<"$engineering_html" && ! grep -Fq 'PPU CONTROL' <<<"$engineering_html"; then
-    verify_pass "/engineering SSR" "canonical Engineering Programming"
+  if engineering_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/engineering" 2>/dev/null)" && grep -Fq 'EMode' <<<"$engineering_html" && ! grep -Fq 'SITE MATRIX' <<<"$engineering_html" && ! grep -Fq 'PPU CONTROL' <<<"$engineering_html"; then
+    verify_pass "/engineering SSR" "canonical EMode shell"
   else
-    verify_fail "/engineering SSR" "missing Engineering Programming or legacy PPU Control leaked"
+    verify_fail "/engineering SSR" "missing EMode shell or legacy Single PPU UI leaked"
   fi
 
-  if fleet_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/fleet" 2>/dev/null)" && grep -Fq 'Facility / PPU Fleet Overview' <<<"$fleet_html"; then
-    verify_pass "/fleet SSR" "read-only Fleet UI"
+  if fleet_html="$(curl --fail --silent --show-error --max-time 5 -H 'Host: plasma.open4th.com' "$local_web/fleet" 2>/dev/null)" && grep -Fq 'Facility / PPU Fleet Overview' <<<"$fleet_html" && ! grep -Fq 'SITE MATRIX' <<<"$fleet_html" && ! grep -Fq 'PPU CONTROL' <<<"$fleet_html"; then
+    verify_pass "/fleet SSR" "Production Fleet UI"
   else
-    verify_fail "/fleet SSR" "missing Fleet UI content"
+    verify_fail "/fleet SSR" "missing Fleet UI or legacy Single PPU UI leaked"
   fi
 
   if [[ -n "$fleet_summary" ]]; then
