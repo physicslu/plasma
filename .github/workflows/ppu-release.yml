@@ -8,6 +8,7 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/product-release.py"
+      - "scripts/ppu-armv7-runtime-acceptance.py"
       - "release/**"
       - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
@@ -18,6 +19,7 @@ on:
       - "software/python/plasma_client/**"
       - "software/python/plasma_web/**"
       - "software/python/tests/test_ppu_runtime.py"
+      - "software/python/tests/test_ppu_armv7_runtime_acceptance.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_product_release.py"
       - "docs/deployment/ppu-runtime-packaging.md"
@@ -45,6 +47,7 @@ jobs:
         run: >-
           python -m pytest -q
           software/python/tests/test_ppu_runtime.py
+          software/python/tests/test_ppu_armv7_runtime_acceptance.py
           software/python/tests/test_ppu_release.py
           software/python/tests/test_product_release.py
 
@@ -122,6 +125,30 @@ jobs:
           set -euo pipefail
           cd "$(dirname "$ARCHIVE")"
           sha256sum --check "$(basename "$SIDECAR")"
+
+      - name: Set up QEMU for ARMv7 runtime acceptance
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm
+
+      - name: Run PPU release under ARMv7 userspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="$RUNNER_TEMP/plasma-ppu-verify/plasma-release/runtime"
+          work="$RUNNER_TEMP/plasma-ppu-armv7-work"
+          test -f "$runtime/ppu/ppu.pyz"
+          mkdir -p "$work"
+
+          docker run --rm \
+            --platform linux/arm/v7 \
+            --volume "$runtime:/runtime:ro" \
+            --volume "$PWD/scripts/ppu-armv7-runtime-acceptance.py:/acceptance.py:ro" \
+            --volume "$work:/work" \
+            arm32v7/python:3.12 \
+            python /acceptance.py \
+              --runtime-dir /runtime \
+              --work-dir /work
 
       - name: Upload PPU release artifact
         uses: actions/upload-artifact@v4
