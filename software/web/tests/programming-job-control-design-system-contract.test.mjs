@@ -18,6 +18,8 @@ const emodeCss = fs.readFileSync(new URL("../app/engineering/programming-workspa
 const emodeBase = fs.readFileSync(new URL("../app/engineering/programming-workspace-base.css", import.meta.url), "utf8");
 const emodeDensity = fs.readFileSync(new URL("../app/engineering/engineering-density.css", import.meta.url), "utf8");
 const emodeRefresh = fs.readFileSync(new URL("../app/engineering/engineering-workspace-refresh.css", import.meta.url), "utf8");
+const directApi = fs.readFileSync(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
+const batchApi = fs.readFileSync(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const sharedDriver = fs.readFileSync(new URL("../e2e/tests/programming-job-test-helpers.ts", import.meta.url), "utf8");
 const productionRuntime = fs.readFileSync(new URL("../e2e/tests/production-multi-ppu-runtime.spec.ts", import.meta.url), "utf8");
 const engineeringRuntime = fs.readFileSync(new URL("../e2e/tests/engineering-programming-asset-cache-runtime.spec.ts", import.meta.url), "utf8");
@@ -141,14 +143,14 @@ test("mode-local styles cannot re-own retired Programming Job or first-level Pan
   assert.doesNotMatch(emodeRefresh, /font-size:\s*0|content:\s*"1\. SYSTEM SETUP|content:\s*"3\. LIVE SITE STATUS/);
 });
 
-test("pre-launch Engineering UI retains no hidden legacy Programming controls", () => {
+test("pre-launch Programming UI retains no hidden legacy Read range ownership", () => {
   assert.doesNotMatch(sharedComponent, /compatibilityFields|programmingJobCompatibility/);
   assert.doesNotMatch(emode, /compatibilityFields|engineeringReadRow|Engineering READ offset|Engineering READ length/);
   assert.doesNotMatch(emodeSession, /emodeReadOffset|emodeReadLength|setEmodeReadOffset|setEmodeReadLength/);
-  assert.match(emode, /const ENGINEERING_READ_OFFSET = 0/);
-  assert.match(emode, /const ENGINEERING_READ_LENGTH = 256/);
-  assert.match(emode, /readOffset:\s*ENGINEERING_READ_OFFSET/);
-  assert.match(emode, /readLength:\s*ENGINEERING_READ_LENGTH/);
+  assert.doesNotMatch(emode, /ENGINEERING_READ_OFFSET|ENGINEERING_READ_LENGTH|readOffset:|readLength:/);
+  assert.doesNotMatch(pmod, /readOffset:|readLength:/);
+  assert.doesNotMatch(directApi, /offset\?:\s*number|length\?:\s*number|body\.offset\s*=|body\.length\s*=/);
+  assert.doesNotMatch(batchApi, /readOffset\?:\s*number|readLength\?:\s*number|options\.readOffset|options\.readLength/);
   assert.doesNotMatch(emode, /recentEvents|RECENT EVENTS|Engineering recent events/);
 
   for (const css of [emodeCss, emodeDensity, emodeRefresh]) {
