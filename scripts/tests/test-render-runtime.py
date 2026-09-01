@@ -100,7 +100,9 @@ def main() -> None:
             for route in ("/", "/demo", "/fleet", "/engineering", "/ppu"):
                 status, content_type, payload = get(origin, route)
                 assert status == 200 and content_type == "text/html"
-                assert b"Plasma PPU Console" in payload
+                assert b"Plasma Control Station" in payload
+                assert b"SITE MATRIX" not in payload
+                assert b"PPU CONTROL" not in payload
                 print(f"[render-runtime] {route}: HTTP {status} {content_type}")
 
             _, _, payload = get(origin, "/api/status")
