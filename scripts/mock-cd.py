@@ -260,9 +260,9 @@ def validate_web_fleet(payload: dict[str, Any]) -> None:
 
 def assert_local_routes() -> None:
     for path, marker in (
-        ("/", "SITE MATRIX"),
+        ("/", "Choose a Demo"),
         ("/demo", "Choose a Demo"),
-        ("/ppu", "SITE MATRIX"),
+        ("/engineering", "EMode"),
         ("/fleet", "Factory Production Console"),
     ):
         request = Request(f"http://127.0.0.1:{WEB_PORT}{path}")
@@ -272,7 +272,21 @@ def assert_local_routes() -> None:
             html = response_obj.read().decode("utf-8", errors="replace")
         if marker not in html:
             raise MockCDError(f"{path} missing expected marker: {marker}")
+        if "SITE MATRIX" in html or "PPU CONTROL" in html:
+            raise MockCDError(f"{path} still exposes the retired Single PPU Programming UI")
         log(f"PASS same-origin route {path}")
+
+    request = Request(f"http://127.0.0.1:{WEB_PORT}/ppu")
+    with urlopen(request, timeout=3) as response_obj:
+        if int(response_obj.status) != 200:
+            raise MockCDError(f"/ppu compatibility route returned HTTP {response_obj.status}")
+        final_url = response_obj.geturl()
+        html = response_obj.read().decode("utf-8", errors="replace")
+    if not final_url.endswith("/engineering"):
+        raise MockCDError(f"/ppu did not redirect to /engineering: final_url={final_url}")
+    if "SITE MATRIX" in html or "PPU CONTROL" in html:
+        raise MockCDError("/ppu compatibility route still exposes the retired Single PPU Programming UI")
+    log("PASS same-origin route /ppu -> /engineering")
 
 
 def dump_failure_logs() -> None:

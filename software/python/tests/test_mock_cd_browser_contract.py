@@ -32,7 +32,6 @@ def test_browser_workflow_is_mock_only_and_fail_closed() -> None:
     assert "scripts/mock-cd-browser-stack.py" in source
     assert "playwright.mock-cd.config.ts" in source
     assert "runtime.json" in source
-    assert 'stream.write(f"MOCK_CD_EXPECTED_SITES={payload[\'enabled_sites\']}\\n")' in source
     assert "engineering_1mib_programming_asset_cache_reuse_and_reconnect" in source
     assert "continue-on-error: true" in source
     assert "Enforce browser acceptance result" in source
@@ -41,26 +40,33 @@ def test_browser_workflow_is_mock_only_and_fail_closed() -> None:
         assert forbidden not in source
 
 
-def test_browser_spec_uses_real_gateway_without_api_route_mocking() -> None:
+def test_browser_spec_moves_real_runtime_acceptance_to_emode_without_api_route_mocking() -> None:
     source = SPEC.read_text(encoding="utf-8")
     assert "page.route(" not in source
     assert "MOCK_CD_GATEWAY_URL" in source
     assert "MOCK_CD_UNREACHABLE_GATEWAY_URL" in source
-    assert "MOCK_CD_EXPECTED_PPU_ID" in source
-    assert "Plasma Web REST Gateway offline" in source
-    assert "Plasma Web REST Gateway connected" in source
-    assert 'for (let siteId = 1; siteId <= expectedSites; siteId += 1)' in source
+    assert "MOCK_CD_ENGINEERING_FACILITY_ID" in source
+    assert "MOCK_CD_ENGINEERING_PPU_ID" in source
+    assert 'page.goto("/")' in source
+    assert 'page.goto("/ppu")' in source
+    assert "/\\/demo$/" in source
+    assert "/\\/engineering$/" in source
+    assert 'getByText("SITE MATRIX"' in source
+    assert 'getByText("PPU CONTROL"' in source
+    assert 'getByLabel("Engineering Gateway URL")' in source
+    assert ".engineeringGateway" in source
+    assert "openEngineeringProgramming" in source
+    assert "Engineering Programming Image Asset file" in source
     for operation in ("erase", "program", "verify", "read"):
         assert f'"{operation}"' in source
     assert "waitForEvent(\"download\")" in source
-    assert "read_SITE${siteId}_flash.bin" in source
-    assert "representativeSelections(expectedSites)" in source
-    assert "runBatchAndAssert" in source
-    assert "selectedSites.length * operations.length" in source
-    assert "starts.slice(before)" in source
-    assert "expectedSummary" in source
-    assert "expectedCompleteCount" not in source
-    assert "siteId % 2" not in source
+    assert "read_SITE${siteId}_main_flash.bin" in source
+    assert 'url.pathname !== "/api/batches"' in source
+    assert "setEngineeringBatchSites" in source
+    assert "setEngineeringBatchOperations" in source
+    assert "[BATCH] SUCCESS" in source
+    assert "BatchLifecycle" not in source
+    assert "representativeSelections" not in source
 
 
 def test_engineering_asset_cache_spec_uses_real_gateway_without_route_mocking() -> None:

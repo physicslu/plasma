@@ -11,18 +11,13 @@ async function workerFor(name) {
 const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
 const ctx = { waitUntil() {}, passThroughOnException() {} };
 
-test("root behavior no longer depends on a public deployment hostname", async () => {
-  const worker = await workerFor("host-independent-root");
-  const response = await worker.fetch(new Request("https://legacy-console.invalid/", { headers: { accept: "text/html" }, redirect: "manual" }), env, ctx);
-  assert.equal(response.status, 200);
-  assert.match(await response.text(), />SITE MATRIX</);
-});
-
-test("non-public local root keeps the original PPU console behavior", async () => {
-  const worker = await workerFor("local-root");
-  const response = await worker.fetch(new Request("http://localhost/", { headers: { accept: "text/html" } }), env, ctx);
-  assert.equal(response.status, 200);
-  assert.match(await response.text(), />SITE MATRIX</);
+test("root always enters the Control Station product landing instead of the legacy PPU console", async () => {
+  for (const url of ["https://legacy-console.invalid/", "http://localhost/"]) {
+    const worker = await workerFor(`product-root-${new URL(url).hostname}`);
+    const response = await worker.fetch(new Request(url, { headers: { accept: "text/html" }, redirect: "manual" }), env, ctx);
+    assert.equal(response.status, 307);
+    assert.equal(new URL(response.headers.get("location"), url).pathname, "/demo");
+  }
 });
 
 test("demo landing page exposes Production and Engineering as the only product modes", async () => {
@@ -37,6 +32,8 @@ test("demo landing page exposes Production and Engineering as the only product m
   assert.match(html, />工程模式</);
   assert.doesNotMatch(html, />Single PPU Demo</);
   assert.doesNotMatch(html, />Manager \/ Fleet Demo</);
+  assert.doesNotMatch(html, />SITE MATRIX</);
+  assert.doesNotMatch(html, />PPU CONTROL</);
 });
 
 test("Web source defines ProductMode rather than Fleet as a product-mode value", async () => {

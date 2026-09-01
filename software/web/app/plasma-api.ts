@@ -511,8 +511,6 @@ export async function startJob(
     assetFile?: File | null;
     engineeringSessionId?: string;
     allowSyntheticMockImage?: boolean;
-    offset?: number;
-    length?: number;
     targetDevice?: JobTargetDeviceRequest;
     executionOwnerId?: string;
     requestTimeoutMs?: number;
@@ -576,10 +574,6 @@ export async function startJob(
         asset_base64: assetBase64,
         timeout_s: 30,
       });
-    }
-    if (options.operation === "read") {
-      body.offset = options.offset ?? 0;
-      body.length = options.length ?? 256;
     }
 
     const payload = await requestJson<{ ok: boolean; job: JobSnapshot }>(

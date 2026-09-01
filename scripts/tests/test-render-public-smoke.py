@@ -135,8 +135,16 @@ def assert_ui_routes(origin: str, *, timeout: float, report: SmokeReport) -> Non
         status, content_type, body = request(origin, path, timeout=timeout)
         if status != 200 or content_type != "text/html":
             raise RuntimeError(f"{path} returned HTTP {status} {content_type}")
-        if b"Plasma PPU Console" not in body:
-            raise RuntimeError(f"{path} does not contain the Plasma PPU Console shell")
+        if report.expected_commit is not None:
+            if b"Plasma Control Station" not in body:
+                raise RuntimeError(f"{path} does not contain the Plasma Control Station shell")
+            if b"Plasma PPU Console" in body or b"SITE MATRIX" in body or b"PPU CONTROL" in body:
+                raise RuntimeError(f"{path} exposes the retired Single PPU Programming shell")
+        elif b"Plasma Control Station" not in body and b"Plasma PPU Console" not in body:
+            # Pull-request smoke observes whatever main revision is already deployed.
+            # Accept the previous shell until this PR itself is deployed; pinned
+            # post-deployment smoke enforces the new Control Station ownership.
+            raise RuntimeError(f"{path} does not contain a recognized Plasma product shell")
         report.checks[f"ui:{path}"] = "PASS"
 
 

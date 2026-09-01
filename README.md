@@ -19,17 +19,23 @@ Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。目前 prototype 預�
 ## 目前目錄
 
 - `pl/`：Zynq Programmable Logic 的 RTL、constraints、模擬、verification 與 Vivado 建置資產。
-- `software/python/`：Plasma PPU control plane、Protocol v3.3 TCP Server、CLI、Plasma Web REST Gateway、optional read-only Plasma Manager 與測試。
-- `software/web/`：React + TypeScript Plasma PPU Console。
+- `software/python/`：Plasma PPU control plane、Protocol v3.3 TCP Server、CLI、Plasma Web REST Gateway、Plasma Manager 與測試。
+- `software/web/`：React + TypeScript Plasma Control Station Web，包括 PMode 與 EMode。
 - `scripts/plasmactl`：integration host 的更新、測試、systemd reconciliation、重啟與服務管理入口。
 - `docs/`：architecture、development 與 deployment 文件。
 
-## Current PPU-local software path
+## Current software path
+
+Formal Control Station path：
 
 ```text
-Browser / Plasma PPU Console
+Browser / Plasma Control Station
         |
-        | Web REST API Contract v3
+        | same-origin Console / BFF
+        v
+Plasma Manager
+        |
+        | selected PPU routing
         v
 Plasma Web REST Gateway
         |
@@ -45,22 +51,9 @@ SiteManager / SiteWorker
 MockInterface today; Z2/FPGA/real-target validation is a separate stage
 ```
 
-PPU 是 autonomous execution node；本地燒錄不依賴 Plasma Manager。
+Engineering Mode 的 `Programming` workspace 是 canonical single-PPU engineering programming UI。退休的 `SITE MATRIX / PPU CONTROL` Single PPU Programming frontend 不再構成第二條產品控制路徑；PPU 本身仍保留 autonomous execution、Gateway/API、Job、Site 與 diagnostics backend capability。
 
-Optional fleet path：
-
-```text
-Fleet client
-    |
-    v
-Plasma Manager (read-only registry / aggregation)
-    |
-    +--> PPU A Plasma Web REST Gateway -> local execution
-    +--> PPU B Plasma Web REST Gateway -> local execution
-    +--> ...
-```
-
-Plasma Manager 使用手動設定的 PPU Gateway endpoints 彙整 health、identity 與 Site topology；Manager 不參與 PPU 本地 deterministic programming execution。
+PPU 是 autonomous execution node；deterministic programming execution 發生在 PPU，不由 Manager 取代。Manager 負責 Control Station 的 PPU registry、observation 與 managed routing ownership。
 
 目前 Plasma Web REST Gateway 使用 Python standard-library `ThreadingHTTPServer` 與 REST polling；**不是 FastAPI，也沒有使用 WebSocket**。
 
@@ -82,14 +75,14 @@ Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration�
 - Operator 操作指南：[`docs/operator/plasma-console-guide.md`](docs/operator/plasma-console-guide.md)
 - Domain / naming / identity：[`docs/architecture/domain-naming-migration.md`](docs/architecture/domain-naming-migration.md)
 - Facility / PPU / Site architecture：[`docs/architecture/ppu-facility-sites.md`](docs/architecture/ppu-facility-sites.md)
-- Plasma Web REST API contract：[`docs/architecture/web-rest-api-contract.md`](docs/architecture/web-rest-api-contract.md)
+- Web REST API Contract v3：[`docs/architecture/web-rest-api-contract.md`](docs/architecture/web-rest-api-contract.md)
 - Gateway 通訊與異常復原：[`docs/architecture/gateway-communication-recovery.md`](docs/architecture/gateway-communication-recovery.md)
 - Engineering Programming observability / audit contract：[`docs/architecture/engineering-programming-observability.md`](docs/architecture/engineering-programming-observability.md)
-- Optional Manager invariant：[`docs/architecture/manager-optional-control-plane.md`](docs/architecture/manager-optional-control-plane.md)
-- Read-only Manager implementation：[`docs/architecture/manager-readonly-fleet-aggregation.md`](docs/architecture/manager-readonly-fleet-aggregation.md)
+- Control Station / Manager architecture：[`docs/architecture/configuration-architecture.md`](docs/architecture/configuration-architecture.md)
+- Manager implementation：[`docs/architecture/manager-readonly-fleet-aggregation.md`](docs/architecture/manager-readonly-fleet-aggregation.md)
 - Protocol v3.3：[`software/python/docs/protocol.md`](software/python/docs/protocol.md)
 - Python software：[`software/python/README.md`](software/python/README.md)
-- Web Console：[`software/web/README.md`](software/web/README.md)
+- Control Station Web：[`software/web/README.md`](software/web/README.md)
 - FPGA / PL：[`pl/README.md`](pl/README.md)
 - Multi-machine development：[`docs/development/multi-machine-development-guide.md`](docs/development/multi-machine-development-guide.md)
 - Integration-host deployment：[`docs/development/swpc-deployment.md`](docs/development/swpc-deployment.md)
@@ -99,4 +92,4 @@ Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration�
 
 ## Validation boundary
 
-Mock、CI、SWPC deployment、Vivado implementation、Z2 runtime 與 real IC programming 是不同的驗證層。任何一層 PASS 都不能被擴大解讀成尚未實際執行的下一層驗證成功。
+Mock、CI、SWPC deployment、Windows/macOS Control Station acceptance、Vivado implementation、Z2 runtime 與 real IC programming 是不同的驗證層。任何一層 PASS 都不能被擴大解讀成尚未實際執行的下一層驗證成功。

@@ -40,9 +40,11 @@ Plasma Manager  :19880
   SQLite observation cache in the temporary runner directory
 
 Vinext/Vite Web :15173
-  Fleet enabled
+  Control Station product entry
+  Production Mode / Fleet enabled
+  Engineering Mode
   Manager BFF -> http://127.0.0.1:19880
-  PPU Console default Gateway -> http://127.0.0.1:19801
+  same-origin Gateway proxy -> http://127.0.0.1:19801
 ```
 
 Expected Fleet topology is 2 current PPUs and 12 current/enabled Sites.
@@ -50,7 +52,7 @@ Expected Fleet topology is 2 current PPUs and 12 current/enabled Sites.
 For Browser Runtime Acceptance, PPU A's REST Gateway additionally enables the server-side Engineering Mock PPU provider. That provider owns a separate Engineering-only simulation topology:
 
 ```text
-3 Mock Facilities
+8 Mock Facilities
   x 4 Mock PPUs per Facility
     -> 2 / 4 / 6 / 8 Sites
 
@@ -70,7 +72,11 @@ Each Engineering Mock PPU is a real in-process `PlasmaServer` runtime backed by 
 - the Vinext/Cloudflare Worker receives Fleet runtime bindings;
 - same-origin `/api/fleet` reaches Manager through the loopback-only BFF;
 - browser Fleet payload remains sanitized and does not expose registry endpoints, raw errors, or observation database paths;
-- public demo routing still resolves `/ -> /demo`, `/demo`, `/ppu`, and `/fleet`;
+- `/` resolves to the Control Station product entry;
+- `/demo` remains the product-mode entry;
+- `/fleet` resolves Production Mode;
+- `/engineering` resolves Engineering Mode;
+- legacy `/ppu` resolves to Engineering Mode and never exposes `SITE MATRIX / PPU CONTROL`;
 - all ephemeral processes remain alive through acceptance.
 
 The harness terminates its own process groups on success or failure and prints service log tails when acceptance fails.
@@ -87,25 +93,13 @@ The GitHub workflow uploads the whole `artifacts/mock-cd/` directory as `mock-cd
 
 ## Browser Runtime Acceptance
 
-`.github/workflows/mock-cd-browser.yml` drives the actual PPU Web console through Playwright while the persistent harness `scripts/mock-cd-browser-stack.py` keeps the same Mock CD stack alive.
+`.github/workflows/mock-cd-browser.yml` drives the actual Control Station through Playwright while the persistent harness `scripts/mock-cd-browser-stack.py` keeps the same Mock CD stack alive.
 
-The browser test does **not** use `page.route()` to replace Plasma APIs. Its required local-PPU path is:
-
-```text
-Playwright browser action
-  -> Web UI
-  -> real Plasma Web REST Gateway
-  -> real Plasma Server
-  -> MockInterface
-  -> runtime result / Read download
-  -> browser assertion
-```
-
-The Engineering path is also real and unmocked:
+The browser test does **not** use `page.route()` to replace Plasma APIs. The canonical engineering execution path is:
 
 ```text
 Playwright browser action
-  -> Engineering -> Programming
+  -> Engineering Mode -> Programming
   -> real Plasma Web REST Gateway
   -> EngineeringPPUProvider
   -> selected virtual PlasmaServer
@@ -115,48 +109,43 @@ Playwright browser action
   -> browser assertion
 ```
 
-The persistent stack publishes `runtime.json`. The workflow derives the Web URL, Gateway URL, deliberately unreachable Gateway endpoint, local PPU identity/site count, and representative Engineering Facility/PPU identity from that runtime contract instead of duplicating those runtime values in the Playwright step.
+The former Single PPU Programming Console is not part of Browser Runtime Acceptance. EMode Programming owns the single-PPU engineering workflow. `/ppu` is tested only as a compatibility redirect to `/engineering`.
+
+The persistent stack publishes `runtime.json`. The workflow derives the Web URL, Gateway URL, deliberately unreachable Gateway endpoint, and representative Engineering Facility/PPU identity from that runtime contract instead of duplicating runtime values in the Playwright step.
 
 The acceptance scenarios are:
 
-1. **Gateway connection state**
-   - start from the valid Mock Gateway and confirm connected/ready;
-   - enter a syntactically valid but unreachable Gateway and confirm offline/unreachable;
-   - require the operator log to contain the attempted endpoint exactly once for that outage transition;
-   - restore the valid Gateway and confirm clean recovery to connected/ready;
-   - verify malformed non-HTTP Gateway input is rejected separately without replacing the active valid connection.
+1. **Control Station routing ownership**
+   - `/` resolves to `/demo` and renders the product-mode entry;
+   - `/ppu` resolves to `/engineering`;
+   - neither route exposes the retired `SITE MATRIX / PPU CONTROL` UI.
 
-2. **Per-Site operator controls and Read download**
-   - use the enabled Site count published by the runtime contract rather than embedding one fixed loop boundary in the workflow;
-   - for every enabled Site, click the individual `Erase`, `Program`, `Verify`, and `Read` controls;
-   - inspect the browser's real outbound `POST /api/jobs` request and require each click to dispatch exactly to the intended Site and operation;
-   - require every operation to be accepted by the real Gateway/Server path and reach `SUCCESS`;
-   - program a deterministic 256-byte Image pattern, verify it, then Read the same range;
-   - capture the real browser download event for every Site;
-   - require the download name `read_SITE<n>_flash.bin`, exact byte length, and exact byte-for-byte content match.
+2. **Engineering Gateway connection state**
+   - start from the valid same-origin Engineering path and confirm the provider is online;
+   - enter a syntactically valid but unreachable Gateway and confirm EMode reports offline;
+   - restore the valid Gateway and confirm clean recovery;
+   - verify malformed non-HTTP Gateway input is rejected without reviving the retired direct PPU Console ownership.
 
-3. **Site batch membership and operation selection**
-   - click every enabled Site's add/remove-from-batch checkbox and prove the selection changes cleanly;
-   - do not impose parity, adjacency, or fixed Site-number rules on batch membership;
-   - exercise representative arbitrary non-empty subsets: one Site, two widely separated Sites, a non-contiguous three-Site set, `N-1` Sites, and all enabled Sites, deduplicated for smaller topologies;
-   - include mixed odd/even and non-contiguous selections when the topology permits them;
-   - change membership between runs so stale selection cannot leak forward;
-   - combine Site membership with one or multiple operation checkboxes and inspect the browser's real outbound `POST /api/jobs` requests without mocking or fulfilling them;
-   - require the resulting dispatch multiset to equal `selected Sites × selected operations` exactly, which also proves unselected Sites and unselected operations receive no jobs.
-
-4. **Engineering server catalog and selected-PUU execution**
-   - require the Gateway's real `/api/engineering/targets` catalog to report 8 Facilities / 32 PPUs / 160 Sites;
+3. **EMode per-Site E/P/V/R and Read download**
    - enter `Engineering -> Programming` through the actual Web UI;
-   - select the runtime-provided representative Facility and 6-Site PPU;
-   - require the rendered Site topology to come from that selected PPU STATUS and contain no `SITE 0`;
-   - load a deterministic Programming Image and execute `Erase -> Program -> Verify -> Read` on the last Site of that selected PPU;
+   - select the runtime-provided representative Facility and PPU;
+   - require Site topology to come from that selected PPU STATUS and contain no `SITE 0`;
+   - load a deterministic Programming Image and execute `Erase -> Program -> Verify -> Read` on a Site;
    - observe real outbound requests scoped to `/api/engineering/targets/{facility_id}/{ppu_id}/api/jobs`;
    - require every operation to reach `SUCCESS` through the Python Provider and selected virtual `PlasmaServer`;
-   - download the Read result and require exact byte length and byte-for-byte Image match.
+   - download the Read result and verify its content.
 
-This fourth scenario specifically proves that Engineering Facility/PPU selection is not a React-only mock and that changing the target identity changes the Python execution target.
+4. **EMode server-owned Batch**
+   - select an arbitrary non-contiguous Site subset in EMode;
+   - select multiple operations;
+   - require one real `POST /api/batches` whose target identity, Site membership and operation list exactly match operator intent;
+   - require the authoritative server-owned Batch to reach `SUCCESS` and selected Site results to reach `PASS`;
+   - do not use the retired browser-owned `BatchLifecycle` path.
 
-For `N` enabled Sites there are `2^N - 1` possible non-empty subsets. CI intentionally uses representative boundary and non-contiguous subsets rather than exhaustively executing all combinations; exhaustive 8-Site coverage would require 255 membership combinations before considering operation combinations.
+5. **Programming Image asset reuse/reconnect**
+   - exercise the dedicated Engineering asset-cache/reconnect scenario;
+   - require server-owned Batch asset semantics and Engineering session continuity;
+   - prove the active path does not fall back to legacy direct asset endpoints or direct per-Site Batch orchestration.
 
 The Playwright configuration preserves trace, screenshot, video, HTML report, and JSON report on failure. The workflow emits:
 

@@ -149,15 +149,17 @@ test("Engineering v2 advertises only the implemented binary Programming Image no
   assert.doesNotMatch(workspace, /\.hex/);
 });
 
-test("Engineering READ uses target-owned Main Flash defaults with no hidden operator state", async () => {
+test("Engineering READ is whole-region Main Flash and Browser owns no numeric range", async () => {
   const workspace = await source("../app/engineering/programming-workspace-v2.tsx");
   const session = await source("../app/workspace-session.tsx");
   const sharedJob = await source("../app/operator-ui/programming-job-panel.tsx");
+  const api = await source("../app/plasma-api.ts");
+  const batchApi = await source("../app/server-batch-api.ts");
 
-  assert.match(workspace, /const ENGINEERING_READ_OFFSET = 0/);
-  assert.match(workspace, /const ENGINEERING_READ_LENGTH = 256/);
-  assert.match(workspace, /readOffset:\s*ENGINEERING_READ_OFFSET/);
-  assert.match(workspace, /readLength:\s*ENGINEERING_READ_LENGTH/);
+  assert.match(workspace, /MAIN FLASH/);
+  assert.doesNotMatch(workspace, /ENGINEERING_READ_OFFSET|ENGINEERING_READ_LENGTH|readOffset:|readLength:/);
+  assert.doesNotMatch(api, /offset\?:\s*number|length\?:\s*number|body\.offset\s*=|body\.length\s*=/);
+  assert.doesNotMatch(batchApi, /readOffset\?:\s*number|readLength\?:\s*number|options\.readOffset|options\.readLength/);
   assert.doesNotMatch(workspace, /Engineering READ offset|Engineering READ length|engineeringReadRow/);
   assert.doesNotMatch(session, /emodeReadOffset|emodeReadLength/);
   assert.doesNotMatch(sharedJob, /compatibilityFields|programmingJobCompatibility/);

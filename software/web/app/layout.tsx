@@ -31,8 +31,8 @@ const apiBaseStorageMigration = `
 `;
 
 export const metadata: Metadata = {
-  title: "Plasma PPU Console",
-  description: "Multi-site IC programming unit control console",
+  title: "Plasma Control Station",
+  description: "Multi-site IC programming Control Station",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -7,9 +7,8 @@ async function source(path) {
 }
 
 test("WorkspaceSession remains the authoritative browser routing owner", async () => {
-  const [workspace, rootPage, devicesPage, deviceApi, picker, selector] = await Promise.all([
+  const [workspace, devicesPage, deviceApi, picker, selector] = await Promise.all([
     source("../app/workspace-session.tsx"),
-    source("../app/page.tsx"),
     source("../app/devices/page.tsx"),
     source("../app/device-catalog-api.ts"),
     source("../app/devices/ic-picker-field.tsx"),
@@ -18,9 +17,6 @@ test("WorkspaceSession remains the authoritative browser routing owner", async (
 
   assert.match(workspace, /const API_STORAGE_KEY = "plasma-api-base"/);
   assert.match(workspace, /markGatewayRoutingResolved\(saved, nextMode\)/);
-  assert.match(rootPage, /useWorkspaceSession\(\)/);
-  assert.doesNotMatch(rootPage, /DEFAULT_API_BASE/);
-  assert.doesNotMatch(rootPage, /normalizeApiBase/);
   assert.match(devicesPage, /useWorkspaceSession\(\)/);
   assert.match(devicesPage, /<ICSelector usage="lookup" apiBase=\{apiBase\}/);
   assert.doesNotMatch(deviceApi, /localStorage/);
@@ -45,17 +41,20 @@ test("Managed transport rebases canonical Gateway paths after routing resolves",
   assert.doesNotMatch(transport, /savedGatewayApiBase/);
 });
 
-test("Managed Site Matrix exposes no editable direct Gateway control", async () => {
-  const [rootPage, routingCss] = await Promise.all([
+test("product entry retires the legacy Single PPU Programming UI", async () => {
+  const [rootPage, nextConfig, renderMain] = await Promise.all([
     source("../app/page.tsx"),
-    source("../app/site-matrix-routing.css"),
+    source("../next.config.ts"),
+    source("../render/main.tsx"),
   ]);
 
-  assert.match(rootPage, /const routingMode = hydrated \? apiMode : "managed"/);
-  assert.match(rootPage, /data-site-matrix-routing-mode=\{routingMode\}/);
-  assert.match(rootPage, /data-routing-hydrated=\{hydrated \? "true" : "false"\}/);
-  assert.match(rootPage, /Managed routing · Plasma Manager/);
-  assert.match(routingCss, /\[data-site-matrix-routing-mode="managed"\] \.connection input/);
-  assert.match(routingCss, /\[data-site-matrix-routing-mode="managed"\] \.connection button/);
-  assert.match(routingCss, /Manager-owned route/);
+  assert.match(rootPage, /redirect\("\/demo"\)/);
+  assert.doesNotMatch(rootPage, /SiteMatrixHome|site-matrix-home|PPU CONTROL|SITE MATRIX/);
+  assert.match(nextConfig, /source:\s*"\/ppu"/);
+  assert.match(nextConfig, /destination:\s*"\/engineering"/);
+  assert.match(nextConfig, /permanent:\s*false/);
+  assert.match(renderMain, /function RetiredPpuConsoleRoute\(\)/);
+  assert.match(renderMain, /replaceRoute\("\/engineering"\)/);
+  assert.match(renderMain, /pathname === "\/ppu"/);
+  assert.doesNotMatch(renderMain, /import PPUConsole/);
 });
