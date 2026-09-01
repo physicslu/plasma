@@ -2,6 +2,7 @@ name: Device catalog Phase 4.1 R/T batch3 discovery
 
 on:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,7 +21,7 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Acquire bounded official ST candidate set
         env:
-          DISCOVERY_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DISCOVERY_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           DISCOVERY_RUN_ID: ${{ github.run_id }}
         run: |
           xvfb-run -a python - <<'PY'
