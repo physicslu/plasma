@@ -10,7 +10,7 @@ permissions:
 jobs:
   publish-retained-evidence:
     if: >-
-      github.event.action == 'reopened' &&
+      github.actor == 'physicslu' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'agent/device-catalog-phase4.1-rt-admission-batch3'
     runs-on: ubuntu-latest
