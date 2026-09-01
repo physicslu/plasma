@@ -123,6 +123,24 @@ Required work:
 - preserve `PROCESSED IC = PASS + FAIL` and exclude infrastructure ERROR;
 - validate sockets, hardware, Z2/FPGA path and real target separately from Mock.
 
+### Batch Readiness vs Execution State Presentation
+
+**Status:** TODO / UX semantic cleanup after public Preview acceptance
+
+**Layer:** Control Station / Operator UI / Batch lifecycle presentation
+
+**Reason:** The Programming Job panel currently presents `BATCH STATUS / BATCH READY`, but `BATCH READY` means the current setup is valid and the operator may start a Batch. It is not the terminal result of the previous Batch. Batch Summary and per-Site state/result already own completed execution evidence, so the current `BATCH STATUS` label can incorrectly imply that readiness and execution lifecycle are the same state model.
+
+Required work:
+
+- model Batch readiness separately from Batch execution lifecycle/result in the UI;
+- consider presenting the readiness surface explicitly as `BATCH READINESS / READY` rather than `BATCH STATUS / BATCH READY`;
+- keep readiness semantics limited to whether the current configuration is executable, including the corresponding not-ready case;
+- keep execution lifecycle and terminal result terminology owned by the authoritative Batch/Job state rather than inventing a UI-only result state;
+- ensure a completed PASS/FAIL/ABORT/ERROR result remains visible independently of whether the next Batch is ready to start;
+- preserve equivalent semantics in both PMode and EMode where the shared Programming Job panel is used;
+- add source/browser regression coverage so readiness is not later conflated with execution status again.
+
 ## Resolved presentation debt
 
 ### PMode / EMode Design System Convergence
