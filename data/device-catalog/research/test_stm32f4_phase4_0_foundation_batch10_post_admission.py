@@ -35,6 +35,8 @@ NEW_BASES = {
 EXPECTED_CANONICAL_SHA256 = "9a5c90fd0b1b326a073fa7d88d7d76962716872505a5f856b6b8f5ba0b2d3a41"
 EXPECTED_PREWRITE_PLAN_SHA256 = "1613d2a0ee774ae34d246feb713cc253f1d1a21717f723d2aa1f20b18754de81"
 EXPECTED_CANONICAL_GIT_BLOB = "8a6740da10a312612b047b1dd65e79dae8deef56"
+POST_BATCH11_CANONICAL_SHA256 = "6a3150e356511dfed679b747515d1ae1380d3da101b11edd3322f27cd936c948"
+POST_BATCH11_CANONICAL_GIT_BLOB = "21ad3fee8b780949e8184cdb56b5601fe6a48c03"
 CONTROL_ICPNS = {"STM32F469ZET6"}
 PREVIEW_AUDIT_ONLY_ICPN = "STM32F401CCF6TR"
 PRE_BATCH10_EVIDENCE_IDS = {
@@ -171,13 +173,17 @@ class STM32F4Phase40FoundationBatch10PostAdmissionTests(unittest.TestCase):
         self.assertIn(PREVIEW_AUDIT_ONLY_ICPN, rows)
         self.assertEqual(rows[PREVIEW_AUDIT_ONLY_ICPN]["base_device"], "STM32F401CC")
 
-    def test_production_manifest_binds_157_f4_rows_and_232_total_rows(self) -> None:
+    def test_production_manifest_retains_batch10_after_exact_batch11_state(self) -> None:
         manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
         sources = {source["family"]: source for source in manifest["sources"]}
-        self.assertEqual(sources["STM32F4"]["row_count"], 157)
-        self.assertEqual(sources["STM32F4"]["sha256"], EXPECTED_CANONICAL_SHA256)
-        self.assertEqual(sources["STM32F4"]["git_blob_sha"], EXPECTED_CANONICAL_GIT_BLOB)
-        self.assertEqual(sum(source["row_count"] for source in sources.values()), 232)
+        with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertTrue(self._baseline_new_icpns() <= {row["icpn"] for row in rows})
+        self.assertEqual(len(rows), 158)
+        self.assertEqual(sources["STM32F4"]["row_count"], 158)
+        self.assertEqual(sources["STM32F4"]["sha256"], POST_BATCH11_CANONICAL_SHA256)
+        self.assertEqual(sources["STM32F4"]["git_blob_sha"], POST_BATCH11_CANONICAL_GIT_BLOB)
+        self.assertEqual(sum(source["row_count"] for source in sources.values()), 233)
 
 
 if __name__ == "__main__":
