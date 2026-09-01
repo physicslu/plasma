@@ -4,7 +4,8 @@
 Host mode builds and validates the PPU runtime, repairs ARM binfmt when needed,
 and launches this same script inside an ARMv7 Python container. Container mode
 starts Plasma Server/Gateway, measures live/ready/loopback request paths, and
-writes JSON evidence. The lab is software-only and does not claim Z2 hardware.
+returns JSON evidence to the host. The lab is software-only and does not claim
+Z2 hardware.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ BINFMT_IMAGE = "docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5
 DEFAULT_REQUESTS = 1000
 DEFAULT_RUNTIME_REL = Path(".work/ppu-runtime")
 DEFAULT_REPORT_REL = Path(".work/reports/ppu-armv7-runtime-lab.json")
+RESULT_MARKER = "PLASMA_ARMV7_LAB_RESULT="
 
 
 class LabError(RuntimeError):
@@ -37,13 +39,7 @@ class LabError(RuntimeError):
 
 
 def _run(command: Sequence[str], *, cwd: Path | None = None, capture: bool = False) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        list(command),
-        cwd=cwd,
-        text=True,
-        capture_output=capture,
-        check=True,
-    )
+    return subprocess.run(list(command), cwd=cwd, text=True, capture_output=capture, check=True)
 
 
 def _repo_root() -> Path:
@@ -85,6 +81,15 @@ def _build_runtime(repo: Path, runtime_dir: Path) -> None:
         raise LabError(f"runtime build did not produce {app}")
 
 
+def _parse_result(stdout: str) -> dict[str, Any]:
+    for line in reversed(stdout.splitlines()):
+        if line.startswith(RESULT_MARKER):
+            value = json.loads(line[len(RESULT_MARKER) :])
+            if isinstance(value, dict):
+                return value
+    raise LabError("ARMv7 container did not emit a lab result marker")
+
+
 def _host_mode(args: argparse.Namespace) -> int:
     repo = _repo_root()
     runtime_dir = (repo / args.runtime_dir).resolve() if not args.runtime_dir.is_absolute() else args.runtime_dir.resolve()
@@ -96,15 +101,18 @@ def _host_mode(args: argparse.Namespace) -> int:
         "docker", "run", "--rm", "--platform", "linux/arm/v7",
         "-v", f"{runtime_dir}:/runtime:ro",
         "-v", f"{Path(__file__).resolve()}:/lab.py:ro",
-        "-v", f"{report_path.parent}:/reports",
         ARM_IMAGE,
-        "python3", "/lab.py", "--inside", "--runtime-dir", "/runtime",
-        "--report", f"/reports/{report_path.name}", "--requests", str(args.requests),
+        "python3", "/lab.py", "--inside", "--runtime-dir", "/runtime", "--requests", str(args.requests),
     ]
     print("Plasma ARMv7 Runtime Lab")
     print(f"runtime: {runtime_dir}")
     print(f"report : {report_path}")
-    return _run(command).returncode
+    completed = _run(command, capture=True)
+    print(completed.stdout, end="")
+    result = _parse_result(completed.stdout)
+    report_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"host-owned report written: {report_path}")
+    return 0
 
 
 def _request_json(url: str, *, method: str = "GET", body: dict[str, Any] | None = None, timeout_s: float = 15.0) -> dict[str, Any]:
@@ -131,9 +139,11 @@ def _proc_metrics(pid: int) -> dict[str, int]:
             key, value = line.split(":", 1)
             status[key] = value.strip()
     rss = int(status.get("VmRSS", "0 kB").split()[0])
-    threads = int(status.get("Threads", "0"))
-    fd_count = len(list(Path(f"/proc/{pid}/fd").iterdir()))
-    return {"rss_kib": rss, "threads": threads, "fds": fd_count}
+    return {
+        "rss_kib": rss,
+        "threads": int(status.get("Threads", "0")),
+        "fds": len(list(Path(f"/proc/{pid}/fd").iterdir())),
+    }
 
 
 def _percentile(values: list[float], percentile: float) -> float:
@@ -170,10 +180,8 @@ def _exercise(name: str, count: int, request_fn, gateway_pid: int, server_pid: i
     return {
         "requests": count,
         "latency_ms": {
-            "min": round(min(latencies), 3),
-            "avg": round(statistics.fmean(latencies), 3),
-            "p95": round(_percentile(latencies, 0.95), 3),
-            "p99": round(_percentile(latencies, 0.99), 3),
+            "min": round(min(latencies), 3), "avg": round(statistics.fmean(latencies), 3),
+            "p95": round(_percentile(latencies, 0.95), 3), "p99": round(_percentile(latencies, 0.99), 3),
             "max": round(max(latencies), 3),
         },
         "gateway_before": before_gateway,
@@ -251,7 +259,6 @@ def _inside_mode(args: argparse.Namespace) -> int:
         ], cwd=work, env=env)
         base = "http://127.0.0.1:18080"
         readiness_ms = _wait_ready(base, server, gateway)
-
         live = _exercise("health/live", args.requests, lambda _: _request_json(f"{base}/api/health/live"), gateway.pid, server.pid)
         ready = _exercise("health/ready", args.requests, lambda _: _request_json(f"{base}/api/health/ready"), gateway.pid, server.pid)
 
@@ -264,7 +271,6 @@ def _inside_mode(args: argparse.Namespace) -> int:
 
         loopback = _exercise("ps-loopback", args.requests, loop, gateway.pid, server.pid)
         time.sleep(30)
-        stable = {"gateway": _proc_metrics(gateway.pid), "server": _proc_metrics(server.pid)}
         result = {
             "result": "PASS",
             "evidence_level": "swpc-qemu-armv7-userspace",
@@ -273,12 +279,10 @@ def _inside_mode(args: argparse.Namespace) -> int:
             "runtime_bytes": sum(path.stat().st_size for path in runtime.rglob("*") if path.is_file()),
             "readiness_ms": round(readiness_ms, 3),
             "paths": {"health_live": live, "health_ready": ready, "ps_loopback": loopback},
-            "stable_after_30s": stable,
+            "stable_after_30s": {"gateway": _proc_metrics(gateway.pid), "server": _proc_metrics(server.pid)},
             "not_claimed": ["PYNQ-Z2 hardware", "systemd boot/reboot", "PS-to-PL", "Site I/O", "target power", "real IC programming"],
         }
-        args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
-        print(json.dumps(result, indent=2, sort_keys=True))
+        print(RESULT_MARKER + json.dumps(result, sort_keys=True), flush=True)
         return 0
     finally:
         _terminate(gateway)
