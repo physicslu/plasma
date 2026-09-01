@@ -260,9 +260,10 @@ def validate_web_fleet(payload: dict[str, Any]) -> None:
 
 def assert_local_routes() -> None:
     for path, marker in (
-        ("/", "SITE MATRIX"),
+        ("/", "Choose a Demo"),
         ("/demo", "Choose a Demo"),
-        ("/ppu", "SITE MATRIX"),
+        ("/ppu", "SINGLE PPU PROGRAMMING"),
+        ("/engineering", "SINGLE PPU PROGRAMMING"),
         ("/fleet", "Factory Production Console"),
     ):
         request = Request(f"http://127.0.0.1:{WEB_PORT}{path}")
@@ -272,6 +273,8 @@ def assert_local_routes() -> None:
             html = response_obj.read().decode("utf-8", errors="replace")
         if marker not in html:
             raise MockCDError(f"{path} missing expected marker: {marker}")
+        if path in {"/", "/ppu"} and ("SITE MATRIX" in html or "PPU CONTROL" in html):
+            raise MockCDError(f"{path} still exposes the retired Single PPU Programming UI")
         log(f"PASS same-origin route {path}")
 
 
