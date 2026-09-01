@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.1-rt-admission-batch2-2026-09-01",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production-admitted Active lifecycle control from Phase 4.0 Batch11; retained separately from the Phase 4.1 admission selection"
+    },
+    {
+      "base_device": "STM32F401RB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401rb.html",
+      "selection_reason": "Phase 4.1 R/T policy-ready 128 KiB STM32F401 LQFP64 coverage gap"
+    },
+    {
+      "base_device": "STM32F401RC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401rc.html",
+      "selection_reason": "Phase 4.1 R/T policy-ready 256 KiB STM32F401 LQFP64 coverage gap"
+    },
+    {
+      "base_device": "STM32F401RD",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401rd.html",
+      "selection_reason": "Phase 4.1 R/T policy-ready 384 KiB STM32F401 LQFP64 coverage gap"
+    },
+    {
+      "base_device": "STM32F401RE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401re.html",
+      "selection_reason": "Phase 4.1 R/T policy-ready 512 KiB STM32F401 LQFP64 coverage gap"
+    },
+    {
+      "base_device": "STM32F405RG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405rg.html",
+      "selection_reason": "Phase 4.1 R/T policy-ready 1024 KiB STM32F405 LQFP64 coverage gap"
+    }
+  ]
+}
