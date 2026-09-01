@@ -9,6 +9,7 @@ on:
       - "scripts/ppu-release.py"
       - "scripts/product-release.py"
       - "scripts/ppu-armv7-runtime-acceptance.py"
+      - "scripts/ppu-armv7-runtime-lab.py"
       - "release/**"
       - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
@@ -20,9 +21,11 @@ on:
       - "software/python/plasma_web/**"
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_armv7_runtime_acceptance.py"
+      - "software/python/tests/test_ppu_armv7_runtime_lab.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_product_release.py"
       - "docs/deployment/ppu-runtime-packaging.md"
+      - "docs/deployment/ppu-armv7-runtime-lab.md"
 
 permissions:
   contents: read
@@ -48,6 +51,7 @@ jobs:
           python -m pytest -q
           software/python/tests/test_ppu_runtime.py
           software/python/tests/test_ppu_armv7_runtime_acceptance.py
+          software/python/tests/test_ppu_armv7_runtime_lab.py
           software/python/tests/test_ppu_release.py
           software/python/tests/test_product_release.py
 
