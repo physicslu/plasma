@@ -94,7 +94,7 @@ export type ServerBatchSnapshot = {
     size_bytes: number;
     sha256: string;
   } | null;
-  read: { offset: number; length: number };
+  read: { scope: "main_flash" } | { offset: number; length: number };
   cancel_requested: boolean;
   stop_reason: string | null;
   error: {
@@ -124,8 +124,6 @@ export type CreateServerBatchOptions = {
   targetDevice?: BatchTargetDeviceRequest | null;
   assetFile?: File | null;
   allowSyntheticMockImage?: boolean;
-  readOffset?: number;
-  readLength?: number;
 };
 
 type BatchPayload = {
@@ -252,10 +250,6 @@ export async function createServerBatch(
         execution_policy: options.executionPolicy,
         ...(options.targetDevice ? { target_device: options.targetDevice } : {}),
         ...(asset ? { asset } : {}),
-        read: {
-          offset: options.readOffset ?? 0,
-          length: options.readLength ?? 256,
-        },
       }),
     },
     120_000,
