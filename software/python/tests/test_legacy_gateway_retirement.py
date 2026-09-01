@@ -2,24 +2,31 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-RETIRED_PUBLIC_GATEWAY = "plasma.open4th.com"
+PUBLIC_PREVIEW_HOST = "plasma.open4th.com"
+PRIVATE_ENGINEERING_HOST = "swpc.tail820e64.ts.net"
 
 
 def _source(path: str) -> str:
     return (REPO_ROOT / path).read_text(encoding="utf-8")
 
 
-def test_retired_public_gateway_is_absent_from_production_runtime_ownership() -> None:
-    production_paths = (
+def test_public_preview_host_is_allowed_without_restoring_direct_gateway_ownership() -> None:
+    vite = _source("software/web/vite.config.ts")
+    assert 'allowedHosts: [' in vite
+    assert f'"{PUBLIC_PREVIEW_HOST}",' in vite
+    assert f'"{PRIVATE_ENGINEERING_HOST}",' in vite
+
+    # The public hostname is an ingress alias for the same SWPC Web runtime.
+    # It must not reappear as a Browser-owned/default remote Gateway endpoint.
+    direct_gateway_ownership_paths = (
         "packaging/windows/run-console.ps1",
         "scripts/plasmactl",
         "software/web/app/layout.tsx",
         "software/web/app/plasma-api.ts",
         "software/web/next.config.ts",
-        "software/web/vite.config.ts",
     )
-    for path in production_paths:
-        assert RETIRED_PUBLIC_GATEWAY not in _source(path), path
+    for path in direct_gateway_ownership_paths:
+        assert PUBLIC_PREVIEW_HOST not in _source(path), path
 
 
 def test_windows_control_station_launcher_is_explicitly_managed() -> None:

@@ -80,6 +80,7 @@
 - **Reference** — [Control Station Runtime Acceptance Evidence](deployment/control-station-runtime-acceptance.md)：定義 macOS／Linux／Windows clean-runtime CI 的證據範圍與不可延伸宣稱的邊界。
 - **Current** — [macOS Control Station Installer Pilot](deployment/macos-control-station-installer-pilot.md)：定義 unsigned `.pkg`、per-user `launchd` LaunchAgents、absolute Node/Python runtime binding，以及 install/start/restart/stop-start/basic-uninstall acceptance；不代表 signing/notarization readiness。
 - **Current** — [Windows Control Station Installer Pilot](deployment/windows-control-station-installer-pilot.md)：定義 unsigned MSI、WinSW-backed Windows SCM services、`Program Files`／`ProgramData` 邊界，以及 install/start/restart/stop-start/basic-uninstall acceptance；不代表 signing 或真正 Windows operator-host readiness。
+- **Current** — [SWPC Public Preview / Mock Environment](deployment/swpc-public-preview.md)：定義 `plasma.open4th.com` 為 SWPC 公開 Preview／Mock frontend ingress；Browser 維持 same-origin routing，且該 hostname 不得重新成為 PPU Gateway/API base。
 - **Current** — [Web Runtime Hygiene](deployment/web-runtime-hygiene.md)
 - **Current** — [Manager BFF Runtime Wiring](deployment/manager-bff-runtime-wiring.md)
 - **Current** — [Render Free Public Mock Demo](deployment/render-free-public-demo.md)
