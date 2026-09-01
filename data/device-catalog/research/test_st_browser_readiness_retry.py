@@ -10,16 +10,23 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 from st_browser_acquisition import (  # noqa: E402
-    MARKETING_STATUS_LABEL,
     QUALITY_HEADING,
     STBrowserAcquirer,
 )
 
 TARGET_URL = "https://www.st.com/en/microcontrollers-microprocessors/stm32f411rc.html"
-HTML = """<!doctype html><html><body>
+READY_HTML = """<!doctype html><html><body>
 <h2>Quality and Reliability</h2>
 <table><tr><th>Part Number</th><th>Marketing Status</th></tr>
 <tr><td>STM32F411RCT6</td><td>Active Product is in volume production.</td></tr></table>
+</body></html>"""
+INCOMPLETE_QR_HTML = """<!doctype html><html><body>
+<section class="quick-view"><p>Marketing Status</p><p>Active</p></section>
+<h2>Quality and Reliability</h2>
+<table><tr><th>Part Number</th></tr>
+<tr><td>STM32F411RCT6</td></tr></table>
+<h2>Sample and Buy</h2>
+<table><tr><th>Marketing Status</th></tr></table>
 </body></html>"""
 
 
@@ -45,7 +52,7 @@ class FakeWaitable:
 class FakeBody:
     def inner_text(self, *, timeout: int) -> str:
         del timeout
-        return "Quality and Reliability Marketing Status STM32F411RCT6 Active"
+        return "Quality and Reliability Part Number Marketing Status STM32F411RCT6 Active"
 
 
 class FakeResponse:
@@ -53,14 +60,17 @@ class FakeResponse:
 
 
 class FakePage:
-    def __init__(self, *, marketing_error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        html: str = READY_HTML,
+        heading_error: Exception | None = None,
+    ) -> None:
         self.url = TARGET_URL
+        self.html = html
         self.closed = False
         self.requests: list[tuple[str, bool]] = []
-        self.waitables = {
-            MARKETING_STATUS_LABEL: FakeWaitable(marketing_error),
-            QUALITY_HEADING: FakeWaitable(),
-        }
+        self.heading = FakeWaitable(heading_error)
 
     def goto(self, url: str, *, wait_until: str, timeout: int) -> FakeResponse:
         self.goto_call = (url, wait_until, timeout)
@@ -68,14 +78,16 @@ class FakePage:
 
     def get_by_text(self, text: str, *, exact: bool) -> FakeWaitable:
         self.requests.append((text, exact))
-        return self.waitables[text]
+        if text != QUALITY_HEADING:
+            raise AssertionError(f"unexpected global readiness locator: {text}")
+        return self.heading
 
     def locator(self, selector: str) -> FakeBody:
         self.selector = selector
         return FakeBody()
 
     def content(self) -> str:
-        return HTML
+        return self.html
 
     def close(self) -> None:
         self.closed = True
@@ -111,7 +123,11 @@ class RetryAcquirer(STBrowserAcquirer):
 
 
 class BrowserReadinessRetryTests(unittest.TestCase):
-    def test_evidence_surface_waits_for_marketing_status_and_quality_heading(self) -> None:
+    def test_qr_parser_surface_is_the_readiness_contract(self) -> None:
+        self.assertTrue(STBrowserAcquirer._quality_surface_ready(READY_HTML))
+        self.assertFalse(STBrowserAcquirer._quality_surface_ready(INCOMPLETE_QR_HTML))
+
+    def test_evidence_surface_waits_for_quality_heading_and_parser_markers(self) -> None:
         page = FakePage()
         acquirer = STBrowserAcquirer()
         acquirer._context = FakeContext(page)
@@ -120,32 +136,26 @@ class BrowserReadinessRetryTests(unittest.TestCase):
 
         body, final_url, etag, last_modified = acquirer.fetch(TARGET_URL, 5.0)
 
-        self.assertEqual(body.decode("utf-8"), HTML)
+        self.assertEqual(body.decode("utf-8"), READY_HTML)
         self.assertEqual(final_url, TARGET_URL)
         self.assertIsNone(etag)
         self.assertIsNone(last_modified)
-        self.assertEqual(
-            page.requests,
-            [(MARKETING_STATUS_LABEL, True), (QUALITY_HEADING, True)],
-        )
+        self.assertEqual(page.requests, [(QUALITY_HEADING, True)])
         self.assertTrue(page.closed)
 
-    def test_readiness_timeout_retries_with_fresh_browser(self) -> None:
-        first = FakePage(marketing_error=FakeTimeoutError("partial ST render"))
+    def test_unrelated_marketing_status_does_not_satisfy_qr_readiness(self) -> None:
+        first = FakePage(html=INCOMPLETE_QR_HTML)
         second = FakePage()
         acquirer = RetryAcquirer([first, second])
 
-        body, final_url, _, _ = acquirer.fetch(TARGET_URL, 5.0)
+        body, final_url, _, _ = acquirer.fetch(TARGET_URL, 0.001)
 
-        self.assertEqual(body.decode("utf-8"), HTML)
+        self.assertEqual(body.decode("utf-8"), READY_HTML)
         self.assertEqual(final_url, TARGET_URL)
         self.assertTrue(first.closed)
         self.assertTrue(second.closed)
-        self.assertEqual(first.requests, [(MARKETING_STATUS_LABEL, True)])
-        self.assertEqual(
-            second.requests,
-            [(MARKETING_STATUS_LABEL, True), (QUALITY_HEADING, True)],
-        )
+        self.assertEqual(first.requests, [(QUALITY_HEADING, True)])
+        self.assertEqual(second.requests, [(QUALITY_HEADING, True)])
 
 
 if __name__ == "__main__":
