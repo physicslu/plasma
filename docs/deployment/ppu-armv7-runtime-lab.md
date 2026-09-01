@@ -6,23 +6,23 @@ The SWPC ARMv7 Runtime Lab is a software-only diagnostic harness for the package
 
 The lab proves only SWPC/QEMU ARMv7 userspace behavior. It does not claim PYNQ-Z2 hardware, systemd boot/reboot, PS-to-PL, Site I/O, target power, or real IC programming.
 
-The default runtime build directory is:
+The default runtime build directory is repository-local:
 
 ```text
-/storage/projects/plasma/.work/ppu-runtime
+$PLASMA_REPO/.work/ppu-runtime
 ```
 
 The default report is:
 
 ```text
-/storage/projects/plasma/.work/reports/ppu-armv7-runtime-lab.json
+$PLASMA_REPO/.work/reports/ppu-armv7-runtime-lab.json
 ```
 
-The runtime directory is created on the SWPC host and mounted read-only into Docker. The container must not write the host runtime artifact; this prevents root-owned runtime files from contaminating the repository workspace.
+The runtime directory is created on the integration host and mounted read-only into Docker. The container must not write the host runtime artifact; this prevents root-owned runtime files from contaminating the repository workspace. The JSON report is emitted by the container and written by the host process so it also remains host-owned.
 
 ## One-command run
 
-From the repository root on SWPC:
+From the repository root on the integration host:
 
 ```bash
 source software/python/.venv/bin/activate
@@ -44,7 +44,7 @@ The script performs:
    - `/api/engineering/diagnostics/loopback` with `endpoint=ps`
 9. Per-path latency, Gateway/Server RSS, thread count, and FD count measurement.
 10. A 30-second post-load stability snapshot.
-11. JSON evidence output and deterministic process/container cleanup.
+11. Host-owned JSON evidence output and deterministic process/container cleanup.
 
 To shorten an exploratory run:
 
@@ -69,7 +69,7 @@ live/ready stable, PS Loopback grows
 
 RSS observed under QEMU is not a Z2-native RAM measurement. Relative growth and path-to-path differences are useful diagnostic evidence; absolute Z2 resource acceptance must be repeated on real PYNQ-Z2 hardware.
 
-## SWPC reboot note
+## Integration-host reboot note
 
 ARM binfmt registration can be lost across host reboot. The lab owns this preflight and attempts to reinstall the ARM handler automatically, so the operator should not need to manually repeat the prior `tonistiigi/binfmt --install arm` command.
 
