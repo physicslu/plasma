@@ -8,10 +8,13 @@ type StartRequest = {
   operation: Operation;
 };
 
+type BatchRequest = {
+  targets?: Array<{ facility_id?: string; ppu_id?: string; site_ids?: number[] }>;
+  operations?: Operation[];
+};
+
 const gatewayUrl = process.env.MOCK_CD_GATEWAY_URL ?? "http://127.0.0.1:19801";
 const unreachableGatewayUrl = process.env.MOCK_CD_UNREACHABLE_GATEWAY_URL ?? "http://127.0.0.1:19899";
-const expectedSites = Number(process.env.MOCK_CD_EXPECTED_SITES ?? "8");
-const expectedPpuId = process.env.MOCK_CD_EXPECTED_PPU_ID ?? "mock-ppu-a";
 const engineeringFacilityId = process.env.MOCK_CD_ENGINEERING_FACILITY_ID ?? "mock-facility-02";
 const engineeringPpuId = process.env.MOCK_CD_ENGINEERING_PPU_ID ?? "mock-facility-02-ppu-03";
 const engineeringPpuSites = Number(process.env.MOCK_CD_ENGINEERING_PPU_SITES ?? "6");
@@ -25,254 +28,13 @@ const operationLabels: Record<Operation, string> = {
 };
 const operationOrder: Operation[] = ["erase", "program", "verify", "read"];
 
-const liveLog = (page: Page) => page.getByLabel("Live job log");
-const siteRow = (page: Page, siteId: number) => page.locator(".channelTable tbody tr").filter({ hasText: `SITE ${siteId}` }).first();
-const allSiteIds = () => Array.from({ length: expectedSites }, (_, index) => index + 1);
+const engineeringLog = (page: Page) => page.getByLabel("Engineering job log");
+const engineeringRow = (page: Page, siteId: number) => {
+  const label = `SITE-${String(siteId).padStart(2, "0")}`;
+  return page.locator(".channelTable tbody tr").filter({ hasText: label }).first();
+};
 
-function representativeSelections(siteCount: number): number[][] {
-  if (!Number.isInteger(siteCount) || siteCount < 1) {
-    throw new Error(`invalid Site count for Browser Runtime Acceptance: ${siteCount}`);
-  }
-  const all = Array.from({ length: siteCount }, (_, index) => index + 1);
-  const candidates: number[][] = [[1]];
-  if (siteCount >= 2) candidates.push([1, siteCount]);
-  if (siteCount >= 3) {
-    const interior = Math.max(2, Math.min(siteCount - 1, Math.floor(siteCount / 2) + 1));
-    candidates.push([1, interior, siteCount]);
-  }
-  if (siteCount >= 2) candidates.push(all.slice(0, -1));
-  candidates.push(all);
-
-  const seen = new Set<string>();
-  return candidates.filter(selection => {
-    const key = selection.join(",");
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-async function openRuntimeConsole(page: Page) {
-  await page.goto("/");
-  await expect(page.locator(".gatewayHealth")).toContainText("Online");
-  await expect(page.locator(".gatewayHealth")).toContainText(`${expectedSites}/${expectedSites} Enabled`);
-  await expect(page.getByLabel("PPU identity")).toContainText(expectedPpuId);
-  await expect(page.locator(".channelDetails")).toHaveCount(expectedSites);
-}
-
-async function runSiteOperation(page: Page, siteId: number, operation: Operation) {
-  const label = operationLabels[operation];
-  const row = siteRow(page, siteId);
-  const accepted = liveLog(page).locator("span")
-    .filter({ hasText: `[SITE ${siteId}]` })
-    .filter({ hasText: "accepted by Plasma" })
-    .filter({ hasText: `· ${operation.toUpperCase()}` });
-  const before = await accepted.count();
-
-  await page.getByLabel(`SITE ${siteId} ${label}`).click();
-  await expect.poll(() => accepted.count(), { timeout: 15_000 }).toBe(before + 1);
-  await expect(row.locator("td").nth(2)).toContainText(label);
-  await expect(row.locator(".state")).toHaveText("成功", { timeout: 15_000 });
-}
-
-async function setSelectedSites(page: Page, selectedSites: number[]) {
-  const desired = new Set(selectedSites);
-  if (desired.size === 0) throw new Error("Browser Runtime Acceptance does not permit an empty Site selection");
-
-  for (const siteId of selectedSites) {
-    const checkbox = page.getByLabel(`顯示 SITE ${siteId}`);
-    if (!(await checkbox.isChecked())) await checkbox.check();
-  }
-  for (const siteId of allSiteIds()) {
-    if (desired.has(siteId)) continue;
-    const checkbox = page.getByLabel(`顯示 SITE ${siteId}`);
-    if (await checkbox.isChecked()) await checkbox.uncheck();
-  }
-
-  await expect(page.getByLabel("Site 配置摘要")).toContainText(`顯示 ${selectedSites.length} / ${expectedSites}`);
-  await expect(page.locator(".batchInfo")).toContainText(
-    `目標：${selectedSites.map(siteId => `SITE ${siteId}`).join("、")}`,
-  );
-}
-
-async function setBatchOperations(page: Page, operations: Operation[]) {
-  const desired = new Set(operations);
-  for (const operation of operationOrder) {
-    const checkbox = page.getByLabel(`批次操作：${operationLabels[operation]}`);
-    const checked = await checkbox.isChecked();
-    if (desired.has(operation) && !checked) await checkbox.check();
-    if (!desired.has(operation) && checked) await checkbox.uncheck();
-  }
-}
-
-async function runBatchAndAssert(
-  page: Page,
-  starts: StartRequest[],
-  selectedSites: number[],
-  operations: Operation[],
-) {
-  await setSelectedSites(page, selectedSites);
-  await setBatchOperations(page, operations);
-
-  const executeName = `批次執行：${operations.map(operation => operationLabels[operation]).join("、")}`;
-  const execute = page.getByRole("button", { name: executeName });
-  await expect(execute).toBeEnabled();
-
-  const before = starts.length;
-  await execute.click();
-  await expect.poll(() => starts.length, { timeout: 30_000 }).toBe(before + selectedSites.length * operations.length);
-
-  await expect(execute).toBeEnabled({ timeout: 30_000 });
-  const expectedSummary = `[BATCH] COMPLETE · success: ${selectedSites.map(siteId => `SITE ${siteId}`).join(", ")}`;
-  await expect(liveLog(page)).toContainText(expectedSummary, { timeout: 30_000 });
-
-  const actual = starts.slice(before)
-    .map(item => `${item.siteId}:${item.operation}`)
-    .sort();
-  const expected = selectedSites
-    .flatMap(siteId => operations.map(operation => `${siteId}:${operation}`))
-    .sort();
-  expect(actual).toEqual(expected);
-  expect(new Set(starts.slice(before).map(item => item.siteId))).toEqual(new Set(selectedSites));
-}
-
-test("real Gateway reports offline and recovers cleanly", async ({ page }) => {
-  await openRuntimeConsole(page);
-
-  const gatewayInput = page.getByLabel("Plasma Web REST Gateway URL");
-  const connected = liveLog(page).locator("span")
-    .filter({ hasText: "Plasma Web REST Gateway connected" });
-  await expect(connected).toHaveCount(1);
-  await expect(connected.first()).not.toContainText(gatewayUrl);
-
-  await gatewayInput.fill(unreachableGatewayUrl);
-  await page.getByRole("button", { name: "連線" }).click();
-  await expect(page.locator(".gatewayHealth")).toContainText("Offline", { timeout: 15_000 });
-
-  const offline = liveLog(page).locator("span")
-    .filter({ hasText: "Plasma Web REST Gateway offline" })
-    .filter({ hasText: unreachableGatewayUrl });
-  await expect(offline).toHaveCount(1);
-  await expect(offline).toHaveAttribute("data-level", "error");
-
-  await gatewayInput.fill(gatewayUrl);
-  await page.getByRole("button", { name: "連線" }).click();
-  await expect(page.locator(".gatewayHealth")).toContainText("Online", { timeout: 15_000 });
-  await expect(connected).toHaveCount(2);
-  await expect(connected.last()).toContainText(gatewayUrl);
-  await expect(offline).toHaveCount(1);
-
-  const malformed = "ftp://invalid-gateway.local";
-  await gatewayInput.fill(malformed);
-  await page.getByRole("button", { name: "連線" }).click();
-  const rejected = liveLog(page).locator("span")
-    .filter({ hasText: "Plasma Web REST Gateway rejected" })
-    .filter({ hasText: malformed });
-  await expect(rejected).toHaveCount(1);
-  await expect(page.locator(".gatewayHealth")).toContainText("Online");
-});
-
-test("every enabled Site runs Erase Program Verify Read and downloads exact bytes", async ({ page }) => {
-  const starts: StartRequest[] = [];
-  page.on("request", request => {
-    const url = new URL(request.url());
-    if (request.method() !== "POST" || url.pathname !== "/api/jobs") return;
-    const body = request.postDataJSON() as { site_id?: number; operation?: Operation };
-    if (typeof body.site_id === "number" && body.operation) {
-      starts.push({ siteId: body.site_id, operation: body.operation });
-    }
-  });
-
-  await openRuntimeConsole(page);
-
-  await page.getByLabel("選擇 Programming Image Asset 檔案").setInputFiles({
-    name: "mock-cd-runtime.bin",
-    mimeType: "application/octet-stream",
-    buffer: imageAssetBytes,
-  });
-  await page.getByLabel("READ logical flash offset").fill("0");
-  await page.getByLabel("READ byte length").fill(String(imageAssetBytes.length));
-
-  for (let siteId = 1; siteId <= expectedSites; siteId += 1) {
-    await test.step(`SITE ${siteId}: Erase -> Program -> Verify -> Read -> download`, async () => {
-      for (const operation of operationOrder) {
-        const before = starts.length;
-        await runSiteOperation(page, siteId, operation);
-        await expect.poll(() => starts.length).toBe(before + 1);
-        expect(starts[before]).toEqual({ siteId, operation });
-      }
-
-      const downloadLink = page.getByLabel(`下載 SITE ${siteId} 讀取檔案`);
-      await expect(downloadLink).toBeVisible();
-      const [download] = await Promise.all([
-        page.waitForEvent("download"),
-        downloadLink.click(),
-      ]);
-      expect(download.suggestedFilename()).toBe(`read_SITE${siteId}_flash.bin`);
-      const path = await download.path();
-      if (!path) throw new Error(`SITE ${siteId} Read download did not produce a local file`);
-      const bytes = await readFile(path);
-      expect(bytes.length).toBe(imageAssetBytes.length);
-      expect(bytes.equals(imageAssetBytes)).toBe(true);
-    });
-  }
-});
-
-test("batch membership supports representative arbitrary Site subsets and selected operations", async ({ page }) => {
-  const starts: StartRequest[] = [];
-  page.on("request", request => {
-    const url = new URL(request.url());
-    if (request.method() !== "POST" || url.pathname !== "/api/jobs") return;
-    const body = request.postDataJSON() as { site_id?: number; operation?: Operation };
-    if (typeof body.site_id === "number" && body.operation) {
-      starts.push({ siteId: body.site_id, operation: body.operation });
-    }
-  });
-
-  await openRuntimeConsole(page);
-
-  for (let siteId = 1; siteId <= expectedSites; siteId += 1) {
-    await test.step(`SITE ${siteId} batch membership toggles cleanly`, async () => {
-      const checkbox = page.getByLabel(`顯示 SITE ${siteId}`);
-      await expect(checkbox).toBeChecked();
-      await checkbox.uncheck();
-      await expect(checkbox).not.toBeChecked();
-      await checkbox.check();
-      await expect(checkbox).toBeChecked();
-    });
-  }
-
-  const selections = representativeSelections(expectedSites);
-  for (const [index, selection] of selections.entries()) {
-    const operations: Operation[] = index === 2 || index === selections.length - 1
-      ? ["erase", "read"]
-      : index === 1
-        ? ["read"]
-        : ["erase"];
-    await test.step(
-      `batch subset ${selection.join(",")} x ${operations.join(",")}`,
-      () => runBatchAndAssert(page, starts, selection, operations),
-    );
-  }
-
-  if (expectedSites >= 3) {
-    expect(selections).toContainEqual([1, Math.max(2, Math.min(expectedSites - 1, Math.floor(expectedSites / 2) + 1)), expectedSites]);
-  }
-  expect(selections.at(-1)).toEqual(allSiteIds());
-});
-
-test("Engineering selects a server-reported Mock PPU and executes E/P/V/R through Python", async ({ page }) => {
-  const engineeringStarts: StartRequest[] = [];
-  page.on("request", request => {
-    const url = new URL(request.url());
-    const expectedPath = `/api/engineering/targets/${engineeringFacilityId}/${engineeringPpuId}/api/jobs`;
-    if (request.method() !== "POST" || url.pathname !== expectedPath) return;
-    const body = request.postDataJSON() as { site_id?: number; operation?: Operation };
-    if (typeof body.site_id === "number" && body.operation) {
-      engineeringStarts.push({ siteId: body.site_id, operation: body.operation });
-    }
-  });
-
+async function openEngineeringProgramming(page: Page) {
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Programming", exact: true }).click();
 
@@ -287,20 +49,89 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
   await expect(page.getByLabel("Selected Engineering PPU", { exact: true })).toContainText(`${engineeringPpuSites} Sites`);
   await expect(page.locator(".channelTable tbody tr")).toHaveCount(engineeringPpuSites, { timeout: 15_000 });
   await expect(page.getByText("SITE-00", { exact: true })).toHaveCount(0);
+}
 
-  const siteId = engineeringPpuSites;
-  const engineeringSiteLabel = `SITE-${String(siteId).padStart(2, "0")}`;
-  const row = page.locator(".channelTable tbody tr").filter({ hasText: engineeringSiteLabel }).first();
+async function setEngineeringBatchSites(page: Page, siteIds: number[]) {
+  const desired = new Set(siteIds);
+  for (let siteId = 1; siteId <= engineeringPpuSites; siteId += 1) {
+    const checkbox = page.getByLabel(`Batch select SITE ${siteId}`);
+    const checked = await checkbox.isChecked();
+    if (desired.has(siteId) && !checked) await checkbox.check();
+    if (!desired.has(siteId) && checked) await checkbox.uncheck();
+  }
+}
+
+async function setEngineeringBatchOperations(page: Page, operations: Operation[]) {
+  const desired = new Set(operations);
+  for (const operation of operationOrder) {
+    const checkbox = page.getByLabel(`Engineering batch ${operation}`);
+    const checked = await checkbox.isChecked();
+    if (desired.has(operation) && !checked) await checkbox.check();
+    if (!desired.has(operation) && checked) await checkbox.uncheck();
+  }
+}
+
+test("Control Station root and retired /ppu route never expose the legacy Site Matrix", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/demo$/);
+  await expect(page.getByText("選擇產品模式", { exact: true })).toBeVisible();
+  await expect(page.getByText("SITE MATRIX", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("PPU CONTROL", { exact: true })).toHaveCount(0);
+
+  await page.goto("/ppu");
+  await expect(page).toHaveURL(/\/engineering$/);
+  await expect(page.getByRole("button", { name: "Programming", exact: true })).toBeVisible();
+  await expect(page.getByText("SITE MATRIX", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("PPU CONTROL", { exact: true })).toHaveCount(0);
+});
+
+test("Engineering Gateway reports offline and recovers without reviving direct PPU Console ownership", async ({ page }) => {
+  await openEngineeringProgramming(page);
+
+  const gatewayInput = page.getByLabel("Engineering Gateway URL");
+  const gatewayForm = page.locator(".engineeringGateway");
+  await expect(gatewayForm).toHaveClass(/online/);
+
+  await gatewayInput.fill(unreachableGatewayUrl);
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(gatewayForm).toHaveClass(/offline/, { timeout: 15_000 });
+  await expect(engineeringLog(page)).toContainText(unreachableGatewayUrl, { timeout: 15_000 });
+
+  await gatewayInput.fill(gatewayUrl);
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(gatewayForm).toHaveClass(/online/, { timeout: 15_000 });
+  await expect(page.getByLabel("Engineering Facility", { exact: true }).locator("option")).toHaveCount(8, { timeout: 15_000 });
+
+  const malformed = "ftp://invalid-gateway.local";
+  await gatewayInput.fill(malformed);
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(engineeringLog(page)).toContainText(malformed);
+  await expect(gatewayForm).toHaveClass(/online/);
+});
+
+test("EMode owns real per-Site E/P/V/R and Read download through the Python Engineering provider", async ({ page }) => {
+  const engineeringStarts: StartRequest[] = [];
+  page.on("request", request => {
+    const url = new URL(request.url());
+    const expectedPath = `/api/engineering/targets/${engineeringFacilityId}/${engineeringPpuId}/api/jobs`;
+    if (request.method() !== "POST" || url.pathname !== expectedPath) return;
+    const body = request.postDataJSON() as { site_id?: number; operation?: Operation };
+    if (typeof body.site_id === "number" && body.operation) {
+      engineeringStarts.push({ siteId: body.site_id, operation: body.operation });
+    }
+  });
+
+  await openEngineeringProgramming(page);
   await page.getByLabel("Engineering Programming Image Asset file").setInputFiles({
     name: "engineering-provider-runtime.bin",
     mimeType: "application/octet-stream",
     buffer: imageAssetBytes,
   });
 
-  await expect(page.locator(".engineeringReadRow")).toHaveCount(0);
-
+  const siteId = engineeringPpuSites;
+  const row = engineeringRow(page, siteId);
   for (const operation of operationOrder) {
-    await test.step(`Engineering ${engineeringFacilityId}/${engineeringPpuId}/${engineeringSiteLabel}: ${operation}`, async () => {
+    await test.step(`${engineeringFacilityId}/${engineeringPpuId}/SITE-${siteId}: ${operation}`, async () => {
       const before = engineeringStarts.length;
       await page.getByLabel(`SITE ${siteId} ${operationLabels[operation]}`).click();
       await expect.poll(() => engineeringStarts.length, { timeout: 15_000 }).toBe(before + 1);
@@ -322,4 +153,36 @@ test("Engineering selects a server-reported Mock PPU and executes E/P/V/R throug
   expect(bytes.length).toBe(engineeringMainFlashBytes);
   expect(bytes.subarray(0, imageAssetBytes.length).equals(imageAssetBytes)).toBe(true);
   expect(bytes.subarray(imageAssetBytes.length).every(value => value === 0xff)).toBe(true);
+});
+
+test("EMode server-owned Batch carries selected Sites and operations", async ({ page }) => {
+  const batches: BatchRequest[] = [];
+  page.on("request", request => {
+    const url = new URL(request.url());
+    if (request.method() !== "POST" || url.pathname !== "/api/batches") return;
+    batches.push(request.postDataJSON() as BatchRequest);
+  });
+
+  await openEngineeringProgramming(page);
+  const selectedSites = engineeringPpuSites >= 3 ? [1, 3, engineeringPpuSites] : [1, engineeringPpuSites];
+  const operations: Operation[] = ["erase", "read"];
+  await setEngineeringBatchSites(page, selectedSites);
+  await setEngineeringBatchOperations(page, operations);
+
+  const start = page.getByRole("button", { name: /START PROGRAMMING/ });
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect.poll(() => batches.length, { timeout: 15_000 }).toBe(1);
+
+  expect(batches[0]?.targets).toEqual([{
+    facility_id: engineeringFacilityId,
+    ppu_id: engineeringPpuId,
+    site_ids: selectedSites,
+  }]);
+  expect(batches[0]?.operations).toEqual(operations);
+
+  await expect(engineeringLog(page)).toContainText("[BATCH] SUCCESS", { timeout: 30_000 });
+  for (const siteId of selectedSites) {
+    await expect(engineeringRow(page, siteId).locator(".engineeringResult")).toHaveText("PASS", { timeout: 30_000 });
+  }
 });

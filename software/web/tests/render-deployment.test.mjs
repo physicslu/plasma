@@ -12,7 +12,8 @@ test("Render build reuses canonical React pages and resolves API requests at the
   assert.match(entry, /from "\.\.\/app\/engineering\/page"/);
   assert.match(entry, /from "\.\.\/app\/fleet\/page"/);
   assert.doesNotMatch(entry, /from "\.\.\/app\/fleet\/programming\/page"/);
-  assert.match(entry, /from "\.\.\/app\/page"/);
+  assert.doesNotMatch(entry, /from "\.\.\/app\/page"/);
+  assert.match(entry, /return <DemoLandingPage \/>/);
   assert.match(entry, /<WorkspaceSessionProvider>/);
   assert.match(config, /"process\.env\.NEXT_PUBLIC_PLASMA_API_URL": "window\.location\.origin"/);
   assert.match(config, /"next\/link"/);
@@ -20,14 +21,16 @@ test("Render build reuses canonical React pages and resolves API requests at the
   assert.match(config, /dist-render/);
 });
 
-test("Render client router retires Production Single PPU Programming and preserves canonical pages", async () => {
+test("Render client router retires legacy single-PPU routes and preserves canonical pages", async () => {
   const entry = await readFile(new URL("../render/main.tsx", import.meta.url), "utf8");
 
   assert.match(entry, /pathname === "\/devices"[\s\S]*<DevicesPage \/>/);
   assert.match(entry, /pathname === "\/documents"[\s\S]*<DocumentsPage \/>/);
   assert.match(entry, /pathname === "\/fleet\/programming"[\s\S]*<RetiredFleetProgrammingRoute \/>/);
   assert.match(entry, /replaceRoute\("\/fleet"\)/);
-  assert.doesNotMatch(entry, /FleetProgrammingPage/);
+  assert.match(entry, /pathname === "\/ppu"[\s\S]*<RetiredPpuConsoleRoute \/>/);
+  assert.match(entry, /replaceRoute\("\/engineering"\)/);
+  assert.doesNotMatch(entry, /FleetProgrammingPage|SiteMatrixHome/);
 
   const programmingIndex = entry.indexOf('pathname === "/fleet/programming"');
   const fleetIndex = entry.indexOf('pathname === "/fleet" || pathname.startsWith("/fleet/")');

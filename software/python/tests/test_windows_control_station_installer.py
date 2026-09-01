@@ -117,7 +117,7 @@ def test_windows_acceptance_requires_packaged_css_and_javascript_assets() -> Non
     source = ACCEPTANCE_SCRIPT.read_text(encoding="utf-8")
     assert "Console HTML does not reference any packaged CSS assets" in source
     assert "Console HTML does not reference any packaged JavaScript assets" in source
-    assert "Windows installer Console static assets after SCM restart: PASS" in source
+    assert "Windows installer Control Station entry/assets after SCM restart: PASS" in source
 
 
 def _fake_python_runtime(root: Path) -> Path:

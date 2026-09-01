@@ -56,29 +56,8 @@
   color: var(--cyan);
 }
 
-.diagnosticsTestCard {
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  box-shadow: 0 10px 30px var(--card-shadow);
-}
-
 .diagnosticsTestCard > header {
   padding: 15px 16px 0;
-}
-
-.diagnosticsTestCard > header h3 {
-  margin: 0;
-  font-size: 14px;
-}
-
-.diagnosticsTestCard > header p {
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
 }
 
 .diagnosticsTestCardBody {

@@ -7,7 +7,6 @@ import EngineeringPage from "../app/engineering/page";
 import FleetPage from "../app/fleet/page";
 import { GlobalNav } from "../app/global-nav";
 import { I18nProvider } from "../app/i18n";
-import PPUConsole from "../app/page";
 import { WorkspaceSessionProvider } from "../app/workspace-session";
 import { replaceRoute, usePathname } from "./next-navigation";
 import "../app/globals.css";
@@ -21,6 +20,13 @@ function RetiredFleetProgrammingRoute() {
   return <FleetPage />;
 }
 
+function RetiredPpuConsoleRoute() {
+  useEffect(() => {
+    replaceRoute("/engineering");
+  }, []);
+  return <EngineeringPage />;
+}
+
 function CurrentPage() {
   const pathname = usePathname();
   if (pathname === "/devices" || pathname.startsWith("/devices/")) return <DevicesPage />;
@@ -30,7 +36,7 @@ function CurrentPage() {
   if (pathname === "/engineering" || pathname.startsWith("/engineering/")) {
     return <EngineeringPage />;
   }
-  if (pathname === "/ppu") return <PPUConsole />;
+  if (pathname === "/ppu") return <RetiredPpuConsoleRoute />;
   return <DemoLandingPage />;
 }
 
