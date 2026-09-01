@@ -173,17 +173,20 @@ class STM32F4Phase40FoundationBatch10PostAdmissionTests(unittest.TestCase):
         self.assertIn(PREVIEW_AUDIT_ONLY_ICPN, rows)
         self.assertEqual(rows[PREVIEW_AUDIT_ONLY_ICPN]["base_device"], "STM32F401CC")
 
-    def test_production_manifest_retains_batch10_after_exact_batch11_state(self) -> None:
+    def test_production_manifest_retains_batch10_after_later_growth(self) -> None:
         manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
         sources = {source["family"]: source for source in manifest["sources"]}
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))
+        payload = CANONICAL.read_bytes()
+        current_sha = hashlib.sha256(payload).hexdigest()
+        current_blob = hashlib.sha1(f"blob {len(payload)}".encode() + bytes([0]) + payload).hexdigest()
         self.assertTrue(self._baseline_new_icpns() <= {row["icpn"] for row in rows})
-        self.assertEqual(len(rows), 158)
-        self.assertEqual(sources["STM32F4"]["row_count"], 158)
-        self.assertEqual(sources["STM32F4"]["sha256"], POST_BATCH11_CANONICAL_SHA256)
-        self.assertEqual(sources["STM32F4"]["git_blob_sha"], POST_BATCH11_CANONICAL_GIT_BLOB)
-        self.assertEqual(sum(source["row_count"] for source in sources.values()), 233)
+        self.assertGreaterEqual(len(rows), 158)
+        self.assertEqual(sources["STM32F4"]["row_count"], len(rows))
+        self.assertEqual(sources["STM32F4"]["sha256"], current_sha)
+        self.assertEqual(sources["STM32F4"]["git_blob_sha"], current_blob)
+        self.assertEqual(sum(source["row_count"] for source in sources.values()), 75 + len(rows))
 
 
 if __name__ == "__main__":
