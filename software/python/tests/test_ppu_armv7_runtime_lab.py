@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
 from pathlib import Path
 
@@ -19,6 +20,7 @@ def test_default_runtime_location_is_repo_local_work_dir() -> None:
     lab = _load_module()
     assert lab.DEFAULT_RUNTIME_REL == Path(".work/ppu-runtime")
     assert lab.DEFAULT_REPORT_REL == Path(".work/reports/ppu-armv7-runtime-lab.json")
+    assert lab.DEFAULT_CONTROL_CHECKPOINTS == (1000, 5000, 10000)
 
 
 def test_images_are_digest_pinned() -> None:
@@ -46,8 +48,20 @@ def test_loopback_body_is_1k_and_crc_matches() -> None:
 
 def test_result_marker_can_be_parsed_from_progress_output() -> None:
     lab = _load_module()
-    output = "health/live: 1/1 PASS\n" + lab.RESULT_MARKER + '{"result":"PASS"}\n'
-    assert lab._parse_result(output) == {"result": "PASS"}
+    output = "health/live: 1/1 PASS\n" + lab.RESULT_MARKER + '{"functional_result":"PASS"}\n'
+    assert lab._parse_result(output) == {"functional_result": "PASS"}
+
+
+def test_control_checkpoints_are_cumulative_and_strictly_increasing() -> None:
+    lab = _load_module()
+    assert lab._parse_checkpoints("1000,5000,10000") == (1000, 5000, 10000)
+    for value in ("", "0,100", "100,100", "1000,500"):
+        try:
+            lab._parse_checkpoints(value)
+        except argparse.ArgumentTypeError:
+            pass
+        else:
+            raise AssertionError(f"expected checkpoint parse failure for {value!r}")
 
 
 def test_source_contract_keeps_container_mounts_read_only_and_reports_host_owned() -> None:
@@ -62,6 +76,17 @@ def test_source_contract_keeps_container_mounts_read_only_and_reports_host_owned
     assert 'time.sleep(30)' in source
 
 
+def test_threading_control_is_stdlib_only_and_reports_resource_state_separately() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "ThreadingHTTPServer" in source
+    assert '"plasma_imported": False' in source
+    assert '"functional_result": "PASS"' in source
+    assert '"resource_result": "INVESTIGATE"' in source
+    assert '"overall_result": "INVESTIGATE"' in source
+    assert '"result": "PASS"' not in source
+    assert '"native Z2 memory stability"' in source
+
+
 def test_hardware_evidence_boundary_remains_closed() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     for claim in (
@@ -71,5 +96,6 @@ def test_hardware_evidence_boundary_remains_closed() -> None:
         "Site I/O",
         "target power",
         "real IC programming",
+        "native Z2 memory stability",
     ):
         assert claim in source
