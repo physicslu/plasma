@@ -1,0 +1,82 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 1,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 1,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "control",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 1,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 1,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 1,
+    "total": 1
+  },
+  "pilot_id": "stm32f4-phase4.0-foundation-batch10-2026-09-01",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469ZE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469ZETx",
+          "icpn": "STM32F469ZET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469ZE",
+        "evidence_section_sha256": "9cf23c18bad27aeb6afe1fa3da03d42f952c0ec2af299e9f239a947d767025e0",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469ZET6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ze.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469ZET6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "19f29b479fcfc237e2e7b8f1a8b9e94c14b73ad92fc3378313502a574d22729f",
+        "retrieved_at_utc": "2026-09-01T01:57:46Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ze.html"
+      },
+      "selection_reason": "production-admitted lifecycle control from Batch9; verifies official-ST extraction stability while expanding adjacent STM32F469 and STM32F479 policy-ready gaps",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ze.html"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,370 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 6,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 6,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 7,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 1,
+      "acquisition_success": 5,
+      "attempt": 1,
+      "clean": false,
+      "failed_targets": [
+        {
+          "base_device": "STM32F469ZI",
+          "error": "browser evidence readiness timed out: Locator.wait_for: Timeout 45000ms exceeded.\nCall log:\n  - waiting for get_by_text(\"Quality and Reliability\", exact=True)\n"
+        }
+      ]
+    },
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 6,
+      "attempt": 2,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 2,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 6,
+    "total": 6
+  },
+  "pilot_id": "stm32f4-phase4.0-foundation-batch10-2026-09-01",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469ZE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469ZETx",
+          "icpn": "STM32F469ZET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469ZE",
+        "evidence_section_sha256": "9cf23c18bad27aeb6afe1fa3da03d42f952c0ec2af299e9f239a947d767025e0",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469ZET6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ze.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469ZET6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "19f29b479fcfc237e2e7b8f1a8b9e94c14b73ad92fc3378313502a574d22729f",
+        "retrieved_at_utc": "2026-09-01T01:57:46Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ze.html"
+      },
+      "selection_reason": "production-admitted lifecycle control from Batch9; verifies official-ST extraction stability while expanding adjacent STM32F469 and STM32F479 policy-ready gaps",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ze.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469ZGTx",
+          "icpn": "STM32F469ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F469ZGTx",
+          "icpn": "STM32F469ZGT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469ZG",
+        "evidence_section_sha256": "01f405a9de52066868f579f024028acb846cb39545885f8c78bf0846d664c78e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469ZGT6",
+          "STM32F469ZGT6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F469ZGT6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "c9525042992472e298c9654563fc63f01ea857a52ca0dcf43bbe1c165dbe298e",
+        "retrieved_at_utc": "2026-09-01T01:57:50Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469zg.html"
+      },
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F469 Z-package capacity variant under the unchanged admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469ZI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469ZITx",
+          "icpn": "STM32F469ZIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469ZI",
+        "evidence_section_sha256": "d20bd486810ae580cbef19e7b10844a54fa989a8522670b5779a868525d2ec4b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469ZIT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469zi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469ZIT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5daa5e135c7dc90c47623edcc373767a483dfdaa5fff2a0dda996387c58d81d0",
+        "retrieved_at_utc": "2026-09-01T01:57:54Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469zi.html"
+      },
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F469 Z-package capacity variant under the unchanged admission policy",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469zi.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479VG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479VGTx",
+          "icpn": "STM32F479VGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479VG",
+        "evidence_section_sha256": "6ef40ce446896e6b7cd8640f3a8a51403e5d11735580824374b224f63f858726",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479VGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479vg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479VGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6a87cc751dc68c433cf939d13d65e11c4c9f7a222620aaa062c864166ecbcfa7",
+        "retrieved_at_utc": "2026-09-01T01:57:58Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479vg.html"
+      },
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F479 V-package candidate selected for bounded new-series discovery",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479vg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479VI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479VITx",
+          "icpn": "STM32F479VIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479VI",
+        "evidence_section_sha256": "bd24e00063c9ee71071d837138bd386f9a77308ab8c6f63246c7ac7857640228",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479VIT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479vi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479VIT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "4625fb40fe5f522047a6dfd5e5697ca00ee20522b9b076eddb5884bd4c5d93e1",
+        "retrieved_at_utc": "2026-09-01T01:58:02Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479vi.html"
+      },
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F479 V-package capacity variant grouped with its adjacent peer",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479vi.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "25f296dcc790bb4f3b99a707c176152794c4ac9478d08c5e540517068c577f54",
+        "retrieved_at_utc": "2026-09-01T01:58:07Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "fresh post-Batch9 policy-ready STM32F479 Z-package candidate included within the six-target acquisition bound",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    }
+  ],
+  "schema_version": 1
+}
