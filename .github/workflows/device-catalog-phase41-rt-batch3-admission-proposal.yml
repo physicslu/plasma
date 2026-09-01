@@ -1,0 +1,112 @@
+name: Device catalog Phase 4.1 R/T batch3 admission proposal
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  propose-stm32f4-rt-batch3:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/device-catalog-phase4.1-rt-admission-batch3'
+    runs-on: ubuntu-latest
+    env:
+      RESEARCH: data/device-catalog/research
+      EVIDENCE_DIR: data/device-catalog/research/evidence/stm32f4-phase4.1-rt-admission-batch3-live-2026-09-01
+      BASELINE: data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch3-baseline.json
+      CANONICAL: data/device-catalog/research/stm32f4-commercial-icpn.csv
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate retained evidence offline
+        run: |
+          python "${RESEARCH}/validate_stm32f4_retained_evidence.py" \
+            --evidence-dir "${EVIDENCE_DIR}" \
+            --baseline "${BASELINE}"
+      - name: Build deterministic read-only admission proposal
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase41-rt-batch3-proposal
+          python "${RESEARCH}/stm32f4_admission.py" \
+            --evidence-dir "${EVIDENCE_DIR}" \
+            --baseline "${BASELINE}" \
+            --catalog "${RESEARCH}/openocd-parts-canonical.csv" \
+            --canonical "${CANONICAL}" \
+            --admit-base STM32F411RC \
+            --admit-base STM32F411RE \
+            --admit-base STM32F413RG \
+            --admit-base STM32F415RG \
+            --output /tmp/phase41-rt-batch3-proposal/admission-plan.json
+          python - <<'PY'
+          import hashlib
+          import json
+          import shutil
+          import sys
+          from pathlib import Path
+
+          research = Path('data/device-catalog/research')
+          sys.path.insert(0, str(research))
+          from device_catalog_admission_framework import write_canonical_dataset
+
+          out = Path('/tmp/phase41-rt-batch3-proposal')
+          plan_path = out / 'admission-plan.json'
+          plan = json.loads(plan_path.read_text(encoding='utf-8'))
+          expected_counts = {
+              'admit': 11,
+              'already_present': 0,
+              'manual_review_required': 0,
+              'reject': 0,
+          }
+          assert plan['candidate_count'] == 11
+          assert plan['decision_counts'] == expected_counts
+          assert plan['conflicts'] == 0
+          assert plan['issues'] == []
+          assert plan['canonical_rows_before'] == 175
+          assert plan['inputs']['admission_base_devices'] == [
+              'STM32F411RC', 'STM32F411RE', 'STM32F413RG', 'STM32F415RG'
+          ]
+
+          source = research / 'stm32f4-commercial-icpn.csv'
+          proposed = out / 'stm32f4-commercial-icpn.proposed.csv'
+          shutil.copyfile(source, proposed)
+          write_result = write_canonical_dataset(plan=plan, canonical_path=proposed)
+          assert write_result['status'] == 'written'
+          assert write_result['rows_before'] == 175
+          assert write_result['rows_after'] == 186
+          assert len(write_result['added']) == 11
+
+          def sha(path: Path) -> str:
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          summary = {
+              'schema_version': 1,
+              'proposal_head_sha': '${{ github.event.pull_request.head.sha }}',
+              'evidence_id': plan['evidence_id'],
+              'candidate_count': plan['candidate_count'],
+              'decision_counts': plan['decision_counts'],
+              'conflicts': plan['conflicts'],
+              'issues': plan['issues'],
+              'canonical_rows_before': plan['canonical_rows_before'],
+              'canonical_rows_after': write_result['rows_after'],
+              'added': write_result['added'],
+              'admission_plan_sha256': sha(plan_path),
+              'proposed_csv_sha256': sha(proposed),
+              'prestate_csv_sha256': sha(source),
+              'canonical_dataset_written': False,
+          }
+          (out / 'proposal-summary.json').write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+      - name: Upload immutable proposal
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase41-stm32f4-rt-batch3-admission-proposal
+          path: /tmp/phase41-rt-batch3-proposal
+          if-no-files-found: error
+          retention-days: 30
