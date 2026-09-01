@@ -75,9 +75,9 @@ def test_search_limit_is_bounded(tmp_path: Path) -> None:
             raise AssertionError(f"invalid limit was accepted: {invalid!r}")
 
 
-def test_checked_in_production_catalog_contains_only_226_admitted_exact_icpns() -> None:
+def test_checked_in_production_catalog_contains_only_232_admitted_exact_icpns() -> None:
     catalog = get_default_device_catalog()
-    assert catalog.size == 226
+    assert catalog.size == 232
     assert catalog.catalog_id == "plasma-icpn"
     assert catalog.catalog_version == "1.0.0"
     assert catalog.status == "production"
@@ -103,6 +103,7 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     foundation_batch7 = catalog.search("stm32f439zgt7tr", limit=1)[0]
     foundation_batch8 = catalog.search("stm32f417vet6tr", limit=1)[0]
     foundation_batch9 = catalog.search("stm32f469vit6tr", limit=1)[0]
+    foundation_batch10 = catalog.search("stm32f479vit6", limit=1)[0]
     family = catalog.search("STM32F4", limit=100)
     combined = catalog.search("STMicroelectronics STM32F4", limit=100)
 
@@ -160,7 +161,12 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert foundation_batch9.pin_count == "100"
     assert foundation_batch9.flash_size == "2048 KiB"
     assert foundation_batch9.target_config == "tcl/target/stm32f4x.cfg"
-    # Search results remain capped at 100 while metadata proves the full 151-row F4 family.
+    assert foundation_batch10.identifier == "STM32F479VIT6"
+    assert foundation_batch10.package == "LQFP"
+    assert foundation_batch10.pin_count == "100"
+    assert foundation_batch10.flash_size == "2048 KiB"
+    assert foundation_batch10.target_config == "tcl/target/stm32f4x.cfg"
+    # Search results remain capped at 100 while metadata proves the full 157-row F4 family.
     assert len(family) == 100
     assert len(combined) == 100
 
@@ -182,15 +188,15 @@ def test_production_payload_separates_catalog_verification_from_physical_validat
 
 def test_production_metadata_reports_vendor_family_taxonomy() -> None:
     metadata = get_default_device_catalog().metadata
-    assert metadata["catalog_size"] == 226
+    assert metadata["catalog_size"] == 232
     assert metadata["source_count"] == 2
     assert metadata["taxonomy"] == [
         {
             "vendor": "STMicroelectronics",
-            "count": 226,
+            "count": 232,
             "families": [
                 {"family": "STM32F1", "count": 75},
-                {"family": "STM32F4", "count": 151},
+                {"family": "STM32F4", "count": 157},
             ],
         }
     ]
