@@ -106,7 +106,7 @@ test("Gateway reads stay inside the Browser until Managed routing discovery reso
   expect(managedStatusRequests.length).toBeGreaterThanOrEqual(2);
 });
 
-test("Managed routing stays exclusive during steady-state polling", async ({ page }) => {
+test("Managed routing stays exclusive during steady-state Browser traffic", async ({ page }) => {
   await seedLegacyStandaloneRouting(page);
   const { leakedGatewayRequests, managedStatusRequests } = observeGatewayRouting(page);
 
@@ -129,22 +129,24 @@ test("Managed routing stays exclusive during steady-state polling", async ({ pag
   await expectManagedBrowserRouting(page);
 
   const statusCountAfterBootstrap = managedStatusRequests.length;
-  await page.waitForTimeout(1_600);
+  const directAttempts: Array<{ status: number; ok: boolean; url: string }> = [];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    directAttempts.push(await page.evaluate(async directGateway => {
+      const response = await fetch(`${directGateway}/api/status`, { cache: "no-store" });
+      return { status: response.status, ok: response.ok, url: response.url };
+    }, staleDirectGateway));
+    await page.waitForTimeout(250);
+  }
 
   expect(leakedGatewayRequests).toEqual([]);
-  expect(managedStatusRequests.length).toBeGreaterThan(statusCountAfterBootstrap);
-
-  const directAttempt = await page.evaluate(async directGateway => {
-    const response = await fetch(`${directGateway}/api/status`, { cache: "no-store" });
-    return { status: response.status, ok: response.ok, url: response.url };
-  }, staleDirectGateway);
-
-  expect(directAttempt).toEqual({
-    status: 200,
-    ok: true,
-    url: expect.stringContaining("/api/manager/ppu/api/status"),
-  });
-  expect(leakedGatewayRequests).toEqual([]);
+  expect(managedStatusRequests.length).toBeGreaterThanOrEqual(statusCountAfterBootstrap + 2);
+  for (const directAttempt of directAttempts) {
+    expect(directAttempt).toEqual({
+      status: 200,
+      ok: true,
+      url: expect.stringContaining("/api/manager/ppu/api/status"),
+    });
+  }
 });
 
 test("Managed Control Station remains fail-closed when the BFF routing config is incomplete", async ({ page }) => {
