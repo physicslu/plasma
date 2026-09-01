@@ -1,6 +1,6 @@
 # Render Free public Mock demo
 
-This deployment publishes the existing Plasma React Console, Web REST Gateway,
+This deployment publishes the Plasma Control Station product pages, Web REST Gateway,
 Protocol v3.3 Server, and MockInterface as **one Render Free Web Service**. It
 does not introduce a second programming backend, a second Gateway, a persistent
 Node.js server, or physical hardware access.
@@ -11,16 +11,20 @@ Node.js server, or physical hardware access.
 Browser
   -> https://<service>.onrender.com
   -> existing Plasma Web REST Gateway on 0.0.0.0:$PORT
-       |-> existing React pages built once as static assets
+       |-> Control Station product entry / PMode / EMode static assets
        |-> canonical Web REST v3 endpoints and REST polling
        |-> local Plasma Server on 127.0.0.1:9900 -> 8 Mock Sites
-       `-> existing Engineering mock provider -> 8 Facilities / 32 PPUs / 160 Sites
+       `-> Engineering mock provider -> 3 Facilities / 12 PPUs / 60 Sites
 ```
 
 `software/web/render/` only supplies a static build entry and small navigation
 adapters. Product pages, batch execution, session state, Programming Asset
 handling, translations, themes, and API calls are imported directly from the
 existing `software/web/app/` implementation.
+
+The former Single PPU Programming Console is retired. Engineering single-PPU
+programming is owned by `Engineering Mode -> Programming`; the local PPU REST
+API remains available as backend/runtime capability.
 
 The current Plasma application uses HTTP REST polling. **It does not implement
 WebSocket.** Render supports WebSocket connections, but deploying Plasma does
@@ -76,12 +80,12 @@ stopped together.
 
 Public paths:
 
-- `/` and `/demo`: product-mode entry.
-- `/fleet`: existing Production Mode with mock Facilities, PPUs, and Sites.
-- `/engineering`: existing Engineering Mode and Programming workspace.
-- `/ppu`: existing eight-Site PPU Console.
+- `/` and `/demo`: Control Station product-mode entry.
+- `/fleet`: Production Mode with mock Facilities, PPUs, and Sites.
+- `/engineering`: Engineering Mode and canonical single-PPU Programming workspace.
+- `/ppu`: compatibility route to Engineering Mode; it no longer exposes `SITE MATRIX / PPU CONTROL`.
 - `/api/health/ready`: Server-backed readiness check.
-- `/api/status`: canonical local PPU and Site status.
+- `/api/status`: canonical local PPU and Site status API.
 - `/api/engineering/targets`: existing mock Facility / PPU inventory.
 
 After building the static assets, run the local end-to-end startup and Mock
