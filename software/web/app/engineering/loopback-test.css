@@ -1,3 +1,5 @@
+@import "../operator-ui/operator-surface-primitives.css";
+
 .loopbackPathCard .diagnosticsTestCardBody {
   display: grid;
   gap: 18px;
@@ -110,41 +112,6 @@ button.loopbackNode:hover {
   margin-bottom: 14px;
 }
 
-.diagnosticsField {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
-.diagnosticsField > span {
-  color: var(--text-soft);
-  font-size: 10px;
-  font-weight: 750;
-}
-
-.diagnosticsField input,
-.diagnosticsField select {
-  width: 100%;
-  min-height: 36px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-2);
-  color: var(--text);
-  padding: 7px 10px;
-  font: 11px var(--font-mono);
-}
-
-.diagnosticsField input:disabled {
-  opacity: .52;
-  cursor: not-allowed;
-}
-
-.diagnosticsField small {
-  color: var(--muted);
-  font-size: 9px;
-  line-height: 1.4;
-}
-
 .loopbackLengthModes {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -229,34 +196,6 @@ button.loopbackNode:hover {
 .loopbackExecutionActions {
   display: grid;
   gap: 8px;
-}
-
-.loopbackExecutionActions button {
-  min-height: 38px;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: var(--panel-2);
-  color: var(--text-soft);
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.loopbackExecutionActions button.primary {
-  border-color: var(--cyan);
-  background: var(--cyan);
-  color: #fff;
-}
-
-.loopbackExecutionActions button:disabled {
-  opacity: .42;
-  cursor: not-allowed;
-}
-
-.loopbackExecutionActions button:not(:disabled):hover {
-  border-color: var(--cyan);
-  color: var(--cyan);
 }
 
 .loopbackBackendBoundary {
