@@ -89,6 +89,25 @@ The Phase 4.1 R/T policy regression likewise verifies that approved policy seman
 
 The permanent Device Catalog CI includes retained-evidence validation and post-admission replay for this Batch 2 transaction. Temporary acquisition/proposal/publish/regression-fix workflows are not part of the retained production workflow set.
 
+## Runtime and REST acceptance
+
+The first full Python regression after the catalog admission correctly exposed a stale test contract: the runtime catalog returned `250`, while five tests still asserted the previous `233` snapshot. The runtime implementation itself did not require a behavior change.
+
+The production runtime/REST contract was updated and tested with a single current production-size constant:
+
+- total production catalog size: `250`
+- STM32F4 production catalog size: `175`
+- REST `catalog_size`: `250`
+- newly admitted positive-search control: `STM32F405RGT7TR`
+- target config exposed by REST for the positive control: `tcl/target/stm32f4x.cfg`
+- targeted acceptance workflow run: `33518547321`
+- tested contract commit: `211412882579a096e62445caa3eb857f92842552`
+- targeted result: success
+
+The targeted acceptance executed both `software/python/tests/test_device_catalog.py` and `software/python/tests/test_device_catalog_web_gateway.py` before the tested contract commit was pushed.
+
+The one-shot runtime-contract workflow was then removed in commit `46e4bd977c0224b89bf7dc079ffe56db7255e258`. The final retained branch therefore contains the tests and audit record, not the temporary mutation workflow.
+
 ## Safety boundary
 
 This closure establishes exact commercial identity admission only. It does not claim that devices sharing `tcl/target/stm32f4x.cfg` have equivalent programming algorithms, flash geometry, electrical behavior, or execution requirements. Those remain separate IC Support / execution-validation concerns.
