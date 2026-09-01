@@ -1,0 +1,19 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 7,
+  "acquisition_time_utc": "2026-09-01T05:52:11Z",
+  "acquisition_transport": "official_st_datasheet_pdf_text",
+  "canonical_dataset_admission": false,
+  "evaluator_result": "policy_mapping_supported",
+  "evidence_id": "stm32f4-phase4.1-rt-policy-2026-09-01-e125390",
+  "exact_icpn_candidate_count": 0,
+  "executed_git_sha": "e125390580dd038c9a95c11fd035b468e05333f8",
+  "headed": false,
+  "manufacturer": "STMicroelectronics",
+  "scale_ready": true,
+  "schema_version": 1,
+  "source_byte_hashes_claimed": false,
+  "source_bytes_retained": false,
+  "source_repository": "physicslu/plasma",
+  "target_count": 7
+}

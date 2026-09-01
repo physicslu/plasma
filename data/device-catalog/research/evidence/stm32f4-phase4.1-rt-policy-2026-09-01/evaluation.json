@@ -1,0 +1,29 @@
+{
+  "algorithm_equivalence_claimed": false,
+  "canonical_dataset_admission": false,
+  "decision": "policy_mapping_supported",
+  "evidence_id": "stm32f4-phase4.1-rt-policy-2026-09-01-e125390",
+  "exact_icpn_lifecycle_claimed": false,
+  "gap_base_devices": 93,
+  "newly_policy_ready": [
+    "STM32F401RB",
+    "STM32F401RC",
+    "STM32F401RD",
+    "STM32F401RE",
+    "STM32F405RG",
+    "STM32F411RC",
+    "STM32F411RE",
+    "STM32F413RG",
+    "STM32F415RG",
+    "STM32F446RC",
+    "STM32F446RE"
+  ],
+  "policy_blocked_after": 82,
+  "policy_blocked_before": 93,
+  "policy_ready_after": 11,
+  "policy_ready_before": 0,
+  "production_exact_icpns_after": 158,
+  "production_exact_icpns_before": 158,
+  "production_st_exact_icpns": 233,
+  "schema_version": 1
+}
