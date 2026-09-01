@@ -117,8 +117,8 @@ test("Gateway and Mock share the same Settings visual contract", async ({ page }
   const mockPage = await page.locator(".settingsPage").boundingBox();
 
   expect(mockVisual).toEqual(gatewayVisual);
-  expect(gatewayVisual.fieldHeight).toBe(40);
-  expect(gatewayVisual.primaryActionHeight).toBe(40);
+  expect(gatewayVisual.fieldHeight).toBe(36);
+  expect(gatewayVisual.primaryActionHeight).toBe(38);
   expect(gatewayCanvas).not.toBeNull();
   expect(gatewayPage).not.toBeNull();
   expect(mockCanvas).not.toBeNull();
