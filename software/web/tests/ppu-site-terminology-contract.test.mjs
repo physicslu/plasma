@@ -2,26 +2,25 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("keeps PPU and Site as the canonical Web vocabulary", async () => {
-  const page = await readFile(new URL("../app/site-matrix-home.tsx", import.meta.url), "utf8");
+test("keeps PPU and Site as the canonical Web vocabulary after legacy console retirement", async () => {
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
+  const engineering = await readFile(new URL("../app/engineering/programming-workspace-v2.tsx", import.meta.url), "utf8");
+  const production = await readFile(new URL("../app/fleet/factory-console-v2.tsx", import.meta.url), "utf8");
   const layout = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
 
   assert.match(api, /export type PPUSnapshot/);
   assert.match(api, /export type SiteSnapshot/);
   assert.match(api, /export async function getPPUStatus/);
-  assert.match(page, />SITE MATRIX</);
-  assert.match(page, />DISPLAY SITES</);
-  assert.match(page, />LIVE SITE STATUS</);
-  assert.match(page, /aria-label="PPU identity"/);
-  assert.match(page, /Facility <b>\{ppu\.facility_id\}/);
-  assert.match(page, /PPU <b>\{ppu\.ppu_id\}/);
-  assert.match(page, /<span>SITE \{site\.id\}<\/span>/);
-  assert.match(layout, /title: "Plasma PPU Console"/);
+  assert.match(engineering, /Select PPU:/);
+  assert.match(engineering, /LIVE SITE STATUS/);
+  assert.match(engineering, /siteLabel\(site\.id\)/);
+  assert.match(production, /PRODUCTION SITE SELECTION/);
+  assert.match(production, /LIVE SITE STATUS/);
+  assert.match(layout, /title: "Plasma Control Station"/);
 
-  assert.doesNotMatch(page, />CHANNEL MATRIX</);
-  assert.doesNotMatch(page, />DISPLAY CHANNELS</);
-  assert.doesNotMatch(page, />LIVE CHANNEL STATUS</);
-  assert.doesNotMatch(page, /aria-label="Programmer identity"/);
-  assert.doesNotMatch(page, />CH\{site\.id\}</);
+  assert.doesNotMatch(engineering, />CHANNEL MATRIX</);
+  assert.doesNotMatch(engineering, />LIVE CHANNEL STATUS</);
+  assert.doesNotMatch(production, />CHANNEL MATRIX</);
+  assert.doesNotMatch(production, />LIVE CHANNEL STATUS</);
+  assert.doesNotMatch(layout, /title: "Plasma PPU Console"/);
 });
