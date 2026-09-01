@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-test("renders the Plasma PPU Console shell before topology discovery", async () => {
+test("renders the Plasma Control Station product entry", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   const response = await worker.fetch(
-    new Request("http://localhost/ppu", {
+    new Request("http://localhost/demo", {
       headers: { accept: "text/html" },
     }),
     {
@@ -28,21 +28,13 @@ test("renders the Plasma PPU Console shell before topology discovery", async () 
   );
   const html = await response.text();
   assert.match(html, /<html\s+lang=["']zh-Hant["']/i);
-  assert.match(html, /<title>Plasma PPU Console<\/title>/i);
+  assert.match(html, /<title>Plasma Control Station<\/title>/i);
   assert.match(html, />PLASMA</);
-  assert.match(html, />SITE MATRIX</);
-  assert.match(html, />深色</);
-  assert.match(html, />淺色</);
-  assert.match(html, /class="active"[^>]*aria-pressed="true"[^>]*>淺色</);
-  assert.match(html, />Plasma Web REST Gateway</);
-  assert.match(html, /aria-label="Plasma Web REST Gateway URL"/);
-  assert.match(html, /<small>Plasma Web REST Gateway<\/small>/);
-  assert.match(html, />DISPLAY SITES</);
-  assert.match(html, /aria-label="Site 配置摘要"/);
-  assert.match(html, />BATCH CONTROL</);
-  assert.match(html, /aria-label="選取批次操作"/);
-  assert.match(html, /aria-label="批次執行：尚未選擇操作"[^>]*disabled/);
-  assert.match(html, />批次執行（0）</);
-  assert.match(html, />LIVE SITE STATUS</);
-  assert.match(html, />獨立操作</);
+  assert.match(html, />選擇產品模式</);
+  assert.match(html, /href="\/fleet"/);
+  assert.match(html, />量產模式</);
+  assert.match(html, /href="\/engineering"/);
+  assert.match(html, />工程模式</);
+  assert.doesNotMatch(html, />SITE MATRIX</);
+  assert.doesNotMatch(html, />PPU CONTROL</);
 });
