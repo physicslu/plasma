@@ -75,7 +75,7 @@ Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration�
 - Operator 操作指南：[`docs/operator/plasma-console-guide.md`](docs/operator/plasma-console-guide.md)
 - Domain / naming / identity：[`docs/architecture/domain-naming-migration.md`](docs/architecture/domain-naming-migration.md)
 - Facility / PPU / Site architecture：[`docs/architecture/ppu-facility-sites.md`](docs/architecture/ppu-facility-sites.md)
-- Plasma Web REST API contract：[`docs/architecture/web-rest-api-contract.md`](docs/architecture/web-rest-api-contract.md)
+- Web REST API Contract v3：[`docs/architecture/web-rest-api-contract.md`](docs/architecture/web-rest-api-contract.md)
 - Gateway 通訊與異常復原：[`docs/architecture/gateway-communication-recovery.md`](docs/architecture/gateway-communication-recovery.md)
 - Engineering Programming observability / audit contract：[`docs/architecture/engineering-programming-observability.md`](docs/architecture/engineering-programming-observability.md)
 - Control Station / Manager architecture：[`docs/architecture/configuration-architecture.md`](docs/architecture/configuration-architecture.md)
