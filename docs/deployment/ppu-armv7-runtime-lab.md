@@ -4,7 +4,7 @@ The SWPC ARMv7 Runtime Lab is a software-only diagnostic harness for the package
 
 ## Scope
 
-The lab proves only SWPC/QEMU ARMv7 userspace behavior. It does not claim PYNQ-Z2 hardware, systemd boot/reboot, PS-to-PL, Site I/O, target power, or real IC programming.
+The lab proves only SWPC/QEMU ARMv7 userspace behavior. It does not claim PYNQ-Z2 hardware, systemd boot/reboot, PS-to-PL, Site I/O, target power, real IC programming, or native Z2 memory stability.
 
 The default runtime build directory is repository-local:
 
@@ -36,25 +36,34 @@ The script performs:
 3. Automatic ARM binfmt installation with the digest-pinned `tonistiigi/binfmt` image if the preflight fails.
 4. Host-side PPU runtime build and validation using `software/python/.venv/bin/python`.
 5. ARMv7 Python 3.12 container launch using a digest-pinned image.
-6. Plasma Server and Gateway startup.
-7. Readiness polling instead of fixed startup sleeps.
-8. Three isolated request-path tests, each defaulting to 1000 requests:
+6. A pure Python standard-library `ThreadingHTTPServer` control experiment with cumulative checkpoints at 1,000, 5,000, and 10,000 requests. This control does not import Plasma.
+7. Plasma Server and Gateway startup.
+8. Readiness polling instead of fixed startup sleeps.
+9. Three isolated Plasma request-path tests, each defaulting to 1,000 requests:
    - `/api/health/live`
    - `/api/health/ready`
    - `/api/engineering/diagnostics/loopback` with `endpoint=ps`
-9. Per-path latency, Gateway/Server RSS, thread count, and FD count measurement.
-10. A 30-second post-load stability snapshot.
-11. Host-owned JSON evidence output and deterministic process/container cleanup.
+10. Per-path latency, Gateway/Server RSS, thread count, and FD count measurement.
+11. A 30-second post-load stability snapshot.
+12. Host-owned JSON evidence output and deterministic process/container cleanup.
 
-To shorten an exploratory run:
+To shorten only the Plasma request-path portion of an exploratory run:
 
 ```bash
 python scripts/ppu-armv7-runtime-lab.py --requests 100
 ```
 
+The control checkpoints can also be reduced explicitly:
+
+```bash
+python scripts/ppu-armv7-runtime-lab.py \
+  --requests 100 \
+  --control-checkpoints 100,500,1000
+```
+
 ## Interpretation
 
-The three paths separate likely sources of memory growth:
+The Plasma paths separate likely sources of memory growth:
 
 ```text
 health/live grows
@@ -67,7 +76,19 @@ live/ready stable, PS Loopback grows
   -> diagnostic payload / protocol exchange path is suspect
 ```
 
-RSS observed under QEMU is not a Z2-native RAM measurement. Relative growth and path-to-path differences are useful diagnostic evidence; absolute Z2 resource acceptance must be repeated on real PYNQ-Z2 hardware.
+The pure-stdlib control adds a stronger negative control. If its request-normalized RSS growth is close to Gateway `/api/health/live`, that supports the hypothesis that the observed growth is caused primarily by the ARMv7 QEMU + `ThreadingHTTPServer` environment rather than Plasma-specific request logic. A mismatch keeps the Gateway implementation itself under investigation.
+
+The report deliberately separates result semantics:
+
+```text
+functional_result = PASS
+resource_result   = INVESTIGATE
+overall_result    = INVESTIGATE
+```
+
+`functional_result=PASS` means the packaged runtime, health paths, and PS Loopback functioned correctly. It does not convert unresolved QEMU/native-memory questions into a resource PASS.
+
+RSS observed under QEMU is not a Z2-native RAM measurement. Relative growth, control-vs-Gateway slopes, and path-to-path differences are useful diagnostic evidence; absolute Z2 resource acceptance must be repeated on real PYNQ-Z2 hardware.
 
 ## Integration-host reboot note
 
