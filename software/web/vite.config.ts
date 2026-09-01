@@ -75,8 +75,13 @@ export default defineConfig(async () => {
   return {
     server: {
       host: "0.0.0.0",
+      // Both names terminate at the same SWPC Web runtime. The public name is
+      // a Preview/Mock ingress only; it must never become a Browser-owned
+      // remote Gateway/API base. The Tailscale name remains a private
+      // engineering/operations ingress.
       allowedHosts: [
         "terminal.local",
+        "plasma.open4th.com",
         "swpc.tail820e64.ts.net",
       ],
       proxy: {
