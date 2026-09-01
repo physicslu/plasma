@@ -1,0 +1,168 @@
+name: Device catalog Phase 4.1 R/T batch2 controlled publish
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-stm32f4-rt-batch2:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/device-catalog-phase4.1-rt-admission-batch2-retained'
+    runs-on: ubuntu-latest
+    env:
+      RESEARCH: data/device-catalog/research
+      EVIDENCE_DIR: data/device-catalog/research/evidence/stm32f4-phase4.1-rt-admission-batch2-live-2026-09-01
+      BASELINE: data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch2-baseline.json
+      CANONICAL: data/device-catalog/research/stm32f4-commercial-icpn.csv
+      PRODUCTION_MANIFEST: data/device-catalog/production/icpn-v1-manifest.json
+      PROPOSAL_ARTIFACT_ID: '9801403104'
+      PROPOSAL_ZIP_SHA256: '3f0ad3b5c9437cf51fb41ba06b532fd2c54bd896dc776de9d18e927d080e727b'
+      PLAN_SHA256: '6f5344b46564f38a7d5b7eadd64ecaeff8d0807209005253f7b79985f7dd7c9e'
+      PROPOSED_CSV_SHA256: '6d096c2129a2a3f520c049c0eaab1749cec05f163a773be7db10ec82472c8e58'
+      PRE_CSV_SHA256: '6a3150e356511dfed679b747515d1ae1380d3da101b11edd3322f27cd936c948'
+      PRE_GIT_BLOB: '21ad3fee8b780949e8184cdb56b5601fe6a48c03'
+      FINAL_GIT_BLOB: '614e81313b69c27d8306b22df68a5a20b031e20d'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify production pre-state
+        run: |
+          set -euo pipefail
+          echo "${PRE_CSV_SHA256}  ${CANONICAL}" | sha256sum -c -
+          test "$(git hash-object "${CANONICAL}")" = "${PRE_GIT_BLOB}"
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          canonical = Path('data/device-catalog/research/stm32f4-commercial-icpn.csv')
+          with canonical.open(newline='', encoding='utf-8') as handle:
+              rows = list(csv.DictReader(handle))
+          assert len(rows) == 158
+          manifest = json.loads(Path('data/device-catalog/production/icpn-v1-manifest.json').read_text(encoding='utf-8'))
+          sources = {item['family']: item for item in manifest['sources']}
+          f4 = sources['STM32F4']
+          assert f4['row_count'] == 158
+          assert f4['sha256'] == '6a3150e356511dfed679b747515d1ae1380d3da101b11edd3322f27cd936c948'
+          assert f4['git_blob_sha'] == '21ad3fee8b780949e8184cdb56b5601fe6a48c03'
+          assert sum(item['row_count'] for item in manifest['sources']) == 233
+          PY
+      - name: Download and verify immutable proposal
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/proposal
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${PROPOSAL_ARTIFACT_ID}/zip" > /tmp/proposal.zip
+          echo "${PROPOSAL_ZIP_SHA256}  /tmp/proposal.zip" | sha256sum -c -
+          unzip -q /tmp/proposal.zip -d /tmp/proposal
+          echo "${PLAN_SHA256}  /tmp/proposal/admission-plan.json" | sha256sum -c -
+          echo "${PROPOSED_CSV_SHA256}  /tmp/proposal/stm32f4-commercial-icpn.proposed.csv" | sha256sum -c -
+          test "$(git hash-object /tmp/proposal/stm32f4-commercial-icpn.proposed.csv)" = "${FINAL_GIT_BLOB}"
+      - name: Rebuild proposal from retained evidence
+        run: |
+          set -euo pipefail
+          python "${RESEARCH}/validate_stm32f4_retained_evidence.py" \
+            --evidence-dir "${EVIDENCE_DIR}" \
+            --baseline "${BASELINE}"
+          python "${RESEARCH}/stm32f4_admission.py" \
+            --evidence-dir "${EVIDENCE_DIR}" \
+            --baseline "${BASELINE}" \
+            --catalog "${RESEARCH}/openocd-parts-canonical.csv" \
+            --canonical "${CANONICAL}" \
+            --admit-base STM32F401RB \
+            --admit-base STM32F401RC \
+            --admit-base STM32F401RD \
+            --admit-base STM32F401RE \
+            --admit-base STM32F405RG \
+            --output /tmp/rebuilt-plan.json
+          echo "${PLAN_SHA256}  /tmp/rebuilt-plan.json" | sha256sum -c -
+          cmp /tmp/rebuilt-plan.json /tmp/proposal/admission-plan.json
+          cp "${CANONICAL}" /tmp/rebuilt.csv
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          research = Path('data/device-catalog/research')
+          sys.path.insert(0, str(research))
+          from device_catalog_admission_framework import write_canonical_dataset
+          plan = json.loads(Path('/tmp/rebuilt-plan.json').read_text(encoding='utf-8'))
+          result = write_canonical_dataset(plan=plan, canonical_path=Path('/tmp/rebuilt.csv'))
+          assert result['status'] == 'written'
+          assert result['rows_before'] == 158
+          assert result['rows_after'] == 175
+          assert len(result['added']) == 17
+          PY
+          echo "${PROPOSED_CSV_SHA256}  /tmp/rebuilt.csv" | sha256sum -c -
+          cmp /tmp/rebuilt.csv /tmp/proposal/stm32f4-commercial-icpn.proposed.csv
+      - name: Publish canonical dataset, manifest, and audit atomically
+        run: |
+          set -euo pipefail
+          cp /tmp/proposal/stm32f4-commercial-icpn.proposed.csv "${CANONICAL}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest_path = Path('data/device-catalog/production/icpn-v1-manifest.json')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          f4 = next(item for item in manifest['sources'] if item['family'] == 'STM32F4')
+          assert f4['row_count'] == 158
+          assert f4['sha256'] == '6a3150e356511dfed679b747515d1ae1380d3da101b11edd3322f27cd936c948'
+          assert f4['git_blob_sha'] == '21ad3fee8b780949e8184cdb56b5601fe6a48c03'
+          f4['row_count'] = 175
+          f4['sha256'] = '6d096c2129a2a3f520c049c0eaab1749cec05f163a773be7db10ec82472c8e58'
+          f4['git_blob_sha'] = '614e81313b69c27d8306b22df68a5a20b031e20d'
+          manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+          proposal = json.loads(Path('/tmp/proposal/proposal-summary.json').read_text(encoding='utf-8'))
+          assert proposal['candidate_count'] == 17
+          assert proposal['canonical_rows_before'] == 158
+          assert proposal['canonical_rows_after'] == 175
+          assert proposal['admission_plan_sha256'] == '6f5344b46564f38a7d5b7eadd64ecaeff8d0807209005253f7b79985f7dd7c9e'
+          assert proposal['proposed_csv_sha256'] == '6d096c2129a2a3f520c049c0eaab1749cec05f163a773be7db10ec82472c8e58'
+          audit = {
+              'schema_version': 1,
+              'phase': 'stm32f4-phase4.1-rt-admission-batch2',
+              'evidence_id': proposal['evidence_id'],
+              'evidence_artifact_id': '9801196525',
+              'evidence_zip_sha256': 'ebd6bcf6a7eaccbf69dabba72adcaed736bbf8c29952091fe73d9bc336468e5b',
+              'proposal_workflow_run_id': '33510466747',
+              'proposal_artifact_id': '9801403104',
+              'proposal_zip_sha256': '3f0ad3b5c9437cf51fb41ba06b532fd2c54bd896dc776de9d18e927d080e727b',
+              'admission_plan_sha256': proposal['admission_plan_sha256'],
+              'decision_counts': proposal['decision_counts'],
+              'conflicts': proposal['conflicts'],
+              'issues': [],
+              'pre_rows': 158,
+              'post_rows': 175,
+              'new_exact_icpns': 17,
+              'added': proposal['added'],
+              'pre_csv_sha256': '6a3150e356511dfed679b747515d1ae1380d3da101b11edd3322f27cd936c948',
+              'pre_git_blob_sha': '21ad3fee8b780949e8184cdb56b5601fe6a48c03',
+              'final_csv_sha256': '6d096c2129a2a3f520c049c0eaab1749cec05f163a773be7db10ec82472c8e58',
+              'final_git_blob_sha': '614e81313b69c27d8306b22df68a5a20b031e20d',
+              'canonical_dataset_written': True,
+          }
+          Path('data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch2-admission-audit.json').write_text(
+              json.dumps(audit, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          PY
+          echo "${PROPOSED_CSV_SHA256}  ${CANONICAL}" | sha256sum -c -
+          test "$(git hash-object "${CANONICAL}")" = "${FINAL_GIT_BLOB}"
+      - name: Commit controlled publish and remove one-shot workflow
+        run: |
+          set -euo pipefail
+          git config user.name 'Gordon'
+          git config user.email 'physicslu@gmail.com'
+          git add "${CANONICAL}" "${PRODUCTION_MANIFEST}" \
+            data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch2-admission-audit.json
+          git rm .github/workflows/device-catalog-phase41-rt-batch2-controlled-publish.yml
+          git diff --cached --check
+          git commit -m 'device-catalog: admit STM32F4 R/T batch2 exact ICPNs'
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
