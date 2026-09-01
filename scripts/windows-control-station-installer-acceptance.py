@@ -126,6 +126,11 @@ def _assert_console_static_assets() -> None:
     except (LookupError, UnicodeDecodeError) as exc:
         raise InstallerAcceptanceError(f"Console HTML could not be decoded as {charset}: {exc}") from exc
 
+    if 'data-route-marker="Choose a Demo"' not in html:
+        raise InstallerAcceptanceError("Console root did not resolve to the Control Station product entry")
+    if "SITE MATRIX" in html or "PPU CONTROL" in html:
+        raise InstallerAcceptanceError("Console root still exposes the retired Single PPU Programming UI")
+
     assets = _console_asset_paths(html)
     stylesheets = [path for path in assets if path.split("?", 1)[0].lower().endswith(".css")]
     scripts = [path for path in assets if path.split("?", 1)[0].lower().endswith(".js")]
@@ -344,7 +349,7 @@ def run_acceptance(msi: Path) -> None:
     _assert_clean_install_managed_routing()
     print("Windows installer self-contained runtime binding: PASS", flush=True)
     print("Windows installer initial SCM launch: PASS", flush=True)
-    print("Windows installer Console static assets: PASS", flush=True)
+    print("Windows installer Control Station product entry and static assets: PASS", flush=True)
     print("Windows installer clean-install managed routing: PASS", flush=True)
 
     _write_smoke_config(program_data)
@@ -358,7 +363,7 @@ def run_acceptance(msi: Path) -> None:
     _start_services()
     _assert_console_static_assets()
     _browser_fetch(bundled_node)
-    print("Windows installer Console static assets after SCM restart: PASS", flush=True)
+    print("Windows installer Control Station entry/assets after SCM restart: PASS", flush=True)
     print("Windows installer SCM restart persistence: PASS", flush=True)
 
     _stop_services()
