@@ -1,0 +1,85 @@
+name: Device catalog Phase 4.2I finalize runtime closure
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2i-f405o-f415og-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42i-finalize.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2i-f405o-f415og-admission
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Update runtime and REST catalog contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime = Path('software/python/tests/test_device_catalog.py')
+          text = runtime.read_text(encoding='utf-8')
+          old = 'EXPECTED_PRODUCTION_CATALOG_SIZE = 283\nEXPECTED_STM32F4_CATALOG_SIZE = 208'
+          new = 'EXPECTED_PRODUCTION_CATALOG_SIZE = 286\nEXPECTED_STM32F4_CATALOG_SIZE = 211'
+          if old not in text:
+              raise SystemExit('runtime catalog count precondition not found')
+          text = text.replace(old, new, 1)
+          old = '    phase42f = catalog.search("stm32f412rgy6ptr", limit=1)[0]\n    family = catalog.search("STM32F4", limit=100)'
+          new = '    phase42f = catalog.search("stm32f412rgy6ptr", limit=1)[0]\n    phase42i = catalog.search("stm32f405oey6tr", limit=1)[0]\n    family = catalog.search("STM32F4", limit=100)'
+          if old not in text:
+              raise SystemExit('runtime lookup insertion precondition not found')
+          text = text.replace(old, new, 1)
+          old = '    assert phase42f.option_suffix == "PTR"\n    assert phase42f.target_config == "tcl/target/stm32f4x.cfg"\n    # Search results remain capped at 100 while metadata proves the full 208-row F4 family.'
+          new = '    assert phase42f.option_suffix == "PTR"\n    assert phase42f.target_config == "tcl/target/stm32f4x.cfg"\n    assert phase42i.identifier == "STM32F405OEY6TR"\n    assert phase42i.family == "STM32F4"\n    assert phase42i.package == "WLCSP"\n    assert phase42i.pin_count == "90"\n    assert phase42i.flash_size == "512 KiB"\n    assert phase42i.target_config == "tcl/target/stm32f4x.cfg"\n    # Search results remain capped at 100 while metadata proves the full 211-row F4 family.'
+          if old not in text:
+              raise SystemExit('runtime assertion insertion precondition not found')
+          runtime.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          rest = Path('software/python/tests/test_device_catalog_web_gateway.py')
+          text = rest.read_text(encoding='utf-8')
+          if 'EXPECTED_PRODUCTION_CATALOG_SIZE = 283' not in text:
+              raise SystemExit('REST catalog count precondition not found')
+          text = text.replace('EXPECTED_PRODUCTION_CATALOG_SIZE = 283', 'EXPECTED_PRODUCTION_CATALOG_SIZE = 286', 1)
+          old = '''        self.assertEqual(result["option_suffix"], "PTR")\n        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")\n\n    def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:'''
+          new = '''        self.assertEqual(result["option_suffix"], "PTR")\n        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")\n\n    def test_phase42i_stm32f405oey6tr_is_exposed_after_admission(self) -> None:\n        status, payload = self.request("/api/devices/search?q=STM32F405OEY6TR&limit=5")\n        self.assertEqual(status, 200)\n        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)\n        self.assertEqual(payload["count"], 1)\n        result = payload["results"][0]\n        self.assertEqual(result["icpn"], "STM32F405OEY6TR")\n        self.assertEqual(result["family"], "STM32F4")\n        self.assertEqual(result["package"], "WLCSP")\n        self.assertEqual(result["pin_count"], "90")\n        self.assertEqual(result["flash_size"], "512 KiB")\n        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")\n\n    def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:'''
+          if old not in text:
+              raise SystemExit('REST insertion precondition not found')
+          rest.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Remove one-shot transaction workflows
+        run: |
+          rm -f \
+            .github/workflows/device-catalog-phase42i-admission-proposal.yml \
+            .github/workflows/device-catalog-phase42i-bind-proposal.yml \
+            .github/workflows/device-catalog-phase42i-controlled-publish.yml \
+            .github/workflows/device-catalog-phase42i-closure-apply.yml \
+            .github/workflows/device-catalog-phase42i-finalize.yml
+      - name: Validate permanent closure
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py
+          python -m pip install -q pytest
+          PYTHONPATH=software/python python -m pytest -q \
+            software/python/tests/test_device_catalog.py \
+            software/python/tests/test_device_catalog_web_gateway.py
+          git diff --check
+      - name: Commit runtime closure
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'device-catalog: close Phase4.2I runtime lifecycle'
+          git push origin HEAD:agent/device-catalog-phase4.2i-f405o-f415og-admission
