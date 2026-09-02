@@ -101,7 +101,7 @@ def main() -> None:
     if command == "server":
         from plasma_server.server import main as entrypoint
     elif command == "gateway":
-        from plasma_web.gateway import main as entrypoint
+        from plasma_web.gateway_phase2 import main as entrypoint
     else:
         raise SystemExit(f"unsupported PPU process: {command}")
     entrypoint()
@@ -253,6 +253,8 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
         "plasma_server/server.py",
         "plasma_client/client.py",
         "plasma_web/gateway.py",
+        "plasma_web/gateway_phase2.py",
+        "plasma_web/ppu_network_activation.py",
         "yaml/__init__.py",
     }
     missing = sorted(required - names)
@@ -266,7 +268,7 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
         raise PPURuntimePackagingError("PPU runtime is missing the PyYAML license")
     boundary = _require_mapping(manifest.get("hardware_boundary"), "hardware_boundary")
     if any(boundary.get(key) is not False for key in ("loads_fpga", "accesses_pl", "changes_target_power", "programs_real_ic")):
-        raise PPURuntimePackagingError("Phase-1 PPU runtime must keep the hardware boundary closed")
+        raise PPURuntimePackagingError("PPU runtime must keep the PL/target hardware boundary closed")
     return manifest
 
 
