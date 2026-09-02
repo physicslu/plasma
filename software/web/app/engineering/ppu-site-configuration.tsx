@@ -115,21 +115,23 @@ export default function PpuSiteConfiguration() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const initialRefresh = window.setTimeout(() => { void refresh(); }, 0);
     const timer = window.setInterval(() => { void refresh(true); }, 2500);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      window.clearInterval(timer);
+    };
   }, [refresh]);
 
-  useEffect(() => {
-    if (!registry) return;
-    const aliases = registry.ppus.map(entry => entry.alias).filter((alias): alias is string => Boolean(alias));
-    if (!selectedAlias || !aliases.includes(selectedAlias)) {
-      setSelectedAlias(aliases[0] ?? null);
-      setRemoveCandidate(null);
-    }
-  }, [registry, selectedAlias]);
+  const registryAliases = useMemo(
+    () => (registry?.ppus ?? []).map(entry => entry.alias).filter((alias): alias is string => Boolean(alias)),
+    [registry],
+  );
+  const effectiveSelectedAlias = selectedAlias && registryAliases.includes(selectedAlias)
+    ? selectedAlias
+    : registryAliases[0] ?? null;
 
-  const selectedEntry = registry?.ppus.find(entry => entry.alias === selectedAlias) ?? null;
+  const selectedEntry = registry?.ppus.find(entry => entry.alias === effectiveSelectedAlias) ?? null;
   const selectedFleet = selectedEntry ? fleetForEntry(selectedEntry, fleet) : null;
   const selectedStatus = selectedEntry ? ppuStatus(selectedEntry, selectedFleet) : "Unknown";
   const selectedHasActiveExecution = hasActiveExecution(selectedFleet);
@@ -299,7 +301,7 @@ export default function PpuSiteConfiguration() {
                     return (
                       <tr
                         key={key}
-                        className={entry.alias && entry.alias === selectedAlias ? "selected" : ""}
+                        className={entry.alias && entry.alias === effectiveSelectedAlias ? "selected" : ""}
                         onClick={() => { if (entry.alias) { setSelectedAlias(entry.alias); setRemoveCandidate(null); } }}
                       >
                         <td><span className="ppuIdLink">{entry.alias ?? "Unaliased"}</span></td>
