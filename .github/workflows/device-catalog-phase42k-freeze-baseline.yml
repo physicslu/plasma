@@ -1,0 +1,203 @@
+name: Device catalog Phase 4.2K freeze discovery baseline
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2k-i176-admission
+    paths:
+      - '.github/workflows/device-catalog-phase42k-freeze-baseline.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  freeze:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2k-i176-admission
+          fetch-depth: 0
+      - name: Download immutable discovery artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase42k-discovery
+          for spec in \
+            'a:9851260459:3a4b59da36a29a206bbaa9ac4c0ef48cea3a89369446529ba462dd10b94daacc' \
+            'b:9851252456:65259ed4f6cc7a35e50b35fe900b380edf5e230499aa0426fc31f0433d48a450' \
+            'c:9851276536:a9f9a5fb5fe06e143cdb8cb86ccaec5d910ffd5b3b4e00585d789d0564f55d1b' \
+            'd:9851248015:6162edddc5b30a95a899acd4855c08376c6a20582b853b92c17450a0b7ebb39d'
+          do
+            IFS=: read -r cohort artifact sha <<< "$spec"
+            zip="/tmp/phase42k-discovery/${cohort}.zip"
+            dir="/tmp/phase42k-discovery/${cohort}"
+            gh api -H 'Accept: application/vnd.github+json' \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact}/zip" > "$zip"
+            printf '%s  %s\n' "$sha" "$zip" | sha256sum -c -
+            mkdir -p "$dir"
+            unzip -q "$zip" -d "$dir"
+          done
+      - name: Build fail-closed baseline from immutable bytes
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('/tmp/phase42k-discovery')
+          specs = {
+              'a': {'artifact_id':'9851260459','artifact_sha256':'3a4b59da36a29a206bbaa9ac4c0ef48cea3a89369446529ba462dd10b94daacc'},
+              'b': {'artifact_id':'9851252456','artifact_sha256':'65259ed4f6cc7a35e50b35fe900b380edf5e230499aa0426fc31f0433d48a450'},
+              'c': {'artifact_id':'9851276536','artifact_sha256':'a9f9a5fb5fe06e143cdb8cb86ccaec5d910ffd5b3b4e00585d789d0564f55d1b'},
+              'd': {'artifact_id':'9851248015','artifact_sha256':'6162edddc5b30a95a899acd4855c08376c6a20582b853b92c17450a0b7ebb39d'},
+          }
+          expected_candidates = {
+              'STM32F407IE','STM32F407IG','STM32F417IE','STM32F417IG','STM32F427IG',
+              'STM32F427II','STM32F429IE','STM32F429IG','STM32F429II','STM32F437IG',
+              'STM32F437II','STM32F439IG','STM32F439II','STM32F469IE','STM32F469IG',
+              'STM32F469II','STM32F479IG','STM32F479II',
+          }
+          control = 'STM32F479ZG'
+          observed_candidates = set()
+          target_rows = {}
+          excluded = []
+          control_semantics = None
+          cohort_summaries = []
+
+          for cohort in 'abcd':
+              summary_path = root / cohort / 'pilot-summary.json'
+              if not summary_path.exists():
+                  raise SystemExit(f'{cohort}: pilot-summary.json missing')
+              summary = json.loads(summary_path.read_text(encoding='utf-8'))
+              results = summary.get('results')
+              if not isinstance(results, list):
+                  raise SystemExit(f'{cohort}: discovery results missing')
+              if summary.get('acquisition_failure') != 0 or summary.get('acquisition_success') != len(results):
+                  raise SystemExit(f'{cohort}: acquisition is not clean')
+              if summary.get('canonical_mapping') != {'unique': len(results), 'ambiguous': 0, 'unmapped': 0}:
+                  raise SystemExit(f'{cohort}: canonical mapping is not uniquely clean')
+              if summary.get('openocd_cfg_mapping') != {'mapped': len(results), 'total': len(results)}:
+                  raise SystemExit(f'{cohort}: OpenOCD mapping is incomplete')
+              if summary.get('canonical_dataset_admission') is not False:
+                  raise SystemExit(f'{cohort}: discovery must deny canonical admission')
+              by_base = {r.get('base_device'): r for r in results if isinstance(r, dict)}
+              if len(by_base) != len(results) or control not in by_base:
+                  raise SystemExit(f'{cohort}: duplicate/missing control target')
+
+              c = by_base[control]
+              cev = c.get('evidence')
+              if not isinstance(cev, dict):
+                  raise SystemExit(f'{cohort}: control evidence missing')
+              csem = {
+                  'exact_icpns': sorted(cev.get('exact_icpns', [])),
+                  'excluded_non_active_part_numbers': sorted(
+                      cev.get('excluded_non_active_part_numbers', []),
+                      key=lambda x: (x.get('icpn',''), x.get('marketing_status','')),
+                  ),
+                  'canonical_mapping': c.get('canonical_mapping'),
+                  'source_url': cev.get('source_url'),
+              }
+              if control_semantics is None:
+                  control_semantics = csem
+              elif csem != control_semantics:
+                  raise SystemExit(f'{cohort}: repeated control lifecycle/mapping drift')
+
+              cohort_candidates = set(by_base) - {control}
+              if not cohort_candidates:
+                  raise SystemExit(f'{cohort}: empty candidate cohort')
+              if observed_candidates & cohort_candidates:
+                  raise SystemExit(f'{cohort}: candidate base repeated across cohorts')
+              observed_candidates |= cohort_candidates
+
+              for base in sorted(cohort_candidates):
+                  result = by_base[base]
+                  if result.get('acquisition_status') != 'success':
+                      raise SystemExit(f'{base}: acquisition not successful')
+                  mapping = result.get('canonical_mapping')
+                  if not isinstance(mapping, dict) or mapping.get('status') != 'unique' or mapping.get('target_configs') != ['tcl/target/stm32f4x.cfg']:
+                      raise SystemExit(f'{base}: mapping not uniquely stm32f4x.cfg')
+                  evidence = result.get('evidence')
+                  if not isinstance(evidence, dict):
+                      raise SystemExit(f'{base}: evidence missing')
+                  active = evidence.get('exact_icpns')
+                  if not isinstance(active, list) or not active or len(active) != len(set(active)):
+                      raise SystemExit(f'{base}: invalid Active exact ICPN set')
+                  if not all(isinstance(x, str) and x.startswith(base) for x in active):
+                      raise SystemExit(f'{base}: invalid Active ICPN ownership')
+                  target_rows[base] = {
+                      'base_device': base,
+                      'exact_icpns': sorted(active),
+                      'source_url': evidence.get('source_url'),
+                      'rendered_dom_sha256': evidence.get('rendered_dom_sha256'),
+                      'evidence_section_sha256': evidence.get('evidence_section_sha256'),
+                      'canonical_mapping': mapping,
+                      'discovery_cohort': cohort,
+                  }
+                  non_active = evidence.get('excluded_non_active_part_numbers', [])
+                  if not isinstance(non_active, list):
+                      raise SystemExit(f'{base}: invalid non-Active observations')
+                  for row in non_active:
+                      if not isinstance(row, dict):
+                          raise SystemExit(f'{base}: invalid non-Active row')
+                      icpn = row.get('icpn')
+                      status = row.get('marketing_status')
+                      if not isinstance(icpn, str) or not icpn.startswith(base) or not isinstance(status, str) or status == 'Active':
+                          raise SystemExit(f'{base}: invalid lifecycle observation')
+                      excluded.append({'base_device':base,'icpn':icpn,'marketing_status':status})
+
+              cohort_summaries.append({
+                  'cohort': cohort,
+                  'pilot_id': summary.get('pilot_id'),
+                  'target_count': len(results),
+                  'candidate_base_count': len(cohort_candidates),
+                  'active_exact_icpn_candidates_including_control': summary.get('exact_icpn_candidates'),
+                  **specs[cohort],
+              })
+
+          if observed_candidates != expected_candidates:
+              raise SystemExit(f'candidate coverage mismatch: missing={sorted(expected_candidates-observed_candidates)} extra={sorted(observed_candidates-expected_candidates)}')
+
+          all_active = [icpn for row in target_rows.values() for icpn in row['exact_icpns']]
+          if len(all_active) != len(set(all_active)):
+              raise SystemExit('Active exact ICPN duplicated across candidate bases')
+
+          baseline = {
+              'schema_version': 1,
+              'phase': '4.2K',
+              'canonical_dataset_admission': False,
+              'source_discovery': {
+                  'workflow_run_id': '33641967827',
+                  'workflow_head_sha': '390e0be1e7a743bad2683fcb05804717816a4106',
+                  'cohorts': cohort_summaries,
+              },
+              'control': {
+                  'base_device': control,
+                  'semantic_evidence': control_semantics,
+                  'repeated_cleanly_across_cohorts': 4,
+              },
+              'candidate_base_device_count': len(target_rows),
+              'active_exact_icpn_candidate_count': len(all_active),
+              'targets': [target_rows[b] for b in sorted(target_rows)],
+              'excluded_non_active_observations': sorted(excluded, key=lambda x:(x['base_device'],x['icpn'],x['marketing_status'])),
+              'algorithm_equivalence_claimed': False,
+              'physical_ppu_validation_claimed': False,
+          }
+          out = Path('data/device-catalog/research/stm32f4-phase4.2k-i176-admission-baseline.json')
+          out.write_text(json.dumps(baseline, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(f"candidate_bases={baseline['candidate_base_device_count']}")
+          print(f"active_exact_icpn_candidates={baseline['active_exact_icpn_candidate_count']}")
+          print(f"excluded_non_active_observations={len(excluded)}")
+          PY
+      - name: Commit frozen baseline only
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32f4-phase4.2k-i176-admission-baseline.json
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          git commit -m 'device-catalog: freeze Phase 4.2K I176 discovery baseline'
+          git push origin HEAD:agent/device-catalog-phase4.2k-i176-admission
