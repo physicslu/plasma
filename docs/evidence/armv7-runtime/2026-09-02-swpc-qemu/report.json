@@ -1,0 +1,72 @@
+{
+  "architecture": "armv7l",
+  "evidence_level": "swpc-qemu-armv7-userspace",
+  "functional_result": "PASS",
+  "not_claimed": [
+    "PYNQ-Z2 hardware",
+    "systemd boot/reboot",
+    "PS-to-PL",
+    "Site I/O",
+    "target power",
+    "real IC programming",
+    "native Z2 memory stability"
+  ],
+  "overall_result": "INVESTIGATE",
+  "paths": {
+    "health_live": {
+      "gateway_after": {"fds": 4, "rss_kib": 85748, "threads": 2},
+      "gateway_before": {"fds": 4, "rss_kib": 58316, "threads": 2},
+      "gateway_delta": {"fds": 0, "rss_kib": 27432, "threads": 0},
+      "latency_ms": {"avg": 5.159, "max": 6.1, "min": 4.886, "p95": 5.386, "p99": 5.779},
+      "requests": 1000,
+      "server_after": {"fds": 7, "rss_kib": 55276, "threads": 2},
+      "server_before": {"fds": 7, "rss_kib": 55276, "threads": 2},
+      "server_delta": {"fds": 0, "rss_kib": 0, "threads": 0}
+    },
+    "health_ready": {
+      "gateway_after": {"fds": 4, "rss_kib": 113192, "threads": 2},
+      "gateway_before": {"fds": 4, "rss_kib": 85748, "threads": 2},
+      "gateway_delta": {"fds": 0, "rss_kib": 27444, "threads": 0},
+      "latency_ms": {"avg": 9.963, "max": 12.344, "min": 9.495, "p95": 10.266, "p99": 10.975},
+      "requests": 1000,
+      "server_after": {"fds": 7, "rss_kib": 55276, "threads": 2},
+      "server_before": {"fds": 7, "rss_kib": 55276, "threads": 2},
+      "server_delta": {"fds": 0, "rss_kib": 0, "threads": 0}
+    },
+    "ps_loopback": {
+      "gateway_after": {"fds": 4, "rss_kib": 140668, "threads": 2},
+      "gateway_before": {"fds": 4, "rss_kib": 113192, "threads": 2},
+      "gateway_delta": {"fds": 0, "rss_kib": 27476, "threads": 0},
+      "latency_ms": {"avg": 11.789, "max": 20.933, "min": 11.3, "p95": 12.264, "p99": 12.909},
+      "requests": 1000,
+      "server_after": {"fds": 7, "rss_kib": 55288, "threads": 2},
+      "server_before": {"fds": 7, "rss_kib": 55276, "threads": 2},
+      "server_delta": {"fds": 0, "rss_kib": 12, "threads": 0}
+    }
+  },
+  "python_version": "3.12.14",
+  "readiness_ms": 4678.246,
+  "resource_comparison": {
+    "control_rss_kib_per_request": 27.4384,
+    "gateway_health_live_rss_kib_per_request": 27.432,
+    "gateway_to_control_ratio": 0.999767,
+    "interpretation": "compare request-normalized RSS growth; matching slopes support a QEMU/ThreadingHTTPServer environment effect"
+  },
+  "resource_result": "INVESTIGATE",
+  "runtime_bytes": 949696,
+  "stable_after_30s": {
+    "gateway": {"fds": 4, "rss_kib": 140668, "threads": 2},
+    "server": {"fds": 7, "rss_kib": 55288, "threads": 2}
+  },
+  "stdlib_threading_control": {
+    "baseline": {"fds": 4, "rss_kib": 48052, "threads": 2},
+    "checkpoints": [
+      {"delta_from_baseline": {"fds": 0, "rss_kib": 27432, "threads": 0}, "metrics": {"fds": 4, "rss_kib": 75484, "threads": 2}, "requests": 1000},
+      {"delta_from_baseline": {"fds": 0, "rss_kib": 137192, "threads": 0}, "metrics": {"fds": 4, "rss_kib": 185244, "threads": 2}, "requests": 5000},
+      {"delta_from_baseline": {"fds": 0, "rss_kib": 274384, "threads": 0}, "metrics": {"fds": 4, "rss_kib": 322436, "threads": 2}, "requests": 10000}
+    ],
+    "implementation": "python-stdlib-ThreadingHTTPServer",
+    "plasma_imported": false,
+    "rss_kib_per_request_final": 27.4384
+  }
+}
