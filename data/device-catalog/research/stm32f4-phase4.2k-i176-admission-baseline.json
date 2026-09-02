@@ -30,6 +30,7 @@
   ],
   "phase": "4.2K",
   "physical_ppu_validation_claimed": false,
+  "pilot_id": "stm32f4-phase4.2k-i176-admission-2026-09-02",
   "schema_version": 1,
   "source_discovery": {
     "cohorts": [
