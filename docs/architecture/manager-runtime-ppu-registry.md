@@ -37,6 +37,22 @@ When `manager.registry_state_path` is configured:
 
 This separation prevents runtime inventory churn from becoming deployment-file churn and avoids concurrent Browser/YAML ownership of the same state.
 
+## Deployment defaults
+
+New Control Station installations provision a writable operator-local runtime registry path:
+
+```text
+macOS
+$HOME/Library/Application Support/Plasma/state/manager-registry.json
+
+Windows
+%ProgramData%\Plasma\state\manager-registry.json
+```
+
+The installer-created `manager.yaml` points to those paths. The immutable application release does not contain registry state.
+
+Existing integration-host or manually maintained Manager configuration is not silently rewritten during this change. Those deployments remain config-backed/read-only until an operator explicitly adds an absolute `manager.registry_state_path` and applies the normal deployment reconciliation/restart gate. This is intentional: enabling Browser-driven inventory mutation changes control-plane authority and must not appear as an implicit software upgrade side effect.
+
 ## Lifecycle
 
 The operator-facing workflow is:
