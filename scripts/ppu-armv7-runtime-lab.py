@@ -3,15 +3,16 @@
 
 Host mode builds and validates the PPU runtime, repairs ARM binfmt when needed,
 and launches this same script inside an ARMv7 Python container. Container mode
-starts Plasma Server/Gateway, measures live/ready/loopback request paths, and
-returns JSON evidence to the host. The lab is software-only and does not claim
-Z2 hardware.
+runs a pure-stdlib ThreadingHTTPServer control, then starts Plasma Server/Gateway
+and measures live/ready/loopback request paths. The lab is software-only and
+does not claim Z2 hardware.
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 import platform
@@ -29,9 +30,11 @@ from typing import Any, Sequence
 ARM_IMAGE = "arm32v7/python:3.12@sha256:45eb5cbc14fe248e7598eb23a5a61424d44e556aed3efa955dfab2ac9a67d91c"
 BINFMT_IMAGE = "docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0"
 DEFAULT_REQUESTS = 1000
+DEFAULT_CONTROL_CHECKPOINTS = (1000, 5000, 10000)
 DEFAULT_RUNTIME_REL = Path(".work/ppu-runtime")
 DEFAULT_REPORT_REL = Path(".work/reports/ppu-armv7-runtime-lab.json")
 RESULT_MARKER = "PLASMA_ARMV7_LAB_RESULT="
+CONTROL_PORT = 18081
 
 
 class LabError(RuntimeError):
@@ -90,6 +93,16 @@ def _parse_result(stdout: str) -> dict[str, Any]:
     raise LabError("ARMv7 container did not emit a lab result marker")
 
 
+def _parse_checkpoints(value: str) -> tuple[int, ...]:
+    try:
+        checkpoints = tuple(int(item.strip()) for item in value.split(",") if item.strip())
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("control checkpoints must be comma-separated positive integers") from exc
+    if not checkpoints or any(item < 1 for item in checkpoints) or tuple(sorted(set(checkpoints))) != checkpoints:
+        raise argparse.ArgumentTypeError("control checkpoints must be unique positive integers in ascending order")
+    return checkpoints
+
+
 def _host_mode(args: argparse.Namespace) -> int:
     repo = _repo_root()
     runtime_dir = (repo / args.runtime_dir).resolve() if not args.runtime_dir.is_absolute() else args.runtime_dir.resolve()
@@ -97,12 +110,14 @@ def _host_mode(args: argparse.Namespace) -> int:
     _docker_preflight()
     _build_runtime(repo, runtime_dir)
     report_path.parent.mkdir(parents=True, exist_ok=True)
+    checkpoints = ",".join(str(item) for item in args.control_checkpoints)
     command = [
         "docker", "run", "--rm", "--platform", "linux/arm/v7",
         "-v", f"{runtime_dir}:/runtime:ro",
         "-v", f"{Path(__file__).resolve()}:/lab.py:ro",
         ARM_IMAGE,
         "python3", "/lab.py", "--inside", "--runtime-dir", "/runtime", "--requests", str(args.requests),
+        "--control-checkpoints", checkpoints,
     ]
     print("Plasma ARMv7 Runtime Lab")
     print(f"runtime: {runtime_dir}")
@@ -193,6 +208,75 @@ def _exercise(name: str, count: int, request_fn, gateway_pid: int, server_pid: i
     }
 
 
+class _ControlHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"
+
+    def do_GET(self) -> None:
+        payload = b'{"ok":true}'
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format: str, *args: Any) -> None:
+        return
+
+
+def _control_server_mode() -> int:
+    server = ThreadingHTTPServer(("127.0.0.1", CONTROL_PORT), _ControlHandler)
+    server.daemon_threads = True
+    server.serve_forever()
+    return 0
+
+
+def _wait_control(process: subprocess.Popen[Any], timeout_s: float = 15.0) -> None:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise LabError("ThreadingHTTPServer control exited before readiness")
+        try:
+            if _request_json(f"http://127.0.0.1:{CONTROL_PORT}/").get("ok") is True:
+                return
+        except LabError:
+            pass
+        time.sleep(0.1)
+    raise LabError("ThreadingHTTPServer control readiness deadline exceeded")
+
+
+def _run_control_experiment(checkpoints: tuple[int, ...]) -> dict[str, Any]:
+    process: subprocess.Popen[Any] | None = None
+    try:
+        process = subprocess.Popen([sys.executable, "/lab.py", "--control-server"])
+        _wait_control(process)
+        baseline = _proc_metrics(process.pid)
+        samples: list[dict[str, Any]] = []
+        previous = 0
+        for checkpoint in checkpoints:
+            for index in range(previous + 1, checkpoint + 1):
+                data = _request_json(f"http://127.0.0.1:{CONTROL_PORT}/")
+                if data.get("ok") is not True:
+                    raise LabError(f"invalid control response at request {index}")
+            metrics = _proc_metrics(process.pid)
+            samples.append({
+                "requests": checkpoint,
+                "metrics": metrics,
+                "delta_from_baseline": {key: metrics[key] - baseline[key] for key in metrics},
+            })
+            print(f"stdlib-threading-control: {checkpoint}/{checkpoints[-1]} checkpoint")
+            previous = checkpoint
+        final_delta = samples[-1]["delta_from_baseline"]
+        return {
+            "implementation": "python-stdlib-ThreadingHTTPServer",
+            "plasma_imported": False,
+            "baseline": baseline,
+            "checkpoints": samples,
+            "rss_kib_per_request_final": round(final_delta["rss_kib"] / checkpoints[-1], 6),
+        }
+    finally:
+        _terminate(process)
+
+
 def _write_config(work: Path) -> Path:
     work.mkdir(parents=True, exist_ok=True)
     path = work / "ppu.yaml"
@@ -243,6 +327,7 @@ def _inside_mode(args: argparse.Namespace) -> int:
         raise LabError(f"PPU zipapp is missing: {app}")
     manifest = json.loads((runtime / "ppu-runtime.json").read_text())
     catalog = runtime / str((manifest.get("data") or {}).get("device_catalog_manifest"))
+    control = _run_control_experiment(args.control_checkpoints)
     work = Path("/work")
     config = _write_config(work)
     for directory in (work / "output", work / "logs", work / "gateway-output"):
@@ -271,16 +356,28 @@ def _inside_mode(args: argparse.Namespace) -> int:
 
         loopback = _exercise("ps-loopback", args.requests, loop, gateway.pid, server.pid)
         time.sleep(30)
+        gateway_live_per_request = live["gateway_delta"]["rss_kib"] / args.requests
+        control_per_request = control["rss_kib_per_request_final"]
+        ratio = gateway_live_per_request / control_per_request if control_per_request > 0 else None
         result = {
-            "result": "PASS",
+            "functional_result": "PASS",
+            "resource_result": "INVESTIGATE",
+            "overall_result": "INVESTIGATE",
             "evidence_level": "swpc-qemu-armv7-userspace",
             "architecture": platform.machine(),
             "python_version": platform.python_version(),
             "runtime_bytes": sum(path.stat().st_size for path in runtime.rglob("*") if path.is_file()),
             "readiness_ms": round(readiness_ms, 3),
+            "stdlib_threading_control": control,
+            "resource_comparison": {
+                "gateway_health_live_rss_kib_per_request": round(gateway_live_per_request, 6),
+                "control_rss_kib_per_request": control_per_request,
+                "gateway_to_control_ratio": round(ratio, 6) if ratio is not None else None,
+                "interpretation": "compare request-normalized RSS growth; matching slopes support a QEMU/ThreadingHTTPServer environment effect",
+            },
             "paths": {"health_live": live, "health_ready": ready, "ps_loopback": loopback},
             "stable_after_30s": {"gateway": _proc_metrics(gateway.pid), "server": _proc_metrics(server.pid)},
-            "not_claimed": ["PYNQ-Z2 hardware", "systemd boot/reboot", "PS-to-PL", "Site I/O", "target power", "real IC programming"],
+            "not_claimed": ["PYNQ-Z2 hardware", "systemd boot/reboot", "PS-to-PL", "Site I/O", "target power", "real IC programming", "native Z2 memory stability"],
         }
         print(RESULT_MARKER + json.dumps(result, sort_keys=True), flush=True)
         return 0
@@ -292,13 +389,22 @@ def _inside_mode(args: argparse.Namespace) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Plasma PPU ARMv7 runtime lab")
     parser.add_argument("--inside", action="store_true")
+    parser.add_argument("--control-server", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--runtime-dir", type=Path, default=DEFAULT_RUNTIME_REL)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT_REL)
     parser.add_argument("--requests", type=int, default=DEFAULT_REQUESTS)
+    parser.add_argument(
+        "--control-checkpoints",
+        type=_parse_checkpoints,
+        default=DEFAULT_CONTROL_CHECKPOINTS,
+        help="cumulative pure-stdlib ThreadingHTTPServer request checkpoints (default: 1000,5000,10000)",
+    )
     args = parser.parse_args(argv)
     if args.requests < 1:
         parser.error("--requests must be >= 1")
     try:
+        if args.control_server:
+            return _control_server_mode()
         return _inside_mode(args) if args.inside else _host_mode(args)
     except (LabError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
         print(f"ppu-armv7-runtime-lab: {exc}", file=sys.stderr)
