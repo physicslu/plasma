@@ -1,0 +1,404 @@
+.ppuSiteConfiguration {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  color: var(--text);
+}
+
+.ppuSiteHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 2px 6px;
+}
+
+.ppuSiteHeader small {
+  color: var(--cyan);
+  font: 700 9px var(--font-mono);
+  letter-spacing: .14em;
+}
+
+.ppuSiteHeader h2 {
+  margin: 5px 0 4px;
+  font-size: 22px;
+  letter-spacing: -.02em;
+}
+
+.ppuSiteHeader p {
+  margin: 0;
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.ppuSiteManagerState {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--green) 45%, var(--line));
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: color-mix(in srgb, var(--green) 8%, var(--panel));
+  color: var(--green);
+  font: 700 10px var(--font-mono);
+}
+
+.ppuSiteManagerState::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ppuSiteLayout {
+  display: grid;
+  grid-template-columns: minmax(320px, .8fr) minmax(520px, 1.45fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ppuSiteColumn {
+  display: grid;
+  gap: 12px;
+}
+
+.ppuSiteCard {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--card-shadow) 60%, transparent);
+  overflow: hidden;
+}
+
+.ppuSiteCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ppuSiteCardHeader h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ppuSiteCardHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.ppuSiteButton {
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel-3);
+  color: var(--text-soft);
+  padding: 7px 10px;
+  font: 700 10px var(--font-sans);
+  cursor: pointer;
+}
+
+.ppuSiteButton:hover {
+  border-color: color-mix(in srgb, var(--cyan) 50%, var(--line));
+  color: var(--cyan);
+}
+
+.ppuSiteButton.primary {
+  border-color: color-mix(in srgb, var(--cyan) 65%, var(--line));
+  background: color-mix(in srgb, var(--cyan) 14%, var(--panel));
+  color: var(--cyan);
+}
+
+.ppuSiteButton.danger {
+  border-color: color-mix(in srgb, var(--red) 45%, var(--line));
+  color: var(--red);
+}
+
+.ppuSiteFilters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 12px 0;
+}
+
+.ppuSiteFilter {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-3);
+  color: var(--muted);
+  padding: 5px 8px;
+  font: 700 9px var(--font-mono);
+}
+
+.ppuSiteFilter[data-tone="online"] { color: var(--green); }
+.ppuSiteFilter[data-tone="pending"] { color: var(--yellow); }
+.ppuSiteFilter[data-tone="error"] { color: var(--red); }
+
+.ppuTableWrap {
+  overflow-x: auto;
+}
+
+.ppuTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.ppuTable th,
+.ppuTable td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ppuTable th {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel-3) 72%, transparent);
+  font: 700 9px var(--font-mono);
+  letter-spacing: .03em;
+}
+
+.ppuTable tbody tr {
+  cursor: pointer;
+}
+
+.ppuTable tbody tr:hover,
+.ppuTable tbody tr.selected {
+  background: color-mix(in srgb, var(--cyan) 7%, var(--panel-2));
+}
+
+.ppuTable tbody tr.selected {
+  box-shadow: inset 2px 0 0 var(--cyan);
+}
+
+.ppuIdLink {
+  color: var(--cyan);
+  font-weight: 750;
+}
+
+.ppuSiteStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--panel-3);
+  color: var(--muted);
+  font: 700 9px var(--font-mono);
+}
+
+.ppuSiteStatus::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ppuSiteStatus.online,
+.ppuSiteStatus.ready { color: var(--green); }
+.ppuSiteStatus.pending { color: var(--yellow); }
+.ppuSiteStatus.offline,
+.ppuSiteStatus.disabled { color: var(--muted); }
+.ppuSiteStatus.error { color: var(--red); }
+.ppuSiteStatus.running { color: var(--cyan); }
+
+.ppuDiscoveredBody {
+  padding: 12px;
+}
+
+.ppuDiscoveredItem {
+  border: 1px solid color-mix(in srgb, var(--cyan) 28%, var(--line));
+  border-radius: 8px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--cyan) 4%, var(--panel-3));
+}
+
+.ppuDiscoveredTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ppuDiscoveredTop strong {
+  font-size: 13px;
+}
+
+.ppuNewBadge {
+  margin-left: 7px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: color-mix(in srgb, var(--cyan) 16%, var(--panel));
+  color: var(--cyan);
+  font: 700 9px var(--font-mono);
+}
+
+.ppuMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-top: 12px;
+}
+
+.ppuMetaGrid span,
+.ppuInfoGrid dt {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font: 700 8px var(--font-mono);
+  letter-spacing: .03em;
+}
+
+.ppuMetaGrid strong,
+.ppuInfoGrid dd {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.ppuInfoBody {
+  padding: 14px;
+}
+
+.ppuInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin: 0;
+}
+
+.ppuInfoGrid div.wide {
+  grid-column: span 2;
+}
+
+.ppuEditable {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel-3);
+  color: var(--text);
+  padding: 7px 8px;
+  font: 650 10px var(--font-sans);
+}
+
+.ppuCapabilityList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ppuCapabilityTag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--panel-3);
+  color: var(--text-soft);
+  font: 700 8px var(--font-mono);
+}
+
+.ppuSiteSummary {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 12px 12px 0;
+}
+
+.ppuSiteSummary span {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: var(--panel-3);
+  color: var(--muted);
+  font: 700 9px var(--font-mono);
+}
+
+.ppuSiteSummary strong {
+  margin-left: 6px;
+  color: var(--text);
+}
+
+.ppuSiteToggle {
+  appearance: none;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-3);
+  position: relative;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.ppuSiteToggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform .16s ease, background .16s ease;
+}
+
+.ppuSiteToggle:checked {
+  border-color: color-mix(in srgb, var(--green) 60%, var(--line));
+  background: color-mix(in srgb, var(--green) 20%, var(--panel));
+}
+
+.ppuSiteToggle:checked::after {
+  transform: translateX(13px);
+  background: var(--green);
+}
+
+.ppuSiteNote {
+  margin: 10px 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 32%, var(--line));
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--cyan) 5%, var(--panel));
+  color: var(--text-soft);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.ppuSiteNote strong {
+  color: var(--cyan);
+}
+
+@media (max-width: 1180px) {
+  .ppuSiteLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuInfoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .ppuSiteHeader {
+    flex-direction: column;
+  }
+
+  .ppuMetaGrid,
+  .ppuInfoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuInfoGrid div.wide {
+    grid-column: span 1;
+  }
+}
