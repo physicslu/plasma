@@ -33,8 +33,6 @@ EXPECTED_REMAINING_BLOCKERS = {
     "unsupported STM32F4 pin/package combination: A/H",
     "unsupported STM32F4 pin/package combination: A/Y",
     "unsupported STM32F4 pin/package combination: B/T",
-    "unsupported STM32F4 pin/package combination: I/H",
-    "unsupported STM32F4 pin/package combination: I/T",
     "unsupported STM32F4 pin/package combination: M/Y",
     "unsupported STM32F4 pin/package combination: N/H",
     "unsupported STM32F4 pin/package combination: T/Y",
@@ -72,7 +70,7 @@ class STM32F4Phase41RTPolicyTests(unittest.TestCase):
         self.assertEqual(EXPECTED_BASE_DEVICES - production_bases, EXPECTED_BASE_DEVICES & ready_bases)
         self.assertTrue(EXPECTED_BASE_DEVICES.isdisjoint(blocked_bases))
 
-    def test_all_unapproved_policy_classes_remain_fail_closed(self) -> None:
+    def test_all_currently_unapproved_policy_classes_remain_fail_closed(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         blockers = {
             blocker

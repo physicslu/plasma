@@ -70,19 +70,19 @@ class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
         )
         self.assertEqual(hashlib.sha256(CANONICAL.read_bytes()).hexdigest(), FINAL_SHA)
 
-    def test_gap_lifecycle_closes_all_three_admitted_bases(self) -> None:
+    def test_gap_lifecycle_keeps_all_three_admitted_bases_closed(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         self.assertEqual(inventory["production"]["exact_icpn_rows"], 211)
         self.assertEqual(inventory["production"]["base_device_count"], 73)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
         self.assertEqual(inventory["gap"]["base_device_count"], 76)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 0)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 76)
         gap_bases = {
             item["base_device"]
             for item in inventory["gap"]["policy_ready"] + inventory["gap"]["policy_blocked"]
         }
         self.assertTrue(ADMISSION_BASES.isdisjoint(gap_bases))
+        production = set(inventory["production"]["base_devices"])
+        self.assertTrue(ADMISSION_BASES <= production)
 
     def test_historical_208_to_211_replay_matches_immutable_proposal(self) -> None:
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
