@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import shutil
 import sys
 import tempfile
 import unittest
@@ -54,7 +53,7 @@ class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
         self.assertEqual(row["pin_count"], "64")
         self.assertEqual(row["flash_size"], "1024 KiB")
         self.assertEqual(row["option_suffix"], "PTR")
-        self.assertEqual(row["target_config"], "tcl/target/stm32f4x.cfg")
+        self.assertEqual(row["openocd_target_config"], "tcl/target/stm32f4x.cfg")
         self.assertEqual(hashlib.sha256(CANONICAL.read_bytes()).hexdigest(), FINAL_SHA)
 
     def test_gap_lifecycle_closes_only_admitted_bases(self) -> None:
