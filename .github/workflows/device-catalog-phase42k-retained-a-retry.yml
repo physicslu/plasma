@@ -1,0 +1,105 @@
+name: Device catalog Phase 4.2K retained cohort A retry
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2k-i176-admission
+    paths:
+      - '.github/workflows/device-catalog-phase42k-retained-a-retry.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  retain-a:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser runtime
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Fresh headed Chromium acquisition
+        run: |
+          set +e
+          out=/tmp/phase42k-retained-a
+          mkdir -p "$out"
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
+            --manifest data/device-catalog/research/stm32f4-phase4.2k-i176-cohort-a-manifest.json \
+            --catalog data/device-catalog/research/openocd-parts-canonical.csv \
+            --output "$out/pilot-summary.json" \
+            --scope pilot --headed --timeout 30 --delay 2 \
+            > "$out/acquisition.stdout" 2> "$out/acquisition.stderr"
+          rc=$?
+          printf '%s\n' "$rc" > "$out/acquisition-exit-code.txt"
+          cat "$out/acquisition.stdout" || true
+          cat "$out/acquisition.stderr" >&2 || true
+          exit 0
+      - name: Evaluate cohort against frozen baseline subset
+        if: always()
+        run: |
+          set +e
+          out=/tmp/phase42k-retained-a
+          python - <<'PY' > "$out/evaluation.stdout" 2> "$out/evaluation.stderr"
+          import json
+          from pathlib import Path
+          out=Path('/tmp/phase42k-retained-a')
+          rc=int((out/'acquisition-exit-code.txt').read_text().strip())
+          baseline=json.loads(Path('data/device-catalog/research/stm32f4-phase4.2k-i176-admission-baseline.json').read_text())
+          manifest=json.loads(Path('data/device-catalog/research/stm32f4-phase4.2k-i176-cohort-a-manifest.json').read_text())
+          expected_bases={x['base_device'] for x in manifest['targets'] if x['base_device']!='STM32F479ZG'}
+          expected={x['base_device']:sorted(x['exact_icpns']) for x in baseline['targets'] if x['base_device'] in expected_bases}
+          expected_na={}
+          for row in baseline.get('excluded_non_active_observations',[]):
+              if row['base_device'] in expected_bases:
+                  expected_na.setdefault(row['base_device'],[]).append({'icpn':row['icpn'],'marketing_status':row['marketing_status']})
+          for values in expected_na.values(): values.sort(key=lambda x:(x['icpn'],x['marketing_status']))
+          issues=[]; observed={}; observed_na={}; control_ok=False
+          if rc!=0: issues.append(f'acquisition process exit code {rc}')
+          p=out/'pilot-summary.json'
+          if not p.exists(): issues.append('pilot-summary.json missing'); summary={}
+          else:
+              summary=json.loads(p.read_text()); results=summary.get('results',[])
+              if summary.get('acquisition_failure')!=0: issues.append(f"summary acquisition_failure={summary.get('acquisition_failure')}")
+              by={r.get('base_device'):r for r in results if isinstance(r,dict)}
+              ctrl=by.get('STM32F479ZG')
+              if isinstance(ctrl,dict) and isinstance(ctrl.get('evidence'),dict):
+                  cev=ctrl['evidence']; control_ok=(sorted(cev.get('exact_icpns',[]))==baseline['control']['semantic_evidence']['exact_icpns'] and sorted(cev.get('excluded_non_active_part_numbers',[]),key=lambda x:(x.get('icpn',''),x.get('marketing_status','')))==baseline['control']['semantic_evidence']['excluded_non_active_part_numbers'] and ctrl.get('canonical_mapping')==baseline['control']['semantic_evidence']['canonical_mapping'])
+              if not control_ok: issues.append('control lifecycle/mapping drift or missing')
+              for base in expected_bases:
+                  r=by.get(base)
+                  if not isinstance(r,dict) or not isinstance(r.get('evidence'),dict): issues.append(f'{base}: result/evidence missing'); continue
+                  ev=r['evidence']; observed[base]=sorted(ev.get('exact_icpns',[])); observed_na[base]=sorted(ev.get('excluded_non_active_part_numbers',[]),key=lambda x:(x.get('icpn',''),x.get('marketing_status','')))
+                  if r.get('canonical_mapping',{}).get('status')!='unique' or r.get('canonical_mapping',{}).get('target_configs')!=['tcl/target/stm32f4x.cfg']: issues.append(f'{base}: mapping not uniquely stm32f4x.cfg')
+                  if observed[base]!=expected[base]: issues.append(f'{base}: Active exact ICPN drift')
+                  if observed_na[base]!=expected_na.get(base,[]): issues.append(f'{base}: lifecycle drift')
+          evaluation={'schema_version':1,'phase':'4.2K','cohort':'a','candidate_baseline_match':not issues,'control_match':control_ok,'expected_candidate_bases':sorted(expected_bases),'expected_exact_icpn_candidates':sum(len(v) for v in expected.values()),'observed_exact_icpn_candidates':sum(len(v) for v in observed.values()),'issues':issues,'scale_ready':not issues,'canonical_dataset_admission':False}
+          (out/'cohort-evaluation.json').write_text(json.dumps(evaluation,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(evaluation,indent=2,sort_keys=True)); raise SystemExit(0 if not issues else 1)
+          PY
+          rc=$?
+          cat "$out/evaluation.stdout" || true
+          cat "$out/evaluation.stderr" >&2 || true
+          printf '%s\n' "$rc" > "$out/evaluation-exit-code.txt"
+          exit 0
+      - name: Hash retained cohort evidence
+        if: always()
+        run: |
+          cd /tmp/phase42k-retained-a
+          sha256sum * > SHA256SUMS || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase42k-stm32f4-i176-retained-a-retry
+          path: /tmp/phase42k-retained-a
+          if-no-files-found: error
+          retention-days: 30
+      - name: Enforce cohort retained gate
+        if: always()
+        run: |
+          test "$(cat /tmp/phase42k-retained-a/acquisition-exit-code.txt)" = 0
+          test "$(cat /tmp/phase42k-retained-a/evaluation-exit-code.txt)" = 0
