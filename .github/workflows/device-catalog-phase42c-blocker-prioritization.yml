@@ -1,0 +1,82 @@
+name: Device catalog Phase 4.2C blocker prioritization
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-current-blockers:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/device-catalog-phase4.2c-blocker-prioritization'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build current blocker portfolio
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase42c
+          python data/device-catalog/research/stm32f4_coverage_gap_inventory.py --output /tmp/phase42c/inventory.json
+          python - <<'PY'
+          import json
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          inv = json.loads(Path('/tmp/phase42c/inventory.json').read_text())
+          assert inv['production']['exact_icpn_rows'] == 199
+          assert inv['production']['base_device_count'] == 68
+          assert inv['openocd_ordering_pattern_base_device_count'] == 149
+          assert inv['gap']['base_device_count'] == 81
+          assert inv['gap']['policy_ready_count'] == 0
+          assert inv['gap']['policy_blocked_count'] == 81
+
+          blocker_counts = Counter()
+          blocker_bases = defaultdict(list)
+          signature_counts = Counter()
+          signature_bases = defaultdict(list)
+          for item in inv['gap']['policy_blocked']:
+              base = item['base_device']
+              blockers = tuple(item['policy_blockers'])
+              signature = ' | '.join(blockers)
+              signature_counts[signature] += 1
+              signature_bases[signature].append(base)
+              for blocker in blockers:
+                  blocker_counts[blocker] += 1
+                  blocker_bases[blocker].append(base)
+
+          summary = {
+              'schema_version': 1,
+              'phase': '4.2C',
+              'production_exact_icpn_rows': inv['production']['exact_icpn_rows'],
+              'production_base_device_count': inv['production']['base_device_count'],
+              'openocd_ordering_pattern_base_device_count': inv['openocd_ordering_pattern_base_device_count'],
+              'gap_base_device_count': inv['gap']['base_device_count'],
+              'policy_ready_count': inv['gap']['policy_ready_count'],
+              'policy_blocked_count': inv['gap']['policy_blocked_count'],
+              'blockers': [
+                  {'blocker': k, 'count': blocker_counts[k], 'base_devices': sorted(blocker_bases[k])}
+                  for k in sorted(blocker_counts, key=lambda x: (blocker_counts[x], x))
+              ],
+              'blocker_signatures': [
+                  {'signature': k, 'count': signature_counts[k], 'base_devices': sorted(signature_bases[k])}
+                  for k in sorted(signature_counts, key=lambda x: (signature_counts[x], x))
+              ],
+              'algorithm_equivalence_claimed': False,
+              'production_write_applied': False,
+              'policy_change_applied': False,
+          }
+          Path('/tmp/phase42c/summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+      - name: Upload blocker portfolio
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase42c-stm32f4-blocker-portfolio
+          path: /tmp/phase42c
+          if-no-files-found: error
+          retention-days: 30
