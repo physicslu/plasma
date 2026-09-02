@@ -1,9 +1,9 @@
 /*
  * Shared presentation primitives for configuration and diagnostic operator surfaces.
  *
- * Loopback diagnostics and Settings keep their own workflow/layout composition, but
- * common cards, fields and actions must consume one visual owner here instead of
- * re-declaring near-identical local scales.
+ * Loopback diagnostics, Settings and PPU/Site management keep their own workflow/layout
+ * composition, but common page headers, cards, fields and actions must consume one visual
+ * owner here instead of re-declaring near-identical local scales.
  */
 
 .settingsCard,
@@ -111,4 +111,124 @@
 .settingsActions button[data-variant="primary"]:not(:disabled):hover,
 .loopbackExecutionActions button.primary:not(:disabled):hover {
   color: #fff;
+}
+
+/* PPU / Site management consumes the same canonical scale without re-owning it locally. */
+.ppuSiteCard {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 10px 30px var(--card-shadow);
+}
+
+.ppuSiteCardHeader h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ppuSiteHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 2px 2px 4px;
+}
+
+.ppuSiteHeader small {
+  display: block;
+  margin: 0 0 7px;
+  color: var(--muted);
+  font: 700 10px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.ppuSiteHeader h2 {
+  margin: 0;
+  font-size: clamp(24px, 2.2vw, 30px);
+  letter-spacing: -.03em;
+}
+
+.ppuSiteHeader p {
+  display: block;
+  margin: 7px 0 0;
+  max-width: 880px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ppuRegistryAddForm label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ppuRegistryAddForm label > span {
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.ppuRegistryAddForm input {
+  width: 100%;
+  min-height: 36px;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 7px 10px;
+  font: 11px var(--font-mono);
+}
+
+.ppuRegistryAddForm input:disabled {
+  opacity: .52;
+  cursor: not-allowed;
+}
+
+.ppuSiteButton {
+  min-height: 38px;
+  box-sizing: border-box;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text-soft);
+  padding: 8px 12px;
+  font: 700 11px/1.2 var(--font-sans);
+  cursor: pointer;
+}
+
+.ppuSiteButton.primary {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  color: #fff;
+}
+
+.ppuSiteButton.danger {
+  border-color: color-mix(in srgb, var(--red) 60%, var(--line));
+  background: var(--panel-2);
+  color: var(--red);
+}
+
+.ppuSiteButton:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.ppuSiteButton:not(:disabled):hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.ppuSiteButton.primary:not(:disabled):hover {
+  color: #fff;
+}
+
+.ppuSiteButton.danger:not(:disabled):hover {
+  border-color: var(--red);
+  color: var(--red);
 }

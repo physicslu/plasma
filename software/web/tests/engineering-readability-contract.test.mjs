@@ -7,6 +7,8 @@ const refreshPath = new URL("../app/engineering/engineering-workspace-refresh.cs
 const sharedControlsPath = new URL("../app/operator-ui/programming-job-controls.css", import.meta.url);
 const designContractPath = new URL("../app/operator-ui/operator-design-contract.css", import.meta.url);
 const panelCssPath = new URL("../app/operator-ui/operator-panel.css", import.meta.url);
+const operatorSurfacePrimitivesPath = new URL("../app/operator-ui/operator-surface-primitives.css", import.meta.url);
+const ppuSiteCssPath = new URL("../app/engineering/ppu-site-configuration.css", import.meta.url);
 const pagePath = new URL("../app/engineering/page.tsx", import.meta.url);
 
 async function source(url) {
@@ -104,4 +106,31 @@ test("Engineering readability layer is typography-only and loads after layout CS
   const refresh = page.indexOf('import "./engineering-workspace-refresh.css";');
   const readability = page.indexOf('import "./engineering-readability.css";');
   assert.ok(refresh >= 0 && readability > refresh, "readability CSS must load after the approved Engineering layout CSS");
+});
+
+test("PPU Site management consumes canonical Settings/Loopback operator primitives and stays single-column", async () => {
+  const [ppuCss, primitives] = await Promise.all([
+    source(ppuSiteCssPath),
+    source(operatorSurfacePrimitivesPath),
+  ]);
+
+  assert.match(
+    ppuCss,
+    /^@import "\.\.\/operator-ui\/operator-surface-primitives\.css";/m,
+    "PPU/Site management must consume the canonical Settings/Loopback operator surface owner",
+  );
+
+  assert.match(primitives, /^\.ppuSiteCard\s*\{[\s\S]*border-radius:\s*10px[\s\S]*box-shadow:/m);
+  assert.match(primitives, /^\.ppuSiteButton\s*\{[\s\S]*min-height:\s*38px[\s\S]*font:\s*700 11px\/1\.2 var\(--font-sans\)/m);
+  assert.match(primitives, /^\.ppuRegistryAddForm input\s*\{[\s\S]*min-height:\s*36px[\s\S]*font:\s*11px var\(--font-mono\)/m);
+
+  assert.doesNotMatch(ppuCss, /^\.ppuSiteCard\s*\{/m, "PPU cards must not redeclare the shared card primitive");
+  assert.doesNotMatch(ppuCss, /^\.ppuSiteButton\s*\{/m, "PPU actions must not redeclare the shared action primitive");
+  assert.doesNotMatch(ppuCss, /^\.ppuRegistryAddForm input\s*\{/m, "PPU fields must not redeclare the shared input primitive");
+
+  assert.match(ppuCss, /\.ppuSiteLayout\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(ppuCss, /\.ppuSiteColumn\s*\{[\s\S]*display:\s*contents/);
+  assert.match(ppuCss, /first-child > \.ppuSiteCard:first-child \{ order: 1; \}/);
+  assert.match(ppuCss, /nth-child\(2\) > \.ppuSiteCard:first-child \{ order: 2; \}/);
+  assert.match(ppuCss, /nth-child\(2\) > \.ppuSiteCard:nth-child\(2\) \{ order: 3; \}/);
 });
