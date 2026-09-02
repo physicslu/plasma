@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "workflow_run_id": "33592306507",
+  "artifact_id": "9832182808",
+  "artifact_name": "phase42f-stm32f4-f412re-rg-retained",
+  "artifact_sha256": "b21c32e754c7b81bd4f2150c53e88a80ba265ca148df5bf2a7a87f3adda796c7",
+  "source_discovery_run_id": "33589566576",
+  "source_discovery_artifact_id": "9831285375",
+  "source_discovery_artifact_sha256": "0b2a245cca793ecc42fb90293ff18744d21ea3ef68ad1cf4be39c26fc5a712da"
+}
