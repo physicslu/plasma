@@ -8,7 +8,7 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from plasma_manager.config import ManagerConfig, PPURegistryEntry
+from plasma_manager.config import ManagerConfig, ManagerConfigError, PPURegistryEntry, load_manager_config
 from plasma_manager.fleet import FleetAggregator
 from plasma_manager.registry import (
     REGISTRY_LIFECYCLE_COMMISSIONED,
@@ -55,12 +55,44 @@ class RuntimeRegistryStoreTests(unittest.TestCase):
 
             restored = PPURegistryStore(seed, state_path)
             self.assertEqual([record.alias for record in restored.records()], ["ppu-a", "ppu-b"])
-            self.assertEqual(restored.record_by_alias("ppu-b").lifecycle, REGISTRY_LIFECYCLE_COMMISSIONED)
+            restored_b = restored.record_by_alias("ppu-b")
+            self.assertIsNotNone(restored_b)
+            assert restored_b is not None
+            self.assertEqual(restored_b.lifecycle, REGISTRY_LIFECYCLE_COMMISSIONED)
 
             removed = restored.remove("ppu-b")
             self.assertEqual(removed.alias, "ppu-b")
             restored_again = PPURegistryStore(seed, state_path)
             self.assertEqual([record.alias for record in restored_again.records()], ["ppu-a"])
+
+    def test_manager_config_accepts_absolute_registry_state_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_path = root / "runtime-registry.json"
+            config_path = root / "manager.yaml"
+            config_path.write_text(
+                "\n".join(
+                    [
+                        "manager:",
+                        f"  registry_state_path: {state_path}",
+                        "ppus: []",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            config = load_manager_config(config_path)
+            self.assertEqual(config.registry_state_path, state_path)
+
+    def test_manager_config_rejects_relative_registry_state_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config_path = Path(temporary) / "manager.yaml"
+            config_path.write_text(
+                "manager:\n  registry_state_path: relative-registry.json\nppus: []\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(ManagerConfigError):
+                load_manager_config(config_path)
 
 
 class RuntimeRegistryHTTPTests(unittest.TestCase):
@@ -92,9 +124,10 @@ class RuntimeRegistryHTTPTests(unittest.TestCase):
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaManagerHandler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
+        # Cleanups run LIFO: shutdown -> join -> close -> restore handler -> temp dir.
         cls.addClassCleanup(cls.server.server_close)
-        cls.addClassCleanup(cls.server.shutdown)
         cls.addClassCleanup(cls.thread.join, 2.0)
+        cls.addClassCleanup(cls.server.shutdown)
 
     @classmethod
     def _restore_handler_state(cls):
