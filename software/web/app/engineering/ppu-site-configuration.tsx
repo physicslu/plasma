@@ -190,7 +190,7 @@ export default function PpuSiteConfiguration() {
     });
   }
 
-  function commissionSelected() {
+  function validateAndEnableSelected() {
     if (!selectedPpu?.identityVerified) return;
     updateSelectedPpu({ status: "Online" });
   }
@@ -268,7 +268,7 @@ export default function PpuSiteConfiguration() {
         <div>
           <small>PPU / SITE MANAGEMENT</small>
           <h2>PPU / Site Configuration</h2>
-          <p>Add or remove PPU registry entries, commission validated PPUs, and control which reported physical Sites are admitted for use.</p>
+          <p>Add or remove PPU registry entries, validate and enable verified PPUs, and control which reported physical Sites are admitted for use.</p>
         </div>
         <span className="ppuSiteManagerState">Manager Online</span>
       </header>
@@ -366,7 +366,7 @@ export default function PpuSiteConfiguration() {
                     <div><span>Gateway Endpoint</span><strong>{discovered.gateway}</strong></div>
                     <div><span>Reported Sites</span><strong>{discovered.siteCount}</strong></div>
                   </div>
-                  <p className="ppuSiteNote"><strong>Admission gate:</strong> adding the PPU creates a Pending registry entry. Commissioning remains a separate explicit step before PMode can use it.</p>
+                  <p className="ppuSiteNote"><strong>Admission gate:</strong> adding the PPU creates a Pending registry entry. Validate &amp; Enable remains a separate explicit step before PMode can use it.</p>
                 </article>
               ) : (
                 <p className="ppuSiteNote">No unregistered PPU is currently waiting for review.</p>
@@ -386,7 +386,7 @@ export default function PpuSiteConfiguration() {
                   </div>
                   <div className="ppuSiteCardHeaderActions">
                     {selectedPpu.status === "Pending" && (
-                      <button className="ppuSiteButton primary" type="button" disabled={!selectedPpu.identityVerified} onClick={commissionSelected}>Commission</button>
+                      <button className="ppuSiteButton primary" type="button" disabled={!selectedPpu.identityVerified} onClick={validateAndEnableSelected}>Validate &amp; Enable</button>
                     )}
                     <button
                       className="ppuSiteButton"
@@ -521,7 +521,7 @@ export default function PpuSiteConfiguration() {
           ) : (
             <section className="ppuSiteCard ppuEmptyRegistry" aria-label="Empty PPU registry">
               <h3>No registered PPU</h3>
-              <p>Add a discovered PPU or register a Gateway endpoint to start commissioning.</p>
+              <p>Add a discovered PPU or register a Gateway endpoint to start validation and enablement.</p>
             </section>
           )}
         </div>
