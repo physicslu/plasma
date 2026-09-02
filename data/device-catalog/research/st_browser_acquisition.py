@@ -11,14 +11,17 @@ existing fail-closed evidence parser without mislabeling rendered DOM as raw HTT
 from __future__ import annotations
 
 import hashlib
+import time
 from typing import Any
 
 from st_product_page_acquisition import (
     AcquisitionError,
     MAX_RESPONSE_BYTES,
     PARSER_VERSION,
+    QualitySectionParser,
     SCHEMA_VERSION,
     extract_part_number_records,
+    normalize_text,
     validate_source_url,
 )
 
@@ -29,12 +32,15 @@ CHALLENGE_MARKERS = (
     "request rejected",
 )
 QUALITY_HEADING = "Quality and Reliability"
+MARKETING_STATUS_LABEL = "Marketing Status"
+PART_NUMBER_LABEL = "Part Number"
 BROWSER_TRANSPORT = "chromium_rendered_dom"
 # ST's CDN has produced deterministic net::ERR_HTTP2_PROTOCOL_ERROR failures on
 # GitHub-hosted Chromium runners. Forcing HTTP/1.1 changes transport negotiation
 # only; it does not alter request headers, evidence scope, or parser semantics.
 CHROMIUM_LAUNCH_ARGS = ["--disable-http2"]
 DEFAULT_NAVIGATION_ATTEMPTS = 2
+EVIDENCE_READINESS_POLL_SECONDS = 0.25
 
 
 def build_browser_evidence_record(
@@ -152,9 +158,56 @@ class STBrowserAcquirer:
         self._context = None
         self._browser = None
 
-    def _fresh_browser_after_navigation_failure(self) -> None:
-        self._close_browser_context()
-        self._launch_browser()
+    @staticmethod
+    def _retryable_failure_message(stage: str, *, timed_out: bool) -> str:
+        if stage == "navigation":
+            return "browser acquisition timed out" if timed_out else "browser acquisition failed"
+        if stage == "evidence readiness":
+            return (
+                "browser evidence readiness timed out"
+                if timed_out
+                else "browser evidence readiness failed"
+            )
+        return (
+            "browser evidence extraction timed out"
+            if timed_out
+            else "browser evidence extraction failed"
+        )
+
+    @staticmethod
+    def _quality_surface_ready(html_text: str) -> bool:
+        """Return true only when the parser's own Q&R evidence surface is present."""
+        parser = QualitySectionParser()
+        parser.feed(html_text)
+        parser.close()
+        if not parser.quality_seen:
+            return False
+        section_text = normalize_text(" ".join(parser.section_parts))
+        return PART_NUMBER_LABEL in section_text and MARKETING_STATUS_LABEL in section_text
+
+    @classmethod
+    def _wait_for_evidence_surface(
+        cls,
+        page: Any,
+        *,
+        timeout_seconds: float,
+        timeout_ms: int,
+    ) -> bool:
+        # The H2 attachment remains a cheap initial DOM signal. The actual ready
+        # condition is deliberately defined by the same H2-scoped parser used by
+        # evidence extraction, so Quick View / Sample & Buy duplicate labels cannot
+        # make an incomplete Quality and Reliability section look ready.
+        deadline = time.monotonic() + timeout_seconds
+        page.get_by_text(QUALITY_HEADING, exact=True).wait_for(
+            state="attached", timeout=timeout_ms
+        )
+        while True:
+            if cls._quality_surface_ready(page.content()):
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(EVIDENCE_READINESS_POLL_SECONDS, remaining))
 
     def fetch(self, source_url: str, timeout_seconds: float) -> tuple[bytes, str, None, None]:
         validate_source_url(source_url)
@@ -164,68 +217,63 @@ class STBrowserAcquirer:
             self._launch_browser()
 
         timeout_ms = int(timeout_seconds * 1000)
-        page: Any = None
-        response: Any = None
-        final_url = source_url
         attempts = self.navigation_attempts if self._rotate_browser_after_fetch else 1
 
         for attempt in range(1, attempts + 1):
-            page = self._context.new_page()
+            if self._context is None:
+                self._launch_browser()
+            page: Any = self._context.new_page()
+            stage = "navigation"
             try:
                 response = page.goto(source_url, wait_until="domcontentloaded", timeout=timeout_ms)
                 final_url = page.url
-                break
+                validate_source_url(final_url)
+                if response is not None and response.status >= 400:
+                    raise AcquisitionError(f"browser navigation returned HTTP {response.status}")
+
+                stage = "evidence extraction"
+                body_text = page.locator("body").inner_text(timeout=timeout_ms)
+                folded = body_text.casefold()
+                for marker in CHALLENGE_MARKERS:
+                    if marker in folded:
+                        raise AcquisitionError(
+                            f"browser acquisition encountered challenge marker: {marker}"
+                        )
+
+                stage = "evidence readiness"
+                if not self._wait_for_evidence_surface(
+                    page,
+                    timeout_seconds=timeout_seconds,
+                    timeout_ms=timeout_ms,
+                ):
+                    if attempt >= attempts:
+                        raise AcquisitionError(
+                            "browser evidence readiness timed out: "
+                            "Quality and Reliability Part Number / Marketing Status surface incomplete"
+                        )
+                    continue
+
+                stage = "evidence extraction"
+                html_text = page.content()
+                body = html_text.encode("utf-8")
+                if len(body) > MAX_RESPONSE_BYTES:
+                    raise AcquisitionError(f"rendered page exceeds {MAX_RESPONSE_BYTES} bytes")
+                return body, final_url, None, None
             except self._timeout_error as exc:
-                page.close()
-                page = None
                 if attempt >= attempts:
-                    raise AcquisitionError(f"browser acquisition timed out: {exc}") from exc
-                self._fresh_browser_after_navigation_failure()
+                    message = self._retryable_failure_message(stage, timed_out=True)
+                    raise AcquisitionError(f"{message}: {exc}") from exc
             except self._playwright_error as exc:
-                page.close()
-                page = None
                 if attempt >= attempts:
-                    raise AcquisitionError(f"browser acquisition failed: {exc}") from exc
-                self._fresh_browser_after_navigation_failure()
+                    message = self._retryable_failure_message(stage, timed_out=False)
+                    raise AcquisitionError(f"{message}: {exc}") from exc
+            finally:
+                page.close()
+                # Real browser-backed acquisition uses a fresh Chromium process
+                # for every bounded target and every retry. This avoids carrying
+                # a half-rendered ST page or transport connection into the next
+                # evidence attempt without changing headers or parser semantics.
+                if self._rotate_browser_after_fetch:
+                    self._close_browser_context()
 
-        if page is None:
-            raise AcquisitionError("browser acquisition navigation produced no page")
-
-        try:
-            validate_source_url(final_url)
-            if response is not None and response.status >= 400:
-                raise AcquisitionError(f"browser navigation returned HTTP {response.status}")
-
-            # ST currently renders several responsive copies of this evidence
-            # section, with the matching heading nodes attached but hidden until
-            # their layout/tab is activated. Attachment is the stable rendered-DOM
-            # readiness signal; the scoped evidence parser still fails closed if the
-            # exact section, Marketing Status, or Active commercial part numbers are absent.
-            page.get_by_text(QUALITY_HEADING, exact=True).wait_for(
-                state="attached", timeout=timeout_ms
-            )
-            body_text = page.locator("body").inner_text(timeout=timeout_ms)
-            folded = body_text.casefold()
-            for marker in CHALLENGE_MARKERS:
-                if marker in folded:
-                    raise AcquisitionError(
-                        f"browser acquisition encountered challenge marker: {marker}"
-                    )
-
-            html_text = page.content()
-            body = html_text.encode("utf-8")
-            if len(body) > MAX_RESPONSE_BYTES:
-                raise AcquisitionError(f"rendered page exceeds {MAX_RESPONSE_BYTES} bytes")
-            return body, final_url, None, None
-        except self._timeout_error as exc:
-            raise AcquisitionError(f"browser evidence readiness timed out: {exc}") from exc
-        except self._playwright_error as exc:
-            raise AcquisitionError(f"browser evidence extraction failed: {exc}") from exc
-        finally:
-            page.close()
-            # A fresh, clean browser process per bounded target avoids transport
-            # connection reuse without changing headers, profiles, timeouts, or
-            # evidence semantics. Navigation retries above also force a fresh
-            # process, but only for transport-level Page.goto failures.
-            if self._rotate_browser_after_fetch:
-                self._close_browser_context()
+        raise AcquisitionError("browser acquisition exhausted retryable attempts")

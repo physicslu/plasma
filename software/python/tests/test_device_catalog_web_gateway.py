@@ -10,7 +10,7 @@ from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 250
+EXPECTED_PRODUCTION_CATALOG_SIZE = 261
 
 
 class DeviceCatalogWebGatewayTests(unittest.TestCase):
@@ -219,6 +219,16 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(payload["count"], 1)
         result = payload["results"][0]
         self.assertEqual(result["icpn"], "STM32F405RGT7TR")
+        self.assertEqual(result["family"], "STM32F4")
+        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
+
+    def test_phase41_rt_batch3_icpn_is_exposed_after_admission(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F413RGT6TR&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32F413RGT6TR")
         self.assertEqual(result["family"], "STM32F4")
         self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
 

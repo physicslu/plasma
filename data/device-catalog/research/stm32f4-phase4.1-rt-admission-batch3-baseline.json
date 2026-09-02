@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.1-rt-admission-batch3-2026-09-01",
+  "source_workflow_run_id": "33525270486",
+  "source_artifact_id": "9807426857",
+  "source_artifact_sha256": "fea8b33ce9b520d0b30ec0bda6d27765398a9caab1c20b6e2805ea09a2cc8c4a",
+  "canonical_dataset_admission": false,
+  "candidate_policy": "Only exact commercial part numbers observed on the official ST product page with Marketing Status Active are candidate rows for new admission.",
+  "lifecycle_audit_policy": "Non-Active official ST rows are retained for lifecycle audit and excluded from new admission candidates.",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "role": "lifecycle_control",
+      "marketing_status": "Active",
+      "exact_icpns": ["STM32F479ZGT6"]
+    },
+    {
+      "base_device": "STM32F411RC",
+      "role": "candidate",
+      "marketing_status": "Active",
+      "exact_icpns": ["STM32F411RCT6", "STM32F411RCT6TR", "STM32F411RCT7", "STM32F411RCT7TR"]
+    },
+    {
+      "base_device": "STM32F411RE",
+      "role": "candidate",
+      "marketing_status": "Active",
+      "exact_icpns": ["STM32F411RET6", "STM32F411RET6TR", "STM32F411RET7"]
+    },
+    {
+      "base_device": "STM32F413RG",
+      "role": "candidate",
+      "marketing_status": "Active",
+      "exact_icpns": ["STM32F413RGT6", "STM32F413RGT6TR"]
+    },
+    {
+      "base_device": "STM32F415RG",
+      "role": "candidate",
+      "marketing_status": "Active",
+      "exact_icpns": ["STM32F415RGT6", "STM32F415RGT6TR"]
+    }
+  ],
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F413RG",
+      "icpn": "STM32F413RGT3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ]
+}

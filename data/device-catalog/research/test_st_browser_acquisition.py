@@ -250,7 +250,11 @@ class BrowserAcquisitionTests(unittest.TestCase):
             acquirer_for(page).fetch(TARGET_URL, 5.0)
 
     def test_rendered_dom_size_limit_is_enforced(self) -> None:
-        page = FakePage(html="x" * (MAX_RESPONSE_BYTES + 1))
+        oversized_html = RENDERED_HTML.replace(
+            "</body></html>",
+            "x" * MAX_RESPONSE_BYTES + "</body></html>",
+        )
+        page = FakePage(html=oversized_html)
         with self.assertRaisesRegex(AcquisitionError, "rendered page exceeds"):
             acquirer_for(page).fetch(TARGET_URL, 5.0)
 
