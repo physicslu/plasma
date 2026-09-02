@@ -1,0 +1,243 @@
+name: Device catalog Phase 4.2I apply lifecycle closure
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2i-f405o-f415og-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42i-closure-apply.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  close:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2i-f405o-f415og-admission
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Write permanent Phase 4.2I lifecycle regression
+        run: |
+          cat > data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py <<'PY'
+          #!/usr/bin/env python3
+          from __future__ import annotations
+
+          import csv
+          import hashlib
+          import json
+          import sys
+          import tempfile
+          import unittest
+          from pathlib import Path
+
+          HERE = Path(__file__).resolve().parent
+          if str(HERE) not in sys.path:
+              sys.path.insert(0, str(HERE))
+
+          from device_catalog_admission_framework import write_canonical_dataset
+          from device_catalog_pipeline_framework import pipeline_plan_is_clean
+          from stm32f4_admission import build_admission_plan
+          from stm32f4_coverage_gap_inventory import build_inventory
+          from validate_stm32f4_retained_evidence import validate_retained_evidence
+
+          CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
+          CATALOG = HERE / "openocd-parts-canonical.csv"
+          BASELINE = HERE / "stm32f4-phase4.2i-f405o-f415og-admission-baseline.json"
+          EVIDENCE = HERE / "evidence" / "stm32f4-phase4.2i-f405o-f415og-admission-live-2026-09-02"
+          PRE_SHA = "22419b078f1c6436f0aa6dd3b410791170a1976be59a03a814469acc54690f09"
+          FINAL_SHA = "2b3e7aaf50e855957af2072815fd536ac8e4374f7a4326f035e344f2c1abc19b"
+          PLAN_SHA = "58d5a9c10b82bd13325e04a9931a42a6bf554304b006b797e9cc46b7014c08db"
+          EXPECTED = {"STM32F405OEY6TR", "STM32F405OGY6TR", "STM32F415OGY6TR"}
+          EXCLUDED_NRND = {"STM32F405OGY6VTR", "STM32F405OGY6WTR"}
+          ADMISSION_BASES = {"STM32F405OE", "STM32F405OG", "STM32F415OG"}
+
+
+          class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
+              def _rows(self, path: Path = CANONICAL) -> list[dict[str, str]]:
+                  with path.open(newline="", encoding="utf-8") as handle:
+                      return list(csv.DictReader(handle))
+
+              def test_retained_evidence_remains_scale_ready_and_lifecycle_locked(self) -> None:
+                  report = validate_retained_evidence(EVIDENCE, baseline_path=BASELINE)
+                  self.assertTrue(report["scale_ready"])
+                  self.assertTrue(report["candidate_baseline_match"])
+                  self.assertEqual(report["candidate_drift"], 0)
+                  self.assertEqual(report["targets"], 4)
+                  self.assertEqual(report["exact_icpn_candidates"], 4)
+                  baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+                  excluded = {
+                      (row["icpn"], row["marketing_status"])
+                      for row in baseline["excluded_non_active_observations"]
+                  }
+                  self.assertEqual(excluded, {(icpn, "NRND") for icpn in EXCLUDED_NRND})
+
+              def test_production_contains_only_active_bounded_admission(self) -> None:
+                  rows = self._rows()
+                  self.assertEqual(len(rows), 211)
+                  by_icpn = {row["icpn"]: row for row in rows}
+                  self.assertTrue(EXPECTED <= set(by_icpn))
+                  self.assertTrue(EXCLUDED_NRND.isdisjoint(by_icpn))
+                  oe = by_icpn["STM32F405OEY6TR"]
+                  self.assertEqual((oe["package"], oe["pin_count"], oe["flash_size"]), ("WLCSP", "90", "512 KiB"))
+                  self.assertEqual(oe["openocd_target_config"], "tcl/target/stm32f4x.cfg")
+                  og = by_icpn["STM32F405OGY6TR"]
+                  self.assertEqual((og["package"], og["pin_count"], og["flash_size"]), ("WLCSP", "90", "1024 KiB"))
+                  self.assertEqual(hashlib.sha256(CANONICAL.read_bytes()).hexdigest(), FINAL_SHA)
+
+              def test_gap_lifecycle_closes_all_three_admitted_bases(self) -> None:
+                  inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
+                  self.assertEqual(inventory["production"]["exact_icpn_rows"], 211)
+                  self.assertEqual(inventory["production"]["base_device_count"], 73)
+                  self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
+                  self.assertEqual(inventory["gap"]["base_device_count"], 76)
+                  self.assertEqual(inventory["gap"]["policy_ready_count"], 0)
+                  self.assertEqual(inventory["gap"]["policy_blocked_count"], 76)
+                  gap_bases = {
+                      item["base_device"]
+                      for item in inventory["gap"]["policy_ready"] + inventory["gap"]["policy_blocked"]
+                  }
+                  self.assertTrue(ADMISSION_BASES.isdisjoint(gap_bases))
+
+              def test_historical_208_to_211_replay_matches_immutable_proposal(self) -> None:
+                  with CANONICAL.open(newline="", encoding="utf-8") as handle:
+                      reader = csv.DictReader(handle)
+                      fields = list(reader.fieldnames or [])
+                      rows = [row for row in reader if row["icpn"] not in EXPECTED]
+                  self.assertEqual(len(rows), 208)
+                  with tempfile.TemporaryDirectory() as tmp:
+                      historical = Path(tmp) / "stm32f4-commercial-icpn.csv"
+                      with historical.open("w", newline="", encoding="utf-8") as handle:
+                          writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+                          writer.writeheader()
+                          writer.writerows(rows)
+                      self.assertEqual(hashlib.sha256(historical.read_bytes()).hexdigest(), PRE_SHA)
+                      plan = build_admission_plan(
+                          evidence_dir=EVIDENCE,
+                          baseline_path=BASELINE,
+                          catalog_path=CATALOG,
+                          canonical_path=historical,
+                          admission_base_devices=ADMISSION_BASES,
+                      )
+                      self.assertTrue(pipeline_plan_is_clean(plan))
+                      self.assertEqual(plan["candidate_count"], 3)
+                      self.assertEqual(plan["decision_counts"]["admit"], 3)
+                      serialized = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
+                      self.assertEqual(hashlib.sha256(serialized).hexdigest(), PLAN_SHA)
+                      first = write_canonical_dataset(plan=plan, canonical_path=historical)
+                      self.assertEqual((first["rows_before"], first["rows_after"]), (208, 211))
+                      self.assertEqual(set(first["added"]), EXPECTED)
+                      self.assertEqual(hashlib.sha256(historical.read_bytes()).hexdigest(), FINAL_SHA)
+                      self.assertEqual(historical.read_bytes(), CANONICAL.read_bytes())
+                      second = write_canonical_dataset(plan=plan, canonical_path=historical)
+                      self.assertEqual(second["status"], "no_op")
+
+              def test_current_replan_is_three_already_present(self) -> None:
+                  plan = build_admission_plan(
+                      evidence_dir=EVIDENCE,
+                      baseline_path=BASELINE,
+                      catalog_path=CATALOG,
+                      canonical_path=CANONICAL,
+                      admission_base_devices=ADMISSION_BASES,
+                  )
+                  self.assertTrue(pipeline_plan_is_clean(plan))
+                  self.assertEqual(plan["candidate_count"], 3)
+                  self.assertEqual(plan["decision_counts"], {
+                      "admit": 0,
+                      "already_present": 3,
+                      "manual_review_required": 0,
+                      "reject": 0,
+                  })
+
+
+          if __name__ == "__main__":
+              unittest.main()
+          PY
+
+          cat > .github/workflows/device-catalog-phase42i-f405o-f415og-validation.yml <<'YML'
+          name: Device catalog Phase 4.2I STM32F405O/415OG lifecycle
+
+          on:
+            push:
+              branches:
+                - main
+            pull_request:
+
+          permissions:
+            contents: read
+
+          jobs:
+            validate:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-python@v5
+                  with:
+                    python-version: '3.12'
+                - name: Validate Phase 4.2I retained evidence and post-admission replay
+                  run: |
+                    python data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py
+          YML
+
+      - name: Update runtime and REST contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime = Path('software/python/tests/test_device_catalog.py')
+          text = runtime.read_text(encoding='utf-8')
+          text = text.replace('EXPECTED_PRODUCTION_CATALOG_SIZE = 283\nEXPECTED_STM32F4_CATALOG_SIZE = 208', 'EXPECTED_PRODUCTION_CATALOG_SIZE = 286\nEXPECTED_STM32F4_CATALOG_SIZE = 211')
+          needle = '    phase42f = catalog.search("stm32f412rgy6ptr", limit=1)[0]\n    family = catalog.search("STM32F4", limit=100)'
+          replacement = '    phase42f = catalog.search("stm32f412rgy6ptr", limit=1)[0]\n    phase42i = catalog.search("stm32f405oey6tr", limit=1)[0]\n    family = catalog.search("STM32F4", limit=100)'
+          if needle not in text:
+              raise SystemExit('runtime phase42f insertion point not found')
+          text = text.replace(needle, replacement, 1)
+          needle = '    assert phase42f.option_suffix == "PTR"\n    assert phase42f.target_config == "tcl/target/stm32f4x.cfg"\n    # Search results remain capped at 100 while metadata proves the full 208-row F4 family.'
+          replacement = '    assert phase42f.option_suffix == "PTR"\n    assert phase42f.target_config == "tcl/target/stm32f4x.cfg"\n    assert phase42i.identifier == "STM32F405OEY6TR"\n    assert phase42i.family == "STM32F4"\n    assert phase42i.package == "WLCSP"\n    assert phase42i.pin_count == "90"\n    assert phase42i.flash_size == "512 KiB"\n    assert phase42i.target_config == "tcl/target/stm32f4x.cfg"\n    # Search results remain capped at 100 while metadata proves the full 211-row F4 family.'
+          if needle not in text:
+              raise SystemExit('runtime phase42f assertion point not found')
+          runtime.write_text(text.replace(needle, replacement, 1), encoding='utf-8')
+
+          rest = Path('software/python/tests/test_device_catalog_web_gateway.py')
+          text = rest.read_text(encoding='utf-8')
+          text = text.replace('EXPECTED_PRODUCTION_CATALOG_SIZE = 283', 'EXPECTED_PRODUCTION_CATALOG_SIZE = 286', 1)
+          needle = '''        self.assertEqual(result["option_suffix"], "PTR")\n        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")\n\n    def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:'''
+          replacement = '''        self.assertEqual(result["option_suffix"], "PTR")\n        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")\n\n    def test_phase42i_stm32f405oey6tr_is_exposed_after_admission(self) -> None:\n        status, payload = self.request("/api/devices/search?q=STM32F405OEY6TR&limit=5")\n        self.assertEqual(status, 200)\n        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)\n        self.assertEqual(payload["count"], 1)\n        result = payload["results"][0]\n        self.assertEqual(result["icpn"], "STM32F405OEY6TR")\n        self.assertEqual(result["family"], "STM32F4")\n        self.assertEqual(result["package"], "WLCSP")\n        self.assertEqual(result["pin_count"], "90")\n        self.assertEqual(result["flash_size"], "512 KiB")\n        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")\n\n    def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:'''
+          if needle not in text:
+              raise SystemExit('REST phase42f insertion point not found')
+          rest.write_text(text.replace(needle, replacement, 1), encoding='utf-8')
+          PY
+
+      - name: Remove one-shot transaction workflows
+        run: |
+          rm -f \
+            .github/workflows/device-catalog-phase42i-admission-proposal.yml \
+            .github/workflows/device-catalog-phase42i-bind-proposal.yml \
+            .github/workflows/device-catalog-phase42i-controlled-publish.yml \
+            .github/workflows/device-catalog-phase42i-closure-apply.yml
+
+      - name: Validate closure locally
+        run: |
+          set -euo pipefail
+          python data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py
+          python -m pip install -q pytest
+          PYTHONPATH=software/python python -m pytest -q \
+            software/python/tests/test_device_catalog.py \
+            software/python/tests/test_device_catalog_web_gateway.py
+          git diff --check
+
+      - name: Commit lifecycle and runtime closure
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'device-catalog: close Phase4.2I admission lifecycle'
+          git push origin HEAD:agent/device-catalog-phase4.2i-f405o-f415og-admission
