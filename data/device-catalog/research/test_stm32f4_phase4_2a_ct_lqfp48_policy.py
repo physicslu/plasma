@@ -33,7 +33,7 @@ class STM32F4Phase42ACTLQFP48PolicyTests(unittest.TestCase):
         blocked = {item["base_device"]: item for item in inventory["gap"]["policy_blocked"]}
 
         self.assertEqual(set(ready), {"STM32F410CB"})
-        self.assertEqual(ready["STM32F410CB"]["package_codes"], ["T"])
+        self.assertEqual(ready["STM32F410CB"]["package_codes"], ["T", "U"])
         self.assertEqual(ready["STM32F410CB"]["policy_blockers"], [])
 
         self.assertIn("STM32F410C8", blocked)
