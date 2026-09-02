@@ -15,10 +15,10 @@ from .ppu_network_settings import PPUNetworkSettingsController
 
 
 ACTIVE_STATES = frozenset({"scheduled", "applying", "applied_waiting_commit", "rolling_back"})
-TERMINAL_STATES = frozenset({"idle", "committed", "rolled_back", "failed", "recovery_required"})
 MIN_ROLLBACK_TIMEOUT_S = 2
 MAX_ROLLBACK_TIMEOUT_S = 120
 DEFAULT_APPLY_DELAY_S = 0.35
+HELPER_SHUTDOWN_WAIT_S = 7.0
 
 
 class PPUNetworkActivationError(RuntimeError):
@@ -40,9 +40,9 @@ class PPUNetworkActivationError(RuntimeError):
 class PPUNetworkActivationHelperClient:
     """Minimal Unix-socket client for the privileged local network helper.
 
-    The Gateway process must remain unprivileged. Only the helper is permitted to
-    mutate the Linux network namespace. Each request uses one JSON line over one
-    Unix-domain stream connection and receives one JSON line in response.
+    The Gateway process stays unprivileged. Only the helper may mutate the Linux
+    network namespace. Each connection carries one JSON-line request and one
+    JSON-line response.
     """
 
     def __init__(self, socket_path: str | Path, *, timeout_s: float = 5.0) -> None:
@@ -168,18 +168,25 @@ class _Transaction:
         }
         if set(raw) != required:
             raise ValueError("activation journal fields are invalid")
+        candidate = raw["candidate"]
+        previous = raw["previous_snapshot"]
+        actual_after = raw["actual_after_apply"]
+        if not isinstance(candidate, dict) or not isinstance(previous, dict):
+            raise ValueError("activation journal network snapshots must be objects")
+        if actual_after is not None and not isinstance(actual_after, dict):
+            raise ValueError("activation journal actual_after_apply must be an object or null")
         return cls(
             activation_id=str(raw["activation_id"]),
             state=str(raw["state"]),
             ppu_id=str(raw["ppu_id"]),
             revision=int(raw["revision"]),
-            candidate=dict(raw["candidate"]),
-            previous_snapshot=dict(raw["previous_snapshot"]),
+            candidate=dict(candidate),
+            previous_snapshot=dict(previous),
             rollback_timeout_s=int(raw["rollback_timeout_s"]),
             scheduled_at_epoch_s=float(raw["scheduled_at_epoch_s"]),
             deadline_epoch_s=float(raw["deadline_epoch_s"]) if raw["deadline_epoch_s"] is not None else None,
             committed_revision=int(raw["committed_revision"]) if raw["committed_revision"] is not None else None,
-            actual_after_apply=dict(raw["actual_after_apply"]) if raw["actual_after_apply"] is not None else None,
+            actual_after_apply=dict(actual_after) if actual_after is not None else None,
             reason=str(raw["reason"]) if raw["reason"] is not None else None,
             error=str(raw["error"]) if raw["error"] is not None else None,
         )
@@ -258,7 +265,13 @@ class PPUNetworkActivationController:
                 http_status=503,
             )
         required = {"action", "expected_revision", "expected_ppu_id", "rollback_timeout_s"}
-        if not isinstance(raw, Mapping) or set(raw) != required:
+        if not isinstance(raw, Mapping):
+            raise PPUNetworkActivationError(
+                "PPU network activation request must be an object",
+                error_type="INVALID_PPU_NETWORK_ACTIVATION_REQUEST",
+                http_status=400,
+            )
+        if set(raw) != required:
             raise PPUNetworkActivationError(
                 "PPU network activation request fields are invalid",
                 error_type="INVALID_PPU_NETWORK_ACTIVATION_REQUEST",
@@ -389,18 +402,32 @@ class PPUNetworkActivationController:
                 candidate = dict(transaction.candidate)
             assert self.helper is not None
             actual = self.helper.apply(candidate)
+            shutdown_requested = self._stop_event.is_set()
             with self._lock:
                 transaction = self._transaction
                 if transaction is None or transaction.activation_id != activation_id:
                     return
                 transaction.actual_after_apply = actual
-                transaction.state = "applied_waiting_commit"
-                transaction.deadline_epoch_s = time.time() + transaction.rollback_timeout_s
+                if not shutdown_requested:
+                    transaction.state = "applied_waiting_commit"
+                    transaction.deadline_epoch_s = time.time() + transaction.rollback_timeout_s
                 self._persist_locked()
                 timeout = transaction.rollback_timeout_s
-            if self._commit_event.wait(timeout):
+            if shutdown_requested:
+                self._rollback(activation_id, "gateway_shutdown")
                 return
-            self._rollback(activation_id, "commit_deadline_expired")
+
+            deadline = time.monotonic() + timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self._rollback(activation_id, "commit_deadline_expired")
+                    return
+                if self._commit_event.wait(min(0.1, remaining)):
+                    return
+                if self._stop_event.is_set():
+                    self._rollback(activation_id, "gateway_shutdown")
+                    return
         except Exception as exc:
             try:
                 self._rollback(activation_id, "apply_failed", error=str(exc))
@@ -419,7 +446,7 @@ class PPUNetworkActivationController:
             transaction = self._transaction
             if transaction is None or transaction.activation_id != activation_id:
                 return
-            if transaction.state == "committed":
+            if transaction.state in {"committed", "rolled_back"}:
                 return
             transaction.state = "rolling_back"
             transaction.reason = reason
@@ -463,21 +490,38 @@ class PPUNetworkActivationController:
         with self._lock:
             transaction = self._transaction
             active_id = transaction.activation_id if transaction is not None and transaction.state in ACTIVE_STATES else None
+            active_state = transaction.state if active_id is not None else None
             self._stop_event.set()
-        if active_id is not None and self.helper is not None:
+
+        # scheduled has not mutated yet; waiting_commit has completed apply. Both
+        # can be restored synchronously. During applying, however, restoring now
+        # would race a still-running apply, so the worker performs rollback after
+        # apply returns and observes _stop_event.
+        if active_id is not None and self.helper is not None and active_state in {"scheduled", "applied_waiting_commit"}:
             try:
                 self._rollback(active_id, "gateway_shutdown")
             except Exception as exc:
-                with self._lock:
-                    transaction = self._transaction
-                    if transaction is not None and transaction.activation_id == active_id:
-                        transaction.state = "recovery_required"
-                        transaction.reason = "gateway_shutdown_rollback_failed"
-                        transaction.error = str(exc)
-                        self._persist_locked()
+                self._mark_recovery_required(active_id, "gateway_shutdown_rollback_failed", str(exc))
+
         worker = self._worker
         if worker is not None and worker.is_alive() and worker is not threading.current_thread():
-            worker.join(timeout=2.0)
+            worker.join(timeout=HELPER_SHUTDOWN_WAIT_S)
+            if worker.is_alive() and active_id is not None:
+                self._mark_recovery_required(
+                    active_id,
+                    "gateway_shutdown_helper_timeout",
+                    "network helper did not finish within shutdown bound",
+                )
+
+    def _mark_recovery_required(self, activation_id: str, reason: str, error: str) -> None:
+        with self._lock:
+            transaction = self._transaction
+            if transaction is None or transaction.activation_id != activation_id or transaction.state == "committed":
+                return
+            transaction.state = "recovery_required"
+            transaction.reason = reason
+            transaction.error = error
+            self._persist_locked()
 
     def _load_journal(self) -> _Transaction | None:
         path = self.journal_path
