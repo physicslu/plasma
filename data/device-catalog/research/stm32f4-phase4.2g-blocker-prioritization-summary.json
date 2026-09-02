@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "phase": "4.2G",
+  "source": {
+    "workflow_run_id": "33605286391",
+    "artifact_id": "9836738428",
+    "artifact_name": "phase42g-stm32f4-blocker-portfolio",
+    "artifact_zip_sha256": "710c9a8fe531439d8487594169f8de10fcd50750f4603f162285bc175a277ba3",
+    "inventory_sha256": "0596e1b795235d6fd8e81a54e826cb670f6456b76c2773329de2d5990b9b0d2a",
+    "portfolio_sha256": "d42936c6f6a54a77fadf39d40260bb71c79a25d20776e3458a30ebe6d0502a88"
+  },
+  "current_state": {
+    "production_exact_icpn_rows": 208,
+    "production_base_device_count": 70,
+    "openocd_ordering_pattern_base_device_count": 149,
+    "gap_base_device_count": 79,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 79
+  },
+  "highest_immediate_unlock_surfaces": [
+    {
+      "surface": "B/T",
+      "affected_base_device_count": 10,
+      "immediately_unblocked_count": 10,
+      "near_term_admission_priority": "deprioritized",
+      "reason": "The mapping appears structurally simple and official ST product data identifies representative B/T parts as LQFP208, but current representative commercial parts across STM32F429/439/469/479 are NRND. Policy-ready count alone would therefore overstate near-term exact-ICPN admission value."
+    },
+    {
+      "surface": "N/H",
+      "affected_base_device_count": 10,
+      "immediately_unblocked_count": 10,
+      "near_term_admission_priority": "not_selected",
+      "reason": "High theoretical unlock, but broader BGA package evidence and lifecycle review are required before preferring it over a smaller Active-only surface."
+    }
+  ],
+  "selected_next_surface": {
+    "policy_mapping": "O/Y -> WLCSP90",
+    "affected_base_devices": [
+      "STM32F405OE",
+      "STM32F405OG",
+      "STM32F415OG"
+    ],
+    "expected_policy_ready_after_mapping": [
+      "STM32F405OE",
+      "STM32F405OG",
+      "STM32F415OG"
+    ],
+    "expected_gap_base_device_count": 79,
+    "expected_policy_ready_count": 3,
+    "expected_policy_blocked_count": 76,
+    "reason": "All three O/Y gaps have no residual blocker. Package code Y is already defined as WLCSP in the STM32F4 admission policy. Current official ST product data exposes Active exact parts for STM32F405OE, STM32F405OG, and STM32F415OG and identifies the Y package as WLCSP90. This gives a one-line bounded pin/package policy extension with immediate downstream admission value and no new package-code or flash-size semantics.",
+    "official_st_product_urls": [
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f405oe.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f405og.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f415og.html"
+    ]
+  },
+  "policy_change_applied": false,
+  "production_write_applied": false,
+  "algorithm_equivalence_claimed": false,
+  "physical_ppu_validation_claimed": false
+}
