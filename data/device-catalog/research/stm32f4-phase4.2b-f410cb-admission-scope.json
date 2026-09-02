@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "phase": "4.2B",
+  "base_main_sha": "100cb56eab568225e126face8e8a0d2d19a07d11",
+  "scope": "official ST exact-ICPN discovery and bounded admission preparation for STM32F410CB",
+  "lifecycle_control": "STM32F479ZG",
+  "admission_targets": ["STM32F410CB"],
+  "prestate": {
+    "stm32f1_exact_icpn_rows": 75,
+    "stm32f4_exact_icpn_rows": 194,
+    "st_exact_icpn_rows": 269,
+    "stm32f4_base_device_count": 67,
+    "openocd_ordering_pattern_base_device_count": 149,
+    "gap_base_device_count": 82,
+    "policy_ready_count": 1,
+    "policy_blocked_count": 81,
+    "policy_ready_bases": ["STM32F410CB"]
+  },
+  "production_write_allowed_during_discovery": false,
+  "algorithm_equivalence_claimed": false,
+  "physical_ppu_validation_claimed": false
+}
