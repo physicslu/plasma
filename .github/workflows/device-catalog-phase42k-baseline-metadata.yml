@@ -1,0 +1,55 @@
+name: Device catalog Phase 4.2K baseline metadata
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2k-i176-admission
+    paths:
+      - '.github/workflows/device-catalog-phase42k-baseline-metadata.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bind:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2k-i176-admission
+          fetch-depth: 0
+      - name: Add aggregate pilot identity without changing evidence semantics
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('data/device-catalog/research/stm32f4-phase4.2k-i176-admission-baseline.json')
+          data = json.loads(p.read_text(encoding='utf-8'))
+          if data.get('phase') != '4.2K':
+              raise SystemExit('unexpected baseline phase')
+          if data.get('candidate_base_device_count') != 18 or data.get('active_exact_icpn_candidate_count') != 54:
+              raise SystemExit('baseline evidence semantics changed')
+          if data.get('excluded_non_active_observations') != [{
+              'base_device':'STM32F417IG',
+              'icpn':'STM32F417IGH6W',
+              'marketing_status':'NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN',
+          }]:
+              raise SystemExit('baseline lifecycle observations changed')
+          if 'pilot_id' in data and data['pilot_id'] != 'stm32f4-phase4.2k-i176-admission-2026-09-02':
+              raise SystemExit('conflicting pilot_id')
+          data['pilot_id'] = 'stm32f4-phase4.2k-i176-admission-2026-09-02'
+          p.write_text(json.dumps(data, indent=2, sort_keys=True)+'\n', encoding='utf-8')
+          PY
+          git diff --check
+          git diff -- data/device-catalog/research/stm32f4-phase4.2k-i176-admission-baseline.json
+      - name: Commit metadata binding only
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32f4-phase4.2k-i176-admission-baseline.json
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          git commit -m 'device-catalog: bind Phase 4.2K aggregate pilot identity'
+          git push origin HEAD:agent/device-catalog-phase4.2k-i176-admission
