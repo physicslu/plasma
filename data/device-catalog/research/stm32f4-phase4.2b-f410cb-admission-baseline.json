@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2b-f410cb-admission-2026-09-02",
+  "source_workflow_run_id": "33585423385",
+  "source_artifact_id": "9829921112",
+  "source_artifact_sha256": "81cfc4be87e5e378597c557a0f43ab14b9deca9c0eda315572efa27b103ad98a",
+  "canonical_dataset_admission": false,
+  "candidate_policy": "admitted_exact_manufacturer_part_number_only",
+  "lifecycle_audit_policy": "non_active_observations_audit_only",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "role": "control",
+      "marketing_status": "Active Product is in volume production.",
+      "exact_icpns": [
+        "STM32F479ZGT6"
+      ]
+    },
+    {
+      "base_device": "STM32F410CB",
+      "role": "candidate",
+      "marketing_status": "Active Product is in volume production.",
+      "exact_icpns": [
+        "STM32F410CBT3",
+        "STM32F410CBT6",
+        "STM32F410CBU3",
+        "STM32F410CBU3TR",
+        "STM32F410CBU6"
+      ]
+    }
+  ],
+  "excluded_non_active_observations": []
+}
