@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2k-i176-cohort-a-2026-09-02",
+  "targets": [
+    {"base_device":"STM32F479ZG","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html","selection_reason":"production-admitted lifecycle control"},
+    {"base_device":"STM32F407IE","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f407ie.html","selection_reason":"policy-ready after merged Phase 4.2J I176 mapping"},
+    {"base_device":"STM32F407IG","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f407ig.html","selection_reason":"policy-ready after merged Phase 4.2J I176 mapping"},
+    {"base_device":"STM32F417IE","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f417ie.html","selection_reason":"policy-ready after merged Phase 4.2J I176 mapping"},
+    {"base_device":"STM32F417IG","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f417ig.html","selection_reason":"policy-ready after merged Phase 4.2J I176 mapping"},
+    {"base_device":"STM32F427IG","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f427ig.html","selection_reason":"policy-ready after merged Phase 4.2J I176 mapping"}
+  ]
+}
