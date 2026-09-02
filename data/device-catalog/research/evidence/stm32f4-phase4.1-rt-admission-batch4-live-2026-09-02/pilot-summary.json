@@ -1,0 +1,288 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 3,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 3,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 3,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 9,
+  "live_acquisition_attempt_outcomes": [
+    {
+      "acquisition_failure": 0,
+      "acquisition_success": 3,
+      "attempt": 1,
+      "clean": true,
+      "failed_targets": []
+    }
+  ],
+  "live_acquisition_attempts": 1,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 3,
+    "total": 3
+  },
+  "pilot_id": "stm32f4-phase4.1-rt-admission-batch4-2026-09-02",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "d0f247178edf96cd693271bbc2b70738e55a48f129522f189c9872e7ee960d2c",
+        "retrieved_at_utc": "2026-09-02T00:59:37Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production-admitted Active lifecycle control retained separately from the Phase 4.1 admission selection",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F446RC",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F446RCTx",
+          "icpn": "STM32F446RCT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F446RCTx",
+          "icpn": "STM32F446RCT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F446RCTx",
+          "icpn": "STM32F446RCT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F446RCTx",
+          "icpn": "STM32F446RCT7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F446RC",
+        "evidence_section_sha256": "5cfc7fb9e4dc5ef6776ff01b591c9fc053f7a812c55bddba274414932d3a4293",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F446RCT6",
+          "STM32F446RCT6TR",
+          "STM32F446RCT7",
+          "STM32F446RCT7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446rc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F446RCT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F446RCT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F446RCT7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F446RCT7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "2f6b5c68eb94b35552fbd4326eff4939c3fa7b6fbde01cd6377e430f5f572252",
+        "retrieved_at_utc": "2026-09-02T00:59:42Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446rc.html"
+      },
+      "selection_reason": "remaining Phase 4.1 R/T policy-ready STM32F446 LQFP64 coverage gap",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446rc.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F446RE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F446RETx",
+          "icpn": "STM32F446RET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F446RETx",
+          "icpn": "STM32F446RET6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F446RETx",
+          "icpn": "STM32F446RET7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F446RETx",
+          "icpn": "STM32F446RET7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F446RE",
+        "evidence_section_sha256": "5cd7c9d903bb582a3c05b46741e5117ec2484bdfda6bc4a62c1285f42765ac2b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F446RET6",
+          "STM32F446RET6TR",
+          "STM32F446RET7",
+          "STM32F446RET7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446re.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F446RET6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F446RET6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F446RET7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F446RET7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "33a44d08318c7faee3f93b78b4d17692d8e82f128f91a80039efbf248520ae58",
+        "retrieved_at_utc": "2026-09-02T00:59:47Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446re.html"
+      },
+      "selection_reason": "remaining Phase 4.1 R/T policy-ready STM32F446 LQFP64 coverage gap",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446re.html"
+    }
+  ],
+  "schema_version": 1
+}

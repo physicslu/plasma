@@ -1,0 +1,82 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 1,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 1,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "launch_args": [
+      "--disable-http2"
+    ],
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "control",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 1,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 1,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 1,
+    "total": 1
+  },
+  "pilot_id": "stm32f4-phase4.1-rt-admission-batch4-2026-09-02",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "41731ae062e98aa19e07f00248428583e46c94a7ceda1019532be7eb8ac4d6ca",
+        "retrieved_at_utc": "2026-09-02T00:59:32Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production-admitted Active lifecycle control retained separately from the Phase 4.1 admission selection",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    }
+  ],
+  "schema_version": 1
+}
