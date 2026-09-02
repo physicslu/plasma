@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "workflow_run_id": "33627304458",
+  "artifact_id": "9845365879",
+  "artifact_name": "phase42i-stm32f405o-f415og-retained",
+  "artifact_sha256": "5ddf79b73a15c3ea412e98a6ed908c2a74f8670f7320d11b880248486fafcbb9",
+  "source_discovery_run_id": "33609506654",
+  "source_discovery_artifact_id": "9838558390",
+  "source_discovery_artifact_sha256": "c211e4b96e9bacd3cbbc72877b49ac514d5e493eb709b0aa1388ea128bc26cba"
+}
