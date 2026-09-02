@@ -6,72 +6,110 @@ on:
       - agent/device-catalog-phase4.2k-i176-admission
     paths:
       - '.github/workflows/device-catalog-phase42k-i176-discovery.yml'
-      - 'data/device-catalog/research/stm32f4-phase4.2k-i176-admission-manifest.json'
+      - 'data/device-catalog/research/stm32f4-phase4.2k-i176-cohort-*-manifest.json'
 
 permissions:
   contents: read
 
 jobs:
   discover:
+    name: discover-${{ matrix.cohort }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: a
+            manifest: data/device-catalog/research/stm32f4-phase4.2k-i176-cohort-a-manifest.json
+          - cohort: b
+            manifest: data/device-catalog/research/stm32f4-phase4.2k-i176-cohort-b-manifest.json
+          - cohort: c
+            manifest: data/device-catalog/research/stm32f4-phase4.2k-i176-cohort-c-manifest.json
+          - cohort: d
+            manifest: data/device-catalog/research/stm32f4-phase4.2k-i176-cohort-d-manifest.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate bounded cohort manifest
+        env:
+          MANIFEST: ${{ matrix.manifest }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ['MANIFEST'])
+          data = json.loads(p.read_text())
+          targets = data['targets']
+          bases = [x['base_device'] for x in targets]
+          if not 1 <= len(targets) <= 6:
+              raise SystemExit(f'cohort is not bounded: {len(targets)}')
+          if bases.count('STM32F479ZG') != 1:
+              raise SystemExit('cohort must contain exactly one production control STM32F479ZG')
+          candidates = [x for x in bases if x != 'STM32F479ZG']
+          if not 1 <= len(candidates) <= 5:
+              raise SystemExit(f'candidate cohort is not bounded: {len(candidates)}')
+          print(f'targets={len(targets)} candidates={len(candidates)}')
+          PY
       - name: Install browser runtime
         run: |
           python -m pip install playwright==1.62.0
           python -m playwright install --with-deps chromium
       - name: Acquire official ST discovery evidence
+        env:
+          MANIFEST: ${{ matrix.manifest }}
+          COHORT: ${{ matrix.cohort }}
         run: |
           set +e
-          mkdir -p /tmp/phase42k
+          out="/tmp/phase42k-${COHORT}"
+          mkdir -p "$out"
           xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
-            --manifest data/device-catalog/research/stm32f4-phase4.2k-i176-admission-manifest.json \
+            --manifest "$MANIFEST" \
             --catalog data/device-catalog/research/openocd-parts-canonical.csv \
-            --output /tmp/phase42k/pilot-summary.json \
+            --output "$out/pilot-summary.json" \
             --scope pilot \
             --headed \
             --timeout 30 \
             --delay 2
           rc=$?
-          printf '%s\n' "$rc" > /tmp/phase42k/acquisition-exit-code.txt
+          printf '%s\n' "$rc" > "$out/acquisition-exit-code.txt"
           exit 0
       - name: Hash discovery output
         if: always()
+        env:
+          COHORT: ${{ matrix.cohort }}
         run: |
-          cd /tmp/phase42k
+          cd "/tmp/phase42k-${COHORT}"
           sha256sum * > SHA256SUMS || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: phase42k-stm32f4-i176-discovery
-          path: /tmp/phase42k
+          name: phase42k-stm32f4-i176-discovery-${{ matrix.cohort }}
+          path: /tmp/phase42k-${{ matrix.cohort }}
           if-no-files-found: error
           retention-days: 30
       - name: Enforce discovery result
         if: always()
+        env:
+          MANIFEST: ${{ matrix.manifest }}
+          COHORT: ${{ matrix.cohort }}
         run: |
-          test -f /tmp/phase42k/acquisition-exit-code.txt
-          test "$(cat /tmp/phase42k/acquisition-exit-code.txt)" = "0"
+          out="/tmp/phase42k-${COHORT}"
+          test -f "$out/acquisition-exit-code.txt"
+          test "$(cat "$out/acquisition-exit-code.txt")" = "0"
           python - <<'PY'
-          import json
+          import json, os
           from pathlib import Path
-          p = Path('/tmp/phase42k/pilot-summary.json')
-          if not p.exists():
-              raise SystemExit('pilot-summary.json missing')
-          data = json.loads(p.read_text())
+          out = Path(f"/tmp/phase42k-{os.environ['COHORT']}")
+          data = json.loads((out / 'pilot-summary.json').read_text())
           if data.get('acquisition_failure') != 0:
               raise SystemExit(f"acquisition failures: {data.get('acquisition_failure')}")
-          manifest = json.loads(Path('data/device-catalog/research/stm32f4-phase4.2k-i176-admission-manifest.json').read_text())
+          manifest = json.loads(Path(os.environ['MANIFEST']).read_text())
           expected = {x['base_device'] for x in manifest['targets']}
           got = {x.get('base_device') for x in data.get('results', [])}
           if got != expected:
               raise SystemExit(f'unexpected target set: expected={sorted(expected)} got={sorted(got)}')
-          if len(got) != 19:
-              raise SystemExit(f'expected 19 bounded targets, got {len(got)}')
-          print(f"bounded_targets={len(got)}")
-          print(f"active_exact_icpn_candidates={data.get('exact_icpn_candidates')}")
+          print(f"cohort={os.environ['COHORT']} targets={len(got)} active_exact_icpn_candidates={data.get('exact_icpn_candidates')}")
           PY
