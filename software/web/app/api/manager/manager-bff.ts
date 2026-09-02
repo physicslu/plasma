@@ -69,10 +69,15 @@ function responseHeaders(response: Response): Headers {
   return headers;
 }
 
-async function relayManagerRequest(request: Request, target: string, bodyAllowed: boolean): Promise<Response> {
+async function relayManagerRequest(
+  request: Request,
+  target: string,
+  bodyAllowed: boolean,
+  requireManagedMode = false,
+): Promise<Response> {
   let managerBase: string;
   try {
-    if (!managerRoutingRequired()) {
+    if (requireManagedMode && !managerRoutingRequired()) {
       return json(503, {
         ok: false,
         error: { code: "manager_not_enabled", message: "Manager mode is not enabled for this Control Station" },
@@ -157,5 +162,5 @@ export async function relayManagerRegistryRequest(request: Request, alias?: stri
   }
   const suffix = alias ? `/${encodeURIComponent(alias)}` : "";
   const bodyAllowed = request.method === "POST" || request.method === "PATCH";
-  return await relayManagerRequest(request, `/api/registry${suffix}`, bodyAllowed);
+  return await relayManagerRequest(request, `/api/registry${suffix}`, bodyAllowed, true);
 }
