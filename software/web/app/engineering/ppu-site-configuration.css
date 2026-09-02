@@ -106,9 +106,14 @@
   cursor: pointer;
 }
 
-.ppuSiteButton:hover {
+.ppuSiteButton:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--cyan) 50%, var(--line));
   color: var(--cyan);
+}
+
+.ppuSiteButton:disabled {
+  opacity: .42;
+  cursor: not-allowed;
 }
 
 .ppuSiteButton.primary {
@@ -120,6 +125,43 @@
 .ppuSiteButton.danger {
   border-color: color-mix(in srgb, var(--red) 45%, var(--line));
   color: var(--red);
+}
+
+.ppuRegistryAddForm {
+  display: grid;
+  grid-template-columns: minmax(120px, .7fr) minmax(190px, 1.3fr) auto;
+  align-items: end;
+  gap: 9px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--cyan) 3%, var(--panel-3));
+}
+
+.ppuRegistryAddForm label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font: 700 8px var(--font-mono);
+  letter-spacing: .03em;
+}
+
+.ppuRegistryAddForm input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 7px 8px;
+  font: 600 10px var(--font-sans);
+}
+
+.ppuRegistryAddForm > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
 }
 
 .ppuSiteFilters {
@@ -139,7 +181,7 @@
 }
 
 .ppuSiteFilter[data-tone="online"] { color: var(--green); }
-.ppuSiteFilter[data-tone="pending"] { color: var(--yellow); }
+.ppuSiteFilter[data-tone="pending"] { color: var(--amber); }
 .ppuSiteFilter[data-tone="error"] { color: var(--red); }
 
 .ppuTableWrap {
@@ -207,7 +249,7 @@
 
 .ppuSiteStatus.online,
 .ppuSiteStatus.ready { color: var(--green); }
-.ppuSiteStatus.pending { color: var(--yellow); }
+.ppuSiteStatus.pending { color: var(--amber); }
 .ppuSiteStatus.offline,
 .ppuSiteStatus.disabled { color: var(--muted); }
 .ppuSiteStatus.error { color: var(--red); }
@@ -266,6 +308,32 @@
   color: var(--text-soft);
   font-size: 10px;
   font-weight: 650;
+}
+
+.ppuRemoveConfirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--red) 32%, var(--line));
+  background: color-mix(in srgb, var(--red) 6%, var(--panel));
+}
+
+.ppuRemoveConfirm > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.ppuRemoveConfirm strong {
+  color: var(--red);
+  font-size: 10px;
+}
+
+.ppuRemoveConfirm span {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
 }
 
 .ppuInfoBody {
@@ -378,6 +446,31 @@
   color: var(--cyan);
 }
 
+.ppuEmptyRegistry {
+  padding: 28px;
+}
+
+.ppuEmptyRegistry h3 {
+  margin: 0 0 7px;
+}
+
+.ppuEmptyRegistry p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.ppuRegistryBoundary {
+  margin: 0;
+  border: 1px dashed color-mix(in srgb, var(--amber) 55%, var(--line));
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--amber) 5%, var(--panel));
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
 @media (max-width: 1180px) {
   .ppuSiteLayout {
     grid-template-columns: 1fr;
@@ -386,19 +479,31 @@
   .ppuInfoGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .ppuRegistryAddForm {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ppuRegistryAddForm > .ppuSiteCardHeaderActions {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 760px) {
-  .ppuSiteHeader {
+  .ppuSiteHeader,
+  .ppuRemoveConfirm {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .ppuMetaGrid,
-  .ppuInfoGrid {
+  .ppuInfoGrid,
+  .ppuRegistryAddForm {
     grid-template-columns: 1fr;
   }
 
-  .ppuInfoGrid div.wide {
+  .ppuInfoGrid div.wide,
+  .ppuRegistryAddForm > .ppuSiteCardHeaderActions {
     grid-column: span 1;
   }
 }
