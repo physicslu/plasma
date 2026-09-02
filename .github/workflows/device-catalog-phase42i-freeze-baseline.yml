@@ -1,0 +1,125 @@
+name: Device catalog Phase 4.2I freeze discovery baseline
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2i-f405o-f415og-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42i-freeze-baseline.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  freeze:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2i-f405o-f415og-admission
+          fetch-depth: 0
+      - name: Download immutable discovery artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase42i-discovery
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            /repos/${GITHUB_REPOSITORY}/actions/artifacts/9838558390/zip \
+            > /tmp/phase42i-discovery.zip
+          printf '%s  %s\n' \
+            'c211e4b96e9bacd3cbbc72877b49ac514d5e493eb709b0aa1388ea128bc26cba' \
+            '/tmp/phase42i-discovery.zip' | sha256sum -c -
+          unzip -q /tmp/phase42i-discovery.zip -d /tmp/phase42i-discovery
+      - name: Build fail-closed baseline from discovery bytes
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          artifact = Path('/tmp/phase42i-discovery')
+          summary_path = artifact / 'pilot-summary.json'
+          if not summary_path.exists():
+              raise SystemExit('pilot-summary.json missing from discovery artifact')
+          summary = json.loads(summary_path.read_text(encoding='utf-8'))
+
+          expected_bases = ['STM32F479ZG', 'STM32F405OE', 'STM32F405OG', 'STM32F415OG']
+          if summary.get('pilot_id') != 'stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02':
+              raise SystemExit('unexpected pilot_id')
+          if summary.get('acquisition_failure') != 0 or summary.get('acquisition_success') != 4:
+              raise SystemExit('discovery acquisition is not clean')
+          if summary.get('canonical_mapping') != {'unique': 4, 'ambiguous': 0, 'unmapped': 0}:
+              raise SystemExit('discovery target mapping is not uniquely clean')
+          if summary.get('openocd_cfg_mapping') != {'mapped': 4, 'total': 4}:
+              raise SystemExit('discovery OpenOCD mapping is incomplete')
+          if summary.get('canonical_dataset_admission') is not False:
+              raise SystemExit('discovery must deny canonical admission')
+
+          results = summary.get('results')
+          if not isinstance(results, list):
+              raise SystemExit('discovery results missing')
+          by_base = {r.get('base_device'): r for r in results if isinstance(r, dict)}
+          if list(sorted(by_base)) != list(sorted(expected_bases)):
+              raise SystemExit(f'unexpected discovery target set: {sorted(by_base)}')
+
+          targets = []
+          excluded = []
+          for base in expected_bases:
+              result = by_base[base]
+              if result.get('acquisition_status') != 'success':
+                  raise SystemExit(f'{base}: acquisition not successful')
+              mapping = result.get('canonical_mapping')
+              if not isinstance(mapping, dict) or mapping.get('status') != 'unique' or mapping.get('target_configs') != ['tcl/target/stm32f4x.cfg']:
+                  raise SystemExit(f'{base}: mapping not uniquely stm32f4x.cfg')
+              evidence = result.get('evidence')
+              if not isinstance(evidence, dict):
+                  raise SystemExit(f'{base}: evidence missing')
+              active = evidence.get('exact_icpns')
+              if not isinstance(active, list) or not active or len(active) != len(set(active)):
+                  raise SystemExit(f'{base}: invalid Active exact ICPN set')
+              if not all(isinstance(x, str) and x.startswith(base) for x in active):
+                  raise SystemExit(f'{base}: invalid Active ICPN ownership')
+              targets.append({'base_device': base, 'exact_icpns': sorted(active)})
+              non_active = evidence.get('excluded_non_active_part_numbers', [])
+              if not isinstance(non_active, list):
+                  raise SystemExit(f'{base}: invalid non-Active observations')
+              for row in non_active:
+                  if not isinstance(row, dict):
+                      raise SystemExit(f'{base}: invalid non-Active row')
+                  icpn = row.get('icpn')
+                  status = row.get('marketing_status')
+                  if not isinstance(icpn, str) or not icpn.startswith(base) or not isinstance(status, str) or status == 'Active':
+                      raise SystemExit(f'{base}: invalid lifecycle observation')
+                  excluded.append({'base_device': base, 'icpn': icpn, 'marketing_status': status})
+
+          baseline = {
+              'schema_version': 1,
+              'pilot_id': 'stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02',
+              'canonical_dataset_admission': False,
+              'source_discovery': {
+                  'workflow_run_id': '33609506654',
+                  'artifact_id': '9838558390',
+                  'artifact_sha256': 'c211e4b96e9bacd3cbbc72877b49ac514d5e493eb709b0aa1388ea128bc26cba',
+                  'source_pr': 303,
+              },
+              'targets': targets,
+              'excluded_non_active_observations': excluded,
+          }
+          out = Path('data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-baseline.json')
+          out.write_text(json.dumps(baseline, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(baseline, indent=2, sort_keys=True))
+          PY
+      - name: Commit frozen baseline only
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-baseline.json
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          git commit -m 'device-catalog: freeze Phase4.2I discovery baseline'
+          git push origin HEAD:agent/device-catalog-phase4.2i-f405o-f415og-admission
