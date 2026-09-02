@@ -50,7 +50,6 @@ jobs:
             "source_discovery_artifact_sha256": "0b2a245cca793ecc42fb90293ff18744d21ea3ef68ad1cf4be39c26fc5a712da"
           }
           JSON
-          python -m json.tool data/device-catalog/research/stm32f4-phase4.2f-f412re-rg-admission-retained-source.json >/dev/null
       - name: Commit retained evidence
         run: |
           git config user.name 'github-actions[bot]'
