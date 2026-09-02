@@ -25,6 +25,7 @@ from .registry import (
     RegistryEntryNotFound,
     RegistryMutationDisabled,
     RegistryStateError,
+    RegistryValidationError,
 )
 
 
@@ -277,9 +278,12 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         elif isinstance(exc, RegistryEntryNotFound):
             status = HTTPStatus.NOT_FOUND
             code = "ppu_not_found"
-        elif isinstance(exc, RegistryStateError):
+        elif isinstance(exc, RegistryValidationError):
             status = HTTPStatus.BAD_REQUEST
             code = "invalid_registry_request"
+        elif isinstance(exc, RegistryStateError):
+            status = HTTPStatus.INTERNAL_SERVER_ERROR
+            code = "registry_state_error"
         else:
             raise exc
         self._json(status, {"ok": False, "error": {"code": code, "message": str(exc)}})
@@ -292,7 +296,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             body = self._read_json_object()
             unexpected = set(body) - {"alias", "endpoint"}
             if unexpected:
-                raise RegistryStateError(f"unsupported registry fields: {', '.join(sorted(unexpected))}")
+                raise RegistryValidationError(f"unsupported registry fields: {', '.join(sorted(unexpected))}")
             record = self.registry_store.add(alias=body.get("alias"), endpoint=body.get("endpoint"))
         except (ValueError, RegistryStateError) as exc:
             if isinstance(exc, RegistryStateError):
@@ -623,7 +627,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             HTTPStatus.METHOD_NOT_ALLOWED,
             {
                 "ok": False,
-                "error": {"message": "Plasma Manager rejects mutation outside the explicit runtime registry and allowlisted Managed PPU routes"},
+                "error": {"message": "Plasma Manager read-only surfaces reject mutation outside the explicit runtime registry and allowlisted Managed PPU routes"},
             },
         )
 
