@@ -120,9 +120,9 @@ test("PPU Site management consumes canonical Settings/Loopback operator primitiv
     "PPU/Site management must consume the canonical Settings/Loopback operator surface owner",
   );
 
-  assert.match(primitives, /\.settingsCard,\s*\.diagnosticsTestCard,\s*\.ppuSiteCard\s*\{/);
-  assert.match(primitives, /\.settingsActions button,\s*\.loopbackExecutionActions button,\s*\.ppuSiteButton\s*\{/);
-  assert.match(primitives, /\.ppuRegistryAddForm input\s*\{/);
+  assert.match(primitives, /^\.ppuSiteCard\s*\{[\s\S]*border-radius:\s*10px[\s\S]*box-shadow:/m);
+  assert.match(primitives, /^\.ppuSiteButton\s*\{[\s\S]*min-height:\s*38px[\s\S]*font:\s*700 11px\/1\.2 var\(--font-sans\)/m);
+  assert.match(primitives, /^\.ppuRegistryAddForm input\s*\{[\s\S]*min-height:\s*36px[\s\S]*font:\s*11px var\(--font-mono\)/m);
 
   assert.doesNotMatch(ppuCss, /^\.ppuSiteCard\s*\{/m, "PPU cards must not redeclare the shared card primitive");
   assert.doesNotMatch(ppuCss, /^\.ppuSiteButton\s*\{/m, "PPU actions must not redeclare the shared action primitive");
