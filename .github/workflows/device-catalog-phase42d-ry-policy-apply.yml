@@ -1,0 +1,53 @@
+name: Device catalog Phase 4.2D R/Y WLCSP64 apply
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2d-ry-wlcsp64
+
+permissions:
+  contents: write
+
+jobs:
+  apply-policy:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2d-ry-wlcsp64
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply bounded R/Y policy delta and regression
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          policy = Path('data/device-catalog/research/stm32f4_admission_policy.py')
+          text = policy.read_text(encoding='utf-8')
+          old = '        ("R", "T"): "64",\n        ("V", "T"): "100",\n'
+          new = '        ("R", "T"): "64",\n        ("R", "Y"): "64",\n        ("V", "T"): "100",\n'
+          if old not in text:
+              raise SystemExit('policy anchor missing or already modified')
+          policy.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          test = Path('data/device-catalog/research/test_stm32f4_phase4_2d_ry_wlcsp64_policy.py')
+          test.write_text('''#!/usr/bin/env python3\nfrom __future__ import annotations\n\nimport sys\nimport unittest\nfrom pathlib import Path\n\nHERE = Path(__file__).resolve().parent\nif str(HERE) not in sys.path:\n    sys.path.insert(0, str(HERE))\n\nfrom stm32f4_admission_policy import _package_and_pins\nfrom stm32f4_coverage_gap_inventory import build_inventory\n\nCATALOG = HERE / "openocd-parts-canonical.csv"\nCANONICAL = HERE / "stm32f4-commercial-icpn.csv"\n\nclass STM32F4Phase42DRYWLCSP64PolicyTests(unittest.TestCase):\n    def test_ry_maps_to_wlcsp64(self) -> None:\n        self.assertEqual(_package_and_pins("R", "Y"), ("WLCSP", "64"))\n\n    def test_policy_delta_unlocks_exactly_two_bases(self) -> None:\n        inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)\n        self.assertEqual(inventory["production"]["exact_icpn_rows"], 199)\n        self.assertEqual(inventory["production"]["base_device_count"], 68)\n        self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)\n        self.assertEqual(inventory["gap"]["base_device_count"], 81)\n        self.assertEqual(inventory["gap"]["policy_ready_count"], 2)\n        self.assertEqual(inventory["gap"]["policy_blocked_count"], 79)\n        ready = {item["base_device"]: item for item in inventory["gap"]["policy_ready"]}\n        self.assertEqual(set(ready), {"STM32F412RE", "STM32F412RG"})\n        for base in ready:\n            self.assertEqual(ready[base]["package_codes"], ["T", "Y"] if base == "STM32F412RE" else ["H", "T", "Y"] )\n            self.assertEqual(ready[base]["policy_blockers"], [])\n\n    def test_production_is_unchanged(self) -> None:\n        inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)\n        production = set(inventory["production"]["base_devices"])\n        self.assertNotIn("STM32F412RE", production)\n        self.assertNotIn("STM32F412RG", production)\n\nif __name__ == "__main__":\n    unittest.main()\n''', encoding='utf-8')
+
+          workflow = Path('.github/workflows/device-catalog-phase42d-ry-wlcsp64-validation.yml')
+          workflow.write_text('''name: Device catalog Phase 4.2D R/Y WLCSP64 policy\n\non:\n  push:\n    branches: [main]\n  pull_request:\n\npermissions:\n  contents: read\n\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-python@v5\n        with:\n          python-version: '3.12'\n      - run: python data/device-catalog/research/test_stm32f4_phase4_2d_ry_wlcsp64_policy.py\n''', encoding='utf-8')
+          PY
+          git diff --check
+          python data/device-catalog/research/test_stm32f4_phase4_2d_ry_wlcsp64_policy.py
+      - name: Commit bounded policy delta
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32f4_admission_policy.py \
+                  data/device-catalog/research/test_stm32f4_phase4_2d_ry_wlcsp64_policy.py \
+                  .github/workflows/device-catalog-phase42d-ry-wlcsp64-validation.yml
+          git diff --cached --check
+          git commit -m 'device-catalog: add STM32F4 R/Y WLCSP64 policy mapping'
+          git push origin HEAD:agent/device-catalog-phase4.2d-ry-wlcsp64
