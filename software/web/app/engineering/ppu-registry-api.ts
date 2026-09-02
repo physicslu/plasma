@@ -19,6 +19,18 @@ export type ManagerRegistryPayload = {
   ppus: ManagerRegistryEntry[];
 };
 
+type RegistryMutationPayload = {
+  ok: true;
+  entry: ManagerRegistryEntry;
+  registry: ManagerRegistryPayload;
+};
+
+type RegistryRemovePayload = {
+  ok: true;
+  removed: ManagerRegistryEntry;
+  registry: ManagerRegistryPayload;
+};
+
 type ErrorPayload = {
   error?: {
     code?: string;
@@ -53,8 +65,8 @@ export function getManagerFleet(): Promise<FleetWebPayload> {
   return jsonRequest<FleetWebPayload>("/api/fleet");
 }
 
-export function addManagerPpu(alias: string, endpoint: string): Promise<{ ok: true; entry: ManagerRegistryEntry; registry: ManagerRegistryPayload }> {
-  return jsonRequest("/api/manager/registry", {
+export function addManagerPpu(alias: string, endpoint: string): Promise<RegistryMutationPayload> {
+  return jsonRequest<RegistryMutationPayload>("/api/manager/registry", {
     method: "POST",
     body: JSON.stringify({ alias, endpoint }),
   });
@@ -63,15 +75,15 @@ export function addManagerPpu(alias: string, endpoint: string): Promise<{ ok: tr
 export function setManagerPpuLifecycle(
   alias: string,
   lifecycle: Exclude<RegistryLifecycle, "pending">,
-): Promise<{ ok: true; entry: ManagerRegistryEntry; registry: ManagerRegistryPayload }> {
-  return jsonRequest(`/api/manager/registry/${encodeURIComponent(alias)}`, {
+): Promise<RegistryMutationPayload> {
+  return jsonRequest<RegistryMutationPayload>(`/api/manager/registry/${encodeURIComponent(alias)}`, {
     method: "PATCH",
     body: JSON.stringify({ lifecycle }),
   });
 }
 
-export function removeManagerPpu(alias: string): Promise<{ ok: true; removed: ManagerRegistryEntry; registry: ManagerRegistryPayload }> {
-  return jsonRequest(`/api/manager/registry/${encodeURIComponent(alias)}`, {
+export function removeManagerPpu(alias: string): Promise<RegistryRemovePayload> {
+  return jsonRequest<RegistryRemovePayload>(`/api/manager/registry/${encodeURIComponent(alias)}`, {
     method: "DELETE",
   });
 }
