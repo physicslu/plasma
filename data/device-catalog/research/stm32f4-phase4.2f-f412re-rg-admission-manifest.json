@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2f-f412re-rg-admission-2026-09-02",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production-admitted lifecycle control retained from prior STM32F4 bounded admissions"
+    },
+    {
+      "base_device": "STM32F412RE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412re.html",
+      "selection_reason": "policy-ready after merged Phase 4.2D R/Y WLCSP64 mapping"
+    },
+    {
+      "base_device": "STM32F412RG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412rg.html",
+      "selection_reason": "policy-ready after merged Phase 4.2D; Phase 4.2E0 routing prerequisite now resolves the P-option exact ICPN"
+    }
+  ]
+}
