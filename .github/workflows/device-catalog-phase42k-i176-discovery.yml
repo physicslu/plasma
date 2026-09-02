@@ -6,6 +6,7 @@ on:
       - agent/device-catalog-phase4.2k-i176-admission
     paths:
       - '.github/workflows/device-catalog-phase42k-i176-discovery.yml'
+      - 'data/device-catalog/research/stm32f4-phase4.2k-i176-admission-manifest.json'
 
 permissions:
   contents: read
@@ -19,76 +20,58 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install browser acquisition dependencies
+      - name: Install browser runtime
         run: |
-          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m pip install playwright==1.62.0
           python -m playwright install --with-deps chromium
-      - name: Discover official ST lifecycle rows
+      - name: Acquire official ST discovery evidence
         run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/phase42k-discovery"
-          PYTHONPATH=data/device-catalog/research python - <<'PY'
-          from __future__ import annotations
-          import json
-          from datetime import datetime, timezone
-          from pathlib import Path
-          from st_browser_acquisition import STBrowserAcquirer, build_browser_evidence_record
-
-          bases = [
-              'STM32F407IE','STM32F407IG','STM32F417IE','STM32F417IG',
-              'STM32F427IG','STM32F427II','STM32F429IE','STM32F429IG','STM32F429II',
-              'STM32F437IG','STM32F437II','STM32F439IG','STM32F439II',
-              'STM32F469IE','STM32F469IG','STM32F469II','STM32F479IG','STM32F479II',
-          ]
-          out = Path('/tmp/phase42k-discovery')
-          out.mkdir(parents=True, exist_ok=True)
-          results = []
-          with STBrowserAcquirer(headless=True, navigation_attempts=2) as acquirer:
-              for base in bases:
-                  url = f'https://www.st.com/en/microcontrollers-microprocessors/{base.lower()}.html'
-                  item = {'base_device': base, 'source_url': url}
-                  try:
-                      body, final_url, _, _ = acquirer.fetch(url, 45.0)
-                      retrieved = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
-                      ev = build_browser_evidence_record(
-                          body=body, source_url=url, final_url=final_url,
-                          base_device=base, retrieved_at_utc=retrieved,
-                      )
-                      (out / f'{base}.json').write_text(json.dumps(ev, indent=2, sort_keys=True)+'\n', encoding='utf-8')
-                      item.update({
-                          'status':'success',
-                          'active_exact_icpns': ev['exact_icpns'],
-                          'excluded_non_active_part_numbers': ev['excluded_non_active_part_numbers'],
-                          'rendered_dom_sha256': ev['rendered_dom_sha256'],
-                          'evidence_section_sha256': ev['evidence_section_sha256'],
-                      })
-                  except Exception as exc:
-                      item.update({'status':'failure','error':str(exc)})
-                  results.append(item)
-
-          summary = {
-              'schema_version': 1,
-              'phase': '4.2K',
-              'purpose': 'discovery_only_no_canonical_write',
-              'target_count': len(bases),
-              'success_count': sum(r['status']=='success' for r in results),
-              'failure_count': sum(r['status']!='success' for r in results),
-              'active_exact_icpn_count': sum(len(r.get('active_exact_icpns', [])) for r in results),
-              'results': results,
-              'canonical_dataset_written': False,
-              'algorithm_equivalence_claimed': False,
-              'physical_ppu_validation_claimed': False,
-          }
-          (out / 'summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True)+'\n', encoding='utf-8')
-          print(json.dumps(summary, indent=2, sort_keys=True))
-          if summary['failure_count']:
-              raise SystemExit(1)
-          PY
-      - name: Upload discovery evidence
+          set +e
+          mkdir -p /tmp/phase42k
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
+            --manifest data/device-catalog/research/stm32f4-phase4.2k-i176-admission-manifest.json \
+            --catalog data/device-catalog/research/openocd-parts-canonical.csv \
+            --output /tmp/phase42k/pilot-summary.json \
+            --scope pilot \
+            --headed \
+            --timeout 30 \
+            --delay 2
+          rc=$?
+          printf '%s\n' "$rc" > /tmp/phase42k/acquisition-exit-code.txt
+          exit 0
+      - name: Hash discovery output
         if: always()
-        uses: actions/upload-artifact@v4
+        run: |
+          cd /tmp/phase42k
+          sha256sum * > SHA256SUMS || true
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: phase42k-stm32f4-i176-discovery
-          path: /tmp/phase42k-discovery
+          path: /tmp/phase42k
           if-no-files-found: error
           retention-days: 30
+      - name: Enforce discovery result
+        if: always()
+        run: |
+          test -f /tmp/phase42k/acquisition-exit-code.txt
+          test "$(cat /tmp/phase42k/acquisition-exit-code.txt)" = "0"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('/tmp/phase42k/pilot-summary.json')
+          if not p.exists():
+              raise SystemExit('pilot-summary.json missing')
+          data = json.loads(p.read_text())
+          if data.get('acquisition_failure') != 0:
+              raise SystemExit(f"acquisition failures: {data.get('acquisition_failure')}")
+          manifest = json.loads(Path('data/device-catalog/research/stm32f4-phase4.2k-i176-admission-manifest.json').read_text())
+          expected = {x['base_device'] for x in manifest['targets']}
+          got = {x.get('base_device') for x in data.get('results', [])}
+          if got != expected:
+              raise SystemExit(f'unexpected target set: expected={sorted(expected)} got={sorted(got)}')
+          if len(got) != 19:
+              raise SystemExit(f'expected 19 bounded targets, got {len(got)}')
+          print(f"bounded_targets={len(got)}")
+          print(f"active_exact_icpn_candidates={data.get('exact_icpn_candidates')}")
+          PY
