@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "phase": "4.2C",
+  "source": {
+    "workflow_run_id": "33588242354",
+    "artifact_id": "9830826354",
+    "artifact_name": "phase42c-stm32f4-blocker-portfolio",
+    "artifact_zip_sha256": "837832c54ac6fcfe1866288e1113871fd6456f4757d3f7b7c298c5d143cd805f"
+  },
+  "current_state": {
+    "production_exact_icpn_rows": 199,
+    "production_base_device_count": 68,
+    "openocd_ordering_pattern_base_device_count": 149,
+    "gap_base_device_count": 81,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 81
+  },
+  "smallest_blocker_surfaces": [
+    {
+      "surface": "unsupported STM32F4 package code: I",
+      "affected_base_devices": ["STM32F410R8", "STM32F410RB"],
+      "immediately_unblocked_if_resolved": ["STM32F410RB"],
+      "additional_policy_semantics_required": true
+    },
+    {
+      "surface": "unsupported STM32F4 pin/package combination: R/Y",
+      "affected_base_devices": ["STM32F412RE", "STM32F412RG"],
+      "immediately_unblocked_if_resolved": ["STM32F412RE", "STM32F412RG"],
+      "additional_policy_semantics_required": false
+    },
+    {
+      "surface": "unsupported STM32F4 pin/package combination: T/Y",
+      "affected_base_devices": ["STM32F410T8", "STM32F410TB"],
+      "immediately_unblocked_if_resolved": ["STM32F410TB"],
+      "additional_policy_semantics_required": false,
+      "still_blocked_after_mapping": {
+        "STM32F410T8": ["unsupported flash-size code 8"]
+      }
+    }
+  ],
+  "selected_next_surface": {
+    "policy_mapping": "R/Y -> WLCSP64",
+    "affected_base_devices": ["STM32F412RE", "STM32F412RG"],
+    "expected_policy_ready_after_mapping": ["STM32F412RE", "STM32F412RG"],
+    "expected_gap_base_device_count": 81,
+    "expected_policy_ready_count": 2,
+    "expected_policy_blocked_count": 79,
+    "reason": "Y is already defined as WLCSP in the STM32F4 admission policy. Official ST product/Q&R data for STM32F412RE and STM32F412RG directly identifies Y-suffix Active parts as WLCSP 64, and the STM32F412xE/G datasheet lists WLCSP64. This requires only one new direct pin/package mapping and immediately unblocks two supported-flash Base Devices.",
+    "official_st_product_urls": [
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f412re.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f412rg.html"
+    ],
+    "official_st_datasheet_url": "https://www.st.com/resource/en/datasheet/stm32f412rg.pdf"
+  },
+  "policy_change_applied": false,
+  "production_write_applied": false,
+  "algorithm_equivalence_claimed": false
+}

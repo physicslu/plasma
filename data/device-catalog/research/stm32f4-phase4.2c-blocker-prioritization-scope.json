@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "phase": "4.2C",
+  "base_main": "4d78f2ca7f40f5c88ea8a1c9d12c30fc62322308",
+  "scope": "read-only prioritization of remaining STM32F4 policy-blocked coverage gaps",
+  "locked_prestate": {
+    "stm32f1_exact_icpns": 75,
+    "stm32f4_exact_icpns": 199,
+    "st_total_exact_icpns": 274,
+    "stm32f4_base_devices": 68,
+    "openocd_ordering_pattern_base_devices": 149,
+    "gap_base_devices": 81,
+    "policy_ready": 0,
+    "policy_blocked": 81
+  },
+  "goals": [
+    "recompute blocker portfolio from current main",
+    "identify the smallest defensible next policy surface",
+    "separate pin-package mapping blockers from flash-code and package-code semantics",
+    "make no production or admission-policy changes in this phase"
+  ],
+  "production_write_allowed": false,
+  "policy_change_allowed": false,
+  "algorithm_equivalence_claimed": false
+}
