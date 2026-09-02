@@ -1,0 +1,29 @@
+name: Device catalog Phase 4.2B STM32F410CB lifecycle
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-phase42b-f410cb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate retained evidence offline
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2b-f410cb-admission-live-2026-09-02 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2b-f410cb-admission-baseline.json
+      - name: Validate Phase 4.2B post-admission lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_2b_f410cb_post_admission.py
+      - name: Preserve Phase 4.2A policy history
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_2a_ct_lqfp48_policy.py
