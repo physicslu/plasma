@@ -137,6 +137,53 @@ When the secure Gateway boundary is active:
 
 This is intentionally stricter than ordinary Programming Job operation permissions because a future Phase 2 network activation can remove the PPU from its current management path.
 
+## Phase 1 packaged ARMv7 acceptance
+
+The canonical one-command acceptance runner is:
+
+```bash
+source software/python/.venv/bin/activate
+python scripts/ppu-network-phase1-acceptance.py
+```
+
+The runner is intentionally broader than a unit test. From the repository revision under test it:
+
+```text
+build PPU runtime
+-> validate runtime
+-> build canonical linux-armv7l release
+-> verify detached SHA-256
+-> clean-extract and verify the release
+-> validate the clean runtime
+-> preflight QEMU/binfmt ARMv7
+-> run the packaged release in an ARMv7 container
+-> start packaged Plasma Server + Gateway
+-> exercise /api/settings/ppu-network
+-> restart the Gateway and prove persistence
+-> run negative validation tests
+-> prove actual eth0 IPv4 did not change
+-> emit human-readable + JSON evidence
+```
+
+The ARMv7 acceptance container is started without `CAP_NET_ADMIN` and with `no-new-privileges`. The runner also reads the actual container `eth0` IPv4 before and after the desired-state writes. A PASS therefore requires both:
+
+```text
+desired PPU network state changes and persists
+actual Linux eth0 state does not change
+```
+
+The default machine-readable report is:
+
+```text
+.work/reports/ppu-network-phase1-acceptance.json
+```
+
+The terminal summary contains the Git SHA, product version, release SHA-256, ARMv7 architecture, each acceptance check, actual/desired IPv4 values, final settings revision, and the final PASS/FAIL result. Operators normally need to paste only this summary for review.
+
+A Phase 1 PASS does **not** claim PYNQ-Z2 hardware, Linux network activation, DHCP activation, route/DNS mutation, Manager reconnect, same-`ppu_id` revalidation, or rollback. Those remain Phase 2 acceptance work.
+
+The PPU release workflow also executes this same one-command runner so the acceptance tool itself is continuously exercised rather than existing only as an operator-side script.
+
 ## Phase 2 boundary
 
 Phase 2 will add Linux network activation semantics. It must not reinterpret a Phase 1 desired-state write as an already-applied configuration.
@@ -159,4 +206,4 @@ The Linux backend (`systemd-networkd`, NetworkManager, or another mechanism) mus
 
 The Phase 1 contract is architecture-independent Python and can be exercised on the SWPC ARM virtual machine for API, validation, persistence, restart, and security behavior.
 
-An ARM VM result does not prove PYNQ-Z2 Linux network activation. Actual `eth0` changes, reconnect behavior, rollback, boot-time network restoration, and PYNQ-Z2 image integration remain Phase 2 / Z2 acceptance work.
+The canonical packaged acceptance above uses SWPC/QEMU ARMv7 userspace as software evidence. That result does not prove PYNQ-Z2 Linux network activation. Actual `eth0` changes, reconnect behavior, rollback, boot-time network restoration, and PYNQ-Z2 image integration remain Phase 2 / Z2 acceptance work.

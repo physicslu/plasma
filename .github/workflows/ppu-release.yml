@@ -10,6 +10,7 @@ on:
       - "scripts/product-release.py"
       - "scripts/ppu-armv7-runtime-acceptance.py"
       - "scripts/ppu-armv7-runtime-lab.py"
+      - "scripts/ppu-network-phase1-acceptance.py"
       - "release/**"
       - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
@@ -22,6 +23,7 @@ on:
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_armv7_runtime_acceptance.py"
       - "software/python/tests/test_ppu_armv7_runtime_lab.py"
+      - "software/python/tests/test_ppu_network_phase1_acceptance.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_product_release.py"
       - "docs/deployment/ppu-runtime-packaging.md"
@@ -52,6 +54,7 @@ jobs:
           software/python/tests/test_ppu_runtime.py
           software/python/tests/test_ppu_armv7_runtime_acceptance.py
           software/python/tests/test_ppu_armv7_runtime_lab.py
+          software/python/tests/test_ppu_network_phase1_acceptance.py
           software/python/tests/test_ppu_release.py
           software/python/tests/test_product_release.py
 
@@ -154,6 +157,14 @@ jobs:
             python /acceptance.py \
               --runtime-dir /runtime \
               --work-dir /work
+
+      - name: Run one-command PPU Network Phase 1 acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ppu-network-phase1-acceptance.py \
+            --work-dir "$RUNNER_TEMP/plasma-ppu-network-phase1" \
+            --report "$RUNNER_TEMP/plasma-ppu-network-phase1.json"
 
       - name: Upload PPU release artifact
         uses: actions/upload-artifact@v4
