@@ -1,0 +1,49 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F405OG",
+      "icpn": "STM32F405OGY6VTR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "base_device": "STM32F405OG",
+      "icpn": "STM32F405OGY6WTR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "pilot_id": "stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9838558390",
+    "artifact_sha256": "c211e4b96e9bacd3cbbc72877b49ac514d5e493eb709b0aa1388ea128bc26cba",
+    "source_pr": 303,
+    "workflow_run_id": "33609506654"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "exact_icpns": [
+        "STM32F479ZGT6"
+      ]
+    },
+    {
+      "base_device": "STM32F405OE",
+      "exact_icpns": [
+        "STM32F405OEY6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F405OG",
+      "exact_icpns": [
+        "STM32F405OGY6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F415OG",
+      "exact_icpns": [
+        "STM32F415OGY6TR"
+      ]
+    }
+  ]
+}

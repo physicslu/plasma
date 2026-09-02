@@ -22,8 +22,10 @@ class STM32F4Phase42DRYWLCSP64PolicyTests(unittest.TestCase):
 
     def test_policy_mapping_remains_valid_after_admission(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
-        self.assertEqual(inventory["production"]["exact_icpn_rows"], 208)
-        self.assertEqual(inventory["production"]["base_device_count"], 70)
+        # This historical gate owns the Phase 4.2D policy invariant, not the
+        # current catalog size. Later admissions are allowed to grow Production.
+        self.assertGreaterEqual(inventory["production"]["exact_icpn_rows"], 208)
+        self.assertGreaterEqual(inventory["production"]["base_device_count"], 70)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
         self.assertEqual(
             inventory["gap"]["base_device_count"],

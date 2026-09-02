@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production-admitted lifecycle control retained from prior STM32F4 bounded admissions"
+    },
+    {
+      "base_device": "STM32F405OE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405oe.html",
+      "selection_reason": "policy-ready after merged Phase 4.2H O/Y WLCSP90 mapping"
+    },
+    {
+      "base_device": "STM32F405OG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405og.html",
+      "selection_reason": "policy-ready after merged Phase 4.2H O/Y WLCSP90 mapping; discovery must exclude NRND variants"
+    },
+    {
+      "base_device": "STM32F415OG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f415og.html",
+      "selection_reason": "policy-ready after merged Phase 4.2H O/Y WLCSP90 mapping"
+    }
+  ]
+}

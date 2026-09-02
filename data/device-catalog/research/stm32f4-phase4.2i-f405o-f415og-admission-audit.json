@@ -1,0 +1,24 @@
+{
+  "algorithm_equivalence_claimed": false,
+  "canonical_dataset_written": true,
+  "final_csv_git_blob": "62b69ade638c1ec6826762b52adb4cfa3cb0a49c",
+  "final_csv_sha256": "2b3e7aaf50e855957af2072815fd536ac8e4374f7a4326f035e344f2c1abc19b",
+  "new_exact_icpns": [
+    "STM32F405OEY6TR",
+    "STM32F405OGY6TR",
+    "STM32F415OGY6TR"
+  ],
+  "physical_ppu_validation_claimed": false,
+  "post_rows": 211,
+  "pre_rows": 208,
+  "proposal_artifact_id": "9845456075",
+  "proposal_artifact_sha256": "b932a860350a03df3881d96d3e8680ed1dd96dbe9d837da7ae83eeefaf41cde6",
+  "proposal_plan_sha256": "58d5a9c10b82bd13325e04a9931a42a6bf554304b006b797e9cc46b7014c08db",
+  "proposal_run_id": "33627682129",
+  "retained_artifact_id": "9845365879",
+  "retained_artifact_sha256": "5ddf79b73a15c3ea412e98a6ed908c2a74f8670f7320d11b880248486fafcbb9",
+  "retained_evidence_id": "stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02-retained-20260902T115842Z-c159334",
+  "retained_run_id": "33627304458",
+  "schema_version": 1,
+  "transaction": "stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02"
+}

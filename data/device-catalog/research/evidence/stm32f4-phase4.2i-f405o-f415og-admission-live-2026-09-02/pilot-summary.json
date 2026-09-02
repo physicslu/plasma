@@ -1,0 +1,248 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 4,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 4,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 4,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 4,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 4,
+    "total": 4
+  },
+  "pilot_id": "stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "bfac04986052b1b9410a5963075419c2204345ae5b9f7611254060d748d3ee7e",
+        "retrieved_at_utc": "2026-09-02T11:58:42Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production-admitted lifecycle control retained from prior STM32F4 bounded admissions",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F405OE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F405OEYx",
+          "icpn": "STM32F405OEY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F405OE",
+        "evidence_section_sha256": "5c1eddf5eb71a80dd99485b90379716bb2d935a7a9da97e1c6b2355026e0f9e5",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F405OEY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405oe.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F405OEY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "7b07182419ffc6ac39cd988748c68a0eec032d77c181d1638069d5bba74181d5",
+        "retrieved_at_utc": "2026-09-02T11:58:53Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405oe.html"
+      },
+      "selection_reason": "policy-ready after merged Phase 4.2H O/Y WLCSP90 mapping",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405oe.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F405OG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F405OGYx",
+          "icpn": "STM32F405OGY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F405OG",
+        "evidence_section_sha256": "a9b1d4f8e9964d2ab1640e47f893bc0f0c7f0359c41479f306d7ca363fea5c19",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F405OGY6TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F405OGY6VTR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32F405OGY6WTR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405og.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F405OGY6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32F405OGY6VTR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32F405OGY6WTR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "770bdb1a676a5a623bed9f4d70c90b3116f35bf38ecc5b7047ae710148100f3d",
+        "retrieved_at_utc": "2026-09-02T11:59:01Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405og.html"
+      },
+      "selection_reason": "policy-ready after merged Phase 4.2H O/Y WLCSP90 mapping; discovery must exclude NRND variants",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f405og.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F415OG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F415OGYx",
+          "icpn": "STM32F415OGY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F415OG",
+        "evidence_section_sha256": "76f292b9294bee67e957913c91922c672d8b4b19f795a08645f78adef65fef87",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F415OGY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f415og.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F415OGY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "c57d112d5968d60954fac7386ad9d113298899ca526003eb2259cfa6c6d72040",
+        "retrieved_at_utc": "2026-09-02T11:59:12Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f415og.html"
+      },
+      "selection_reason": "policy-ready after merged Phase 4.2H O/Y WLCSP90 mapping",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f415og.html"
+    }
+  ],
+  "schema_version": 1
+}
