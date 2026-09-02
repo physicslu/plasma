@@ -1,0 +1,93 @@
+name: Device catalog Phase 4.2I bind admission proposal
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2i-f405o-f415og-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42i-bind-proposal.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  bind:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2i-f405o-f415og-admission
+      - uses: actions/download-artifact@v4
+        with:
+          name: phase42i-stm32f405o-f415og-admission-proposal
+          path: /tmp/phase42i-proposal
+          github-token: ${{ github.token }}
+          repository: physicslu/plasma
+          run-id: 33627682129
+      - name: Validate proposal artifact and write binding
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          root = Path('/tmp/phase42i-proposal')
+          plan_path = root / 'plan.json'
+          proposed_path = root / 'proposed.csv'
+          write_result_path = root / 'write-result.json'
+          for p in (plan_path, proposed_path, write_result_path):
+              if not p.exists():
+                  raise SystemExit(f'missing proposal file: {p}')
+
+          plan = json.loads(plan_path.read_text(encoding='utf-8'))
+          assert plan['candidate_count'] == 3, plan
+          assert plan['decision_counts'] == {
+              'admit': 3,
+              'already_present': 0,
+              'manual_review_required': 0,
+              'reject': 0,
+          }, plan
+          assert plan['conflicts'] == 0 and plan['issues'] == [], plan
+
+          result = json.loads(write_result_path.read_text(encoding='utf-8'))
+          assert result['status'] == 'written', result
+          assert result['rows_before'] == 208 and result['rows_after'] == 211, result
+          assert sorted(result['added']) == [
+              'STM32F405OEY6TR',
+              'STM32F405OGY6TR',
+              'STM32F415OGY6TR',
+          ], result
+
+          binding = {
+              'schema_version': 1,
+              'transaction': 'stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02',
+              'proposal_run_id': '33627682129',
+              'proposal_artifact_id': '9845456075',
+              'proposal_artifact_name': 'phase42i-stm32f405o-f415og-admission-proposal',
+              'proposal_artifact_sha256': 'b932a860350a03df3881d96d3e8680ed1dd96dbe9d837da7ae83eeefaf41cde6',
+              'plan_sha256': hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+              'proposed_csv_sha256': hashlib.sha256(proposed_path.read_bytes()).hexdigest(),
+              'write_result_sha256': hashlib.sha256(write_result_path.read_bytes()).hexdigest(),
+              'production_pre_rows': 208,
+              'production_pre_csv_sha256': '22419b078f1c6436f0aa6dd3b410791170a1976be59a03a814469acc54690f09',
+              'production_pre_git_blob': '13c456ad4b64a0be2d626af45d2b2fddb9ab4c17',
+              'proposed_post_rows': 211,
+              'canonical_dataset_written': False,
+          }
+          out = Path('data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-proposal-binding.json')
+          out.write_text(json.dumps(binding, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(binding, indent=2, sort_keys=True))
+          PY
+          git diff --check
+      - name: Commit proposal binding
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-proposal-binding.json
+          git diff --cached --check
+          git commit -m 'device-catalog: bind Phase4.2I admission proposal'
+          git push origin HEAD:agent/device-catalog-phase4.2i-f405o-f415og-admission
