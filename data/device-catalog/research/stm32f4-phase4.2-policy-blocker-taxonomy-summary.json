@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "phase": "4.2",
+  "scope": "STM32F4 policy-blocked ordering-pattern coverage gaps",
+  "source": {
+    "workflow_run_id": "33581639230",
+    "artifact_id": "9828581417",
+    "artifact_name": "phase42-stm32f4-policy-blocker-analysis",
+    "artifact_zip_sha256": "62b425f37d50b845943b201fcd67d980c46b27d9f31ee70fee2ca6c5a8e627a7",
+    "inventory_sha256": "600cb2690df6367b7569b40c5b29f7cc9ba65a58ed854e23164cffe587dbf462",
+    "taxonomy_sha256": "9d929d80445207fa7cbff25705c98b89149f66c05a1e2b5671299df52b47ec5a"
+  },
+  "prestate": {
+    "production_exact_icpn_rows": 194,
+    "production_base_device_count": 67,
+    "openocd_ordering_pattern_base_device_count": 149,
+    "gap_base_device_count": 82,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 82
+  },
+  "pin_package_combination_counts": {
+    "A/H": 11,
+    "A/Y": 5,
+    "B/T": 10,
+    "C/T": 2,
+    "I/H": 18,
+    "I/T": 18,
+    "M/Y": 5,
+    "N/H": 10,
+    "O/Y": 3,
+    "R/Y": 2,
+    "T/Y": 2,
+    "V/H": 11
+  },
+  "flash_code_blocker_counts": {
+    "8": 3,
+    "H": 10
+  },
+  "other_blocker_counts": {
+    "unsupported STM32F4 package code: I": 2
+  },
+  "smallest_defensible_next_surface": {
+    "policy_mapping": "C/T -> LQFP48",
+    "affected_bases": [
+      "STM32F410C8",
+      "STM32F410CB"
+    ],
+    "immediately_unblocked_if_only_mapping_is_added": [
+      "STM32F410CB"
+    ],
+    "still_blocked_by_flash_code_after_mapping": [
+      "STM32F410C8"
+    ],
+    "reason": "STM32F410CB has only the C/T pin-package blocker; STM32F410C8 additionally has unsupported flash-size code 8. Official ST product/Q&R data and the STM32F410x8/B datasheet identify the T package as LQFP48.",
+    "official_st_product_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410cb.html",
+    "official_st_datasheet_url": "https://www.st.com/resource/en/datasheet/stm32f410cb.pdf"
+  },
+  "policy_change_applied": false,
+  "production_write_applied": false,
+  "algorithm_equivalence_claimed": false
+}
