@@ -333,7 +333,7 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
         if path == "/api/devices/search":
             self._authorize(Permission.CATALOG_READ)
             return
-        if path in {"/api/settings/gateway", "/api/mock/runtime"}:
+        if path in {"/api/settings/gateway", "/api/settings/ppu-network", "/api/mock/runtime"}:
             self._authorize(Permission.SETTINGS_READ)
             return
 
@@ -424,6 +424,8 @@ class SecurePlasmaWebHandler(CanonicalPlasmaWebHandler):
             return False
         if path == "/api/settings/gateway":
             return self._admit_command(Permission.GATEWAY_SETTINGS_WRITE)
+        if path == "/api/settings/ppu-network":
+            return self._admit_command(Permission.PPU_NETWORK_SETTINGS_WRITE)
         if path == "/api/mock/runtime":
             return self._admit_command(Permission.MOCK_SETTINGS_WRITE)
         if path == "/api/engineering/session":
