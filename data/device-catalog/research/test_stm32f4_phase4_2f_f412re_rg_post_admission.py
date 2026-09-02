@@ -27,6 +27,14 @@ EXPECTED = {
     "STM32F412RET6", "STM32F412RET6TR", "STM32F412RET7", "STM32F412RET7TR", "STM32F412REY6TR",
     "STM32F412RGT6", "STM32F412RGT6TR", "STM32F412RGY6PTR", "STM32F412RGY6TR",
 }
+# Admissions after Phase 4.2F must be removed when reconstructing the immutable
+# historical 199-row pre-state. Otherwise a later legitimate catalog expansion
+# would make this historical replay test fail for the wrong reason.
+POST_PHASE42F_ADMISSIONS = {
+    "STM32F405OEY6TR",
+    "STM32F405OGY6TR",
+    "STM32F415OGY6TR",
+}
 
 
 class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
@@ -44,7 +52,7 @@ class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
 
     def test_production_contains_exact_bounded_admission(self) -> None:
         rows = self._rows()
-        self.assertEqual(len(rows), 208)
+        self.assertGreaterEqual(len(rows), 208)
         by_icpn = {row["icpn"]: row for row in rows}
         self.assertTrue(EXPECTED <= set(by_icpn))
         row = by_icpn["STM32F412RGY6PTR"]
@@ -54,12 +62,11 @@ class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
         self.assertEqual(row["flash_size"], "1024 KiB")
         self.assertEqual(row["option_suffix"], "PTR")
         self.assertEqual(row["openocd_target_config"], "tcl/target/stm32f4x.cfg")
-        self.assertEqual(hashlib.sha256(CANONICAL.read_bytes()).hexdigest(), FINAL_SHA)
 
     def test_gap_lifecycle_closes_admitted_bases_without_freezing_future_policy(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
-        self.assertEqual(inventory["production"]["exact_icpn_rows"], 208)
-        self.assertEqual(inventory["production"]["base_device_count"], 70)
+        self.assertGreaterEqual(inventory["production"]["exact_icpn_rows"], 208)
+        self.assertGreaterEqual(inventory["production"]["base_device_count"], 70)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
         self.assertEqual(
             inventory["gap"]["base_device_count"],
@@ -75,7 +82,11 @@ class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if row["icpn"] not in EXPECTED]
+            rows = [
+                row
+                for row in reader
+                if row["icpn"] not in EXPECTED and row["icpn"] not in POST_PHASE42F_ADMISSIONS
+            ]
         self.assertEqual(len(rows), 199)
         with tempfile.TemporaryDirectory() as tmp:
             historical = Path(tmp) / "stm32f4-commercial-icpn.csv"
@@ -96,7 +107,6 @@ class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
             result = write_canonical_dataset(plan=plan, canonical_path=historical)
             self.assertEqual((result["rows_before"], result["rows_after"], len(result["added"])), (199, 208, 9))
             self.assertEqual(hashlib.sha256(historical.read_bytes()).hexdigest(), FINAL_SHA)
-            self.assertEqual(historical.read_bytes(), CANONICAL.read_bytes())
 
 
 if __name__ == "__main__":
