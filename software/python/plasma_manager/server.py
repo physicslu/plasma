@@ -17,15 +17,27 @@ from .fleet import MANAGER_CONTRACT_VERSION, MANAGER_SERVICE_NAME, FleetAggregat
 from .observation import FleetObservationStore, FleetSnapshotSource
 from .persistence import SQLiteObservationPersistence
 from .poller import FleetPoller
+from .registry import (
+    REGISTRY_LIFECYCLE_COMMISSIONED,
+    REGISTRY_LIFECYCLE_DISABLED,
+    PPURegistryStore,
+    RegistryConflictError,
+    RegistryEntryNotFound,
+    RegistryMutationDisabled,
+    RegistryStateError,
+)
 
 
 PS_LOOPBACK_ROUTE_PREFIX = "/api/ppus/"
 PS_LOOPBACK_ROUTE_SUFFIX = "/diagnostics/loopback"
 MANAGED_PPU_ROUTE_PREFIX = "/api/ppus/"
 MANAGED_PPU_ROUTE_MARKER = "/gateway"
+REGISTRY_ROUTE = "/api/registry"
+REGISTRY_ROUTE_PREFIX = "/api/registry/"
 MAX_MANAGER_REQUEST_BYTES = 24 * 1024 * 1024
 MAX_MANAGER_RESPONSE_BYTES = 32 * 1024 * 1024
 FORWARDED_REQUEST_HEADERS = frozenset({"authorization", "idempotency-key", "content-type", "accept"})
+ACTIVE_SITE_STATES = frozenset({"queued", "submitting", "running", "stopping", "erase", "program", "verify", "read"})
 
 _SEGMENT = r"[^/]+"
 _MANAGED_GET_PATTERNS = tuple(
@@ -70,11 +82,6 @@ class PlasmaManagerHTTPServer(ThreadingHTTPServer):
     """Threaded Manager HTTP server whose bind path never depends on DNS."""
 
     def server_bind(self) -> None:
-        # HTTPServer.server_bind() performs socket.getfqdn(host) after the socket
-        # bind. That reverse-DNS step can block service startup on hosts where DNS
-        # is unavailable or slow even though the local socket itself is usable.
-        # Plasma Manager service identity is configured explicitly, so DNS-derived
-        # server_name adds no product value and must not be a startup dependency.
         socketserver.TCPServer.server_bind(self)
         host, port = self.server_address[:2]
         self.server_name = str(host)
@@ -85,6 +92,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
     aggregator: FleetAggregator | None = None
     poller: FleetPoller | None = None
     config: ManagerConfig | None = None
+    registry_store: PPURegistryStore | None = None
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -142,9 +150,31 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             raise ValueError("request JSON must be an object")
         return payload
 
+    def _registry_entries(self) -> tuple[PPURegistryEntry, ...]:
+        if self.registry_store is not None:
+            return self.registry_store.entries()
+        return self._config().ppus
+
     def _resolve_ppu_alias(self, alias: str) -> PPURegistryEntry | None:
-        matches = [entry for entry in self._config().ppus if entry.alias == alias]
+        matches = [entry for entry in self._registry_entries() if entry.alias == alias]
         return matches[0] if len(matches) == 1 else None
+
+    def _registry_lifecycle(self, alias: str) -> str:
+        if self.registry_store is None:
+            return REGISTRY_LIFECYCLE_COMMISSIONED
+        record = self.registry_store.record_by_alias(alias)
+        return record.lifecycle if record is not None else "missing"
+
+    def _registry_snapshot(self) -> dict[str, Any]:
+        if self.registry_store is None:
+            return self._aggregator().registry_snapshot()
+        snapshot = self.registry_store.snapshot()
+        return {
+            "ok": True,
+            "service": MANAGER_SERVICE_NAME,
+            "contract_version": MANAGER_CONTRACT_VERSION,
+            **snapshot,
+        }
 
     @staticmethod
     def _valid_alias(encoded: str) -> str | None:
@@ -154,6 +184,15 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         if not alias or alias in {".", ".."} or "/" in alias or "\\" in alias:
             return None
         return alias
+
+    @classmethod
+    def _parse_registry_alias(cls, path: str) -> str | None:
+        if not path.startswith(REGISTRY_ROUTE_PREFIX):
+            return None
+        encoded = path[len(REGISTRY_ROUTE_PREFIX) :]
+        if not encoded or "/" in encoded:
+            return None
+        return cls._valid_alias(encoded)
 
     @classmethod
     def _parse_ps_loopback_alias(cls, path: str) -> str | None:
@@ -185,6 +224,144 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
     def _managed_route_allowed(method: str, target_path: str) -> bool:
         patterns = _MANAGED_GET_PATTERNS if method == "GET" else _MANAGED_POST_PATTERNS if method == "POST" else ()
         return any(pattern.fullmatch(target_path) for pattern in patterns)
+
+    def _fleet_item_for_alias(self, alias: str) -> dict[str, Any] | None:
+        try:
+            snapshot = self._poller().snapshot()
+        except RuntimeError:
+            return None
+        ppus = snapshot.get("ppus")
+        if not isinstance(ppus, list):
+            return None
+        matches = [item for item in ppus if isinstance(item, dict) and item.get("alias") == alias]
+        return matches[0] if len(matches) == 1 else None
+
+    def _alias_has_active_execution(self, alias: str) -> bool:
+        item = self._fleet_item_for_alias(alias)
+        if item is None:
+            return False
+        sites = item.get("sites")
+        if not isinstance(sites, list):
+            return False
+        for site in sites:
+            if not isinstance(site, dict):
+                continue
+            state = str(site.get("state", "")).strip().lower()
+            if state in ACTIVE_SITE_STATES or site.get("current_job_id"):
+                return True
+        return False
+
+    def _alias_is_trusted_for_enable(self, alias: str) -> bool:
+        item = self._fleet_item_for_alias(alias)
+        if item is None:
+            return False
+        observation = item.get("observation")
+        return (
+            item.get("gateway_live") is True
+            and item.get("execution_ready") is True
+            and item.get("contract_compatible") is True
+            and item.get("identity_conflict") is False
+            and isinstance(item.get("ppu"), dict)
+            and isinstance(item.get("sites"), list)
+            and not item.get("errors")
+            and (not isinstance(observation, dict) or observation.get("state") == "current")
+        )
+
+    def _registry_error(self, exc: Exception) -> None:
+        if isinstance(exc, RegistryMutationDisabled):
+            status = HTTPStatus.SERVICE_UNAVAILABLE
+            code = "registry_mutation_disabled"
+        elif isinstance(exc, RegistryConflictError):
+            status = HTTPStatus.CONFLICT
+            code = "registry_conflict"
+        elif isinstance(exc, RegistryEntryNotFound):
+            status = HTTPStatus.NOT_FOUND
+            code = "ppu_not_found"
+        elif isinstance(exc, RegistryStateError):
+            status = HTTPStatus.BAD_REQUEST
+            code = "invalid_registry_request"
+        else:
+            raise exc
+        self._json(status, {"ok": False, "error": {"code": code, "message": str(exc)}})
+
+    def _handle_registry_add(self) -> None:
+        if self.registry_store is None:
+            self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
+            return
+        try:
+            body = self._read_json_object()
+            unexpected = set(body) - {"alias", "endpoint"}
+            if unexpected:
+                raise RegistryStateError(f"unsupported registry fields: {', '.join(sorted(unexpected))}")
+            record = self.registry_store.add(alias=body.get("alias"), endpoint=body.get("endpoint"))
+        except (ValueError, RegistryStateError) as exc:
+            if isinstance(exc, RegistryStateError):
+                self._registry_error(exc)
+            else:
+                self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_request", "message": str(exc)}})
+            return
+        self._json(
+            HTTPStatus.CREATED,
+            {"ok": True, "entry": record.as_dict(), "registry": self._registry_snapshot()},
+        )
+
+    def _handle_registry_lifecycle(self, alias: str) -> None:
+        if self.registry_store is None:
+            self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
+            return
+        try:
+            body = self._read_json_object()
+        except ValueError as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_request", "message": str(exc)}})
+            return
+        if set(body) != {"lifecycle"}:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": {"code": "invalid_request", "message": "registry lifecycle request requires only lifecycle"}},
+            )
+            return
+        lifecycle = body.get("lifecycle")
+        if lifecycle == REGISTRY_LIFECYCLE_COMMISSIONED and not self._alias_is_trusted_for_enable(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "ppu_validation_incomplete",
+                        "message": "PPU must have a current trusted identity/topology observation before Validate & Enable",
+                    },
+                },
+            )
+            return
+        if lifecycle == REGISTRY_LIFECYCLE_DISABLED and self._alias_has_active_execution(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": {"code": "ppu_busy", "message": "active PPU Jobs must finish or be cancelled before disabling this PPU"}},
+            )
+            return
+        try:
+            record = self.registry_store.set_lifecycle(alias, lifecycle)
+        except RegistryStateError as exc:
+            self._registry_error(exc)
+            return
+        self._json(HTTPStatus.OK, {"ok": True, "entry": record.as_dict(), "registry": self._registry_snapshot()})
+
+    def _handle_registry_remove(self, alias: str) -> None:
+        if self.registry_store is None:
+            self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
+            return
+        if self._alias_has_active_execution(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": {"code": "ppu_busy", "message": "active PPU Jobs must finish or be cancelled before removing this PPU"}},
+            )
+            return
+        try:
+            removed = self.registry_store.remove(alias)
+        except RegistryStateError as exc:
+            self._registry_error(exc)
+            return
+        self._json(HTTPStatus.OK, {"ok": True, "removed": removed.as_dict(), "registry": self._registry_snapshot()})
 
     @staticmethod
     def _log_ps_loopback_relay(
@@ -238,8 +415,8 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if parsed.path == "/api/registry":
-            self._json(HTTPStatus.OK, self._aggregator().registry_snapshot())
+        if parsed.path == REGISTRY_ROUTE:
+            self._json(HTTPStatus.OK, self._registry_snapshot())
             return
         if parsed.path == "/api/fleet":
             self._json(HTTPStatus.OK, self._poller().snapshot())
@@ -257,6 +434,12 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.NOT_FOUND,
                 {"ok": False, "error": {"code": "ppu_not_found", "message": "configured PPU alias was not found"}},
+            )
+            return
+        if self._registry_lifecycle(alias) != REGISTRY_LIFECYCLE_COMMISSIONED:
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": {"code": "ppu_not_enabled", "message": "PPU must complete Validate & Enable before Manager write operations"}},
             )
             return
         try:
@@ -348,6 +531,12 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
                 {"ok": False, "error": {"code": "ppu_not_found", "message": "configured PPU alias was not found"}},
             )
             return
+        if self.command == "POST" and self._registry_lifecycle(alias) != REGISTRY_LIFECYCLE_COMMISSIONED:
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": {"code": "ppu_not_enabled", "message": "PPU must complete Validate & Enable before Manager write operations"}},
+            )
+            return
 
         body: bytes | None = None
         if self.command == "POST":
@@ -434,12 +623,15 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             HTTPStatus.METHOD_NOT_ALLOWED,
             {
                 "ok": False,
-                "error": {"message": "Plasma Manager read-only fleet surfaces reject mutation; only the legacy PS loopback route and explicit allowlisted Managed PPU routes accept writes"},
+                "error": {"message": "Plasma Manager rejects mutation outside the explicit runtime registry and allowlisted Managed PPU routes"},
             },
         )
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == REGISTRY_ROUTE:
+            self._handle_registry_add()
+            return
         managed = self._parse_managed_ppu_route(parsed.path)
         if managed is not None:
             alias, target_path = managed
@@ -455,9 +647,19 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         self._read_only()
 
     def do_PATCH(self) -> None:
+        parsed = urlparse(self.path)
+        alias = self._parse_registry_alias(parsed.path)
+        if alias is not None:
+            self._handle_registry_lifecycle(alias)
+            return
         self._read_only()
 
     def do_DELETE(self) -> None:
+        parsed = urlparse(self.path)
+        alias = self._parse_registry_alias(parsed.path)
+        if alias is not None:
+            self._handle_registry_remove(alias)
+            return
         self._read_only()
 
 
@@ -474,16 +676,15 @@ def _build_observation_store(
 
 
 def serve(config: ManagerConfig) -> None:
-    aggregator = FleetAggregator(config)
+    registry = PPURegistryStore(config.ppus, config.registry_state_path)
+    aggregator = FleetAggregator(config, registry_provider=registry.entries)
     observations = _build_observation_store(config, aggregator)
     poller = FleetPoller(observations, config.poll_interval_s)
     PlasmaManagerHandler.aggregator = aggregator
     PlasmaManagerHandler.poller = poller
     PlasmaManagerHandler.config = config
+    PlasmaManagerHandler.registry_store = registry
     server = PlasmaManagerHTTPServer((config.host, config.port), PlasmaManagerHandler)
-    # Product liveness is owned by the Manager process itself, not by PPU transport.
-    # Prime the fleet cache immediately, but do that first poll in the background so
-    # an offline or slow PPU cannot prevent /api/health/live from becoming available.
     poller.start(prime_cache=False)
     print(f"Plasma Manager listening on http://{config.host}:{config.port}")
     try:
