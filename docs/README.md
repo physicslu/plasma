@@ -29,6 +29,7 @@
 - **Current** — [Gateway Communication and Recovery](architecture/gateway-communication-recovery.md)
 - **Current** — [Production Real-Path Loopback Diagnostics](architecture/diagnostics-real-path-loopback.md)
 - **Current** — [Control Plane Routing Architecture](architecture/control-plane-routing-architecture.md)：定義 Control Console、BFF、Plasma Manager、PPU Gateway、Plasma Server 的責任邊界，以及 Managed Mode 的 Programming／Loopback 共用 production route。
+- **Current** — [Manager Runtime PPU Registry](architecture/manager-runtime-ppu-registry.md)：定義 Manager-owned runtime inventory、`pending`／`commissioned`／`disabled` lifecycle、Add／Validate & Enable／Disable／Remove 與 durable state 邊界。
 - **Reference** — [Remote Write Security Boundary](architecture/remote-write-security-boundary.md)
 - **Current** — [PMode Factory Console v2](architecture/pmode-factory-console-v2.md)
 - **Current** — [Engineering Programming Workspace](architecture/engineering-programming-workspace.md)
