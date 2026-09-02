@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2b-f410cb-admission-2026-09-02",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production-admitted Active lifecycle control retained separately from the Phase 4.2B admission target"
+    },
+    {
+      "base_device": "STM32F410CB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410cb.html",
+      "selection_reason": "sole STM32F4 policy-ready coverage gap after Phase 4.2A C/T to LQFP48 policy extension"
+    }
+  ]
+}

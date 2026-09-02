@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "workflow_run_id": "33585683509",
+  "artifact_id": "9830008020",
+  "artifact_name": "phase42b-stm32f410cb-retained",
+  "artifact_zip_sha256": "2424bc688f67d4cd01c34505f9e210735ac7456e4536d022133249548d13512d",
+  "evidence_id": "stm32f4-phase4.2b-f410cb-admission-2026-09-02-retained-20260902T030605Z-664109b",
+  "discovery_workflow_run_id": "33585423385",
+  "discovery_artifact_id": "9829921112",
+  "discovery_artifact_sha256": "81cfc4be87e5e378597c557a0f43ab14b9deca9c0eda315572efa27b103ad98a"
+}

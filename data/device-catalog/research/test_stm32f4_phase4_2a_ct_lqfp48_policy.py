@@ -20,21 +20,25 @@ class STM32F4Phase42ACTLQFP48PolicyTests(unittest.TestCase):
     def test_ct_maps_to_lqfp48(self) -> None:
         self.assertEqual(_package_and_pins("C", "T"), ("LQFP", "48"))
 
-    def test_policy_delta_is_bounded_and_fail_closed(self) -> None:
+    def test_policy_remains_bounded_after_candidate_admission(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
-        self.assertEqual(inventory["production"]["exact_icpn_rows"], 194)
-        self.assertEqual(inventory["production"]["base_device_count"], 67)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
-        self.assertEqual(inventory["gap"]["base_device_count"], 82)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 1)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 81)
+        self.assertEqual(
+            inventory["gap"]["base_device_count"],
+            149 - inventory["production"]["base_device_count"],
+        )
+        self.assertEqual(
+            inventory["gap"]["base_device_count"],
+            inventory["gap"]["policy_ready_count"] + inventory["gap"]["policy_blocked_count"],
+        )
 
         ready = {item["base_device"]: item for item in inventory["gap"]["policy_ready"]}
         blocked = {item["base_device"]: item for item in inventory["gap"]["policy_blocked"]}
+        production_bases = set(inventory["production"]["base_devices"])
 
-        self.assertEqual(set(ready), {"STM32F410CB"})
-        self.assertEqual(ready["STM32F410CB"]["package_codes"], ["T", "U"])
-        self.assertEqual(ready["STM32F410CB"]["policy_blockers"], [])
+        self.assertIn("STM32F410CB", production_bases)
+        self.assertNotIn("STM32F410CB", ready)
+        self.assertNotIn("STM32F410CB", blocked)
 
         self.assertIn("STM32F410C8", blocked)
         self.assertEqual(
@@ -42,10 +46,9 @@ class STM32F4Phase42ACTLQFP48PolicyTests(unittest.TestCase):
             ["unsupported flash-size code 8"],
         )
 
-    def test_no_production_admission_is_implicit(self) -> None:
+    def test_policy_mapping_does_not_implicitly_admit_other_ct_devices(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         production_bases = set(inventory["production"]["base_devices"])
-        self.assertNotIn("STM32F410CB", production_bases)
         self.assertNotIn("STM32F410C8", production_bases)
 
 
