@@ -1,0 +1,420 @@
+{
+  "active_exact_icpn_candidate_count": 54,
+  "algorithm_equivalence_claimed": false,
+  "candidate_base_device_count": 18,
+  "canonical_dataset_admission": false,
+  "control": {
+    "base_device": "STM32F479ZG",
+    "repeated_cleanly_across_cohorts": 4,
+    "semantic_evidence": {
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "exact_icpns": [
+        "STM32F479ZGT6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    }
+  },
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F417IG",
+      "icpn": "STM32F417IGH6W",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "phase": "4.2K",
+  "physical_ppu_validation_claimed": false,
+  "schema_version": 1,
+  "source_discovery": {
+    "cohorts": [
+      {
+        "active_exact_icpn_candidates_including_control": 20,
+        "artifact_id": "9851260459",
+        "artifact_sha256": "3a4b59da36a29a206bbaa9ac4c0ef48cea3a89369446529ba462dd10b94daacc",
+        "candidate_base_count": 5,
+        "cohort": "a",
+        "pilot_id": "stm32f4-phase4.2k-i176-cohort-a-2026-09-02",
+        "target_count": 6
+      },
+      {
+        "active_exact_icpn_candidates_including_control": 15,
+        "artifact_id": "9851252456",
+        "artifact_sha256": "65259ed4f6cc7a35e50b35fe900b380edf5e230499aa0426fc31f0433d48a450",
+        "candidate_base_count": 5,
+        "cohort": "b",
+        "pilot_id": "stm32f4-phase4.2k-i176-cohort-b-2026-09-02",
+        "target_count": 6
+      },
+      {
+        "active_exact_icpn_candidates_including_control": 15,
+        "artifact_id": "9851276536",
+        "artifact_sha256": "a9f9a5fb5fe06e143cdb8cb86ccaec5d910ffd5b3b4e00585d789d0564f55d1b",
+        "candidate_base_count": 5,
+        "cohort": "c",
+        "pilot_id": "stm32f4-phase4.2k-i176-cohort-c-2026-09-02",
+        "target_count": 6
+      },
+      {
+        "active_exact_icpn_candidates_including_control": 8,
+        "artifact_id": "9851248015",
+        "artifact_sha256": "6162edddc5b30a95a899acd4855c08376c6a20582b853b92c17450a0b7ebb39d",
+        "candidate_base_count": 3,
+        "cohort": "d",
+        "pilot_id": "stm32f4-phase4.2k-i176-cohort-d-2026-09-02",
+        "target_count": 4
+      }
+    ],
+    "workflow_head_sha": "390e0be1e7a743bad2683fcb05804717816a4106",
+    "workflow_run_id": "33641967827"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F407IE",
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "a",
+      "evidence_section_sha256": "c96b97346853d5ed75f2d3172e73e5e75394fd0ad11fe1562abb5450b27cfb78",
+      "exact_icpns": [
+        "STM32F407IEH6",
+        "STM32F407IEH6TR",
+        "STM32F407IEH7",
+        "STM32F407IET6"
+      ],
+      "rendered_dom_sha256": "bfb8c81b60d92c8df9bb06a36ea21456377840e5c01178f5b0cf705e1283c19a",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ie.html"
+    },
+    {
+      "base_device": "STM32F407IG",
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "a",
+      "evidence_section_sha256": "56c10145e2b7fe0e46b918b6013316a45c493dcf68333eb87cc317f35d686148",
+      "exact_icpns": [
+        "STM32F407IGH6",
+        "STM32F407IGH6TR",
+        "STM32F407IGH7",
+        "STM32F407IGT6",
+        "STM32F407IGT7"
+      ],
+      "rendered_dom_sha256": "985d742a0ac5101adf9f7162d2dff5b9522dee829e069f972ddcb2667250ed82",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ig.html"
+    },
+    {
+      "base_device": "STM32F417IE",
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "a",
+      "evidence_section_sha256": "3f03cee38b0ff73f3097d863425b387f41bc61bc810c28be5c7829959bdc7d97",
+      "exact_icpns": [
+        "STM32F417IEH6",
+        "STM32F417IET6"
+      ],
+      "rendered_dom_sha256": "65d56e10356f97cf78292069229b55ea53d9b096e7e543e27140fa602785f41c",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ie.html"
+    },
+    {
+      "base_device": "STM32F417IG",
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "a",
+      "evidence_section_sha256": "f9b581bcc6d1085e7db3f7fa63c65963a092e268d32538d06d503a7e71433beb",
+      "exact_icpns": [
+        "STM32F417IGH6",
+        "STM32F417IGH6TR",
+        "STM32F417IGT6",
+        "STM32F417IGT7"
+      ],
+      "rendered_dom_sha256": "09474ab85fd83a9b40aa73a9df5b44b233ad25191c2caa7e171bea016950cda2",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ig.html"
+    },
+    {
+      "base_device": "STM32F427IG",
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "a",
+      "evidence_section_sha256": "fb9a17854077b8579e60f9ffbf85f5d5acc35fd114b52fcbbfeed002ea920781",
+      "exact_icpns": [
+        "STM32F427IGH6",
+        "STM32F427IGH6TR",
+        "STM32F427IGH7",
+        "STM32F427IGT6"
+      ],
+      "rendered_dom_sha256": "0f41bd9885d1049d6e9ec886c4d10b39b3a24301645156395b5da81f607a0ba3",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ig.html"
+    },
+    {
+      "base_device": "STM32F427II",
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "b",
+      "evidence_section_sha256": "855599ef715839fbfe1ab8b621c641ca87fd7ff64b6bde67be3979927bcacc95",
+      "exact_icpns": [
+        "STM32F427IIH6",
+        "STM32F427IIH6TR",
+        "STM32F427IIH7",
+        "STM32F427IIT6",
+        "STM32F427IIT7"
+      ],
+      "rendered_dom_sha256": "bc544cda1b8528084f279bfbb4ca98678870b4894b7129aa3ec83f3aed5afe21",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ii.html"
+    },
+    {
+      "base_device": "STM32F429IE",
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "b",
+      "evidence_section_sha256": "f8cc5a1534ba510556206ea0703c98c54e584018d2974a8d3dc6ff1d4d388fe2",
+      "exact_icpns": [
+        "STM32F429IEH6",
+        "STM32F429IET6"
+      ],
+      "rendered_dom_sha256": "ee7ac5912fad1de160329292a9ebaedfb06cea804667defaff5778f42f5e2bc8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ie.html"
+    },
+    {
+      "base_device": "STM32F429IG",
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "b",
+      "evidence_section_sha256": "84116b858f4e113ba2080f7e401a332e0b5e6bb967d4727d4e26dddefc8a7570",
+      "exact_icpns": [
+        "STM32F429IGH6",
+        "STM32F429IGT6"
+      ],
+      "rendered_dom_sha256": "ac23ad13496366f39fd739d537715576736a3ceca7b22ebd77ef3ddc106dde98",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ig.html"
+    },
+    {
+      "base_device": "STM32F429II",
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "b",
+      "evidence_section_sha256": "e056c910822ff1ababfcfe2112061a6ad693646f0afbb3e3a02c66a6a42458ca",
+      "exact_icpns": [
+        "STM32F429IIH6",
+        "STM32F429IIH6TR",
+        "STM32F429IIT6"
+      ],
+      "rendered_dom_sha256": "f0159a44c54ce328549db5d9d3d4f4166a117d11b6edcdd9b9e665de689655d2",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ii.html"
+    },
+    {
+      "base_device": "STM32F437IG",
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "b",
+      "evidence_section_sha256": "0893d0d3fcffe1b1c65c2be6cd4fa11d1edfab3b96a04ad2f0c4670b8b9032b6",
+      "exact_icpns": [
+        "STM32F437IGH6",
+        "STM32F437IGT6"
+      ],
+      "rendered_dom_sha256": "6de0fa068d069f87a7de538b9f120eb5cf8f31f8cbfa3be2fe908d3152b20130",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ig.html"
+    },
+    {
+      "base_device": "STM32F437II",
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "c",
+      "evidence_section_sha256": "aa60b6d06e9119f4e47560b717659ce918bc500dc18389328b324019fe696c7b",
+      "exact_icpns": [
+        "STM32F437IIH6",
+        "STM32F437IIH6TR",
+        "STM32F437IIT6",
+        "STM32F437IIT7"
+      ],
+      "rendered_dom_sha256": "5486bcccc173b9c4bcf3979a93149a9be39e89de9f1042db76dc4eed8e4839f4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ii.html"
+    },
+    {
+      "base_device": "STM32F439IG",
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "c",
+      "evidence_section_sha256": "786cc0d484efaa906faca5e12fd7ec6bdf2dbef828a3d405de09d2ee93512b0c",
+      "exact_icpns": [
+        "STM32F439IGH6",
+        "STM32F439IGT6"
+      ],
+      "rendered_dom_sha256": "487d3a17d264b7720b46e6a8f33fe70a4c516833a43af3edcb25eb00f2e81f92",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ig.html"
+    },
+    {
+      "base_device": "STM32F439II",
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "c",
+      "evidence_section_sha256": "2c68b04360dc73238a8dc623284771d391fe61956f376d4e4d61ca2ba8acf631",
+      "exact_icpns": [
+        "STM32F439IIH6",
+        "STM32F439IIH6TR",
+        "STM32F439IIH7",
+        "STM32F439IIT6"
+      ],
+      "rendered_dom_sha256": "6d1e9ebb02e722e5b0635488843c2b04cd9976c03b1f407ec9c0f1b45255fae3",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ii.html"
+    },
+    {
+      "base_device": "STM32F469IE",
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "c",
+      "evidence_section_sha256": "6dfe38d6edd37d9dea60018da0b50de16264a0779fa0627f41fd02a56ae8c6ff",
+      "exact_icpns": [
+        "STM32F469IEH6"
+      ],
+      "rendered_dom_sha256": "9091640ae880ed32a862c8471e7ee78d968d6c8e5723075dc999a4601f574591",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ie.html"
+    },
+    {
+      "base_device": "STM32F469IG",
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "c",
+      "evidence_section_sha256": "7dfd90cfc9c52f7e9a46f44ad64c2ffee6f5bb349039e82283bc4f20f5e2ab12",
+      "exact_icpns": [
+        "STM32F469IGH6",
+        "STM32F469IGH6TR",
+        "STM32F469IGT6"
+      ],
+      "rendered_dom_sha256": "06f02245195d63d230ab1e4334d2c3f9a6647aa932335afc17a63f9c979b5ae5",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ig.html"
+    },
+    {
+      "base_device": "STM32F469II",
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "d",
+      "evidence_section_sha256": "c078c0df84ad9358cf062a16cb6d060a44aff7ad8da020650dcb4205258ee507",
+      "exact_icpns": [
+        "STM32F469IIH6",
+        "STM32F469IIT6"
+      ],
+      "rendered_dom_sha256": "4ac47ffc94846171440f572b4c7168ef82e10c9f667954af9269a5fa37365b93",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ii.html"
+    },
+    {
+      "base_device": "STM32F479IG",
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "d",
+      "evidence_section_sha256": "4847a677ee77616e2f370fecf92c41eb893bffe46039d1b0530ce183269c7188",
+      "exact_icpns": [
+        "STM32F479IGH6"
+      ],
+      "rendered_dom_sha256": "f06bdb8a9a32af0ec878e6484fd9e5ce28bd77a9025530c39a59cb5addfbb781",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ig.html"
+    },
+    {
+      "base_device": "STM32F479II",
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "discovery_cohort": "d",
+      "evidence_section_sha256": "2b5096b00d145067513f65a23f6fb3a40d84ac7b68b8755e468211f4c4022058",
+      "exact_icpns": [
+        "STM32F479IIH6",
+        "STM32F479IIH7",
+        "STM32F479IIH7TR",
+        "STM32F479IIT6"
+      ],
+      "rendered_dom_sha256": "6615ba62dbc49e536f6f1a940ec3b6018e3728eadb5a9d727680ca9a29c635d9",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ii.html"
+    }
+  ]
+}
