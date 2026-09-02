@@ -1,0 +1,16 @@
+{
+  "canonical_dataset_written": false,
+  "plan_sha256": "58d5a9c10b82bd13325e04a9931a42a6bf554304b006b797e9cc46b7014c08db",
+  "production_pre_csv_sha256": "22419b078f1c6436f0aa6dd3b410791170a1976be59a03a814469acc54690f09",
+  "production_pre_git_blob": "13c456ad4b64a0be2d626af45d2b2fddb9ab4c17",
+  "production_pre_rows": 208,
+  "proposal_artifact_id": "9845456075",
+  "proposal_artifact_name": "phase42i-stm32f405o-f415og-admission-proposal",
+  "proposal_artifact_sha256": "b932a860350a03df3881d96d3e8680ed1dd96dbe9d837da7ae83eeefaf41cde6",
+  "proposal_run_id": "33627682129",
+  "proposed_csv_sha256": "2b3e7aaf50e855957af2072815fd536ac8e4374f7a4326f035e344f2c1abc19b",
+  "proposed_post_rows": 211,
+  "schema_version": 1,
+  "transaction": "stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02",
+  "write_result_sha256": "1cf48b6b25f5a9efe43276fd657c94e389ee271da5ef955c27e28320e0760103"
+}
