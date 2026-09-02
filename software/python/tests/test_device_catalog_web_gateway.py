@@ -10,7 +10,7 @@ from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 269
+EXPECTED_PRODUCTION_CATALOG_SIZE = 274
 
 
 class DeviceCatalogWebGatewayTests(unittest.TestCase):
@@ -243,6 +243,19 @@ class DeviceCatalogWebGatewayTests(unittest.TestCase):
         self.assertEqual(result["package"], "LQFP")
         self.assertEqual(result["pin_count"], "64")
         self.assertEqual(result["flash_size"], "512 KiB")
+        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
+
+    def test_phase42b_stm32f410cb_icpn_is_exposed_after_admission(self) -> None:
+        status, payload = self.request("/api/devices/search?q=STM32F410CBT6&limit=5")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)
+        self.assertEqual(payload["count"], 1)
+        result = payload["results"][0]
+        self.assertEqual(result["icpn"], "STM32F410CBT6")
+        self.assertEqual(result["family"], "STM32F4")
+        self.assertEqual(result["package"], "LQFP")
+        self.assertEqual(result["pin_count"], "48")
+        self.assertEqual(result["flash_size"], "128 KiB")
         self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")
 
     def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:
