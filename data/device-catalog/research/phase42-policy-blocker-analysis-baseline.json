@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "phase": "4.2",
+  "scope": "STM32F4 policy blocker taxonomy",
+  "base_main_commit": "69213b768ec987922a4790b77b7700d0a8a95899",
+  "stm32f1_exact_icpn_rows": 75,
+  "stm32f4_exact_icpn_rows": 194,
+  "st_total_exact_icpn_rows": 269,
+  "stm32f4_base_device_count": 67,
+  "openocd_ordering_pattern_base_device_count": 149,
+  "gap_base_device_count": 82,
+  "policy_ready_count": 0,
+  "policy_blocked_count": 82,
+  "stm32f4_git_blob_sha": "b6aaef8f8cafd0ad2d26b89dfc17c0f670bf8f77",
+  "stm32f4_sha256": "8339390cdafe1aee25cac8f3e371a09fbc01d57a243ad66f012bcb205b322cac",
+  "production_write_allowed": false,
+  "admission_policy_change_allowed": false,
+  "algorithm_equivalence_claimed": false
+}
