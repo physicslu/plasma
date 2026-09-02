@@ -1,0 +1,63 @@
+name: Phase 4.2I runtime closure fix
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2i-f405o-f415og-admission
+    paths:
+      - .github/workflows/phase42i-runtime-closure-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2i-f405o-f415og-admission
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Update current runtime catalog expectations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path('software/python/tests/test_device_catalog.py'): [
+                  ('EXPECTED_PRODUCTION_CATALOG_SIZE = 283', 'EXPECTED_PRODUCTION_CATALOG_SIZE = 286'),
+                  ('EXPECTED_STM32F4_CATALOG_SIZE = 208', 'EXPECTED_STM32F4_CATALOG_SIZE = 211'),
+                  ('full 208-row F4 family', 'full 211-row F4 family'),
+              ],
+              Path('software/python/tests/test_device_catalog_web_gateway.py'): [
+                  ('EXPECTED_PRODUCTION_CATALOG_SIZE = 283', 'EXPECTED_PRODUCTION_CATALOG_SIZE = 286'),
+              ],
+          }
+          for path, pairs in replacements.items():
+              text = path.read_text(encoding='utf-8')
+              for old, new in pairs:
+                  if old not in text:
+                      raise SystemExit(f'missing expected token in {path}: {old!r}')
+                  text = text.replace(old, new, 1)
+              path.write_text(text, encoding='utf-8')
+          PY
+      - name: Validate closure tests
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_2d_ry_wlcsp64_policy.py
+          python data/device-catalog/research/test_stm32f4_phase4_2f_f412re_rg_post_admission.py
+          python data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py
+          python -m pip install -e './software/python[dev]'
+          python -m pytest -q software/python/tests/test_device_catalog.py software/python/tests/test_device_catalog_web_gateway.py
+      - name: Commit closure and remove one-shot workflow
+        run: |
+          rm .github/workflows/phase42i-runtime-closure-fix.yml
+          git config user.name 'Gordon'
+          git config user.email 'physicslu@gmail.com'
+          git add software/python/tests/test_device_catalog.py \
+                  software/python/tests/test_device_catalog_web_gateway.py \
+                  .github/workflows/phase42i-runtime-closure-fix.yml
+          git commit -m 'test: close Phase 4.2I runtime catalog expectations'
+          git push origin HEAD:agent/device-catalog-phase4.2i-f405o-f415og-admission
