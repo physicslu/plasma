@@ -1,0 +1,195 @@
+name: Device catalog Phase 4.2K retained acquisition
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2k-i176-admission
+    paths:
+      - '.github/workflows/device-catalog-phase42k-retained-acquisition.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  retain:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser runtime
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Acquire fresh bounded cohorts
+        run: |
+          set -euo pipefail
+          root=/tmp/phase42k-retained
+          mkdir -p "$root"
+          for cohort in a b c d; do
+            manifest="data/device-catalog/research/stm32f4-phase4.2k-i176-cohort-${cohort}-manifest.json"
+            out="$root/${cohort}-pilot-summary.json"
+            xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
+              --manifest "$manifest" \
+              --catalog data/device-catalog/research/openocd-parts-canonical.csv \
+              --output "$out" \
+              --scope pilot \
+              --headed \
+              --timeout 30 \
+              --delay 2
+          done
+      - name: Evaluate fresh evidence against frozen baseline
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          repo = Path('.')
+          root = Path('/tmp/phase42k-retained')
+          baseline_path = repo / 'data/device-catalog/research/stm32f4-phase4.2k-i176-admission-baseline.json'
+          baseline = json.loads(baseline_path.read_text(encoding='utf-8'))
+          expected = {row['base_device']: row for row in baseline['targets']}
+          expected_non_active = {}
+          for row in baseline.get('excluded_non_active_observations', []):
+              expected_non_active.setdefault(row['base_device'], []).append({
+                  'icpn': row['icpn'],
+                  'marketing_status': row['marketing_status'],
+              })
+          for rows in expected_non_active.values():
+              rows.sort(key=lambda x:(x['icpn'],x['marketing_status']))
+
+          observed = {}
+          observed_non_active = {}
+          control_semantics = baseline['control']['semantic_evidence']
+          cohort_reports = []
+          issues = []
+
+          for cohort in 'abcd':
+              p = root / f'{cohort}-pilot-summary.json'
+              summary = json.loads(p.read_text(encoding='utf-8'))
+              results = summary.get('results', [])
+              if summary.get('acquisition_failure') != 0 or summary.get('acquisition_success') != len(results):
+                  issues.append(f'{cohort}: acquisition not clean')
+              if summary.get('canonical_dataset_admission') is not False:
+                  issues.append(f'{cohort}: live acquisition unexpectedly admits canonical data')
+              by_base = {r.get('base_device'): r for r in results if isinstance(r, dict)}
+              control = by_base.get('STM32F479ZG')
+              if not isinstance(control, dict) or not isinstance(control.get('evidence'), dict):
+                  issues.append(f'{cohort}: control missing')
+              else:
+                  cev = control['evidence']
+                  csem = {
+                      'exact_icpns': sorted(cev.get('exact_icpns', [])),
+                      'excluded_non_active_part_numbers': sorted(
+                          cev.get('excluded_non_active_part_numbers', []),
+                          key=lambda x:(x.get('icpn',''),x.get('marketing_status','')),
+                      ),
+                      'canonical_mapping': control.get('canonical_mapping'),
+                      'source_url': cev.get('source_url'),
+                  }
+                  if csem != control_semantics:
+                      issues.append(f'{cohort}: control lifecycle/mapping drift')
+
+              for base, result in by_base.items():
+                  if base == 'STM32F479ZG':
+                      continue
+                  if base in observed:
+                      issues.append(f'{base}: duplicated across retained cohorts')
+                      continue
+                  evidence = result.get('evidence')
+                  if not isinstance(evidence, dict):
+                      issues.append(f'{base}: evidence missing')
+                      continue
+                  observed[base] = sorted(evidence.get('exact_icpns', []))
+                  observed_non_active[base] = sorted(
+                      evidence.get('excluded_non_active_part_numbers', []),
+                      key=lambda x:(x.get('icpn',''),x.get('marketing_status','')),
+                  )
+                  mapping = result.get('canonical_mapping')
+                  if not isinstance(mapping, dict) or mapping.get('status') != 'unique' or mapping.get('target_configs') != ['tcl/target/stm32f4x.cfg']:
+                      issues.append(f'{base}: non-unique retained OpenOCD routing')
+
+              cohort_reports.append({
+                  'cohort': cohort,
+                  'pilot_id': summary.get('pilot_id'),
+                  'target_count': len(results),
+                  'exact_icpn_candidates_including_control': summary.get('exact_icpn_candidates'),
+                  'pilot_summary_sha256': __import__('hashlib').sha256(p.read_bytes()).hexdigest(),
+              })
+
+          if set(observed) != set(expected):
+              issues.append(f"candidate base drift: missing={sorted(set(expected)-set(observed))} extra={sorted(set(observed)-set(expected))}")
+
+          drift = []
+          for base in sorted(set(expected) | set(observed)):
+              exp = expected.get(base, {}).get('exact_icpns', [])
+              got = observed.get(base, [])
+              if exp != got:
+                  drift.append({'base_device':base,'expected_active_exact_icpns':exp,'observed_active_exact_icpns':got})
+              exp_na = expected_non_active.get(base, [])
+              got_na = observed_non_active.get(base, [])
+              if exp_na != got_na:
+                  drift.append({'base_device':base,'expected_non_active':exp_na,'observed_non_active':got_na})
+
+          if drift:
+              issues.append('candidate/lifecycle drift detected')
+
+          total = sum(len(v) for v in observed.values())
+          if total != baseline['active_exact_icpn_candidate_count']:
+              issues.append(f'active candidate count drift: expected={baseline["active_exact_icpn_candidate_count"]} observed={total}')
+
+          evaluation = {
+              'schema_version': 1,
+              'phase': '4.2K',
+              'decision': 'scale_ready' if not issues else 'fail_closed',
+              'scale_ready': not issues,
+              'candidate_baseline_match': not drift and set(observed)==set(expected),
+              'candidate_drift': drift,
+              'issues': issues,
+              'expected_base_devices': len(expected),
+              'observed_base_devices': len(observed),
+              'expected_exact_icpn_candidates': baseline['active_exact_icpn_candidate_count'],
+              'observed_exact_icpn_candidates': total,
+              'canonical_dataset_admission': False,
+              'algorithm_equivalence_claimed': False,
+              'physical_ppu_validation_claimed': False,
+              'cohorts': cohort_reports,
+          }
+          (root / 'evaluation.json').write_text(json.dumps(evaluation, indent=2, sort_keys=True)+'\n', encoding='utf-8')
+          provenance = {
+              'schema_version': 1,
+              'phase': '4.2K',
+              'kind': 'independent_retained_acquisition',
+              'baseline_path': str(baseline_path),
+              'baseline_sha256': __import__('hashlib').sha256(baseline_path.read_bytes()).hexdigest(),
+              'git_sha': __import__('subprocess').check_output(['git','rev-parse','HEAD'], text=True).strip(),
+              'retrained_at_utc': datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z'),
+              'source_discovery_run_id': baseline['source_discovery']['workflow_run_id'],
+              'canonical_dataset_admission': False,
+          }
+          (root / 'provenance.json').write_text(json.dumps(provenance, indent=2, sort_keys=True)+'\n', encoding='utf-8')
+          (root / 'README.md').write_text(
+              '# STM32F4 Phase 4.2K retained evidence\n\n'
+              'Fresh independent ST browser acquisition for the four bounded I176 cohorts.\n'
+              'Canonical dataset admission remains false at this evidence stage.\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(evaluation, indent=2, sort_keys=True))
+          if issues:
+              raise SystemExit(1)
+          PY
+      - name: Hash retained evidence
+        run: |
+          cd /tmp/phase42k-retained
+          sha256sum README.md *-pilot-summary.json evaluation.json provenance.json > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase42k-stm32f4-i176-retained
+          path: /tmp/phase42k-retained
+          if-no-files-found: error
+          retention-days: 30
