@@ -7,11 +7,18 @@ manager:
   # Optional durable last-known observation cache. Use a writable operator-local absolute path.
   # Omit this field for memory-only restart semantics.
   # observation_db_path: /absolute/operator/local/path/manager-observations.sqlite3
+  # Optional Manager-owned runtime PPU registry state.
+  # When configured, the first Manager start seeds this file from the ppus list below.
+  # After the file exists, Add / Validate & Enable / Disable / Remove mutate this file;
+  # the deployment YAML remains bootstrap configuration and is never rewritten by the Console.
+  # Omit this field to keep the historical read-only config-backed registry behavior.
+  # registry_state_path: /absolute/operator/local/path/manager-ppu-registry.json
 
-# Manual enrollment is intentional in the first Manager release.
+# Bootstrap PPU enrollment. With registry_state_path enabled, these entries seed
+# the runtime registry only when its state file does not yet exist.
 # Each endpoint is the root URL of one autonomous PPU's Plasma Web REST Gateway.
-# Phase 0 PS Loopback command pass-through resolves the destination by alias,
-# so every PPU that will receive that command needs a stable, unique alias.
+# Managed PPU command pass-through resolves the destination by alias, so every
+# PPU that can receive commands needs a stable, unique alias.
 ppus:
   - alias: ppu-a
     endpoint: http://127.0.0.1:18080

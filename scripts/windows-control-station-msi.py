@@ -212,7 +212,8 @@ def stage_payload(
     seed.mkdir()
     (seed / "manager.yaml").write_text(
         "manager:\n  host: 127.0.0.1\n  port: 18180\n  request_timeout_s: 2.0\n  poll_interval_s: 2.0\n"
-        "  observation_db_path: C:\\ProgramData\\Plasma\\state\\manager-observations.sqlite3\nppus: []\n",
+        "  observation_db_path: C:\\ProgramData\\Plasma\\state\\manager-observations.sqlite3\n"
+        "  registry_state_path: C:\\ProgramData\\Plasma\\state\\manager-registry.json\nppus: []\n",
         encoding="utf-8",
     )
     (seed / "selected-ppu-alias").write_text("", encoding="utf-8")

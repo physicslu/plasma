@@ -11,6 +11,7 @@ class ManagerConfigCompatibilityTests(unittest.TestCase):
         config = ManagerConfig("127.0.0.1", 18180, 2.0, 2.0, ppus)
         self.assertEqual(config.ppus, ppus)
         self.assertIsNone(config.observation_db_path)
+        self.assertIsNone(config.registry_state_path)
 
 
 if __name__ == "__main__":

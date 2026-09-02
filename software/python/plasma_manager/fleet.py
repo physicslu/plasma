@@ -14,14 +14,24 @@ MANAGER_SERVICE_NAME = "plasma-manager"
 PPU_FLEET_CONTRACT_VERSION = "1"
 
 ClientFactory = Callable[[str, float], Any]
+RegistryProvider = Callable[[], tuple[PPURegistryEntry, ...]]
 
 
 class FleetAggregator:
     """Read-only aggregation over independently operating PPU REST gateways."""
 
-    def __init__(self, config: ManagerConfig, client_factory: ClientFactory = PPUHttpClient) -> None:
+    def __init__(
+        self,
+        config: ManagerConfig,
+        client_factory: ClientFactory = PPUHttpClient,
+        registry_provider: RegistryProvider | None = None,
+    ) -> None:
         self.config = config
         self.client_factory = client_factory
+        self.registry_provider = registry_provider
+
+    def _registry_entries(self) -> tuple[PPURegistryEntry, ...]:
+        return self.registry_provider() if self.registry_provider is not None else self.config.ppus
 
     def registry_snapshot(self) -> dict[str, Any]:
         return {
@@ -30,12 +40,12 @@ class FleetAggregator:
             "contract_version": MANAGER_CONTRACT_VERSION,
             "ppus": [
                 {"endpoint": entry.endpoint, "alias": entry.alias}
-                for entry in self.config.ppus
+                for entry in self._registry_entries()
             ],
         }
 
     def fleet_snapshot(self) -> dict[str, Any]:
-        entries = self.config.ppus
+        entries = self._registry_entries()
         if entries:
             workers = min(len(entries), 8)
             with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="plasma-manager") as executor:

@@ -11,7 +11,9 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Sequence
 from urllib.error import HTTPError, URLError
@@ -149,10 +151,105 @@ def _wait_for_manager(port: int, process: subprocess.Popen[bytes], deadline_s: f
     raise SmokeError("Manager readiness timed out")
 
 
-def _wait_for_console_fetch(
+class _FakePPUHandler(BaseHTTPRequestHandler):
+    ppu_id = "runtime-smoke-ppu"
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+    def _json(self, status: int, payload: dict[str, object]) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    @classmethod
+    def _ppu(cls) -> dict[str, object]:
+        return {
+            "ppu_id": cls.ppu_id,
+            "facility_id": "runtime-smoke-facility",
+            "model": "runtime-smoke",
+            "display_name": "Runtime Smoke PPU",
+            "site_count": 2,
+            "enabled_site_count": 2,
+            "capabilities": {
+                "max_supported_sites": 2,
+                "operations": ["erase", "program", "verify", "read"],
+            },
+        }
+
+    def do_GET(self) -> None:
+        if self.path == "/api/health/live":
+            self._json(200, {"ok": True, "service": "plasma-web-rest-gateway", "gateway": "alive"})
+            return
+        if self.path == "/api/health/ready":
+            self._json(
+                200,
+                {
+                    "ok": True,
+                    "gateway": "alive",
+                    "execution": "ready",
+                    "ppu_id": self.ppu_id,
+                },
+            )
+            return
+        if self.path == "/api/node":
+            self._json(
+                200,
+                {
+                    "ok": True,
+                    "contract_version": "1",
+                    "node_role": "ppu",
+                    "manager_required": False,
+                    "ppu": self._ppu(),
+                    "links": {
+                        "status": "/api/status",
+                        "jobs": "/api/jobs",
+                        "liveness": "/api/health/live",
+                        "readiness": "/api/health/ready",
+                    },
+                },
+            )
+            return
+        if self.path == "/api/status":
+            self._json(
+                200,
+                {
+                    "ok": True,
+                    "ppu": self._ppu(),
+                    "sites": [
+                        {
+                            "site_id": 1,
+                            "enabled": True,
+                            "state": "idle",
+                            "current_job_id": None,
+                            "queued_jobs": 0,
+                            "interface": "SWD",
+                            "target": "runtime-smoke-target",
+                        },
+                        {
+                            "site_id": 2,
+                            "enabled": True,
+                            "state": "idle",
+                            "current_job_id": None,
+                            "queued_jobs": 0,
+                            "interface": "SWD",
+                            "target": "runtime-smoke-target",
+                        },
+                    ],
+                },
+            )
+            return
+        self._json(404, {"ok": False, "error": {"message": "not found"}})
+
+
+def _verify_registry_lifecycle_via_console(
     port: int,
     process: subprocess.Popen[bytes],
     *,
+    fake_ppu_endpoint: str,
     node_executable: str,
     cwd: Path,
     env: dict[str, str],
@@ -161,33 +258,112 @@ def _wait_for_console_fetch(
     if process.poll() is not None:
         raise SmokeError(f"Console exited before readiness with code {process.returncode}")
     script = r"""
-const url = process.argv[1];
-const deadline = Date.now() + Number(process.argv[2]);
-const payload = { endpoint: "ps", timeout_ms: 100, payload: "runtime-smoke" };
-let last = "no response observed";
+const base = process.argv[1];
+const endpoint = process.argv[2];
+const deadline = Date.now() + Number(process.argv[3]);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function request(path, init = {}) {
+  const response = await fetch(`${base}${path}`, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.headers ?? {}),
+    },
+    signal: AbortSignal.timeout(5000),
+  });
+  const text = await response.text();
+  let payload = null;
+  try { payload = JSON.parse(text); } catch {}
+  return { status: response.status, payload, text };
+}
+
+let registry = null;
 while (Date.now() < deadline) {
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(5000),
-    });
-    const text = await response.text();
-    last = `status=${response.status} body=${text}`;
-    let decoded = null;
-    try { decoded = JSON.parse(text); } catch {}
-    if (response.status === 504 && decoded?.error?.code === "ppu_transport_error") {
-      console.log(last);
-      process.exit(0);
-    }
-  } catch (error) {
-    last = error?.message ?? String(error);
-  }
-  await new Promise((resolve) => setTimeout(resolve, 200));
+    registry = await request("/api/manager/registry");
+    if (registry.status === 200 && registry.payload?.ok === true) break;
+  } catch {}
+  await sleep(150);
 }
-console.error(last);
-process.exit(2);
+if (!registry || registry.status !== 200 || registry.payload?.ok !== true) {
+  console.error(`registry readiness failed: ${JSON.stringify(registry)}`);
+  process.exit(2);
+}
+if (registry.payload.mutable !== true || registry.payload.storage !== "file") {
+  console.error(`registry is not mutable file-backed state: ${registry.text}`);
+  process.exit(2);
+}
+if (!Array.isArray(registry.payload.ppus) || registry.payload.ppus.length !== 0) {
+  console.error(`registry should start empty: ${registry.text}`);
+  process.exit(2);
+}
+
+const added = await request("/api/manager/registry", {
+  method: "POST",
+  body: JSON.stringify({ alias: "runtime-smoke-ppu", endpoint }),
+});
+if (added.status !== 201 || added.payload?.entry?.lifecycle !== "pending") {
+  console.error(`registry add failed: status=${added.status} body=${added.text}`);
+  process.exit(2);
+}
+
+let fleet = null;
+while (Date.now() < deadline) {
+  try {
+    fleet = await request("/api/fleet");
+    const ppu = fleet.payload?.ppus?.find?.((item) => item.alias === "runtime-smoke-ppu");
+    if (
+      fleet.status === 200
+      && ppu?.observation?.state === "current"
+      && ppu?.transport_state === "reachable"
+      && ppu?.execution_state === "ready"
+      && ppu?.identity?.ppu_id === "runtime-smoke-ppu"
+      && ppu?.identity_conflict === false
+      && ppu?.degraded === false
+      && ppu?.topology?.site_count === 2
+    ) break;
+  } catch {}
+  await sleep(150);
+}
+const trusted = fleet?.payload?.ppus?.find?.((item) => item.alias === "runtime-smoke-ppu");
+if (
+  fleet?.status !== 200
+  || trusted?.observation?.state !== "current"
+  || trusted?.execution_state !== "ready"
+  || trusted?.topology?.site_count !== 2
+) {
+  console.error(`trusted Fleet observation not reached: ${JSON.stringify(fleet)}`);
+  process.exit(2);
+}
+
+const enabled = await request("/api/manager/registry/runtime-smoke-ppu", {
+  method: "PATCH",
+  body: JSON.stringify({ lifecycle: "commissioned" }),
+});
+if (enabled.status !== 200 || enabled.payload?.entry?.lifecycle !== "commissioned") {
+  console.error(`Validate & Enable failed: status=${enabled.status} body=${enabled.text}`);
+  process.exit(2);
+}
+
+const removed = await request("/api/manager/registry/runtime-smoke-ppu", { method: "DELETE" });
+if (removed.status !== 200 || removed.payload?.removed?.alias !== "runtime-smoke-ppu") {
+  console.error(`registry remove failed: status=${removed.status} body=${removed.text}`);
+  process.exit(2);
+}
+
+const finalRegistry = await request("/api/manager/registry");
+if (
+  finalRegistry.status !== 200
+  || !Array.isArray(finalRegistry.payload?.ppus)
+  || finalRegistry.payload.ppus.length !== 0
+) {
+  console.error(`registry did not end empty: status=${finalRegistry.status} body=${finalRegistry.text}`);
+  process.exit(2);
+}
+
+console.log("Add -> trusted observation -> Validate & Enable -> Remove: PASS");
 """
     try:
         completed = subprocess.run(
@@ -196,7 +372,8 @@ process.exit(2);
                 "--input-type=module",
                 "-e",
                 script,
-                f"http://127.0.0.1:{port}/api/manager/diagnostics/loopback",
+                f"http://127.0.0.1:{port}",
+                fake_ppu_endpoint,
                 str(int(deadline_s * 1000)),
             ],
             cwd=cwd,
@@ -204,18 +381,29 @@ process.exit(2);
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            timeout=deadline_s + 5,
+            timeout=deadline_s + 10,
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        raise SmokeError(f"Console/BFF browser-style Fetch smoke timed out\n{exc.stdout or ''}") from exc
+        raise SmokeError(f"Console/BFF registry lifecycle smoke timed out\n{exc.stdout or ''}") from exc
     if completed.returncode != 0:
         raise SmokeError(
-            "Console/BFF -> Manager browser-style Fetch smoke failed; "
+            "Console/BFF -> Manager registry lifecycle smoke failed; "
             f"last observation: {completed.stdout.strip()}"
         )
     if process.poll() is not None:
-        raise SmokeError(f"Console exited during relay smoke with code {process.returncode}")
+        raise SmokeError(f"Console exited during registry lifecycle smoke with code {process.returncode}")
+
+
+def _verify_registry_persistence(path: Path) -> None:
+    if not path.is_file():
+        raise SmokeError(f"Manager runtime registry state file was not created: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SmokeError(f"Manager runtime registry state is not valid JSON: {path}") from exc
+    if payload.get("schema_version") != 1 or payload.get("ppus") != []:
+        raise SmokeError(f"Manager runtime registry final state is invalid: {payload!r}")
 
 
 def _terminate(process: subprocess.Popen[bytes] | None) -> None:
@@ -258,12 +446,17 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
     manager_port = _free_port()
     console_port = _free_port()
     fake_ppu_port = _free_port()
+    fake_ppu_endpoint = f"http://127.0.0.1:{fake_ppu_port}"
 
     manager_process: subprocess.Popen[bytes] | None = None
     console_process: subprocess.Popen[bytes] | None = None
+    fake_ppu_server = ThreadingHTTPServer(("127.0.0.1", fake_ppu_port), _FakePPUHandler)
+    fake_ppu_thread = threading.Thread(target=fake_ppu_server.serve_forever, daemon=True)
+    fake_ppu_thread.start()
     with tempfile.TemporaryDirectory(prefix="plasma-control-station-smoke-") as temporary:
         temp_root = Path(temporary)
         manager_config = temp_root / "manager.yaml"
+        registry_state = temp_root / "manager-registry.json"
         manager_config.write_text(
             "\n".join(
                 [
@@ -271,10 +464,9 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
                     "  host: 127.0.0.1",
                     f"  port: {manager_port}",
                     "  request_timeout_s: 0.2",
-                    "  poll_interval_s: 60",
-                    "ppus:",
-                    "  - alias: runtime-smoke-ppu",
-                    f"    endpoint: http://127.0.0.1:{fake_ppu_port}",
+                    "  poll_interval_s: 0.1",
+                    f"  registry_state_path: {registry_state}",
+                    "ppus: []",
                     "",
                 ]
             ),
@@ -309,6 +501,7 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
                 **clean_env,
                 "HOST": "127.0.0.1",
                 "PORT": str(console_port),
+                "PLASMA_CONTROL_STATION_MODE": "managed",
                 "PLASMA_FLEET_UI_ENABLED": "1",
                 "PLASMA_MANAGER_API_URL": f"http://127.0.0.1:{manager_port}",
                 "PLASMA_MANAGER_PPU_ALIAS": "runtime-smoke-ppu",
@@ -320,14 +513,16 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
                 stdout=console_log,
                 stderr=subprocess.STDOUT,
             )
-            _wait_for_console_fetch(
+            _verify_registry_lifecycle_via_console(
                 console_port,
                 console_process,
+                fake_ppu_endpoint=fake_ppu_endpoint,
                 node_executable=resolved_node,
                 cwd=console_dir,
                 env=console_env,
             )
-            print("Control Station packaged Console/BFF -> Manager relay: PASS", flush=True)
+            _verify_registry_persistence(registry_state)
+            print("Control Station packaged Console/BFF -> Manager registry lifecycle: PASS", flush=True)
         except Exception as exc:
             manager_log.flush()
             console_log.flush()
@@ -341,6 +536,9 @@ def run_smoke(runtime_dir: Path, *, node_executable: str = "node") -> None:
             _terminate(manager_process)
             manager_log.close()
             console_log.close()
+            fake_ppu_server.shutdown()
+            fake_ppu_server.server_close()
+            fake_ppu_thread.join(timeout=2)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
