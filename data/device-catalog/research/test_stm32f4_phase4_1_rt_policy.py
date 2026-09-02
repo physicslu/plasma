@@ -33,7 +33,6 @@ EXPECTED_REMAINING_BLOCKERS = {
     "unsupported STM32F4 pin/package combination: A/H",
     "unsupported STM32F4 pin/package combination: A/Y",
     "unsupported STM32F4 pin/package combination: B/T",
-    "unsupported STM32F4 pin/package combination: C/T",
     "unsupported STM32F4 pin/package combination: I/H",
     "unsupported STM32F4 pin/package combination: I/T",
     "unsupported STM32F4 pin/package combination: M/Y",
