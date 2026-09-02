@@ -1,0 +1,19 @@
+name: Device catalog Phase 4.2E0 P-option routing
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python data/device-catalog/research/test_stm32f4_phase4_2e0_p_option_routing.py
