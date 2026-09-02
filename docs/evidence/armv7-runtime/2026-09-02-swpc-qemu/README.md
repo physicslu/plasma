@@ -1,6 +1,6 @@
 # Plasma ARMv7 / QEMU Runtime Lab 測試報告
 
-> 測試日期：2026-09-02  
+> 測試日期：2026-09-02
 > Evidence Level：`swpc-qemu-armv7-userspace`
 
 ## 結論摘要
