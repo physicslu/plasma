@@ -26,7 +26,11 @@ REGISTRY_LIFECYCLES = frozenset(
 
 
 class RegistryStateError(RuntimeError):
-    """Raised when Manager-owned PPU registry state cannot be trusted."""
+    """Raised when Manager-owned PPU registry state cannot be trusted or persisted."""
+
+
+class RegistryValidationError(RegistryStateError):
+    """Raised when a requested registry mutation is syntactically invalid."""
 
 
 class RegistryMutationDisabled(RegistryStateError):
@@ -66,10 +70,10 @@ def normalize_registry_alias(value: object, *, allow_none: bool = False) -> str 
     if value is None and allow_none:
         return None
     if not isinstance(value, str):
-        raise RegistryStateError("PPU registry alias must be a string")
+        raise RegistryValidationError("PPU registry alias must be a string")
     alias = value.strip()
     if not alias or len(alias) > 128 or "/" in alias or "\\" in alias:
-        raise RegistryStateError("PPU registry alias must be 1-128 characters and contain no path separators")
+        raise RegistryValidationError("PPU registry alias must be 1-128 characters and contain no path separators")
     return alias
 
 
@@ -152,7 +156,7 @@ class PPURegistryStore:
         try:
             normalized_endpoint = normalize_endpoint(endpoint)
         except ValueError as exc:
-            raise RegistryStateError(str(exc)) from exc
+            raise RegistryValidationError(str(exc)) from exc
         with self._lock:
             if any(record.alias == normalized_alias for record in self._records):
                 raise RegistryConflictError(f"PPU registry alias already exists: {normalized_alias}")
@@ -166,15 +170,20 @@ class PPURegistryStore:
                 registered_at=now,
                 updated_at=now,
             )
+            previous = self._records
             self._records = (*self._records, record)
-            self._persist_locked()
+            try:
+                self._persist_locked()
+            except Exception:
+                self._records = previous
+                raise
             return record
 
     def set_lifecycle(self, alias: str, lifecycle: str) -> PPURegistryRecord:
         self._require_mutable()
         normalized_alias = normalize_registry_alias(alias)
         if lifecycle not in {REGISTRY_LIFECYCLE_COMMISSIONED, REGISTRY_LIFECYCLE_DISABLED}:
-            raise RegistryStateError("registry lifecycle update must be commissioned or disabled")
+            raise RegistryValidationError("registry lifecycle update must be commissioned or disabled")
         with self._lock:
             index = next((i for i, record in enumerate(self._records) if record.alias == normalized_alias), None)
             if index is None:
@@ -189,8 +198,13 @@ class PPURegistryStore:
             )
             records = list(self._records)
             records[index] = updated
+            previous = self._records
             self._records = tuple(records)
-            self._persist_locked()
+            try:
+                self._persist_locked()
+            except Exception:
+                self._records = previous
+                raise
             return updated
 
     def remove(self, alias: str) -> PPURegistryRecord:
@@ -201,8 +215,13 @@ class PPURegistryStore:
             if index is None:
                 raise RegistryEntryNotFound(f"PPU registry alias was not found: {normalized_alias}")
             removed = self._records[index]
+            previous = self._records
             self._records = tuple(record for i, record in enumerate(self._records) if i != index)
-            self._persist_locked()
+            try:
+                self._persist_locked()
+            except Exception:
+                self._records = previous
+                raise
             return removed
 
     def _require_mutable(self) -> None:
@@ -219,10 +238,11 @@ class PPURegistryStore:
             "ppus": [record.as_dict() for record in self._records],
         }
         parent = self._state_path.parent
-        parent.mkdir(parents=True, exist_ok=True)
-        fd, temporary_name = tempfile.mkstemp(prefix=f".{self._state_path.name}.", suffix=".tmp", dir=parent)
-        temporary_path = Path(temporary_name)
+        temporary_path: Path | None = None
         try:
+            parent.mkdir(parents=True, exist_ok=True)
+            fd, temporary_name = tempfile.mkstemp(prefix=f".{self._state_path.name}.", suffix=".tmp", dir=parent)
+            temporary_path = Path(temporary_name)
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
                 handle.write("\n")
@@ -230,10 +250,11 @@ class PPURegistryStore:
                 os.fsync(handle.fileno())
             os.replace(temporary_path, self._state_path)
         except OSError as exc:
-            try:
-                temporary_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+            if temporary_path is not None:
+                try:
+                    temporary_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
             raise RegistryStateError(f"cannot persist Manager runtime PPU registry: {self._state_path}") from exc
 
     @classmethod
@@ -260,7 +281,10 @@ class PPURegistryStore:
                 endpoint = normalize_endpoint(raw_record.get("endpoint"))
             except ValueError as exc:
                 raise RegistryStateError(str(exc)) from exc
-            alias = normalize_registry_alias(raw_record.get("alias"), allow_none=True)
+            try:
+                alias = normalize_registry_alias(raw_record.get("alias"), allow_none=True)
+            except RegistryValidationError as exc:
+                raise RegistryStateError(str(exc)) from exc
             lifecycle = raw_record.get("lifecycle")
             if lifecycle not in REGISTRY_LIFECYCLES:
                 raise RegistryStateError("Manager runtime PPU registry lifecycle is invalid")
