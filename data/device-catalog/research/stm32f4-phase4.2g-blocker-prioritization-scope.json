@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "phase": "4.2G",
+  "transaction": "stm32f4-phase4.2g-blocker-prioritization-2026-09-02",
+  "base_main_sha": "9861e8d0da8afca4422da0773404ef1b6fb60e5e",
+  "scope": "read-only current-main STM32F4 policy-blocker prioritization",
+  "expected_prestate": {
+    "production_exact_icpn_rows": 208,
+    "production_base_device_count": 70,
+    "openocd_ordering_pattern_base_device_count": 149,
+    "gap_base_device_count": 79,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 79
+  },
+  "policy_change_allowed": false,
+  "production_write_allowed": false,
+  "algorithm_equivalence_claimed": false,
+  "physical_ppu_validation_claimed": false
+}
