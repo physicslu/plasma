@@ -1,0 +1,65 @@
+name: Device catalog Phase 4.2E F412RE/RG discovery
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2e-f412re-rg-admission
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2e-f412re-rg-admission
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser acquisition dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Run bounded official-ST browser discovery
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase42e
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
+            --manifest data/device-catalog/research/stm32f4-phase4.2e-f412re-rg-admission-manifest.json \
+            --catalog data/device-catalog/research/openocd-parts-canonical.csv \
+            --output /tmp/phase42e/discovery.json \
+            --scope pilot \
+            --headed \
+            --timeout 45 \
+            --delay 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('/tmp/phase42e/discovery.json')
+          s = json.loads(p.read_text())
+          assert s['canonical_dataset_admission'] is False
+          assert s['acquisition_transport'] == 'chromium_rendered_dom'
+          results = s['results']
+          assert [r['base_device'] for r in results] == ['STM32F479ZG', 'STM32F412RE', 'STM32F412RG']
+          assert all(r['acquisition_status'] == 'success' for r in results)
+          for r in results:
+              evidence = r['evidence']
+              assert evidence['marketing_status'] == 'Active'
+              assert evidence['exact_icpns']
+              mapping = r.get('catalog_mapping') or r.get('mapping')
+              if r['base_device'] in {'STM32F412RE', 'STM32F412RG'}:
+                  assert mapping and mapping['status'] == 'unique'
+          print(json.dumps(s, indent=2, sort_keys=True))
+          PY
+      - name: Upload immutable discovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase42e-stm32f4-f412re-rg-discovery
+          path: /tmp/phase42e
+          if-no-files-found: error
+          retention-days: 30
