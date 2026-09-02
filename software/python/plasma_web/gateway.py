@@ -23,6 +23,7 @@ from .engineering_targets import EngineeringPPUProvider
 from .gateway_communication import ppu_response_budget_ms, request_with_gateway_policy
 from .gateway_settings import GatewayCommunicationPolicy, GatewaySettingsController
 from .persistent_mock_batch_runtime import PersistentMockAwareBatchRuntimeManager
+from .ppu_network_settings import PPUNetworkSettingsController
 from .shared_image_mock_provider import SharedImageMockEngineeringPPUProvider
 
 
@@ -55,6 +56,18 @@ def _gateway_settings_payload(settings: dict[str, int]) -> dict[str, Any]:
         "gateway_settings": {
             **settings,
             "ppu_response_budget_ms": ppu_response_budget_ms(policy),
+        },
+    }
+
+
+def _ppu_network_settings_payload(settings: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "rest_contract_version": WEB_REST_CONTRACT_VERSION,
+        "ppu_network_settings": settings,
+        "activation": {
+            "supported": False,
+            "state": "not_implemented",
         },
     }
 
@@ -209,6 +222,7 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
 
     batch_runtime: BatchRuntimeManager | None = None
     gateway_settings = GatewaySettingsController()
+    ppu_network_settings = PPUNetworkSettingsController()
     engineering_status_retry_backoff_s = 1.0
 
     @staticmethod
@@ -225,6 +239,10 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
     @staticmethod
     def _is_gateway_settings_path(path: str) -> bool:
         return path.rstrip("/") == "/api/settings/gateway"
+
+    @staticmethod
+    def _is_ppu_network_settings_path(path: str) -> bool:
+        return path.rstrip("/") == "/api/settings/ppu-network"
 
     @staticmethod
     def _is_device_search_path(path: str) -> bool:
@@ -516,6 +534,16 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 self._error(exc)
             return
 
+        if self._is_ppu_network_settings_path(parsed.path):
+            try:
+                self._json(
+                    HTTPStatus.OK,
+                    _ppu_network_settings_payload(self.ppu_network_settings.current()),
+                )
+            except Exception as exc:
+                self._error(exc)
+            return
+
         if self._is_device_search_path(parsed.path):
             try:
                 params = parse_qs(parsed.query, keep_blank_values=True)
@@ -576,6 +604,16 @@ class PlasmaWebHandler(base.PlasmaWebHandler):
                 self._json(
                     HTTPStatus.OK,
                     _gateway_settings_payload(self.gateway_settings.update(self._body())),
+                )
+            except Exception as exc:
+                self._error(exc)
+            return
+
+        if self._is_ppu_network_settings_path(parsed.path):
+            try:
+                self._json(
+                    HTTPStatus.OK,
+                    _ppu_network_settings_payload(self.ppu_network_settings.update(self._body())),
                 )
             except Exception as exc:
                 self._error(exc)
@@ -698,9 +736,11 @@ def serve(
     gateway_settings_path: Path | None = None,
 ) -> None:
     settings = GatewaySettingsController(gateway_settings_path or (output_root / "gateway-settings.yaml"))
+    network_settings = PPUNetworkSettingsController(output_root / "ppu-network-settings.yaml")
     PlasmaWebHandler.client_factory = staticmethod(lambda: base.PlasmaClient(plasma_host, plasma_port))
     PlasmaWebHandler.engineering_provider = engineering_provider
     PlasmaWebHandler.gateway_settings = settings
+    PlasmaWebHandler.ppu_network_settings = network_settings
     PlasmaWebHandler.batch_runtime = _build_batch_runtime(
         engineering_provider,
         settings=settings,
