@@ -6,6 +6,7 @@ import { useWorkspaceSession } from "../workspace-session";
 import GatewaySettingsPanel from "./gateway-settings";
 import LoopbackTest from "./loopback-test";
 import MockRuntimeSettingsPanel from "./mock-runtime-settings";
+import PpuSiteConfiguration from "./ppu-site-configuration";
 import ProgrammingWorkspaceV2 from "./programming-workspace-v2";
 import "./engineering.css";
 import "./engineering-density.css";
@@ -42,6 +43,7 @@ export default function EngineeringPage() {
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const diagnosticsSurfaceActive = active === "diagnostics";
   const settingsSurfaceActive = active === "settings";
+  const ppuSiteSurfaceActive = active === "ppu-sites";
 
   function selectSection(id: (typeof sections)[number][0]) {
     if (id === "diagnostics") {
@@ -182,9 +184,11 @@ export default function EngineeringPage() {
             </button>
           </aside>
 
-          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : diagnosticsSurfaceActive ? "diagnosticsActive" : settingsSurfaceActive ? "settingsActive" : ""}`}>
+          <section className={`engineeringCanvas ${active === "programming" ? "programmingActive" : diagnosticsSurfaceActive ? "diagnosticsActive" : settingsSurfaceActive ? "settingsActive" : ppuSiteSurfaceActive ? "ppuSitesActive" : ""}`}>
             {active === "programming" ? (
               <ProgrammingWorkspaceV2 />
+            ) : active === "ppu-sites" ? (
+              <PpuSiteConfiguration />
             ) : active === "diagnostics" && diagnosticsSection === "loopback" ? (
               <LoopbackTest />
             ) : active === "settings" && settingsSection === "mock" ? (
