@@ -1,7 +1,7 @@
 # Plasma Device Support / Hardware Execution / OpenOCD 架構決策
 
-> 更新日期：2026-09-02  
-> 狀態：Plan  
+> 更新日期：2026-09-02
+> 狀態：Plan
 > 核心原則：IC support 的擴充速度優先；硬體 hot path 才下沉到 C / PL；OpenOCD 保留 target / flash algorithm 價值，不直接承擔 Plasma 的底層硬體 driver 責任。
 
 ## 1. 三層責任分離
