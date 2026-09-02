@@ -1,0 +1,128 @@
+name: Device catalog Phase 4.2I STM32F405O/415OG admission proposal
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2i-f405o-f415og-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42i-admission-proposal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  proposal:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2i-f405o-f415og-admission
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build immutable read-only admission proposal
+        run: |
+          set -euo pipefail
+          EVIDENCE=data/device-catalog/research/evidence/stm32f4-phase4.2i-f405o-f415og-admission-live-2026-09-02
+          BASELINE=data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-baseline.json
+          CANONICAL=data/device-catalog/research/stm32f4-commercial-icpn.csv
+          CATALOG=data/device-catalog/research/openocd-parts-canonical.csv
+          mkdir -p /tmp/phase42i-proposal
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir "$EVIDENCE" \
+            --baseline "$BASELINE"
+          python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir "$EVIDENCE" \
+            --baseline "$BASELINE" \
+            --catalog "$CATALOG" \
+            --canonical "$CANONICAL" \
+            --admit-base STM32F405OE \
+            --admit-base STM32F405OG \
+            --admit-base STM32F415OG \
+            --output /tmp/phase42i-proposal/plan.json
+          cp "$CANONICAL" /tmp/phase42i-proposal/proposed.csv
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'data/device-catalog/research')
+          from device_catalog_admission_framework import write_canonical_dataset
+          plan = json.loads(Path('/tmp/phase42i-proposal/plan.json').read_text())
+          assert plan['candidate_count'] == 3, plan
+          assert plan['decision_counts'] == {
+              'admit': 3,
+              'already_present': 0,
+              'manual_review_required': 0,
+              'reject': 0,
+          }, plan
+          assert plan['conflicts'] == 0 and plan['issues'] == [], plan
+          result = write_canonical_dataset(
+              plan=plan,
+              canonical_path=Path('/tmp/phase42i-proposal/proposed.csv'),
+          )
+          assert result['status'] == 'written', result
+          assert result['rows_before'] == 208 and result['rows_after'] == 211, result
+          assert sorted(result['added']) == [
+              'STM32F405OEY6TR',
+              'STM32F405OGY6TR',
+              'STM32F415OGY6TR',
+          ], result
+          Path('/tmp/phase42i-proposal/write-result.json').write_text(
+              json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          PY
+          sha256sum \
+            /tmp/phase42i-proposal/plan.json \
+            /tmp/phase42i-proposal/proposed.csv \
+            /tmp/phase42i-proposal/write-result.json \
+            > /tmp/phase42i-proposal/SHA256SUMS
+          cat /tmp/phase42i-proposal/SHA256SUMS
+      - id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase42i-stm32f405o-f415og-admission-proposal
+          path: /tmp/phase42i-proposal
+          if-no-files-found: error
+          retention-days: 30
+      - name: Record immutable proposal binding
+        env:
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          root = Path('/tmp/phase42i-proposal')
+          digest = os.environ['ARTIFACT_DIGEST']
+          if not digest.startswith('sha256:'):
+              raise SystemExit(f'unexpected artifact digest: {digest}')
+          binding = {
+              'schema_version': 1,
+              'transaction': 'stm32f4-phase4.2i-f405o-f415og-admission-2026-09-02',
+              'proposal_run_id': os.environ['GITHUB_RUN_ID'],
+              'proposal_artifact_id': os.environ['ARTIFACT_ID'],
+              'proposal_artifact_name': 'phase42i-stm32f405o-f415og-admission-proposal',
+              'proposal_artifact_sha256': digest.removeprefix('sha256:'),
+              'plan_sha256': hashlib.sha256((root / 'plan.json').read_bytes()).hexdigest(),
+              'proposed_csv_sha256': hashlib.sha256((root / 'proposed.csv').read_bytes()).hexdigest(),
+              'write_result_sha256': hashlib.sha256((root / 'write-result.json').read_bytes()).hexdigest(),
+              'production_pre_rows': 208,
+              'production_pre_csv_sha256': '22419b078f1c6436f0aa6dd3b410791170a1976be59a03a814469acc54690f09',
+              'production_pre_git_blob': '13c456ad4b64a0be2d626af45d2b2fddb9ab4c17',
+              'proposed_post_rows': 211,
+              'canonical_dataset_written': False,
+          }
+          Path('data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-proposal-binding.json').write_text(
+              json.dumps(binding, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(binding, indent=2, sort_keys=True))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-proposal-binding.json
+          git diff --cached --check
+          git commit -m 'device-catalog: bind Phase4.2I admission proposal'
+          git push origin HEAD:agent/device-catalog-phase4.2i-f405o-f415og-admission
