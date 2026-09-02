@@ -45,6 +45,32 @@ Closure evidence must include a rebuilt/installed macOS package and real browser
 
 ## Deferred architecture evolution
 
+### Plasma Hardware API / OpenOCD Adapter Productization
+
+**Status:** TODO / post-PoC architecture evolution
+
+**Layer:** Device Support / Programmer Backend / PPU hardware execution
+
+**Reason:** The current PoC should continue using PYNQ + Python because it maximizes learning velocity for `PS -> PL -> Site -> real IC`. After the PoC proves the end-to-end programming path, the product architecture should decouple Python Device Support and replaceable Programmer Backends from board-specific PL access. The approved direction is documented in [Device Support / Hardware Execution / OpenOCD Architecture](../architecture/device-support-hardware-openocd.md) and must remain a Plan until production implementation and hardware evidence exist.
+
+Required work:
+
+- keep Device Support, parsers, Device Profiles, Programming Plans and Image handling in Python so new IC support remains data/rule driven rather than C-code driven;
+- define a semantic Plasma Hardware API that exposes operations such as Site power/reset, SWD/JTAG transactions, program start/cancel and status without exposing raw register addresses to Programming Logic;
+- evaluate a stable `libplasma_hw.so` boundary after PoC, with Python calling it through an approved binding only where C is justified;
+- use UIO as the user-space hardware resource boundary, MMIO for control/status register access, IRQ for events and DMA for Programming Image bulk transfer;
+- keep raw `/dev/mem` and per-register implementation details out of the production application contract;
+- design a custom OpenOCD Plasma adapter that calls the Plasma Hardware API while preserving OpenOCD as a replaceable Programmer Backend;
+- avoid per-bit OpenOCD/Python MMIO bit-banging; send high-level SWD/JTAG transactions to PL protocol engines so deterministic timing and multi-Site parallelism remain in hardware;
+- keep OpenOCD target/flash-algorithm knowledge separate from Plasma hardware execution so a future Plasma-native or vendor backend can use the same Hardware API;
+- after PYNQ is removed from the production hardware path, make Plasma own its Python runtime version instead of coupling application Python to the PYNQ image;
+- evaluate Linux FPGA Manager for production bitstream loading and remove any production dependency on Jupyter;
+- add native Z2 acceptance for UIO/MMIO/IRQ/DMA behavior, memory/resource stability, PS-to-PL execution, Site I/O and real IC programming before declaring this architecture Current.
+
+Architectural invariant:
+
+> Device knowledge and programming orchestration remain high-level and replaceable; the Hardware API describes Plasma hardware capabilities rather than raw registers, and PL owns deterministic protocol execution.
+
 ### Split Programming Image Data Plane
 
 **Status:** TODO / future architecture optimization
