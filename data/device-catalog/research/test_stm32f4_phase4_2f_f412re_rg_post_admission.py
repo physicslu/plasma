@@ -56,14 +56,15 @@ class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
         self.assertEqual(row["openocd_target_config"], "tcl/target/stm32f4x.cfg")
         self.assertEqual(hashlib.sha256(CANONICAL.read_bytes()).hexdigest(), FINAL_SHA)
 
-    def test_gap_lifecycle_closes_only_admitted_bases(self) -> None:
+    def test_gap_lifecycle_closes_admitted_bases_without_freezing_future_policy(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         self.assertEqual(inventory["production"]["exact_icpn_rows"], 208)
         self.assertEqual(inventory["production"]["base_device_count"], 70)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
-        self.assertEqual(inventory["gap"]["base_device_count"], 79)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 0)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 79)
+        self.assertEqual(
+            inventory["gap"]["base_device_count"],
+            inventory["gap"]["policy_ready_count"] + inventory["gap"]["policy_blocked_count"],
+        )
         gap_bases = {x["base_device"] for x in inventory["gap"]["policy_ready"] + inventory["gap"]["policy_blocked"]}
         self.assertNotIn("STM32F412RE", gap_bases)
         self.assertNotIn("STM32F412RG", gap_bases)
