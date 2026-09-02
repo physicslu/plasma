@@ -36,6 +36,7 @@
 - **Current** — [Engineering Settings UI Design System](architecture/engineering-settings-ui-design-system.md)
 - **Current** — [IC Selector Architecture](architecture/ic-selector.md)
 - **Current** — [Device Support and Validation](architecture/device-support-validation.md)
+- **Plan** — [Device Support / Hardware Execution / OpenOCD Architecture](architecture/device-support-hardware-openocd.md)：PoC 維持 PYNQ + Python；Production 將 Programmer Backend、stable Plasma HW API、UIO/MMIO/DMA/IRQ 與 PL protocol engine 分層，並避免 OpenOCD per-bit bit-banging。
 - **Plan** — [IC Support Reusable Profile Architecture](architecture/ic-support-profile-architecture.md)
 - **Current** — [IC Support Coverage Normalization](architecture/ic-support-coverage-normalization.md)：以 derived inventory 將 production exact ICPN 正規化為 Base Device、Programming Profile 與 backend readiness，避免把商業料號數量誤當成燒錄演算法數量。
 - **Current** — [IC Support Runtime Resolver Foundation](architecture/ic-support-runtime-resolver.md)：定義 exact ICPN → reusable IC Support profiles 的 runtime-consumable resolver，並維持 Profile resolved 與 backend/runtime implemented 的 fail-closed 邊界。
