@@ -1,0 +1,30 @@
+{
+  "algorithm_equivalence_claimed": false,
+  "canonical_dataset_written": true,
+  "final_csv_git_blob": "13c456ad4b64a0be2d626af45d2b2fddb9ab4c17",
+  "final_csv_sha256": "22419b078f1c6436f0aa6dd3b410791170a1976be59a03a814469acc54690f09",
+  "new_exact_icpns": [
+    "STM32F412RET6",
+    "STM32F412RET6TR",
+    "STM32F412RET7",
+    "STM32F412RET7TR",
+    "STM32F412REY6TR",
+    "STM32F412RGT6",
+    "STM32F412RGT6TR",
+    "STM32F412RGY6PTR",
+    "STM32F412RGY6TR"
+  ],
+  "physical_ppu_validation_claimed": false,
+  "post_rows": 208,
+  "pre_rows": 199,
+  "proposal_artifact_id": "9833785496",
+  "proposal_artifact_sha256": "e385fdb3c4132ad9fbcc9c05aeba61a0e5e3f1e0ae34dbc98f5466654d573051",
+  "proposal_plan_sha256": "f589d55036448ba53c8cf3222d5e528f5acd71b8ff494d8f45e0f684046b266c",
+  "proposal_run_id": "33597158933",
+  "retained_artifact_id": "9832182808",
+  "retained_artifact_sha256": "b21c32e754c7b81bd4f2150c53e88a80ba265ca148df5bf2a7a87f3adda796c7",
+  "retained_evidence_id": "stm32f4-phase4.2f-f412re-rg-admission-2026-09-02-retained-20260902T045042Z-501ca11",
+  "retained_run_id": "33592306507",
+  "schema_version": 1,
+  "transaction": "stm32f4-phase4.2f-f412re-rg-admission-2026-09-02"
+}
