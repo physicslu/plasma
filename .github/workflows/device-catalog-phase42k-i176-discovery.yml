@@ -1,0 +1,94 @@
+name: Device catalog Phase 4.2K I176 discovery
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2k-i176-admission
+    paths:
+      - '.github/workflows/device-catalog-phase42k-i176-discovery.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+      - name: Discover official ST lifecycle rows
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/phase42k-discovery"
+          PYTHONPATH=data/device-catalog/research python - <<'PY'
+          from __future__ import annotations
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from st_browser_acquisition import STBrowserAcquirer, build_browser_evidence_record
+
+          bases = [
+              'STM32F407IE','STM32F407IG','STM32F417IE','STM32F417IG',
+              'STM32F427IG','STM32F427II','STM32F429IE','STM32F429IG','STM32F429II',
+              'STM32F437IG','STM32F437II','STM32F439IG','STM32F439II',
+              'STM32F469IE','STM32F469IG','STM32F469II','STM32F479IG','STM32F479II',
+          ]
+          out = Path('/tmp/phase42k-discovery')
+          out.mkdir(parents=True, exist_ok=True)
+          results = []
+          with STBrowserAcquirer(headless=True, navigation_attempts=2) as acquirer:
+              for base in bases:
+                  url = f'https://www.st.com/en/microcontrollers-microprocessors/{base.lower()}.html'
+                  item = {'base_device': base, 'source_url': url}
+                  try:
+                      body, final_url, _, _ = acquirer.fetch(url, 45.0)
+                      retrieved = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
+                      ev = build_browser_evidence_record(
+                          body=body, source_url=url, final_url=final_url,
+                          base_device=base, retrieved_at_utc=retrieved,
+                      )
+                      (out / f'{base}.json').write_text(json.dumps(ev, indent=2, sort_keys=True)+'\n', encoding='utf-8')
+                      item.update({
+                          'status':'success',
+                          'active_exact_icpns': ev['exact_icpns'],
+                          'excluded_non_active_part_numbers': ev['excluded_non_active_part_numbers'],
+                          'rendered_dom_sha256': ev['rendered_dom_sha256'],
+                          'evidence_section_sha256': ev['evidence_section_sha256'],
+                      })
+                  except Exception as exc:
+                      item.update({'status':'failure','error':str(exc)})
+                  results.append(item)
+
+          summary = {
+              'schema_version': 1,
+              'phase': '4.2K',
+              'purpose': 'discovery_only_no_canonical_write',
+              'target_count': len(bases),
+              'success_count': sum(r['status']=='success' for r in results),
+              'failure_count': sum(r['status']!='success' for r in results),
+              'active_exact_icpn_count': sum(len(r.get('active_exact_icpns', [])) for r in results),
+              'results': results,
+              'canonical_dataset_written': False,
+              'algorithm_equivalence_claimed': False,
+              'physical_ppu_validation_claimed': False,
+          }
+          (out / 'summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True)+'\n', encoding='utf-8')
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          if summary['failure_count']:
+              raise SystemExit(1)
+          PY
+      - name: Upload discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase42k-stm32f4-i176-discovery
+          path: /tmp/phase42k-discovery
+          if-no-files-found: error
+          retention-days: 30
