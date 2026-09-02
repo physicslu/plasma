@@ -1,0 +1,193 @@
+name: Device catalog Phase 4.2B STM32F410CB controlled publish
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-stm32f410cb:
+    if: >-
+      github.actor == 'physicslu' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/device-catalog-phase4.2b-f410cb-admission'
+    runs-on: ubuntu-latest
+    env:
+      RESEARCH: data/device-catalog/research
+      EVIDENCE_DIR: data/device-catalog/research/evidence/stm32f4-phase4.2b-f410cb-admission-live-2026-09-02
+      BASELINE: data/device-catalog/research/stm32f4-phase4.2b-f410cb-admission-baseline.json
+      CANONICAL: data/device-catalog/research/stm32f4-commercial-icpn.csv
+      PRODUCTION_MANIFEST: data/device-catalog/production/icpn-v1-manifest.json
+      PROPOSAL_ARTIFACT_ID: '9830104671'
+      PROPOSAL_ZIP_SHA256: '43d536c28d4b718d1d98e17dab442e7cb3b8d1b6c387c5f3b09fac296e71cfe2'
+      PLAN_SHA256: 'b10adc356811557a2c80f453ade374a5ffd85cbb283f3c3b6455801687eda183'
+      PROPOSED_CSV_SHA256: 'c4e3889392383cb7861bb29c759074c5089a47ae518a1a8cb5330af97335c7f4'
+      PRE_CSV_SHA256: '8339390cdafe1aee25cac8f3e371a09fbc01d57a243ad66f012bcb205b322cac'
+      PRE_GIT_BLOB: 'b6aaef8f8cafd0ad2d26b89dfc17c0f670bf8f77'
+      FINAL_GIT_BLOB: 'c77df45c0cd8c03c71090df04176da5371d57124'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify production pre-state
+        run: |
+          set -euo pipefail
+          echo "${PRE_CSV_SHA256}  ${CANONICAL}" | sha256sum -c -
+          test "$(git hash-object "${CANONICAL}")" = "${PRE_GIT_BLOB}"
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          canonical = Path('data/device-catalog/research/stm32f4-commercial-icpn.csv')
+          rows = list(csv.DictReader(canonical.open(newline='', encoding='utf-8')))
+          assert len(rows) == 194
+          manifest = json.loads(Path('data/device-catalog/production/icpn-v1-manifest.json').read_text())
+          sources = {item['family']: item for item in manifest['sources']}
+          assert sources['STM32F1']['row_count'] == 75
+          assert sources['STM32F4']['row_count'] == 194
+          assert sources['STM32F4']['sha256'] == '8339390cdafe1aee25cac8f3e371a09fbc01d57a243ad66f012bcb205b322cac'
+          assert sources['STM32F4']['git_blob_sha'] == 'b6aaef8f8cafd0ad2d26b89dfc17c0f670bf8f77'
+          assert sum(item['row_count'] for item in manifest['sources']) == 269
+          PY
+      - name: Download and verify immutable proposal
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/proposal
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${PROPOSAL_ARTIFACT_ID}/zip" > /tmp/proposal.zip
+          echo "${PROPOSAL_ZIP_SHA256}  /tmp/proposal.zip" | sha256sum -c -
+          unzip -q /tmp/proposal.zip -d /tmp/proposal
+          echo "${PLAN_SHA256}  /tmp/proposal/admission-plan.json" | sha256sum -c -
+          echo "${PROPOSED_CSV_SHA256}  /tmp/proposal/stm32f4-commercial-icpn.proposed.csv" | sha256sum -c -
+          test "$(git hash-object /tmp/proposal/stm32f4-commercial-icpn.proposed.csv)" = "${FINAL_GIT_BLOB}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          summary = json.loads(Path('/tmp/proposal/proposal-summary.json').read_text())
+          plan = json.loads(Path('/tmp/proposal/admission-plan.json').read_text())
+          expected = ['STM32F410CBT3','STM32F410CBT6','STM32F410CBU3','STM32F410CBU3TR','STM32F410CBU6']
+          assert summary['candidate_count'] == 5
+          assert summary['decision_counts'] == {'admit': 5, 'already_present': 0, 'manual_review_required': 0, 'reject': 0}
+          assert summary['conflicts'] == 0 and summary['issues'] == []
+          assert summary['canonical_rows_before'] == 194
+          assert summary['canonical_rows_after'] == 199
+          assert summary['added'] == expected
+          assert summary['admission_plan_sha256'] == 'b10adc356811557a2c80f453ade374a5ffd85cbb283f3c3b6455801687eda183'
+          assert summary['proposed_csv_sha256'] == 'c4e3889392383cb7861bb29c759074c5089a47ae518a1a8cb5330af97335c7f4'
+          assert plan['issues'] == [] and plan['conflicts'] == 0
+          assert plan['inputs']['admission_base_devices'] == ['STM32F410CB']
+          PY
+      - name: Rebuild proposal from retained evidence
+        run: |
+          set -euo pipefail
+          python "${RESEARCH}/validate_stm32f4_retained_evidence.py" --evidence-dir "${EVIDENCE_DIR}" --baseline "${BASELINE}"
+          python "${RESEARCH}/stm32f4_admission.py" \
+            --evidence-dir "${EVIDENCE_DIR}" --baseline "${BASELINE}" \
+            --catalog "${RESEARCH}/openocd-parts-canonical.csv" --canonical "${CANONICAL}" \
+            --admit-base STM32F410CB \
+            --output /tmp/rebuilt-plan.json
+          echo "${PLAN_SHA256}  /tmp/rebuilt-plan.json" | sha256sum -c -
+          cmp /tmp/rebuilt-plan.json /tmp/proposal/admission-plan.json
+          cp "${CANONICAL}" /tmp/rebuilt.csv
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          research = Path('data/device-catalog/research'); sys.path.insert(0, str(research))
+          from device_catalog_admission_framework import write_canonical_dataset
+          plan = json.loads(Path('/tmp/rebuilt-plan.json').read_text())
+          result = write_canonical_dataset(plan=plan, canonical_path=Path('/tmp/rebuilt.csv'))
+          assert result['status'] == 'written'
+          assert result['rows_before'] == 194 and result['rows_after'] == 199
+          assert len(result['added']) == 5
+          PY
+          echo "${PROPOSED_CSV_SHA256}  /tmp/rebuilt.csv" | sha256sum -c -
+          cmp /tmp/rebuilt.csv /tmp/proposal/stm32f4-commercial-icpn.proposed.csv
+      - name: Publish canonical dataset manifest and audit
+        run: |
+          set -euo pipefail
+          cp /tmp/rebuilt.csv "${CANONICAL}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest_path = Path('data/device-catalog/production/icpn-v1-manifest.json')
+          manifest = json.loads(manifest_path.read_text())
+          f4 = next(item for item in manifest['sources'] if item['family'] == 'STM32F4')
+          assert f4['row_count'] == 194
+          f4['row_count'] = 199
+          f4['sha256'] = 'c4e3889392383cb7861bb29c759074c5089a47ae518a1a8cb5330af97335c7f4'
+          f4['git_blob_sha'] = 'c77df45c0cd8c03c71090df04176da5371d57124'
+          manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
+          proposal = json.loads(Path('/tmp/proposal/proposal-summary.json').read_text())
+          audit = {
+            'schema_version': 1,
+            'phase': 'stm32f4-phase4.2b-f410cb-admission',
+            'evidence_id': proposal['evidence_id'],
+            'evidence_artifact_id': '9830008020',
+            'evidence_zip_sha256': '2424bc688f67d4cd01c34505f9e210735ac7456e4536d022133249548d13512d',
+            'proposal_workflow_run_id': '33586071276',
+            'proposal_artifact_id': '9830104671',
+            'proposal_zip_sha256': '43d536c28d4b718d1d98e17dab442e7cb3b8d1b6c387c5f3b09fac296e71cfe2',
+            'admission_plan_sha256': proposal['admission_plan_sha256'],
+            'decision_counts': proposal['decision_counts'],
+            'conflicts': proposal['conflicts'],
+            'issues': proposal['issues'],
+            'pre_rows': 194,
+            'post_rows': 199,
+            'new_exact_icpns': 5,
+            'added': proposal['added'],
+            'excluded_non_active': [],
+            'pre_csv_sha256': '8339390cdafe1aee25cac8f3e371a09fbc01d57a243ad66f012bcb205b322cac',
+            'pre_git_blob_sha': 'b6aaef8f8cafd0ad2d26b89dfc17c0f670bf8f77',
+            'final_csv_sha256': 'c4e3889392383cb7861bb29c759074c5089a47ae518a1a8cb5330af97335c7f4',
+            'final_git_blob_sha': 'c77df45c0cd8c03c71090df04176da5371d57124',
+            'canonical_dataset_written': True,
+          }
+          Path('data/device-catalog/research/stm32f4-phase4.2b-f410cb-admission-audit.json').write_text(json.dumps(audit, indent=2, sort_keys=True) + '\n')
+          PY
+          echo "${PROPOSED_CSV_SHA256}  ${CANONICAL}" | sha256sum -c -
+          test "$(git hash-object "${CANONICAL}")" = "${FINAL_GIT_BLOB}"
+      - name: Validate controlled post-state
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          rows = list(csv.DictReader(Path('data/device-catalog/research/stm32f4-commercial-icpn.csv').open(newline='', encoding='utf-8')))
+          assert len(rows) == 199
+          icpns = {r['icpn'] for r in rows}
+          expected = {'STM32F410CBT3','STM32F410CBT6','STM32F410CBU3','STM32F410CBU3TR','STM32F410CBU6'}
+          assert expected <= icpns
+          manifest = json.loads(Path('data/device-catalog/production/icpn-v1-manifest.json').read_text())
+          sources = {i['family']: i for i in manifest['sources']}
+          assert sources['STM32F1']['row_count'] == 75
+          assert sources['STM32F4']['row_count'] == 199
+          assert sum(i['row_count'] for i in manifest['sources']) == 274
+          PY
+          python "${RESEARCH}/stm32f4_coverage_gap_inventory.py" --output /tmp/post.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r = json.loads(Path('/tmp/post.json').read_text())
+          assert r['production']['exact_icpn_rows'] == 199
+          assert r['production']['base_device_count'] == 68
+          assert r['openocd_ordering_pattern_base_device_count'] == 149
+          assert r['gap']['base_device_count'] == 81
+          assert r['gap']['policy_ready_count'] == 0
+          assert r['gap']['policy_blocked_count'] == 81
+          assert r['gap']['policy_ready'] == []
+          PY
+      - name: Commit controlled publish
+        run: |
+          set -euo pipefail
+          git config user.name 'Gordon'
+          git config user.email 'physicslu@gmail.com'
+          git add "${CANONICAL}" "${PRODUCTION_MANIFEST}" data/device-catalog/research/stm32f4-phase4.2b-f410cb-admission-audit.json
+          git diff --cached --check
+          git commit -m 'device-catalog: admit STM32F410CB exact ICPNs'
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
