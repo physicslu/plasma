@@ -112,6 +112,7 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     rt_batch2 = catalog.search("stm32f405rgt7tr", limit=1)[0]
     rt_batch3 = catalog.search("stm32f413rgt6tr", limit=1)[0]
     rt_batch4 = catalog.search("stm32f446ret7tr", limit=1)[0]
+    rt_batch4 = catalog.search("stm32f446ret7tr", limit=1)[0]
     family = catalog.search("STM32F4", limit=100)
     combined = catalog.search("STMicroelectronics STM32F4", limit=100)
 
