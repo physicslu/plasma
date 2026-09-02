@@ -65,11 +65,14 @@ def _git_blob(path):
 class Batch4PostAdmissionTests(unittest.TestCase):
     def _prewrite(self, output):
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
-            reader = csv.DictReader(handle); fields = list(reader.fieldnames or [])
+            reader = csv.DictReader(handle)
+            fields = list(reader.fieldnames or [])
             rows = [row for row in reader if _evidence_id(row) in PRE_BATCH4_EVIDENCE_IDS]
         self.assertEqual(len(rows), 186)
         with output.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n"); writer.writeheader(); writer.writerows(rows)
+            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
 
     def test_retained_evidence_and_audit(self):
         report = validate_retained_evidence(EVIDENCE, baseline_path=BASELINE)
@@ -85,7 +88,8 @@ class Batch4PostAdmissionTests(unittest.TestCase):
         self.assertEqual(audit["evidence_artifact_id"], "9827190036")
         self.assertEqual(audit["proposal_workflow_run_id"], "33577825725")
         self.assertEqual(audit["proposal_artifact_id"], "9827276583")
-        self.assertEqual(audit["pre_rows"], 186); self.assertEqual(audit["post_rows"], 194)
+        self.assertEqual(audit["pre_rows"], 186)
+        self.assertEqual(audit["post_rows"], 194)
         self.assertEqual(audit["new_exact_icpns"], 8)
         self.assertEqual(audit["decision_counts"], {"admit": 8, "already_present": 0, "manual_review_required": 0, "reject": 0})
         self.assertEqual(audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
@@ -100,8 +104,13 @@ class Batch4PostAdmissionTests(unittest.TestCase):
 
     def test_historical_replay_186_to_194_is_byte_identical(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); canonical = root / "f4.csv"; catalog = root / "catalog.csv"; evidence = root / EVIDENCE.name
-            self._prewrite(canonical); catalog.write_bytes(CATALOG.read_bytes().replace(b"\r\n", b"\n")); shutil.copytree(EVIDENCE, evidence)
+            root = Path(temp)
+            canonical = root / "stm32f4-commercial-icpn.csv"
+            catalog = root / "openocd-parts-canonical.csv"
+            evidence = root / EVIDENCE.name
+            self._prewrite(canonical)
+            catalog.write_bytes(CATALOG.read_bytes().replace(b"\r\n", b"\n"))
+            shutil.copytree(EVIDENCE, evidence)
             plan = build_admission_plan(evidence_dir=evidence, baseline_path=BASELINE, catalog_path=catalog, canonical_path=canonical, admission_base_devices=NEW_BASES)
             serialized = (json.dumps(plan, indent=2, sort_keys=True) + "\n").encode()
             self.assertEqual(hashlib.sha256(serialized).hexdigest(), EXPECTED_PLAN_SHA256)
@@ -111,15 +120,22 @@ class Batch4PostAdmissionTests(unittest.TestCase):
             self.assertEqual(_git_blob(canonical), EXPECTED_CANONICAL_GIT_BLOB)
 
     def test_current_manifest_and_inventory_are_growth_safe(self):
-        payload = CANONICAL.read_bytes(); current_sha = hashlib.sha256(payload).hexdigest(); current_blob = hashlib.sha1(f"blob {len(payload)}\0".encode() + payload).hexdigest()
-        rows = list(csv.DictReader(CANONICAL.open(newline="", encoding="utf-8"))); bases = {r["base_device"] for r in rows}
-        manifest = json.loads(PRODUCTION_MANIFEST.read_text()); sources = {s["family"]: s for s in manifest["sources"]}; f4 = sources["STM32F4"]
+        payload = CANONICAL.read_bytes()
+        current_sha = hashlib.sha256(payload).hexdigest()
+        current_blob = hashlib.sha1(f"blob {len(payload)}\0".encode() + payload).hexdigest()
+        with CANONICAL.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        bases = {r["base_device"] for r in rows}
+        manifest = json.loads(PRODUCTION_MANIFEST.read_text())
+        sources = {s["family"]: s for s in manifest["sources"]}
+        f4 = sources["STM32F4"]
         self.assertEqual((f4["row_count"], f4["sha256"], f4["git_blob_sha"]), (len(rows), current_sha, current_blob))
         self.assertTrue(NEW_BASES <= bases)
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         self.assertFalse(inventory["algorithm_equivalence_claimed"])
         self.assertEqual(inventory["gap"]["base_device_count"], 149 - inventory["production"]["base_device_count"])
-        ready = {x["base_device"] for x in inventory["gap"]["policy_ready"]}; blocked = {x["base_device"] for x in inventory["gap"]["policy_blocked"]}
+        ready = {x["base_device"] for x in inventory["gap"]["policy_ready"]}
+        blocked = {x["base_device"] for x in inventory["gap"]["policy_blocked"]}
         self.assertTrue(NEW_BASES.isdisjoint(ready | blocked))
 
 
