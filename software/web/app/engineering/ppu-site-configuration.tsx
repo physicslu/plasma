@@ -288,6 +288,7 @@ export default function PpuSiteConfiguration() {
                   <tr>
                     <th>Alias</th>
                     <th>PPU ID</th>
+                    <th>Lifecycle</th>
                     <th>Status</th>
                     <th>Sites</th>
                     <th>Gateway</th>
@@ -306,6 +307,7 @@ export default function PpuSiteConfiguration() {
                       >
                         <td><span className="ppuIdLink">{entry.alias ?? "Unaliased"}</span></td>
                         <td>{fleetView?.identity.ppu_id ?? "Awaiting probe"}</td>
+                        <td><span className={`ppuLifecycle ${entry.lifecycle}`}>{lifecycleLabel(entry)}</span></td>
                         <td><span className={`ppuSiteStatus ${statusClass(status)}`}>{status}</span></td>
                         <td>{fleetView?.topology.site_count || "—"}</td>
                         <td>{entry.endpoint}</td>
@@ -313,7 +315,7 @@ export default function PpuSiteConfiguration() {
                     );
                   })}
                   {!loading && registry?.ppus.length === 0 && (
-                    <tr><td colSpan={5}>No PPU is registered.</td></tr>
+                    <tr><td colSpan={6}>No PPU is registered.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -339,7 +341,11 @@ export default function PpuSiteConfiguration() {
               <section className="ppuSiteCard" aria-label="PPU Information">
                 <header className="ppuSiteCardHeader">
                   <div className="ppuSiteCardHeaderActions">
-                    <h3>{selectedEntry.alias ?? "Unaliased PPU"}</h3>
+                    <h3 className="ppuSelectedPpuTitle">
+                      <span>Selected PPU</span>
+                      <span className="ppuSelectedPpuDivider">·</span>
+                      <strong>{selectedEntry.alias ?? "Unaliased PPU"}</strong>
+                    </h3>
                     <span className={`ppuSiteStatus ${statusClass(selectedStatus)}`}>{selectedStatus}</span>
                   </div>
                   <div className="ppuSiteCardHeaderActions">
@@ -393,15 +399,15 @@ export default function PpuSiteConfiguration() {
                     <div><dt>Lifecycle</dt><dd>{lifecycleLabel(selectedEntry)}</dd></div>
                     <div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div>
                     <div><dt>Status</dt><dd><span className={`ppuSiteStatus ${statusClass(selectedStatus)}`}>{selectedStatus}</span></dd></div>
-                    <div className="wide"><dt>Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
+                    <div><dt>Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
                     <div><dt>Observation</dt><dd>{selectedFleet?.observation.state ?? "unknown"}</dd></div>
                     <div><dt>Execution</dt><dd>{selectedFleet?.execution_state ?? "unknown"}</dd></div>
-                    <div className="wide"><dt>Display Name</dt><dd>{selectedFleet?.identity.display_name ?? "—"}</dd></div>
-                    <div><dt>HW Model</dt><dd>{selectedFleet?.identity.model ?? "—"}</dd></div>
                     <div><dt>Facility</dt><dd>{selectedFleet?.identity.facility_id ?? "—"}</dd></div>
-                    <div className="wide"><dt>Manager Registered At</dt><dd>{selectedEntry.registered_at}</dd></div>
-                    <div className="wide"><dt>Registry Updated At</dt><dd>{selectedEntry.updated_at}</dd></div>
-                    <div className="wide">
+                    <div><dt>Display Name</dt><dd>{selectedFleet?.identity.display_name ?? "—"}</dd></div>
+                    <div><dt>HW Model</dt><dd>{selectedFleet?.identity.model ?? "—"}</dd></div>
+                    <div><dt>Manager Registered At</dt><dd>{selectedEntry.registered_at}</dd></div>
+                    <div><dt>Registry Updated At</dt><dd>{selectedEntry.updated_at}</dd></div>
+                    <div className="full">
                       <dt>Reported Interfaces</dt>
                       <dd className="ppuCapabilityList">
                         {selectedInterfaces.length
@@ -421,10 +427,19 @@ export default function PpuSiteConfiguration() {
                   <span className="ppuSiteFilter">PPU-reported topology</span>
                 </header>
 
-                <div className="ppuSiteSummary">
-                  <span>Physical Sites <strong>{selectedFleet?.topology.site_count || "—"}</strong></span>
-                  <span>Enabled Sites <strong>{selectedFleet?.topology.enabled_site_count ?? "—"}</strong></span>
-                  <span>Topology Source <strong>{selectedFleet?.topology.source ?? "none"}</strong></span>
+                <div className="ppuSiteSummary" aria-label="Site topology summary">
+                  <div className="ppuSiteSummaryItem">
+                    <span>Physical Sites</span>
+                    <strong>{selectedFleet?.topology.site_count || "—"}</strong>
+                  </div>
+                  <div className="ppuSiteSummaryItem">
+                    <span>Enabled Sites</span>
+                    <strong>{selectedFleet?.topology.enabled_site_count ?? "—"}</strong>
+                  </div>
+                  <div className="ppuSiteSummaryItem">
+                    <span>Topology Source</span>
+                    <strong>{selectedFleet?.topology.source ?? "none"}</strong>
+                  </div>
                 </div>
 
                 {selectedFleet?.topology.sites.length ? (
