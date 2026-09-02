@@ -86,6 +86,14 @@
   background: var(--panel-3);
 }
 
+/* PPU/Site management keeps the existing EMode sidebar and uses the remaining
+ * canvas as an inventory/configuration workbench. */
+.engineeringCanvas.ppuSitesActive {
+  place-items: start stretch;
+  padding: 12px;
+  background: var(--panel-3);
+}
+
 /* Settings is an operator configuration surface. Keep it near the top of the
  * workspace rather than vertically centering a short panel in the 620 px shell. */
 .engineeringCanvas.settingsActive {
@@ -163,7 +171,8 @@
     grid-template-columns: 1fr;
   }
 
-  .engineeringCanvas.programmingActive {
+  .engineeringCanvas.programmingActive,
+  .engineeringCanvas.ppuSitesActive {
     padding: 8px;
   }
 
