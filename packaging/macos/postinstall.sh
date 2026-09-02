@@ -130,6 +130,7 @@ manager:
   request_timeout_s: 2.0
   poll_interval_s: 2.0
   observation_db_path: $USER_STATE_ROOT/manager-observations.sqlite3
+  registry_state_path: $USER_STATE_ROOT/manager-registry.json
 ppus: []
 EOF
   chown "$INSTALL_USER:$INSTALL_GROUP" "$MANAGER_CONFIG"
