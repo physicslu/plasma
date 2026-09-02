@@ -1,0 +1,66 @@
+name: Device catalog Phase 4.2I retained artifact publish
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2i-f405o-f415og-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42i-retained-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2i-f405o-f415og-admission
+      - uses: actions/download-artifact@v4
+        with:
+          name: phase42i-stm32f405o-f415og-retained
+          path: /tmp/phase42i
+          github-token: ${{ github.token }}
+          repository: physicslu/plasma
+          run-id: 33627304458
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate and stage retained evidence
+        run: |
+          set -euo pipefail
+          SRC=/tmp/phase42i/retained
+          DST=data/device-catalog/research/evidence/stm32f4-phase4.2i-f405o-f415og-admission-live-2026-09-02
+          test -d "$SRC"
+          test ! -e "$DST"
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir "$SRC" \
+            --baseline data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-baseline.json
+          cp -a "$SRC" "$DST"
+          cat > data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-retained-source.json <<'JSON'
+          {
+            "schema_version": 1,
+            "workflow_run_id": "33627304458",
+            "artifact_id": "9845365879",
+            "artifact_name": "phase42i-stm32f405o-f415og-retained",
+            "artifact_sha256": "5ddf79b73a15c3ea412e98a6ed908c2a74f8670f7320d11b880248486fafcbb9",
+            "source_discovery_run_id": "33609506654",
+            "source_discovery_artifact_id": "9838558390",
+            "source_discovery_artifact_sha256": "c211e4b96e9bacd3cbbc72877b49ac514d5e493eb709b0aa1388ea128bc26cba"
+          }
+          JSON
+          git diff --check
+      - name: Commit retained evidence
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/evidence/stm32f4-phase4.2i-f405o-f415og-admission-live-2026-09-02 \
+                  data/device-catalog/research/stm32f4-phase4.2i-f405o-f415og-admission-retained-source.json
+          git diff --cached --check
+          git commit -m 'device-catalog: retain Phase4.2I STM32F405O/415OG evidence'
+          git push origin HEAD:agent/device-catalog-phase4.2i-f405o-f415og-admission
