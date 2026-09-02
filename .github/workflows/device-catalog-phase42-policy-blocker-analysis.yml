@@ -1,0 +1,99 @@
+name: Device catalog Phase 4.2 policy blocker analysis
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-policy-blockers:
+    if: >-
+      github.actor == 'physicslu' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/device-catalog-phase4.2-policy-blocker-analysis'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build current STM32F4 coverage-gap inventory
+        run: |
+          python data/device-catalog/research/stm32f4_coverage_gap_inventory.py \
+            --output /tmp/stm32f4-coverage-gap-inventory.json
+      - name: Build blocker taxonomy
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          src = Path('/tmp/stm32f4-coverage-gap-inventory.json')
+          inventory = json.loads(src.read_text())
+          blocked = inventory['gap']['policy_blocked']
+
+          blocker_counts = Counter()
+          exact_sets = Counter()
+          bases_by_blocker = defaultdict(list)
+          bases_by_exact_set = defaultdict(list)
+          pin_package_counts = Counter()
+          flash_code_counts = Counter()
+          other_counts = Counter()
+
+          for item in blocked:
+              base = item['base_device']
+              blockers = tuple(item['policy_blockers'])
+              exact_sets[blockers] += 1
+              bases_by_exact_set[' | '.join(blockers)].append(base)
+              for blocker in blockers:
+                  blocker_counts[blocker] += 1
+                  bases_by_blocker[blocker].append(base)
+                  prefix = 'unsupported STM32F4 pin/package combination: '
+                  flash_prefix = 'unsupported flash-size code '
+                  if blocker.startswith(prefix):
+                      pin_package_counts[blocker.removeprefix(prefix)] += 1
+                  elif blocker.startswith(flash_prefix):
+                      flash_code_counts[blocker.removeprefix(flash_prefix)] += 1
+                  else:
+                      other_counts[blocker] += 1
+
+          report = {
+              'schema_version': 1,
+              'phase': '4.2',
+              'scope': 'STM32F4 policy-blocked ordering-pattern coverage gaps',
+              'algorithm_equivalence_claimed': False,
+              'production_exact_icpn_rows': inventory['production']['exact_icpn_rows'],
+              'production_base_device_count': inventory['production']['base_device_count'],
+              'openocd_ordering_pattern_base_device_count': inventory['openocd_ordering_pattern_base_device_count'],
+              'gap_base_device_count': inventory['gap']['base_device_count'],
+              'policy_ready_count': inventory['gap']['policy_ready_count'],
+              'policy_blocked_count': inventory['gap']['policy_blocked_count'],
+              'blocker_occurrence_counts': dict(sorted(blocker_counts.items())),
+              'exact_blocker_set_counts': {
+                  ' | '.join(k): v for k, v in sorted(exact_sets.items(), key=lambda kv: (-kv[1], kv[0]))
+              },
+              'pin_package_combination_counts': dict(sorted(pin_package_counts.items(), key=lambda kv: (-kv[1], kv[0]))),
+              'flash_code_blocker_counts': dict(sorted(flash_code_counts.items(), key=lambda kv: (-kv[1], kv[0]))),
+              'other_blocker_counts': dict(sorted(other_counts.items(), key=lambda kv: (-kv[1], kv[0]))),
+              'bases_by_blocker': {k: sorted(v) for k, v in sorted(bases_by_blocker.items())},
+              'bases_by_exact_blocker_set': {k: sorted(v) for k, v in sorted(bases_by_exact_set.items())},
+          }
+          Path('/tmp/stm32f4-phase4.2-policy-blocker-taxonomy.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n'
+          )
+
+          assert report['policy_ready_count'] == 0
+          assert report['policy_blocked_count'] == 82
+          assert report['gap_base_device_count'] == 82
+          assert sum(report['exact_blocker_set_counts'].values()) == 82
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload analysis artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase42-stm32f4-policy-blocker-analysis
+          path: |
+            /tmp/stm32f4-coverage-gap-inventory.json
+            /tmp/stm32f4-phase4.2-policy-blocker-taxonomy.json
+          if-no-files-found: error
