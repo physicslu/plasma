@@ -1,0 +1,38 @@
+{
+  "added": [
+    "STM32F446RCT6",
+    "STM32F446RCT6TR",
+    "STM32F446RCT7",
+    "STM32F446RCT7TR",
+    "STM32F446RET6",
+    "STM32F446RET6TR",
+    "STM32F446RET7",
+    "STM32F446RET7TR"
+  ],
+  "admission_plan_sha256": "05913c6bf5b1f35998208add33145ed0730a29d1be15480e1f527615b590f06c",
+  "canonical_dataset_written": true,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 8,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_artifact_id": "9827190036",
+  "evidence_id": "stm32f4-phase4.1-rt-admission-batch4-2026-09-02-retained-20260902T005937Z-f2c2198",
+  "evidence_zip_sha256": "8a46be75ed83d442ad0acb7fa61c9bbdcb4785eda88271385ebb987c575ba726",
+  "excluded_non_active": [],
+  "final_csv_sha256": "8339390cdafe1aee25cac8f3e371a09fbc01d57a243ad66f012bcb205b322cac",
+  "final_git_blob_sha": "b6aaef8f8cafd0ad2d26b89dfc17c0f670bf8f77",
+  "issues": [],
+  "new_exact_icpns": 8,
+  "phase": "stm32f4-phase4.1-rt-admission-batch4",
+  "post_rows": 194,
+  "pre_csv_sha256": "c9f7709994c4894f335c9c07264149ffa25b1cbe11343eb667ec41dbc84be6d8",
+  "pre_git_blob_sha": "02af1f1557b2f2c1bb5429edeb09837111225d73",
+  "pre_rows": 186,
+  "proposal_artifact_id": "9827276583",
+  "proposal_workflow_run_id": "33577825725",
+  "proposal_zip_sha256": "f9503ac60347376347439682ec34000e9b8fb2121c434a2d4e9574528900f114",
+  "schema_version": 1
+}

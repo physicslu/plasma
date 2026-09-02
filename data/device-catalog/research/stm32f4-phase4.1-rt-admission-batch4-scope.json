@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "phase": "stm32f4-phase4.1-rt-admission-batch4",
+  "canonical_dataset_admission": false,
+  "control_base_device": "STM32F479ZG",
+  "admission_base_devices": [
+    "STM32F446RC",
+    "STM32F446RE"
+  ],
+  "deferred_base_devices": [],
+  "pre_production": {
+    "stm32f1_exact_icpns": 75,
+    "stm32f4_exact_icpns": 186,
+    "st_total_exact_icpns": 261,
+    "stm32f4_base_devices": 65,
+    "openocd_ordering_pattern_base_devices": 149,
+    "remaining_gap_base_devices": 84,
+    "policy_ready_gap_base_devices": 2,
+    "policy_blocked_gap_base_devices": 82,
+    "stm32f4_git_blob_sha": "02af1f1557b2f2c1bb5429edeb09837111225d73",
+    "stm32f4_sha256": "c9f7709994c4894f335c9c07264149ffa25b1cbe11343eb667ec41dbc84be6d8"
+  },
+  "candidate_policy": "admitted_exact_manufacturer_part_number_only",
+  "notes": [
+    "Exact ICPN observations must come from official ST evidence; do not infer suffixes.",
+    "OpenOCD ordering-pattern mapping is routing evidence only, not programming-algorithm equivalence.",
+    "MAX_PILOT_TARGETS remains unchanged; this bounded transaction has three targets including lifecycle control."
+  ]
+}

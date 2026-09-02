@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.1-rt-admission-batch4-2026-09-02",
+  "source_workflow_run_id": "33577245347",
+  "source_artifact_id": "9827109545",
+  "source_artifact_sha256": "940a4f9ca6a4f6dcc8afe0a3a1a78d5bece58600dda5876f78c17d564ad2aff1",
+  "canonical_dataset_admission": false,
+  "candidate_policy": "admitted_exact_manufacturer_part_number_only",
+  "lifecycle_audit_policy": "non_active_observations_audit_only",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "role": "control",
+      "marketing_status": "Active Product is in volume production.",
+      "exact_icpns": [
+        "STM32F479ZGT6"
+      ]
+    },
+    {
+      "base_device": "STM32F446RC",
+      "role": "candidate",
+      "marketing_status": "Active Product is in volume production.",
+      "exact_icpns": [
+        "STM32F446RCT6",
+        "STM32F446RCT6TR",
+        "STM32F446RCT7",
+        "STM32F446RCT7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F446RE",
+      "role": "candidate",
+      "marketing_status": "Active Product is in volume production.",
+      "exact_icpns": [
+        "STM32F446RET6",
+        "STM32F446RET6TR",
+        "STM32F446RET7",
+        "STM32F446RET7TR"
+      ]
+    }
+  ],
+  "excluded_non_active_observations": []
+}
