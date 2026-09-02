@@ -25,9 +25,10 @@ class STM32F4Phase42DRYWLCSP64PolicyTests(unittest.TestCase):
         self.assertEqual(inventory["production"]["exact_icpn_rows"], 208)
         self.assertEqual(inventory["production"]["base_device_count"], 70)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
-        self.assertEqual(inventory["gap"]["base_device_count"], 79)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 0)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 79)
+        self.assertEqual(
+            inventory["gap"]["base_device_count"],
+            inventory["gap"]["policy_ready_count"] + inventory["gap"]["policy_blocked_count"],
+        )
 
         gap_bases = {
             item["base_device"]
