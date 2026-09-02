@@ -13,6 +13,7 @@ import "./engineering-density.css";
 import "./engineering-workspace-refresh.css";
 import "./engineering-readability.css";
 import "./engineering-alignment.css";
+import "./ppu-site-registry-live.css";
 
 const sections = [
   ["overview", "engineering.overview", "⌂"],
