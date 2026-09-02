@@ -1,1 +1,203 @@
 name: Device catalog validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-device-catalog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check device catalog diff whitespace
+        run: git diff --check HEAD^1 HEAD
+      - name: Validate STM32F1 commercial ICPN dataset
+        run: python data/device-catalog/research/validate_stm32f1_commercial_icpn.py
+      - name: Validate ST authoritative source acquisition parser
+        run: python data/device-catalog/research/test_st_product_page_acquisition.py
+      - name: Validate STM32F1 controlled batch acquisition pilot
+        run: python data/device-catalog/research/test_stm32f1_acquisition_pilot.py
+      - name: Validate STM32F1 live evidence contract
+        run: python data/device-catalog/research/test_stm32f1_live_pilot.py
+      - name: Validate ST transport diagnostic contract
+        run: python data/device-catalog/research/test_st_transport_diagnostic.py
+      - name: Validate ST browser acquisition contract
+        run: |
+          python data/device-catalog/research/test_st_browser_acquisition.py
+          python data/device-catalog/research/test_st_browser_readiness_retry.py
+      - name: Validate generic device catalog evidence framework
+        run: python data/device-catalog/research/test_device_catalog_evidence_framework.py
+      - name: Validate retained STM32F1 browser evidence
+        run: |
+          python data/device-catalog/research/validate_stm32f1_retained_evidence.py
+          python data/device-catalog/research/test_stm32f1_retained_evidence.py
+      - name: Validate generic device catalog pipeline framework
+        run: python data/device-catalog/research/test_device_catalog_pipeline_framework.py
+      - name: Validate generic device catalog admission framework
+        run: python data/device-catalog/research/test_device_catalog_admission_framework.py
+      - name: Validate STM32F1 canonical admission
+        run: |
+          python data/device-catalog/research/validate_stm32f1_admission_plan.py
+          python data/device-catalog/research/test_stm32f1_canonical_admission.py
+      - name: Validate STM32F1 Phase 2.9 scaleout contract
+        run: python data/device-catalog/research/test_stm32f1_phase2_9_scaleout.py
+      - name: Validate STM32F4 Phase 3.1 family adapter and synthetic pipeline
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase3_1_policy.py
+          python data/device-catalog/research/test_stm32f4_phase3_1_pipeline.py
+      - name: Validate STM32F4 Phase 3.1 retained evidence and canonical lifecycle
+        run: |
+          python data/device-catalog/research/validate_stm32f4_commercial_icpn.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase3.1-bounded-pilot-live-2026-08-30 \
+            --baseline data/device-catalog/research/stm32f4-phase3.1-pilot-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase3_1_post_admission.py
+      - name: Validate STM32F4 Phase 3.3 scaleout batch 1
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase3.3-scaleout-batch1-live-2026-08-30 \
+            --baseline data/device-catalog/research/stm32f4-phase3.3-scaleout-batch1-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase3_3_scaleout.py
+      - name: Validate STM32F4 Phase 3.3 scaleout batch 2
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase3.3-scaleout-batch2-live-2026-08-30 \
+            --baseline data/device-catalog/research/stm32f4-phase3.3-scaleout-batch2-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase3_3_scaleout_batch2.py
+      - name: Validate STM32F4 Phase 4.0 F446 admission lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_f446.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-f446-batch1-live-2026-08-30 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-f446-batch1-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_f446_post_admission.py
+      - name: Validate STM32F4 Phase 4.0 foundation batch 2 admission lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch2.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch2-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch2-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch2_post_admission.py
+      - name: Validate STM32F4 Phase 4.0 foundation batch 3 admission lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch3.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch3-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch3-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch3_post_admission.py
+      - name: Validate STM32F4 Phase 4.0 foundation batch 4 admission lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch4.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch4-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch4-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch4_post_admission.py
+      - name: Validate STM32F4 Phase 4.0 foundation batch 5 admission lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch5.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch5-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch5-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch5_post_admission.py
+      - name: Validate STM32F4 Phase 4.0 foundation batch 6 evidence lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch6.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch6-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch6-baseline.json
+          if test -f data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch6_post_admission.py; then
+            python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch6_post_admission.py
+          fi
+      - name: Validate STM32F4 Phase 4.0 foundation batch 7 evidence lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch7.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch7-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch7-baseline.json
+          if test -f data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch7_post_admission.py; then
+            python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch7_post_admission.py
+          fi
+      - name: Validate STM32F4 Phase 4.0 foundation batch 8 evidence lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch8.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch8-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch8-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch8_post_admission.py
+      - name: Validate STM32F4 Phase 4.0 foundation batch 9 evidence lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch9.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch9-live-2026-08-31 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch9-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch9_post_admission.py
+      - name: Validate STM32F4 Phase 4.0 foundation batch 10 evidence lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch10.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch10-live-2026-09-01 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch10-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch10_post_admission.py
+      - name: Validate STM32F4 Phase 4.0 foundation batch 11 evidence lifecycle
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch11.py
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.0-foundation-batch11-live-2026-09-01 \
+            --baseline data/device-catalog/research/stm32f4-phase4.0-foundation-batch11-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_0_foundation_batch11_post_admission.py
+      - name: Validate STM32F4 Phase 4.1 R/T policy evidence and fail-closed delta
+        run: |
+          python data/device-catalog/research/validate_stm32f4_phase4_1_rt_policy_evidence.py
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py
+      - name: Validate STM32F4 Phase 4.1 R/T batch2 admission lifecycle
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.1-rt-admission-batch2-live-2026-09-01 \
+            --baseline data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch2-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_admission_batch2_post_admission.py
+      - name: Validate STM32F4 Phase 4.1 R/T batch3 admission lifecycle
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.1-rt-admission-batch3-live-2026-09-01 \
+            --baseline data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch3-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_admission_batch3_post_admission.py
+      - name: Inventory STM32F4 production coverage gaps
+        run: |
+          python data/device-catalog/research/stm32f4_coverage_gap_inventory.py \
+            --output /tmp/stm32f4-coverage-gap.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/stm32f4-coverage-gap.json').read_text())
+          print(json.dumps({
+              'production_base_devices': report['production']['base_device_count'],
+              'production_exact_icpns': report['production']['exact_icpn_rows'],
+              'openocd_base_devices': report['openocd_ordering_pattern_base_device_count'],
+              'gap_base_devices': report['gap']['base_device_count'],
+              'policy_ready_count': report['gap']['policy_ready_count'],
+              'policy_blocked_count': report['gap']['policy_blocked_count'],
+              'policy_ready_bases': [item['base_device'] for item in report['gap']['policy_ready']],
+          }, indent=2, sort_keys=True))
+          PY
+      - name: Report admitted production source SHA-256
+        run: |
+          sha256sum data/device-catalog/research/stm32f1-commercial-icpn.csv
+          sha256sum data/device-catalog/research/stm32f4-commercial-icpn.csv
+      - name: Validate ICPN v1 production manifest and runtime view
+        env:
+          PYTHONPATH: software/python
+        run: |
+          python -m plasma_web.device_catalog \
+            --manifest data/device-catalog/production/icpn-v1-manifest.json \
+            --json
