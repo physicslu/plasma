@@ -41,12 +41,21 @@ PACKAGE_BY_CODE = {
 
 
 def commercial_core(icpn: str) -> str:
-    """Remove packing-only suffixes before matching OpenOCD ordering patterns."""
+    """Build an OpenOCD routing key without changing canonical commercial identity."""
 
+    core = icpn
     for suffix in ("TR", "TT"):
-        if icpn.endswith(suffix):
-            return icpn[: -len(suffix)]
-    return icpn
+        if core.endswith(suffix):
+            core = core[: -len(suffix)]
+            break
+
+    # STM32F412xE/G ordering information defines P as a device option
+    # (internal regulator disabled), not as packing. OpenOCD ordering
+    # patterns do not encode this option. Ignore it only for routing;
+    # build_canonical_row() still retains P in option_suffix.
+    if core.startswith("STM32F412") and core.endswith("P"):
+        core = core[:-1]
+    return core
 
 
 def _pattern_matches(pattern: str, value: str) -> bool:
