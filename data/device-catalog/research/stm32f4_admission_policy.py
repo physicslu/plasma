@@ -151,6 +151,7 @@ def _package_and_pins(pin_code: str, package_code: str) -> tuple[str, str]:
         raise CandidateReject(f"unsupported STM32F4 package code: {package_code}")
 
     direct = {
+        ("C", "T"): "48",
         ("C", "U"): "48",
         ("C", "F"): "49",
         ("C", "Y"): "49",
