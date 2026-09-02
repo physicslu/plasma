@@ -18,6 +18,7 @@ type PpuRecord = {
   firmwareVersion: string;
   registeredAt: string;
   capabilities: string[];
+  identityVerified?: boolean;
 };
 
 type DiscoveredPpu = {
@@ -43,6 +44,7 @@ const initialPpus: PpuRecord[] = [
     firmwareVersion: "0.9.0",
     registeredAt: "2026-09-02 10:03:11",
     capabilities: ["SWD", "SPI", "I2C", "GPIO"],
+    identityVerified: true,
   },
   {
     id: "PPU-002",
@@ -56,6 +58,7 @@ const initialPpus: PpuRecord[] = [
     firmwareVersion: "0.9.0",
     registeredAt: "2026-09-02 10:04:02",
     capabilities: ["SWD", "SPI", "I2C", "GPIO"],
+    identityVerified: true,
   },
   {
     id: "PPU-003",
@@ -69,6 +72,7 @@ const initialPpus: PpuRecord[] = [
     firmwareVersion: "0.9.0",
     registeredAt: "2026-09-02 10:15:32",
     capabilities: ["SWD", "SPI", "I2C", "GPIO"],
+    identityVerified: true,
   },
   {
     id: "PPU-004",
@@ -82,6 +86,7 @@ const initialPpus: PpuRecord[] = [
     firmwareVersion: "0.9.0",
     registeredAt: "2026-09-02 09:52:44",
     capabilities: ["SWD", "SPI", "I2C"],
+    identityVerified: true,
   },
   {
     id: "PPU-005",
@@ -95,6 +100,7 @@ const initialPpus: PpuRecord[] = [
     firmwareVersion: "0.9.0",
     registeredAt: "2026-09-01 17:31:09",
     capabilities: ["SWD", "SPI", "I2C", "GPIO"],
+    identityVerified: true,
   },
 ];
 
@@ -127,15 +133,26 @@ function siteStatus(ppu: PpuRecord, siteIndex: number, enabled: boolean): SiteSt
   return "Ready";
 }
 
+function registryTimestamp(): string {
+  return "2026-09-02 12:20:00";
+}
+
 export default function PpuSiteConfiguration() {
+  // UI/domain prototype only. Plasma Manager is currently read-only; these
+  // mutations must be replaced by Manager-owned registry APIs before release.
   const [ppus, setPpus] = useState<PpuRecord[]>(initialPpus);
   const [selectedPpuId, setSelectedPpuId] = useState("PPU-003");
   const [siteEnabledByPpu, setSiteEnabledByPpu] = useState<Record<string, boolean[]>>(buildInitialSiteEnableState);
   const [discovered, setDiscovered] = useState<DiscoveredPpu | null>(initialDiscovered);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newAlias, setNewAlias] = useState("");
+  const [newGateway, setNewGateway] = useState("");
+  const [removeCandidateId, setRemoveCandidateId] = useState<string | null>(null);
 
-  const selectedPpu = ppus.find(ppu => ppu.id === selectedPpuId) ?? ppus[0];
-  const selectedSiteEnabled = siteEnabledByPpu[selectedPpu.id]
-    ?? Array.from({ length: selectedPpu.siteCount }, () => true);
+  const selectedPpu = ppus.find(ppu => ppu.id === selectedPpuId) ?? ppus[0] ?? null;
+  const selectedSiteEnabled = selectedPpu
+    ? siteEnabledByPpu[selectedPpu.id] ?? Array.from({ length: selectedPpu.siteCount }, () => true)
+    : [];
   const enabledSiteCount = selectedSiteEnabled.filter(Boolean).length;
 
   const statusCounts = useMemo(() => ({
@@ -145,11 +162,17 @@ export default function PpuSiteConfiguration() {
     disabled: ppus.filter(ppu => ppu.status === "Disabled").length,
   }), [ppus]);
 
+  const selectedHasRunningSite = selectedPpu
+    ? selectedSiteEnabled.some((enabled, index) => siteStatus(selectedPpu, index, enabled) === "Running")
+    : false;
+
   function updateSelectedPpu(patch: Partial<PpuRecord>) {
+    if (!selectedPpu) return;
     setPpus(current => current.map(ppu => ppu.id === selectedPpu.id ? { ...ppu, ...patch } : ppu));
   }
 
   function setAllSites(enabled: boolean) {
+    if (!selectedPpu) return;
     setSiteEnabledByPpu(current => ({
       ...current,
       [selectedPpu.id]: Array.from({ length: selectedPpu.siteCount }, () => enabled),
@@ -157,6 +180,7 @@ export default function PpuSiteConfiguration() {
   }
 
   function toggleSite(index: number) {
+    if (!selectedPpu) return;
     setSiteEnabledByPpu(current => {
       const previous = current[selectedPpu.id] ?? Array.from({ length: selectedPpu.siteCount }, () => true);
       return {
@@ -167,11 +191,12 @@ export default function PpuSiteConfiguration() {
   }
 
   function commissionSelected() {
+    if (!selectedPpu?.identityVerified) return;
     updateSelectedPpu({ status: "Online" });
   }
 
-  function commissionDiscovered() {
-    if (!discovered) return;
+  function addDiscovered() {
+    if (!discovered || ppus.some(ppu => ppu.id === discovered.id)) return;
     const newPpu: PpuRecord = {
       id: discovered.id,
       name: discovered.id,
@@ -184,6 +209,7 @@ export default function PpuSiteConfiguration() {
       firmwareVersion: discovered.firmwareVersion,
       registeredAt: discovered.detectedAt,
       capabilities: ["SWD", "SPI", "I2C", "GPIO"],
+      identityVerified: true,
     };
     setPpus(current => [...current, newPpu]);
     setSiteEnabledByPpu(current => ({
@@ -194,13 +220,55 @@ export default function PpuSiteConfiguration() {
     setDiscovered(null);
   }
 
+  function addManualPpu() {
+    const alias = newAlias.trim();
+    const gateway = newGateway.trim();
+    if (!alias || !gateway) return;
+    if (ppus.some(ppu => ppu.id.toLowerCase() === alias.toLowerCase())) return;
+
+    const pending: PpuRecord = {
+      id: alias,
+      name: alias,
+      location: "Unassigned",
+      status: "Pending",
+      siteCount: 0,
+      gateway,
+      model: "Awaiting probe",
+      serialNumber: "Awaiting probe",
+      firmwareVersion: "Awaiting probe",
+      registeredAt: registryTimestamp(),
+      capabilities: [],
+      identityVerified: false,
+    };
+    setPpus(current => [...current, pending]);
+    setSiteEnabledByPpu(current => ({ ...current, [pending.id]: [] }));
+    setSelectedPpuId(pending.id);
+    setNewAlias("");
+    setNewGateway("");
+    setShowAddForm(false);
+  }
+
+  function removeSelectedPpu() {
+    if (!selectedPpu || selectedHasRunningSite) return;
+    const removedId = selectedPpu.id;
+    const remaining = ppus.filter(ppu => ppu.id !== removedId);
+    setPpus(remaining);
+    setSiteEnabledByPpu(current => {
+      const next = { ...current };
+      delete next[removedId];
+      return next;
+    });
+    setSelectedPpuId(remaining[0]?.id ?? "");
+    setRemoveCandidateId(null);
+  }
+
   return (
     <section className="ppuSiteConfiguration" aria-label="PPU and Site Configuration">
       <header className="ppuSiteHeader">
         <div>
           <small>PPU / SITE MANAGEMENT</small>
           <h2>PPU / Site Configuration</h2>
-          <p>Commission PPU gateways and control which physical Sites are admitted for engineering and production use.</p>
+          <p>Add or remove PPU registry entries, commission validated PPUs, and control which reported physical Sites are admitted for use.</p>
         </div>
         <span className="ppuSiteManagerState">Manager Online</span>
       </header>
@@ -209,9 +277,30 @@ export default function PpuSiteConfiguration() {
         <div className="ppuSiteColumn">
           <section className="ppuSiteCard" aria-label="PPU List">
             <header className="ppuSiteCardHeader">
-              <h3>PPU List</h3>
-              <button className="ppuSiteButton primary" type="button">Scan for New PPU</button>
+              <h3>PPU Registry</h3>
+              <div className="ppuSiteCardHeaderActions">
+                <button className="ppuSiteButton" type="button" onClick={() => setDiscovered(current => current ?? initialDiscovered)}>Scan</button>
+                <button className="ppuSiteButton primary" type="button" onClick={() => setShowAddForm(value => !value)}>+ Add PPU</button>
+              </div>
             </header>
+
+            {showAddForm && (
+              <div className="ppuRegistryAddForm" aria-label="Add PPU to Manager registry">
+                <label>
+                  <span>Registry Alias</span>
+                  <input value={newAlias} placeholder="line1-ppu-c" onChange={event => setNewAlias(event.target.value)} />
+                </label>
+                <label>
+                  <span>Gateway Endpoint</span>
+                  <input value={newGateway} placeholder="192.168.10.27:18080" onChange={event => setNewGateway(event.target.value)} />
+                </label>
+                <div className="ppuSiteCardHeaderActions">
+                  <button className="ppuSiteButton primary" type="button" disabled={!newAlias.trim() || !newGateway.trim()} onClick={addManualPpu}>Add to Registry</button>
+                  <button className="ppuSiteButton" type="button" onClick={() => setShowAddForm(false)}>Cancel</button>
+                </div>
+                <p>Alias and endpoint are registry inputs. Canonical PPU identity, Site count, model, and capabilities must come from the PPU health/identity probe.</p>
+              </div>
+            )}
 
             <div className="ppuSiteFilters" aria-label="PPU status summary">
               <span className="ppuSiteFilter">All {ppus.length}</span>
@@ -225,7 +314,7 @@ export default function PpuSiteConfiguration() {
               <table className="ppuTable">
                 <thead>
                   <tr>
-                    <th>PPU ID</th>
+                    <th>PPU ID / Alias</th>
                     <th>Name</th>
                     <th>Status</th>
                     <th>Sites</th>
@@ -236,13 +325,13 @@ export default function PpuSiteConfiguration() {
                   {ppus.map(ppu => (
                     <tr
                       key={ppu.id}
-                      className={ppu.id === selectedPpu.id ? "selected" : ""}
-                      onClick={() => setSelectedPpuId(ppu.id)}
+                      className={ppu.id === selectedPpu?.id ? "selected" : ""}
+                      onClick={() => { setSelectedPpuId(ppu.id); setRemoveCandidateId(null); }}
                     >
                       <td><span className="ppuIdLink">{ppu.id}</span></td>
                       <td>{ppu.name}</td>
                       <td><span className={`ppuSiteStatus ${statusClass(ppu.status)}`}>{ppu.status}</span></td>
-                      <td>{ppu.siteCount}</td>
+                      <td>{ppu.siteCount || "—"}</td>
                       <td>{ppu.gateway}</td>
                     </tr>
                   ))}
@@ -262,10 +351,10 @@ export default function PpuSiteConfiguration() {
                   <div className="ppuDiscoveredTop">
                     <div>
                       <strong>{discovered.id}</strong>
-                      <span className="ppuNewBadge">New</span>
+                      <span className="ppuNewBadge">Discovered</span>
                     </div>
                     <div className="ppuSiteCardHeaderActions">
-                      <button className="ppuSiteButton primary" type="button" onClick={commissionDiscovered}>Commission</button>
+                      <button className="ppuSiteButton primary" type="button" onClick={addDiscovered}>Add to Registry</button>
                       <button className="ppuSiteButton" type="button" onClick={() => setDiscovered(null)}>Ignore</button>
                     </div>
                   </div>
@@ -277,128 +366,170 @@ export default function PpuSiteConfiguration() {
                     <div><span>Gateway Endpoint</span><strong>{discovered.gateway}</strong></div>
                     <div><span>Reported Sites</span><strong>{discovered.siteCount}</strong></div>
                   </div>
-                  <p className="ppuSiteNote"><strong>Pending admission:</strong> review identity and topology before this PPU becomes available to PMode.</p>
+                  <p className="ppuSiteNote"><strong>Admission gate:</strong> adding the PPU creates a Pending registry entry. Commissioning remains a separate explicit step before PMode can use it.</p>
                 </article>
               ) : (
-                <p className="ppuSiteNote">No uncommissioned PPU is currently waiting for review.</p>
+                <p className="ppuSiteNote">No unregistered PPU is currently waiting for review.</p>
               )}
             </div>
           </section>
         </div>
 
         <div className="ppuSiteColumn">
-          <section className="ppuSiteCard" aria-label="PPU Information">
-            <header className="ppuSiteCardHeader">
-              <div className="ppuSiteCardHeaderActions">
-                <h3>{selectedPpu.id}</h3>
-                <span className={`ppuSiteStatus ${statusClass(selectedPpu.status)}`}>{selectedPpu.status}</span>
-              </div>
-              <div className="ppuSiteCardHeaderActions">
-                {selectedPpu.status === "Pending" && (
-                  <button className="ppuSiteButton primary" type="button" onClick={commissionSelected}>Commission</button>
+          {selectedPpu ? (
+            <>
+              <section className="ppuSiteCard" aria-label="PPU Information">
+                <header className="ppuSiteCardHeader">
+                  <div className="ppuSiteCardHeaderActions">
+                    <h3>{selectedPpu.id}</h3>
+                    <span className={`ppuSiteStatus ${statusClass(selectedPpu.status)}`}>{selectedPpu.status}</span>
+                  </div>
+                  <div className="ppuSiteCardHeaderActions">
+                    {selectedPpu.status === "Pending" && (
+                      <button className="ppuSiteButton primary" type="button" disabled={!selectedPpu.identityVerified} onClick={commissionSelected}>Commission</button>
+                    )}
+                    <button
+                      className="ppuSiteButton"
+                      type="button"
+                      onClick={() => updateSelectedPpu({ status: selectedPpu.status === "Disabled" ? "Offline" : "Disabled" })}
+                    >
+                      {selectedPpu.status === "Disabled" ? "Enable" : "Disable"}
+                    </button>
+                    <button className="ppuSiteButton" type="button">Health Check</button>
+                    <button
+                      className="ppuSiteButton danger"
+                      type="button"
+                      disabled={selectedHasRunningSite}
+                      title={selectedHasRunningSite ? "Stop active Jobs before removing this PPU" : "Remove this PPU from the Manager registry"}
+                      onClick={() => setRemoveCandidateId(selectedPpu.id)}
+                    >
+                      Remove PPU
+                    </button>
+                  </div>
+                </header>
+
+                {removeCandidateId === selectedPpu.id && (
+                  <div className="ppuRemoveConfirm" role="alert">
+                    <div>
+                      <strong>Remove {selectedPpu.id} from Manager registry?</strong>
+                      <span>This removes the registry entry only. It does not erase, reset, or reconfigure the physical PPU.</span>
+                    </div>
+                    <div className="ppuSiteCardHeaderActions">
+                      <button className="ppuSiteButton danger" type="button" onClick={removeSelectedPpu}>Confirm Remove</button>
+                      <button className="ppuSiteButton" type="button" onClick={() => setRemoveCandidateId(null)}>Cancel</button>
+                    </div>
+                  </div>
                 )}
-                <button
-                  className="ppuSiteButton danger"
-                  type="button"
-                  onClick={() => updateSelectedPpu({ status: selectedPpu.status === "Disabled" ? "Offline" : "Disabled" })}
-                >
-                  {selectedPpu.status === "Disabled" ? "Enable" : "Disable"}
-                </button>
-                <button className="ppuSiteButton" type="button">Health Check</button>
-              </div>
-            </header>
 
-            <div className="ppuInfoBody">
-              <dl className="ppuInfoGrid">
-                <div><dt>PPU ID</dt><dd>{selectedPpu.id}</dd></div>
-                <div><dt>Status</dt><dd><span className={`ppuSiteStatus ${statusClass(selectedPpu.status)}`}>{selectedPpu.status}</span></dd></div>
-                <div><dt>HW Model</dt><dd>{selectedPpu.model}</dd></div>
-                <div><dt>FW Version</dt><dd>{selectedPpu.firmwareVersion}</dd></div>
+                <div className="ppuInfoBody">
+                  <dl className="ppuInfoGrid">
+                    <div><dt>PPU ID</dt><dd>{selectedPpu.identityVerified ? selectedPpu.id : "Awaiting identity probe"}</dd></div>
+                    <div><dt>Status</dt><dd><span className={`ppuSiteStatus ${statusClass(selectedPpu.status)}`}>{selectedPpu.status}</span></dd></div>
+                    <div><dt>HW Model</dt><dd>{selectedPpu.model}</dd></div>
+                    <div><dt>FW Version</dt><dd>{selectedPpu.firmwareVersion}</dd></div>
 
-                <div className="wide">
-                  <dt>Name</dt>
-                  <dd><input className="ppuEditable" value={selectedPpu.name} onChange={event => updateSelectedPpu({ name: event.target.value })} /></dd>
+                    <div className="wide">
+                      <dt>Name</dt>
+                      <dd><input className="ppuEditable" value={selectedPpu.name} onChange={event => updateSelectedPpu({ name: event.target.value })} /></dd>
+                    </div>
+                    <div className="wide">
+                      <dt>Location</dt>
+                      <dd><input className="ppuEditable" value={selectedPpu.location} onChange={event => updateSelectedPpu({ location: event.target.value })} /></dd>
+                    </div>
+
+                    <div className="wide"><dt>Gateway Endpoint</dt><dd>{selectedPpu.gateway}</dd></div>
+                    <div><dt>Identity</dt><dd><span className={`ppuSiteStatus ${selectedPpu.identityVerified ? "online" : "pending"}`}>{selectedPpu.identityVerified ? "Verified" : "Probe Required"}</span></dd></div>
+                    <div><dt>Gateway</dt><dd><span className="ppuSiteStatus online">Online</span></dd></div>
+                    <div className="wide"><dt>Serial Number</dt><dd>{selectedPpu.serialNumber}</dd></div>
+                    <div className="wide"><dt>Manager Registered At</dt><dd>{selectedPpu.registeredAt}</dd></div>
+                    <div className="wide">
+                      <dt>Capabilities</dt>
+                      <dd className="ppuCapabilityList">
+                        {selectedPpu.capabilities.length
+                          ? selectedPpu.capabilities.map(capability => <span className="ppuCapabilityTag" key={capability}>{capability}</span>)
+                          : <span className="ppuCapabilityTag">Awaiting probe</span>}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
-                <div className="wide">
-                  <dt>Location</dt>
-                  <dd><input className="ppuEditable" value={selectedPpu.location} onChange={event => updateSelectedPpu({ location: event.target.value })} /></dd>
+              </section>
+
+              <section className="ppuSiteCard" aria-label="Site Configuration">
+                <header className="ppuSiteCardHeader">
+                  <h3>Site Configuration</h3>
+                  <div className="ppuSiteCardHeaderActions">
+                    <button className="ppuSiteButton primary" type="button" disabled={!selectedPpu.siteCount} onClick={() => setAllSites(true)}>Enable All</button>
+                    <button className="ppuSiteButton" type="button" disabled={!selectedPpu.siteCount} onClick={() => setAllSites(false)}>Disable All</button>
+                  </div>
+                </header>
+
+                <div className="ppuSiteSummary">
+                  <span>Physical Sites <strong>{selectedPpu.siteCount || "—"}</strong></span>
+                  <span>Enabled Sites <strong>{selectedPpu.siteCount ? enabledSiteCount : "—"}</strong></span>
+                  <span>Disabled Sites <strong>{selectedPpu.siteCount ? selectedPpu.siteCount - enabledSiteCount : "—"}</strong></span>
                 </div>
 
-                <div className="wide"><dt>Gateway Endpoint</dt><dd>{selectedPpu.gateway}</dd></div>
-                <div><dt>Plasma Server</dt><dd><span className="ppuSiteStatus online">Online</span></dd></div>
-                <div><dt>Gateway</dt><dd><span className="ppuSiteStatus online">Online</span></dd></div>
-                <div className="wide"><dt>Serial Number</dt><dd>{selectedPpu.serialNumber}</dd></div>
-                <div className="wide"><dt>Manager Registered At</dt><dd>{selectedPpu.registeredAt}</dd></div>
-                <div className="wide">
-                  <dt>Capabilities</dt>
-                  <dd className="ppuCapabilityList">
-                    {selectedPpu.capabilities.map(capability => <span className="ppuCapabilityTag" key={capability}>{capability}</span>)}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </section>
+                {selectedPpu.siteCount ? (
+                  <div className="ppuTableWrap">
+                    <table className="ppuTable">
+                      <thead>
+                        <tr>
+                          <th>Site ID</th>
+                          <th>Site Name</th>
+                          <th>Enabled</th>
+                          <th>Status</th>
+                          <th>Capability</th>
+                          <th>Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: selectedPpu.siteCount }, (_, index) => {
+                          const enabled = selectedSiteEnabled[index] ?? true;
+                          const status = siteStatus(selectedPpu, index, enabled);
+                          const siteNumber = index + 1;
+                          return (
+                            <tr key={`${selectedPpu.id}-site-${siteNumber}`}>
+                              <td><span className="ppuIdLink">SITE{siteNumber}</span></td>
+                              <td>Socket-A{siteNumber}</td>
+                              <td>
+                                <input
+                                  className="ppuSiteToggle"
+                                  aria-label={`Enable SITE${siteNumber}`}
+                                  type="checkbox"
+                                  checked={enabled}
+                                  onChange={() => toggleSite(index)}
+                                />
+                              </td>
+                              <td><span className={`ppuSiteStatus ${statusClass(status)}`}>{status}</span></td>
+                              <td>{selectedPpu.capabilities.filter(capability => capability !== "GPIO").join(" / ") || "—"}</td>
+                              <td>{status === "Error" ? "Comm. Timeout" : "—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="ppuSiteNote"><strong>Topology unavailable:</strong> this registry entry has not completed its PPU identity/topology probe. Site count cannot be entered manually.</p>
+                )}
 
-          <section className="ppuSiteCard" aria-label="Site Configuration">
-            <header className="ppuSiteCardHeader">
-              <h3>Site Configuration</h3>
-              <div className="ppuSiteCardHeaderActions">
-                <button className="ppuSiteButton primary" type="button" onClick={() => setAllSites(true)}>Enable All</button>
-                <button className="ppuSiteButton" type="button" onClick={() => setAllSites(false)}>Disable All</button>
-              </div>
-            </header>
-
-            <div className="ppuSiteSummary">
-              <span>Physical Sites <strong>{selectedPpu.siteCount}</strong></span>
-              <span>Enabled Sites <strong>{enabledSiteCount}</strong></span>
-              <span>Disabled Sites <strong>{selectedPpu.siteCount - enabledSiteCount}</strong></span>
-            </div>
-
-            <div className="ppuTableWrap">
-              <table className="ppuTable">
-                <thead>
-                  <tr>
-                    <th>Site ID</th>
-                    <th>Site Name</th>
-                    <th>Enabled</th>
-                    <th>Status</th>
-                    <th>Capability</th>
-                    <th>Note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: selectedPpu.siteCount }, (_, index) => {
-                    const enabled = selectedSiteEnabled[index] ?? true;
-                    const status = siteStatus(selectedPpu, index, enabled);
-                    return (
-                      <tr key={`${selectedPpu.id}-site-${index}`}>
-                        <td><span className="ppuIdLink">SITE{index}</span></td>
-                        <td>Socket-A{index + 1}</td>
-                        <td>
-                          <input
-                            className="ppuSiteToggle"
-                            aria-label={`Enable SITE${index}`}
-                            type="checkbox"
-                            checked={enabled}
-                            onChange={() => toggleSite(index)}
-                          />
-                        </td>
-                        <td><span className={`ppuSiteStatus ${statusClass(status)}`}>{status}</span></td>
-                        <td>{selectedPpu.capabilities.filter(capability => capability !== "GPIO").join(" / ")}</td>
-                        <td>{status === "Error" ? "Comm. Timeout" : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <p className="ppuSiteNote">
-              <strong>Ownership boundary:</strong> physical Site count and capabilities are reported by the PPU. The Console only controls admission and logical naming; PL/AXI resource mapping remains PPU-owned.
-            </p>
-          </section>
+                <p className="ppuSiteNote">
+                  <strong>Ownership boundary:</strong> physical Site count and capabilities are reported by the PPU. The Console only controls admission and logical naming; PL/AXI resource mapping remains PPU-owned.
+                </p>
+              </section>
+            </>
+          ) : (
+            <section className="ppuSiteCard ppuEmptyRegistry" aria-label="Empty PPU registry">
+              <h3>No registered PPU</h3>
+              <p>Add a discovered PPU or register a Gateway endpoint to start commissioning.</p>
+            </section>
+          )}
         </div>
       </div>
+
+      <p className="ppuRegistryBoundary">
+        UI contract preview: Plasma Manager currently exposes a read-only registry. Add/remove controls must be backed by a Manager-owned mutable registry API and durable operational state before this is production-functional.
+      </p>
     </section>
   );
 }
