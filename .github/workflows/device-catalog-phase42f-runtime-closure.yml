@@ -1,0 +1,64 @@
+name: Device catalog Phase 4.2F runtime closure
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2f-f412re-rg-admission
+
+permissions:
+  contents: write
+
+jobs:
+  close-runtime:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2f-f412re-rg-admission
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Update runtime catalog contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('software/python/tests/test_device_catalog.py')
+          s = p.read_text()
+          s = s.replace('EXPECTED_PRODUCTION_CATALOG_SIZE = 274', 'EXPECTED_PRODUCTION_CATALOG_SIZE = 283', 1)
+          s = s.replace('EXPECTED_STM32F4_CATALOG_SIZE = 199', 'EXPECTED_STM32F4_CATALOG_SIZE = 208', 1)
+          anchor = '    phase42b = catalog.search("stm32f410cbt6", limit=1)[0]\n'
+          if anchor not in s:
+              raise SystemExit('phase42b search anchor missing')
+          s = s.replace(anchor, anchor + '    phase42f = catalog.search("stm32f412rgy6ptr", limit=1)[0]\n', 1)
+          anchor2 = '    assert phase42b.target_config == "tcl/target/stm32f4x.cfg"\n'
+          if anchor2 not in s:
+              raise SystemExit('phase42b assert anchor missing')
+          block = '''    assert phase42f.identifier == "STM32F412RGY6PTR"\n    assert phase42f.family == "STM32F4"\n    assert phase42f.package == "WLCSP"\n    assert phase42f.pin_count == "64"\n    assert phase42f.flash_size == "1024 KiB"\n    assert phase42f.option_suffix == "PTR"\n    assert phase42f.target_config == "tcl/target/stm32f4x.cfg"\n'''
+          s = s.replace(anchor2, anchor2 + block, 1)
+          s = s.replace('full 199-row F4 family', 'full 208-row F4 family', 1)
+          p.write_text(s)
+
+          p = Path('software/python/tests/test_device_catalog_web_gateway.py')
+          s = p.read_text()
+          s = s.replace('EXPECTED_PRODUCTION_CATALOG_SIZE = 274', 'EXPECTED_PRODUCTION_CATALOG_SIZE = 283', 1)
+          anchor = '''    def test_research_only_identifier_is_not_exposed_by_production_search(self) -> None:\n'''
+          if anchor not in s:
+              raise SystemExit('gateway insertion anchor missing')
+          method = '''    def test_phase42f_stm32f412rg_ptr_icpn_is_exposed_after_admission(self) -> None:\n        status, payload = self.request("/api/devices/search?q=STM32F412RGY6PTR&limit=5")\n        self.assertEqual(status, 200)\n        self.assertEqual(payload["catalog_size"], EXPECTED_PRODUCTION_CATALOG_SIZE)\n        self.assertEqual(payload["count"], 1)\n        result = payload["results"][0]\n        self.assertEqual(result["icpn"], "STM32F412RGY6PTR")\n        self.assertEqual(result["family"], "STM32F4")\n        self.assertEqual(result["package"], "WLCSP")\n        self.assertEqual(result["pin_count"], "64")\n        self.assertEqual(result["flash_size"], "1024 KiB")\n        self.assertEqual(result["option_suffix"], "PTR")\n        self.assertEqual(result["backend"]["target_config"], "tcl/target/stm32f4x.cfg")\n\n'''
+          s = s.replace(anchor, method + anchor, 1)
+          p.write_text(s)
+          PY
+          git diff --check
+      - name: Run runtime and REST contracts
+        run: |
+          cd software/python
+          python -m pytest -q tests/test_device_catalog.py tests/test_device_catalog_web_gateway.py
+      - name: Commit runtime closure
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add software/python/tests/test_device_catalog.py software/python/tests/test_device_catalog_web_gateway.py
+          git commit -m 'test: close Phase4.2F runtime catalog contract'
+          git push origin HEAD:agent/device-catalog-phase4.2f-f412re-rg-admission
