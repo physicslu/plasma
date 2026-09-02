@@ -1,0 +1,22 @@
+name: Device catalog Phase 4.2F STM32F412RE/RG lifecycle
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Phase 4.2F retained evidence and post-admission replay
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_2f_f412re_rg_post_admission.py

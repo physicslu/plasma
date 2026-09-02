@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2f-f412re-rg-admission-2026-09-02",
+  "canonical_dataset_admission": false,
+  "source_discovery": {
+    "workflow_run_id": "33589566576",
+    "artifact_id": "9831285375",
+    "artifact_sha256": "0b2a245cca793ecc42fb90293ff18744d21ea3ef68ad1cf4be39c26fc5a712da",
+    "source_pr": 294
+  },
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "exact_icpns": ["STM32F479ZGT6"]
+    },
+    {
+      "base_device": "STM32F412RE",
+      "exact_icpns": [
+        "STM32F412RET6",
+        "STM32F412RET6TR",
+        "STM32F412RET7",
+        "STM32F412RET7TR",
+        "STM32F412REY6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F412RG",
+      "exact_icpns": [
+        "STM32F412RGT6",
+        "STM32F412RGT6TR",
+        "STM32F412RGY6PTR",
+        "STM32F412RGY6TR"
+      ]
+    }
+  ],
+  "excluded_non_active_observations": []
+}

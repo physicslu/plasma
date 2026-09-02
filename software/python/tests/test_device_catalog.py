@@ -7,8 +7,8 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalog, get_default_device_catalog
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 274
-EXPECTED_STM32F4_CATALOG_SIZE = 199
+EXPECTED_PRODUCTION_CATALOG_SIZE = 283
+EXPECTED_STM32F4_CATALOG_SIZE = 208
 
 
 LEGACY_COLUMNS = [
@@ -113,6 +113,7 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     rt_batch3 = catalog.search("stm32f413rgt6tr", limit=1)[0]
     rt_batch4 = catalog.search("stm32f446ret7tr", limit=1)[0]
     phase42b = catalog.search("stm32f410cbt6", limit=1)[0]
+    phase42f = catalog.search("stm32f412rgy6ptr", limit=1)[0]
     family = catalog.search("STM32F4", limit=100)
     combined = catalog.search("STMicroelectronics STM32F4", limit=100)
 
@@ -198,7 +199,14 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert phase42b.pin_count == "48"
     assert phase42b.flash_size == "128 KiB"
     assert phase42b.target_config == "tcl/target/stm32f4x.cfg"
-    # Search results remain capped at 100 while metadata proves the full 199-row F4 family.
+    assert phase42f.identifier == "STM32F412RGY6PTR"
+    assert phase42f.family == "STM32F4"
+    assert phase42f.package == "WLCSP"
+    assert phase42f.pin_count == "64"
+    assert phase42f.flash_size == "1024 KiB"
+    assert phase42f.option_suffix == "PTR"
+    assert phase42f.target_config == "tcl/target/stm32f4x.cfg"
+    # Search results remain capped at 100 while metadata proves the full 208-row F4 family.
     assert len(family) == 100
     assert len(combined) == 100
 
