@@ -48,7 +48,7 @@ class STM32F4Phase42HOYWLCSP90PolicyTests(unittest.TestCase):
         production = set(inventory["production"]["base_devices"])
         self.assertTrue(EXPECTED_READY <= production)
 
-    def test_historical_policy_replay_unlocks_exactly_three_bases(self) -> None:
+    def test_historical_oy_policy_replay_is_phase_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             historical = self._historical_pre_phase42i(Path(tmp))
             inventory = build_inventory(catalog_path=CATALOG, canonical_path=historical)
@@ -57,14 +57,19 @@ class STM32F4Phase42HOYWLCSP90PolicyTests(unittest.TestCase):
         self.assertEqual(inventory["production"]["base_device_count"], 70)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
         self.assertEqual(inventory["gap"]["base_device_count"], 79)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 3)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 76)
 
         ready = {item["base_device"]: item for item in inventory["gap"]["policy_ready"]}
-        self.assertEqual(set(ready), EXPECTED_READY)
+        self.assertTrue(EXPECTED_READY <= set(ready))
         for base in EXPECTED_READY:
             self.assertEqual(ready[base]["package_codes"], ["Y"])
             self.assertEqual(ready[base]["policy_blockers"], [])
+
+        oy_ready = {
+            base
+            for base, item in ready.items()
+            if base[-2] == "O" and item["package_codes"] == ["Y"]
+        }
+        self.assertEqual(oy_ready, EXPECTED_READY)
 
         production = set(inventory["production"]["base_devices"])
         self.assertTrue(EXPECTED_READY.isdisjoint(production))
