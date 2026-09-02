@@ -19,24 +19,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Apply bounded routing normalization and regression
+      - name: Apply bounded routing normalization
+        run: python data/device-catalog/research/apply_stm32f4_phase4_2e0_p_option_routing.py
+      - name: Validate bounded routing normalization
         run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          policy = Path('data/device-catalog/research/stm32f4_admission_policy.py')
-          text = policy.read_text(encoding='utf-8')
-          old = '''def commercial_core(icpn: str) -> str:\n    \"\"\"Remove packing-only suffixes before matching OpenOCD ordering patterns.\"\"\"\n\n    for suffix in (\"TR\", \"TT\"):\n        if icpn.endswith(suffix):\n            return icpn[: -len(suffix)]\n    return icpn\n'''
-          new = '''def commercial_core(icpn: str) -> str:\n    \"\"\"Build the OpenOCD routing key while preserving canonical commercial identity.\"\"\"\n\n    core = icpn\n    for suffix in (\"TR\", \"TT\"):\n        if core.endswith(suffix):\n            core = core[: -len(suffix)]\n            break\n\n    # STM32F412xE/G ordering information defines P as a device option\n    # (internal regulator disabled), not as packing.  OpenOCD ordering\n    # patterns route by the base/package/temperature identity and do not\n    # encode this option.  Ignore P only for routing; build_canonical_row()\n    # still retains it in option_suffix.\n    if core.startswith(\"STM32F412\") and core.endswith(\"P\"):\n        core = core[:-1]\n    return core\n'''
-          if old not in text:
-              raise SystemExit('commercial_core anchor missing or already changed')
-          policy.write_text(text.replace(old, new, 1), encoding='utf-8')
-
-          test = Path('data/device-catalog/research/test_stm32f4_phase4_2e0_p_option_routing.py')
-          test.write_text('''#!/usr/bin/env python3\nfrom __future__ import annotations\n\nimport csv\nimport sys\nimport unittest\nfrom pathlib import Path\n\nHERE = Path(__file__).resolve().parent\nif str(HERE) not in sys.path:\n    sys.path.insert(0, str(HERE))\n\nfrom stm32f4_admission_policy import (\n    commercial_core,\n    resolve_ordering_pattern_mapping,\n    build_canonical_row,\n)\n\nCATALOG = HERE / "openocd-parts-canonical.csv"\nCANONICAL = HERE / "stm32f4-commercial-icpn.csv"\nICPN = "STM32F412RGY6PTR"\n\nclass STM32F4Phase42E0POptionRoutingTests(unittest.TestCase):\n    def _catalog_rows(self):\n        with CATALOG.open(newline="", encoding="utf-8") as handle:\n            return list(csv.DictReader(handle))\n\n    def _fields(self):\n        with CANONICAL.open(newline="", encoding="utf-8") as handle:\n            return list(csv.DictReader(handle).fieldnames or [])\n\n    def test_p_option_is_ignored_only_in_routing_key(self) -> None:\n        self.assertEqual(commercial_core(ICPN), "STM32F412RGY6")\n        self.assertEqual(commercial_core("STM32F412RGY6TR"), "STM32F412RGY6")\n        self.assertEqual(commercial_core("STM32F410CBT6TR"), "STM32F410CBT6")\n\n    def test_ptr_exact_part_routes_uniquely(self) -> None:\n        mapping = resolve_ordering_pattern_mapping(ICPN, self._catalog_rows())\n        self.assertEqual(mapping["status"], "unique")\n        self.assertEqual(mapping["match_count"], 1)\n        self.assertEqual(mapping["existing_identifier"], "STM32F412RGYx")\n        self.assertEqual(mapping["target_configs"], ["tcl/target/stm32f4x.cfg"])
-\n    def test_canonical_identity_retains_p_option(self) -> None:\n        mapping = resolve_ordering_pattern_mapping(ICPN, self._catalog_rows())\n        candidate = {\n            "manufacturer": "STMicroelectronics",\n            "base_device": "STM32F412RG",\n            "icpn": ICPN,\n            "authoritative_evidence": {\n                "evidence_id": "phase4.2e0-routing-contract",\n                "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412rg.html",\n            },\n            "base_mapping": mapping,\n        }\n        row = build_canonical_row(candidate, self._fields())\n        self.assertEqual(row["package"], "WLCSP")\n        self.assertEqual(row["pin_count"], "64")\n        self.assertEqual(row["flash_size"], "1024 KiB")\n        self.assertEqual(row["option_suffix"], "PTR")\n\nif __name__ == "__main__":\n    unittest.main()\n''', encoding='utf-8')
-          PY
           git diff --check
           python data/device-catalog/research/test_stm32f4_phase4_2e0_p_option_routing.py
       - name: Commit bounded policy delta
