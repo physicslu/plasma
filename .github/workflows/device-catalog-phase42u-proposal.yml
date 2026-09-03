@@ -1,0 +1,38 @@
+name: Device catalog Phase 4.2U STM32F413 H admission proposal
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2u-h-admission-batch1]
+    paths: [".github/workflows/device-catalog-phase42u-proposal.yml"]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  propose:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/device-catalog-phase4.2u-h-admission-batch1}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Build proposal
+        run: |
+          mkdir -p /tmp/phase42u
+          PYTHONPATH=data/device-catalog/research python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2u-h-admission-batch1-live-2026-09-03 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2u-h-admission-batch1-baseline.json \
+            --admit-base STM32F413CH --admit-base STM32F413RH --admit-base STM32F413VH --admit-base STM32F413ZH \
+            --output /tmp/phase42u/admission-plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/phase42u/admission-plan.json').read_text())
+          expected={'admit':14,'already_present':0,'manual_review_required':0,'reject':0}
+          expected_icpns={'STM32F413CHU3','STM32F413CHU3TR','STM32F413CHU6','STM32F413CHU6TR','STM32F413RHT3','STM32F413RHT6','STM32F413RHT6TR','STM32F413VHH3','STM32F413VHH6','STM32F413VHT6','STM32F413ZHJ6','STM32F413ZHJ6TR','STM32F413ZHT3','STM32F413ZHT6'}
+          if p['candidate_count'] != 14 or p['decision_counts'] != expected or p['conflicts'] != 0 or p['canonical_rows_before'] != 307:
+              raise SystemExit('unclean Phase 4.2U plan')
+          if {x['icpn'] for x in p['candidates']} != expected_icpns:
+              raise SystemExit('unexpected Phase 4.2U candidate set')
+          PY
+          cd /tmp/phase42u && sha256sum admission-plan.json > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with: {name: phase42u-h-batch1-admission-proposal, path: /tmp/phase42u, if-no-files-found: error, retention-days: 30}
