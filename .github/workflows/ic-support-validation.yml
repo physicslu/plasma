@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - "data/ic-support/**"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/research/stm32f1-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32f4-commercial-icpn.csv"
       - "software/python/plasma_core/ic_support.py"
       - "software/python/plasma_handlers/programming.py"
       - "software/python/plasma_handlers/stm32.py"
@@ -22,6 +25,9 @@ on:
   pull_request:
     paths:
       - "data/ic-support/**"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/research/stm32f1-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32f4-commercial-icpn.csv"
       - "software/python/plasma_core/ic_support.py"
       - "software/python/plasma_handlers/programming.py"
       - "software/python/plasma_handlers/stm32.py"
