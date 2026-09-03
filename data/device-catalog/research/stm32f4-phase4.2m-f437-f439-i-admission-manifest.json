@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2m-f437-f439-i-admission-2026-09-03",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production-admitted lifecycle control retained from prior STM32F4 bounded admissions"
+    },
+    {
+      "base_device": "STM32F437IG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ig.html",
+      "selection_reason": "policy-ready STM32F437 1024 KiB I-pin member; exact identity and lifecycle require direct evidence"
+    },
+    {
+      "base_device": "STM32F437II",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ii.html",
+      "selection_reason": "policy-ready STM32F437 2048 KiB I-pin member; no equivalence inferred from sibling devices"
+    },
+    {
+      "base_device": "STM32F439IG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ig.html",
+      "selection_reason": "policy-ready STM32F439 1024 KiB I-pin member; lifecycle evaluated per exact ICPN"
+    },
+    {
+      "base_device": "STM32F439II",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ii.html",
+      "selection_reason": "policy-ready STM32F439 2048 KiB I-pin member in the bounded family batch"
+    }
+  ]
+}
