@@ -133,6 +133,8 @@ It provides:
 
 The BFF does not accept arbitrary PPU destination URLs and does not own the alias-to-endpoint mapping.
 
+The PPU/Site configuration surface also uses an alias-scoped BFF route for PPU network desired state. The Browser supplies a registry alias and the fixed `ppu-network` resource kind; it never supplies the physical PPU destination URL.
+
 ## Plasma Manager boundary
 
 Manager owns fleet identity and managed route resolution:
@@ -152,13 +154,16 @@ Current managed route families support the central PPU workflow for:
 - Job submit/status/cancel/readback;
 - server-side Batch submit/status/cancel;
 - Gateway communication-policy read/write;
+- PPU network desired-state read/write through `/api/settings/ppu-network`;
 - Engineering Mock runtime settings read/write when that PPU runtime exposes the Mock feature;
 - authenticated Principal introspection;
 - PS real-path Loopback.
 
-The Gateway/Mock settings writes remain subject to the PPU secure Gateway's `GATEWAY_SETTINGS_WRITE` and `MOCK_SETTINGS_WRITE` authorization/idempotency contracts. Manager merely preserves and routes that evidence.
+The Gateway/Mock/PPU-network settings writes remain subject to the PPU secure Gateway authorization/idempotency contracts. Manager merely preserves and routes that evidence.
 
-The fleet registry and fleet observation resources themselves remain read-only surfaces. Unsupported write routes fail closed.
+PPU network **activation** is not part of the generic managed relay allowlist in this slice. Changing a PPU endpoint and changing Manager's durable registry endpoint form one commissioning transaction and require explicit orchestration, same-`ppu_id` revalidation and rollback handling. The Browser therefore cannot promote desired-state access into an arbitrary activation sequence.
+
+The fleet registry and fleet observation resources themselves remain read-only surfaces except for the explicit runtime-registry lifecycle API. Unsupported write routes fail closed.
 
 ## PPU Gateway boundary
 
@@ -247,12 +252,14 @@ Current invariants include:
 | Capability | Current software contract |
 |---|---|
 | PPU local autonomy | Preserved |
-| Manager fleet registry/observation | Implemented, read-only surfaces |
+| Manager fleet registry/observation | Implemented; runtime registry lifecycle mutations are explicit, observation remains read-only |
 | Manager PS Loopback relay | Implemented through shared managed route; legacy fixed route retained for compatibility |
 | Managed Programming Job routing | Implemented as explicit allowlisted relay |
 | Managed Programming Asset/Image relay | Implemented, bounded; EMode binary upload and PMode bounded Batch envelope retain their existing PPU contracts |
 | Managed Batch routing | Implemented for current server-side Batch REST family |
 | Managed Gateway/Mock settings | Explicit allowlisted read/write routes; PPU secure Gateway remains authorization authority |
+| Managed PPU network desired state | Explicit allowlisted `GET/POST /api/settings/ppu-network`; activation is not exposed through generic relay |
+| Manager network commissioning transaction | Not implemented in this slice; must own static endpoint migration, identity revalidation, commit/rollback and registry reconciliation |
 | Manager arbitrary reverse proxy | Prohibited |
 | PL Loopback | Not implemented; fail closed |
 | IC Loopback | Not implemented; fail closed |
