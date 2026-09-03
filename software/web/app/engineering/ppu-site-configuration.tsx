@@ -11,6 +11,7 @@ import {
   type ManagerRegistryEntry,
   type ManagerRegistryPayload,
 } from "./ppu-registry-api";
+import PpuNetworkConfiguration from "./ppu-network-configuration";
 import "./ppu-site-configuration.css";
 
 type PpuStatus = "Online" | "Pending" | "Offline" | "Disabled" | "Error" | "Unknown";
@@ -412,6 +413,11 @@ export default function PpuSiteConfiguration() {
                   </dl>
                 </div>
               </section>
+
+              <PpuNetworkConfiguration
+                entry={selectedEntry}
+                hasActiveExecution={selectedHasActiveExecution}
+              />
 
               <section className="ppuSiteCard" aria-label="Site Configuration">
                 <header className="ppuSiteCardHeader">

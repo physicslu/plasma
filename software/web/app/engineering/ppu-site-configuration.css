@@ -37,7 +37,7 @@
 /*
  * Single-column engineering flow.
  * Existing DOM columns are flattened so visual order is:
- * Registry -> selected PPU -> Site Configuration -> discovery boundary.
+ * Registry -> selected PPU -> PPU Network -> Site Configuration -> discovery boundary.
  */
 .ppuSiteLayout {
   display: grid;
@@ -53,7 +53,8 @@
 .ppuSiteColumn:first-child > .ppuSiteCard:first-child { order: 1; }
 .ppuSiteColumn:nth-child(2) > .ppuSiteCard:first-child { order: 2; }
 .ppuSiteColumn:nth-child(2) > .ppuSiteCard:nth-child(2) { order: 3; }
-.ppuSiteColumn:first-child > .ppuSiteCard:nth-child(2) { order: 4; }
+.ppuSiteColumn:nth-child(2) > .ppuSiteCard:nth-child(3) { order: 4; }
+.ppuSiteColumn:first-child > .ppuSiteCard:nth-child(2) { order: 5; }
 
 .ppuSiteCardHeader {
   display: flex;
