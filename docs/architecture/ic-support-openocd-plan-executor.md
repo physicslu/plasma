@@ -1,10 +1,10 @@
 # IC Support OpenOCD Compiled-Plan Executor
 
-Status: **Phase 3.8 current contract**
+Status: **Current software-only compiled-plan executor contract; introduced in Phase 3.8**
 
 ## 1. Purpose
 
-Phase 3.8 validates the software boundary between a canonical `OpenOCDExecutionPlan` and an external OpenOCD-like process without enabling real hardware execution.
+Plasma validates the software boundary between a canonical `OpenOCDExecutionPlan` and an external OpenOCD-like process without enabling production hardware execution.
 
 The chain is:
 
@@ -23,7 +23,7 @@ The production hardware gate remains closed.
 
 ## 2. Current system boundary: PS only
 
-The current IC Support execution path stops at the programmer's **PS software layer**. Phase 3.8 and the next OpenOCD hardware-validation phase are PS/OpenOCD work.
+The current IC Support execution path stops at the programmer's **PS software layer**. The compiled-plan executor is PS/OpenOCD work.
 
 The intended near-term physical path is:
 
@@ -35,7 +35,7 @@ Plasma PS runtime
   -> target IC
 ```
 
-The FPGA PL is **not** part of this path yet. No Phase 3.8 acceptance criterion depends on PL logic, PL registers, a PL programming engine, or PS-to-PL command transport.
+The FPGA PL is **not** part of this OpenOCD path. No current executor acceptance criterion depends on PL logic, PL registers, a PL programming engine, or PS-to-PL command transport.
 
 A future Plasma-native PPU path may later be:
 
@@ -76,7 +76,7 @@ A real Site Job still fails before JobRegistry insertion, PPU lease reservation,
 
 Constructing the executor in normal runtime code is insufficient to start a process. Calling `execute()` without an explicitly injected launcher fails closed as `INTERFACE_NOT_CONFIGURED` and reports `hardware_runtime_ready=false`.
 
-CI explicitly injects `asyncio.create_subprocess_exec`, but redirects the executable to a fake OpenOCD Python process. Phase 3.8 does not configure, invoke or probe a physical adapter or IC.
+CI explicitly injects `asyncio.create_subprocess_exec`, but redirects the executable to a fake OpenOCD Python process. The current software acceptance does not configure, invoke or probe a physical adapter or IC.
 
 ## 5. Canonical-plan verification
 
@@ -143,7 +143,7 @@ Plan artifact tokens such as `${PLASMA_IMAGE_BIN}` are replaced only with execut
 
 ## 8. Fake-process CI acceptance
 
-The Phase 3.8 regression executes a real subprocess, but the process is a fake OpenOCD Python program. It validates:
+The regression executes a real subprocess, but the process is a fake OpenOCD Python program. It validates:
 
 - argv construction;
 - interface/target configuration placement;
@@ -165,7 +165,7 @@ This test proves the PS software process boundary. It does not prove that OpenOC
 
 ## 9. Direct OpenOCD interface remains non-executable
 
-`OpenOCDInterface` no longer owns an internal subprocess primitive in Phase 3.8.
+`OpenOCDInterface` does not own an alternate production subprocess path around the compiled-plan executor boundary.
 
 Direct:
 
@@ -176,19 +176,20 @@ verify
 read
 ```
 
-remain fail-closed. `safe_shutdown()` is also a no-op while the hardware runtime is disabled, removing the previous latent subprocess path that could invoke OpenOCD even when no Job was admitted.
+remain fail-closed for production hardware use while the hardware runtime is disabled. `safe_shutdown()` does not create a latent OpenOCD subprocess ingress when no Job is admitted.
 
-Therefore the only Phase 3.8 process ingress is the explicitly injected software-validation `OpenOCDPlanExecutor`.
+## 10. Current coverage meaning
 
-## 10. Coverage meaning after Phase 3.8
-
-The catalog and evidence baseline remains unchanged:
+The executable catalog/evidence baseline is:
 
 ```text
-Exact ICPNs:                               124
-Base Devices:                               32
+Exact ICPNs:                               286
+Base Devices:                               91
+Deterministic OpenOCD-mapped exact ICPNs:  286
+Direct IC Support-bound exact ICPNs:         2
+Unresolved Programming Profile ICPNs:      284
 Evidence-backed Programming Profiles:        1
-OpenOCD plan-compiled Programming Profiles:   1
+OpenOCD plan-compiled Programming Profiles:  1
 OpenOCD plan-compiled exact ICPNs:            2
 Software-executor-validated profiles:         1
 Software-executor-validated exact ICPNs:      2
@@ -196,9 +197,9 @@ OpenOCD hardware-runtime-ready exact ICPNs:   0
 Native PPU runtime-ready exact ICPNs:         0
 ```
 
-The software-executor count must not be presented as physical programming support. Native PPU readiness remains a separate future PL-related metric and is not advanced by this phase.
+The software-executor count must not be presented as physical programming support. Likewise, the 286 deterministic OpenOCD target mappings are catalog-routing evidence, not 286 executable Programming Profiles. Native PPU readiness remains a separate future PL-related metric and is not advanced by this executor.
 
-## 11. Next gate
+## 11. Next hardware gate
 
 A later separately approved hardware phase may evaluate whether this **PS/OpenOCD** executor can be promoted to real OpenOCD runtime use. That phase must independently validate at least:
 
@@ -210,17 +211,16 @@ A later separately approved hardware phase may evaluate whether this **PS/OpenOC
 - cleanup/reset behavior after success, failure, timeout and cancellation;
 - evidence retention for the physical test.
 
-No PL involvement is required for that gate.
+No PL involvement is required for that OpenOCD hardware gate.
 
 Until that gate passes, `hardware_runtime_ready` remains false.
 
 ## 12. Non-goals
 
-Phase 3.8 does not:
+The current software executor contract does not:
 
-- mutate Device Catalog coverage;
-- add STM32F4 Programming Profiles;
-- make production OpenOCD Jobs executable;
+- infer Programming Profiles for the 284 unresolved production exact ICPNs;
+- make production OpenOCD Jobs hardware-executable;
 - run a real OpenOCD binary against hardware;
 - access a debug adapter, Z2, FPGA or IC;
 - implement or validate PS-to-PL programming transport;

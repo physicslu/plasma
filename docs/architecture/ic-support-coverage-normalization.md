@@ -1,6 +1,6 @@
 # IC Support Coverage Normalization
 
-Status: **Phase 3.4 derived coverage model**
+Status: **Current derived coverage contract; introduced in Phase 3.4 and extended by the runtime resolver / OpenOCD planning phases**
 
 ## 1. Purpose
 
@@ -18,7 +18,7 @@ IC Support
 
 The production Device Catalog can contain many exact commercial orderable part numbers that share the same underlying silicon behavior. A packaging/ordering suffix must not be counted as a new programming algorithm.
 
-Phase 3.4 therefore adds a deterministic derived inventory:
+Plasma therefore maintains a deterministic derived inventory:
 
 ```text
 Exact ICPN
@@ -29,7 +29,7 @@ Base Device
     v
 Programming Profile
     |
-    +--> OpenOCD backend mapping
+    +--> OpenOCD backend mapping / plan readiness
     `--> Native PPU backend readiness
 ```
 
@@ -52,21 +52,24 @@ ICPN != Programming Algorithm
 
 ## 3. Current production baseline
 
-The Phase 3.4 regression baseline after STM32F4 scale-out Batch 2 is:
+The executable coverage inventory on the current production Device Catalog is:
 
 ```text
-Exact ICPNs:                         124
-Families:                              2
-  STM32F1:                            75
-  STM32F4:                            49
-Base Devices:                         32
-Deterministic OpenOCD-mapped ICPNs: 124
-Direct IC Support-bound ICPNs:         2
-Evidence-backed Programming Profiles:  1
-Native PPU runtime-ready ICPNs:         0
+Exact ICPNs:                           286
+Families:                                2
+  STM32F1:                              75
+  STM32F4:                             211
+Base Devices:                           91
+Deterministic OpenOCD-mapped ICPNs:    286
+Direct IC Support-bound ICPNs:           2
+Unresolved Programming Profile ICPNs:  284
+Evidence-backed Programming Profiles:    1
+Native PPU runtime-ready ICPNs:           0
 ```
 
-These numbers describe different maturity layers and must not be collapsed into a single `supported=true` claim.
+These values are enforced by `data/ic-support/test_coverage_inventory.py` and are derived from the production Device Catalog manifest plus its admitted STM32F1/STM32F4 commercial ICPN sources.
+
+The counts describe different maturity layers and must not be collapsed into a single `supported=true` claim. In particular, `286 deterministic OpenOCD-mapped ICPNs` does **not** mean Plasma has 286 evidence-backed Programming Profiles or 286 hardware-validated programming targets.
 
 ## 4. Example: commercial variants are not new algorithms
 
@@ -89,11 +92,11 @@ They therefore count as:
 0 evidence-backed Plasma Programming Profiles today
 ```
 
-The last value is intentionally zero for this base device. The common OpenOCD target is deterministic catalog evidence, but it is not enough to claim that Plasma has already extracted and admitted the full programming algorithm needed by the Native PPU Driver.
+The last value is intentionally zero for this base device. The common OpenOCD target is deterministic catalog evidence, but it is not enough to claim that Plasma has extracted and admitted the complete Programming Profile needed for production execution.
 
 ## 5. Programming Profile meaning
 
-A Programming Profile is the reusable algorithmic Flash behavior already defined by the IC Support architecture. It owns facts such as:
+A Programming Profile is reusable algorithmic Flash behavior. It owns facts such as:
 
 - Flash controller registers;
 - unlock keys and sequence;
@@ -108,9 +111,9 @@ Consequently, equal OpenOCD target configuration is useful routing evidence but 
 
 ## 6. Backend interpretation
 
-For every production exact ICPN, the derived inventory reports two independent backend states.
+For every production exact ICPN, the derived inventory reports independent backend states.
 
-### OpenOCD
+### OpenOCD mapping
 
 `deterministic_target_mapped` means the admitted Device Catalog has a deterministic target configuration such as:
 
@@ -121,11 +124,13 @@ tcl/target/stm32f4x.cfg
 
 This is a routing/mapping statement, not a PPU/Socket or real-IC validation statement.
 
+For the currently bound STM32F103C pilot targets, the runtime resolver can resolve reusable IC Support profiles and the OpenOCD plan compiler can generate deterministic plans. The software-only compiled-plan executor is also validated for the bound profile. Production hardware execution remains fail-closed.
+
 ### Native PPU
 
-The current Native PPU runtime does not yet consume `ResolvedICSupport`; therefore all exact ICPNs remain `runtime_ready=false` in this Phase 3.4 inventory, even when a research/pilot Programming Profile exists.
+The runtime resolver exists, but the Plasma Native / FPGA programming backend is not runtime-ready. Therefore all production exact ICPNs remain `native_ppu.runtime_ready=false` in the coverage inventory.
 
-For the current STM32F103C pilot, two exact ICPNs are directly bound to the evidence-backed pilot profile:
+The two current exact ICPN bindings are:
 
 ```text
 STM32F103C8T6  --\
@@ -133,7 +138,7 @@ STM32F103C8T6  --\
 STM32F103CBT6  --/
 ```
 
-That profile is reusable programming knowledge, but the architecture explicitly remains research/pilot-only until a future approved runtime resolver/driver phase connects it to execution.
+They share one evidence-backed Programming Profile while using distinct Memory Geometry Profiles. This is reusable programming knowledge, not a claim that a Native PPU Driver or physical socket path is production-ready.
 
 ## 7. Fail-closed normalization rules
 
@@ -150,7 +155,21 @@ That profile is reusable programming knowledge, but the architecture explicitly 
 
 These checks prevent commercial suffix expansion from silently creating contradictory technical identities.
 
-## 8. Commands
+## 8. Cross-domain CI dependency
+
+IC Support coverage depends on production Device Catalog inputs, not only on `data/ic-support/**`.
+
+`IC Support validation` must therefore run when any of the directly consumed production inputs change:
+
+```text
+data/device-catalog/production/icpn-v1-manifest.json
+data/device-catalog/research/stm32f1-commercial-icpn.csv
+data/device-catalog/research/stm32f4-commercial-icpn.csv
+```
+
+This dependency is intentional. A Device Catalog admission that changes production coverage must re-run IC Support coverage normalization in the same PR so the derived inventory cannot silently drift behind the catalog.
+
+## 9. Commands
 
 From repository root:
 
@@ -163,7 +182,7 @@ python data/ic-support/test_coverage_inventory.py
 
 The complete JSON output is a deterministic derived view suitable for tooling, review and future API/resolver work. It is intentionally generated on demand instead of checked in as a second catalog.
 
-## 9. Coverage KPIs going forward
+## 10. Coverage KPIs going forward
 
 Every future catalog/profile expansion should report at least:
 
@@ -172,6 +191,7 @@ Exact ICPNs
 Base Devices
 Evidence-backed Programming Profiles
 Direct IC Support-bound exact ICPNs
+Unresolved Programming Profile exact ICPNs
 Deterministic OpenOCD-mapped exact ICPNs
 Native PPU runtime-ready exact ICPNs
 PPU-verified support
@@ -196,16 +216,16 @@ or:
 
 The second case represents a real increase in programming-technology coverage; the first may primarily increase commercial ordering coverage.
 
-## 10. Explicit non-goals
+## 11. Explicit non-goals
 
-Phase 3.4 does not:
+This coverage model does not:
 
-- add new Device Catalog ICPNs;
 - infer missing Programming Profiles from family names or OpenOCD cfg names;
-- promote the STM32F103C pilot to production runtime support;
-- implement `ResolvedICSupport`;
-- change Handler/OpenOCD execution;
+- promote deterministic OpenOCD target mapping to programming-support proof;
+- promote the STM32F103C profile to hardware runtime readiness;
 - implement a Native PPU Driver algorithm;
 - claim PPU, Socket or real-IC validation;
 - deploy or restart Plasma services;
 - perform Z2/FPGA/real-target operations.
+
+Historical Phase 3.x / Phase 4.x admission documents retain the production counts that were true at those historical checkpoints. This Current document reports the executable production coverage enforced by the present repository state.
