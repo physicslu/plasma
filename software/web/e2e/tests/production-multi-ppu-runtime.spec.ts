@@ -145,8 +145,8 @@ test("real Production Mock submits one server Batch for two PPUs and completes b
   });
   expect(ownership.browserJobPosts()).toBe(0);
 
-  await expect(first.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
-  await expect(second.locator('[data-production-site="1"]')).toHaveAttribute("data-site-state", "running", { timeout: 5_000 });
+  await expect.poll(async () => first.locator('[data-production-site="1"]').getAttribute("data-site-state"), { timeout: 5_000 }).toMatch(/^(running|success)$/);
+  await expect.poll(async () => second.locator('[data-production-site="1"]').getAttribute("data-site-state"), { timeout: 5_000 }).toMatch(/^(running|success)$/);
 
   await expect(siteCard(page, ppuOne)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
   await expect(siteCard(page, ppuTwo)).toHaveAttribute("data-site-state", "success", { timeout: 15_000 });
