@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2p-vh-admission-batch1-2026-09-03",
+  "targets": [
+    {"base_device":"STM32F479ZG","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html","selection_reason":"production lifecycle control"},
+    {"base_device":"STM32F401VB","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f401vb.html","selection_reason":"Phase 4.2O policy-ready V/H UFBGA100"},
+    {"base_device":"STM32F401VC","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f401vc.html","selection_reason":"Phase 4.2O policy-ready V/H UFBGA100"},
+    {"base_device":"STM32F401VD","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f401vd.html","selection_reason":"Phase 4.2O policy-ready V/H UFBGA100"},
+    {"base_device":"STM32F401VE","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f401ve.html","selection_reason":"Phase 4.2O policy-ready V/H UFBGA100"},
+    {"base_device":"STM32F411VC","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32f411vc.html","selection_reason":"Phase 4.2O policy-ready V/H UFBGA100"}
+  ]
+}
