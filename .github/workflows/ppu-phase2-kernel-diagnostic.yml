@@ -32,10 +32,10 @@ jobs:
           docker network create --subnet 192.168.77.0/24 --gateway 192.168.77.1 "$NET"
           docker run -d --name "$PPU" --platform linux/arm/v7 --network "$NET" --ip 192.168.77.40 --cap-add NET_ADMIN \
             -v "$PWD/scripts/ppu-network-phase2-acceptance.py:/acceptance.py:ro" \
-            arm32v7/python:3.12 python3 -c 'import time; time.sleep(3600)'
+            arm32v7/python:3.12 python3 -c 'import socket,time; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind(("0.0.0.0",18080)); s.listen(); time.sleep(3600)'
           docker run -d --name "$PROBE" --platform linux/arm/v7 --network "$NET" --ip 192.168.77.30 \
             arm32v7/python:3.12 python3 -c 'import time; time.sleep(3600)'
-          docker exec "$PPU" python3 - <<'PY'
+          docker exec -i "$PPU" python3 - <<'PY'
           import importlib.util
           spec = importlib.util.spec_from_file_location("acc", "/acceptance.py")
           acc = importlib.util.module_from_spec(spec); spec.loader.exec_module(acc)
@@ -43,17 +43,18 @@ jobs:
           print("added .10")
           PY
           echo '--- before delete: /proc/net/fib_trie ---'
-          docker exec "$PPU" cat /proc/net/fib_trie | grep -A2 -B2 '192.168.77' || true
-          docker exec "$PROBE" python3 - <<'PY'
+          docker exec "$PPU" cat /proc/net/fib_trie | grep -A3 -B2 '192.168.77' || true
+          echo '--- raw TCP reachability before replace ---'
+          docker exec -i "$PROBE" python3 - <<'PY'
           import socket
           for ip in ("192.168.77.40","192.168.77.10"):
-              s=socket.socket(); s.settimeout(.5)
+              s=socket.socket(); s.settimeout(.8)
               try:
                   s.connect((ip, 18080)); print(ip, "tcp-connect", "connected")
               except Exception as e: print(ip, "tcp-connect", type(e).__name__, str(e))
               finally: s.close()
           PY
-          docker exec "$PPU" python3 - <<'PY'
+          docker exec -i "$PPU" python3 - <<'PY'
           import importlib.util
           spec = importlib.util.spec_from_file_location("acc", "/acceptance.py")
           acc = importlib.util.module_from_spec(spec); spec.loader.exec_module(acc)
@@ -62,9 +63,9 @@ jobs:
           print("deleted .10, added .21")
           PY
           echo '--- after replace: /proc/net/fib_trie ---'
-          docker exec "$PPU" cat /proc/net/fib_trie | grep -A2 -B2 '192.168.77' || true
+          docker exec "$PPU" cat /proc/net/fib_trie | grep -A3 -B2 '192.168.77' || true
           echo '--- raw TCP reachability after replace ---'
-          docker exec "$PROBE" python3 - <<'PY'
+          docker exec -i "$PROBE" python3 - <<'PY'
           import socket
           for ip in ("192.168.77.40","192.168.77.10","192.168.77.21"):
               s=socket.socket(); s.settimeout(.8)
