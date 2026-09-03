@@ -44,12 +44,14 @@ test("PPU management names the northbound service Plasma Gateway", () => {
   assert.doesNotMatch(ppuSite, /<span>Gateway Endpoint<\/span>|<dt>Gateway Endpoint<\/dt>|<th>Gateway<\/th>/);
 });
 
-test("PPU network desired state is rendered inside PPU/Site management", () => {
+test("PPU network desired state and commissioning are rendered inside PPU/Site management", () => {
   assert.match(ppuSite, /import PpuNetworkConfiguration/);
   assert.match(ppuSite, /<PpuNetworkConfiguration/);
   assert.match(ppuSite, /hasActiveExecution=\{selectedHasActiveExecution\}/);
   assert.match(ppuNetwork, /PPU Network Configuration/);
   assert.match(ppuNetwork, /Save Desired Network/);
+  assert.match(ppuNetwork, /Commission Static Network/);
+  assert.match(ppuNetwork, /Manager Txn/);
   assert.match(ppuNetwork, /Running <code>eth0<\/code> was not activated/);
 });
 
@@ -61,17 +63,20 @@ test("PPU network UI distinguishes Linux Default Gateway from the Plasma Gateway
   assert.doesNotMatch(ppuNetwork, /<span>Gateway<\/span>/);
 });
 
-test("PPU network browser client uses alias-scoped Manager BFF and never calls activation directly", () => {
+test("Browser never sequences the PPU activation API directly", () => {
   assert.match(registryApi, /getManagerPpuNetwork/);
   assert.match(registryApi, /saveManagerPpuNetwork/);
+  assert.match(registryApi, /commissionManagerPpuStaticNetwork/);
   assert.match(registryApi, /\/api\/manager\/registry\/\$\{encodeURIComponent\(alias\)\}\/network/);
+  assert.match(registryApi, /\/network-commissioning/);
   assert.match(registryApi, /Idempotency-Key/);
   assert.doesNotMatch(ppuNetwork, /\/api\/settings\/ppu-network\/activation/);
   assert.doesNotMatch(ppuNetwork, /fetch\(/);
-  assert.match(ppuNetwork, /Manager-orchestrated apply/);
+  assert.match(ppuNetwork, /one Manager-owned transaction/);
+  assert.match(ppuNetwork, /verify the same <code>ppu_id<\/code>/);
 });
 
-test("browser registry client exposes add, lifecycle, remove, and desired network settings through same-origin BFF", () => {
+test("browser registry client exposes add, lifecycle, remove, desired network, and commissioning through same-origin BFF", () => {
   assert.match(registryApi, /\/api\/manager\/registry/);
   assert.match(registryApi, /method: "POST"/);
   assert.match(registryApi, /method: "PATCH"/);
@@ -79,22 +84,25 @@ test("browser registry client exposes add, lifecycle, remove, and desired networ
   assert.doesNotMatch(registryApi, /127\.0\.0\.1:18180/);
 });
 
-test("Manager registry BFF remains loopback-only and mutation requires managed Control Station mode", () => {
+test("Manager registry BFF remains loopback-only and commissioning is a Manager resource, not generic PPU relay", () => {
   assert.match(managerBff, /LOOPBACK_HOSTS/);
   assert.match(managerBff, /relayManagerRegistryRequest/);
   assert.match(managerBff, /relayManagerPpuAliasRequest/);
+  assert.match(managerBff, /relayManagerNetworkCommissioningRequest/);
+  assert.match(managerBff, /\/api\/registry\/\$\{encodeURIComponent\(normalizedAlias\)\}\/network-commissioning/);
   assert.match(managerBff, /requireManagedMode = false/);
-  assert.match(managerBff, /relayManagerRequest\(request, `\/api\/registry\$\{suffix\}`, bodyAllowed, true\)/);
   assert.match(managerBff, /PLASMA_CONTROL_STATION_MODE/);
   assert.match(managerBff, /PLASMA_MANAGER_API_URL/);
+  assert.doesNotMatch(managerBff, /gateway\$\{targetPath\}.*network-commissioning/);
 });
 
-test("registry BFF routes keep inventory mutations and alias-scoped network relay explicit", () => {
+test("registry BFF routes keep desired-state relay and Manager-owned commissioning explicit", () => {
   assert.match(registryRoute, /export async function GET/);
   assert.match(registryRoute, /export async function POST/);
   assert.doesNotMatch(registryRoute, /export async function PATCH|export async function DELETE/);
-  assert.match(registryEntryRoute, /resource: "entry" \| "network"/);
+  assert.match(registryEntryRoute, /resource: "entry" \| "network" \| "network-commissioning"/);
   assert.match(registryEntryRoute, /relayManagerPpuAliasRequest\(request, parsed\.alias, "\/api\/settings\/ppu-network"\)/);
+  assert.match(registryEntryRoute, /relayManagerNetworkCommissioningRequest\(request, parsed\.alias\)/);
   assert.match(registryEntryRoute, /export async function GET/);
   assert.match(registryEntryRoute, /export async function POST/);
   assert.match(registryEntryRoute, /export async function PATCH/);
