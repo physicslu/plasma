@@ -17,6 +17,7 @@ from device_catalog_admission_framework import write_canonical_dataset
 from device_catalog_pipeline_framework import pipeline_plan_is_clean
 from stm32f4_admission import build_admission_plan
 from stm32f4_coverage_gap_inventory import build_inventory
+from stm32f4_historical_replay import admitted_after_phase42
 from validate_stm32f4_retained_evidence import validate_retained_evidence
 
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
@@ -29,25 +30,6 @@ PLAN_SHA = "58d5a9c10b82bd13325e04a9931a42a6bf554304b006b797e9cc46b7014c08db"
 EXPECTED = {"STM32F405OEY6TR", "STM32F405OGY6TR", "STM32F415OGY6TR"}
 EXCLUDED_NRND = {"STM32F405OGY6VTR", "STM32F405OGY6WTR"}
 ADMISSION_BASES = {"STM32F405OE", "STM32F405OG", "STM32F415OG"}
-POST_PHASE42I_ADMISSIONS = {
-    "STM32F407IEH6",
-    "STM32F407IEH6TR",
-    "STM32F407IEH7",
-    "STM32F407IET6",
-    "STM32F407IGH6",
-    "STM32F407IGH6TR",
-    "STM32F407IGH7",
-    "STM32F407IGT6",
-    "STM32F407IGT7",
-    "STM32F417IEH6",
-    "STM32F417IET6",
-    "STM32F417IGH6",
-    "STM32F417IGH6TR",
-    "STM32F417IGT6",
-    "STM32F417IGT7",
-}
-
-
 class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
     def _rows(self, path: Path = CANONICAL) -> list[dict[str, str]]:
         with path.open(newline="", encoding="utf-8") as handle:
@@ -109,7 +91,7 @@ class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
             fields = list(reader.fieldnames or [])
             rows = [
                 row for row in reader
-                if row["icpn"] not in EXPECTED and row["icpn"] not in POST_PHASE42I_ADMISSIONS
+                if row["icpn"] not in EXPECTED and not admitted_after_phase42(row, "i")
             ]
         self.assertEqual(len(rows), 208)
         with tempfile.TemporaryDirectory() as tmp:

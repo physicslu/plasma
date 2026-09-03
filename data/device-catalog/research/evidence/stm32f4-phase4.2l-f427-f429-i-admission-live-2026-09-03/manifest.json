@@ -1,0 +1,27 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32f4-phase4.2l-f427-f429-i-admission-2026-09-03-retained-20260903T053301Z-0c61df6",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "cd2c94b54bf70d12ad902f1043fb6591a72f69a872905ded3476f516366460e8"
+    },
+    {
+      "path": "control-summary.json",
+      "sha256": "bcc989bb2d217f39b445c4f30d8798ee618b0bd457b1e9fead828c1025b4c94a"
+    },
+    {
+      "path": "evaluation.json",
+      "sha256": "efd92d8df3ed82e4d80598ee850d4fb3c5c55e3dce5630182ced104c4124f613"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "771ce25ccdf45dbab8d018ca327a2a0049d83abf2053bf23b82b0e7793ac571c"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "b18675a11d9e076399c96c2db28c2c6568570aab392aa0b08a500d63ff592c55"
+    }
+  ],
+  "schema_version": 1
+}

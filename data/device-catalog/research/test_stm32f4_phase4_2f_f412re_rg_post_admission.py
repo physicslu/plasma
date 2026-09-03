@@ -16,6 +16,7 @@ from device_catalog_admission_framework import write_canonical_dataset
 from device_catalog_pipeline_framework import pipeline_plan_is_clean
 from stm32f4_admission import build_admission_plan
 from stm32f4_coverage_gap_inventory import build_inventory
+from stm32f4_historical_replay import admitted_after_phase42
 from validate_stm32f4_retained_evidence import validate_retained_evidence
 
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
@@ -27,31 +28,6 @@ EXPECTED = {
     "STM32F412RET6", "STM32F412RET6TR", "STM32F412RET7", "STM32F412RET7TR", "STM32F412REY6TR",
     "STM32F412RGT6", "STM32F412RGT6TR", "STM32F412RGY6PTR", "STM32F412RGY6TR",
 }
-# Admissions after Phase 4.2F must be removed when reconstructing the immutable
-# historical 199-row pre-state. Otherwise a later legitimate catalog expansion
-# would make this historical replay test fail for the wrong reason.
-POST_PHASE42F_ADMISSIONS = {
-    "STM32F405OEY6TR",
-    "STM32F405OGY6TR",
-    "STM32F415OGY6TR",
-    "STM32F407IEH6",
-    "STM32F407IEH6TR",
-    "STM32F407IEH7",
-    "STM32F407IET6",
-    "STM32F407IGH6",
-    "STM32F407IGH6TR",
-    "STM32F407IGH7",
-    "STM32F407IGT6",
-    "STM32F407IGT7",
-    "STM32F417IEH6",
-    "STM32F417IET6",
-    "STM32F417IGH6",
-    "STM32F417IGH6TR",
-    "STM32F417IGT6",
-    "STM32F417IGT7",
-}
-
-
 class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
     def _rows(self, path: Path = CANONICAL) -> list[dict[str, str]]:
         with path.open(newline="", encoding="utf-8") as handle:
@@ -100,7 +76,7 @@ class STM32F4Phase42FPostAdmissionTests(unittest.TestCase):
             rows = [
                 row
                 for row in reader
-                if row["icpn"] not in EXPECTED and row["icpn"] not in POST_PHASE42F_ADMISSIONS
+                if row["icpn"] not in EXPECTED and not admitted_after_phase42(row, "f")
             ]
         self.assertEqual(len(rows), 199)
         with tempfile.TemporaryDirectory() as tmp:
