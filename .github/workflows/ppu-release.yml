@@ -30,9 +30,10 @@ on:
       - "software/python/tests/test_ppu_network_activation_security.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_product_release.py"
-      - "docs/deployment/ppu-runtime-packaging.md"
-      - "docs/deployment/ppu-armv7-runtime-lab.md"
-      - "docs/architecture/ppu-network-configuration.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
