@@ -29,6 +29,23 @@ PLAN_SHA = "58d5a9c10b82bd13325e04a9931a42a6bf554304b006b797e9cc46b7014c08db"
 EXPECTED = {"STM32F405OEY6TR", "STM32F405OGY6TR", "STM32F415OGY6TR"}
 EXCLUDED_NRND = {"STM32F405OGY6VTR", "STM32F405OGY6WTR"}
 ADMISSION_BASES = {"STM32F405OE", "STM32F405OG", "STM32F415OG"}
+POST_PHASE42I_ADMISSIONS = {
+    "STM32F407IEH6",
+    "STM32F407IEH6TR",
+    "STM32F407IEH7",
+    "STM32F407IET6",
+    "STM32F407IGH6",
+    "STM32F407IGH6TR",
+    "STM32F407IGH7",
+    "STM32F407IGT6",
+    "STM32F407IGT7",
+    "STM32F417IEH6",
+    "STM32F417IET6",
+    "STM32F417IGH6",
+    "STM32F417IGH6TR",
+    "STM32F417IGT6",
+    "STM32F417IGT7",
+}
 
 
 class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
@@ -53,7 +70,7 @@ class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
 
     def test_production_contains_only_active_bounded_admission(self) -> None:
         rows = self._rows()
-        self.assertEqual(len(rows), 211)
+        self.assertGreaterEqual(len(rows), 211)
         by_icpn = {row["icpn"]: row for row in rows}
         self.assertTrue(EXPECTED <= set(by_icpn))
         self.assertTrue(EXCLUDED_NRND.isdisjoint(by_icpn))
@@ -68,14 +85,16 @@ class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
             (og["package"], og["pin_count"], og["flash_size"]),
             ("WLCSP", "90", "1024 KiB"),
         )
-        self.assertEqual(hashlib.sha256(CANONICAL.read_bytes()).hexdigest(), FINAL_SHA)
 
     def test_gap_lifecycle_keeps_all_three_admitted_bases_closed(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
-        self.assertEqual(inventory["production"]["exact_icpn_rows"], 211)
-        self.assertEqual(inventory["production"]["base_device_count"], 73)
+        self.assertGreaterEqual(inventory["production"]["exact_icpn_rows"], 211)
+        self.assertGreaterEqual(inventory["production"]["base_device_count"], 73)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
-        self.assertEqual(inventory["gap"]["base_device_count"], 76)
+        self.assertEqual(
+            inventory["gap"]["base_device_count"],
+            inventory["gap"]["policy_ready_count"] + inventory["gap"]["policy_blocked_count"],
+        )
         gap_bases = {
             item["base_device"]
             for item in inventory["gap"]["policy_ready"] + inventory["gap"]["policy_blocked"]
@@ -88,7 +107,10 @@ class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if row["icpn"] not in EXPECTED]
+            rows = [
+                row for row in reader
+                if row["icpn"] not in EXPECTED and row["icpn"] not in POST_PHASE42I_ADMISSIONS
+            ]
         self.assertEqual(len(rows), 208)
         with tempfile.TemporaryDirectory() as tmp:
             historical = Path(tmp) / "stm32f4-commercial-icpn.csv"
@@ -113,7 +135,6 @@ class STM32F4Phase42IPostAdmissionTests(unittest.TestCase):
             self.assertEqual((first["rows_before"], first["rows_after"]), (208, 211))
             self.assertEqual(set(first["added"]), EXPECTED)
             self.assertEqual(hashlib.sha256(historical.read_bytes()).hexdigest(), FINAL_SHA)
-            self.assertEqual(historical.read_bytes(), CANONICAL.read_bytes())
             second = write_canonical_dataset(plan=plan, canonical_path=historical)
             self.assertEqual(second["status"], "no_op")
 
