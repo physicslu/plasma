@@ -86,6 +86,17 @@ Programming Recipe 是「PPU 要做什麼」的 control-plane concept，不屬�
 
 `serial_number` 是 per-device identity Asset，不是 security key，也不應直接沿用 PPU-wide Image sharing semantics。
 
+### Plasma Gateway terminology
+
+```text
+Plasma Gateway          PPU 上的 northbound API service
+Plasma Gateway API      該 service 的 REST contract
+Plasma Gateway Endpoint 例如 http://192.168.2.99:18080
+Default Gateway         Linux eth0 的 Layer-3 next-hop router
+```
+
+既有 Python package/module `plasma_web`、`gateway.py`、systemd unit `plasma-web.service`、REST path `/api/settings/gateway` 與 network JSON field `gateway` 都保留 compatibility identifier。人類可讀文件與 UI 不應因此把 Plasma Gateway service 與 Linux Default Gateway 混為一談。
+
 ## 已完成的功能
 
 - Python 3.11+。
@@ -104,7 +115,7 @@ Programming Recipe 是「PPU 要做什麼」的 control-plane concept，不屬�
 - Server log、Job text log、JSONL audit log。
 - `job_state.json` / `result.json` / read-back binary。
 - Server startup recovery 將不完整 Job 標記為 `ABORTED`。
-- Plasma Web REST Gateway 提供 status、Job、cancel、read-back download 與 Engineering Programming Asset routes。
+- Plasma Gateway 提供 status、Job、cancel、read-back download 與 Engineering Programming Asset routes。
 - Engineering Mock Provider 支援 8 Facilities × 4 PPUs，Site 數 2/4/6/8。
 - Engineering session/PPU 可 cache 多個 Programming Assets。
 - Program/Verify 以 **Normalized Image SHA** 建立 PPU-wide active Image lease。
@@ -128,7 +139,7 @@ software/python/
 │   ├── site_manager.py
 │   ├── site_worker.py
 │   └── server.py
-├── plasma_web/
+├── plasma_web/               # Plasma Gateway implementation package
 ├── tests/
 └── pyproject.toml
 ```
@@ -158,14 +169,16 @@ python3 -m plasma_server.server --config config/plasma.yaml
 
 預設 code-level listener 為 `127.0.0.1:9900`。若允許遠端 Client，必須另外規劃 authentication、TLS 與 firewall；目前 prototype 不應把 raw TCP Server 直接暴露到 Internet。
 
-## 啟動 Plasma Web REST Gateway
+## 啟動 Plasma Gateway
+
+CLI command name 仍為 `plasma-web`：
 
 ```bash
 plasma-web --host 127.0.0.1 --port 8080 \
   --plasma-host 127.0.0.1 --plasma-port 9900
 ```
 
-Core local routes 包含：
+Core local Plasma Gateway API routes 包含：
 
 ```text
 GET  /api/status
@@ -206,11 +219,13 @@ GET /api/fleet
 
 `/api/registry` 與 `/api/fleet` 仍是 read-only surfaces。
 
-Managed PPU relay 使用：
+Managed PPU relay 使用既有 internal route shape：
 
 ```text
-/api/ppus/{ppu_alias}/gateway/<allowlisted PPU API path>
+/api/ppus/{ppu_alias}/gateway/<allowlisted Plasma Gateway API path>
 ```
+
+其中 URL segment `gateway` 是 compatibility-sensitive API identifier，不是 operator-facing component name。
 
 目前明確 allowlist 的 route family 涵蓋中央 Programming workflow 所需的：
 
@@ -219,7 +234,7 @@ Managed PPU relay 使用：
 - Programming Asset cache check/upload；
 - Job submit/status/cancel/readback；
 - server-side Batch create/status/cancel；
-- Gateway communication-policy read；
+- Plasma Gateway communication-policy read；
 - authenticated Principal introspection；
 - PS real-path Loopback。
 
@@ -229,16 +244,16 @@ Managed command path：
 Control Console
         -> BFF
         -> Plasma Manager
-        -> enrolled PPU Gateway
+        -> enrolled Plasma Gateway
         -> Plasma Server
         -> local execution / diagnostic dispatch
 ```
 
-Manager 只從自己的 registry 依 `ppu_alias` 解析目的 PPU，不接受 caller 指定任意 URL，也不是 generic HTTP proxy。未 allowlist 的 path/method 在接觸 PPU 前 fail closed。
+Manager 只從自己的 registry 依 `ppu_alias` 解析目的 PPU，不接受 caller 指定任意 URL，也不是 generic HTTP proxy。Registry 中的 `endpoint` 是該 PPU 的 Plasma Gateway Endpoint。未 allowlist 的 path/method 在接觸 PPU 前 fail closed。
 
-BFF 與 Manager 僅轉送明確需要的 headers，例如 `Authorization`、`Idempotency-Key`、`Content-Type`、`Accept`。PPU secure Gateway 仍是 Principal／permission／Facility-PPU-Site scope／replay 的 execution authorization authority；Manager 不授權硬體操作，也不保存 plaintext Bearer credential。
+BFF 與 Manager 僅轉送明確需要的 headers，例如 `Authorization`、`Idempotency-Key`、`Content-Type`、`Accept`。Secure Plasma Gateway 仍是 Principal／permission／Facility-PPU-Site scope／replay 的 execution authorization authority；Manager 不授權硬體操作，也不保存 plaintext Bearer credential。
 
-Programming Asset/Image Phase 1 同樣經 BFF -> Manager -> PPU。Binary payload 維持 byte-preserving 並受 bounded request/response limit 約束，不另建 Manager-specific Base64 Image protocol。
+Programming Asset/Image Phase 1 同樣經 BFF -> Manager -> Plasma Gateway。Binary payload 維持 byte-preserving 並受 bounded request/response limit 約束，不另建 Manager-specific Base64 Image protocol。
 
 PS Loopback 使用和 Programming 相同的 Managed PPU relay family；成功回應包含 `manager.relay = "pass-through"`、`ppu_alias` 與 Manager RTT，供 Browser 驗證確實跨過 Manager boundary。Legacy fixed PS Loopback route可保留相容性，但中央 Console 不再依賴它作為不同於 Programming 的 transport。
 
@@ -330,7 +345,7 @@ logs/YYYY-MM-DD/
 
 ## 已知限制
 
-- Canonical Gateway 預設部署並不強制啟用完整 authentication/TLS；secure Gateway 是 opt-in path，production exposure 仍需部署層 security design。
+- Plasma Gateway 預設部署並不強制啟用完整 authentication/TLS；secure Plasma Gateway 是 opt-in path，production exposure 仍需部署層 security design。
 - Job persistence 仍以檔案為主；高工作量需重新評估資料層。
 - TCP 目前一個 request 對一個 connection，沒有長連線 multiplexing/server-push。
 - 只有 raw binary Image Asset normalization 已實作。
