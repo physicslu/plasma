@@ -19,8 +19,8 @@ def test_phase42k_exact_icpns_are_resolved_by_runtime_catalog() -> None:
     assert catalog.size >= EXPECTED_MIN_PRODUCTION_CATALOG_SIZE
 
     ufbga = catalog.search(UFBGA_ICPN.lower(), limit=5)
-    assert len(ufbga) == 1
-    ufbga_record = ufbga[0]
+    assert {record.icpn for record in ufbga} == {UFBGA_ICPN, f"{UFBGA_ICPN}TR"}
+    ufbga_record = next(record for record in ufbga if record.icpn == UFBGA_ICPN)
     assert ufbga_record.icpn == UFBGA_ICPN
     assert ufbga_record.package == "UFBGA"
     assert ufbga_record.pin_count == "176"
@@ -55,8 +55,12 @@ def test_phase42k_exact_icpn_is_exposed_by_rest_catalog_and_nrnd_is_absent() -> 
         assert response.status == 200
         assert payload["rest_contract_version"] == "3"
         assert payload["catalog_size"] >= EXPECTED_MIN_PRODUCTION_CATALOG_SIZE
-        assert payload["count"] == 1
-        result = payload["results"][0]
+        assert payload["count"] == 2
+        assert {item["icpn"] for item in payload["results"]} == {
+            UFBGA_ICPN,
+            f"{UFBGA_ICPN}TR",
+        }
+        result = next(item for item in payload["results"] if item["icpn"] == UFBGA_ICPN)
         assert result["icpn"] == UFBGA_ICPN
         assert result["package"] == "UFBGA"
         assert result["pin_count"] == "176"
