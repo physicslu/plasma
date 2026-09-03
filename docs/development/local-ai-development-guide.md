@@ -256,7 +256,7 @@ AI-generated changes must preserve the same engineering constraints as human-gen
 - scope cancellation to the intended job/Site;
 - keep canonical Site identity one-based;
 - do not reintroduce retired Programmer/Channel identity or zero-based Site compatibility;
-- recognize the current Web boundary as **Plasma Web REST Gateway**, implemented with standard-library HTTP and REST polling;
+- recognize the current Web boundary as **Plasma Gateway**, implemented with standard-library HTTP and REST polling;
 - do not invent FastAPI/WebSocket behavior that is not implemented;
 - do not invent hardware register addresses, timing, pin mappings, protocols, or API behavior;
 - add or update regression tests when behavior changes;
