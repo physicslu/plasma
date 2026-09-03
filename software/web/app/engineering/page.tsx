@@ -142,7 +142,7 @@ export default function EngineeringPage() {
                         onClick={() => selectSettingsSection("gateway")}
                       >
                         <span className="engineeringNavTreeBranch" aria-hidden="true">├</span>
-                        <span className="engineeringNavLabel">Gateway</span>
+                        <span className="engineeringNavLabel">Plasma Gateway</span>
                       </button>
                       <button
                         type="button"
