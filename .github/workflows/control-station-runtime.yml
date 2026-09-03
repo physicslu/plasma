@@ -15,7 +15,6 @@ on:
       - "software/python/tests/test_control_station_release.py"
       - "release/**"
       - ".github/workflows/control-station-runtime.yml"
-      - "docs/deployment/**"
   pull_request:
     paths:
       - "scripts/control-station-runtime.py"
@@ -30,7 +29,6 @@ on:
       - "software/python/tests/test_control_station_release.py"
       - "release/**"
       - ".github/workflows/control-station-runtime.yml"
-      - "docs/deployment/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
