@@ -1,0 +1,15 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2n-f469-f479-i-admission-2026-09-03",
+  "schema_version": 1,
+  "source_discovery": {"artifact_id": "9880912637", "artifact_sha256": "9c8e1a80aaecc9f1153ce191fbd1b4f3a2e8a699d0fc91eaae744dc179b625bd", "source_commit": "6ecad5d69f4a7c04543a13759b6aef5748b902f0", "workflow_run_id": "33722883103"},
+  "targets": [
+    {"base_device": "STM32F479ZG", "exact_icpns": ["STM32F479ZGT6"]},
+    {"base_device": "STM32F469IE", "exact_icpns": ["STM32F469IEH6"]},
+    {"base_device": "STM32F469IG", "exact_icpns": ["STM32F469IGH6", "STM32F469IGH6TR", "STM32F469IGT6"]},
+    {"base_device": "STM32F469II", "exact_icpns": ["STM32F469IIH6", "STM32F469IIT6"]},
+    {"base_device": "STM32F479IG", "exact_icpns": ["STM32F479IGH6"]},
+    {"base_device": "STM32F479II", "exact_icpns": ["STM32F479IIH6", "STM32F479IIH7", "STM32F479IIH7TR", "STM32F479IIT6"]}
+  ]
+}

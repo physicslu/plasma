@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2n-f469-f479-i-admission-2026-09-03",
+  "targets": [
+    {"base_device": "STM32F479ZG", "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html", "selection_reason": "production-admitted lifecycle control"},
+    {"base_device": "STM32F469IE", "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ie.html", "selection_reason": "policy-ready 512 KiB I-pin member requiring direct exact-identity evidence"},
+    {"base_device": "STM32F469IG", "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ig.html", "selection_reason": "policy-ready 1024 KiB I-pin member requiring independent lifecycle evidence"},
+    {"base_device": "STM32F469II", "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ii.html", "selection_reason": "policy-ready 2048 KiB I-pin member; no sibling equivalence inferred"},
+    {"base_device": "STM32F479IG", "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ig.html", "selection_reason": "policy-ready STM32F479 1024 KiB I-pin member"},
+    {"base_device": "STM32F479II", "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ii.html", "selection_reason": "policy-ready STM32F479 2048 KiB I-pin member"}
+  ]
+}

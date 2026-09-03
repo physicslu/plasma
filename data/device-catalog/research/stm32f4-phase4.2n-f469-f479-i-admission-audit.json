@@ -1,0 +1,28 @@
+{
+  "added_exact_icpns": [
+    "STM32F469IEH6",
+    "STM32F469IGH6",
+    "STM32F469IGH6TR",
+    "STM32F469IGT6",
+    "STM32F469IIH6",
+    "STM32F469IIT6",
+    "STM32F479IGH6",
+    "STM32F479IIH6",
+    "STM32F479IIH7",
+    "STM32F479IIH7TR",
+    "STM32F479IIT6"
+  ],
+  "admission_plan_sha256": "97dabf192eed56be10b84fa88290007b96e52e97518f371823478a8420f21434",
+  "canonical_csv_file_sha256": "712f3b340946af0bc1a5398a5adedd8b3a9df1afcee599d6c4bda93b018c39ec",
+  "lifecycle_exclusions": [],
+  "phase": "4.2N",
+  "production_base_devices_after": 91,
+  "production_base_devices_before": 86,
+  "production_rows_after": 265,
+  "production_rows_before": 254,
+  "proposal_artifact_id": 9882415184,
+  "proposal_artifact_zip_sha256": "6abdde394bbbbe15b5b5ed9c07cb5d5113901d79808a93f536494c8a3f56e749",
+  "proposal_run_id": 33727209072,
+  "schema_version": 1,
+  "status": "published"
+}

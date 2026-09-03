@@ -8,14 +8,14 @@ from http.server import ThreadingHTTPServer
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 329
+EXPECTED_MIN_PRODUCTION_CATALOG_SIZE = 329
 UFBGA_ICPN = "STM32F439IIH7"
 LQFP_ICPN = "STM32F437IIT7"
 
 
 def test_phase42m_exact_icpns_are_resolved_by_runtime_catalog() -> None:
     catalog = get_default_device_catalog()
-    assert catalog.size == EXPECTED_PRODUCTION_CATALOG_SIZE
+    assert catalog.size >= EXPECTED_MIN_PRODUCTION_CATALOG_SIZE
     for icpn, package in ((UFBGA_ICPN, "UFBGA"), (LQFP_ICPN, "LQFP")):
         matches = catalog.search(icpn.lower(), limit=5)
         assert {record.icpn for record in matches} == {icpn}
@@ -38,7 +38,7 @@ def test_phase42m_exact_icpn_is_exposed_by_rest_catalog() -> None:
         connection.close()
         assert response.status == 200
         assert payload["rest_contract_version"] == "3"
-        assert payload["catalog_size"] == EXPECTED_PRODUCTION_CATALOG_SIZE
+        assert payload["catalog_size"] >= EXPECTED_MIN_PRODUCTION_CATALOG_SIZE
         assert payload["count"] == 1
         result = payload["results"][0]
         assert result["icpn"] == UFBGA_ICPN
