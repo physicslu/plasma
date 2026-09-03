@@ -1,0 +1,114 @@
+name: Device catalog Phase 4.2M controlled Production publish
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2m-next-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42m-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2m-next-admission
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: phase42m-stm32f437-f439-i-admission-proposal
+          path: /tmp/phase42m
+          repository: physicslu/plasma
+          run-id: 33722004007
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate bound proposal and publish exact rows
+        run: |
+          set -euo pipefail
+          PYTHONPATH=data/device-catalog/research python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from device_catalog_admission_framework import read_csv, write_canonical_dataset
+          from device_catalog_pipeline_framework import pipeline_plan_is_clean
+
+          root = Path('data/device-catalog/research')
+          canonical = root / 'stm32f4-commercial-icpn.csv'
+          evidence = root / 'evidence/stm32f4-phase4.2m-f437-f439-i-admission-live-2026-09-03'
+          proposal = Path('/tmp/phase42m/admission-plan.json')
+          plan_bytes = proposal.read_bytes()
+          plan_sha = hashlib.sha256(plan_bytes).hexdigest()
+          expected_plan_sha = '527de5f191ccd7f264f00d4fa7cf851dbc54085d56143f91745b7eb4b4be631d'
+          if plan_sha != expected_plan_sha:
+              raise SystemExit({'proposal_hash_mismatch': [plan_sha, expected_plan_sha]})
+          plan = json.loads(plan_bytes)
+          expected = {
+              'STM32F437IGH6', 'STM32F437IGT6',
+              'STM32F437IIH6', 'STM32F437IIH6TR', 'STM32F437IIT6', 'STM32F437IIT7',
+              'STM32F439IGH6', 'STM32F439IGT6',
+              'STM32F439IIH6', 'STM32F439IIH6TR', 'STM32F439IIH7', 'STM32F439IIT6',
+          }
+          observed = {item['icpn'] for item in plan['candidates']}
+          if observed != expected:
+              raise SystemExit({'candidate_set_mismatch': sorted(observed ^ expected)})
+          if not pipeline_plan_is_clean(plan) or plan['decision_counts'] != {
+              'admit': 12, 'already_present': 0, 'manual_review_required': 0, 'reject': 0,
+          } or plan['conflicts'] != 0:
+              raise SystemExit({'unclean_plan': plan['decision_counts'], 'conflicts': plan['conflicts']})
+
+          _, rows = read_csv(canonical)
+          if len(rows) != 242 or len({row['icpn'] for row in rows}) != 242:
+              raise SystemExit('expected a unique 242-row pre-publish STM32F4 Production catalog')
+          if len({row['base_device'] for row in rows}) != 82:
+              raise SystemExit('expected 82 pre-publish STM32F4 Base Devices')
+          result = write_canonical_dataset(plan=plan, canonical_path=canonical)
+          if result['status'] != 'written' or result['rows_after'] != 254 or set(result['added']) != expected:
+              raise SystemExit({'unexpected_publish_result': result})
+          _, rows_after = read_csv(canonical)
+          if len({row['base_device'] for row in rows_after}) != 86 or len({row['icpn'] for row in rows_after}) != 254:
+              raise SystemExit('post-publish STM32F4 row/base uniqueness invariant failed')
+
+          (evidence / 'admission-plan.json').write_bytes(plan_bytes)
+          summary = {
+              'schema_version': 1,
+              'phase': '4.2M',
+              'proposal_run_id': 33722004007,
+              'proposal_artifact_id': 9880549219,
+              'proposal_artifact_zip_sha256': 'e695f3a46ff6920390ba70502624a1320ae0f92b345832405e6a5d9810ab841e',
+              'admission_plan_sha256': plan_sha,
+              'production_rows_before': 242,
+              'production_rows_after': 254,
+              'production_base_devices_before': 82,
+              'production_base_devices_after': 86,
+              'added_exact_icpns': sorted(expected),
+              'lifecycle_exclusions': [],
+              'canonical_csv_file_sha256': hashlib.sha256(canonical.read_bytes()).hexdigest(),
+              'status': 'published',
+          }
+          (evidence / 'publish-summary.json').write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(summary, indent=2))
+          PY
+      - name: Commit bounded Production transaction
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            data/device-catalog/research/stm32f4-commercial-icpn.csv \
+            data/device-catalog/research/evidence/stm32f4-phase4.2m-f437-f439-i-admission-live-2026-09-03/admission-plan.json \
+            data/device-catalog/research/evidence/stm32f4-phase4.2m-f437-f439-i-admission-live-2026-09-03/publish-summary.json
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'refusing no-op publish'; exit 1; }
+          git commit -m 'device-catalog: admit Phase 4.2M STM32F437/439 I-pin ICPNs'
+          git push origin HEAD:agent/device-catalog-phase4.2m-next-admission
