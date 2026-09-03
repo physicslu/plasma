@@ -42,6 +42,14 @@ test("Plasma Gateway settings retain compatibility-sensitive internal identifier
   assert.match(settingsPanel, /updateGatewaySettings/);
 });
 
+test("Plasma Gateway user-facing connection errors use canonical terminology", () => {
+  assert.match(plasmaApi, /Plasma Gateway Endpoint 必須使用 http:\/\/ 或 https:\/\//);
+  assert.match(plasmaApi, /Plasma Gateway communication policy unavailable/);
+  assert.match(plasmaApi, /Plasma Gateway request timed out/);
+  assert.match(plasmaApi, /Plasma Gateway connection failed/);
+  assert.doesNotMatch(plasmaApi, /Plasma Web REST Gateway/);
+});
+
 test("Plasma Gateway uses the shared Engineering Settings UI primitives without a redundant local tab shell", () => {
   for (const primitive of ["SettingsPage", "SettingsCard", "SettingsGrid", "SettingsField", "SettingsActions", "SettingsMessage", "SettingsGuide"]) {
     assert.match(settingsPanel, new RegExp(primitive));
