@@ -1,0 +1,38 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2l-f427-f429-i-admission-2026-09-03",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9879514668",
+    "artifact_sha256": "11ecdce581724a95316c01882215b1436dd54a6b761b8de6a3b1dcc4f1fa9b24",
+    "source_commit": "175ee9671bc9e5f5868009807892c1bfb6caaf42",
+    "workflow_run_id": "33718806787"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "exact_icpns": ["STM32F479ZGT6"]
+    },
+    {
+      "base_device": "STM32F427IG",
+      "exact_icpns": ["STM32F427IGH6", "STM32F427IGH6TR", "STM32F427IGH7", "STM32F427IGT6"]
+    },
+    {
+      "base_device": "STM32F427II",
+      "exact_icpns": ["STM32F427IIH6", "STM32F427IIH6TR", "STM32F427IIH7", "STM32F427IIT6", "STM32F427IIT7"]
+    },
+    {
+      "base_device": "STM32F429IE",
+      "exact_icpns": ["STM32F429IEH6", "STM32F429IET6"]
+    },
+    {
+      "base_device": "STM32F429IG",
+      "exact_icpns": ["STM32F429IGH6", "STM32F429IGT6"]
+    },
+    {
+      "base_device": "STM32F429II",
+      "exact_icpns": ["STM32F429IIH6", "STM32F429IIH6TR", "STM32F429IIT6"]
+    }
+  ]
+}
