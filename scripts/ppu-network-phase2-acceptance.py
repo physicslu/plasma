@@ -18,7 +18,6 @@ boot persistence, or a final Z2 Linux network-manager backend.
 from __future__ import annotations
 
 import argparse
-import errno
 import fcntl
 import hashlib
 import ipaddress
@@ -56,7 +55,7 @@ SIOCGIFADDR = 0x8915
 SIOCGIFNETMASK = 0x891B
 MAX_HELPER_REQUEST = 1024 * 1024
 
-# Linux rtnetlink address ABI.  The lab intentionally uses the kernel API
+# Linux rtnetlink address ABI. The lab intentionally uses the kernel API
 # directly instead of depending on iproute2 inside the minimal ARMv7 image.
 NETLINK_ROUTE = 0
 NLMSG_ERROR = 2
@@ -283,16 +282,19 @@ def _wait_unreachable(container: str, ip: str, path: str = "/api/node", *, timeo
 
 def _wait_activation_state(container: str, ip: str, state: str, *, timeout_s: float = 8.0) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_s
-    last: dict[str, Any] | None = None
+    last_result: dict[str, Any] | None = None
+    last_activation: dict[str, Any] | None = None
     while time.monotonic() < deadline:
-        payload = _expect_json(container, ip, "/api/settings/ppu-network/activation")
-        activation = payload.get("activation")
-        if isinstance(activation, dict):
-            last = activation
-            if activation.get("state") == state:
-                return activation
+        result = _probe(container, ip, "/api/settings/ppu-network/activation")
+        last_result = result
+        if result.get("reachable") is True and result.get("status") == 200 and isinstance(result.get("payload"), dict):
+            activation = result["payload"].get("activation")
+            if isinstance(activation, dict):
+                last_activation = activation
+                if activation.get("state") == state:
+                    return activation
         time.sleep(0.1)
-    raise AcceptanceError(f"activation did not reach {state}: {last!r}")
+    raise AcceptanceError(f"activation did not reach {state}: activation={last_activation!r} last_probe={last_result!r}")
 
 
 def _node_ppu_id(payload: Mapping[str, Any]) -> str:
@@ -319,9 +321,6 @@ def _host_mode(args: argparse.Namespace) -> int:
     work.mkdir(parents=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # The PPU container deliberately has no DAC_OVERRIDE. Give only this
-    # disposable lab directory explicit write permission instead of weakening
-    # the process capability boundary.
     container_work = work / "container-work"
     container_work.mkdir()
     container_work.chmod(0o777)
@@ -402,8 +401,7 @@ def _host_mode(args: argparse.Namespace) -> int:
 
         scheduled = _expect_json(
             probe, INITIAL_IP, "/api/settings/ppu-network/activation", method="POST",
-            body={"action": "apply", "expected_revision": revision2, "expected_ppu_id": initial_ppu_id, "rollback_timeout_s": ROLLBACK_TIMEOUT_S},
-            status=202,
+            body={"action": "apply", "expected_revision": revision2, "expected_ppu_id": initial_ppu_id, "rollback_timeout_s": ROLLBACK_TIMEOUT_S}, status=202,
         )
         activation_id = scheduled["activation"]["activation_id"]
         if not isinstance(activation_id, str) or not activation_id:
@@ -442,8 +440,7 @@ def _host_mode(args: argparse.Namespace) -> int:
             raise AcceptanceError(f"expected desired revision 3, got {revision3}")
         second = _expect_json(
             probe, COMMITTED_IP, "/api/settings/ppu-network/activation", method="POST",
-            body={"action": "apply", "expected_revision": revision3, "expected_ppu_id": initial_ppu_id, "rollback_timeout_s": ROLLBACK_TIMEOUT_S},
-            status=202,
+            body={"action": "apply", "expected_revision": revision3, "expected_ppu_id": initial_ppu_id, "rollback_timeout_s": ROLLBACK_TIMEOUT_S}, status=202,
         )
         second_id = second["activation"]["activation_id"]
         if second_id == activation_id:
@@ -478,23 +475,14 @@ def _host_mode(args: argparse.Namespace) -> int:
         checks["durable_journal"] = "PASS"
 
         result = {
-            "overall_result": "PASS",
-            "transaction_result": "PASS",
-            "evidence_level": "swpc-qemu-armv7-isolated-static-ipv4",
-            "git_sha": git_sha,
-            "product_version": version,
-            "architecture": "armv7l",
-            "release_artifact": archive.name,
-            "release_sha256": release_sha,
-            "arm_binfmt_installed_now": installed_binfmt,
-            "initial_ipv4": INITIAL_IP,
-            "committed_ipv4": COMMITTED_IP,
-            "rollback_candidate_ipv4": ROLLBACK_CANDIDATE_IP,
-            "ppu_id": initial_ppu_id,
-            "committed_revision": revision2,
-            "desired_revision_after_rollback": revision3,
-            "checks": checks,
-            "actual_network_mutation": "isolated-lab-static-ipv4",
+            "overall_result": "PASS", "transaction_result": "PASS",
+            "evidence_level": "swpc-qemu-armv7-isolated-static-ipv4", "git_sha": git_sha,
+            "product_version": version, "architecture": "armv7l", "release_artifact": archive.name,
+            "release_sha256": release_sha, "arm_binfmt_installed_now": installed_binfmt,
+            "initial_ipv4": INITIAL_IP, "committed_ipv4": COMMITTED_IP,
+            "rollback_candidate_ipv4": ROLLBACK_CANDIDATE_IP, "ppu_id": initial_ppu_id,
+            "committed_revision": revision2, "desired_revision_after_rollback": revision3,
+            "checks": checks, "actual_network_mutation": "isolated-lab-static-ipv4",
             "privilege_separation": {"gateway_cap_net_admin": False, "helper_cap_net_admin": True},
             "not_claimed": [
                 "PYNQ-Z2 hardware", "final Z2 Linux network-manager backend", "DHCP activation",
@@ -662,17 +650,10 @@ def _replace_ipv4(interface: str, old_address: str, old_prefix: int, new_address
     ipaddress.IPv4Address(new_address)
     if old_address == new_address and old_prefix == new_prefix:
         return
-    # RTM_DELADDR is the explicit Linux address-removal primitive. Delete first
-    # so the candidate cannot coexist with the previous management endpoint;
-    # the helper transaction uses a local Unix socket and remains reachable
-    # during the intentionally address-less interval.
     _address_message(interface, old_address, old_prefix, RTM_DELADDR)
     try:
         _address_message(interface, new_address, new_prefix, RTM_NEWADDR, create=True)
     except Exception:
-        # Best-effort local repair if add fails after delete. If repair itself
-        # fails, propagate the original activation failure and let the durable
-        # transaction surface recovery_required rather than claiming success.
         try:
             _address_message(interface, old_address, old_prefix, RTM_NEWADDR, create=True)
         except Exception:
