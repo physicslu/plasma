@@ -87,3 +87,10 @@ jobs:
 
       - name: Validate Phase 4.2P V/H batch1 post-admission closure
         run: python data/device-catalog/research/test_stm32f4_phase4_2p_vh_admission_batch1_post_admission.py
+
+      - name: Validate Phase 4.2Q V/H batch2 retained evidence and post-admission closure
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2q-vh-admission-batch2-live-2026-09-03 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2q-vh-admission-batch2-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_2q_vh_admission_batch2_post_admission.py

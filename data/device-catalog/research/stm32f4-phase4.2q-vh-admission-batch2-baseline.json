@@ -1,0 +1,25 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F413VG",
+      "icpn": "STM32F413VGH3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "pilot_id": "stm32f4-phase4.2q-vh-admission-batch2-2026-09-03",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9885887790",
+    "artifact_sha256": "3252404911d2fc7dad5ca1495a18759cbc35dad9d798d6a7be758f9c8db8e7b7",
+    "source_commit": "5fa4def36b6792758b83de2241fda56d253853a9",
+    "workflow_run_id": "33736243898"
+  },
+  "targets": [
+    {"base_device": "STM32F479ZG", "exact_icpns": ["STM32F479ZGT6"]},
+    {"base_device": "STM32F411VE", "exact_icpns": ["STM32F411VEH6", "STM32F411VEH6TR", "STM32F411VET6", "STM32F411VET6TR"]},
+    {"base_device": "STM32F412VE", "exact_icpns": ["STM32F412VEH3TR", "STM32F412VEH6", "STM32F412VEH6TR", "STM32F412VET3", "STM32F412VET3TR", "STM32F412VET6", "STM32F412VET6TR"]},
+    {"base_device": "STM32F412VG", "exact_icpns": ["STM32F412VGH6", "STM32F412VGH6TR", "STM32F412VGT6", "STM32F412VGT6TR", "STM32F412VGT7"]},
+    {"base_device": "STM32F413VG", "exact_icpns": ["STM32F413VGH6", "STM32F413VGT3", "STM32F413VGT3TR", "STM32F413VGT6", "STM32F413VGT6TR"]}
+  ]
+}
