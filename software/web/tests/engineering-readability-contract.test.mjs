@@ -9,6 +9,7 @@ const designContractPath = new URL("../app/operator-ui/operator-design-contract.
 const panelCssPath = new URL("../app/operator-ui/operator-panel.css", import.meta.url);
 const operatorSurfacePrimitivesPath = new URL("../app/operator-ui/operator-surface-primitives.css", import.meta.url);
 const ppuSiteCssPath = new URL("../app/engineering/ppu-site-configuration.css", import.meta.url);
+const ppuSitePagePath = new URL("../app/engineering/ppu-site-configuration.tsx", import.meta.url);
 const pagePath = new URL("../app/engineering/page.tsx", import.meta.url);
 
 async function source(url) {
@@ -133,4 +134,24 @@ test("PPU Site management consumes canonical Settings/Loopback operator primitiv
   assert.match(ppuCss, /first-child > \.ppuSiteCard:first-child \{ order: 1; \}/);
   assert.match(ppuCss, /nth-child\(2\) > \.ppuSiteCard:first-child \{ order: 2; \}/);
   assert.match(ppuCss, /nth-child\(2\) > \.ppuSiteCard:nth-child\(2\) \{ order: 3; \}/);
+});
+
+test("PPU Site management separates lifecycle from connectivity and keeps compact selected-PPU composition", async () => {
+  const [ppuCss, ppuPage] = await Promise.all([
+    source(ppuSiteCssPath),
+    source(ppuSitePagePath),
+  ]);
+
+  assert.match(ppuPage, /<th>PPU ID<\/th>\s*<th>Lifecycle<\/th>\s*<th>Status<\/th>/);
+  assert.match(ppuPage, /className=\{`ppuLifecycle \$\{entry\.lifecycle\}`\}/);
+  assert.match(ppuPage, /Selected PPU[\s\S]*ppuSelectedPpuDivider[\s\S]*selectedEntry\.alias/);
+  assert.match(ppuPage, /<div className="ppuSiteSummaryItem">[\s\S]*Physical Sites/);
+  assert.match(ppuPage, /<div className="ppuSiteSummaryItem">[\s\S]*Enabled Sites/);
+  assert.match(ppuPage, /<div className="ppuSiteSummaryItem">[\s\S]*Topology Source/);
+
+  assert.match(ppuCss, /\.ppuInfoGrid\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)[\s\S]*gap:\s*0/);
+  assert.match(ppuCss, /\.ppuInfoGrid > div\.full\s*\{[\s\S]*grid-column:\s*1 \/ -1/);
+  assert.match(ppuCss, /\.ppuSiteSummary\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  assert.doesNotMatch(ppuCss, /^\.ppuSiteCard\s*\{/m, "density tuning must not reclaim shared card ownership");
+  assert.doesNotMatch(ppuCss, /^\.ppuSiteButton\s*\{/m, "density tuning must not reclaim shared action ownership");
 });

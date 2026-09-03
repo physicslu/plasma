@@ -71,6 +71,21 @@
   flex-wrap: wrap;
 }
 
+.ppuSelectedPpuTitle {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.ppuSelectedPpuTitle strong {
+  font-weight: 850;
+}
+
+.ppuSelectedPpuDivider {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .ppuRegistryAddForm {
   display: grid;
   grid-template-columns: minmax(160px, .7fr) minmax(260px, 1.3fr) auto;
@@ -152,6 +167,14 @@
   font-weight: 750;
 }
 
+.ppuLifecycle {
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.ppuLifecycle.pending { color: var(--amber); }
+.ppuLifecycle.disabled { color: var(--muted); }
+
 .ppuSiteStatus {
   display: inline-flex;
   align-items: center;
@@ -221,7 +244,7 @@
 .ppuMetaGrid span,
 .ppuInfoGrid dt {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   color: var(--text-soft);
   font-size: 10px;
   font-weight: 750;
@@ -232,8 +255,8 @@
   margin: 0;
   color: var(--text);
   font-size: 11px;
-  font-weight: 700;
-  line-height: 1.45;
+  font-weight: 750;
+  line-height: 1.4;
 }
 
 .ppuRemoveConfirm {
@@ -262,19 +285,40 @@
   line-height: 1.5;
 }
 
+/*
+ * Selected PPU detail is intentionally compact. Shared card and typography scale
+ * remains owned by operator-surface-primitives.css; this block owns composition only.
+ */
 .ppuInfoBody {
-  padding: 16px;
+  padding: 0;
 }
 
 .ppuInfoGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px 24px;
+  gap: 0;
   margin: 0;
 }
 
-.ppuInfoGrid div.wide {
-  grid-column: span 2;
+.ppuInfoGrid > div {
+  min-width: 0;
+  padding: 11px 16px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.ppuInfoGrid > div:nth-child(4n) {
+  border-right: 0;
+}
+
+.ppuInfoGrid > div.full {
+  grid-column: 1 / -1;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.ppuInfoGrid dd {
+  overflow-wrap: anywhere;
 }
 
 .ppuEditable {
@@ -305,24 +349,34 @@
 }
 
 .ppuSiteSummary {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 14px 16px 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-3) 70%, transparent);
 }
 
-.ppuSiteSummary span {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: var(--panel-3);
-  color: var(--muted);
-  font: 700 10px var(--font-mono);
+.ppuSiteSummaryItem {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 16px;
+  border-right: 1px solid var(--line);
 }
 
-.ppuSiteSummary strong {
-  margin-left: 6px;
+.ppuSiteSummaryItem:last-child {
+  border-right: 0;
+}
+
+.ppuSiteSummaryItem span {
+  color: var(--text-soft);
+  font: 750 10px var(--font-mono);
+}
+
+.ppuSiteSummaryItem strong {
   color: var(--text);
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .ppuSiteToggle {
@@ -406,6 +460,19 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .ppuInfoGrid > div:nth-child(4n) {
+    border-right: 1px solid var(--line);
+  }
+
+  .ppuInfoGrid > div:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .ppuInfoGrid > div.full {
+    grid-column: 1 / -1;
+    border-right: 0;
+  }
+
   .ppuRegistryAddForm {
     grid-template-columns: 1fr 1fr;
   }
@@ -424,12 +491,24 @@
 
   .ppuMetaGrid,
   .ppuInfoGrid,
-  .ppuRegistryAddForm {
+  .ppuRegistryAddForm,
+  .ppuSiteSummary {
     grid-template-columns: 1fr;
   }
 
-  .ppuInfoGrid div.wide,
+  .ppuInfoGrid > div,
+  .ppuInfoGrid > div:nth-child(2n),
+  .ppuInfoGrid > div:nth-child(4n),
+  .ppuSiteSummaryItem {
+    border-right: 0;
+  }
+
+  .ppuInfoGrid > div.full,
   .ppuRegistryAddForm > .ppuSiteCardHeaderActions {
     grid-column: span 1;
+  }
+
+  .ppuSiteSummaryItem:not(:last-child) {
+    border-bottom: 1px solid var(--line);
   }
 }
