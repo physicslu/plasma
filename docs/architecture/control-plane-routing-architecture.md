@@ -16,7 +16,7 @@ BFF
 Plasma Manager
       |
       v
-PPU Gateway @ selected PPU
+Plasma Gateway @ selected PPU
       |
       v
 Plasma Server
@@ -38,7 +38,7 @@ Which PPU should receive this command?
         -> Plasma Manager
 
 How does this PPU expose its local execution service?
-        -> PPU Gateway
+        -> Plasma Gateway
 ```
 
 These responsibilities must not collapse into a browser-selected target URL or an arbitrary Manager reverse proxy.
@@ -50,7 +50,10 @@ These responsibilities must not collapse into a browser-selected target URL or a
 | **Control Console** | Operator-facing product UI | User intent, presentation, workflow state | PPU network topology or direct managed-device routing policy |
 | **BFF — Backend for Frontend** | Presentation Boundary | Same-origin browser API, request shaping, browser security/session boundary, sanitized errors | Fleet routing, arbitrary destination URLs, device execution |
 | **Plasma Manager** | Fleet / Routing Ownership | PPU registry, canonical identity, managed PPU selection, explicit command routing | FPGA/IC execution, caller-controlled generic proxying |
-| **PPU Gateway** | Device Network Boundary | One PPU's REST boundary, local request validation, REST-to-runtime translation, local status/errors | Fleet-wide PPU selection |
+| **Plasma Gateway** | PPU Northbound API Boundary | One PPU's REST boundary, local request validation, REST-to-runtime translation, local status/errors | Fleet-wide PPU selection or Linux Layer-3 routing |
+| **Plasma Gateway API** | REST contract exposed by Plasma Gateway | PPU northbound HTTP resources and security contract | Fleet selection |
+| **Plasma Gateway Endpoint** | Network location of one Plasma Gateway | Scheme/host/port used by Manager or explicit Standalone clients, e.g. `http://192.168.2.99:18080` | Linux default-route semantics |
+| **Default Gateway** | Linux Layer-3 next-hop router | PPU `eth0` route toward other subnets | Plasma REST/API behavior |
 | **Plasma Server** | PPU Execution Service | Local Job/Batch/diagnostic dispatch, Site execution, Protocol v3.3 runtime | Fleet routing or browser presentation |
 | **PS** | Embedded Linux processing system | Local control/runtime and PS-side hardware integration | Fleet ownership |
 | **PL** | FPGA programmable logic | Deterministic/custom hardware peripheral behavior | Control-plane policy |
@@ -61,6 +64,8 @@ These responsibilities must not collapse into a browser-selected target URL or a
 | **Programming Job** | One requested Site operation | Operation intent, Site and execution references | PPU discovery |
 | **Control Plane** | Central intent/routing layer | Identity, selection, policy and routing | Direct hardware execution |
 | **Execution Plane** | Per-PPU runtime | Job/Batch/diagnostics and PS/PL/Site/IC execution | Global fleet routing |
+
+`Plasma Gateway`, `Plasma Gateway API`, `Plasma Gateway Endpoint`, and Linux `Default Gateway` are intentionally different concepts. Existing compatibility-sensitive identifiers such as `/api/settings/gateway`, Python `gateway.py`, JSON field `gateway`, and `plasma-web.service` are not renamed merely to match operator terminology; their human-readable meaning must still use the canonical vocabulary above.
 
 ## BFF — Backend for Frontend
 
@@ -88,9 +93,9 @@ BFF does not decide which fleet endpoint an alias means. That mapping belongs to
 Manager is the Managed Mode routing source of truth:
 
 ```text
-ppu-a -> configured PPU A Gateway
-ppu-b -> configured PPU B Gateway
-ppu-c -> configured PPU C Gateway
+ppu-a -> configured Plasma Gateway Endpoint for PPU A
+ppu-b -> configured Plasma Gateway Endpoint for PPU B
+ppu-c -> configured Plasma Gateway Endpoint for PPU C
 ```
 
 The browser identifies the configured managed PPU by alias/identity. Manager resolves that alias from its registry and forwards only explicitly allowlisted Plasma domain routes.
@@ -108,32 +113,32 @@ Current relay families cover the Managed Mode production needs for:
 - Programming Asset cache check/upload;
 - Job submit/status/cancel/readback;
 - Batch create/status/cancel and target cancellation;
-- Gateway communication-policy reads needed by runtime observation;
+- Plasma Gateway communication-policy reads needed by runtime observation;
 - authenticated Principal introspection;
 - PS real-path Loopback.
 
-The allowlist is intentionally narrower than the PPU Gateway's complete local API surface.
+The allowlist is intentionally narrower than the Plasma Gateway API's complete local surface.
 
-## PPU Gateway
+## Plasma Gateway
 
-Each physical PPU owns its own Gateway. In the target Z2 product:
+Each physical PPU owns one Plasma Gateway. In the target Z2 product:
 
 ```text
 PPU / Z2
-├── PPU Gateway
+├── Plasma Gateway
 ├── Plasma Server
 ├── PS runtime
 ├── PL / FPGA
 └── Sites / target ICs
 ```
 
-The Gateway answers:
+The Plasma Gateway answers:
 
 > What request is this Programmer being asked to execute, and how is it translated to the local runtime?
 
 It knows one PPU. It does not know which other PPUs exist and does not own fleet selection.
 
-The PPU secure Gateway remains the execution authorization authority. Manager/BFF preserve the browser's authorization and idempotency evidence; they do not replace the PPU's Principal/permission/scope/replay checks.
+The secure Plasma Gateway remains the execution authorization authority. Manager/BFF preserve the browser's authorization and idempotency evidence; they do not replace the PPU's Principal/permission/scope/replay checks.
 
 ## Deployment modes
 
@@ -150,7 +155,7 @@ Mac / industrial PC / server / VM
        | network
        v
 PPU / Z2
-├── PPU Gateway
+├── Plasma Gateway
 ├── Plasma Server
 ├── PS
 ├── PL
@@ -159,7 +164,7 @@ PPU / Z2
 
 When Manager routing is configured, the shared Workspace API base is the same-origin managed BFF path. PMode, EMode and Loopback therefore use the same routing ownership.
 
-Manager failure in Managed Mode is fail-closed. The Console must not silently switch to a stored direct PPU URL.
+Manager failure in Managed Mode is fail-closed. The Console must not silently switch to a stored direct Plasma Gateway Endpoint.
 
 ### Standalone Mode
 
@@ -169,7 +174,7 @@ A PPU remains autonomous:
 Local client / local PPU Console
         |
         v
-PPU Gateway
+Plasma Gateway
         |
         v
 Plasma Server
@@ -178,7 +183,7 @@ Plasma Server
 PS -> PL -> Site -> IC
 ```
 
-Standalone Mode may explicitly use a direct Gateway API base. This is a distinct operating mode, not an automatic Managed Mode fallback.
+Standalone Mode may explicitly use a direct Plasma Gateway API base. This is a distinct operating mode, not an automatic Managed Mode fallback.
 
 ## Programming route
 
@@ -194,7 +199,7 @@ BFF
 Plasma Manager
       |  resolve configured ppu_alias
       v
-PPU Gateway
+Plasma Gateway
       |
       v
 Plasma Server
@@ -218,7 +223,7 @@ Site electrical / protocol path
 Target IC
 ```
 
-PMode and EMode share the same Workspace API base. Managed routing no longer uses a target PPU URL as the browser source of truth.
+PMode and EMode share the same Workspace API base. Managed routing no longer uses a target Plasma Gateway Endpoint as the browser source of truth.
 
 ## Programming Asset / Image route — Phase 1
 
@@ -234,7 +239,7 @@ BFF
 Plasma Manager
       |
       v
-PPU Gateway
+Plasma Gateway
       |
       v
 Programming Asset / Batch contract
@@ -246,7 +251,7 @@ PPU cache / Programming Runtime
 There are currently **two production Web REST representations** above that common route, and they must not be conflated:
 
 1. **EMode / individual Engineering Job** — the browser performs Programming Asset cache check/upload using `application/octet-stream`; Jobs subsequently reference `asset_sha256`.
-2. **PMode / server-side Batch** — the existing Batch REST contract carries one bounded Programming Asset inside the Batch JSON as `asset_base64`, together with declared size and SHA-256. The PPU Gateway decodes the Asset, validates its size/hash, and caches it for the Batch targets before execution.
+2. **PMode / server-side Batch** — the existing Batch REST contract carries one bounded Programming Asset inside the Batch JSON as `asset_base64`, together with declared size and SHA-256. The Plasma Gateway decodes the Asset, validates its size/hash, and caches it for the Batch targets before execution.
 
 Manager does **not** introduce or transform either representation. BFF and Manager forward the incoming request body without decoding/re-encoding the Programming Asset. In particular, the PMode Base64 envelope is an existing Batch API contract, not a Manager-specific transport protocol.
 
@@ -263,7 +268,7 @@ Browser-computed source SHA-256
 PMode Batch:
 Browser-computed source SHA-256 + declared size
         -> Batch JSON asset envelope
-        -> PPU Gateway decode + size/SHA validation
+        -> Plasma Gateway decode + size/SHA validation
         -> per-target PPU cache / Batch execution
 ```
 
@@ -281,7 +286,7 @@ Managed PS Loopback uses the same Workspace base and same BFF/Manager relay as P
 Control Console
  -> BFF
  -> Manager
- -> PPU Gateway
+ -> Plasma Gateway
  -> Plasma Server
       |
       v
@@ -329,13 +334,13 @@ A PASS claim stops at the deepest real endpoint traversed:
 
 ```text
 PS Loopback PASS
-Console -> BFF -> Manager -> PPU Gateway -> Server -> PS
+Console -> BFF -> Manager -> Plasma Gateway -> Server -> PS
 
 PL Loopback PASS
-Console -> BFF -> Manager -> PPU Gateway -> Server -> PS -> PL
+Console -> BFF -> Manager -> Plasma Gateway -> Server -> PS -> PL
 
 IC Loopback PASS
-Console -> BFF -> Manager -> PPU Gateway -> Server -> PS -> PL -> IC
+Console -> BFF -> Manager -> Plasma Gateway -> Server -> PS -> PL -> IC
 ```
 
 Therefore:
@@ -357,9 +362,9 @@ PS Loopback PASS does not prove Programming Job semantics, PL behavior, socket/e
 - Manager resolves PPU alias only from its registry.
 - Manager routes are explicit allowlisted domain paths and methods.
 - `Authorization`, `Idempotency-Key`, content type and accepted response type are preserved where required.
-- The PPU secure Gateway remains authoritative for Principal, permission, Facility/PPU/Site scope and replay/idempotency enforcement.
+- The secure Plasma Gateway remains authoritative for Principal, permission, Facility/PPU/Site scope and replay/idempotency enforcement.
 - Managed Mode never silently falls back to direct PPU routing.
-- Programming and Loopback share the same BFF -> Manager -> PPU Gateway boundary.
+- Programming and Loopback share the same BFF -> Manager -> Plasma Gateway boundary.
 - PL/IC diagnostics fail closed until real paths exist.
 - Mock success is never substituted for physical-path evidence.
 - Programming Asset/Image identity must remain bound to the Job/Batch that consumes it.
@@ -372,7 +377,7 @@ Manager / BFF unavailable
     -> already accepted PPU Jobs continue locally
     -> explicit Standalone/local PPU maintenance remains possible
 
-One PPU Gateway unavailable
+One Plasma Gateway unavailable
     -> that PPU loses managed access
     -> other PPUs remain independent
 
