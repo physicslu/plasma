@@ -40,9 +40,13 @@ export function managerApiBase(): string {
   return url.toString().replace(/\/$/, "");
 }
 
+function validPpuAlias(alias: string): boolean {
+  return Boolean(alias.trim() && alias.length <= 128 && !alias.includes("/") && !alias.includes("\\"));
+}
+
 export function managerPpuAlias(): string {
   const alias = (process.env.PLASMA_MANAGER_PPU_ALIAS ?? "").trim();
-  if (!alias || alias.length > 128 || alias.includes("/") || alias.includes("\\")) {
+  if (!validPpuAlias(alias)) {
     throw new Error("PLASMA_MANAGER_PPU_ALIAS must identify one enrolled PPU alias");
   }
   return alias;
@@ -147,6 +151,30 @@ export async function relayManagerPpuRequest(request: Request, targetPath: strin
   return await relayManagerRequest(request, target, bodyAllowed);
 }
 
+export async function relayManagerPpuAliasRequest(
+  request: Request,
+  alias: string,
+  targetPath: string,
+): Promise<Response> {
+  const normalizedAlias = alias.trim();
+  if (!validPpuAlias(normalizedAlias)) {
+    return json(400, {
+      ok: false,
+      error: { code: "invalid_alias", message: "PPU registry alias is invalid" },
+    });
+  }
+  if (!targetPath.startsWith("/api/")) {
+    return json(404, {
+      ok: false,
+      error: { code: "managed_route_not_allowed", message: "Managed PPU path must remain under /api" },
+    });
+  }
+  const incoming = new URL(request.url);
+  const target = `/api/ppus/${encodeURIComponent(normalizedAlias)}/gateway${targetPath}${incoming.search}`;
+  const bodyAllowed = request.method !== "GET" && request.method !== "HEAD";
+  return await relayManagerRequest(request, target, bodyAllowed, true);
+}
+
 export async function relayManagerRegistryRequest(request: Request, alias?: string): Promise<Response> {
   if (!["GET", "POST", "PATCH", "DELETE"].includes(request.method)) {
     return json(405, {
@@ -154,7 +182,7 @@ export async function relayManagerRegistryRequest(request: Request, alias?: stri
       error: { code: "method_not_allowed", message: "Manager registry BFF method is not allowed" },
     });
   }
-  if (alias && (!alias.trim() || alias.length > 128 || alias.includes("/") || alias.includes("\\"))) {
+  if (alias && !validPpuAlias(alias)) {
     return json(400, {
       ok: false,
       error: { code: "invalid_alias", message: "PPU registry alias is invalid" },
