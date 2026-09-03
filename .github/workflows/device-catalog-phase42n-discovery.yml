@@ -1,0 +1,61 @@
+name: Device catalog Phase 4.2N STM32F469/479 I-pin discovery
+
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2n-next-admission]
+    paths:
+      - ".github/workflows/device-catalog-phase42n-discovery.yml"
+      - "data/device-catalog/research/stm32f4-phase4.2n-f469-f479-i-admission-manifest.json"
+  workflow_dispatch:
+
+permissions: {contents: read}
+
+jobs:
+  discover:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install browser runtime
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Acquire official ST discovery evidence
+        run: |
+          set +e
+          mkdir -p /tmp/phase42n
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
+            --manifest data/device-catalog/research/stm32f4-phase4.2n-f469-f479-i-admission-manifest.json \
+            --catalog data/device-catalog/research/openocd-parts-canonical.csv \
+            --output /tmp/phase42n/pilot-summary.json --scope pilot --headed --timeout 45 --delay 2
+          rc=$?
+          printf '%s\n' "$rc" > /tmp/phase42n/acquisition-exit-code.txt
+          exit 0
+      - name: Hash discovery output
+        if: always()
+        run: cd /tmp/phase42n && sha256sum * > SHA256SUMS || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase42n-stm32f469-f479-i-discovery
+          path: /tmp/phase42n
+          if-no-files-found: error
+          retention-days: 30
+      - name: Enforce discovery result
+        if: always()
+        run: |
+          test "$(cat /tmp/phase42n/acquisition-exit-code.txt)" = "0"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('/tmp/phase42n/pilot-summary.json').read_text())
+          expected={'STM32F479ZG','STM32F469IE','STM32F469IG','STM32F469II','STM32F479IG','STM32F479II'}
+          got={x.get('base_device') for x in data.get('results',[])}
+          if data.get('acquisition_failure') != 0 or got != expected:
+              raise SystemExit({'failures':data.get('acquisition_failure'),'targets':sorted(got)})
+          if data.get('ambiguous_match_count',0) != 0 or data.get('unmapped_count',0) != 0:
+              raise SystemExit('mapping ambiguity or unmapped candidate')
+          PY
