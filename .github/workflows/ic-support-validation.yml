@@ -18,11 +18,6 @@ on:
       - "software/python/tests/test_execution_router.py"
       - "software/python/tests/test_openocd_plan.py"
       - "software/python/tests/test_openocd_executor.py"
-      - "docs/architecture/ic-support-profile-architecture.md"
-      - "docs/architecture/ic-support-coverage-normalization.md"
-      - "docs/architecture/ic-support-runtime-resolver.md"
-      - "docs/architecture/ic-support-openocd-plan-compiler.md"
-      - "docs/architecture/ic-support-openocd-plan-executor.md"
       - ".github/workflows/ic-support-validation.yml"
   pull_request:
     paths:
@@ -39,12 +34,11 @@ on:
       - "software/python/tests/test_execution_router.py"
       - "software/python/tests/test_openocd_plan.py"
       - "software/python/tests/test_openocd_executor.py"
-      - "docs/architecture/ic-support-profile-architecture.md"
-      - "docs/architecture/ic-support-coverage-normalization.md"
-      - "docs/architecture/ic-support-runtime-resolver.md"
-      - "docs/architecture/ic-support-openocd-plan-compiler.md"
-      - "docs/architecture/ic-support-openocd-plan-executor.md"
       - ".github/workflows/ic-support-validation.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
