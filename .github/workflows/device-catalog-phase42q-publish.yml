@@ -1,0 +1,46 @@
+name: Device catalog Phase 4.2Q controlled Production publish
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2q-vh-admission-batch2]
+    paths: [".github/workflows/device-catalog-phase42q-publish.yml"]
+  workflow_dispatch:
+permissions: {actions: read, contents: write}
+jobs:
+  publish:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/device-catalog-phase4.2q-vh-admission-batch2, fetch-depth: 0}
+      - uses: actions/download-artifact@v4
+        with: {name: phase42q-admission-proposal, path: /tmp/phase42q, repository: physicslu/plasma, run-id: 33737023122, github-token: "${{ secrets.GITHUB_TOKEN }}"}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Publish exact bound proposal
+        run: |
+          PYTHONPATH=data/device-catalog/research python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from device_catalog_admission_framework import read_csv,write_canonical_dataset
+          from device_catalog_pipeline_framework import pipeline_plan_is_clean
+          root=Path('data/device-catalog/research'); canonical=root/'stm32f4-commercial-icpn.csv'; evidence=root/'evidence/stm32f4-phase4.2q-vh-admission-batch2-live-2026-09-03'
+          raw=Path('/tmp/phase42q/admission-plan.json').read_bytes(); sha=hashlib.sha256(raw).hexdigest()
+          if sha!='5e89433425228adf250ceda168eb4030638b9b5e3d07f5b79c1dd6afead9444b': raise SystemExit('proposal hash mismatch')
+          plan=json.loads(raw); expected={i['icpn'] for i in plan['candidates']}
+          if len(expected)!=21 or not pipeline_plan_is_clean(plan): raise SystemExit('unclean plan')
+          _,rows=read_csv(canonical)
+          if len(rows)!=283 or len({r['base_device'] for r in rows})!=96: raise SystemExit('pre-state mismatch')
+          result=write_canonical_dataset(plan=plan,canonical_path=canonical)
+          _,after=read_csv(canonical)
+          if result['rows_after']!=304 or len({r['base_device'] for r in after})!=100: raise SystemExit('post-state mismatch')
+          (evidence/'admission-plan.json').write_bytes(raw)
+          summary={'schema_version':1,'phase':'4.2Q','proposal_run_id':33737023122,'proposal_artifact_id':9886134721,'proposal_artifact_zip_sha256':'a6cc9c37433463f9ea4bb2c801f8eabd0cb08fbec0f102453cc9a9f4e47b059d','admission_plan_sha256':sha,'production_rows_before':283,'production_rows_after':304,'production_base_devices_before':96,'production_base_devices_after':100,'added_exact_icpns':sorted(expected),'lifecycle_exclusions':['STM32F413VGH3'],'canonical_csv_file_sha256':hashlib.sha256(canonical.read_bytes()).hexdigest(),'status':'published'}
+          (evidence/'publish-summary.json').write_text(json.dumps(summary,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Commit publish
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32f4-commercial-icpn.csv data/device-catalog/research/evidence/stm32f4-phase4.2q-vh-admission-batch2-live-2026-09-03/admission-plan.json data/device-catalog/research/evidence/stm32f4-phase4.2q-vh-admission-batch2-live-2026-09-03/publish-summary.json
+          git commit -m 'device-catalog: admit Phase 4.2Q V/H batch2 ICPNs'
+          git push origin HEAD:agent/device-catalog-phase4.2q-vh-admission-batch2
