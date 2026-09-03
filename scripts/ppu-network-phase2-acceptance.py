@@ -195,8 +195,9 @@ data = None if body_json == "" else body_json.encode()
 headers = {"Accept":"application/json"}
 if data is not None: headers["Content-Type"] = "application/json"
 req = urllib.request.Request(url, data=data, headers=headers, method=method)
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 try:
-    with urllib.request.urlopen(req, timeout=1.2) as r:
+    with opener.open(req, timeout=1.2) as r:
         raw=r.read(); payload=json.loads(raw) if raw else None
         print(json.dumps({"reachable":True,"status":r.status,"payload":payload}, sort_keys=True))
 except urllib.error.HTTPError as e:
