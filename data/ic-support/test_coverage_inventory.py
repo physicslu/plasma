@@ -37,13 +37,13 @@ def test_current_production_metrics() -> None:
     inventory = module.build_inventory()
     metrics = inventory["metrics"]
 
-    assert metrics["exact_icpns"] == 382
+    assert metrics["exact_icpns"] == 396
     assert metrics["families"] == 2
-    assert metrics["family_exact_icpns"] == {"STM32F1": 75, "STM32F4": 307}
-    assert metrics["base_devices"] == 119
-    assert metrics["deterministic_openocd_exact_icpns"] == 382
+    assert metrics["family_exact_icpns"] == {"STM32F1": 75, "STM32F4": 321}
+    assert metrics["base_devices"] == 123
+    assert metrics["deterministic_openocd_exact_icpns"] == 396
     assert metrics["ic_support_bound_exact_icpns"] == 2
-    assert metrics["unresolved_programming_profile_exact_icpns"] == 380
+    assert metrics["unresolved_programming_profile_exact_icpns"] == 394
     assert metrics["evidence_backed_programming_profiles"] == 1
     assert metrics["native_ppu_runtime_ready_exact_icpns"] == 0
     assert inventory["programming_profile_ids"] == ["stm32f1-medium-density-flash-v0"]
