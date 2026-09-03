@@ -37,6 +37,13 @@ test("PPU identity and Site topology remain Manager-observed rather than manuall
   assert.doesNotMatch(ppuSite, /Enable All|Disable All/);
 });
 
+test("PPU management names the northbound service Plasma Gateway", () => {
+  assert.match(ppuSite, /Plasma Gateway Endpoint/);
+  assert.match(ppuSite, /Add a Plasma Gateway to the Manager registry/);
+  assert.match(ppuSite, /<th>Plasma Gateway<\/th>/);
+  assert.doesNotMatch(ppuSite, /<span>Gateway Endpoint<\/span>|<dt>Gateway Endpoint<\/dt>|<th>Gateway<\/th>/);
+});
+
 test("PPU network desired state is rendered inside PPU/Site management", () => {
   assert.match(ppuSite, /import PpuNetworkConfiguration/);
   assert.match(ppuSite, /<PpuNetworkConfiguration/);
@@ -44,6 +51,14 @@ test("PPU network desired state is rendered inside PPU/Site management", () => {
   assert.match(ppuNetwork, /PPU Network Configuration/);
   assert.match(ppuNetwork, /Save Desired Network/);
   assert.match(ppuNetwork, /Running <code>eth0<\/code> was not activated/);
+});
+
+test("PPU network UI distinguishes Linux Default Gateway from the Plasma Gateway service", () => {
+  assert.match(ppuNetwork, /<span>Default Gateway<\/span>/);
+  assert.match(ppuNetwork, /aria-label="PPU static default gateway"/);
+  assert.match(ppuNetwork, /Default Gateway is the Linux Layer-3 next-hop router/);
+  assert.match(ppuNetwork, /It is not the Plasma Gateway service running on this PPU/);
+  assert.doesNotMatch(ppuNetwork, /<span>Gateway<\/span>/);
 });
 
 test("PPU network browser client uses alias-scoped Manager BFF and never calls activation directly", () => {
