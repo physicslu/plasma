@@ -44,6 +44,7 @@ RETIRED_CURRENT_GUIDANCE_PHRASES = (
     "Python REST Gateway",
     "Plasma Python Web Gateway",
     "Python Gateway API",
+    "Plasma Web REST Gateway",
     "Plasma Programmer Console",
     "prototype currently enables CH0",
     "Prototype currently enables CH0",
@@ -100,7 +101,7 @@ def test_canonical_guidance_uses_current_protocol(relative_path: str) -> None:
         ),
         (
             "AGENTS.md",
-            ("Facility", "PPU", "SITE 1", "Protocol v3.3", "Plasma Web REST Gateway", "Plasma Manager"),
+            ("Facility", "PPU", "SITE 1", "Protocol v3.3", "Plasma Gateway", "Plasma Manager"),
         ),
         (
             "software/README.md",
@@ -124,7 +125,7 @@ def test_canonical_guidance_uses_current_protocol(relative_path: str) -> None:
         ),
         (
             "software/web/README.md",
-            ("Plasma PPU Console", "SITE 1", "Protocol v3.3", "Programming Asset", "Plasma Web REST Gateway"),
+            ("Plasma PPU Console", "SITE 1", "Protocol v3.3", "Programming Asset", "Plasma Gateway"),
         ),
         (
             "docs/architecture/ppu-facility-sites.md",
@@ -136,7 +137,7 @@ def test_canonical_guidance_uses_current_protocol(relative_path: str) -> None:
         ),
         (
             "docs/development/swpc-deployment.md",
-            ("Plasma PPU Programming Server", "Plasma Web REST Gateway", "v3.3", "Web REST API Contract v3"),
+            ("Plasma PPU Programming Server", "Plasma Gateway", "v3.3", "Web REST API Contract v3"),
         ),
         ("pl/README.md", ("Programming Site", "rtl/site/")),
     ),
@@ -149,6 +150,23 @@ def test_current_guidance_states_the_canonical_baseline(
 
     for phrase in required:
         assert phrase in text, f"{relative_path} is missing canonical baseline text: {phrase}"
+
+
+def test_canonical_gateway_terminology_separates_service_endpoint_and_linux_route() -> None:
+    agents = _read("AGENTS.md")
+    ppu_network = _read("docs/architecture/ppu-network-configuration.md")
+
+    for phrase in (
+        "Plasma Gateway",
+        "Plasma Gateway API",
+        "Plasma Gateway Endpoint",
+        "Default Gateway",
+    ):
+        assert phrase in agents, f"AGENTS.md is missing canonical gateway terminology: {phrase}"
+
+    assert "Default Gateway" in ppu_network
+    assert "Plasma Gateway service" in ppu_network
+    assert '"gateway"' in ppu_network
 
 
 def test_canonical_architecture_examples_are_one_based() -> None:
