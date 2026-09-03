@@ -13,6 +13,7 @@ if str(HERE) not in sys.path:
 
 from stm32f4_admission_policy import _package_and_pins
 from stm32f4_coverage_gap_inventory import build_inventory
+from stm32f4_historical_replay import admitted_after_phase42
 
 CATALOG = HERE / "openocd-parts-canonical.csv"
 CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
@@ -22,32 +23,12 @@ PHASE42I_ADMITTED = {
     "STM32F405OGY6TR",
     "STM32F415OGY6TR",
 }
-POST_PHASE42I_ADMITTED = {
-    "STM32F407IEH6",
-    "STM32F407IEH6TR",
-    "STM32F407IEH7",
-    "STM32F407IET6",
-    "STM32F407IGH6",
-    "STM32F407IGH6TR",
-    "STM32F407IGH7",
-    "STM32F407IGT6",
-    "STM32F407IGT7",
-    "STM32F417IEH6",
-    "STM32F417IET6",
-    "STM32F417IGH6",
-    "STM32F417IGH6TR",
-    "STM32F417IGT6",
-    "STM32F417IGT7",
-}
-
-
 class STM32F4Phase42HOYWLCSP90PolicyTests(unittest.TestCase):
     def _historical_pre_phase42i(self, directory: Path) -> Path:
-        later_admissions = PHASE42I_ADMITTED | POST_PHASE42I_ADMITTED
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if row["icpn"] not in later_admissions]
+            rows = [row for row in reader if not admitted_after_phase42(row, "h")]
         self.assertEqual(len(rows), 208)
 
         historical = directory / "stm32f4-commercial-icpn.csv"
