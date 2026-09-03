@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2l-f427-f429-i-admission-2026-09-03",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production-admitted lifecycle control retained from prior STM32F4 bounded admissions"
+    },
+    {
+      "base_device": "STM32F427IG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ig.html",
+      "selection_reason": "policy-ready after merged Phase 4.2J I/H UFBGA176 and I/T LQFP176 mappings"
+    },
+    {
+      "base_device": "STM32F427II",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ii.html",
+      "selection_reason": "same STM32F427 I-pin policy surface; exact identity and lifecycle require independent evidence"
+    },
+    {
+      "base_device": "STM32F429IE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ie.html",
+      "selection_reason": "policy-ready STM32F429 512 KiB I-pin member in the bounded family batch"
+    },
+    {
+      "base_device": "STM32F429IG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ig.html",
+      "selection_reason": "policy-ready STM32F429 1024 KiB I-pin member; lifecycle must be evaluated per exact ICPN"
+    },
+    {
+      "base_device": "STM32F429II",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ii.html",
+      "selection_reason": "policy-ready STM32F429 2048 KiB I-pin member; no equivalence inferred from sibling devices"
+    }
+  ]
+}
