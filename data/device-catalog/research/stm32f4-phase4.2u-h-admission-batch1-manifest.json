@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2u-h-admission-batch1-2026-09-03",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production lifecycle control"
+    },
+    {
+      "base_device": "STM32F413CH",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413ch.html",
+      "selection_reason": "Phase 4.2R policy-ready H=1536 KiB batch1"
+    },
+    {
+      "base_device": "STM32F413RH",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413rh.html",
+      "selection_reason": "Phase 4.2R policy-ready H=1536 KiB batch1"
+    },
+    {
+      "base_device": "STM32F413VH",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413vh.html",
+      "selection_reason": "Phase 4.2R policy-ready H=1536 KiB batch1"
+    },
+    {
+      "base_device": "STM32F413ZH",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413zh.html",
+      "selection_reason": "Phase 4.2R policy-ready H=1536 KiB batch1"
+    }
+  ],
+  "admission_scope": {
+    "family": "STM32F4",
+    "base_devices": ["STM32F413CH", "STM32F413RH", "STM32F413VH", "STM32F413ZH"],
+    "production_exact_icpns_before": 307,
+    "production_base_devices_before": 101,
+    "fail_closed": true
+  }
+}
