@@ -1,0 +1,30 @@
+name: Device catalog Phase 4.2P admission proposal
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2p-vh-admission-batch1]
+    paths: [".github/workflows/device-catalog-phase42p-proposal.yml"]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  propose:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/device-catalog-phase4.2p-vh-admission-batch1}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Build proposal
+        run: |
+          mkdir -p /tmp/phase42p
+          PYTHONPATH=data/device-catalog/research python data/device-catalog/research/stm32f4_admission.py --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2p-vh-admission-batch1-live-2026-09-03 --baseline data/device-catalog/research/stm32f4-phase4.2p-vh-admission-batch1-baseline.json --admit-base STM32F401VB --admit-base STM32F401VC --admit-base STM32F401VD --admit-base STM32F401VE --admit-base STM32F411VC --output /tmp/phase42p/admission-plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/phase42p/admission-plan.json').read_text())
+          if p['candidate_count'] != 18 or p['decision_counts'] != {'admit':18,'already_present':0,'manual_review_required':0,'reject':0} or p['conflicts'] != 0 or p['canonical_rows_before'] != 265:
+              raise SystemExit('unclean Phase 4.2P plan')
+          PY
+          cd /tmp/phase42p && sha256sum admission-plan.json > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with: {name: phase42p-admission-proposal, path: /tmp/phase42p, if-no-files-found: error, retention-days: 30}
