@@ -192,3 +192,24 @@ export async function relayManagerRegistryRequest(request: Request, alias?: stri
   const bodyAllowed = request.method === "POST" || request.method === "PATCH";
   return await relayManagerRequest(request, `/api/registry${suffix}`, bodyAllowed, true);
 }
+
+export async function relayManagerNetworkCommissioningRequest(
+  request: Request,
+  alias: string,
+): Promise<Response> {
+  const normalizedAlias = alias.trim();
+  if (!validPpuAlias(normalizedAlias)) {
+    return json(400, {
+      ok: false,
+      error: { code: "invalid_alias", message: "PPU registry alias is invalid" },
+    });
+  }
+  if (!["GET", "POST"].includes(request.method)) {
+    return json(405, {
+      ok: false,
+      error: { code: "method_not_allowed", message: "Network commissioning supports GET and POST only" },
+    });
+  }
+  const target = `/api/registry/${encodeURIComponent(normalizedAlias)}/network-commissioning`;
+  return await relayManagerRequest(request, target, request.method === "POST", true);
+}
