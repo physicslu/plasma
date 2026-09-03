@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "phase": "4.2R",
+  "base_main": "daece3f23b5457705ee168987d4a23104dd3b557",
+  "scope": "read-only reprioritization of remaining STM32F4 ordering-pattern coverage gaps after Phase 4.2Q",
+  "locked_prestate": {
+    "stm32f1_exact_icpns": 75,
+    "stm32f4_exact_icpns": 304,
+    "total_st_exact_icpns": 379,
+    "stm32f4_production_base_devices": 100,
+    "stm32f4_openocd_ordering_pattern_base_devices": 149,
+    "stm32f4_gap_base_devices": 49
+  },
+  "fresh_inventory_required": true,
+  "next_policy_surface_selected": false,
+  "policy_change_applied": false,
+  "production_write_applied": false,
+  "algorithm_equivalence_claimed": false,
+  "governance": {
+    "fail_closed": true,
+    "rule": "Do not select a Phase 4.2R policy surface or admit any ICPN until a fresh inventory generated from this exact post-4.2Q main prestate has been inspected."
+  }
+}

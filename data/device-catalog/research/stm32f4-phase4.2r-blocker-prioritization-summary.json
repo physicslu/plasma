@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "phase": "4.2R",
+  "source": {
+    "base_main": "daece3f23b5457705ee168987d4a23104dd3b557",
+    "analysis_head": "a58c038aed1f74444bcf9e7ac83430e90b9ba7be",
+    "workflow_run_id": 33740067220,
+    "workflow_job_id": 100599646334,
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "production_canonical_sha256": "7629b95fdb8f324aaa4c3fced7e6fb951f77380dab939ed82d84b1c1c4caf9c3"
+  },
+  "current_state": {
+    "production_exact_icpn_rows": 304,
+    "production_base_device_count": 100,
+    "openocd_ordering_pattern_base_device_count": 149,
+    "gap_base_device_count": 49,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 49
+  },
+  "blocker_surface_counts": {
+    "unsupported STM32F4 package code: I": 2,
+    "unsupported STM32F4 pin/package combination: T/Y": 2,
+    "unsupported STM32F4 pin/package combination: M/Y": 5,
+    "unsupported STM32F4 pin/package combination: A/Y": 5,
+    "unsupported STM32F4 pin/package combination: B/T": 10,
+    "unsupported STM32F4 pin/package combination: N/H": 10,
+    "unsupported STM32F4 pin/package combination: A/H": 11,
+    "unsupported flash-size code 8": 3,
+    "unsupported flash-size code H": 10
+  },
+  "smallest_blocker_surfaces": [
+    {
+      "surface": "unsupported STM32F4 package code: I",
+      "affected_base_devices": ["STM32F410R8", "STM32F410RB"],
+      "immediately_unblocked_if_resolved": ["STM32F410RB"],
+      "additional_policy_semantics_required": true,
+      "still_blocked_after_resolution": {
+        "STM32F410R8": ["unsupported flash-size code 8"]
+      }
+    },
+    {
+      "surface": "unsupported STM32F4 pin/package combination: T/Y",
+      "affected_base_devices": ["STM32F410T8", "STM32F410TB"],
+      "immediately_unblocked_if_resolved": ["STM32F410TB"],
+      "additional_policy_semantics_required": false,
+      "still_blocked_after_mapping": {
+        "STM32F410T8": ["unsupported flash-size code 8"]
+      }
+    }
+  ],
+  "selected_next_surface": {
+    "policy_mapping": "T/Y -> WLCSP36",
+    "affected_base_devices": ["STM32F410T8", "STM32F410TB"],
+    "expected_policy_ready_after_mapping": ["STM32F410TB"],
+    "expected_gap_base_device_count": 49,
+    "expected_policy_ready_count": 1,
+    "expected_policy_blocked_count": 48,
+    "reason": "T/Y is tied for the smallest remaining blocker surface but, unlike package code I, requires no new package-code semantics. Official ST product/Q&R data for STM32F410TB and STM32F410T8 identifies Y-suffix parts as WLCSP36, and the STM32F410x8/B datasheet lists WLCSP36 for TBY/T8Y devices. STM32F410TB would become policy-ready; STM32F410T8 remains blocked by unsupported flash-size code 8.",
+    "official_st_product_urls": [
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f410t8.html"
+    ],
+    "official_st_datasheet_url": "https://www.st.com/resource/en/datasheet/stm32f410tb.pdf"
+  },
+  "policy_change_applied": false,
+  "production_write_applied": false,
+  "algorithm_equivalence_claimed": false
+}
