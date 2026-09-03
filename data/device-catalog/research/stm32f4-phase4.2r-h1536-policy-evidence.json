@@ -22,7 +22,16 @@
       "evidence": "Official product-line page states STM32F413/F423 devices carry 1024 to 1536 Kbytes of Flash memory."
     }
   ],
-  "newly_policy_ready": ["STM32F413VH", "STM32F423VH"],
+  "newly_policy_ready": [
+    "STM32F413CH",
+    "STM32F413RH",
+    "STM32F413VH",
+    "STM32F413ZH",
+    "STM32F423CH",
+    "STM32F423RH",
+    "STM32F423VH",
+    "STM32F423ZH"
+  ],
   "production_write_applied": false,
   "exact_icpn_admission_deferred": true,
   "algorithm_equivalence_claimed": false

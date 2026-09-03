@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2t-f410tb-admission-2026-09-03",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production lifecycle control"
+    },
+    {
+      "base_device": "STM32F410TB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html",
+      "selection_reason": "Phase 4.2S policy-ready T/Y WLCSP36 Base Device; sole current policy-ready STM32F4 gap"
+    }
+  ]
+}

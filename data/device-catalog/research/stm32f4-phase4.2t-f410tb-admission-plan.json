@@ -1,0 +1,172 @@
+{
+  "candidate_count": 3,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2t-f410tb-admission-2026-09-03-retained-20260903T095612Z-58e3ad1",
+        "evidence_section_sha256": "ba8a62fea182ee6cef89dad0d17d13bcd89c3c80bf4d4d0506c492ca77d8c007",
+        "rendered_dom_sha256": "8ff613a0be608084262a32edd43929cc7b594172605112d62c1f55533d5cbc05",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html"
+      },
+      "base_device": "STM32F410TB",
+      "base_mapping": {
+        "existing_identifier": "STM32F410TBYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F410TBY3TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F410TB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F410TBYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F410TBY3TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "36",
+        "series": "STM32F410",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html#plasma-evidence=stm32f4-phase4.2t-f410tb-admission-2026-09-03-retained-20260903T095612Z-58e3ad1",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2t-f410tb-admission-2026-09-03-retained-20260903T095612Z-58e3ad1",
+        "evidence_section_sha256": "ba8a62fea182ee6cef89dad0d17d13bcd89c3c80bf4d4d0506c492ca77d8c007",
+        "rendered_dom_sha256": "8ff613a0be608084262a32edd43929cc7b594172605112d62c1f55533d5cbc05",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html"
+      },
+      "base_device": "STM32F410TB",
+      "base_mapping": {
+        "existing_identifier": "STM32F410TBYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F410TBY6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F410TB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F410TBYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F410TBY6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "36",
+        "series": "STM32F410",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html#plasma-evidence=stm32f4-phase4.2t-f410tb-admission-2026-09-03-retained-20260903T095612Z-58e3ad1",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2t-f410tb-admission-2026-09-03-retained-20260903T095612Z-58e3ad1",
+        "evidence_section_sha256": "ba8a62fea182ee6cef89dad0d17d13bcd89c3c80bf4d4d0506c492ca77d8c007",
+        "rendered_dom_sha256": "8ff613a0be608084262a32edd43929cc7b594172605112d62c1f55533d5cbc05",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html"
+      },
+      "base_device": "STM32F410TB",
+      "base_mapping": {
+        "existing_identifier": "STM32F410TBYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F410TBY7TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F410TB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F410TBYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F410TBY7TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "36",
+        "series": "STM32F410",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html#plasma-evidence=stm32f4-phase4.2t-f410tb-admission-2026-09-03-retained-20260903T095612Z-58e3ad1",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 304,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 3,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase4.2t-f410tb-admission-2026-09-03-retained-20260903T095612Z-58e3ad1",
+  "family": "STM32F4",
+  "inputs": {
+    "admission_base_devices": [
+      "STM32F410TB"
+    ],
+    "baseline": "stm32f4-phase4.2t-f410tb-admission-baseline.json",
+    "baseline_sha256": "cc9c9cabe4e1ad3b02df2c23b85cb2beb9a69654c406ff4357e73da3d9ce3fe9",
+    "canonical_dataset": "stm32f4-commercial-icpn.csv",
+    "canonical_input_sha256": "c772ed36b4f019757adc68db3556adfa67ba34435087bd0548c7a21807ac9b3b",
+    "family_adapter": "stm32f4-phase3.1",
+    "mapping_catalog": "openocd-parts-canonical.csv",
+    "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "retained_evidence_directory": "stm32f4-phase4.2t-f410tb-admission-live-2026-09-03"
+  },
+  "issues": [],
+  "pipeline_expected_candidate_count": 3,
+  "schema_version": 1,
+  "source_provenance": {
+    "evidence_manifest_sha256": "6fb4a964a4696e51eaef75f81357195abd90d7a274ac7b661603d1a499e961cb",
+    "executed_git_sha": "58e3ad160217c5dc9051d6dd65be8e6e513d9804",
+    "repository": "physicslu/plasma"
+  }
+}
