@@ -102,6 +102,62 @@ The desired-state persistence file is:
 
 Updates use temporary-file write, flush, `fsync`, and atomic replacement. The in-memory desired state changes only after persistence succeeds. An invalid existing persistence file fails closed during Gateway startup.
 
+## Control Station desired-state integration
+
+The EMode `PPU / SITE Configuration` surface can read and persist the selected PPU's desired network state through the existing Manager-owned control path:
+
+```text
+Control Console
+  -> same-origin Manager BFF
+  -> Manager alias-scoped allowlisted relay
+  -> selected PPU Gateway
+  -> GET/POST /api/settings/ppu-network
+```
+
+The Browser supplies the selected Manager registry alias, not a destination URL. The Manager resolves the registered PPU endpoint and remains the routing owner. The current relay exposes only the exact desired-state resource; the Browser does not receive an arbitrary Manager reverse-proxy capability.
+
+A desired-state write through this surface requires the PPU registry lifecycle to be `commissioned` (`Validate & Enable` completed). The Console also disables the edit while it has evidence of active Site execution or an active network activation transaction. The PPU Gateway remains the authoritative validator and persistence owner.
+
+The panel displays:
+
+- fixed interface `eth0`;
+- desired revision and mode;
+- static IPv4 fields when applicable;
+- activation support/state;
+- last committed activation revision when available.
+
+The operator action is deliberately named **Save Desired Network**. It means only:
+
+```text
+validate desired values
+-> persist PPU-owned desired settings
+-> return new desired revision
+```
+
+It does **not** mean:
+
+```text
+mutate Linux eth0
+change the Manager registry endpoint
+prove candidate reachability
+commit an activation
+```
+
+The Browser intentionally does not call `/api/settings/ppu-network/activation` directly. A safe endpoint migration crosses two durable ownership domains — PPU network state and Manager registry endpoint state — and must therefore be owned by a Manager commissioning transaction rather than a sequence of loosely coupled Browser requests.
+
+The next commissioning gate is a Manager-owned static IPv4 transaction:
+
+```text
+persist desired static network
+-> schedule PPU activation on old endpoint
+-> reconnect to deterministic candidate endpoint
+-> read /api/node and verify the same immutable ppu_id
+-> commit PPU activation
+-> reconcile the Manager registry endpoint durably
+```
+
+Failure before commit must leave explicit rollback/recovery evidence and must not silently repoint the Manager registry. DHCP remains valid as PPU desired state, but automatic DHCP endpoint migration is not claimed until Manager has a deterministic lease/discovery and same-identity reconnect contract.
+
 ## Phase 2 activation API
 
 Phase 2 adds a separate activation resource; a desired-state write is never reinterpreted as an already-applied configuration.

@@ -4,6 +4,7 @@ import test from "node:test";
 
 const engineering = await readFile(new URL("../app/engineering/page.tsx", import.meta.url), "utf8");
 const ppuSite = await readFile(new URL("../app/engineering/ppu-site-configuration.tsx", import.meta.url), "utf8");
+const ppuNetwork = await readFile(new URL("../app/engineering/ppu-network-configuration.tsx", import.meta.url), "utf8");
 const registryApi = await readFile(new URL("../app/engineering/ppu-registry-api.ts", import.meta.url), "utf8");
 const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
 const registryRoute = await readFile(new URL("../app/api/manager/registry/route.ts", import.meta.url), "utf8");
@@ -36,7 +37,26 @@ test("PPU identity and Site topology remain Manager-observed rather than manuall
   assert.doesNotMatch(ppuSite, /Enable All|Disable All/);
 });
 
-test("browser registry client exposes add, lifecycle and remove through same-origin BFF", () => {
+test("PPU network desired state is rendered inside PPU/Site management", () => {
+  assert.match(ppuSite, /import PpuNetworkConfiguration/);
+  assert.match(ppuSite, /<PpuNetworkConfiguration/);
+  assert.match(ppuSite, /hasActiveExecution=\{selectedHasActiveExecution\}/);
+  assert.match(ppuNetwork, /PPU Network Configuration/);
+  assert.match(ppuNetwork, /Save Desired Network/);
+  assert.match(ppuNetwork, /Running <code>eth0<\/code> was not activated/);
+});
+
+test("PPU network browser client uses alias-scoped Manager BFF and never calls activation directly", () => {
+  assert.match(registryApi, /getManagerPpuNetwork/);
+  assert.match(registryApi, /saveManagerPpuNetwork/);
+  assert.match(registryApi, /\/api\/manager\/registry\/\$\{encodeURIComponent\(alias\)\}\/network/);
+  assert.match(registryApi, /Idempotency-Key/);
+  assert.doesNotMatch(ppuNetwork, /\/api\/settings\/ppu-network\/activation/);
+  assert.doesNotMatch(ppuNetwork, /fetch\(/);
+  assert.match(ppuNetwork, /Manager-orchestrated apply/);
+});
+
+test("browser registry client exposes add, lifecycle, remove, and desired network settings through same-origin BFF", () => {
   assert.match(registryApi, /\/api\/manager\/registry/);
   assert.match(registryApi, /method: "POST"/);
   assert.match(registryApi, /method: "PATCH"/);
@@ -47,17 +67,21 @@ test("browser registry client exposes add, lifecycle and remove through same-ori
 test("Manager registry BFF remains loopback-only and mutation requires managed Control Station mode", () => {
   assert.match(managerBff, /LOOPBACK_HOSTS/);
   assert.match(managerBff, /relayManagerRegistryRequest/);
+  assert.match(managerBff, /relayManagerPpuAliasRequest/);
   assert.match(managerBff, /requireManagedMode = false/);
   assert.match(managerBff, /relayManagerRequest\(request, `\/api\/registry\$\{suffix\}`, bodyAllowed, true\)/);
   assert.match(managerBff, /PLASMA_CONTROL_STATION_MODE/);
   assert.match(managerBff, /PLASMA_MANAGER_API_URL/);
 });
 
-test("registry BFF routes expose only the expected Manager inventory methods", () => {
+test("registry BFF routes keep inventory mutations and alias-scoped network relay explicit", () => {
   assert.match(registryRoute, /export async function GET/);
   assert.match(registryRoute, /export async function POST/);
   assert.doesNotMatch(registryRoute, /export async function PATCH|export async function DELETE/);
+  assert.match(registryEntryRoute, /resource: "entry" \| "network"/);
+  assert.match(registryEntryRoute, /relayManagerPpuAliasRequest\(request, parsed\.alias, "\/api\/settings\/ppu-network"\)/);
+  assert.match(registryEntryRoute, /export async function GET/);
+  assert.match(registryEntryRoute, /export async function POST/);
   assert.match(registryEntryRoute, /export async function PATCH/);
   assert.match(registryEntryRoute, /export async function DELETE/);
-  assert.doesNotMatch(registryEntryRoute, /export async function GET|export async function POST/);
 });

@@ -49,6 +49,7 @@ _MANAGED_GET_PATTERNS = tuple(
         r"^/api/node$",
         r"^/api/status$",
         r"^/api/settings/gateway$",
+        r"^/api/settings/ppu-network$",
         r"^/api/mock/runtime$",
         r"^/api/security/me$",
         r"^/api/devices/search$",
@@ -63,6 +64,7 @@ _MANAGED_POST_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (
         r"^/api/settings/gateway$",
+        r"^/api/settings/ppu-network$",
         r"^/api/mock/runtime$",
         r"^/api/engineering/diagnostics/loopback$",
         r"^/api/engineering/session$",
