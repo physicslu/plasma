@@ -73,7 +73,7 @@ Current code and current guidance must not:
 - expose alternate Programmer/Channel product models;
 - write retired identity fields into canonical Site audit records;
 - use bare `Gateway` in network configuration when **Default Gateway** is meant;
-- use `PPU Gateway` or `Plasma Web REST Gateway` as the canonical product name when **Plasma Gateway** is meant;
+- use a PPU-prefixed or legacy Web/REST Gateway label as the canonical product name when **Plasma Gateway** is meant;
 - reintroduce compatibility aliases without an explicit new product requirement and versioned migration plan.
 
 The following remain independent from this naming policy:
