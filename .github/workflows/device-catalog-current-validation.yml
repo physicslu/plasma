@@ -1,0 +1,79 @@
+name: Device catalog current validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog.py"
+      - ".github/workflows/device-catalog-current-validation.yml"
+  pull_request:
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog.py"
+      - ".github/workflows/device-catalog-current-validation.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-current-device-catalog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Phase 4.1 R/T batch4 retained evidence and post-admission replay
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.1-rt-admission-batch4-live-2026-09-02 \
+            --baseline data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch4-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_admission_batch4_post_admission.py
+
+      - name: Validate Phase 4.2A C/T LQFP48 policy delta
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_2a_ct_lqfp48_policy.py
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py
+
+      - name: Validate Phase 4.2B STM32F410CB retained evidence
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2b-f410cb-admission-live-2026-09-02 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2b-f410cb-admission-baseline.json
+
+      - name: Validate Phase 4.2B post-admission lifecycle
+        run: python data/device-catalog/research/test_stm32f4_phase4_2b_f410cb_post_admission.py
+
+      - name: Preserve Phase 4.2A policy history for Phase 4.2B
+        run: python data/device-catalog/research/test_stm32f4_phase4_2a_ct_lqfp48_policy.py
+
+      - name: Validate Phase 4.2D R/Y WLCSP64 policy
+        run: python data/device-catalog/research/test_stm32f4_phase4_2d_ry_wlcsp64_policy.py
+
+      - name: Validate Phase 4.2E0 P-option routing
+        run: python data/device-catalog/research/test_stm32f4_phase4_2e0_p_option_routing.py
+
+      - name: Validate Phase 4.2F STM32F412RE/RG post-admission replay
+        run: python data/device-catalog/research/test_stm32f4_phase4_2f_f412re_rg_post_admission.py
+
+      - name: Validate Phase 4.2H O/Y policy and historical fail-closed boundary
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_2h_oy_wlcsp90_policy.py
+          python data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py
+
+      - name: Validate Phase 4.2I STM32F405O/415OG post-admission replay
+        run: python data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py
+
+      - name: Validate Phase 4.2J policy and historical boundaries
+        run: |
+          python data/device-catalog/research/test_stm32f4_phase4_2j_i_ht_176_policy.py
+          python data/device-catalog/research/test_stm32f4_phase4_2h_oy_wlcsp90_policy.py
+          python data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py
