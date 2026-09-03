@@ -1,0 +1,40 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F417IG",
+      "icpn": "STM32F417IGH6W",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "pilot_id": "stm32f4-phase4.2k-f407-f417-i-admission-2026-09-03",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9876768286",
+    "artifact_sha256": "4f0f5bdb69256ecc9002c787830b35d7149a19ae808137f6e4e8e7cd0266f4f9",
+    "source_pr": 316,
+    "workflow_run_id": "33710524134"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "exact_icpns": ["STM32F479ZGT6"]
+    },
+    {
+      "base_device": "STM32F407IE",
+      "exact_icpns": ["STM32F407IEH6", "STM32F407IEH6TR", "STM32F407IEH7", "STM32F407IET6"]
+    },
+    {
+      "base_device": "STM32F407IG",
+      "exact_icpns": ["STM32F407IGH6", "STM32F407IGH6TR", "STM32F407IGH7", "STM32F407IGT6", "STM32F407IGT7"]
+    },
+    {
+      "base_device": "STM32F417IE",
+      "exact_icpns": ["STM32F417IEH6", "STM32F417IET6"]
+    },
+    {
+      "base_device": "STM32F417IG",
+      "exact_icpns": ["STM32F417IGH6", "STM32F417IGH6TR", "STM32F417IGT6", "STM32F417IGT7"]
+    }
+  ]
+}
