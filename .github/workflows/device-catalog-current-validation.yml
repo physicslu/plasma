@@ -38,7 +38,7 @@ jobs:
             --baseline data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch4-baseline.json
           python data/device-catalog/research/test_stm32f4_phase4_1_rt_admission_batch4_post_admission.py
 
-      - name: Validate Phase 4.2A C/T LQFP48 policy delta
+      - name: Validate Phase 4.2A C/T LQFP48 policy delta and historical boundary
         run: |
           python data/device-catalog/research/test_stm32f4_phase4_2a_ct_lqfp48_policy.py
           python data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py
@@ -52,9 +52,6 @@ jobs:
       - name: Validate Phase 4.2B post-admission lifecycle
         run: python data/device-catalog/research/test_stm32f4_phase4_2b_f410cb_post_admission.py
 
-      - name: Preserve Phase 4.2A policy history for Phase 4.2B
-        run: python data/device-catalog/research/test_stm32f4_phase4_2a_ct_lqfp48_policy.py
-
       - name: Validate Phase 4.2D R/Y WLCSP64 policy
         run: python data/device-catalog/research/test_stm32f4_phase4_2d_ry_wlcsp64_policy.py
 
@@ -64,16 +61,11 @@ jobs:
       - name: Validate Phase 4.2F STM32F412RE/RG post-admission replay
         run: python data/device-catalog/research/test_stm32f4_phase4_2f_f412re_rg_post_admission.py
 
-      - name: Validate Phase 4.2H O/Y policy and historical fail-closed boundary
-        run: |
-          python data/device-catalog/research/test_stm32f4_phase4_2h_oy_wlcsp90_policy.py
-          python data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py
+      - name: Validate Phase 4.2H O/Y WLCSP90 policy
+        run: python data/device-catalog/research/test_stm32f4_phase4_2h_oy_wlcsp90_policy.py
 
       - name: Validate Phase 4.2I STM32F405O/415OG post-admission replay
         run: python data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py
 
-      - name: Validate Phase 4.2J policy and historical boundaries
-        run: |
-          python data/device-catalog/research/test_stm32f4_phase4_2j_i_ht_176_policy.py
-          python data/device-catalog/research/test_stm32f4_phase4_2h_oy_wlcsp90_policy.py
-          python data/device-catalog/research/test_stm32f4_phase4_2i_f405o_f415og_post_admission.py
+      - name: Validate Phase 4.2J I/HT176 policy
+        run: python data/device-catalog/research/test_stm32f4_phase4_2j_i_ht_176_policy.py
