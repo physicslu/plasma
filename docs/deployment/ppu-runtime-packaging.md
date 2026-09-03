@@ -9,7 +9,7 @@ This layer creates the first source-tree-independent PPU product runtime for the
 ```text
 Control Station
   -> Manager
-  -> Z2 PPU Gateway
+  -> Z2 Plasma Gateway
   -> Z2 Plasma Server
   -> PS diagnostic handler
   -> return
@@ -39,9 +39,11 @@ python3 ppu/ppu.pyz server  --config <ppu-config>
 python3 ppu/ppu.pyz gateway <gateway arguments>
 ```
 
+The `gateway` CLI subcommand is an implementation identifier; the running northbound service is the **Plasma Gateway**.
+
 The PPU runtime does not contain the Control Console, Plasma Manager, Node.js/npm payloads, Git metadata, tests, FPGA bitstreams, or PL/real-target activation logic.
 
-The production Device Catalog is included as runtime data so the REST Gateway does not depend on a source-tree-relative `data/` directory when later Device Catalog routes are used. A deployed service should set `PLASMA_DEVICE_CATALOG_MANIFEST` to the installed manifest path.
+The production Device Catalog is included as runtime data so the Plasma Gateway does not depend on a source-tree-relative `data/` directory when later Device Catalog routes are used. A deployed service should set `PLASMA_DEVICE_CATALOG_MANIFEST` to the installed manifest path.
 
 ## Canonical release
 
@@ -66,7 +68,7 @@ The release carries the canonical contracts:
 
 ```text
 Plasma Protocol = 3.3
-Web REST API    = 3
+Plasma Gateway API / Web REST = 3
 ```
 
 ## Build
@@ -125,7 +127,7 @@ The current product baseline requires:
 - Linux on an ARM target;
 - Python >= 3.11;
 - system-level systemd;
-- network reachability suitable for the Control Station Manager to reach the PPU REST Gateway.
+- network reachability suitable for the Control Station Manager to reach the PPU Plasma Gateway Endpoint.
 
 An audit failure is a deployment blocker to resolve explicitly. Do not bypass a Python/runtime mismatch by claiming the product runtime has been validated.
 
@@ -170,15 +172,17 @@ systemd
 └── plasma-web.service
       -> Python >= 3.11
       -> ppu.pyz gateway
-      -> externally reachable PPU Gateway port (normally 18080)
+      -> externally reachable Plasma Gateway port (normally 18080)
       -> local Plasma Server 127.0.0.1:9900
 ```
 
-The Gateway listen address is a deployment/security choice. Do not default an externally reachable service to an arbitrary public interface without confirming the intended trusted network path. The Plasma Server remains loopback-only.
+`plasma-web.service` is the existing systemd unit name and remains unchanged for compatibility. Its product role is Plasma Gateway.
+
+The Plasma Gateway listen address is a deployment/security choice. Do not default an externally reachable service to an arbitrary public interface without confirming the intended trusted network path. The Plasma Server remains loopback-only.
 
 ## Manager enrollment
 
-The Control Station Manager registry uses a stable alias and the Z2 Gateway root URL:
+The Control Station Manager registry uses a stable alias and the Z2 **Plasma Gateway Endpoint**:
 
 ```yaml
 ppus:
