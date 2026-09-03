@@ -263,7 +263,7 @@ def assert_local_routes() -> None:
         ("/", "Choose a Demo"),
         ("/demo", "Choose a Demo"),
         ("/engineering", "EMode"),
-        ("/fleet", "Factory Production Console"),
+        ("/fleet", "PMODE · FACTORY CONSOLE"),
     ):
         request = Request(f"http://127.0.0.1:{WEB_PORT}{path}")
         with urlopen(request, timeout=3) as response_obj:
