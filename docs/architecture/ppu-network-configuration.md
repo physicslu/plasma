@@ -262,13 +262,15 @@ build + validate PPU runtime
 -> clean extraction + runtime validation
 -> ARMv7 QEMU/binfmt preflight
 -> create isolated Docker bridge
--> start packaged PPU container at 192.168.77.10 without CAP_NET_ADMIN
--> start helper sidecar in same network namespace with CAP_NET_ADMIN only
+-> start packaged PPU namespace with Docker-owned control IPv4 192.168.77.40 and no CAP_NET_ADMIN
+-> start helper sidecar in the same network namespace with CAP_NET_ADMIN only
+-> helper adds the PPU managed IPv4 192.168.77.10 on eth0
 -> start independent coordinator probe
 -> desired revision 2 = 192.168.77.21
--> apply and receive ACK on old endpoint
--> real isolated eth0 mutation .10 -> .21
+-> apply and receive ACK on managed old endpoint 192.168.77.10
+-> real isolated eth0 managed-address mutation .10 -> .21 while Docker control .40 remains untouched
 -> reconnect .21 and verify same ppu_id
+-> prove managed old endpoint .10 is removed
 -> commit revision 2
 -> prove .21 survives rollback deadline
 -> desired revision 3 = 192.168.77.22
@@ -278,18 +280,21 @@ build + validate PPU runtime
 -> emit terminal summary + JSON evidence
 ```
 
+The Docker control address is deliberately outside the property being tested. Docker/IPAM owns `.40`; the privileged helper owns only the managed PPU address `.10/.21/.22`. This prevents the test harness from asking Docker to relinquish its own control-plane address while still exercising real Linux IPv4 add/delete on the same `eth0` network namespace.
+
 Default report:
 
 ```text
 .work/reports/ppu-network-phase2-acceptance.json
 ```
 
-A PASS proves the Phase 2 transaction semantics, real static IPv4 mutation inside the isolated ARMv7 lab namespace, privilege separation, reconnect, same-`ppu_id` verification, explicit commit, and automatic rollback.
+A PASS proves the Phase 2 transaction semantics, real static managed-IPv4 mutation inside the isolated ARMv7 lab namespace, privilege separation, reconnect, same-`ppu_id` verification, explicit commit, old-endpoint removal, and automatic rollback.
 
 It does **not** prove:
 
 - PYNQ-Z2 hardware;
 - the final PYNQ-Z2 Linux network-manager backend;
+- primary-address replacement under Docker IPAM;
 - DHCP activation;
 - production DNS/default-route mutation;
 - boot-time network persistence;
