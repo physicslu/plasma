@@ -28,12 +28,12 @@ The workflows start only ephemeral localhost processes on the GitHub-hosted runn
 
 ```text
 Mock PPU A: 8 enabled Sites
-  Plasma Server :19901
-  REST Gateway  :19801
+  Plasma Server  :19901
+  Plasma Gateway :19801
 
 Mock PPU B: 4 enabled Sites
-  Plasma Server :19902
-  REST Gateway  :19802
+  Plasma Server  :19902
+  Plasma Gateway :19802
 
 Plasma Manager  :19880
   manual registry -> PPU A + PPU B
@@ -44,12 +44,12 @@ Vinext/Vite Web :15173
   Production Mode / Fleet enabled
   Engineering Mode
   Manager BFF -> http://127.0.0.1:19880
-  same-origin Gateway proxy -> http://127.0.0.1:19801
+  same-origin Plasma Gateway proxy -> http://127.0.0.1:19801
 ```
 
 Expected Fleet topology is 2 current PPUs and 12 current/enabled Sites.
 
-For Browser Runtime Acceptance, PPU A's REST Gateway additionally enables the server-side Engineering Mock PPU provider. That provider owns a separate Engineering-only simulation topology:
+For Browser Runtime Acceptance, PPU A's Plasma Gateway additionally enables the server-side Engineering Mock PPU provider. That provider owns a separate Engineering-only simulation topology:
 
 ```text
 8 Mock Facilities
@@ -65,13 +65,13 @@ Each Engineering Mock PPU is a real in-process `PlasmaServer` runtime backed by 
 
 `scripts/mock-cd.py` validates:
 
-- both PPU REST Gateways become execution-ready;
+- both PPU Plasma Gateways become execution-ready;
 - Manager liveness succeeds;
 - Manager aggregates both heterogeneous PPUs;
 - Fleet summary reports 2 current PPUs and 12 Sites;
 - the Vinext/Cloudflare Worker receives Fleet runtime bindings;
 - same-origin `/api/fleet` reaches Manager through the loopback-only BFF;
-- browser Fleet payload remains sanitized and does not expose registry endpoints, raw errors, or observation database paths;
+- browser Fleet payload remains sanitized and does not expose registered Plasma Gateway Endpoints, raw errors, or observation database paths;
 - `/` resolves to the Control Station product entry;
 - `/demo` remains the product-mode entry;
 - `/fleet` resolves Production Mode;
@@ -100,7 +100,7 @@ The browser test does **not** use `page.route()` to replace Plasma APIs. The can
 ```text
 Playwright browser action
   -> Engineering Mode -> Programming
-  -> real Plasma Web REST Gateway
+  -> real Plasma Gateway
   -> EngineeringPPUProvider
   -> selected virtual PlasmaServer
   -> SiteManager / SiteWorker
@@ -111,7 +111,7 @@ Playwright browser action
 
 The former Single PPU Programming Console is not part of Browser Runtime Acceptance. EMode Programming owns the single-PPU engineering workflow. `/ppu` is tested only as a compatibility redirect to `/engineering`.
 
-The persistent stack publishes `runtime.json`. The workflow derives the Web URL, Gateway URL, deliberately unreachable Gateway endpoint, and representative Engineering Facility/PPU identity from that runtime contract instead of duplicating runtime values in the Playwright step.
+The persistent stack publishes `runtime.json`. The workflow derives the Web URL, Plasma Gateway URL, deliberately unreachable Plasma Gateway test endpoint, and representative Engineering Facility/PPU identity from that runtime contract instead of duplicating runtime values in the Playwright step. The runtime field names remain compatibility-sensitive implementation details where applicable.
 
 The acceptance scenarios are:
 
@@ -120,11 +120,11 @@ The acceptance scenarios are:
    - `/ppu` resolves to `/engineering`;
    - neither route exposes the retired `SITE MATRIX / PPU CONTROL` UI.
 
-2. **Engineering Gateway connection state**
+2. **Engineering Plasma Gateway connection state**
    - start from the valid same-origin Engineering path and confirm the provider is online;
-   - enter a syntactically valid but unreachable Gateway and confirm EMode reports offline;
-   - restore the valid Gateway and confirm clean recovery;
-   - verify malformed non-HTTP Gateway input is rejected without reviving the retired direct PPU Console ownership.
+   - use the test harness's syntactically valid but unreachable Plasma Gateway path and confirm EMode reports offline;
+   - restore the valid path and confirm clean recovery;
+   - verify malformed non-HTTP endpoint input is rejected without reviving retired Browser-owned topology authority.
 
 3. **EMode per-Site E/P/V/R and Read download**
    - enter `Engineering -> Programming` through the actual Web UI;
