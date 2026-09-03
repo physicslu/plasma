@@ -46,7 +46,7 @@ The installer creates or uses the Python environment, installs dependencies, run
 | systemd unit | Default port | Operator name / role |
 |---|---:|---|
 | `plasma-server.service` | 9900 | **Plasma PPU Programming Server** — Protocol v3.3 / `PLASMA33` TCP Server |
-| `plasma-web.service` | 18080 | **Plasma Gateway** — Plasma Gateway API / Web REST Contract v3; optional Engineering Mock Provider host |
+| `plasma-web.service` | 18080 | **Plasma Gateway** — Plasma Gateway API / Web REST API Contract v3; optional Engineering Mock Provider host |
 | `plasma-vite.service` | 5173 | Plasma PPU Console development/demo Web runtime |
 | `plasma-manager.service` | 18180 | **Plasma Manager** — optional fleet control plane |
 
@@ -162,7 +162,7 @@ Deployment health proves that the selected software revision starts and its conf
 Current software contracts to keep aligned during deployment are:
 
 ```text
-Plasma Gateway API / Web REST v3   # Browser/external-facing input API
-Plasma Protocol v3.3                # internal execution wire contract
-Fleet Contract v1                   # Manager-facing PPU observation/routing contract
+Plasma Gateway API / Web REST API Contract v3   # Browser/external-facing input API
+Plasma Protocol v3.3                            # internal execution wire contract
+Fleet Contract v1                               # Manager-facing PPU observation/routing contract
 ```
