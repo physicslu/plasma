@@ -20,7 +20,7 @@ Vinext standalone build
   -> clean extraction
   -> packaged Manager startup with temporary operator-local registry state
   -> packaged Console/BFF startup in Managed Mode
-  -> synthetic local PPU Gateway contract endpoint
+  -> synthetic local Plasma Gateway contract endpoint
   -> Browser-style same-origin Registry BFF
   -> Add PPU as Pending
   -> Manager current trusted identity/topology observation
@@ -29,7 +29,7 @@ Vinext standalone build
   -> durable registry state verification
 ```
 
-The synthetic PPU is a process-local contract fixture, not hardware. It exposes the canonical PPU fleet health, identity and Site status surfaces required for Manager validation. The acceptance therefore proves that the **packaged** Console/BFF and **packaged** Manager can execute the complete Manager-owned PPU Registry lifecycle after clean extraction, including file-backed runtime state.
+The synthetic PPU is a process-local Plasma Gateway API contract fixture, not hardware. It exposes the canonical PPU fleet health, identity and Site status surfaces required for Manager validation. The acceptance therefore proves that the **packaged** Console/BFF and **packaged** Manager can execute the complete Manager-owned PPU Registry lifecycle after clean extraction, including file-backed runtime state.
 
 The final registry is intentionally empty after Remove, and the acceptance verifies the persisted `manager-registry.json` state rather than trusting only the HTTP response.
 
