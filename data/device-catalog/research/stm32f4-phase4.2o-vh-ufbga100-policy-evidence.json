@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "phase": "4.2O",
+  "policy_mapping": "V/H -> UFBGA100",
+  "official_sources": [
+    {
+      "url": "https://www.st.com/resource/en/datasheet/stm32f401rd.pdf",
+      "document": "DS10086 Rev 4",
+      "evidence": "Ordering information defines pin-count code V as 100 pins and package code H as UFBGA."
+    },
+    {
+      "url": "https://www.st.com/resource/en/datasheet/stm32f412cg.pdf",
+      "document": "DS11139 Rev 9",
+      "evidence": "Package information identifies H-coded devices with the 100-ball UFBGA100 package."
+    },
+    {
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f401vc.html",
+      "evidence": "Official Q&R table lists Active STM32F401VCH6/VCH7 exact parts as UFBGA 100."
+    },
+    {
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f412ve.html",
+      "evidence": "Official Q&R table lists Active STM32F412VEH exact parts as UFBGA 100."
+    }
+  ],
+  "affected_base_devices": ["STM32F401VB", "STM32F401VC", "STM32F401VD", "STM32F401VE", "STM32F411VC", "STM32F411VE", "STM32F412VE", "STM32F412VG", "STM32F413VG", "STM32F413VH", "STM32F423VH"],
+  "immediately_policy_ready": ["STM32F401VB", "STM32F401VC", "STM32F401VD", "STM32F401VE", "STM32F411VC", "STM32F411VE", "STM32F412VE", "STM32F412VG", "STM32F413VG"],
+  "still_fail_closed": {"STM32F413VH": "unsupported flash-size code H", "STM32F423VH": "unsupported flash-size code H"},
+  "production_write_applied": false,
+  "algorithm_equivalence_claimed": false
+}
