@@ -97,3 +97,6 @@ jobs:
 
       - name: Validate Phase 4.2S T/Y WLCSP36 policy boundary
         run: python data/device-catalog/research/test_stm32f4_phase4_2s_ty_wlcsp36_policy.py
+
+      - name: Validate Phase 4.2R H=1536 KiB flash-size policy boundary
+        run: python data/device-catalog/research/test_stm32f4_phase4_2r_h1536_policy.py
