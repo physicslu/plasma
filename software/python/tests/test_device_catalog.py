@@ -7,8 +7,8 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalog, get_default_device_catalog
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 286
-EXPECTED_STM32F4_CATALOG_SIZE = 211
+EXPECTED_PRODUCTION_CATALOG_SIZE = 301
+EXPECTED_STM32F4_CATALOG_SIZE = 226
 
 
 LEGACY_COLUMNS = [

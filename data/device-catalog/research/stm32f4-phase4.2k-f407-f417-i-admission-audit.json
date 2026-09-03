@@ -1,0 +1,34 @@
+{
+  "added_exact_icpns": [
+    "STM32F407IEH6",
+    "STM32F407IEH6TR",
+    "STM32F407IEH7",
+    "STM32F407IET6",
+    "STM32F407IGH6",
+    "STM32F407IGH6TR",
+    "STM32F407IGH7",
+    "STM32F407IGT6",
+    "STM32F407IGT7",
+    "STM32F417IEH6",
+    "STM32F417IET6",
+    "STM32F417IGH6",
+    "STM32F417IGH6TR",
+    "STM32F417IGT6",
+    "STM32F417IGT7"
+  ],
+  "admission_plan_sha256": "5bf84e7ebbac8808e6ef3f1cc072bc55ac380e0ba64a59b23a0684db0b76764f",
+  "canonical_csv_file_sha256": "780ff3801bbc95476b6c366eda5946fa70bebff978c35d891197bf7527c5c181",
+  "lifecycle_exclusions": [
+    "STM32F417IGH6W"
+  ],
+  "phase": "4.2K",
+  "production_base_devices_after": 77,
+  "production_base_devices_before": 73,
+  "production_rows_after": 226,
+  "production_rows_before": 211,
+  "proposal_artifact_id": 9876998587,
+  "proposal_artifact_zip_sha256": "427727ceecb8f1ec6f1ce3ea3ece58660ceef6c7fb14f8f2e67fe8398dd12356",
+  "proposal_run_id": 33711328905,
+  "schema_version": 1,
+  "status": "published"
+}
