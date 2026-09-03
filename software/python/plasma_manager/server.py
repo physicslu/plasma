@@ -14,6 +14,12 @@ from urllib.parse import unquote, urlparse
 from .client import PPUHTTPError, PPUTransportError, PPUHttpClient
 from .config import ManagerConfig, PPURegistryEntry, load_manager_config
 from .fleet import MANAGER_CONTRACT_VERSION, MANAGER_SERVICE_NAME, FleetAggregator
+from .network_commissioning import (
+    DEFAULT_ROLLBACK_TIMEOUT_S,
+    NetworkCommissioningCoordinator,
+    NetworkCommissioningError,
+    NetworkCommissioningStore,
+)
 from .observation import FleetObservationStore, FleetSnapshotSource
 from .persistence import SQLiteObservationPersistence
 from .poller import FleetPoller
@@ -35,6 +41,7 @@ MANAGED_PPU_ROUTE_PREFIX = "/api/ppus/"
 MANAGED_PPU_ROUTE_MARKER = "/gateway"
 REGISTRY_ROUTE = "/api/registry"
 REGISTRY_ROUTE_PREFIX = "/api/registry/"
+NETWORK_COMMISSIONING_SUFFIX = "/network-commissioning"
 MAX_MANAGER_REQUEST_BYTES = 24 * 1024 * 1024
 MAX_MANAGER_RESPONSE_BYTES = 32 * 1024 * 1024
 FORWARDED_REQUEST_HEADERS = frozenset({"authorization", "idempotency-key", "content-type", "accept"})
@@ -96,6 +103,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
     poller: FleetPoller | None = None
     config: ManagerConfig | None = None
     registry_store: PPURegistryStore | None = None
+    network_commissioning: NetworkCommissioningCoordinator | None = None
 
     def log_message(self, format: str, *args: Any) -> None:
         return
@@ -133,6 +141,15 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         if self.config is None:
             raise RuntimeError("Plasma Manager configuration is not configured")
         return self.config
+
+    def _network_commissioning(self) -> NetworkCommissioningCoordinator:
+        if self.network_commissioning is None:
+            raise NetworkCommissioningError(
+                "Manager network commissioning is unavailable",
+                code="network_commissioning_unavailable",
+                http_status=503,
+            )
+        return self.network_commissioning
 
     def _read_raw_body(self) -> bytes:
         raw_length = self.headers.get("Content-Length")
@@ -193,6 +210,15 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         if not path.startswith(REGISTRY_ROUTE_PREFIX):
             return None
         encoded = path[len(REGISTRY_ROUTE_PREFIX) :]
+        if not encoded or "/" in encoded:
+            return None
+        return cls._valid_alias(encoded)
+
+    @classmethod
+    def _parse_network_commissioning_alias(cls, path: str) -> str | None:
+        if not path.startswith(REGISTRY_ROUTE_PREFIX) or not path.endswith(NETWORK_COMMISSIONING_SUFFIX):
+            return None
+        encoded = path[len(REGISTRY_ROUTE_PREFIX) : -len(NETWORK_COMMISSIONING_SUFFIX)]
         if not encoded or "/" in encoded:
             return None
         return cls._valid_alias(encoded)
@@ -369,6 +395,81 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             return
         self._json(HTTPStatus.OK, {"ok": True, "removed": removed.as_dict(), "registry": self._registry_snapshot()})
 
+    def _handle_network_commissioning_get(self, alias: str) -> None:
+        try:
+            record = self._network_commissioning().get(alias)
+        except NetworkCommissioningError as exc:
+            self._json(exc.http_status, {"ok": False, "error": {"code": exc.code, "message": exc.message}})
+            return
+        if record is None:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"ok": False, "error": {"code": "network_commissioning_not_found", "message": "No network commissioning transaction exists for this PPU"}},
+            )
+            return
+        self._json(HTTPStatus.OK, {"ok": True, "commissioning": record.as_dict()})
+
+    def _handle_network_commissioning_post(self, alias: str) -> None:
+        if self.registry_store is None:
+            self._registry_error(RegistryMutationDisabled("Manager runtime PPU registry is unavailable"))
+            return
+        if self._registry_lifecycle(alias) != REGISTRY_LIFECYCLE_COMMISSIONED:
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": {"code": "ppu_not_enabled", "message": "PPU must complete Validate & Enable before network commissioning"}},
+            )
+            return
+        if self._alias_has_active_execution(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": {"code": "ppu_busy", "message": "active PPU Jobs must finish or be cancelled before network commissioning"}},
+            )
+            return
+        if not self._alias_is_trusted_for_enable(alias):
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": {"code": "ppu_validation_incomplete", "message": "A current trusted PPU identity/topology observation is required before network commissioning"}},
+            )
+            return
+        try:
+            body = self._read_json_object()
+        except ValueError as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_request", "message": str(exc)}})
+            return
+        if set(body) - {"desired", "rollback_timeout_s"} or "desired" not in body:
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": {"code": "invalid_network_commissioning_request", "message": "commissioning request accepts only desired and optional rollback_timeout_s"}},
+            )
+            return
+        request_key = self.headers.get("Idempotency-Key", "")
+        authorization = self.headers.get("Authorization")
+        try:
+            record = self._network_commissioning().start(
+                alias,
+                body.get("desired"),
+                rollback_timeout_s=body.get("rollback_timeout_s", DEFAULT_ROLLBACK_TIMEOUT_S),
+                request_key=request_key,
+                authorization=authorization,
+            )
+        except NetworkCommissioningError as exc:
+            payload: dict[str, Any] = {
+                "ok": False,
+                "error": {"code": exc.code, "message": exc.message},
+            }
+            if exc.record is not None:
+                payload["commissioning"] = exc.record.as_dict()
+            self._json(exc.http_status, payload)
+            return
+        self._json(
+            HTTPStatus.OK,
+            {
+                "ok": True,
+                "commissioning": record.as_dict(),
+                "registry": self._registry_snapshot(),
+            },
+        )
+
     @staticmethod
     def _log_ps_loopback_relay(
         *,
@@ -423,6 +524,10 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == REGISTRY_ROUTE:
             self._json(HTTPStatus.OK, self._registry_snapshot())
+            return
+        commissioning_alias = self._parse_network_commissioning_alias(parsed.path)
+        if commissioning_alias is not None:
+            self._handle_network_commissioning_get(commissioning_alias)
             return
         if parsed.path == "/api/fleet":
             self._json(HTTPStatus.OK, self._poller().snapshot())
@@ -629,7 +734,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             HTTPStatus.METHOD_NOT_ALLOWED,
             {
                 "ok": False,
-                "error": {"message": "Plasma Manager read-only surfaces reject mutation outside the explicit runtime registry and allowlisted Managed PPU routes"},
+                "error": {"message": "Plasma Manager rejects mutation outside the explicit runtime registry, network commissioning, and allowlisted Managed PPU routes"},
             },
         )
 
@@ -637,6 +742,10 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == REGISTRY_ROUTE:
             self._handle_registry_add()
+            return
+        commissioning_alias = self._parse_network_commissioning_alias(parsed.path)
+        if commissioning_alias is not None:
+            self._handle_network_commissioning_post(commissioning_alias)
             return
         managed = self._parse_managed_ppu_route(parsed.path)
         if managed is not None:
@@ -683,6 +792,15 @@ def _build_observation_store(
 
 def serve(config: ManagerConfig) -> None:
     registry = PPURegistryStore(config.ppus, config.registry_state_path)
+    commissioning_store = NetworkCommissioningStore(
+        NetworkCommissioningCoordinator.state_path_for_registry(config.registry_state_path)
+    )
+    commissioning = NetworkCommissioningCoordinator(
+        registry,
+        commissioning_store,
+        config.request_timeout_s,
+    )
+    commissioning.recover()
     aggregator = FleetAggregator(config, registry_provider=registry.entries)
     observations = _build_observation_store(config, aggregator)
     poller = FleetPoller(observations, config.poll_interval_s)
@@ -690,6 +808,7 @@ def serve(config: ManagerConfig) -> None:
     PlasmaManagerHandler.poller = poller
     PlasmaManagerHandler.config = config
     PlasmaManagerHandler.registry_store = registry
+    PlasmaManagerHandler.network_commissioning = commissioning
     server = PlasmaManagerHTTPServer((config.host, config.port), PlasmaManagerHandler)
     poller.start(prime_cache=False)
     print(f"Plasma Manager listening on http://{config.host}:{config.port}")
