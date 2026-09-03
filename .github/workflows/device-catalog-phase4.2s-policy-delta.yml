@@ -1,0 +1,55 @@
+name: Device catalog Phase 4.2S policy delta
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/**"
+      - ".github/workflows/device-catalog-phase4.2s-policy-delta.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-phase42s-policy-delta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate permanent Phase 4.2S policy regression
+        run: python data/device-catalog/research/test_stm32f4_phase4_2s_ty_wlcsp36_policy.py
+
+      - name: Validate exact pre-admission policy delta
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, 'data/device-catalog/research')
+          from stm32f4_coverage_gap_inventory import build_inventory
+
+          inv = build_inventory(
+              catalog_path=Path('data/device-catalog/research/openocd-parts-canonical.csv'),
+              canonical_path=Path('data/device-catalog/research/stm32f4-commercial-icpn.csv'),
+          )
+
+          assert inv['production']['exact_icpn_rows'] == 304
+          assert inv['production']['base_device_count'] == 100
+          assert inv['openocd_ordering_pattern_base_device_count'] == 149
+          assert inv['gap']['base_device_count'] == 49
+          assert inv['gap']['policy_ready_count'] == 1
+          assert inv['gap']['policy_blocked_count'] == 48
+
+          ready = {item['base_device']: item for item in inv['gap']['policy_ready']}
+          blocked = {item['base_device']: item for item in inv['gap']['policy_blocked']}
+
+          assert set(ready) == {'STM32F410TB'}
+          assert ready['STM32F410TB']['policy_blockers'] == []
+          assert blocked['STM32F410T8']['policy_blockers'] == ['unsupported flash-size code 8']
+
+          print('Phase 4.2S exact pre-admission policy delta: PASS')
+          PY
