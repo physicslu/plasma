@@ -143,6 +143,7 @@ class PPUNetworkActivationSecurityTests(unittest.TestCase):
         self.assertTrue(payload["activation"]["supported"])
 
     def test_operator_cannot_activate_network(self) -> None:
+        apply_calls_before = self.helper.apply_calls
         status, payload = self.request(
             "POST",
             "/api/settings/ppu-network/activation",
@@ -152,9 +153,10 @@ class PPUNetworkActivationSecurityTests(unittest.TestCase):
         )
         self.assertEqual(status, 403)
         self.assertEqual(payload["error"]["error_code"], "E4102")
-        self.assertEqual(self.helper.apply_calls, 0)
+        self.assertEqual(self.helper.apply_calls, apply_calls_before)
 
     def test_admin_activation_requires_idempotency_and_replays(self) -> None:
+        apply_calls_before = self.helper.apply_calls
         body = self.activation_body()
         status, payload = self.request(
             "POST",
@@ -186,7 +188,7 @@ class PPUNetworkActivationSecurityTests(unittest.TestCase):
         self.assertEqual(replay, first)
 
         waiting = self.wait_state("applied_waiting_commit")
-        self.assertEqual(self.helper.apply_calls, 1)
+        self.assertEqual(self.helper.apply_calls, apply_calls_before + 1)
         revision = waiting["revision"]
         status, committed = self.request(
             "POST",
