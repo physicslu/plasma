@@ -23,6 +23,7 @@
 - **Current** — [Web Product Modes](architecture/web-product-modes.md)
 - **Current** — [Web REST API Contract](architecture/web-rest-api-contract.md)
 - **Current** — [Configuration Architecture](architecture/configuration-architecture.md)
+- **Current** — [CI/CD Validation Architecture](architecture/ci-cd-validation-architecture.md)：定義 risk-based validation topology、Fast／Browser／Runtime／Release gate、Device Catalog Historical／Current 邊界，以及 production Device Catalog → IC Support 的跨 domain dependency。
 - **Current** — [Batch Domain Model](architecture/batch-domain-model.md)
 - **Current** — [Server-side Batch Runtime](architecture/server-side-batch-runtime.md)
 - **Current** — [Batch Persistence and Gateway Restart Recovery](architecture/batch-persistence-recovery.md)
