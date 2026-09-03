@@ -1,0 +1,35 @@
+{
+  "added_exact_icpns": [
+    "STM32F413CHU3",
+    "STM32F413CHU3TR",
+    "STM32F413CHU6",
+    "STM32F413CHU6TR",
+    "STM32F413RHT3",
+    "STM32F413RHT6",
+    "STM32F413RHT6TR",
+    "STM32F413VHH3",
+    "STM32F413VHH6",
+    "STM32F413VHT6",
+    "STM32F413ZHJ6",
+    "STM32F413ZHJ6TR",
+    "STM32F413ZHT3",
+    "STM32F413ZHT6"
+  ],
+  "admission_plan_sha256": "13251cba507dea125654da403d808382850b8b602921f5dbca1fd1790c8c8852",
+  "canonical_csv_file_sha256": "6c5138d5de50187d4f877fe3dcbeb9e0b68189f2e957a085fe2d7128965f0831",
+  "lifecycle_exclusions": [
+    "STM32F413VHT3",
+    "STM32F413ZHJ3"
+  ],
+  "phase": "4.2U",
+  "production_base_devices_after": 105,
+  "production_base_devices_before": 101,
+  "production_rows_after": 321,
+  "production_rows_before": 307,
+  "proposal_artifact_id": 9893881941,
+  "proposal_artifact_zip_sha256": "bfe6f065b55165faad4f41d13ff11f6d6634ebbcf0525c49aec45fb33c1d369f",
+  "proposal_run_id": 33757105044,
+  "retained_evidence_id": "stm32f4-phase4.2u-h-admission-batch1-2026-09-03-retained-20260903T123710Z-a642f06",
+  "schema_version": 1,
+  "status": "published"
+}
