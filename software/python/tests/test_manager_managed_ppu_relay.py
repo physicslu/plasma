@@ -203,7 +203,7 @@ class ManagerManagedPPURelayTests(unittest.TestCase):
         self.assertEqual(observed["idempotency_key"], "batch-1")
 
     def test_managed_workspace_settings_routes_preserve_security_headers(self):
-        for path in ("/api/settings/gateway", "/api/mock/runtime"):
+        for path in ("/api/settings/gateway", "/api/settings/ppu-network", "/api/mock/runtime"):
             status, _, data = self.relay("GET", path)
             self.assertEqual(status, 200)
             self.assertEqual(json.loads(data)["path"], path)
