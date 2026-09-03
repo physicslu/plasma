@@ -1,0 +1,32 @@
+name: Device catalog Phase 4.2T STM32F410TB retained evidence
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2t-f410tb-admission]
+    paths: [".github/workflows/device-catalog-phase42t-retained.yml"]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  retain:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/device-catalog-phase4.2t-f410tb-admission}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install browser
+        run: python -m pip install playwright==1.62.0 && python -m playwright install --with-deps chromium
+      - name: Acquire control and pilot
+        run: |
+          mkdir -p /tmp/phase42t
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py --manifest data/device-catalog/research/stm32f4-phase3.1-pilot-manifest.json --catalog data/device-catalog/research/openocd-parts-canonical.csv --output /tmp/phase42t/control.json --scope control --headed --timeout 45 --delay 2
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py --manifest data/device-catalog/research/stm32f4-phase4.2t-f410tb-admission-manifest.json --catalog data/device-catalog/research/openocd-parts-canonical.csv --output /tmp/phase42t/pilot.json --scope pilot --headed --timeout 45 --delay 2
+      - name: Evaluate and retain
+        run: |
+          python data/device-catalog/research/evaluate_stm32f4_pilot.py --summary /tmp/phase42t/pilot.json --baseline data/device-catalog/research/stm32f4-phase4.2t-f410tb-admission-baseline.json --output /tmp/phase42t/evaluation.json --repository physicslu/plasma --git-sha "$GITHUB_SHA"
+          python data/device-catalog/research/retain_stm32f4_browser_evidence.py --control /tmp/phase42t/control.json --pilot /tmp/phase42t/pilot.json --evaluation /tmp/phase42t/evaluation.json --baseline data/device-catalog/research/stm32f4-phase4.2t-f410tb-admission-baseline.json --output-dir /tmp/phase42t/retained
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py --evidence-dir /tmp/phase42t/retained --baseline data/device-catalog/research/stm32f4-phase4.2t-f410tb-admission-baseline.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: phase42t-f410tb-retained, path: /tmp/phase42t, if-no-files-found: error, retention-days: 30}
