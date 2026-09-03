@@ -18,6 +18,7 @@ boot persistence, or a final Z2 Linux network-manager backend.
 from __future__ import annotations
 
 import argparse
+import errno
 import fcntl
 import hashlib
 import ipaddress
@@ -29,7 +30,6 @@ import socket
 import struct
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -53,10 +53,22 @@ ROLLBACK_TIMEOUT_S = 2
 RESULT_MARKER = "PLASMA_PPU_NETWORK_PHASE2_RESULT="
 CAP_NET_ADMIN = 12
 SIOCGIFADDR = 0x8915
-SIOCSIFADDR = 0x8916
 SIOCGIFNETMASK = 0x891B
-SIOCSIFNETMASK = 0x891C
 MAX_HELPER_REQUEST = 1024 * 1024
+
+# Linux rtnetlink address ABI.  The lab intentionally uses the kernel API
+# directly instead of depending on iproute2 inside the minimal ARMv7 image.
+NETLINK_ROUTE = 0
+NLMSG_ERROR = 2
+NLM_F_REQUEST = 0x0001
+NLM_F_ACK = 0x0004
+NLM_F_REPLACE = 0x0100
+NLM_F_CREATE = 0x0400
+RTM_NEWADDR = 20
+RTM_DELADDR = 21
+IFA_ADDRESS = 1
+IFA_LOCAL = 2
+RT_SCOPE_UNIVERSE = 0
 
 
 class AcceptanceError(RuntimeError):
@@ -67,13 +79,7 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def _run(
-    command: Sequence[str],
-    *,
-    cwd: Path | None = None,
-    capture: bool = True,
-    check: bool = True,
-) -> subprocess.CompletedProcess[str]:
+def _run(command: Sequence[str], *, cwd: Path | None = None, capture: bool = True, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(list(command), cwd=cwd, text=True, capture_output=capture, check=check)
 
 
@@ -110,10 +116,9 @@ def _sha256(path: Path) -> str:
 
 
 def _verify_sidecar(archive: Path, sidecar: Path) -> str:
-    line = sidecar.read_text(encoding="utf-8").strip()
-    parts = line.split()
+    parts = sidecar.read_text(encoding="utf-8").strip().split()
     if len(parts) != 2 or parts[1] != archive.name or len(parts[0]) != 64:
-        raise AcceptanceError(f"invalid release sidecar: {line!r}")
+        raise AcceptanceError("invalid release SHA-256 sidecar")
     actual = _sha256(archive)
     if actual != parts[0]:
         raise AcceptanceError(f"release SHA-256 mismatch: expected {parts[0]}, got {actual}")
@@ -123,17 +128,11 @@ def _verify_sidecar(archive: Path, sidecar: Path) -> str:
 def _docker_preflight() -> bool:
     if shutil.which("docker") is None:
         raise AcceptanceError("docker is not available on PATH")
-    probe = [
-        "docker", "run", "--rm", "--platform", "linux/arm/v7", ARM_IMAGE,
-        "python3", "-c", "import platform; print(platform.machine())",
-    ]
+    probe = ["docker", "run", "--rm", "--platform", "linux/arm/v7", ARM_IMAGE, "python3", "-c", "import platform; print(platform.machine())"]
     installed = False
     result = _run(probe, check=False)
     if result.returncode != 0:
-        install = _run(
-            ["docker", "run", "--privileged", "--rm", BINFMT_IMAGE, "--install", "arm"],
-            check=False,
-        )
+        install = _run(["docker", "run", "--privileged", "--rm", BINFMT_IMAGE, "--install", "arm"], check=False)
         if install.returncode != 0:
             raise AcceptanceError("ARM binfmt installation failed:\n" + install.stdout + install.stderr)
         installed = True
@@ -149,32 +148,17 @@ def _build_release(repo: Path, work: Path, python: Path, git_sha: str, version: 
     extracted = work / "extracted"
     _run([str(python), "scripts/ppu-runtime.py", "build", "--output-dir", str(runtime)], cwd=repo)
     _run([str(python), "scripts/ppu-runtime.py", "validate", str(runtime)], cwd=repo)
-    _run(
-        [
-            str(python), "scripts/ppu-release.py",
-            "--runtime-dir", str(runtime),
-            "--output-dir", str(release_dir),
-            "--git-sha", git_sha,
-        ],
-        cwd=repo,
-    )
+    _run([str(python), "scripts/ppu-release.py", "--runtime-dir", str(runtime), "--output-dir", str(release_dir), "--git-sha", git_sha], cwd=repo)
     archive = release_dir / f"plasma-ppu-{version}-linux-armv7l.tar.gz"
     sidecar = Path(f"{archive}.sha256")
     if not archive.is_file() or not sidecar.is_file():
         raise AcceptanceError("canonical PPU linux-armv7l release was not produced")
     release_sha = _verify_sidecar(archive, sidecar)
-    _run(
-        [
-            str(python), "scripts/product-release.py", "verify", str(archive),
-            "--sidecar", str(sidecar),
-            "--extract-to", str(extracted),
-            "--expect-role", "ppu",
-            "--expect-platform", "linux",
-            "--expect-architecture", "armv7l",
-            "--expect-version", version,
-        ],
-        cwd=repo,
-    )
+    _run([
+        str(python), "scripts/product-release.py", "verify", str(archive), "--sidecar", str(sidecar),
+        "--extract-to", str(extracted), "--expect-role", "ppu", "--expect-platform", "linux",
+        "--expect-architecture", "armv7l", "--expect-version", version,
+    ], cwd=repo)
     clean_runtime = extracted / "plasma-release/runtime"
     _run([str(python), "scripts/ppu-runtime.py", "validate", str(clean_runtime)], cwd=repo)
     return clean_runtime, archive, release_sha
@@ -212,14 +196,7 @@ def _docker_network_rm(name: str) -> None:
 
 
 def _container_diagnostics(name: str) -> str:
-    state = _run(
-        [
-            "docker", "inspect", "-f",
-            "status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}",
-            name,
-        ],
-        check=False,
-    )
+    state = _run(["docker", "inspect", "-f", "status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}", name], check=False)
     logs = _run(["docker", "logs", name], check=False)
     state_text = (state.stdout + state.stderr).strip() or f"inspect rc={state.returncode}"
     logs_text = (logs.stdout + logs.stderr).strip() or "<no logs>"
@@ -265,13 +242,7 @@ except Exception as exc:
 
 def _probe(container: str, ip: str, path: str, *, method: str = "GET", body: Mapping[str, Any] | None = None) -> dict[str, Any]:
     body_json = json.dumps(dict(body), separators=(",", ":"), sort_keys=True) if body is not None else ""
-    result = _run(
-        [
-            "docker", "exec", container, "python3", "-c", PROBE_CODE,
-            f"http://{ip}:{PPU_PORT}{path}", method, body_json,
-        ],
-        check=False,
-    )
+    result = _run(["docker", "exec", container, "python3", "-c", PROBE_CODE, f"http://{ip}:{PPU_PORT}{path}", method, body_json], check=False)
     if result.returncode != 0:
         raise AcceptanceError(f"probe process failed: {result.stdout}{result.stderr}")
     try:
@@ -304,8 +275,7 @@ def _wait_reachable(container: str, ip: str, path: str = "/api/node", *, timeout
 def _wait_unreachable(container: str, ip: str, path: str = "/api/node", *, timeout_s: float = 5.0) -> None:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        result = _probe(container, ip, path)
-        if result.get("reachable") is not True:
+        if _probe(container, ip, path).get("reachable") is not True:
             return
         time.sleep(0.1)
     raise AcceptanceError(f"endpoint {ip}{path} remained reachable")
@@ -334,13 +304,7 @@ def _node_ppu_id(payload: Mapping[str, Any]) -> str:
 
 
 def _desired(address: str) -> dict[str, Any]:
-    return {
-        "mode": "static",
-        "address": address,
-        "prefix_length": 24,
-        "gateway": LAB_GATEWAY,
-        "dns_servers": [LAB_GATEWAY],
-    }
+    return {"mode": "static", "address": address, "prefix_length": 24, "gateway": LAB_GATEWAY, "dns_servers": [LAB_GATEWAY]}
 
 
 def _host_mode(args: argparse.Namespace) -> int:
@@ -355,11 +319,9 @@ def _host_mode(args: argparse.Namespace) -> int:
     work.mkdir(parents=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # The lab deliberately drops every capability from the PPU container. A
-    # host-owned 0755 bind mount is therefore not writable even by container
-    # uid 0 after DAC_OVERRIDE is removed. Keep the build/report tree private,
-    # but expose one dedicated ephemeral container work tree with explicit write
-    # permission. This preserves the capability boundary instead of weakening it.
+    # The PPU container deliberately has no DAC_OVERRIDE. Give only this
+    # disposable lab directory explicit write permission instead of weakening
+    # the process capability boundary.
     container_work = work / "container-work"
     container_work.mkdir()
     container_work.chmod(0o777)
@@ -370,7 +332,6 @@ def _host_mode(args: argparse.Namespace) -> int:
 
     installed_binfmt = _docker_preflight()
     runtime, archive, release_sha = _build_release(repo, work, python, git_sha, version)
-
     suffix = f"{os.getpid()}-{int(time.time())}"
     network = f"plasma-phase2-{suffix}"
     ppu = f"plasma-phase2-ppu-{suffix}"
@@ -382,38 +343,24 @@ def _host_mode(args: argparse.Namespace) -> int:
     try:
         _run(["docker", "network", "create", "--subnet", LAB_SUBNET, "--gateway", LAB_GATEWAY, network])
         checks["isolated_network"] = "PASS"
-
         _run([
-            "docker", "run", "-d", "--name", ppu,
-            "--platform", "linux/arm/v7",
-            "--network", network, "--ip", INITIAL_IP,
-            "--cap-drop", "ALL",
-            "--security-opt", "no-new-privileges:true",
-            "-v", f"{runtime}:/runtime:ro",
-            "-v", f"{container_work}:/work",
-            "-v", f"{script}:/acceptance.py:ro",
-            ARM_IMAGE,
-            "python3", "/acceptance.py", "--inside-ppu",
-            "--runtime-dir", "/runtime", "--work-dir", "/work",
+            "docker", "run", "-d", "--name", ppu, "--platform", "linux/arm/v7",
+            "--network", network, "--ip", INITIAL_IP, "--cap-drop", "ALL",
+            "--security-opt", "no-new-privileges:true", "-v", f"{runtime}:/runtime:ro",
+            "-v", f"{container_work}:/work", "-v", f"{script}:/acceptance.py:ro", ARM_IMAGE,
+            "python3", "/acceptance.py", "--inside-ppu", "--runtime-dir", "/runtime", "--work-dir", "/work",
         ])
         _run([
-            "docker", "run", "-d", "--name", helper,
-            "--platform", "linux/arm/v7",
-            "--network", f"container:{ppu}",
-            "--cap-drop", "ALL", "--cap-add", "NET_ADMIN",
-            "--security-opt", "no-new-privileges:true",
-            "-v", f"{container_work}:/work",
-            "-v", f"{script}:/acceptance.py:ro",
-            ARM_IMAGE,
-            "python3", "/acceptance.py", "--helper",
+            "docker", "run", "-d", "--name", helper, "--platform", "linux/arm/v7",
+            "--network", f"container:{ppu}", "--cap-drop", "ALL", "--cap-add", "NET_ADMIN",
+            "--security-opt", "no-new-privileges:true", "-v", f"{container_work}:/work",
+            "-v", f"{script}:/acceptance.py:ro", ARM_IMAGE, "python3", "/acceptance.py", "--helper",
             "--helper-socket", "/work/network-helper.sock",
         ])
         _run([
-            "docker", "run", "-d", "--name", probe,
-            "--platform", "linux/arm/v7",
-            "--network", network, "--ip", PROBE_IP,
-            "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
-            ARM_IMAGE,
+            "docker", "run", "-d", "--name", probe, "--platform", "linux/arm/v7",
+            "--network", network, "--ip", PROBE_IP, "--cap-drop", "ALL",
+            "--security-opt", "no-new-privileges:true", ARM_IMAGE,
             "python3", "-c", "import time; time.sleep(3600)",
         ])
 
@@ -447,24 +394,15 @@ def _host_mode(args: argparse.Namespace) -> int:
             raise AcceptanceError(f"Phase 2 activation is not ready: {activation!r}")
         checks["activation_supported"] = "PASS"
 
-        desired2 = _expect_json(
-            probe, INITIAL_IP, "/api/settings/ppu-network",
-            method="POST", body=_desired(COMMITTED_IP),
-        )
+        desired2 = _expect_json(probe, INITIAL_IP, "/api/settings/ppu-network", method="POST", body=_desired(COMMITTED_IP))
         revision2 = desired2["ppu_network_settings"]["revision"]
         if revision2 != 2:
             raise AcceptanceError(f"expected desired revision 2, got {revision2}")
         checks["desired_revision_2"] = "PASS"
 
         scheduled = _expect_json(
-            probe, INITIAL_IP, "/api/settings/ppu-network/activation",
-            method="POST",
-            body={
-                "action": "apply",
-                "expected_revision": revision2,
-                "expected_ppu_id": initial_ppu_id,
-                "rollback_timeout_s": ROLLBACK_TIMEOUT_S,
-            },
+            probe, INITIAL_IP, "/api/settings/ppu-network/activation", method="POST",
+            body={"action": "apply", "expected_revision": revision2, "expected_ppu_id": initial_ppu_id, "rollback_timeout_s": ROLLBACK_TIMEOUT_S},
             status=202,
         )
         activation_id = scheduled["activation"]["activation_id"]
@@ -485,52 +423,37 @@ def _host_mode(args: argparse.Namespace) -> int:
         checks["old_endpoint_removed"] = "PASS"
 
         committed = _expect_json(
-            probe, COMMITTED_IP,
-            f"/api/settings/ppu-network/activation/{activation_id}/commit",
-            method="POST",
-            body={"expected_revision": revision2, "expected_ppu_id": candidate_ppu_id},
+            probe, COMMITTED_IP, f"/api/settings/ppu-network/activation/{activation_id}/commit",
+            method="POST", body={"expected_revision": revision2, "expected_ppu_id": candidate_ppu_id},
         )
         committed_activation = committed["activation"]
         if committed_activation.get("state") != "committed" or committed_activation.get("committed_revision") != revision2:
             raise AcceptanceError(f"commit did not finalize revision 2: {committed_activation!r}")
         time.sleep(ROLLBACK_TIMEOUT_S + 0.4)
-        still_committed = _wait_reachable(probe, COMMITTED_IP)
-        if _node_ppu_id(still_committed) != initial_ppu_id:
+        if _node_ppu_id(_wait_reachable(probe, COMMITTED_IP)) != initial_ppu_id:
             raise AcceptanceError("committed endpoint identity drifted")
         _wait_unreachable(probe, INITIAL_IP, timeout_s=1.5)
         checks["explicit_commit"] = "PASS"
         checks["commit_survives_deadline"] = "PASS"
 
-        desired3 = _expect_json(
-            probe, COMMITTED_IP, "/api/settings/ppu-network",
-            method="POST", body=_desired(ROLLBACK_CANDIDATE_IP),
-        )
+        desired3 = _expect_json(probe, COMMITTED_IP, "/api/settings/ppu-network", method="POST", body=_desired(ROLLBACK_CANDIDATE_IP))
         revision3 = desired3["ppu_network_settings"]["revision"]
         if revision3 != 3:
             raise AcceptanceError(f"expected desired revision 3, got {revision3}")
         second = _expect_json(
-            probe, COMMITTED_IP, "/api/settings/ppu-network/activation",
-            method="POST",
-            body={
-                "action": "apply",
-                "expected_revision": revision3,
-                "expected_ppu_id": initial_ppu_id,
-                "rollback_timeout_s": ROLLBACK_TIMEOUT_S,
-            },
+            probe, COMMITTED_IP, "/api/settings/ppu-network/activation", method="POST",
+            body={"action": "apply", "expected_revision": revision3, "expected_ppu_id": initial_ppu_id, "rollback_timeout_s": ROLLBACK_TIMEOUT_S},
             status=202,
         )
         second_id = second["activation"]["activation_id"]
         if second_id == activation_id:
             raise AcceptanceError("second activation reused activation_id")
-        second_node = _wait_reachable(probe, ROLLBACK_CANDIDATE_IP)
-        if _node_ppu_id(second_node) != initial_ppu_id:
+        if _node_ppu_id(_wait_reachable(probe, ROLLBACK_CANDIDATE_IP)) != initial_ppu_id:
             raise AcceptanceError("rollback candidate endpoint ppu_id changed")
         _wait_unreachable(probe, COMMITTED_IP)
         _wait_activation_state(probe, ROLLBACK_CANDIDATE_IP, "applied_waiting_commit")
         checks["second_candidate_reconnect"] = "PASS"
 
-        # Intentionally do not commit revision 3. The PPU-side transaction must
-        # restore the previous committed .21 snapshot without coordinator help.
         restored_node = _wait_reachable(probe, COMMITTED_IP, timeout_s=ROLLBACK_TIMEOUT_S + 5)
         if _node_ppu_id(restored_node) != initial_ppu_id:
             raise AcceptanceError("restored endpoint ppu_id changed")
@@ -572,21 +495,11 @@ def _host_mode(args: argparse.Namespace) -> int:
             "desired_revision_after_rollback": revision3,
             "checks": checks,
             "actual_network_mutation": "isolated-lab-static-ipv4",
-            "privilege_separation": {
-                "gateway_cap_net_admin": False,
-                "helper_cap_net_admin": True,
-            },
+            "privilege_separation": {"gateway_cap_net_admin": False, "helper_cap_net_admin": True},
             "not_claimed": [
-                "PYNQ-Z2 hardware",
-                "final Z2 Linux network-manager backend",
-                "DHCP activation",
-                "DNS mutation",
-                "default-route mutation",
-                "boot-time network persistence",
-                "Manager production integration",
-                "PS-to-PL",
-                "Site I/O",
-                "real IC programming",
+                "PYNQ-Z2 hardware", "final Z2 Linux network-manager backend", "DHCP activation",
+                "DNS mutation", "default-route mutation", "boot-time network persistence",
+                "Manager production integration", "PS-to-PL", "Site I/O", "real IC programming",
             ],
         }
         report_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -599,7 +512,6 @@ def _host_mode(args: argparse.Namespace) -> int:
 
 
 def _print_summary(result: Mapping[str, Any], report_path: Path) -> None:
-    checks = result["checks"]
     print("=" * 72)
     print("Plasma PPU Network Phase 2 Acceptance")
     print("=" * 72)
@@ -609,7 +521,7 @@ def _print_summary(result: Mapping[str, Any], report_path: Path) -> None:
     print(f"Release Artifact           : {result['release_artifact']}")
     print(f"Release SHA-256            : {result['release_sha256']}")
     print()
-    for name, value in checks.items():
+    for name, value in result["checks"].items():
         print(f"[{value}] {name.replace('_', ' ').title()}")
     print()
     print(f"PPU ID                     : {result['ppu_id']}")
@@ -642,8 +554,7 @@ def _inside_ppu(args: argparse.Namespace) -> int:
     if not app.is_file():
         raise AcceptanceError(f"packaged PPU zipapp missing: {app}")
     manifest = json.loads((runtime / "ppu-runtime.json").read_text(encoding="utf-8"))
-    catalog_relative = (manifest.get("data") or {}).get("device_catalog_manifest")
-    catalog = runtime / str(catalog_relative)
+    catalog = runtime / str((manifest.get("data") or {}).get("device_catalog_manifest"))
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
     env["PLASMA_DEVICE_CATALOG_MANIFEST"] = str(catalog)
@@ -651,20 +562,12 @@ def _inside_ppu(args: argparse.Namespace) -> int:
         directory.mkdir(parents=True, exist_ok=True)
     server = gateway = None
     try:
-        server = subprocess.Popen(
-            [sys.executable, str(app), "server", "--config", str(work / "ppu.yaml")],
-            cwd=work, env=env,
-        )
-        gateway = subprocess.Popen(
-            [
-                sys.executable, str(app), "gateway",
-                "--host", "0.0.0.0", "--port", str(PPU_PORT),
-                "--plasma-host", "127.0.0.1", "--plasma-port", "9900",
-                "--output-root", str(work / "gateway-output"),
-                "--network-activation-socket", str(work / "network-helper.sock"),
-            ],
-            cwd=work, env=env,
-        )
+        server = subprocess.Popen([sys.executable, str(app), "server", "--config", str(work / "ppu.yaml")], cwd=work, env=env)
+        gateway = subprocess.Popen([
+            sys.executable, str(app), "gateway", "--host", "0.0.0.0", "--port", str(PPU_PORT),
+            "--plasma-host", "127.0.0.1", "--plasma-port", "9900", "--output-root", str(work / "gateway-output"),
+            "--network-activation-socket", str(work / "network-helper.sock"),
+        ], cwd=work, env=env)
         while True:
             if server.poll() is not None:
                 raise AcceptanceError(f"packaged Plasma Server exited: {server.returncode}")
@@ -691,59 +594,94 @@ def _ifreq_name(interface: str) -> bytes:
 
 def _get_ipv4(interface: str) -> str:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        request = struct.pack("256s", _ifreq_name(interface))
-        response = fcntl.ioctl(sock.fileno(), SIOCGIFADDR, request)
+        response = fcntl.ioctl(sock.fileno(), SIOCGIFADDR, struct.pack("256s", _ifreq_name(interface)))
         return socket.inet_ntoa(response[20:24])
 
 
 def _get_netmask(interface: str) -> str:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        request = struct.pack("256s", _ifreq_name(interface))
-        response = fcntl.ioctl(sock.fileno(), SIOCGIFNETMASK, request)
+        response = fcntl.ioctl(sock.fileno(), SIOCGIFNETMASK, struct.pack("256s", _ifreq_name(interface)))
         return socket.inet_ntoa(response[20:24])
 
 
 def _prefix_from_netmask(netmask: str) -> int:
-    network = ipaddress.IPv4Network(f"0.0.0.0/{netmask}")
-    return network.prefixlen
+    return ipaddress.IPv4Network(f"0.0.0.0/{netmask}").prefixlen
 
 
-def _set_sockaddr(interface: str, command: int, address: str) -> None:
-    packed = struct.pack(
-        "16sH2s4s8s",
-        _ifreq_name(interface),
-        socket.AF_INET,
-        b"\x00\x00",
-        socket.inet_aton(address),
-        b"\x00" * 8,
-    )
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        fcntl.ioctl(sock.fileno(), command, packed)
+def _align4(length: int) -> int:
+    return (length + 3) & ~3
 
 
-def _set_ipv4(interface: str, address: str, prefix_length: int) -> None:
+def _rtattr(attr_type: int, payload: bytes) -> bytes:
+    length = 4 + len(payload)
+    return struct.pack("=HH", length, attr_type) + payload + b"\x00" * (_align4(length) - length)
+
+
+def _netlink_ack(sock: socket.socket, sequence: int) -> None:
+    while True:
+        packet = sock.recv(65535)
+        offset = 0
+        while offset + 16 <= len(packet):
+            length, msg_type, _flags, msg_seq, _pid = struct.unpack_from("=IHHII", packet, offset)
+            if length < 16 or offset + length > len(packet):
+                raise AcceptanceError("malformed rtnetlink response")
+            if msg_seq == sequence and msg_type == NLMSG_ERROR:
+                if length < 20:
+                    raise AcceptanceError("short rtnetlink ACK")
+                error_code = struct.unpack_from("=i", packet, offset + 16)[0]
+                if error_code == 0:
+                    return
+                code = -error_code
+                raise OSError(code, os.strerror(code))
+            offset += _align4(length)
+
+
+def _address_message(interface: str, address: str, prefix_length: int, msg_type: int, *, create: bool = False) -> None:
     ipaddress.IPv4Address(address)
     if not 1 <= prefix_length <= 32:
         raise AcceptanceError("helper prefix_length must be 1..32")
-    netmask = str(ipaddress.IPv4Network(f"0.0.0.0/{prefix_length}").netmask)
+    ifindex = socket.if_nametoindex(interface)
+    ifaddr = struct.pack("=BBBBI", socket.AF_INET, prefix_length, 0, RT_SCOPE_UNIVERSE, ifindex)
+    packed_address = socket.inet_aton(address)
+    attrs = _rtattr(IFA_LOCAL, packed_address) + _rtattr(IFA_ADDRESS, packed_address)
+    sequence = int(time.monotonic_ns() & 0xFFFFFFFF) or 1
+    flags = NLM_F_REQUEST | NLM_F_ACK
+    if create:
+        flags |= NLM_F_CREATE | NLM_F_REPLACE
+    header = struct.pack("=IHHII", 16 + len(ifaddr) + len(attrs), msg_type, flags, sequence, 0)
+    family = getattr(socket, "AF_NETLINK", 16)
+    sock_type = getattr(socket, "SOCK_RAW", 3)
+    with socket.socket(family, sock_type, NETLINK_ROUTE) as sock:
+        sock.bind((0, 0))
+        sock.send(header + ifaddr + attrs)
+        _netlink_ack(sock, sequence)
 
-    # Linux SIOCSIFADDR may leave the previous AF_INET address present when a
-    # new address is applied. netdevice(7) defines deletion of an IPv4 address
-    # by setting it to 0.0.0.0 through SIOCSIFADDR. Do that first so this helper
-    # implements replace semantics: after apply, the old PPU endpoint must no
-    # longer be routable. The helper is local over a Unix socket, so the brief
-    # address-less interval does not break the transaction channel.
-    _set_sockaddr(interface, SIOCSIFADDR, "0.0.0.0")
-    _set_sockaddr(interface, SIOCSIFADDR, address)
-    _set_sockaddr(interface, SIOCSIFNETMASK, netmask)
+
+def _replace_ipv4(interface: str, old_address: str, old_prefix: int, new_address: str, new_prefix: int) -> None:
+    ipaddress.IPv4Address(old_address)
+    ipaddress.IPv4Address(new_address)
+    if old_address == new_address and old_prefix == new_prefix:
+        return
+    # RTM_DELADDR is the explicit Linux address-removal primitive. Delete first
+    # so the candidate cannot coexist with the previous management endpoint;
+    # the helper transaction uses a local Unix socket and remains reachable
+    # during the intentionally address-less interval.
+    _address_message(interface, old_address, old_prefix, RTM_DELADDR)
+    try:
+        _address_message(interface, new_address, new_prefix, RTM_NEWADDR, create=True)
+    except Exception:
+        # Best-effort local repair if add fails after delete. If repair itself
+        # fails, propagate the original activation failure and let the durable
+        # transaction surface recovery_required rather than claiming success.
+        try:
+            _address_message(interface, old_address, old_prefix, RTM_NEWADDR, create=True)
+        except Exception:
+            pass
+        raise
 
 
 def _snapshot(interface: str) -> dict[str, Any]:
-    return {
-        "interface": interface,
-        "address": _get_ipv4(interface),
-        "prefix_length": _prefix_from_netmask(_get_netmask(interface)),
-    }
+    return {"interface": interface, "address": _get_ipv4(interface), "prefix_length": _prefix_from_netmask(_get_netmask(interface))}
 
 
 def _helper_operation(interface: str, request: Mapping[str, Any]) -> dict[str, Any]:
@@ -760,7 +698,8 @@ def _helper_operation(interface: str, request: Mapping[str, Any]) -> dict[str, A
         prefix = settings.get("prefix_length")
         if not isinstance(address, str) or isinstance(prefix, bool) or not isinstance(prefix, int):
             raise AcceptanceError("lab helper received invalid static settings")
-        _set_ipv4(interface, address, prefix)
+        current = _snapshot(interface)
+        _replace_ipv4(interface, current["address"], current["prefix_length"], address, prefix)
         return _snapshot(interface)
     if operation == "restore":
         snapshot = request.get("snapshot")
@@ -770,7 +709,8 @@ def _helper_operation(interface: str, request: Mapping[str, Any]) -> dict[str, A
         prefix = snapshot.get("prefix_length")
         if not isinstance(address, str) or isinstance(prefix, bool) or not isinstance(prefix, int):
             raise AcceptanceError("helper restore snapshot address/prefix is invalid")
-        _set_ipv4(interface, address, prefix)
+        current = _snapshot(interface)
+        _replace_ipv4(interface, current["address"], current["prefix_length"], address, prefix)
         return _snapshot(interface)
     raise AcceptanceError(f"unsupported helper operation: {operation!r}")
 
@@ -801,16 +741,9 @@ def _helper_mode(args: argparse.Namespace) -> int:
                     request = json.loads(bytes(raw).split(b"\n", 1)[0].decode("utf-8"))
                     if not isinstance(request, dict):
                         raise AcceptanceError("helper request must be an object")
-                    result = _helper_operation(args.interface, request)
-                    response = {"ok": True, "result": result}
+                    response = {"ok": True, "result": _helper_operation(args.interface, request)}
                 except Exception as exc:
-                    response = {
-                        "ok": False,
-                        "error": {
-                            "error_type": "LAB_NETWORK_HELPER_ERROR",
-                            "message": str(exc),
-                        },
-                    }
+                    response = {"ok": False, "error": {"error_type": "LAB_NETWORK_HELPER_ERROR", "message": str(exc)}}
                 connection.sendall((json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8"))
 
 
