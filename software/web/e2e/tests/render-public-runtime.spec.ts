@@ -103,9 +103,8 @@ test("public Render uses Mock Synthetic Image without requiring an uploaded Imag
   await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
 
   await commitProductionSites(page, facilityId, ppuId, [1]);
-  await expect(
-    page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`),
-  ).toBeVisible();
+  const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
+  await expect(live.locator(".factorySiteLedCard")).toHaveCount(1);
 
   const job = programmingJob(page);
   const program = programmingJobOperation(job, "program");
@@ -126,7 +125,7 @@ test("public Render uses Mock Synthetic Image without requiring an uploaded Imag
     await expect(execute).toBeDisabled();
   }
 
-  // Acceptance boundary: do not click Execute. This verifies the live Image
+  // Acceptance boundary: do not click START. This verifies the live Image
   // selection contract without creating a Batch, Job, Programming Image
   // upload, or changing Mock Runtime settings on the shared public demo.
 });
