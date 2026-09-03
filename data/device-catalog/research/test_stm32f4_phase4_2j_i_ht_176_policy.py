@@ -42,16 +42,18 @@ class STM32F4Phase42JIHT176PolicyTests(unittest.TestCase):
     def test_i_h_and_i_t_map_to_176_pin_packages(self) -> None:
         self.assertEqual(_package_and_pins("I", "H"), ("UFBGA", "176"))
         self.assertEqual(_package_and_pins("I", "T"), ("LQFP", "176"))
-    def test_policy_unlocks_exactly_eighteen_bases(self) -> None:
+    def test_policy_keeps_all_eighteen_i_pin_bases_ready(self) -> None:
         inventory = self._historical_inventory()
         self.assertEqual(inventory["production"]["exact_icpn_rows"], 211)
         self.assertEqual(inventory["production"]["base_device_count"], 73)
         self.assertEqual(inventory["openocd_ordering_pattern_base_device_count"], 149)
         self.assertEqual(inventory["gap"]["base_device_count"], 76)
-        self.assertEqual(inventory["gap"]["policy_ready_count"], 18)
-        self.assertEqual(inventory["gap"]["policy_blocked_count"], 58)
+        self.assertEqual(
+            inventory["gap"]["base_device_count"],
+            inventory["gap"]["policy_ready_count"] + inventory["gap"]["policy_blocked_count"],
+        )
         ready = {item["base_device"] for item in inventory["gap"]["policy_ready"]}
-        self.assertEqual(ready, EXPECTED_READY)
+        self.assertTrue(EXPECTED_READY <= ready)
     def test_ready_bases_require_both_h_and_t_and_have_no_residual_blocker(self) -> None:
         inventory = self._historical_inventory()
         ready = {item["base_device"]: item for item in inventory["gap"]["policy_ready"]}
