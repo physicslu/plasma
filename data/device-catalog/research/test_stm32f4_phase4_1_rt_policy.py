@@ -26,7 +26,7 @@ PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
 F446_BASELINE = HERE / "stm32f4-phase4.0-f446-batch1-baseline.json"
 EXPECTED_CANONICAL_SHA256 = "6a3150e356511dfed679b747515d1ae1380d3da101b11edd3322f27cd936c948"
 PREVIEW_AUDIT_ONLY_ICPN = "STM32F401CCF6TR"
-EXPECTED_REMAINING_BLOCKERS = {
+PHASE41_KNOWN_BLOCKER_CLASSES = {
     "unsupported flash-size code 8",
     "unsupported flash-size code H",
     "unsupported STM32F4 package code: I",
@@ -69,14 +69,18 @@ class STM32F4Phase41RTPolicyTests(unittest.TestCase):
         self.assertEqual(EXPECTED_BASE_DEVICES - production_bases, EXPECTED_BASE_DEVICES & ready_bases)
         self.assertTrue(EXPECTED_BASE_DEVICES.isdisjoint(blocked_bases))
 
-    def test_all_currently_unapproved_policy_classes_remain_fail_closed(self) -> None:
+    def test_later_policy_growth_does_not_introduce_unknown_phase41_blocker_classes(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         blockers = {
             blocker
             for item in inventory["gap"]["policy_blocked"]
             for blocker in item["policy_blockers"]
         }
-        self.assertEqual(blockers, EXPECTED_REMAINING_BLOCKERS)
+        # Phase 4.1 owns the historical blocker vocabulary it observed. Later
+        # phases may legitimately remove blocker classes as policy expands, but
+        # they must not silently introduce a blocker class outside that reviewed
+        # vocabulary. Current exact blocker counts belong to the current phase.
+        self.assertTrue(blockers.issubset(PHASE41_KNOWN_BLOCKER_CLASSES))
 
     def test_policy_history_and_preview_audit_survive_later_growth(self) -> None:
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
