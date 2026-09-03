@@ -104,3 +104,6 @@ jobs:
             --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2t-f410tb-admission-live-2026-09-03 \
             --baseline data/device-catalog/research/stm32f4-phase4.2t-f410tb-admission-baseline.json
           python data/device-catalog/research/test_stm32f4_phase4_2t_f410tb_post_admission.py
+
+      - name: Validate Phase 4.2R H=1536 KiB flash-size policy boundary
+        run: python data/device-catalog/research/test_stm32f4_phase4_2r_h1536_policy.py

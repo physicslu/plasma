@@ -23,6 +23,7 @@ FLASH_BY_CODE = {
     "D": "384 KiB",
     "E": "512 KiB",
     "G": "1024 KiB",
+    "H": "1536 KiB",
     "I": "2048 KiB",
 }
 TEMPERATURE_BY_CODE = {
