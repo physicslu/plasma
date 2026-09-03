@@ -1,4 +1,15 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  programmingJobAction,
+  programmingJobField,
+  programmingJobOperation,
+  programmingJobStatusValue,
+} from "./programming-job-test-helpers";
+import {
+  commitProductionSites,
+  factoryConsoleHeading,
+  programmingJob,
+} from "./production-console-helpers";
 
 const expectedCommit = process.env.EXPECTED_RENDER_COMMIT ?? "";
 const facilityId = "mock-facility-01";
@@ -32,80 +43,74 @@ async function requireExpectedDeployment(request: APIRequestContext) {
   });
 }
 
-test.beforeAll(async ({ request }) => {
-  await requireExpectedDeployment(request);
-});
+async function expectConstrainedProductionJob(page: Page) {
+  const job = programmingJob(page);
+  await expect(job).toBeVisible();
 
-test("public Render keeps Production batch toolbar stable on iPad landscape", async ({ page }) => {
-  await page.setViewportSize({ width: 1194, height: 834 });
-  await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
-
-  const toolbar = page.getByRole("region", { name: "Batch operation toolbar" });
-  await expect(toolbar).toBeVisible();
-  await expect(page.getByRole("button", { name: "收起選擇器" })).toBeVisible();
-
-  const expanded = await toolbar.evaluate(element => {
-    const toolbarRect = element.getBoundingClientRect();
-    const image = element.querySelector<HTMLElement>(".programmingBatchFile")!;
-    const operations = element.querySelector<HTMLElement>(".programmingBatchOperations")!;
-    const actions = element.querySelector<HTMLElement>(".programmingBatchActions")!;
-    const imageRect = image.getBoundingClientRect();
-    const operationsRect = operations.getBoundingClientRect();
-    const actionsRect = actions.getBoundingClientRect();
-    const operationTops = [...operations.querySelectorAll<HTMLElement>("label")].map(label => label.getBoundingClientRect().top);
+  const layout = await job.evaluate(element => {
+    const panel = element.getBoundingClientRect();
+    const grid = element.querySelector<HTMLElement>("[data-programming-job-fields]")!;
+    const operations = element.querySelector<HTMLElement>(
+      '[data-programming-job-field="operations"] [role="group"]',
+    )!;
+    const actionBar = element.querySelector<HTMLElement>("[data-programming-job-actions]")!;
+    const operationTops = [...operations.querySelectorAll<HTMLElement>("label")].map(label =>
+      label.getBoundingClientRect().top,
+    );
+    const actions = [...actionBar.querySelectorAll<HTMLElement>("button")].map(button =>
+      button.getBoundingClientRect(),
+    );
 
     return {
-      areas: getComputedStyle(element).gridTemplateAreas,
+      gridColumns: getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length,
       operationWrap: getComputedStyle(operations).flexWrap,
       operationTopSpread: Math.max(...operationTops) - Math.min(...operationTops),
-      toolbarRight: toolbarRect.right,
-      actionsRight: actionsRect.right,
-      imageBottom: imageRect.bottom,
-      operationsBottom: operationsRect.bottom,
-      actionsTop: actionsRect.top,
+      panelLeft: panel.left,
+      panelRight: panel.right,
+      actionLefts: actions.map(rect => rect.left),
+      actionRights: actions.map(rect => rect.right),
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
     };
   });
 
-  expect(expanded.areas).toBe('"image operations" "actions actions"');
-  expect(expanded.operationWrap).toBe("nowrap");
-  expect(expanded.operationTopSpread).toBeLessThanOrEqual(1);
-  expect(expanded.actionsTop).toBeGreaterThanOrEqual(Math.max(expanded.imageBottom, expanded.operationsBottom) - 1);
-  expect(expanded.actionsRight).toBeLessThanOrEqual(expanded.toolbarRight + 1);
-  expect(expanded.scrollWidth).toBeLessThanOrEqual(expanded.clientWidth + 1);
+  expect(layout.gridColumns).toBeGreaterThanOrEqual(1);
+  expect(layout.operationWrap).toBe("nowrap");
+  expect(layout.operationTopSpread).toBeLessThanOrEqual(1);
+  expect(Math.min(...layout.actionLefts)).toBeGreaterThanOrEqual(layout.panelLeft - 1);
+  expect(Math.max(...layout.actionRights)).toBeLessThanOrEqual(layout.panelRight + 1);
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+}
 
-  await page.getByRole("button", { name: "收起選擇器" }).click();
-  await expect(page.getByRole("button", { name: "展開選擇器" })).toBeVisible();
-  await page.waitForTimeout(220);
+test.beforeAll(async ({ request }) => {
+  await requireExpectedDeployment(request);
+});
 
-  const collapsed = await toolbar.evaluate(element => ({
-    areas: getComputedStyle(element).gridTemplateAreas,
-    scrollWidth: element.scrollWidth,
-    clientWidth: element.clientWidth,
-  }));
+test("public Render keeps Production Programming Job contained on iPad landscape", async ({ page }) => {
+  await page.setViewportSize({ width: 1194, height: 834 });
+  await page.goto("/fleet");
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
+  await expectConstrainedProductionJob(page);
 
-  expect(collapsed.areas).toBe('"image operations actions"');
-  expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
+  const selection = page.getByRole("region", { name: "PRODUCTION SITE SELECTION" });
+  await selection.getByRole("button", { name: /收起|Hide/ }).click();
+  await expect(selection.locator(".operatorPanelBody")).toBeHidden();
+  await expectConstrainedProductionJob(page);
 });
 
 test("public Render uses Mock Synthetic Image without requiring an uploaded Image", async ({ page }) => {
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
 
-  const site = page.getByRole("checkbox", { name: `${facilityId} ${ppuId} SITE-01`, exact: true });
-  await expect(site).toBeVisible();
-  await site.check();
-  await page.getByRole("button", { name: "確定選取", exact: true }).click();
-  await expect(page.locator(`[data-production-target="${facilityId}::${ppuId}"] [data-production-site="1"]`)).toBeVisible();
+  await commitProductionSites(page, facilityId, ppuId, [1]);
+  const live = page.getByRole("region", { name: "LIVE SITE STATUS" });
+  await expect(live.locator(".factorySiteLedCard")).toHaveCount(1);
 
-  const toolbar = page.locator(".programmingBatchToolbar");
-  const operations = toolbar.locator(".programmingBatchOperations input");
-  const program = operations.nth(1);
-  const fileName = toolbar.locator(".programmingFileName");
-  const readiness = toolbar.getByRole("status", { name: "Batch readiness" });
-  const execute = toolbar.locator(".executeBatchButton");
+  const job = programmingJob(page);
+  const program = programmingJobOperation(job, "program");
+  const fileName = programmingJobField(job, "image").locator("[data-image-source]");
+  const readiness = programmingJobStatusValue(job);
+  const execute = programmingJobAction(job, "start");
 
   if (!(await program.isChecked())) await program.check();
   await expect(fileName).toHaveText("Mock Synthetic Image");
@@ -120,7 +125,7 @@ test("public Render uses Mock Synthetic Image without requiring an uploaded Imag
     await expect(execute).toBeDisabled();
   }
 
-  // Acceptance boundary: do not click Execute. This verifies the live Image
+  // Acceptance boundary: do not click START. This verifies the live Image
   // selection contract without creating a Batch, Job, Programming Image
   // upload, or changing Mock Runtime settings on the shared public demo.
 });

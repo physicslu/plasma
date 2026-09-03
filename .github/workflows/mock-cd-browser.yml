@@ -7,8 +7,20 @@ on:
       - "scripts/mock-cd.py"
       - "scripts/mock-cd-browser-stack.py"
       - "software/python/**"
+      - "!software/python/tests/**"
+      - "!software/python/docs/**"
       - "software/web/**"
-      - "docs/development/mock-cd.md"
+      - "!software/web/tests/**"
+      - "!software/web/e2e/**"
+      - "software/web/e2e/package.json"
+      - "software/web/e2e/package-lock.json"
+      - "software/web/e2e/playwright.mock-cd.config.ts"
+      - "software/web/e2e/tests/mock-cd-runtime.spec.ts"
+      - "software/web/e2e/tests/engineering-programming-asset-cache-runtime.spec.ts"
+      - "software/web/e2e/tests/production-multi-ppu-runtime.spec.ts"
+      - "software/web/e2e/tests/mock-runtime-settings-runtime.spec.ts"
+      - "software/web/e2e/tests/programming-job-real-stack-parity.spec.ts"
+      - "software/web/e2e/tests/programming-job-test-helpers.ts"
   push:
     branches: [main]
     paths:
@@ -16,9 +28,25 @@ on:
       - "scripts/mock-cd.py"
       - "scripts/mock-cd-browser-stack.py"
       - "software/python/**"
+      - "!software/python/tests/**"
+      - "!software/python/docs/**"
       - "software/web/**"
-      - "docs/development/mock-cd.md"
+      - "!software/web/tests/**"
+      - "!software/web/e2e/**"
+      - "software/web/e2e/package.json"
+      - "software/web/e2e/package-lock.json"
+      - "software/web/e2e/playwright.mock-cd.config.ts"
+      - "software/web/e2e/tests/mock-cd-runtime.spec.ts"
+      - "software/web/e2e/tests/engineering-programming-asset-cache-runtime.spec.ts"
+      - "software/web/e2e/tests/production-multi-ppu-runtime.spec.ts"
+      - "software/web/e2e/tests/mock-runtime-settings-runtime.spec.ts"
+      - "software/web/e2e/tests/programming-job-real-stack-parity.spec.ts"
+      - "software/web/e2e/tests/programming-job-test-helpers.ts"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
