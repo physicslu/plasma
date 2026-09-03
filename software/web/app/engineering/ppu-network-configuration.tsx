@@ -28,12 +28,12 @@ function parseDns(value: string): string[] {
 
 export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: Props) {
   const [network, setNetwork] = useState<PPUNetworkPayload | null>(null);
+  const [loadedAlias, setLoadedAlias] = useState<string | null>(null);
   const [mode, setMode] = useState<PPUNetworkMode>("dhcp");
   const [address, setAddress] = useState("");
   const [prefixLength, setPrefixLength] = useState("24");
   const [gateway, setGateway] = useState("");
   const [dnsServers, setDnsServers] = useState("");
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -41,8 +41,6 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
   useEffect(() => {
     if (!entry.alias) return;
     let cancelled = false;
-    setLoading(true);
-    setSaved(false);
     void getManagerPpuNetwork(entry.alias)
       .then(payload => {
         if (cancelled) return;
@@ -54,19 +52,21 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
         setGateway(settings.gateway ?? "");
         setDnsServers(dnsText(settings.dns_servers));
         setError(null);
+        setSaved(false);
+        setLoadedAlias(entry.alias);
       })
       .catch(loadError => {
         if (!cancelled) {
           setNetwork(null);
           setError(loadError instanceof Error ? loadError.message : "PPU network settings unavailable");
+          setSaved(false);
+          setLoadedAlias(entry.alias);
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
   }, [entry.alias, entry.endpoint]);
 
+  const loading = Boolean(entry.alias) && loadedAlias !== entry.alias;
   const parsedPrefix = Number(prefixLength);
   const desired = useMemo(() => ({
     mode,
@@ -114,6 +114,7 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
       setDnsServers(dnsText(settings.dns_servers));
       setError(null);
       setSaved(true);
+      setLoadedAlias(entry.alias);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "PPU network settings update failed");
     } finally {
@@ -204,7 +205,7 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
       </div>
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
-      {saved && <p className="ppuRegistryMessage success" role="status">Desired PPU network settings saved. Running <code>eth0</code> was not activated by this action.</p>}
+      {saved && !loading && <p className="ppuRegistryMessage success" role="status">Desired PPU network settings saved. Running <code>eth0</code> was not activated by this action.</p>}
 
       {!lifecycleWritable && (
         <p className="ppuSiteNote"><strong>Write gate:</strong> complete Validate &amp; Enable before changing PPU desired network settings through Manager.</p>
