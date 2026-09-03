@@ -141,12 +141,13 @@ Current primary test owners:
 | Operator Site selection / same-Gateway reconnect / bad-Gateway round trip / explicit zero selection | `software/web/e2e/tests/engineering-site-selection-reconnect.spec.ts` |
 | Programming Image cache behavior through real browser + real Gateway/Provider/Server | `software/web/e2e/tests/engineering-programming-asset-cache-runtime.spec.ts` |
 | Baseline real-stack PPU operator and batch acceptance | `software/web/e2e/tests/mock-cd-runtime.spec.ts` |
-| Browser regression CI | `.github/workflows/web-tests.yml` |
+| Web fast source gate: lint + build/source tests | `.github/workflows/web-tests.yml` |
+| Browser E2E + visual regression CI | `.github/workflows/web-e2e.yml` |
 | Full software-stack acceptance | `.github/workflows/mock-cd.yml` |
 | Real browser + persistent Mock CD stack | `.github/workflows/mock-cd-browser.yml` |
 | Provider/server Programming Asset cache and PPU Image lease | `software/python/tests/test_engineering_targets.py` and Gateway tests |
 
-`docs/development/mock-cd.md` remains the authoritative document for Mock CD layer boundaries. `docs/development/programming-image-observability-test-plan.md` remains the focused Programming Image/log observability specification. This OAT matrix is the cross-layer operator contract tying those tests together.
+`docs/development/mock-cd.md` remains the authoritative document for Mock CD layer boundaries. `docs/development/programming-image-observability-test-plan.md` remains the focused Programming Image/log observability specification. [CI/CD Validation Architecture](../architecture/ci-cd-validation-architecture.md) defines the repository-wide workflow ownership and trigger topology. This OAT matrix is the cross-layer operator contract tying those tests together.
 
 ## 7. Release gate policy
 
