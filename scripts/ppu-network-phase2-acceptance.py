@@ -211,6 +211,21 @@ def _docker_network_rm(name: str) -> None:
     _run(["docker", "network", "rm", name], check=False)
 
 
+def _container_diagnostics(name: str) -> str:
+    state = _run(
+        [
+            "docker", "inspect", "-f",
+            "status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}",
+            name,
+        ],
+        check=False,
+    )
+    logs = _run(["docker", "logs", name], check=False)
+    state_text = (state.stdout + state.stderr).strip() or f"inspect rc={state.returncode}"
+    logs_text = (logs.stdout + logs.stderr).strip() or "<no logs>"
+    return f"{name}: {state_text}\n{logs_text}"
+
+
 def _cap_eff(container: str) -> int:
     result = _run(["docker", "exec", container, "cat", "/proc/1/status"])
     for line in result.stdout.splitlines():
@@ -339,7 +354,20 @@ def _host_mode(args: argparse.Namespace) -> int:
         shutil.rmtree(work)
     work.mkdir(parents=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    _write_ppu_config(work)
+
+    # The lab deliberately drops every capability from the PPU container. A
+    # host-owned 0755 bind mount is therefore not writable even by container
+    # uid 0 after DAC_OVERRIDE is removed. Keep the build/report tree private,
+    # but expose one dedicated ephemeral container work tree with explicit write
+    # permission. This preserves the capability boundary instead of weakening it.
+    container_work = work / "container-work"
+    container_work.mkdir()
+    container_work.chmod(0o777)
+    for directory in (container_work / "server-output", container_work / "gateway-output", container_work / "logs"):
+        directory.mkdir()
+        directory.chmod(0o777)
+    _write_ppu_config(container_work)
+
     installed_binfmt = _docker_preflight()
     runtime, archive, release_sha = _build_release(repo, work, python, git_sha, version)
 
@@ -362,7 +390,7 @@ def _host_mode(args: argparse.Namespace) -> int:
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges:true",
             "-v", f"{runtime}:/runtime:ro",
-            "-v", f"{work}:/work",
+            "-v", f"{container_work}:/work",
             "-v", f"{script}:/acceptance.py:ro",
             ARM_IMAGE,
             "python3", "/acceptance.py", "--inside-ppu",
@@ -374,7 +402,7 @@ def _host_mode(args: argparse.Namespace) -> int:
             "--network", f"container:{ppu}",
             "--cap-drop", "ALL", "--cap-add", "NET_ADMIN",
             "--security-opt", "no-new-privileges:true",
-            "-v", f"{work}:/work",
+            "-v", f"{container_work}:/work",
             "-v", f"{script}:/acceptance.py:ro",
             ARM_IMAGE,
             "python3", "/acceptance.py", "--helper",
@@ -389,11 +417,13 @@ def _host_mode(args: argparse.Namespace) -> int:
             "python3", "-c", "import time; time.sleep(3600)",
         ])
 
+        helper_socket = container_work / "network-helper.sock"
         deadline = time.monotonic() + 8
-        while time.monotonic() < deadline and not (work / "network-helper.sock").exists():
+        while time.monotonic() < deadline and not helper_socket.exists():
             time.sleep(0.05)
-        if not (work / "network-helper.sock").exists():
-            raise AcceptanceError("privileged helper Unix socket did not appear")
+        if not helper_socket.exists():
+            diagnostics = "\n\n".join(_container_diagnostics(name) for name in (ppu, helper))
+            raise AcceptanceError(f"privileged helper Unix socket did not appear\n{diagnostics}")
         checks["helper_socket_ready"] = "PASS"
 
         ppu_cap = _cap_eff(ppu)
@@ -519,7 +549,7 @@ def _host_mode(args: argparse.Namespace) -> int:
         checks["committed_revision_preserved"] = "PASS"
         checks["desired_revision_preserved"] = "PASS"
 
-        journal = work / "gateway-output" / "ppu-network-activation.json"
+        journal = container_work / "gateway-output" / "ppu-network-activation.json"
         if not journal.is_file():
             raise AcceptanceError("activation journal was not persisted")
         checks["durable_journal"] = "PASS"
