@@ -25,6 +25,10 @@ Definitions:
 - **PPU**: one physical Plasma programming appliance and autonomous local execution node.
 - **Site**: one independently controlled Programming Site inside a PPU.
 - **Socket**: mechanical/electrical IC fixture attached to a Site; not Site identity.
+- **Plasma Gateway**: the northbound REST service owned by one PPU.
+- **Plasma Gateway API**: the REST contract exposed by Plasma Gateway.
+- **Plasma Gateway Endpoint**: the root URL used to reach one PPU's Plasma Gateway, for example `http://192.168.10.21:18080`.
+- **Default Gateway**: the Linux Layer-3 next-hop router for a network interface. It is not the Plasma Gateway service. Human-facing network configuration must not shorten this term to bare `Gateway`.
 
 Canonical Site identity is one-based:
 
@@ -59,7 +63,7 @@ Repository layout:
 
 ```text
 pl/                 Zynq PL RTL, constraints, simulation, verification, Vivado build assets
-software/python/    PPU control plane, Protocol v3.3 TCP server, CLI, REST gateway, optional Manager, tests
+software/python/    PPU control plane, Protocol v3.3 TCP server, CLI, Plasma Gateway REST service, optional Manager, tests
 software/web/       Plasma PPU Console
 scripts/            integration/deployment and service-control scripts
 docs/               architecture, development, and deployment documentation
@@ -182,7 +186,7 @@ Browser / Plasma PPU Console
         |
         | HTTP REST polling / Web REST v3
         v
-Plasma Web REST Gateway
+Plasma Gateway
         |
         | Plasma Protocol v3.3 / PLASMA33
         v
@@ -206,14 +210,14 @@ Fleet client
     v
 Plasma Manager (read-only registry / aggregation + narrow Phase-0 PS Loopback relay)
     |
-    +--> PPU A Plasma Web REST Gateway -> local execution
-    +--> PPU B Plasma Web REST Gateway -> local execution
+    +--> PPU A Plasma Gateway -> local execution
+    +--> PPU B Plasma Gateway -> local execution
     +--> ...
 ```
 
 Implementation facts:
 
-- Plasma Web REST Gateway uses Python standard-library `ThreadingHTTPServer`.
+- Plasma Gateway uses Python standard-library `ThreadingHTTPServer`.
 - It is **not FastAPI**.
 - It does **not use WebSocket**.
 - Web Console uses REST polling.
@@ -296,7 +300,7 @@ Service management is defined by `scripts/plasmactl`.
 | systemd service | Default port | Canonical role |
 |---|---:|---|
 | `plasma-server.service` | 9900 | Plasma PPU Programming Server / Protocol v3.3 TCP Server |
-| `plasma-web.service` | 18080 | Plasma Web REST Gateway |
+| `plasma-web.service` | 18080 | Plasma Gateway |
 | `plasma-vite.service` | 5173 | Plasma PPU Console development/demo runtime |
 | `plasma-manager.service` | 18180 | Optional Plasma Manager fleet control plane; read-only observation plus narrow Phase-0 PS Loopback pass-through |
 
@@ -598,8 +602,8 @@ Before standardizing a Z2 Python environment, verify compatibility with PYNQ/XRT
 Agents must not silently turn these facts into wrong assumptions:
 
 1. Python supports >=3.11; CI and integration host may use different allowed minor versions.
-2. Integration deployment uses Plasma Web REST Gateway port 18080 while `plasma_web.gateway` retains a code-level local default of 8080.
-3. Gateway is standard-library HTTP + REST polling, not FastAPI/WebSocket.
+2. Integration deployment uses Plasma Gateway port 18080 while `plasma_web.gateway` retains a code-level local default of 8080.
+3. Plasma Gateway is standard-library HTTP + REST polling, not FastAPI/WebSocket.
 4. Web stack includes React/TypeScript plus Next.js/Vinext and Vite tooling; inspect `package.json` before stack assumptions.
 5. Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
 6. Only binary Image Asset normalization is implemented; other declared Asset formats/types are extension points, not validated functionality.

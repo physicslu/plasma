@@ -32,7 +32,7 @@ The Web route calls Manager only through a loopback URL. The default expected Ma
 http://127.0.0.1:18180
 ```
 
-The BFF rejects non-loopback Manager URLs, strips registry endpoints and raw Manager errors, and exposes no write methods.
+The BFF rejects non-loopback Manager URLs, strips registered Plasma Gateway Endpoints and raw Manager errors, and exposes no generic write proxy.
 
 ## Opt-in runtime variables
 
@@ -90,7 +90,8 @@ Do not infer from the integration-host demo that Z2 must run the Control Station
 Z2 / PPU role
 - Embedded Linux
 - Plasma Server
-- Plasma Web REST Gateway
+- Plasma Gateway
+- Plasma Gateway API
 - PYNQ / FPGA runtime
 - PPU execution and diagnostics APIs
 
@@ -102,5 +103,7 @@ Control Station / Management Host role
 - Plasma Manager
 - optional SQLite observation store
 ```
+
+The Plasma Gateway Endpoint is the PPU network location used by Manager or explicit Standalone clients. It is distinct from a Linux **Default Gateway**, which is only an IP-routing next hop for the PPU interface.
 
 The integration workstation may co-locate both roles for development and demonstration only. A separate PPU Programming frontend is not part of the canonical product surface.

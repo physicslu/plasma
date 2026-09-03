@@ -12,7 +12,7 @@ Canonical ownership is defined in [Control Plane Routing Architecture](control-p
 
 A Plasma PPU is a complete autonomous execution node. It must not require a live Manager connection to:
 
-- start its local Plasma Server and PPU Gateway;
+- start its local Plasma Server and Plasma Gateway;
 - expose its explicit local/Standalone maintenance boundary;
 - continue an already accepted Job or Batch;
 - recover a Site;
@@ -28,10 +28,10 @@ PPU autonomy does **not** mean that a centrally managed Console may bypass Manag
 
 ```text
 Standalone Mode
-local client -> PPU Gateway -> Plasma Server -> local execution
+local client -> Plasma Gateway -> Plasma Server -> local execution
 
 Managed Mode
-Control Console -> BFF -> Manager -> selected PPU Gateway -> Plasma Server -> local execution
+Control Console -> BFF -> Manager -> selected Plasma Gateway -> Plasma Server -> local execution
 ```
 
 Manager is optional for the PPU, but mandatory for a Managed Mode central request once that mode is selected.
@@ -42,7 +42,7 @@ Manager is optional for the PPU, but mandatory for a Managed Mode central reques
 
 ```text
 PPU / Z2
-├── PPU Gateway
+├── Plasma Gateway
 ├── Plasma Server
 ├── PS runtime
 ├── PL / FPGA
@@ -63,8 +63,8 @@ Management Host
 ├── BFF
 └── Plasma Manager
        |
-       +--> PPU A Gateway -> local execution
-       +--> PPU B Gateway -> local execution
+       +--> PPU A Plasma Gateway -> local execution
+       +--> PPU B Plasma Gateway -> local execution
        +--> ...
 ```
 
@@ -78,7 +78,7 @@ No Manager or central host is required for local PPU capability:
 Local client / local PPU Console
         |
         v
-PPU Gateway
+Plasma Gateway
         |
         v
 Plasma Server
@@ -104,7 +104,7 @@ Plasma Manager
       |
       | resolve configured ppu_alias / canonical identity
       v
-Target PPU Gateway
+Target Plasma Gateway
       |
       v
 Plasma Server
@@ -115,7 +115,7 @@ local execution
 
 PMode, EMode, Programming Asset/Image transfer and PS Loopback use the same Managed Mode routing ownership.
 
-A previously stored direct Gateway URL is not the Managed Mode routing source of truth. When the Management Host is configured for Manager routing, the shared Workspace API base uses the same-origin Manager BFF path. An operator may select Standalone Mode explicitly when a direct local PPU workflow is intended.
+A previously stored direct Plasma Gateway Endpoint is not the Managed Mode routing source of truth. When the Management Host is configured for Manager routing, the shared Workspace API base uses the same-origin Manager BFF path. An operator may select Standalone Mode explicitly when a direct local PPU workflow is intended.
 
 ## Browser-facing BFF boundary
 
@@ -125,7 +125,7 @@ It provides:
 
 - same-origin browser APIs;
 - validation of the management-host-local Manager configuration;
-- a configured PPU alias without exposing the PPU endpoint;
+- a configured PPU alias without exposing the Plasma Gateway Endpoint;
 - bounded body forwarding for Programming Asset/Image traffic;
 - propagation of required `Authorization` and `Idempotency-Key` headers;
 - binary response preservation for readback;
@@ -133,15 +133,15 @@ It provides:
 
 The BFF does not accept arbitrary PPU destination URLs and does not own the alias-to-endpoint mapping.
 
-The PPU/Site configuration surface also uses an alias-scoped BFF route for PPU network desired state. The Browser supplies a registry alias and the fixed `ppu-network` resource kind; it never supplies the physical PPU destination URL.
+The PPU/Site configuration surface also uses an alias-scoped BFF route for PPU network desired state. The Browser supplies a registry alias and the fixed `ppu-network` resource kind; it never supplies the physical Plasma Gateway Endpoint.
 
 ## Plasma Manager boundary
 
 Manager owns fleet identity and managed route resolution:
 
 ```text
-ppu-a -> configured PPU A Gateway
-ppu-b -> configured PPU B Gateway
+ppu-a -> configured Plasma Gateway Endpoint for PPU A
+ppu-b -> configured Plasma Gateway Endpoint for PPU B
 ```
 
 A managed request is relayed only through explicit allowlisted domain route families. Manager is **not** a generic arbitrary-method/arbitrary-URL HTTP proxy.
@@ -153,25 +153,25 @@ Current managed route families support the central PPU workflow for:
 - Programming Asset/Image check and upload;
 - Job submit/status/cancel/readback;
 - server-side Batch submit/status/cancel;
-- Gateway communication-policy read/write;
+- Plasma Gateway communication-policy read/write;
 - PPU network desired-state read/write through `/api/settings/ppu-network`;
 - Engineering Mock runtime settings read/write when that PPU runtime exposes the Mock feature;
 - authenticated Principal introspection;
 - PS real-path Loopback.
 
-The Gateway/Mock/PPU-network settings writes remain subject to the PPU secure Gateway authorization/idempotency contracts. Manager merely preserves and routes that evidence.
+The Plasma Gateway/Mock/PPU-network settings writes remain subject to the secure Plasma Gateway authorization/idempotency contracts. Manager merely preserves and routes that evidence.
 
-PPU network **activation** is not part of the generic managed relay allowlist in this slice. Changing a PPU endpoint and changing Manager's durable registry endpoint form one commissioning transaction and require explicit orchestration, same-`ppu_id` revalidation and rollback handling. The Browser therefore cannot promote desired-state access into an arbitrary activation sequence.
+PPU network **activation** is not part of the generic managed relay allowlist in this slice. Changing a Plasma Gateway Endpoint and changing Manager's durable registry endpoint form one commissioning transaction and require explicit orchestration, same-`ppu_id` revalidation and rollback handling. The Browser therefore cannot promote desired-state access into an arbitrary activation sequence.
 
 The fleet registry and fleet observation resources themselves remain read-only surfaces except for the explicit runtime-registry lifecycle API. Unsupported write routes fail closed.
 
-## PPU Gateway boundary
+## Plasma Gateway boundary
 
-The PPU Gateway is the northbound network boundary of one Programmer:
+The Plasma Gateway is the northbound API boundary of one Programmer:
 
 ```text
 Z2 / PPU
-├── PPU Gateway
+├── Plasma Gateway
 ├── Plasma Server
 ├── PS
 ├── PL
@@ -180,7 +180,7 @@ Z2 / PPU
 
 It validates its local REST/security contract, translates accepted requests to local runtime behavior and reports local status/errors. It does not choose between PPUs.
 
-The PPU secure Gateway remains the final execution authorization authority. Manager/BFF preserve authentication and idempotency evidence but do not grant permissions or widen Facility/PPU/Site scopes.
+The secure Plasma Gateway remains the final execution authorization authority. Manager/BFF preserve authentication and idempotency evidence but do not grant permissions or widen Facility/PPU/Site scopes.
 
 ## PPU northbound contract
 
@@ -193,7 +193,7 @@ GET /api/node
 GET /api/status
 ```
 
-Managed write/read relay uses the existing PPU Gateway production API rather than defining a second Programming protocol. Exact Manager allowlisting is intentionally narrower than the complete standalone Gateway API surface.
+Managed write/read relay uses the existing Plasma Gateway API rather than defining a second Programming protocol. Exact Manager allowlisting is intentionally narrower than the complete standalone Plasma Gateway API surface.
 
 ## Programming Asset / Image direction
 
@@ -203,12 +203,12 @@ Phase 1 uses Manager-mediated Asset/Image transfer:
 Control Console
  -> BFF
  -> Manager
- -> selected PPU Gateway
+ -> selected Plasma Gateway
  -> Programming Asset / Batch contract
  -> PPU cache / Programming Runtime
 ```
 
-The common routing owner does not require one wire representation for every workflow. EMode individual Engineering Jobs use binary Programming Asset cache upload plus `asset_sha256` Job references. PMode server-side Batch preserves its existing bounded JSON Asset envelope containing `asset_base64`, declared size and SHA-256; the PPU Gateway decodes and validates that envelope before caching/execution.
+The common routing owner does not require one wire representation for every workflow. EMode individual Engineering Jobs use binary Programming Asset cache upload plus `asset_sha256` Job references. PMode server-side Batch preserves its existing bounded JSON Asset envelope containing `asset_base64`, declared size and SHA-256; the Plasma Gateway decodes and validates that envelope before caching/execution.
 
 Manager does not introduce or translate either representation. BFF and Manager forward the incoming body without decoding/re-encoding the Asset. Current PMode limits a selected Image to 4 MiB, so the Base64-expanded Batch body remains below the current 24 MiB managed request bound.
 
@@ -222,7 +222,7 @@ Manager / BFF unavailable
     -> already accepted PPU work continues locally
     -> explicit Standalone/local maintenance remains available
 
-Gateway failure on one PPU
+Plasma Gateway failure on one PPU
     -> that PPU loses managed REST access
     -> other PPUs remain independent
 
@@ -242,7 +242,7 @@ Current invariants include:
 - caller cannot supply a PPU destination URL;
 - Manager resolves only enrolled/configured aliases;
 - BFF and Manager forward only intentional headers;
-- PPU Gateway remains authoritative for Principal, permission and resource scope;
+- secure Plasma Gateway remains authoritative for Principal, permission and resource scope;
 - `Idempotency-Key` remains available to the PPU replay ledger;
 - unsupported route/method combinations fail closed;
 - Managed Mode does not silently bypass Manager.
@@ -257,7 +257,7 @@ Current invariants include:
 | Managed Programming Job routing | Implemented as explicit allowlisted relay |
 | Managed Programming Asset/Image relay | Implemented, bounded; EMode binary upload and PMode bounded Batch envelope retain their existing PPU contracts |
 | Managed Batch routing | Implemented for current server-side Batch REST family |
-| Managed Gateway/Mock settings | Explicit allowlisted read/write routes; PPU secure Gateway remains authorization authority |
+| Managed Plasma Gateway/Mock settings | Explicit allowlisted read/write routes; secure Plasma Gateway remains authorization authority |
 | Managed PPU network desired state | Explicit allowlisted `GET/POST /api/settings/ppu-network`; activation is not exposed through generic relay |
 | Manager network commissioning transaction | Not implemented in this slice; must own static endpoint migration, identity revalidation, commit/rollback and registry reconciliation |
 | Manager arbitrary reverse proxy | Prohibited |

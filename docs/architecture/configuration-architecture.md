@@ -1,6 +1,6 @@
 # Plasma Configuration Architecture
 
-> Status: current baseline for standalone integration-host deployment, managed Control Station routing, optional Plasma Manager, Engineering Mock Provider, and shared Gateway communication policy.
+> Status: current baseline for standalone integration-host deployment, managed Control Station routing, optional Plasma Manager, Engineering Mock Provider, and shared Plasma Gateway communication policy.
 
 This document defines ownership, source-of-truth, precedence, persistence, migration, and reconciliation rules for Plasma configuration. It intentionally avoids private account names, private hostnames, and workstation-specific absolute paths.
 
@@ -28,7 +28,7 @@ A formal Control Station therefore routes:
 Browser
   -> same-origin Console/BFF
   -> Plasma Manager
-  -> selected PPU
+  -> selected PPU Plasma Gateway
 ```
 
 A standalone integration host routes:
@@ -37,11 +37,22 @@ A standalone integration host routes:
 Browser
   -> same-origin Web endpoint
   -> local Vite proxy
-  -> local Plasma Web REST Gateway
+  -> local Plasma Gateway
   -> local PPU / Engineering Mock Provider
 ```
 
-Neither topology requires a hard-coded remote Gateway URL in Browser source code.
+Neither topology requires a hard-coded remote Plasma Gateway Endpoint in Browser source code.
+
+Canonical network/service terminology is:
+
+```text
+Plasma Gateway          northbound API service running on each PPU
+Plasma Gateway API      REST contract exposed by that service
+Plasma Gateway Endpoint service location, e.g. http://192.168.2.99:18080
+Default Gateway         Linux eth0 Layer-3 next-hop router
+```
+
+Existing config/API identifiers containing `GATEWAY` or `gateway` remain compatibility identifiers unless explicitly migrated. Their names do not collapse the four concepts above.
 
 ## 2. Canonical domain
 
@@ -70,8 +81,9 @@ The word **Facility** is used for a factory/lab/deployment location. **Site** is
 | Browser routing mode | managed vs standalone | Runtime/deployment | Same-origin discovery plus generated service environment |
 | PPU identity | PPU ID, model, serial identity, facility association | Device provisioning | Device-local persistent identity |
 | PPU capability | Site count, supported operations/interfaces, FPGA/Image capability | PPU runtime/hardware | Device-reported capability |
-| Gateway communication policy | PPU request timeout and retry count | Plasma Web REST Gateway | Persistent Gateway settings YAML |
-| Derived communication budget | complete PPU observation response budget | Plasma Web REST Gateway | Derived from Gateway policy; not persisted |
+| Plasma Gateway communication policy | PPU request timeout and retry count | Plasma Gateway | Persistent Gateway settings YAML |
+| Derived communication budget | complete PPU observation response budget | Plasma Gateway | Derived from Plasma Gateway policy; not persisted |
+| PPU network configuration | IPv4 address, prefix, Default Gateway, DNS | PPU network subsystem | PPU-owned desired network state |
 | Site configuration | Site enablement, interface binding, per-Site limits | PPU configuration | Canonical PPU config |
 | Target profile | IC family, memory geometry, interface | Target-definition layer | Checked-in target/profile data |
 | Job configuration | operation, target, file, offset, read length | Job request/server | Accepted server-side job record |
@@ -79,7 +91,7 @@ The word **Facility** is used for a factory/lab/deployment location. **Site** is
 | User preference | theme, layout, visible Sites | Browser/user | Browser-local preference storage |
 | Secrets/credentials | certificates, tokens, private keys | Security/deployment layer | Protected secret storage |
 
-A browser may cache presentation preferences, but it must not become authoritative for PPU inventory, Site topology, Site capability, hardware capability, Gateway retry policy, Gateway response budget, Manager selection, or PPU endpoint URLs.
+A browser may cache presentation preferences, but it must not become authoritative for PPU inventory, Site topology, Site capability, hardware capability, Plasma Gateway retry policy, Plasma Gateway response budget, Manager selection, Plasma Gateway Endpoint URLs, or Linux Default Gateway configuration.
 
 ## 4. Deployment configuration
 
@@ -114,6 +126,8 @@ PLASMA_MANAGER_PPU_ALIAS=
 PLASMA_ENGINEERING_MOCK_ENABLED=0
 PLASMA_ENGINEERING_MOCK_ROOT=/path/to/runtime-state/engineering-mock
 ```
+
+`PLASMA_GATEWAY_HOST` and `PLASMA_GATEWAY_PORT` are existing deployment identifiers for the Plasma Gateway listener. They are retained for configuration compatibility.
 
 `PLASMA_PUBLIC_API_URL` is retained only as a compatibility field in schema v6 and is empty by default. It is no longer the Browser's topology owner. New deployments use same-origin Browser routing.
 
@@ -184,18 +198,18 @@ There is no universal precedence chain for every setting. Precedence is domain-s
 
 ### Browser API routing
 
-Direct Browser ownership of a remote Gateway endpoint is retired.
+Direct Browser ownership of a remote Plasma Gateway Endpoint is retired.
 
-Standalone integration-host mode uses the Browser's current origin. Local Vite routing proxies PPU-local API namespaces to the local Gateway, currently `127.0.0.1:18080` by default.
+Standalone integration-host mode uses the Browser's current origin. Local Vite routing proxies PPU-local API namespaces to the local Plasma Gateway, currently `127.0.0.1:18080` by default.
 
-Managed Control Station mode uses the same-origin Manager/BFF namespace. The Browser does not receive or edit the selected PPU Gateway URL.
+Managed Control Station mode uses the same-origin Manager/BFF namespace. The Browser does not receive or edit the selected PPU Plasma Gateway Endpoint.
 
 ```text
 standalone:
-Browser -> same origin -> local proxy -> Gateway
+Browser -> same origin -> local proxy -> Plasma Gateway
 
 managed:
-Browser -> same origin -> Console/BFF -> Manager -> selected PPU
+Browser -> same origin -> Console/BFF -> Manager -> selected PPU Plasma Gateway
 ```
 
 An old Browser-local absolute API Base is migration input only. It is not retained as current topology truth.
@@ -212,19 +226,23 @@ An old Browser-local absolute API Base is migration input only. It is not retain
 
 Once a job is accepted, the server-side job record is authoritative for that execution.
 
-### Gateway communication policy
+### Plasma Gateway communication policy
 
 ```text
-1. persistent Gateway settings selected by --gateway-settings
+1. persistent Plasma Gateway settings selected by --gateway-settings
 2. <output-root>/gateway-settings.yaml
 3. code defaults: 10-second PPU request timeout and 3 retries
 ```
 
-The resource is edited through `EMode -> Settings -> Gateway` and shared by PMode and EMode. Each Batch freezes a policy revision at START; updates affect only future Batches.
+The `--gateway-settings` option and `gateway-settings.yaml` filename are retained implementation identifiers. The resource is edited through `EMode -> Settings -> Plasma Gateway` and shared by PMode and EMode. Each Batch freezes a policy revision at START; updates affect only future Batches.
 
-The writable persistent fields are `ppu_request_timeout_ms` and `ppu_retry_count`; `revision` is server-owned. The complete observation budget `ppu_response_budget_ms` is calculated by the Gateway from configured attempts plus communication backoff. It is read-only, not persisted, and must not be treated as a third operator setting.
+The writable persistent fields are `ppu_request_timeout_ms` and `ppu_retry_count`; `revision` is server-owned. The complete observation budget `ppu_response_budget_ms` is calculated by the Plasma Gateway from configured attempts plus communication backoff. It is read-only, not persisted, and must not be treated as a third operator setting.
 
 The Browser may derive an outer HTTP watchdog from `ppu_response_budget_ms` plus a transport margin. That watchdog is a client-side transport guard only. It must not become a second source of truth for PPU request timeout or retry count.
+
+### PPU network Default Gateway
+
+For static PPU network configuration, the JSON compatibility field `gateway` means **Default Gateway**: the Linux Layer-3 next-hop router for `eth0`. It does not identify the Plasma Gateway service or Plasma Gateway Endpoint.
 
 ## 7. Schema versioning and migration
 
@@ -250,7 +268,7 @@ reconcile derived runtime state
 
 Schema v5 added `PLASMA_MANAGER_PPU_ALIAS`. Migration preserved an existing explicit value; otherwise it added an empty value. It did not infer a command target from Manager registry ordering.
 
-Schema v6 retires Browser-owned direct Gateway endpoints. Migration deliberately clears `PLASMA_PUBLIC_API_URL`, including prior custom values, because those values represented an ownership model that no longer exists. The local Gateway and Engineering Mock Provider are not removed; they remain reachable through same-origin integration-host routing.
+Schema v6 retires Browser-owned direct Plasma Gateway Endpoints. Migration deliberately clears `PLASMA_PUBLIC_API_URL`, including prior custom values, because those values represented an ownership model that no longer exists. The local Plasma Gateway and Engineering Mock Provider are not removed; they remain reachable through same-origin integration-host routing.
 
 Browser storage has a parallel migration boundary. Browser API-base storage schema v3 clears previously stored absolute API endpoints so runtime routing can resolve to same-origin standalone or Manager-owned managed transport.
 
@@ -303,13 +321,14 @@ The following must not become authoritative browser state:
 
 ```text
 PPU inventory
-PPU endpoint URLs
+Plasma Gateway Endpoint URLs
 selected PPU routing truth
 PPU Site count
 Site enable/disable truth
 PPU hardware interfaces/capability
-Gateway timeout/retry policy
-Gateway response budget
+Plasma Gateway timeout/retry policy
+Plasma Gateway response budget
+PPU Default Gateway / DNS
 production routing policy
 authentication secrets
 job execution state
@@ -350,12 +369,12 @@ same-origin Console/BFF
         v
 Plasma Manager
         |
-        +-- selected PPU A Gateway -> local execution
-        +-- selected PPU B Gateway -> local execution
-        +-- selected PPU C Gateway -> local execution
+        +-- selected PPU A Plasma Gateway -> local execution
+        +-- selected PPU B Plasma Gateway -> local execution
+        +-- selected PPU C Plasma Gateway -> local execution
 ```
 
-The packaged Windows and macOS Control Station runtime must start in managed mode. A clean installation with no selected PPU fails closed at the Manager/BFF routing boundary; it must not silently fall back to a remote or remembered Gateway endpoint.
+The packaged Windows and macOS Control Station runtime must start in managed mode. A clean installation with no selected PPU fails closed at the Manager/BFF routing boundary; it must not silently fall back to a remote or remembered Plasma Gateway Endpoint.
 
 The standalone integration-host path remains valid for development, Engineering Mock, and PPU-local operation:
 
@@ -366,7 +385,7 @@ Browser
 same-origin Vite runtime
    |
    v
-local Gateway
+local Plasma Gateway
    |
    +-- Plasma Server / PPU execution
    `-- Engineering Mock Provider when enabled
@@ -397,11 +416,13 @@ What source version is running?
 What config schema is loaded?
 Is Browser routing standalone or managed?
 Which PPU alias is selected by Manager?
+What Plasma Gateway Endpoint is registered for that alias?
 What ports are active?
 What Facility / PPU identity is active?
 What Site topology/capability is active?
-What Gateway policy revision is active?
+What Plasma Gateway policy revision is active?
 What derived PPU response budget is effective?
+What PPU network mode / IPv4 / Default Gateway is desired?
 ```
 
 A future structured read-only effective-configuration/status endpoint may reduce ambiguity, but its API contract should be designed deliberately rather than inferred from UI convenience.
@@ -413,8 +434,8 @@ A future structured read-only effective-configuration/status endpoint may reduce
 | `PLASMA_CONFIG_VERSION` | Facility/deployment | Deployment | `plasmactl.env` | Current schema v6 |
 | `PLASMA_REPO` | Facility/deployment | Deployment | `plasmactl.env` | Host-specific repository location |
 | `PLASMA_BRANCH` | Facility/deployment | Deployment | `plasmactl.env` | Normal deployment branch is `main` |
-| `PLASMA_GATEWAY_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Gateway bind input |
-| `PLASMA_GATEWAY_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current deployment default 18080 |
+| `PLASMA_GATEWAY_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Plasma Gateway bind input; key retained for compatibility |
+| `PLASMA_GATEWAY_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Plasma Gateway deployment port; current default 18080 |
 | `PLASMA_VITE_HOST` | Facility/deployment | Deployment | `plasmactl.env` | Integration-host Web binding |
 | `PLASMA_VITE_PORT` | Facility/deployment | Deployment | `plasmactl.env` | Current default 5173 |
 | `PLASMA_PUBLIC_API_URL` | Compatibility | Deployment migration | `plasmactl.env` | Empty in schema v6; direct Browser endpoint ownership retired |
@@ -428,9 +449,10 @@ A future structured read-only effective-configuration/status endpoint may reduce
 | `PLASMA_ENGINEERING_MOCK_ROOT` | Test runtime | Deployment | Operator-local state path | Must remain outside the Git worktree |
 | `NEXT_PUBLIC_PLASMA_API_URL` | Legacy/explicit build input | Deployment/build | Environment when deliberately supplied | No hard-coded remote fallback |
 | Same-origin Browser API base | Browser transport | Runtime | `window.location.origin` | Default standalone Browser route |
-| Gateway PPU timeout/retry | Gateway policy | Gateway | Persistent Gateway settings YAML | Frozen into each Batch snapshot |
-| `ppu_response_budget_ms` | Derived Gateway policy | Gateway | Calculated from timeout/retry/backoff | Read-only; not persisted/writable |
-| Browser HTTP watchdog | Derived transport guard | Browser | Gateway response budget + margin | Not a PPU policy source |
+| Plasma Gateway PPU timeout/retry | Plasma Gateway policy | Plasma Gateway | Persistent Gateway settings YAML | Frozen into each Batch snapshot |
+| `ppu_response_budget_ms` | Derived Plasma Gateway policy | Plasma Gateway | Calculated from timeout/retry/backoff | Read-only; not persisted/writable |
+| Browser HTTP watchdog | Derived transport guard | Browser | Plasma Gateway response budget + margin | Not a PPU policy source |
+| PPU network JSON `gateway` | PPU network desired state | PPU network subsystem | `ppu-network-settings.yaml` | Means Linux Default Gateway; wire key retained |
 | Browser theme/layout | User preference | Browser/user | Browser storage | User-local only |
 | PPU ID | PPU identity | PPU provisioning | Device-local identity | Stable resource identity |
 | Site count | PPU capability | PPU/device | Device capability report | Support 1–8 in current software |
@@ -445,9 +467,10 @@ A future structured read-only effective-configuration/status endpoint may reduce
 3. Keep Browser routing same-origin and topology out of browser storage
 4. Keep canonical Site identity one-based across new layers
 5. Keep Manager control-plane routing separate from PPU-local execution ownership
-6. Keep Gateway communication policy server-owned and derived budgets read-only
-7. Keep Engineering Mock available without reintroducing direct Browser Gateway ownership
-8. Add effective-config observability where ambiguity remains operationally costly
+6. Keep Plasma Gateway communication policy server-owned and derived budgets read-only
+7. Keep Plasma Gateway Endpoint distinct from Linux Default Gateway
+8. Keep Engineering Mock available without reintroducing direct Browser Plasma Gateway ownership
+9. Add effective-config observability where ambiguity remains operationally costly
 ```
 
 Do not build a large generic configuration framework merely because configuration exists. Add abstraction only when repeated concrete requirements justify it.

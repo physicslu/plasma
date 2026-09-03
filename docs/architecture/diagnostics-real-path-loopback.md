@@ -10,7 +10,7 @@ In Managed Mode, PS Loopback now uses the same production routing prefix as PMod
 Control Console
  -> BFF
  -> Plasma Manager
- -> selected PPU Gateway
+ -> selected Plasma Gateway
  -> Plasma Server
 ```
 
@@ -22,7 +22,7 @@ This is software architecture evidence only until the deployed Management Host -
 
 Loopback is a fault-isolation diagnostic. A PASS at endpoint `X` is valid only if the test payload actually crosses into `X`, is processed by the implementation assigned to `X`, and returns through the expected production boundaries.
 
-A diagnostic transport must not bypass the route used by the production operation it is intended to qualify. This requirement prevents the misleading condition previously possible when Manager-mediated Loopback could PASS while Programming used an unrelated direct Gateway `apiBase` and failed.
+A diagnostic transport must not bypass the route used by the production operation it is intended to qualify. This requirement prevents the misleading condition previously possible when Manager-mediated Loopback could PASS while Programming used an unrelated direct Plasma Gateway API base and failed.
 
 ## Shared Managed Mode route
 
@@ -39,13 +39,13 @@ Plasma Manager
       |
       | resolve configured ppu_alias
       v
-PPU Gateway
+Plasma Gateway
       |
       v
 Plasma Server
 ```
 
-PMode, EMode and Loopback share the Workspace API base. When Manager routing is configured, that base is the same-origin Managed PPU BFF path. Managed Mode never silently falls back to a stored direct PPU URL.
+PMode, EMode and Loopback share the Workspace API base. When Manager routing is configured, that base is the same-origin Managed PPU BFF path. Managed Mode never silently falls back to a stored direct Plasma Gateway Endpoint.
 
 ### Loopback selected
 
@@ -53,7 +53,7 @@ PMode, EMode and Loopback share the Workspace API base. When Manager routing is 
 Control Console
  -> BFF
  -> Manager
- -> PPU Gateway
+ -> Plasma Gateway
  -> Plasma Server
       |
       v
@@ -70,7 +70,7 @@ Control Console
 Control Console
  -> BFF
  -> Manager
- -> PPU Gateway
+ -> Plasma Gateway
  -> Plasma Server
       |
       v
@@ -90,11 +90,11 @@ The shared prefix proves route ownership, not downstream equivalence. PS Loopbac
 Current PPU-side PS execution remains:
 
 ```text
-PPU Gateway
+Plasma Gateway
   -> Plasma Protocol v3.3 diagnostic_request
   -> Plasma Server / PS diagnostic handler
   -> diagnostic_response
-  -> PPU Gateway
+  -> Plasma Gateway
 ```
 
 The PS handler does **not** enqueue a Programming Job and does **not** enter a Site Interface. It does not call `MockInterface`, even when the development configuration contains Mock Sites.
@@ -128,10 +128,10 @@ seed              deterministic seed; empty when unused
 payload_length    decoded payload bytes
 payload_base64    Browser-generated payload
 tx_crc32          lowercase CRC32 of decoded payload
-timeout_ms        per-case Gateway -> Plasma Server timeout
+timeout_ms        per-case Plasma Gateway -> Plasma Server timeout
 ```
 
-The PPU Gateway validates the payload before forwarding it to Plasma Server. There is no Engineering Provider or Mock fallback.
+The Plasma Gateway validates the payload before forwarding it to Plasma Server. There is no Engineering Provider or Mock fallback.
 
 ## Diagnostic Protocol v1
 
@@ -196,7 +196,7 @@ Latency measurements are distinct:
 
 - **Browser RTT**: browser-visible end-to-end time through the actual route.
 - **Manager RTT**: Manager relay observation for the selected PPU request.
-- **PPU RTT**: PPU Gateway -> Plasma Server -> PPU Gateway.
+- **PPU RTT**: Plasma Gateway -> Plasma Server -> Plasma Gateway.
 
 These values are observations, not substitutes for endpoint correctness.
 
@@ -212,13 +212,13 @@ A claim stops at the deepest endpoint actually crossed:
 
 ```text
 PS Loopback PASS
-Console -> BFF -> Manager -> PPU Gateway -> Server -> PS
+Console -> BFF -> Manager -> Plasma Gateway -> Server -> PS
 
 PL Loopback PASS
-Console -> BFF -> Manager -> PPU Gateway -> Server -> PS -> PL
+Console -> BFF -> Manager -> Plasma Gateway -> Server -> PS -> PL
 
 IC Loopback PASS
-Console -> BFF -> Manager -> PPU Gateway -> Server -> PS -> PL -> IC
+Console -> BFF -> Manager -> Plasma Gateway -> Server -> PS -> PL -> IC
 ```
 
 Examples:
@@ -243,7 +243,7 @@ Managed Programming Asset/Image transfer uses the production route:
 Control Console
  -> BFF
  -> Manager
- -> selected PPU Gateway
+ -> selected Plasma Gateway
  -> PPU Asset Service / Cache
 ```
 
@@ -261,7 +261,7 @@ A diagnostic-only Asset upload route would recreate false confidence and is proh
 
 ## Security boundary
 
-The PPU secure Gateway remains the execution authorization authority. Managed BFF and Manager preserve required `Authorization` and `Idempotency-Key` headers; they do not grant permissions or widen resource scope.
+The secure Plasma Gateway remains the execution authorization authority. Managed BFF and Manager preserve required `Authorization` and `Idempotency-Key` headers; they do not grant permissions or widen resource scope.
 
 Current PS Loopback is non-destructive and uses its existing authorization contract. Future PL/IC diagnostics that change hardware state, power, routing, reset or I/O require their own authorization/safety review.
 

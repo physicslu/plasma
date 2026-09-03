@@ -194,10 +194,10 @@ The current UI is the **Plasma PPU Console**. It discovers PPU/Site topology dyn
 | Service | Default port | Role |
 |---|---:|---|
 | Plasma PPU Programming Server | 9900 | Plasma Protocol v3.3 TCP Server |
-| Plasma Web REST Gateway | 18080 | HTTP REST boundary for the Web Console |
+| Plasma Gateway | 18080 | Plasma Gateway API / HTTP REST boundary for the Web Console |
 | Plasma PPU Console development/demo service | 5173 | Vite/Vinext Web runtime |
 
-The current Gateway uses Python standard-library HTTP (`ThreadingHTTPServer`) and REST polling. It is not FastAPI and does not currently use WebSocket.
+The current Plasma Gateway uses Python standard-library HTTP (`ThreadingHTTPServer`) and REST polling. It is not FastAPI and does not currently use WebSocket.
 
 A port number is not a credential. The security boundary is whether that port is exposed to an untrusted network and what authentication/authorization protects it.
 

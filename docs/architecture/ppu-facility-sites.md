@@ -17,6 +17,9 @@ Plasma System
 - **PPU**: **Plasma Programming Unit**, one physical autonomous programming device and local execution node.
 - **Site**: **Programming Site**, one independently controlled programming position inside a PPU.
 - **Socket**: mechanical/electrical IC fixture attached to a Site. Site and Socket are separate abstractions.
+- **Plasma Gateway**: the PPU-local northbound API service.
+- **Plasma Gateway API**: the REST contract exposed by Plasma Gateway.
+- **Plasma Gateway Endpoint**: the network location used to reach a Plasma Gateway.
 
 At the current prototype stage, one Site normally drives one Socket and one target IC. The model does not require that relation to remain permanently one-to-one.
 
@@ -49,8 +52,9 @@ A PPU MUST remain independently operable without Plasma Manager.
 Browser / local client
         |
         v
-PPU-local Plasma Web REST Gateway
+PPU-local Plasma Gateway
         |
+        | Plasma Gateway API
         v
 Plasma Server
         |
@@ -84,7 +88,7 @@ Facility A                Facility B
         +-- ... SITE N
 ```
 
-The Manager owns fleet concerns such as registry, health aggregation, routing policy and fleet audit. Each PPU owns local execution, deterministic protocol timing, Site arbitration, hardware safety and recovery.
+The Manager owns fleet concerns such as registry, health aggregation, routing policy and fleet audit. Each PPU owns its Plasma Gateway, local execution, deterministic protocol timing, Site arbitration, hardware safety and recovery.
 
 ## Canonical configuration
 
@@ -143,7 +147,7 @@ Protocol v3.3 STATUS exposes `ppu` and `sites` using one-based Site identity:
 
 ## REST boundary
 
-The Plasma Web REST Gateway uses canonical one-based Site addressing:
+The Plasma Gateway API uses canonical one-based Site addressing:
 
 ```text
 GET  /api/status?site=1
@@ -151,6 +155,17 @@ POST /api/jobs  { "site_id": 1, ... }
 ```
 
 REST v3 accepts canonical Site fields only; retired zero-based addressing is not an alternate REST contract.
+
+## Network terminology boundary
+
+The Plasma Gateway service must not be confused with Linux routing configuration:
+
+```text
+Plasma Gateway Endpoint  http://192.168.2.99:18080
+Default Gateway          e.g. 192.168.2.1 router / next hop
+```
+
+The PPU network JSON field `gateway` is retained for wire compatibility and means **Default Gateway**.
 
 ## Plasma Protocol v3.3
 

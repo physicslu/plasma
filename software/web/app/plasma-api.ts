@@ -248,7 +248,7 @@ export function normalizeApiBase(value: string): string {
   if (!trimmed) return "";
   const url = new URL(trimmed);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Plasma Web REST Gateway URL 必須使用 http:// 或 https://");
+    throw new Error("Plasma Gateway Endpoint 必須使用 http:// 或 https://");
   }
   return url.toString().replace(/\/$/, "");
 }
@@ -275,7 +275,7 @@ async function statusObservationTimeoutMs(apiBase: string, requestedTimeoutMs?: 
     return gatewayStatusObservationTimeoutMs(settings);
   } catch (error) {
     throw new PlasmaApiError(
-      `Gateway communication policy unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+      `Plasma Gateway communication policy unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
       undefined,
       undefined,
       true,
@@ -336,14 +336,14 @@ async function requestJson<T>(
     if (error instanceof PlasmaApiError) throw error;
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new PlasmaApiError(
-        `Plasma Web REST Gateway request timed out · ${method} ${path} · ${Date.now() - startedAt} ms`,
+        `Plasma Gateway request timed out · ${method} ${path} · ${Date.now() - startedAt} ms`,
         undefined,
         undefined,
         true,
       );
     }
     throw new PlasmaApiError(
-      `${error instanceof Error ? error.message : "Plasma Web REST Gateway connection failed"} · ${method} ${path} · ${Date.now() - startedAt} ms`,
+      `${error instanceof Error ? error.message : "Plasma Gateway connection failed"} · ${method} ${path} · ${Date.now() - startedAt} ms`,
       undefined,
       undefined,
       true,

@@ -1,16 +1,16 @@
-# Gateway Communication and Recovery
+# Plasma Gateway Communication and Recovery
 
 ## Scope
 
-This document defines the Plasma Web REST Gateway-to-PPU communication policy and the server-side recovery boundary shared by PMode and EMode. It does not redefine the Plasma Protocol v3.3 Job timeout/retry policy or the Batch `site_retry_limit`; those are separate layers.
+This document defines the Plasma Gateway-to-PPU communication policy and the server-side recovery boundary shared by PMode and EMode. It does not redefine the Plasma Protocol v3.3 Job timeout/retry policy or the Batch `site_retry_limit`; those are separate layers.
 
 The ownership rule is explicit:
 
 ```text
 Browser / UI
-    -> observes Gateway responses and presents reconnect state
+    -> observes Plasma Gateway responses and presents reconnect state
 
-Plasma Web REST Gateway
+Plasma Gateway
     -> owns PPU request deadline, retry count, communication backoff,
        stable communication errors, and the declared response budget
 
@@ -18,29 +18,31 @@ PPU
     -> executes the requested status / Job operation
 ```
 
-A browser transport watchdog must never expire before the Gateway has had enough time to complete its declared PPU communication policy.
+A browser transport watchdog must never expire before the Plasma Gateway has had enough time to complete its declared PPU communication policy.
 
 ## Shared policy resource
 
-The canonical resource is:
+The canonical resource remains:
 
 ```text
 GET  /api/settings/gateway
 POST /api/settings/gateway
 ```
 
-EMode exposes the writable settings at `Settings -> Gateway`. PMode consumes the same Gateway-side policy and does not maintain a second PPU timeout/retry policy.
+The `/api/settings/gateway` path is retained as a compatibility-sensitive REST identifier. Its human-readable owner is the **Plasma Gateway**.
+
+EMode exposes the writable settings at `Settings -> Gateway`. PMode consumes the same Plasma Gateway-side policy and does not maintain a second PPU timeout/retry policy.
 
 | Field | Default | Allowed range | Meaning |
 |---|---:|---:|---|
-| `ppu_request_timeout_ms` | 10000 | 1000–120000 | Deadline for one Gateway-to-PPU provider attempt. |
+| `ppu_request_timeout_ms` | 10000 | 1000–120000 | Deadline for one Plasma Gateway-to-PPU provider attempt. |
 | `ppu_retry_count` | 3 | 0–10 | Additional attempts after a transient retryable observation failure. |
 | `revision` | 1 | positive integer | Server-owned revision; clients cannot write it. |
-| `ppu_response_budget_ms` | 47000 | derived | Read-only upper bound for the complete Gateway observation request, including configured attempts and communication backoff. |
+| `ppu_response_budget_ms` | 47000 | derived | Read-only upper bound for the complete Plasma Gateway observation request, including configured attempts and communication backoff. |
 
-`ppu_response_budget_ms` is derived by the Gateway and is not persisted or accepted in the settings POST body. With the default policy, four 10-second attempts plus 1 s, 2 s, and 4 s backoff produce a 47-second response budget.
+`ppu_response_budget_ms` is derived by the Plasma Gateway and is not persisted or accepted in the settings POST body. With the default policy, four 10-second attempts plus 1 s, 2 s, and 4 s backoff produce a 47-second response budget.
 
-When a persistence path is configured, only `revision`, `ppu_request_timeout_ms`, and `ppu_retry_count` are written atomically as YAML. A Batch snapshots the complete persistent policy at creation; an update changes only future Batches. Direct Engineering status observations read the current Gateway policy for each HTTP request.
+When a persistence path is configured, only `revision`, `ppu_request_timeout_ms`, and `ppu_retry_count` are written atomically as YAML. A Batch snapshots the complete persistent policy at creation; an update changes only future Batches. Direct Engineering status observations read the current Plasma Gateway policy for each HTTP request.
 
 ## Status observation boundary
 
@@ -51,22 +53,22 @@ GET /api/engineering/targets/{facility_id}/{ppu_id}/api/status
 GET /api/engineering/targets/{facility_id}/{ppu_id}/api/status?site={site_id}&job={job_id}
 ```
 
-These routes execute PPU communication inside the Gateway policy boundary. The Browser does not apply its own PPU attempt timeout or retry count.
+These routes execute PPU communication inside the Plasma Gateway policy boundary. The Browser does not apply its own PPU attempt timeout or retry count.
 
-For transient communication failures, the Gateway retries the provider call before returning an HTTP response. When retries are exhausted, the Gateway returns `503 Service Unavailable` with the stable communication error code:
+For transient communication failures, the Plasma Gateway retries the provider call before returning an HTTP response. When retries are exhausted, the Plasma Gateway returns `503 Service Unavailable` with the stable communication error code:
 
 ```text
 E2001 CONNECTION_FAILED
 E2002 CONNECTION_TIMEOUT
 ```
 
-PMode may perform a later background status re-probe after one complete Gateway request has failed. That UI recovery loop is a new observation request; it is not another IC attempt, does not increment manufacturing retry statistics, and does not replace the Gateway's PPU communication retry ownership.
+PMode may perform a later background status re-probe after one complete Plasma Gateway request has failed. That UI recovery loop is a new observation request; it is not another IC attempt, does not increment manufacturing retry statistics, and does not replace the Plasma Gateway's PPU communication retry ownership.
 
-The browser still has an HTTP transport watchdog to detect a Gateway/public-path request that never completes. Its deadline is derived from `ppu_response_budget_ms` plus a transport margin. The margin exists only to prevent an outer browser timeout from racing the authoritative Gateway policy.
+The browser still has an HTTP transport watchdog to detect a Plasma Gateway/public-path request that never completes. Its deadline is derived from `ppu_response_budget_ms` plus a transport margin. The margin exists only to prevent an outer browser timeout from racing the authoritative Plasma Gateway policy.
 
 ## Response-boundary diagnostics
 
-PPU-level Engineering status diagnostics separate the provider phase from the Gateway HTTP response-write phase. The normal sequence is:
+PPU-level Engineering status diagnostics separate the provider phase from the Plasma Gateway HTTP response-write phase. The normal sequence is:
 
 ```text
 engineering_ppu_status_start
@@ -78,9 +80,9 @@ The fields `provider_elapsed_ms`, `response_write_elapsed_ms`, and `total_elapse
 
 The semantics are deliberately narrow:
 
-- `engineering_ppu_status_ok` means the Gateway obtained a PPU/provider payload successfully. It does **not** prove that the HTTP response was written successfully or received by the Browser.
-- `engineering_ppu_status_response_sent` means the Gateway handler's response-write call returned successfully. It does **not** prove that Vite, Cloudflare/public ingress, or the Browser received or acknowledged the response.
-- `engineering_ppu_status_response_error` means the provider phase succeeded but the Gateway response-write call raised an exception. The diagnostic includes `error_type` plus provider/write/total timing.
+- `engineering_ppu_status_ok` means the Plasma Gateway obtained a PPU/provider payload successfully. It does **not** prove that the HTTP response was written successfully or received by the Browser.
+- `engineering_ppu_status_response_sent` means the Plasma Gateway handler's response-write call returned successfully. It does **not** prove that Vite, Cloudflare/public ingress, or the Browser received or acknowledged the response.
+- `engineering_ppu_status_response_error` means the provider phase succeeded but the Plasma Gateway response-write call raised an exception. The diagnostic includes `error_type` plus provider/write/total timing.
 - `engineering_ppu_status_error` remains a provider/PPU communication failure; response-write failures must not be misclassified as PPU failures.
 
 A response-write failure therefore has this diagnostic sequence:
@@ -98,13 +100,13 @@ The current diagnostics do not provide a per-request correlation ID. Timestamp o
 
 ## Retry boundary
 
-Only transient timeout, OS/connection failure, `CONNECTION_TIMEOUT`, and `CONNECTION_FAILED` are retryable. Gateway communication backoff is capped:
+Only transient timeout, OS/connection failure, `CONNECTION_TIMEOUT`, and `CONNECTION_FAILED` are retryable. Plasma Gateway communication backoff is capped:
 
 ```text
 1 s -> 2 s -> 4 s -> 4 s ...
 ```
 
-Job `start` submission is intentionally not retried. A timeout after an unacknowledged submission has an ambiguous outcome, so resending could create a duplicate Job. After the Gateway receives an accepted `job_id`, status observation is idempotent and may be retried.
+Job `start` submission is intentionally not retried. A timeout after an unacknowledged submission has an ambiguous outcome, so resending could create a duplicate Job. After the Plasma Gateway receives an accepted `job_id`, status observation is idempotent and may be retried.
 
 Batch `site_retry_limit` is different: it controls retry of a trustworthy Site operation failure inside the PPU Job contract. Operators and software must not add communication retry counts to Site retry counts or interpret communication recovery as another IC programming attempt.
 
@@ -113,8 +115,8 @@ Batch `site_retry_limit` is different: it controls retry of a trustworthy Site o
 | Failure | Runtime action | Manufacturing accounting |
 |---|---|---|
 | One Site returns `failed`/`timeout` after Site retry | Mark the Site `FAULTED`; apply Batch failed-Site threshold. | Count one `FAIL` for the affected IC round. |
-| Gateway observation retry is exhausted for one PPU during Batch execution | Mark trigger Site `ERROR`; mark that PPU failed; cancel active Jobs only on that PPU; prevent its remaining Sites from continuing. | Do not increment `FAIL`; state is infrastructure `ERROR`/`STOPPED`. |
-| Pre-Batch PPU status observation exhausts Gateway retries | Return `503/E2001` or `503/E2002`; UI marks communication degraded and may re-probe later. | No manufacturing result exists yet. |
+| Plasma Gateway observation retry is exhausted for one PPU during Batch execution | Mark trigger Site `ERROR`; mark that PPU failed; cancel active Jobs only on that PPU; prevent its remaining Sites from continuing. | Do not increment `FAIL`; state is infrastructure `ERROR`/`STOPPED`. |
+| Pre-Batch PPU status observation exhausts Plasma Gateway retries | Return `503/E2001` or `503/E2002`; UI marks communication degraded and may re-probe later. | No manufacturing result exists yet. |
 | Operator presses ABORT | Set Batch `STOPPING`; cancel all active Jobs in the Batch; reconcile terminal states. | Cancelled work is not PASS or FAIL. |
 | Failed-Site threshold is reached | Set Batch `STOPPING`; cancel all active Batch Jobs. | Existing PASS/FAIL remain; unprocessed work is stopped. |
 | Unhandled Batch runtime exception | Mark Batch `ERROR`; stop remaining work. | Do not fabricate IC results. |
@@ -140,10 +142,10 @@ Terminal states include `SUCCESS`, `PARTIAL`, `ERROR`, and `CANCELLED`. A reconn
 1. Record `batch_id` when applicable, Facility, PPU, Site, current `job_id`, policy revision and timestamps.
 2. Distinguish submission failure (no accepted Job identity) from status-observation failure (accepted Job identity may exist).
 3. For PPU-level Engineering observation, correlate `engineering_ppu_status_start`, optional `engineering_ppu_status_retry`, `engineering_ppu_status_ok` / `engineering_ppu_status_error`, and the response-boundary event `engineering_ppu_status_response_sent` / `engineering_ppu_status_response_error`.
-4. If `engineering_ppu_status_error` occurs, investigate the PPU/provider communication path and the Gateway retry classification before blaming the public path.
-5. If `engineering_ppu_status_ok` is followed by `engineering_ppu_status_response_error`, the provider completed but the Gateway response-write boundary failed; do not classify that incident as a PPU programming failure.
-6. If `engineering_ppu_status_ok` and `engineering_ppu_status_response_sent` are both present but the Browser still times out, the Gateway provider and handler response-write call both completed. Investigate the downstream Vite proxy / public ingress / Browser fetch path without claiming any one component as root cause until evidence identifies it.
-7. If `engineering_ppu_status_ok` appears without either response-boundary event, inspect the Gateway handler/write path and confirm the deployed version before drawing conclusions.
+4. If `engineering_ppu_status_error` occurs, investigate the PPU/provider communication path and the Plasma Gateway retry classification before blaming the public path.
+5. If `engineering_ppu_status_ok` is followed by `engineering_ppu_status_response_error`, the provider completed but the Plasma Gateway response-write boundary failed; do not classify that incident as a PPU programming failure.
+6. If `engineering_ppu_status_ok` and `engineering_ppu_status_response_sent` are both present but the Browser still times out, the Plasma Gateway provider and handler response-write call both completed. Investigate the downstream Vite proxy / public ingress / Browser fetch path without claiming any one component as root cause until evidence identifies it.
+7. If `engineering_ppu_status_ok` appears without either response-boundary event, inspect the Plasma Gateway handler/write path and confirm the deployed version before drawing conclusions.
 8. Check `communication_state` and `communication_attempt` before classifying a Batch event.
 9. Preserve `ERROR` as an infrastructure outcome; never convert it to IC `FAIL` merely to close a Batch.
 10. If ABORT is requested, wait for Batch terminal reconciliation before switching product mode.

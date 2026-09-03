@@ -19,7 +19,7 @@ Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。目前 prototype 預�
 ## 目前目錄
 
 - `pl/`：Zynq Programmable Logic 的 RTL、constraints、模擬、verification 與 Vivado 建置資產。
-- `software/python/`：Plasma PPU control plane、Protocol v3.3 TCP Server、CLI、Plasma Web REST Gateway、Plasma Manager 與測試。
+- `software/python/`：Plasma PPU control plane、Protocol v3.3 TCP Server、CLI、Plasma Gateway、Plasma Manager 與測試。
 - `software/web/`：React + TypeScript Plasma Control Station Web，包括 PMode 與 EMode。
 - `scripts/plasmactl`：integration host 的更新、測試、systemd reconciliation、重啟與服務管理入口。
 - `docs/`：architecture、development 與 deployment 文件。
@@ -37,8 +37,9 @@ Plasma Manager
         |
         | selected PPU routing
         v
-Plasma Web REST Gateway
+Plasma Gateway
         |
+        | Plasma Gateway API
         | Programming Asset -> normalize -> Image
         | Plasma Protocol v3.3 / PLASMA33
         v
@@ -51,11 +52,20 @@ SiteManager / SiteWorker
 MockInterface today; Z2/FPGA/real-target validation is a separate stage
 ```
 
-Engineering Mode 的 `Programming` workspace 是 canonical single-PPU engineering programming UI。退休的 `SITE MATRIX / PPU CONTROL` Single PPU Programming frontend 不再構成第二條產品控制路徑；PPU 本身仍保留 autonomous execution、Gateway/API、Job、Site 與 diagnostics backend capability。
+Engineering Mode 的 `Programming` workspace 是 canonical single-PPU engineering programming UI。退休的 `SITE MATRIX / PPU CONTROL` Single PPU Programming frontend 不再構成第二條產品控制路徑；PPU 本身仍保留 autonomous execution、Plasma Gateway API、Job、Site 與 diagnostics backend capability。
 
 PPU 是 autonomous execution node；deterministic programming execution 發生在 PPU，不由 Manager 取代。Manager 負責 Control Station 的 PPU registry、observation 與 managed routing ownership。
 
-目前 Plasma Web REST Gateway 使用 Python standard-library `ThreadingHTTPServer` 與 REST polling；**不是 FastAPI，也沒有使用 WebSocket**。
+目前 Plasma Gateway 使用 Python standard-library `ThreadingHTTPServer` 與 REST polling；**不是 FastAPI，也沒有使用 WebSocket**。既有 package/module/service identifiers（例如 `plasma_web`、`gateway.py`、`plasma-web.service`）保留 compatibility，不改變 product-facing component name。
+
+Canonical network terminology：
+
+```text
+Plasma Gateway          PPU 上的 northbound API service
+Plasma Gateway API      該 service 的 REST contract
+Plasma Gateway Endpoint 例如 http://192.168.2.99:18080
+Default Gateway         Linux eth0 的 Layer-3 next-hop router
+```
 
 Protocol v3.3 的 canonical wire identity 是 one-based `site_id = 1..N`。Plasma 仍在開發期，current runtime 不維護退休的 zero-based Programmer/Channel compatibility model。
 
@@ -76,7 +86,8 @@ Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration�
 - Domain / naming / identity：[`docs/architecture/domain-naming-migration.md`](docs/architecture/domain-naming-migration.md)
 - Facility / PPU / Site architecture：[`docs/architecture/ppu-facility-sites.md`](docs/architecture/ppu-facility-sites.md)
 - Web REST API Contract v3：[`docs/architecture/web-rest-api-contract.md`](docs/architecture/web-rest-api-contract.md)
-- Gateway 通訊與異常復原：[`docs/architecture/gateway-communication-recovery.md`](docs/architecture/gateway-communication-recovery.md)
+- Plasma Gateway 通訊與異常復原：[`docs/architecture/gateway-communication-recovery.md`](docs/architecture/gateway-communication-recovery.md)
+- PPU Network Configuration：[`docs/architecture/ppu-network-configuration.md`](docs/architecture/ppu-network-configuration.md)
 - Engineering Programming observability / audit contract：[`docs/architecture/engineering-programming-observability.md`](docs/architecture/engineering-programming-observability.md)
 - Control Station / Manager architecture：[`docs/architecture/configuration-architecture.md`](docs/architecture/configuration-architecture.md)
 - Manager implementation：[`docs/architecture/manager-readonly-fleet-aggregation.md`](docs/architecture/manager-readonly-fleet-aggregation.md)

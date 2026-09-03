@@ -31,7 +31,7 @@ async function settingsVisualContract(page: import("@playwright/test").Page) {
   });
 }
 
-test("EMode Settings > Gateway edits shared server-owned timeout and retry settings", async ({ page }) => {
+test("EMode Settings > Plasma Gateway edits shared server-owned timeout and retry settings", async ({ page }) => {
   let settings = { revision: 1, ppu_request_timeout_ms: 10_000, ppu_retry_count: 3 };
   let submitted: Record<string, number> | null = null;
 
@@ -49,15 +49,15 @@ test("EMode Settings > Gateway edits shared server-owned timeout and retry setti
 
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Gateway 設定", exact: true })).toBeVisible();
-  await expect(page.getByText("GATEWAY COMMUNICATION CONFIGURATION", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plasma Gateway 設定", exact: true })).toBeVisible();
+  await expect(page.getByText("PLASMA GATEWAY COMMUNICATION CONFIGURATION", { exact: true })).toBeVisible();
   await expect(page.getByLabel("PPU Request Timeout seconds")).toHaveValue("10");
   await expect(page.getByLabel("PPU Retry Count")).toHaveValue("3");
   await expect(page.getByText("REV 1", { exact: true })).toBeVisible();
 
-  const guide = page.getByRole("region", { name: "Gateway Settings Guide" });
+  const guide = page.getByRole("region", { name: "Plasma Gateway Settings Guide" });
   await expect(guide).toBeVisible();
-  await expect(guide).toContainText("Gateway 設定說明");
+  await expect(guide).toContainText("Plasma Gateway 設定說明");
   await expect(guide).toContainText("測試方法");
   await expect(guide).toContainText("Mock 的 E/P/V/R Error Rate");
 
@@ -73,10 +73,10 @@ test("EMode Settings > Gateway edits shared server-owned timeout and retry setti
 
   await expect.poll(() => submitted).toEqual({ ppu_request_timeout_ms: 20_000, ppu_retry_count: 5 });
   await expect(page.getByText("REV 2", { exact: true })).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("Gateway 設定已儲存");
+  await expect(page.getByRole("status")).toContainText("Plasma Gateway 設定已儲存");
 });
 
-test("Gateway and Mock share the same Settings visual contract", async ({ page }) => {
+test("Plasma Gateway and Mock share the same Settings visual contract", async ({ page }) => {
   const gatewaySettings = { revision: 2, ppu_request_timeout_ms: 10_000, ppu_retry_count: 3 };
   const mockSettings = {
     profile_id: "default",
@@ -105,7 +105,7 @@ test("Gateway and Mock share the same Settings visual contract", async ({ page }
 
   await page.goto("/engineering");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Gateway Settings Guide" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Plasma Gateway Settings Guide" })).toBeVisible();
   const gatewayVisual = await settingsVisualContract(page);
   const gatewayCanvas = await page.locator(".engineeringCanvas.settingsActive").boundingBox();
   const gatewayPage = await page.locator(".settingsPage").boundingBox();

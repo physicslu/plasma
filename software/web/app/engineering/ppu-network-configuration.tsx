@@ -181,9 +181,9 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
               />
             </label>
             <label>
-              <span>Gateway</span>
+              <span>Default Gateway</span>
               <input
-                aria-label="PPU static gateway"
+                aria-label="PPU static default gateway"
                 value={gateway}
                 placeholder="192.168.10.1"
                 disabled={loading || saving || !canSave}
@@ -203,6 +203,12 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
           </>
         )}
       </div>
+
+      {mode === "static" && (
+        <p className="ppuSiteNote">
+          <strong>Network terminology:</strong> Default Gateway is the Linux Layer-3 next-hop router for <code>eth0</code>. It is not the Plasma Gateway service running on this PPU.
+        </p>
+      )}
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {saved && !loading && <p className="ppuRegistryMessage success" role="status">Desired PPU network settings saved. Running <code>eth0</code> was not activated by this action.</p>}

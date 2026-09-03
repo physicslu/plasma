@@ -13,7 +13,7 @@ CI / isolated software validation
     -> unit / contract / browser tests
 
 Runtime acceptance
-    -> real BFF / Manager / PPU Gateway / Plasma Server processes
+    -> real BFF / Manager / Plasma Gateway / Plasma Server processes
     -> real HTTP/TCP routing
     -> Mock execution provider by default
 

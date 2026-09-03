@@ -246,7 +246,7 @@ export default function PpuSiteConfiguration() {
                   className="ppuSiteButton primary"
                   type="button"
                   disabled={!registryMutable || busyAction !== null}
-                  title={registryMutable ? "Add a PPU Gateway to the Manager registry" : "Configure manager.registry_state_path to enable registry mutation"}
+                  title={registryMutable ? "Add a Plasma Gateway to the Manager registry" : "Configure manager.registry_state_path to enable registry mutation"}
                   onClick={() => setShowAddForm(value => !value)}
                 >
                   + Add PPU
@@ -261,7 +261,7 @@ export default function PpuSiteConfiguration() {
                   <input value={newAlias} placeholder="line1-ppu-c" disabled={busyAction !== null} onChange={event => setNewAlias(event.target.value)} />
                 </label>
                 <label>
-                  <span>Gateway Endpoint</span>
+                  <span>Plasma Gateway Endpoint</span>
                   <input value={newGateway} placeholder="http://192.168.10.27:18080" disabled={busyAction !== null} onChange={event => setNewGateway(event.target.value)} />
                 </label>
                 <div className="ppuSiteCardHeaderActions">
@@ -270,7 +270,7 @@ export default function PpuSiteConfiguration() {
                   </button>
                   <button className="ppuSiteButton" type="button" disabled={busyAction !== null} onClick={() => setShowAddForm(false)}>Cancel</button>
                 </div>
-                <p>Only Alias and Gateway Endpoint are entered manually. Canonical PPU identity, model and Site topology must be observed from the PPU before Validate &amp; Enable succeeds.</p>
+                <p>Only Alias and Plasma Gateway Endpoint are entered manually. Canonical PPU identity, model and Site topology must be observed from the PPU before Validate &amp; Enable succeeds.</p>
               </div>
             )}
 
@@ -291,7 +291,7 @@ export default function PpuSiteConfiguration() {
                     <th>PPU ID</th>
                     <th>Status</th>
                     <th>Sites</th>
-                    <th>Gateway</th>
+                    <th>Plasma Gateway</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -328,7 +328,7 @@ export default function PpuSiteConfiguration() {
             </header>
             <div className="ppuDiscoveredBody">
               <p className="ppuSiteNote">
-                <strong>Discovery boundary:</strong> automatic LAN discovery is not enabled in this phase. Add a known PPU by Gateway Endpoint; discovery can be added later without changing the registry admission flow.
+                <strong>Discovery boundary:</strong> automatic LAN discovery is not enabled in this phase. Add a known PPU by Plasma Gateway Endpoint; discovery can be added later without changing the registry admission flow.
               </p>
             </div>
           </section>
@@ -394,7 +394,7 @@ export default function PpuSiteConfiguration() {
                     <div><dt>Lifecycle</dt><dd>{lifecycleLabel(selectedEntry)}</dd></div>
                     <div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div>
                     <div><dt>Status</dt><dd><span className={`ppuSiteStatus ${statusClass(selectedStatus)}`}>{selectedStatus}</span></dd></div>
-                    <div className="wide"><dt>Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
+                    <div className="wide"><dt>Plasma Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
                     <div><dt>Observation</dt><dd>{selectedFleet?.observation.state ?? "unknown"}</dd></div>
                     <div><dt>Execution</dt><dd>{selectedFleet?.execution_state ?? "unknown"}</dd></div>
                     <div className="wide"><dt>Display Name</dt><dd>{selectedFleet?.identity.display_name ?? "—"}</dd></div>
@@ -475,7 +475,7 @@ export default function PpuSiteConfiguration() {
           ) : (
             <section className="ppuSiteCard ppuEmptyRegistry" aria-label="Empty PPU registry">
               <h3>{loading ? "Loading Manager registry..." : "No selectable PPU"}</h3>
-              <p>{loading ? "Reading Manager-owned inventory and Fleet state." : "Add a PPU with an alias and Gateway endpoint to begin validation."}</p>
+              <p>{loading ? "Reading Manager-owned inventory and Fleet state." : "Add a PPU with an alias and Plasma Gateway Endpoint to begin validation."}</p>
             </section>
           )}
         </div>

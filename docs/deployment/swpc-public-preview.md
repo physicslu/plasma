@@ -6,7 +6,7 @@
 
 Its purpose is fast software feedback before a local Control Station or Z2 deployment is available. It is suitable for checking the latest Web UI, PMode / EMode flows, same-origin routing, Engineering Mock behavior, Programming Job presentation, Batch behavior, and other software-only integration paths supported by the SWPC runtime.
 
-It is **not** a production PPU Gateway endpoint and it is **not** evidence of Z2, PS↔PL, FPGA, target-power, electrical, or real-IC acceptance.
+It is **not** a production Plasma Gateway Endpoint and it is **not** evidence of Z2, PS↔PL, FPGA, target-power, electrical, or real-IC acceptance.
 
 ## Routing contract
 
@@ -27,7 +27,7 @@ plasma.open4th.com
                     +--------------+--------------+
                     |                             |
                     v                             v
-             local Gateway                  Manager / BFF
+             local Plasma Gateway           Manager / BFF
                     |
                     v
           Engineering Mock Provider
@@ -41,7 +41,7 @@ Allowed:
 
 - `plasma.open4th.com` as a Vite `allowedHosts` frontend ingress alias;
 - Browser requests using the current origin;
-- SWPC-local Vite proxying to the local Gateway;
+- SWPC-local Vite proxying to the local Plasma Gateway;
 - Engineering Mock Provider behind the same-origin Web path;
 - Manager/BFF routing when the integration host is configured for it.
 
@@ -49,18 +49,20 @@ Retired and forbidden:
 
 - `plasma.open4th.com` as a hard-coded Browser API Base;
 - `PLASMA_PUBLIC_API_URL=https://plasma.open4th.com...` as current topology ownership;
-- Browser code learning or selecting a PPU Gateway URL through this hostname;
+- Browser code learning or selecting a Plasma Gateway Endpoint through this hostname;
 - treating Preview / Mock PASS as Real-Host or Real-PPU acceptance.
 
 The architectural invariant remains:
 
 ```text
 standalone SWPC Preview / Mock:
-Browser -> same origin -> local Vite proxy -> local Gateway -> Mock / local execution
+Browser -> same origin -> local Vite proxy -> local Plasma Gateway -> Mock / local execution
 
 formal Control Station:
-Browser -> same-origin Console/BFF -> Manager -> selected PPU
+Browser -> same-origin Console/BFF -> Manager -> selected PPU Plasma Gateway
 ```
+
+The public hostname is frontend ingress. A **Plasma Gateway Endpoint** is the network location of one PPU's northbound service. A Linux **Default Gateway** is a routing next hop. These concepts are intentionally distinct.
 
 ## Expected routes
 
@@ -73,14 +75,14 @@ The public Preview should expose the same current product Web routes as the SWPC
 /ppu          -> compatibility redirect to /engineering
 ```
 
-The public hostname changes ingress only. It must not introduce a second frontend implementation or a second API contract.
+The public hostname changes ingress only. It must not introduce a second frontend implementation or a second Plasma Gateway API contract.
 
 ## Validation boundary
 
 A useful Preview acceptance proves that the deployed SWPC revision can be reached through the public hostname and that supported same-origin Web / Mock paths operate. It does not prove:
 
 - Windows or macOS installer behavior on a physical operator machine;
-- network reachability to a real PPU;
+- network reachability to a real PPU Plasma Gateway Endpoint;
 - Z2 embedded-Linux runtime;
 - PS↔PL integration;
 - FPGA timing or logic;

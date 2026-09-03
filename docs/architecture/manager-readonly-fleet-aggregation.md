@@ -2,7 +2,7 @@
 
 ## Scope
 
-Plasma Manager is an **optional, read-only fleet control plane**. It inventories configured PPU Plasma Web REST Gateway endpoints and aggregates current health, canonical PPU identity, Site topology, and explicit last-known observation state. It does not participate in local job execution.
+Plasma Manager is an **optional, read-only fleet control plane**. It inventories configured PPU Plasma Gateway Endpoints and aggregates current health, canonical PPU identity, Site topology, and explicit last-known observation state. It does not participate in local job execution.
 
 The architectural dependency remains one-way:
 
@@ -10,7 +10,7 @@ The architectural dependency remains one-way:
 Plasma Manager -> PPU
 ```
 
-A PPU continues to start, expose its local Plasma Web REST Gateway and Plasma PPU Console, execute Site jobs, recover, and perform maintenance without a Manager connection. The fleet-facing PPU contract continues to require `manager_required = false`.
+A PPU continues to start, expose its local Plasma Gateway and Plasma PPU Console, execute Site jobs, recover, and perform maintenance without a Manager connection. The fleet-facing PPU contract continues to require `manager_required = false`.
 
 Heterogeneous **2-Site**, **4-Site**, and **8-Site** PPUs may coexist in the same fleet. Manager never assumes a uniform Site count.
 
@@ -22,9 +22,9 @@ Fleet client
     v
 Plasma Manager
     |
-    +--> PPU A Plasma Web REST Gateway -> local Plasma Server -> Sites
-    +--> PPU B Plasma Web REST Gateway -> local Plasma Server -> Sites
-    +--> PPU C Plasma Web REST Gateway -> local Plasma Server -> Sites
+    +--> PPU A Plasma Gateway -> local Plasma Server -> Sites
+    +--> PPU B Plasma Gateway -> local Plasma Server -> Sites
+    +--> PPU C Plasma Gateway -> local Plasma Server -> Sites
 ```
 
 The Manager is a separate `plasma_manager` Python package and service. It is not part of `plasma_server` or `SiteManager`, so fleet concerns do not enter the deterministic local execution path.
@@ -53,7 +53,7 @@ ppus:
 
 `observation_db_path` is optional. When omitted, last-known history remains process memory and is lost on Manager restart. When present, it must be a writable absolute operator-local filesystem path and enables SQLite persistence of the latest trusted observation per configured endpoint.
 
-The endpoint identifies the root of one autonomous PPU's Plasma Web REST Gateway. `alias` is operator-facing registry metadata only; canonical `ppu_id`, `facility_id`, model, capabilities, and Site counts come from the PPU itself.
+The endpoint identifies the root of one autonomous PPU's **Plasma Gateway Endpoint**. `alias` is operator-facing registry metadata only; canonical `ppu_id`, `facility_id`, model, capabilities, and Site counts come from the PPU itself.
 
 Manager configuration rejects duplicate endpoints, embedded URL credentials, query strings, fragments, nested endpoint paths, invalid polling intervals, and relative observation database paths. The observation database is operational state, not a source-controlled artifact and not a credential store.
 
@@ -73,7 +73,7 @@ Returns the configured read-only PPU endpoint registry without performing fleet 
 
 Returns the last completed fleet snapshot from Manager memory. The HTTP request itself does not contact any PPU.
 
-A dedicated background poller refreshes the snapshot by querying each configured PPU through the PPU-local REST contract:
+A dedicated background poller refreshes the snapshot by querying each configured PPU through the Plasma Gateway API:
 
 ```text
 GET /api/health/live
@@ -109,9 +109,11 @@ Each PPU entry separates current transport from current local execution:
 }
 ```
 
+`gateway_live` is an existing API field name retained for compatibility; semantically it reports Plasma Gateway liveness.
+
 `transport_state` is `reachable`, `unreachable`, or `unknown`. An HTTP response that violates the fleet contract is still transport-reachable; contract failure is not mislabeled as a network outage.
 
-`execution_state` is `ready`, `unavailable`, or `unknown`. A reachable Gateway may therefore report unavailable local execution.
+`execution_state` is `ready`, `unavailable`, or `unknown`. A reachable Plasma Gateway may therefore report unavailable local execution.
 
 The observation model remains:
 
@@ -121,7 +123,7 @@ stale    -> current poll is not trusted/current, but last-known trusted history 
 unknown  -> no trusted last-known observation is available
 ```
 
-A trusted observation requires a live Gateway, ready local execution, compatible fleet contract, no identity conflict, valid canonical PPU/Site topology, and no per-PPU errors.
+A trusted observation requires a live Plasma Gateway, ready local execution, compatible fleet contract, no identity conflict, valid canonical PPU/Site topology, and no per-PPU errors.
 
 Each PPU entry exposes:
 
@@ -164,7 +166,7 @@ The summary fields `known_ppus`, `stale_ppus`, and `unknown_ppus` describe obser
 
 ## Durable last-known observation persistence
 
-Durable persistence is intentionally narrow. SQLite stores **one latest trusted observation per configured PPU endpoint**:
+Durable persistence is intentionally narrow. SQLite stores **one latest trusted observation per configured PPU Plasma Gateway Endpoint**:
 
 ```text
 endpoint -> observed_at + canonical PPU object + canonical Sites
@@ -184,7 +186,7 @@ one last-known record per currently configured endpoint
 
 When an endpoint is removed from the Manager registry, its durable last-known record is removed on the next successful observation-store write. There is no historical timeline and no age-based retention policy in this phase.
 
-Endpoint is the persistence key. If an operator deliberately reuses the same endpoint for different hardware, prior data may appear as **stale last-known** until a new trusted observation replaces it. It is never counted as current capacity.
+Endpoint is the persistence key. If an operator deliberately reuses the same Plasma Gateway Endpoint for different hardware, prior data may appear as **stale last-known** until a new trusted observation replaces it. It is never counted as current capacity.
 
 ### Recovery and failure policy
 
@@ -272,7 +274,7 @@ The Manager systemd unit depends on network availability only; it does not make 
 
 This release still rejects Manager POST/PUT/PATCH/DELETE fleet commands. It does not implement job routing, central scheduling, mandatory registration, mDNS discovery, authentication/authorization policy, central audit persistence, or Programming Image rollout. PMode provides a Factory Console, but Manager remains an observation-only provider rather than its command scheduler.
 
-Durable observation persistence must not be confused with those control-plane responsibilities. Future command routing must use an existing PPU REST contract rather than bypassing the PPU and invoking internal `SiteManager`/`SiteWorker` APIs directly.
+Durable observation persistence must not be confused with those control-plane responsibilities. Future command routing must use an existing Plasma Gateway API contract rather than bypassing the PPU and invoking internal `SiteManager`/`SiteWorker` APIs directly.
 
 ## Development and deployment entry points
 

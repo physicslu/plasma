@@ -192,7 +192,7 @@ The intended production logging transport remains:
 
 ```text
 PPU JobEventLogger JSONL
-    -> read-only PPU Gateway event API (bounded, cursor-based)
+    -> read-only Plasma Gateway event API (bounded, cursor-based)
     -> authenticated/sanitized management aggregation path
     -> Factory Log Console
     -> retention/search/export layer
@@ -219,7 +219,7 @@ Plasma Manager remains outside the PPU-local execution path. Its current contrac
 ```text
 Local execution:
 Browser / local PPU Console
-    -> PPU Gateway
+    -> Plasma Gateway
     -> Plasma Server
     -> Site
 
@@ -227,14 +227,14 @@ Production observation:
 Production Mode / management UI
     -> Management BFF
     -> read-only Manager
-    -> PPU Gateways
+    -> Plasma Gateways
 ```
 
 The Production Mock prototype is a separate simulation path:
 
 ```text
 Production Mock UI
-    -> Plasma Web REST Gateway
+    -> Plasma Gateway
     -> Python Mock PPU Provider
     -> selected virtual PlasmaServers
     -> MockInterface
@@ -246,7 +246,7 @@ This path exists only to prove Facility/PPU selection, cross-PPU concurrency, Si
 
 The first real multi-PPU deployment may assume a controlled factory LAN and an explicit PPU registry. Automatic subnet discovery is not required for this prototype.
 
-A Manager registry entry identifies the root of one autonomous PPU Gateway. The current development/runtime convention remains an operator-local config outside the Git worktree, such as:
+A Manager registry entry identifies the **Plasma Gateway Endpoint** of one autonomous PPU. The current development/runtime convention remains an operator-local config outside the Git worktree, such as:
 
 ```text
 $XDG_CONFIG_HOME/plasma/manager.yaml

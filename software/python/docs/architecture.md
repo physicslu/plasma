@@ -9,9 +9,12 @@ PPU-local execution path：
 ```text
 Browser / CLI / Client
         |
-        | Web REST v3 Programming Asset boundary (Browser path)
+        | Plasma Gateway API / Web REST v3 Programming Asset boundary
         | normalize to Image
-        | Plasma Protocol v3.3 / PLASMA33
+        v
+Plasma Gateway
+        |
+        | Plasma Protocol v3.3 / PLASMA33 to local execution service
         v
 Plasma Server
         |
@@ -31,12 +34,12 @@ Fleet client
     v
 plasma_manager
     |
-    +--> PPU A Plasma Web REST Gateway -> local Plasma Server -> SiteManager
-    +--> PPU B Plasma Web REST Gateway -> local Plasma Server -> SiteManager
+    +--> PPU A Plasma Gateway -> local Plasma Server -> SiteManager
+    +--> PPU B Plasma Gateway -> local Plasma Server -> SiteManager
     +--> ...
 ```
 
-`plasma_manager` 是獨立於 `plasma_server` 的 optional read-only control plane。它只能透過每台 PPU 的 fleet-facing REST contract 取得 health、identity 與 Site topology，不能繞過 PPU boundary 直接呼叫遠端 `SiteManager` / `SiteWorker`。PPU 本地執行不依賴 Manager。
+`plasma_manager` 是獨立於 `plasma_server` 的 optional fleet control plane。它只能透過每台 PPU 的 Plasma Gateway API / fleet-facing contract 取得 health、identity 與 Site topology，並透過明確 allowlist 的 managed route 執行核准的 PPU API 操作；不能繞過 PPU boundary 直接呼叫遠端 `SiteManager` / `SiteWorker`。PPU 本地執行不依賴 Manager。
 
 Plasma 仍在開發期，current runtime 只保留 Facility / PPU / Site canonical model；不維護退休的 zero-based Programmer/Channel compatibility adapter。
 
@@ -47,10 +50,23 @@ Plasma 仍在開發期，current runtime 只保留 Facility / PPU / Site canonic
 | `plasma_client` | 建立 request、Protocol v3.3 TCP 傳輸、CLI | Site 排程與硬體操作 |
 | `plasma_core` | Programming Asset/Image models、errors、config、protocol、log/output | target-specific 指令 |
 | `plasma_server` | 連線、Job registry、Site queue/worker、cancel | MCU 燒錄細節、fleet orchestration |
-| `plasma_web` | PPU-local REST v3 boundary、Asset validation/normalization、browser-facing API | 跨 PPU scheduling |
-| `plasma_manager` | manual PPU registry、read-only fleet health / identity / Site aggregation | PPU-local execution、直接控制 SiteWorker、central scheduling |
+| `plasma_web` | **Plasma Gateway implementation package**；PPU-local REST v3 boundary、Asset validation/normalization、browser-facing API | 跨 PPU scheduling |
+| `plasma_manager` | PPU registry、fleet health / identity / Site aggregation、explicit managed routing | PPU-local execution、直接控制 SiteWorker、arbitrary reverse proxy |
 | `plasma_handlers` | IC 的獨立 erase、program、verify、read 操作 | TCP、檔案路徑、AXI 位址 |
 | `plasma_interfaces` | 實際硬體或 Mock 操作 | Job 排程與跨 Site 策略 |
+
+`plasma_web` 是 compatibility-sensitive Python package 名稱；產品/架構名稱為 **Plasma Gateway**。
+
+## Network terminology boundary
+
+```text
+Plasma Gateway          PPU northbound API service
+Plasma Gateway API      its REST contract
+Plasma Gateway Endpoint service location, e.g. http://192.168.2.99:18080
+Default Gateway         Linux eth0 Layer-3 next-hop router
+```
+
+PPU network JSON field `gateway` 保留 wire compatibility，但其語意是 **Default Gateway**。
 
 ## Programming data boundary
 
@@ -105,7 +121,7 @@ SiteWorker -> Server: cancelled + safe shutdown
 - 每個 Site 使用獨立 interface instance。
 - 真實共用資源限制必須在硬體/Provider 層明確建模，不得偽裝成任意跨 Site serialization。
 - Program/Verify 的 PPU-wide active Image lease 以 Normalized Image SHA 為 authority。
-- Plasma Manager 對各 PPU 獨立 polling；Manager failure 只影響 fleet visibility，不得停止健康 PPU 的 local execution。
+- Plasma Manager 對各 PPU 獨立 polling；Manager failure 只影響 fleet visibility/control-plane access，不得停止健康 PPU 的 local execution。
 
 ## Identity invariants
 

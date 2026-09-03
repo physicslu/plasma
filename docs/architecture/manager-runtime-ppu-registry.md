@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The EMode `PPU / Site` surface manages which PPU Gateways belong to a Plasma Manager deployment. This inventory is operational state, not source-controlled deployment configuration.
+The EMode `PPU / Site` surface manages which Plasma Gateways belong to a Plasma Manager deployment. This inventory is operational state, not source-controlled deployment configuration.
 
 The ownership chain is:
 
@@ -10,7 +10,7 @@ The ownership chain is:
 Control Console
   -> same-origin Manager BFF
   -> Plasma Manager runtime registry
-  -> PPU Gateway
+  -> Plasma Gateway
   -> Plasma Server
   -> Sites
 ```
@@ -75,13 +75,13 @@ Pending / Enabled / Disabled
 
 The internal lifecycle token for a PPU that passed `Validate & Enable` is `commissioned`. The Console intentionally does not use `Commission` as the primary operator label.
 
-`Remove PPU` means only "remove this endpoint/alias from Manager inventory". It does not erase, reset, power off, update firmware, or change the physical PPU.
+`Remove PPU` means only "remove this Plasma Gateway Endpoint/alias from Manager inventory". It does not erase, reset, power off, update firmware, or change the physical PPU.
 
 ## Validation gate
 
 Manager, not the Browser, decides whether `Validate & Enable` is allowed. A PPU must have a current trusted fleet observation with:
 
-- reachable Gateway;
+- reachable Plasma Gateway;
 - execution-ready PPU;
 - compatible PPU fleet contract;
 - no canonical `ppu_id` identity conflict;
@@ -117,6 +117,8 @@ DELETE /api/registry/{alias}
   "endpoint": "http://192.168.10.21:18080"
 }
 ```
+
+Here, `endpoint` is the **Plasma Gateway Endpoint** for the PPU. The field name remains `endpoint` for API compatibility.
 
 A new entry starts as `pending`.
 
