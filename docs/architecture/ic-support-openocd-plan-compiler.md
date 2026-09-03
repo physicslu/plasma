@@ -1,10 +1,10 @@
 # Profile-driven OpenOCD Plan Compiler
 
-Status: **Phase 3.7 current contract**
+Status: **Current deterministic OpenOCD plan-compilation contract; introduced in Phase 3.7**
 
 ## 1. Purpose
 
-Phase 3.7 converts evidence-backed IC Support knowledge into a deterministic, reviewable OpenOCD dry-run execution plan without starting OpenOCD or touching hardware.
+Plasma converts evidence-backed IC Support knowledge into a deterministic, reviewable OpenOCD execution plan without treating plan generation as hardware readiness.
 
 The current chain is:
 
@@ -18,15 +18,16 @@ Exact ICPN
        -> OpenOCD target identity
   -> OpenOCDPlanCompiler
   -> OpenOCDExecutionPlan
+  -> software executor validation where applicable
   -> runtime-readiness gate
-  -> STOP: no hardware executor in Phase 3.7
+  -> production hardware gate remains closed
 ```
 
-This phase proves the transformation from support knowledge to backend-specific command intent. It does not prove that those commands successfully program a physical IC.
+This contract proves the transformation from support knowledge to backend-specific command intent. It does not prove that those commands successfully program a physical IC.
 
 ## 2. Current supported scope
 
-The compiler supports only the evidence-backed Programming Profile:
+The compiler supports the evidence-backed Programming Profile:
 
 ```text
 stm32f1-medium-density-flash-v0
@@ -56,7 +57,7 @@ STM32F103CBT6
   flash erase_address 0x08000000 0x00020000
 ```
 
-This is the first concrete proof that Plasma can reuse one Programming Profile across multiple exact ICPNs while varying geometry independently.
+This proves that Plasma can reuse one Programming Profile across multiple exact ICPNs while varying geometry independently.
 
 ## 3. Plan model
 
@@ -81,20 +82,18 @@ plan_only = true
 hardware_runtime_ready = false
 ```
 
-Artifact references are symbolic tokens, not filesystem paths. For example:
+Artifact references are symbolic tokens, not caller-controlled filesystem paths. For example:
 
 ```text
 ${PLASMA_IMAGE_BIN}
 ${PLASMA_READ_000_BIN}
 ```
 
-The compiler does not create staging files and does not infer a client-supplied path.
-
 ## 4. Operation compilation
 
 ### 4.1 ERASE
 
-Phase 3.7 ERASE means full resolved Main Flash erase.
+ERASE means full resolved Main Flash erase:
 
 ```text
 init
@@ -116,9 +115,7 @@ flash write_image ${PLASMA_IMAGE_BIN} <main_flash_start> bin
 shutdown
 ```
 
-The symbolic input artifact is bound to the Job's image size and SHA-256.
-
-PROGRAM does not implicitly erase in Phase 3.7. ERASE and PROGRAM remain separate Plasma operations.
+The symbolic input artifact is bound to the Job's Image size and SHA-256. PROGRAM does not implicitly erase; ERASE and PROGRAM remain separate Plasma operations.
 
 ### 4.3 VERIFY
 
@@ -137,7 +134,7 @@ VERIFY does not erase or program.
 
 READ uses explicit `map.sections[]` when supplied. Every section must remain fully inside the resolved Main Flash range.
 
-The default dry-run reads the first 256 bytes of resolved Main Flash:
+The default plan reads the first 256 bytes of resolved Main Flash:
 
 ```text
 init
@@ -146,7 +143,7 @@ dump_image ${PLASMA_READ_000_BIN} 0x08000000 0x00000100
 shutdown
 ```
 
-Option Bytes, OTP, system memory and other address spaces are deliberately outside this Phase 3.7 Main Flash plan compiler.
+Option Bytes, OTP, system memory and other address spaces remain outside the current Main Flash plan compiler.
 
 ## 5. Fail-closed invariants
 
@@ -168,29 +165,16 @@ The compiler rejects at least:
 
 ## 6. Execution remains closed
 
-Phase 3.7 changes route state from:
+For supported OpenOCD routes the route state is:
 
 ```text
-routing_only
+backend_implementation_state: plan_compiled_not_executable
+hardware_runtime_ready: false
 ```
 
-to:
+The route contains the canonical plan, and the isolated software executor can validate that plan against a controlled subprocess boundary. Production hardware execution remains fail-closed.
 
-```text
-plan_compiled_not_executable
-```
-
-for supported OpenOCD routes.
-
-The route contains the dry-run plan, but still records:
-
-```text
-hardware_runtime_ready = false
-```
-
-and `SiteManager` rejects the real Job before JobRegistry insertion, PPU lease reservation, SiteWorker queueing or interface execution.
-
-`OpenOCDInterface.erase/program/verify/read` also fail closed until a validated compiled-plan executor exists. The previous direct hard-coded 64 KiB erase path is removed, so there is no alternate target-specific command path around the compiler.
+`OpenOCDInterface.erase/program/verify/read` do not provide an alternate target-specific hardware path around the compiler/executor gate.
 
 ## 7. OpenOCD command basis
 
@@ -200,7 +184,7 @@ The command forms used by this compiler follow the OpenOCD User's Guide:
 - Flash Programming: <https://openocd.org/doc/html/Flash-Programming.html>
 - General Commands / image access: <https://openocd.org/doc/html/General-Commands.html>
 
-The relevant upstream behavior includes:
+Relevant upstream behavior includes:
 
 - use `reset init` before Flash Programming Commands;
 - `flash erase_address address length` erases a resolved address range;
@@ -208,37 +192,39 @@ The relevant upstream behavior includes:
 - `flash verify_image filename offset type` performs flash-driver-aware verification;
 - `dump_image filename address size` emits a memory range to a binary file.
 
-These upstream command definitions do not substitute for physical STM32F103 validation. They only establish the backend command grammar used by the dry-run compiler.
+These upstream command definitions do not substitute for physical STM32F103 validation.
 
-## 8. Coverage meaning after Phase 3.7
+## 8. Current coverage meaning
 
-The production catalog baseline remains unchanged:
+The executable production coverage is:
 
 ```text
-Exact ICPNs:                              124
-Base Devices:                              32
-Evidence-backed Programming Profiles:       1
+Exact ICPNs:                               286
+Base Devices:                               91
+Deterministic OpenOCD-mapped exact ICPNs:  286
+Direct IC Support-bound exact ICPNs:         2
+Unresolved Programming Profile ICPNs:      284
+Evidence-backed Programming Profiles:        1
 OpenOCD plan-compiled Programming Profiles:  1
-OpenOCD plan-compiled exact ICPNs:           2
-Native PPU runtime-ready exact ICPNs:        0
+OpenOCD plan-compiled exact ICPNs:            2
+Native PPU runtime-ready exact ICPNs:         0
 ```
 
-The new `1` means a profile has a deterministic backend plan compiler. It does not mean physical programming has passed.
+The single plan-compiled Programming Profile is a deterministic backend-planning capability. It does not mean physical programming has passed. The 286 deterministic target mappings are catalog routing evidence and must not be reported as 286 compiled Programming Profiles.
 
-## 9. Next gate
+## 9. Next hardware gate
 
-The next phase may introduce a controlled executor that consumes `OpenOCDExecutionPlan`, stages artifacts safely and validates the plan first against software/process behavior and then against real STM32F103 hardware.
+A separately approved hardware phase may promote the validated plan/executor path to real OpenOCD runtime use only after adapter, target, erase/program/verify/read, reset/finalization, cancellation and evidence-retention behavior are validated against known hardware.
 
 Hardware readiness must remain a separate, evidence-backed state transition. It must never be inferred merely because a command plan can be generated.
 
 ## 10. Non-goals
 
-Phase 3.7 does not:
+The current compiler contract does not:
 
-- add new exact ICPNs;
-- create STM32F4 Programming Profiles;
-- execute OpenOCD programming commands;
-- create image staging files;
+- infer Programming Profiles for the 284 unresolved production exact ICPNs;
+- create STM32F4 Programming Profiles from target cfg similarity;
+- make production OpenOCD Jobs hardware-executable;
 - alter PMode / EMode IC selection;
 - implement Native PPU programming;
 - create PPU or Socket verification evidence;
