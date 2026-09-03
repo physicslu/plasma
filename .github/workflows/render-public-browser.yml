@@ -6,7 +6,6 @@ on:
       - ".github/workflows/render-public-browser.yml"
       - "software/web/e2e/playwright.render-public.config.ts"
       - "software/web/e2e/tests/render-public-runtime.spec.ts"
-      - "docs/deployment/render-public-browser.md"
   workflow_dispatch:
     inputs:
       expected_commit:
