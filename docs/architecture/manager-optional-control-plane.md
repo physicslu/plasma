@@ -68,7 +68,7 @@ Management Host
        +--> ...
 ```
 
-The Management Host owns centralized visibility and managed routing. It does not execute FPGA/IC operations.
+The Management Host owns centralized visibility, managed routing, runtime PPU registry state, and cross-domain network commissioning orchestration. It does not execute FPGA/IC operations and does not receive Linux network-mutation privilege on the PPU.
 
 ## Mode A: Standalone PPU
 
@@ -125,7 +125,7 @@ It provides:
 
 - same-origin browser APIs;
 - validation of the management-host-local Manager configuration;
-- a configured PPU alias without exposing the Plasma Gateway Endpoint;
+- a configured PPU alias without exposing arbitrary destination selection;
 - bounded body forwarding for Programming Asset/Image traffic;
 - propagation of required `Authorization` and `Idempotency-Key` headers;
 - binary response preservation for readback;
@@ -133,7 +133,7 @@ It provides:
 
 The BFF does not accept arbitrary PPU destination URLs and does not own the alias-to-endpoint mapping.
 
-The PPU/Site configuration surface also uses an alias-scoped BFF route for PPU network desired state. The Browser supplies a registry alias and the fixed `ppu-network` resource kind; it never supplies the physical Plasma Gateway Endpoint.
+The PPU/Site configuration surface uses an alias-scoped BFF route for PPU network desired state. Static IPv4 endpoint migration uses a separate Manager-owned `network-commissioning` resource. The Browser supplies the registry alias and desired static network values; it never supplies the physical candidate Plasma Gateway Endpoint or directly sequences PPU activation calls.
 
 ## Plasma Manager boundary
 
@@ -159,15 +159,52 @@ Current managed route families support the central PPU workflow for:
 - authenticated Principal introspection;
 - PS real-path Loopback.
 
-The Plasma Gateway/Mock/PPU-network settings writes remain subject to the secure Plasma Gateway authorization/idempotency contracts. Manager merely preserves and routes that evidence.
+The Plasma Gateway/Mock/PPU-network settings writes remain subject to the secure Plasma Gateway authorization/idempotency contracts. Manager preserves and routes that evidence.
 
-PPU network **activation** is not part of the generic managed relay allowlist in this slice. Changing a Plasma Gateway Endpoint and changing Manager's durable registry endpoint form one commissioning transaction and require explicit orchestration, same-`ppu_id` revalidation and rollback handling. The Browser therefore cannot promote desired-state access into an arbitrary activation sequence.
+PPU network **activation remains excluded from the generic managed relay allowlist**. Static IPv4 migration is instead implemented as one explicit Manager-owned transaction:
 
-The fleet registry and fleet observation resources themselves remain read-only surfaces except for the explicit runtime-registry lifecycle API. Unsupported write routes fail closed.
+```text
+POST /api/registry/{alias}/network-commissioning
+```
+
+Manager owns the cross-domain sequence:
+
+```text
+current registry endpoint
+-> persist desired static state
+-> PPU activation apply
+-> deterministic candidate reconnect
+-> same immutable ppu_id verification
+-> PPU activation commit
+-> durable registry endpoint compare-and-swap
+```
+
+This is not a general command-routing exception. The Browser cannot promote desired-state access into an arbitrary activation sequence or supply an arbitrary candidate URL.
+
+Manager runtime registry lifecycle and endpoint mutations are explicit write surfaces; fleet observation itself remains read-only. Unsupported write routes fail closed.
+
+## Static IPv4 commissioning boundary
+
+Static network commissioning crosses two durable state owners:
+
+1. the PPU owns desired/actual Linux network state and activation rollback;
+2. Manager owns the durable alias -> Plasma Gateway Endpoint registry mapping.
+
+The Manager therefore coordinates both without collapsing ownership.
+
+The transaction requires a commissioned PPU, no active Site execution, a current trusted fleet observation, and a mutable runtime registry. Candidate endpoint derivation preserves the old endpoint scheme/port and replaces only the host with the requested static IPv4 address.
+
+The candidate must return the same canonical `ppu_id` from `/api/node` before Manager sends PPU activation commit. Wrong identity fails closed and the Manager registry is never repointed.
+
+After commit, registry reconciliation uses compare-and-swap against the old endpoint captured at transaction start. This prevents the transaction from overwriting a newer operator/concurrent endpoint mutation.
+
+Manager keeps a durable commissioning journal but does not persist the caller's `Authorization` credential. Restart recovery can automatically finish Manager-local registry reconciliation only after `activation_committed` is already durable. Earlier ambiguous states become `recovery_required` rather than guessing whether a protected PPU command succeeded.
+
+DHCP endpoint migration is intentionally not implemented because Manager does not yet own deterministic DHCP lease/discovery evidence bound to the same immutable PPU identity.
 
 ## Plasma Gateway boundary
 
-The Plasma Gateway is the northbound API boundary of one Programmer:
+The Plasma Gateway is the northbound API boundary of one PPU:
 
 ```text
 Z2 / PPU
@@ -178,9 +215,9 @@ Z2 / PPU
 └── IC
 ```
 
-It validates its local REST/security contract, translates accepted requests to local runtime behavior and reports local status/errors. It does not choose between PPUs.
+It validates its local REST/security contract, translates accepted requests to local runtime behavior and reports local status/errors. It does not choose between PPUs and does not own the fleet registry.
 
-The secure Plasma Gateway remains the final execution authorization authority. Manager/BFF preserve authentication and idempotency evidence but do not grant permissions or widen Facility/PPU/Site scopes.
+The secure Plasma Gateway remains the final execution/PPU-network authorization authority. Manager/BFF preserve authentication and idempotency evidence but do not grant permissions or widen Facility/PPU/Site scopes.
 
 ## PPU northbound contract
 
@@ -194,6 +231,8 @@ GET /api/status
 ```
 
 Managed write/read relay uses the existing Plasma Gateway API rather than defining a second Programming protocol. Exact Manager allowlisting is intentionally narrower than the complete standalone Plasma Gateway API surface.
+
+Static IPv4 commissioning internally uses the existing PPU network desired-state and activation APIs, but those activation paths are invoked only by the Manager commissioning coordinator, not exposed as generic Browser relay paths.
 
 ## Programming Asset / Image direction
 
@@ -218,8 +257,9 @@ This is a deliberate Phase-1 compatibility decision: first establish one trustwo
 
 ```text
 Manager / BFF unavailable
-    -> no new centrally managed request can be routed
+    -> no new centrally managed request can be routed or commissioned
     -> already accepted PPU work continues locally
+    -> PPU-side activation rollback remains local and authoritative
     -> explicit Standalone/local maintenance remains available
 
 Plasma Gateway failure on one PPU
@@ -241,9 +281,11 @@ Current invariants include:
 
 - caller cannot supply a PPU destination URL;
 - Manager resolves only enrolled/configured aliases;
+- candidate Static IPv4 endpoint is derived by Manager rather than supplied as a URL;
 - BFF and Manager forward only intentional headers;
 - secure Plasma Gateway remains authoritative for Principal, permission and resource scope;
 - `Idempotency-Key` remains available to the PPU replay ledger;
+- Manager commissioning journal does not persist the caller's authorization credential;
 - unsupported route/method combinations fail closed;
 - Managed Mode does not silently bypass Manager.
 
@@ -252,14 +294,16 @@ Current invariants include:
 | Capability | Current software contract |
 |---|---|
 | PPU local autonomy | Preserved |
-| Manager fleet registry/observation | Implemented; runtime registry lifecycle mutations are explicit, observation remains read-only |
+| Manager fleet registry/observation | Implemented; runtime registry lifecycle/commissioning endpoint mutations are explicit, observation remains read-only |
 | Manager PS Loopback relay | Implemented through shared managed route; legacy fixed route retained for compatibility |
 | Managed Programming Job routing | Implemented as explicit allowlisted relay |
 | Managed Programming Asset/Image relay | Implemented, bounded; EMode binary upload and PMode bounded Batch envelope retain their existing PPU contracts |
 | Managed Batch routing | Implemented for current server-side Batch REST family |
 | Managed Plasma Gateway/Mock settings | Explicit allowlisted read/write routes; secure Plasma Gateway remains authorization authority |
-| Managed PPU network desired state | Explicit allowlisted `GET/POST /api/settings/ppu-network`; activation is not exposed through generic relay |
-| Manager network commissioning transaction | Not implemented in this slice; must own static endpoint migration, identity revalidation, commit/rollback and registry reconciliation |
+| Managed PPU network desired state | Explicit allowlisted `GET/POST /api/settings/ppu-network` |
+| Manager Static IPv4 commissioning | Implemented as explicit Manager-owned transaction with same-`ppu_id` verification, PPU commit, registry endpoint CAS, durable journal and fail-closed recovery state |
+| DHCP endpoint migration | Not implemented; deterministic lease/discovery + same-identity evidence is missing |
+| PPU activation through generic relay | Prohibited |
 | Manager arbitrary reverse proxy | Prohibited |
 | PL Loopback | Not implemented; fail closed |
 | IC Loopback | Not implemented; fail closed |

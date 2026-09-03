@@ -2,8 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  commissionManagerPpuStaticNetwork,
   getManagerPpuNetwork,
+  getManagerPpuNetworkCommissioning,
   saveManagerPpuNetwork,
+  type ManagerNetworkCommissioning,
   type ManagerRegistryEntry,
   type PPUNetworkPayload,
   type PPUNetworkMode,
@@ -13,7 +16,19 @@ import "./ppu-network-configuration.css";
 type Props = {
   entry: ManagerRegistryEntry;
   hasActiveExecution: boolean;
+  onRegistryChanged?: () => void | Promise<void>;
 };
+
+const ACTIVE_COMMISSIONING_STATES = new Set([
+  "requested",
+  "desired_saved",
+  "apply_requested",
+  "reconnecting",
+  "identity_verified",
+  "activation_committed",
+  "registry_reconciled",
+  "rollback_wait",
+]);
 
 function dnsText(values: string[]): string {
   return values.join(", ");
@@ -26,8 +41,9 @@ function parseDns(value: string): string[] {
     .filter(Boolean);
 }
 
-export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: Props) {
+export default function PpuNetworkConfiguration({ entry, hasActiveExecution, onRegistryChanged }: Props) {
   const [network, setNetwork] = useState<PPUNetworkPayload | null>(null);
+  const [commissioning, setCommissioning] = useState<ManagerNetworkCommissioning | null>(null);
   const [loadedAlias, setLoadedAlias] = useState<string | null>(null);
   const [mode, setMode] = useState<PPUNetworkMode>("dhcp");
   const [address, setAddress] = useState("");
@@ -35,14 +51,18 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
   const [gateway, setGateway] = useState("");
   const [dnsServers, setDnsServers] = useState("");
   const [saving, setSaving] = useState(false);
+  const [commissioningBusy, setCommissioningBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [commissioned, setCommissioned] = useState(false);
 
   useEffect(() => {
     if (!entry.alias) return;
     let cancelled = false;
-    void getManagerPpuNetwork(entry.alias)
-      .then(payload => {
+    const alias = entry.alias;
+    void (async () => {
+      try {
+        const payload = await getManagerPpuNetwork(alias);
         if (cancelled) return;
         const settings = payload.ppu_network_settings;
         setNetwork(payload);
@@ -52,17 +72,27 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
         setGateway(settings.gateway ?? "");
         setDnsServers(dnsText(settings.dns_servers));
         setError(null);
-        setSaved(false);
-        setLoadedAlias(entry.alias);
-      })
-      .catch(loadError => {
+      } catch (loadError) {
         if (!cancelled) {
           setNetwork(null);
           setError(loadError instanceof Error ? loadError.message : "PPU network settings unavailable");
-          setSaved(false);
-          setLoadedAlias(entry.alias);
         }
-      });
+      }
+      try {
+        const transaction = await getManagerPpuNetworkCommissioning(alias);
+        if (!cancelled) setCommissioning(transaction);
+      } catch (loadError) {
+        if (!cancelled) {
+          setCommissioning(null);
+          setError(loadError instanceof Error ? loadError.message : "Manager network commissioning status unavailable");
+        }
+      }
+      if (!cancelled) {
+        setSaved(false);
+        setCommissioned(false);
+        setLoadedAlias(alias);
+      }
+    })();
     return () => { cancelled = true; };
   }, [entry.alias, entry.endpoint]);
 
@@ -96,22 +126,35 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
     "applied_waiting_commit",
     "rolling_back",
   ].includes(network.activation.state));
+  const commissioningActive = Boolean(commissioning && ACTIVE_COMMISSIONING_STATES.has(commissioning.state));
+  const recoveryRequired = commissioning?.state === "recovery_required";
+  const commissioningBlocking = commissioningActive || recoveryRequired;
   const lifecycleWritable = entry.lifecycle === "commissioned";
-  const canSave = lifecycleWritable && !hasActiveExecution && !activationBusy;
+  const canEdit = lifecycleWritable && !hasActiveExecution && !activationBusy && !commissioningBlocking;
+  const canSave = canEdit;
+  const canCommission = canEdit
+    && mode === "static"
+    && valid
+    && network?.activation.supported === true;
+
+  function applyNetworkPayload(payload: PPUNetworkPayload) {
+    const settings = payload.ppu_network_settings;
+    setNetwork(payload);
+    setMode(settings.mode);
+    setAddress(settings.address ?? "");
+    setPrefixLength(settings.prefix_length == null ? "24" : String(settings.prefix_length));
+    setGateway(settings.gateway ?? "");
+    setDnsServers(dnsText(settings.dns_servers));
+  }
 
   async function saveDesired() {
-    if (!entry.alias || !valid || !changed || !canSave || saving) return;
+    if (!entry.alias || !valid || !changed || !canSave || saving || commissioningBusy) return;
     setSaving(true);
     setSaved(false);
+    setCommissioned(false);
     try {
       const payload = await saveManagerPpuNetwork(entry.alias, desired);
-      const settings = payload.ppu_network_settings;
-      setNetwork(payload);
-      setMode(settings.mode);
-      setAddress(settings.address ?? "");
-      setPrefixLength(settings.prefix_length == null ? "24" : String(settings.prefix_length));
-      setGateway(settings.gateway ?? "");
-      setDnsServers(dnsText(settings.dns_servers));
+      applyNetworkPayload(payload);
       setError(null);
       setSaved(true);
       setLoadedAlias(entry.alias);
@@ -122,12 +165,40 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
     }
   }
 
+  async function commissionStatic() {
+    if (!entry.alias || !canCommission || commissioningBusy || saving || desired.mode !== "static") return;
+    setCommissioningBusy(true);
+    setSaved(false);
+    setCommissioned(false);
+    try {
+      const result = await commissionManagerPpuStaticNetwork(entry.alias, desired, 20);
+      setCommissioning(result.commissioning);
+      setError(null);
+      setCommissioned(true);
+      const refreshed = await getManagerPpuNetwork(entry.alias);
+      applyNetworkPayload(refreshed);
+      setLoadedAlias(entry.alias);
+      await onRegistryChanged?.();
+    } catch (commissionError) {
+      setError(commissionError instanceof Error ? commissionError.message : "Static IPv4 commissioning failed");
+      try {
+        setCommissioning(await getManagerPpuNetworkCommissioning(entry.alias));
+      } catch {
+        // Preserve the primary commissioning error. The Manager journal remains authoritative.
+      }
+    } finally {
+      setCommissioningBusy(false);
+    }
+  }
+
+  const controlsDisabled = loading || saving || commissioningBusy || !canEdit;
+
   return (
     <section className="ppuSiteCard ppuNetworkConfiguration" aria-label="PPU Network Configuration">
       <header className="ppuSiteCardHeader">
         <div>
           <h3>PPU Network Configuration</h3>
-          <p className="ppuNetworkSubtitle">PPU-owned desired <code>eth0</code> configuration. Saving here does not change the running Linux network.</p>
+          <p className="ppuNetworkSubtitle">PPU-owned desired <code>eth0</code> configuration. Save stores intent only; Static IPv4 commissioning is a separate Manager-owned transaction.</p>
         </div>
         <div className="ppuSiteCardHeaderActions">
           <span className="ppuSiteFilter">REV {current?.revision ?? "—"}</span>
@@ -140,6 +211,7 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
         <span>Desired Mode <strong>{current?.mode?.toUpperCase() ?? "—"}</strong></span>
         <span>Activation <strong>{network?.activation.state ?? "unknown"}</strong></span>
         <span>Committed REV <strong>{network?.activation.committed_revision ?? "—"}</strong></span>
+        <span>Manager Txn <strong>{commissioning?.state ?? "none"}</strong></span>
       </div>
 
       <div className="ppuNetworkGrid">
@@ -148,8 +220,8 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
           <select
             aria-label="PPU network mode"
             value={mode}
-            disabled={loading || saving || !canSave}
-            onChange={event => { setSaved(false); setMode(event.target.value as PPUNetworkMode); }}
+            disabled={controlsDisabled}
+            onChange={event => { setSaved(false); setCommissioned(false); setMode(event.target.value as PPUNetworkMode); }}
           >
             <option value="dhcp">DHCP</option>
             <option value="static">Static IPv4</option>
@@ -164,8 +236,8 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
                 aria-label="PPU static IPv4 address"
                 value={address}
                 placeholder="192.168.10.21"
-                disabled={loading || saving || !canSave}
-                onChange={event => { setSaved(false); setAddress(event.target.value); }}
+                disabled={controlsDisabled}
+                onChange={event => { setSaved(false); setCommissioned(false); setAddress(event.target.value); }}
               />
             </label>
             <label>
@@ -176,8 +248,8 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
                 min="1"
                 max="32"
                 value={prefixLength}
-                disabled={loading || saving || !canSave}
-                onChange={event => { setSaved(false); setPrefixLength(event.target.value); }}
+                disabled={controlsDisabled}
+                onChange={event => { setSaved(false); setCommissioned(false); setPrefixLength(event.target.value); }}
               />
             </label>
             <label>
@@ -186,8 +258,8 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
                 aria-label="PPU static default gateway"
                 value={gateway}
                 placeholder="192.168.10.1"
-                disabled={loading || saving || !canSave}
-                onChange={event => { setSaved(false); setGateway(event.target.value); }}
+                disabled={controlsDisabled}
+                onChange={event => { setSaved(false); setCommissioned(false); setGateway(event.target.value); }}
               />
             </label>
             <label className="wide">
@@ -196,8 +268,8 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
                 aria-label="PPU DNS servers"
                 value={dnsServers}
                 placeholder="192.168.10.1, 8.8.8.8"
-                disabled={loading || saving || !canSave}
-                onChange={event => { setSaved(false); setDnsServers(event.target.value); }}
+                disabled={controlsDisabled}
+                onChange={event => { setSaved(false); setCommissioned(false); setDnsServers(event.target.value); }}
               />
             </label>
           </>
@@ -210,8 +282,19 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
         </p>
       )}
 
+      {commissioning?.candidate_endpoint && (
+        <p className="ppuSiteNote">
+          <strong>Commissioning evidence:</strong> candidate Plasma Gateway Endpoint <code>{commissioning.candidate_endpoint}</code>; transaction <code>{commissioning.transaction_id}</code>.
+        </p>
+      )}
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {saved && !loading && <p className="ppuRegistryMessage success" role="status">Desired PPU network settings saved. Running <code>eth0</code> was not activated by this action.</p>}
+      {commissioned && commissioning?.state === "completed" && (
+        <p className="ppuRegistryMessage success" role="status">Static IPv4 commissioning completed. Manager verified the same <code>ppu_id</code>, committed the PPU activation, and reconciled the durable Plasma Gateway Endpoint.</p>
+      )}
+      {recoveryRequired && (
+        <p className="ppuRegistryMessage warning" role="alert"><strong>Recovery required:</strong> {commissioning?.error_message ?? "Manager cannot prove a safe automatic continuation."} Do not start another network transaction until the PPU network and Manager registry are reconciled.</p>
+      )}
 
       {!lifecycleWritable && (
         <p className="ppuSiteNote"><strong>Write gate:</strong> complete Validate &amp; Enable before changing PPU desired network settings through Manager.</p>
@@ -222,18 +305,33 @@ export default function PpuNetworkConfiguration({ entry, hasActiveExecution }: P
       {activationBusy && (
         <p className="ppuSiteNote"><strong>Activation in progress:</strong> desired settings are frozen until the PPU activation transaction reaches a terminal state.</p>
       )}
+      {commissioningActive && (
+        <p className="ppuSiteNote"><strong>Manager commissioning in progress:</strong> desired settings and endpoint ownership are frozen while the transaction is non-terminal.</p>
+      )}
+      {network && !network.activation.supported && (
+        <p className="ppuSiteNote"><strong>Commissioning unavailable:</strong> this Plasma Gateway does not currently expose a configured privileged network-activation helper. Desired-state Save remains safe and available.</p>
+      )}
       <p className="ppuSiteNote">
-        <strong>Current activation boundary:</strong> this screen persists validated desired settings only. Safe endpoint migration still requires Manager-orchestrated apply → reconnect → same <code>ppu_id</code> verification → commit/rollback; the Browser does not call the activation API directly.
+        <strong>Commissioning boundary:</strong> Static IPv4 uses one Manager-owned transaction: persist desired state → apply on the old endpoint → reconnect to the deterministic candidate endpoint → verify the same <code>ppu_id</code> → commit → durable registry reconciliation. DHCP remains desired-state only until deterministic lease/discovery exists.
       </p>
 
       <div className="ppuNetworkActions">
         <button
-          className="ppuSiteButton primary"
+          className="ppuSiteButton"
           type="button"
-          disabled={loading || saving || !valid || !changed || !canSave}
+          disabled={loading || saving || commissioningBusy || !valid || !changed || !canSave}
           onClick={() => void saveDesired()}
         >
           {saving ? "Saving..." : "Save Desired Network"}
+        </button>
+        <button
+          className="ppuSiteButton primary"
+          type="button"
+          disabled={loading || saving || commissioningBusy || !canCommission}
+          title={network?.activation.supported ? "Run Manager-owned static IPv4 commissioning" : "PPU network activation helper is unavailable"}
+          onClick={() => void commissionStatic()}
+        >
+          {commissioningBusy ? "Commissioning..." : "Commission Static Network"}
         </button>
       </div>
     </section>
