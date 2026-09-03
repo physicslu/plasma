@@ -56,7 +56,7 @@ test("Gateway composition follows the approved shared Settings structure", () =>
 
   assert.match(gateway, /title=\{text\.title\}/);
   assert.match(gateway, /subtitle=\{text\.subtitle\}/);
-  assert.match(gateway, /<SettingsCard ariaLabel="Gateway Communication Settings">/);
+  assert.match(gateway, /<SettingsCard ariaLabel="Plasma Gateway Communication Settings">/);
   assert.match(gateway, /<SettingsGrid columns=\{3\}>/);
   assert.doesNotMatch(gateway, /SettingsTabs/);
 });
