@@ -38,7 +38,11 @@ PROBE_IP = "192.168.77.30"
 PPU_CONTROL_IP = "192.168.77.40"
 PPU_ID = "swpc-armv7-phase2"
 PPU_PORT = 18080
-ROLLBACK_TIMEOUT_S = 2
+# QEMU-backed ARMv7 probes use docker exec + an emulated Python process for
+# every HTTP observation. Keep the production transaction bounded, but leave
+# enough time for reconnect, identity verification, old-endpoint rejection,
+# and the explicit commit to complete before the local rollback watchdog fires.
+ROLLBACK_TIMEOUT_S = 12
 RESULT_MARKER = "PLASMA_PPU_NETWORK_PHASE2_RESULT="
 CAP_NET_ADMIN = 12
 MAX_HELPER_REQUEST = 1024 * 1024
