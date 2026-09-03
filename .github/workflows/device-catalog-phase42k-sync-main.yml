@@ -1,0 +1,32 @@
+name: Device catalog Phase 4.2K sync current main
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2k-f407-f417-i-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42k-sync-main.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2k-f407-f417-i-admission
+          fetch-depth: 0
+      - name: Merge current main without rewriting Phase 4.2K history
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          echo "branch_before=$(git rev-parse HEAD)"
+          echo "main=$(git rev-parse origin/main)"
+          git merge --no-edit origin/main
+          git push origin HEAD:agent/device-catalog-phase4.2k-f407-f417-i-admission
