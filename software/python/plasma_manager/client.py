@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import ProxyHandler, Request, build_opener
 
 
@@ -35,15 +36,20 @@ class PPUHttpClient:
         accepted_statuses: frozenset[int],
         body: dict[str, Any] | None = None,
         timeout_s: float | None = None,
+        headers: dict[str, str] | None = None,
     ) -> tuple[int, dict[str, Any]]:
         data = None if body is None else json.dumps(body, separators=(",", ":")).encode("utf-8")
-        headers = {"Accept": "application/json", "User-Agent": "plasma-manager/1"}
-        if data is not None:
-            headers["Content-Type"] = "application/json"
+        request_headers = {
+            "Accept": "application/json",
+            "User-Agent": "plasma-manager/1",
+            **(headers or {}),
+        }
+        if data is not None and "Content-Type" not in request_headers:
+            request_headers["Content-Type"] = "application/json"
         request = Request(
             f"{self.endpoint}{path}",
             data=data,
-            headers=headers,
+            headers=request_headers,
             method=method,
         )
         try:
@@ -122,8 +128,19 @@ class PPUHttpClient:
             raise PPUHTTPError(f"{path_and_query} response exceeds Manager relay limit")
         return status, response_headers, response_data
 
-    def _get(self, path: str, accepted_statuses: frozenset[int]) -> tuple[int, dict[str, Any]]:
-        return self._request_json("GET", path, accepted_statuses=accepted_statuses)
+    def _get(
+        self,
+        path: str,
+        accepted_statuses: frozenset[int],
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        return self._request_json(
+            "GET",
+            path,
+            accepted_statuses=accepted_statuses,
+            headers=headers,
+        )
 
     def liveness(self) -> tuple[int, dict[str, Any]]:
         return self._get("/api/health/live", frozenset({200}))
@@ -131,11 +148,73 @@ class PPUHttpClient:
     def readiness(self) -> tuple[int, dict[str, Any]]:
         return self._get("/api/health/ready", frozenset({200, 503}))
 
-    def node(self) -> tuple[int, dict[str, Any]]:
-        return self._get("/api/node", frozenset({200}))
+    def node(self, *, headers: dict[str, str] | None = None) -> tuple[int, dict[str, Any]]:
+        return self._get("/api/node", frozenset({200}), headers=headers)
 
     def status(self) -> tuple[int, dict[str, Any]]:
         return self._get("/api/status", frozenset({200}))
+
+    def ppu_network_settings(
+        self,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        return self._get("/api/settings/ppu-network", frozenset({200}), headers=headers)
+
+    def update_ppu_network_settings(
+        self,
+        body: dict[str, Any],
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        return self._request_json(
+            "POST",
+            "/api/settings/ppu-network",
+            accepted_statuses=frozenset({200}),
+            body=body,
+            headers=headers,
+        )
+
+    def network_activation(
+        self,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        return self._get(
+            "/api/settings/ppu-network/activation",
+            frozenset({200}),
+            headers=headers,
+        )
+
+    def start_network_activation(
+        self,
+        body: dict[str, Any],
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        return self._request_json(
+            "POST",
+            "/api/settings/ppu-network/activation",
+            accepted_statuses=frozenset({202}),
+            body=body,
+            headers=headers,
+        )
+
+    def commit_network_activation(
+        self,
+        activation_id: str,
+        body: dict[str, Any],
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        encoded = quote(activation_id, safe="")
+        return self._request_json(
+            "POST",
+            f"/api/settings/ppu-network/activation/{encoded}/commit",
+            accepted_statuses=frozenset({200}),
+            body=body,
+            headers=headers,
+        )
 
     def ps_loopback(
         self,

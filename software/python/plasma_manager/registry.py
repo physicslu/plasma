@@ -87,7 +87,7 @@ class PPURegistryStore:
     `manager.yaml` remains deployment/bootstrap configuration. When
     `registry_state_path` is configured, the first start seeds this store from
     `config.ppus`; after that, this state file becomes the runtime inventory
-    source of truth for add/remove/admission lifecycle changes.
+    source of truth for add/remove/admission lifecycle/endpoint changes.
     """
 
     def __init__(
@@ -193,6 +193,79 @@ class PPURegistryStore:
                 endpoint=current.endpoint,
                 alias=current.alias,
                 lifecycle=lifecycle,
+                registered_at=current.registered_at,
+                updated_at=self._clock(),
+            )
+            records = list(self._records)
+            records[index] = updated
+            previous = self._records
+            self._records = tuple(records)
+            try:
+                self._persist_locked()
+            except Exception:
+                self._records = previous
+                raise
+            return updated
+
+    def check_endpoint_available(self, alias: str, endpoint: str) -> str:
+        normalized_alias = normalize_registry_alias(alias)
+        try:
+            normalized_endpoint = normalize_endpoint(endpoint)
+        except ValueError as exc:
+            raise RegistryValidationError(str(exc)) from exc
+        with self._lock:
+            if not any(record.alias == normalized_alias for record in self._records):
+                raise RegistryEntryNotFound(f"PPU registry alias was not found: {normalized_alias}")
+            if any(
+                record.alias != normalized_alias and record.endpoint == normalized_endpoint
+                for record in self._records
+            ):
+                raise RegistryConflictError(
+                    f"candidate Plasma Gateway Endpoint already belongs to another PPU: {normalized_endpoint}"
+                )
+        return normalized_endpoint
+
+    def compare_and_swap_endpoint(
+        self,
+        alias: str,
+        *,
+        expected_endpoint: str,
+        new_endpoint: str,
+    ) -> PPURegistryRecord:
+        """Durably update one endpoint only if its previous value still matches.
+
+        Commissioning must never overwrite an operator or concurrent transaction
+        mutation that occurred after the network transaction started.
+        """
+        self._require_mutable()
+        normalized_alias = normalize_registry_alias(alias)
+        try:
+            normalized_expected = normalize_endpoint(expected_endpoint)
+            normalized_new = normalize_endpoint(new_endpoint)
+        except ValueError as exc:
+            raise RegistryValidationError(str(exc)) from exc
+        with self._lock:
+            index = next((i for i, record in enumerate(self._records) if record.alias == normalized_alias), None)
+            if index is None:
+                raise RegistryEntryNotFound(f"PPU registry alias was not found: {normalized_alias}")
+            current = self._records[index]
+            if current.endpoint != normalized_expected:
+                raise RegistryConflictError(
+                    f"PPU registry endpoint changed during commissioning: expected {normalized_expected}, found {current.endpoint}"
+                )
+            if any(
+                i != index and record.endpoint == normalized_new
+                for i, record in enumerate(self._records)
+            ):
+                raise RegistryConflictError(
+                    f"candidate Plasma Gateway Endpoint already belongs to another PPU: {normalized_new}"
+                )
+            if current.endpoint == normalized_new:
+                return current
+            updated = PPURegistryRecord(
+                endpoint=normalized_new,
+                alias=current.alias,
+                lifecycle=current.lifecycle,
                 registered_at=current.registered_at,
                 updated_at=self._clock(),
             )
