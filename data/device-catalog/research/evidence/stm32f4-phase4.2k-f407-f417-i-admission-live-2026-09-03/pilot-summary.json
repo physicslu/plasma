@@ -1,0 +1,465 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 5,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 5,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 5,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 16,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 5,
+    "total": 5
+  },
+  "pilot_id": "stm32f4-phase4.2k-f407-f417-i-admission-2026-09-03",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "26cae02914c1efa9db4674f57ce42e2ba3f02a06d62546fc5951dc783421112c",
+        "retrieved_at_utc": "2026-09-03T03:18:15Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production-admitted lifecycle control retained from prior STM32F4 bounded admissions",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F407IE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F407IEHx",
+          "icpn": "STM32F407IEH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F407IEHx",
+          "icpn": "STM32F407IEH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F407IEHx",
+          "icpn": "STM32F407IEH7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F407IETx",
+          "icpn": "STM32F407IET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F407IE",
+        "evidence_section_sha256": "c96b97346853d5ed75f2d3172e73e5e75394fd0ad11fe1562abb5450b27cfb78",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F407IEH6",
+          "STM32F407IEH6TR",
+          "STM32F407IEH7",
+          "STM32F407IET6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ie.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F407IEH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F407IEH6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F407IEH7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F407IET6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "115eeedf3cc199de2d52c02b33f1e648cbdbe3621f99c6f9cc244b800f9ab47b",
+        "retrieved_at_utc": "2026-09-03T03:18:22Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ie.html"
+      },
+      "selection_reason": "policy-ready after merged Phase 4.2J I/H UFBGA176 and I/T LQFP176 mappings",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ie.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F407IG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F407IGHx",
+          "icpn": "STM32F407IGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F407IGHx",
+          "icpn": "STM32F407IGH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F407IGHx",
+          "icpn": "STM32F407IGH7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F407IGTx",
+          "icpn": "STM32F407IGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F407IGTx",
+          "icpn": "STM32F407IGT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F407IG",
+        "evidence_section_sha256": "56c10145e2b7fe0e46b918b6013316a45c493dcf68333eb87cc317f35d686148",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F407IGH6",
+          "STM32F407IGH6TR",
+          "STM32F407IGH7",
+          "STM32F407IGT6",
+          "STM32F407IGT7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ig.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F407IGH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F407IGH6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F407IGH7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F407IGT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F407IGT7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e3866c34fb87edc09a046a37b24e4fde07def515af5562156513f439a3858505",
+        "retrieved_at_utc": "2026-09-03T03:18:29Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ig.html"
+      },
+      "selection_reason": "policy-ready after merged Phase 4.2J; discovery must preserve exact lifecycle observations",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f407ig.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F417IE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F417IEHx",
+          "icpn": "STM32F417IEH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F417IETx",
+          "icpn": "STM32F417IET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F417IE",
+        "evidence_section_sha256": "3f03cee38b0ff73f3097d863425b387f41bc61bc810c28be5c7829959bdc7d97",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F417IEH6",
+          "STM32F417IET6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ie.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F417IEH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F417IET6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "8e74ecbdf8d5be5fcd4126adee385bf6b572f6aa18f569550d488e477e9d07e7",
+        "retrieved_at_utc": "2026-09-03T03:18:35Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ie.html"
+      },
+      "selection_reason": "policy-ready after merged Phase 4.2J I/H UFBGA176 and I/T LQFP176 mappings",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ie.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F417IG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F417IGHx",
+          "icpn": "STM32F417IGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F417IGHx",
+          "icpn": "STM32F417IGH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F417IGTx",
+          "icpn": "STM32F417IGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F417IGTx",
+          "icpn": "STM32F417IGT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F417IG",
+        "evidence_section_sha256": "f9b581bcc6d1085e7db3f7fa63c65963a092e268d32538d06d503a7e71433beb",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F417IGH6",
+          "STM32F417IGH6TR",
+          "STM32F417IGT6",
+          "STM32F417IGT7"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F417IGH6W",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ig.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F417IGH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F417IGH6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32F417IGH6W",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F417IGT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F417IGT7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "2faeaa76f247487d2d2a3683b122a4fec3ff14083b94b285dd4f37f9624c5f02",
+        "retrieved_at_utc": "2026-09-03T03:18:41Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ig.html"
+      },
+      "selection_reason": "policy-ready after merged Phase 4.2J; discovery must exclude non-Active variants from Production",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f417ig.html"
+    }
+  ],
+  "schema_version": 1
+}
