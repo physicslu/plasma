@@ -1,0 +1,26 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2t-f410tb-admission-2026-09-03",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9887852841",
+    "artifact_sha256": "007c519ee70dabe1879385bc928bef9e88525731a8380eaec372d5a9c1ad5d8b",
+    "source_commit": "133c4ce7c2f3418c5adf9155382e50572eebe047",
+    "workflow_run_id": "33741319793"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "exact_icpns": ["STM32F479ZGT6"]
+    },
+    {
+      "base_device": "STM32F410TB",
+      "exact_icpns": [
+        "STM32F410TBY3TR",
+        "STM32F410TBY6TR",
+        "STM32F410TBY7TR"
+      ]
+    }
+  ]
+}
