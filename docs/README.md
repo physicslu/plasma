@@ -11,6 +11,11 @@
 | **Plan** | 尚未全部實作的核准方向；不能宣稱為現有能力。 |
 | **Historical** | 僅供遷移背景；不是相容性或執行契約。 |
 
+## Architecture Decision Records
+
+- **Current** — [ADR Index](adr/README.md)：記錄 Plasma 已核准的長期架構決策與狀態。
+- **Current** — [ADR-0001: PYNQ System Python 與 Plasma PPU Runtime 分離](adr/0001-pynq-system-python-plasma-runtime-separation.md)：PYNQ owns System Python；Plasma owns an isolated, Plasma-qualified Python runtime。Bundled Python 是偏好的產品方向，但必須先完成 ARMv7/PYNQ 實機 qualification。
+
 ## Operator
 
 - **Current** — [Plasma Console Operator Guide](operator/plasma-console-guide.md)：PMode／EMode、Batch Summary、操作與異常復原。
