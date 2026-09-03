@@ -1,0 +1,21 @@
+{
+  "added_exact_icpns": [
+    "STM32F410TBY3TR",
+    "STM32F410TBY6TR",
+    "STM32F410TBY7TR"
+  ],
+  "admission_plan_sha256": "ea3f68cdaddfd99cae37483442ec5d5204bf6139fb363bcecd838a997446c61d",
+  "canonical_csv_file_sha256": "d74913a72995dbbf5a4e5b14934e816266cd89166e080fe9aa0b95c5eb52d539",
+  "lifecycle_exclusions": [],
+  "phase": "4.2T",
+  "production_base_devices_after": 101,
+  "production_base_devices_before": 100,
+  "production_rows_after": 307,
+  "production_rows_before": 304,
+  "proposal_artifact_id": 9887984179,
+  "proposal_artifact_zip_sha256": "6df1b93f41535026a75bdbd6572a4b0359315f8be16ae25ddf92c7e17a5e818f",
+  "proposal_run_id": 33741730096,
+  "retained_evidence_id": "stm32f4-phase4.2t-f410tb-admission-2026-09-03-retained-20260903T095612Z-58e3ad1",
+  "schema_version": 1,
+  "status": "published"
+}

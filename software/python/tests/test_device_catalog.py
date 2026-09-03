@@ -7,8 +7,8 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalog, get_default_device_catalog
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 379
-EXPECTED_STM32F4_CATALOG_SIZE = 304
+EXPECTED_PRODUCTION_CATALOG_SIZE = 382
+EXPECTED_STM32F4_CATALOG_SIZE = 307
 
 
 LEGACY_COLUMNS = [
@@ -206,7 +206,7 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert phase42f.flash_size == "1024 KiB"
     assert phase42f.option_suffix == "PTR"
     assert phase42f.target_config == "tcl/target/stm32f4x.cfg"
-    # Search results remain capped at 100 while metadata proves the full 211-row F4 family.
+    # Search results remain capped at 100 while metadata proves the full F4 family.
     assert len(family) == 100
     assert len(combined) == 100
 
