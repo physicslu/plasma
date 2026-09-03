@@ -17,7 +17,7 @@ jobs:
         uses: docker/setup-qemu-action@v4
         with:
           platforms: arm
-      - name: Diagnose managed IPv4 delete semantics
+      - name: Diagnose HTTP probe path
         shell: bash
         run: |
           set -euo pipefail
@@ -32,45 +32,43 @@ jobs:
           docker network create --subnet 192.168.77.0/24 --gateway 192.168.77.1 "$NET"
           docker run -d --name "$PPU" --platform linux/arm/v7 --network "$NET" --ip 192.168.77.40 --cap-add NET_ADMIN \
             -v "$PWD/scripts/ppu-network-phase2-acceptance.py:/acceptance.py:ro" \
-            arm32v7/python:3.12 python3 -c 'import socket,time; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind(("0.0.0.0",18080)); s.listen(); time.sleep(3600)'
+            arm32v7/python:3.12 python3 -m http.server 18080 --bind 0.0.0.0
           docker run -d --name "$PROBE" --platform linux/arm/v7 --network "$NET" --ip 192.168.77.30 \
             arm32v7/python:3.12 python3 -c 'import time; time.sleep(3600)'
+          echo '--- probe proxy environment ---'
+          docker exec "$PROBE" sh -c 'env | grep -i proxy || true'
           docker exec -i "$PPU" python3 - <<'PY'
           import importlib.util
-          spec = importlib.util.spec_from_file_location("acc", "/acceptance.py")
-          acc = importlib.util.module_from_spec(spec); spec.loader.exec_module(acc)
-          acc._address_message("eth0", "192.168.77.10", 24, acc.RTM_NEWADDR, create=True)
-          print("added .10")
+          spec=importlib.util.spec_from_file_location("acc","/acceptance.py")
+          acc=importlib.util.module_from_spec(spec); spec.loader.exec_module(acc)
+          acc._address_message("eth0","192.168.77.10",24,acc.RTM_NEWADDR,create=True)
           PY
-          echo '--- before delete: /proc/net/fib_trie ---'
-          docker exec "$PPU" cat /proc/net/fib_trie | grep -A3 -B2 '192.168.77' || true
-          echo '--- raw TCP reachability before replace ---'
+          echo '--- urllib before replace ---'
           docker exec -i "$PROBE" python3 - <<'PY'
-          import socket
-          for ip in ("192.168.77.40","192.168.77.10"):
-              s=socket.socket(); s.settimeout(.8)
-              try:
-                  s.connect((ip, 18080)); print(ip, "tcp-connect", "connected")
-              except Exception as e: print(ip, "tcp-connect", type(e).__name__, str(e))
-              finally: s.close()
+          import urllib.request
+          print('proxies', urllib.request.getproxies())
+          for ip in ('192.168.77.10','192.168.77.40'):
+              for direct in (False, True):
+                  opener=urllib.request.build_opener(urllib.request.ProxyHandler({})) if direct else urllib.request.build_opener()
+                  try:
+                      with opener.open(f'http://{ip}:18080/',timeout=1) as r: print(ip,'direct' if direct else 'default',r.status)
+                  except Exception as e: print(ip,'direct' if direct else 'default',type(e).__name__,str(e))
           PY
           docker exec -i "$PPU" python3 - <<'PY'
           import importlib.util
-          spec = importlib.util.spec_from_file_location("acc", "/acceptance.py")
-          acc = importlib.util.module_from_spec(spec); spec.loader.exec_module(acc)
-          acc._address_message("eth0", "192.168.77.10", 24, acc.RTM_DELADDR)
-          acc._address_message("eth0", "192.168.77.21", 24, acc.RTM_NEWADDR, create=True)
-          print("deleted .10, added .21")
+          spec=importlib.util.spec_from_file_location("acc","/acceptance.py")
+          acc=importlib.util.module_from_spec(spec); spec.loader.exec_module(acc)
+          acc._address_message("eth0","192.168.77.10",24,acc.RTM_DELADDR)
+          acc._address_message("eth0","192.168.77.21",24,acc.RTM_NEWADDR,create=True)
           PY
-          echo '--- after replace: /proc/net/fib_trie ---'
-          docker exec "$PPU" cat /proc/net/fib_trie | grep -A3 -B2 '192.168.77' || true
-          echo '--- raw TCP reachability after replace ---'
+          echo '--- urllib after replace ---'
           docker exec -i "$PROBE" python3 - <<'PY'
-          import socket
-          for ip in ("192.168.77.40","192.168.77.10","192.168.77.21"):
-              s=socket.socket(); s.settimeout(.8)
-              try:
-                  s.connect((ip, 18080)); print(ip, "tcp-connect", "connected")
-              except Exception as e: print(ip, "tcp-connect", type(e).__name__, str(e))
-              finally: s.close()
+          import urllib.request
+          print('proxies', urllib.request.getproxies())
+          for ip in ('192.168.77.10','192.168.77.21','192.168.77.40'):
+              for direct in (False, True):
+                  opener=urllib.request.build_opener(urllib.request.ProxyHandler({})) if direct else urllib.request.build_opener()
+                  try:
+                      with opener.open(f'http://{ip}:18080/',timeout=1) as r: print(ip,'direct' if direct else 'default',r.status)
+                  except Exception as e: print(ip,'direct' if direct else 'default',type(e).__name__,str(e))
           PY
