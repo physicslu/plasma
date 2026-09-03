@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "phase": "4.2S",
+  "base_main": "b71cf33a9f131e67da89d0867470316776493aa1",
+  "source_prioritization": "stm32f4-phase4.2r-blocker-prioritization-summary.json",
+  "policy_mapping": {
+    "pin_code": "T",
+    "package_code": "Y",
+    "package": "WLCSP",
+    "pin_count": "36"
+  },
+  "affected_base_devices": [
+    "STM32F410T8",
+    "STM32F410TB"
+  ],
+  "official_evidence": {
+    "product_urls": [
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f410t8.html"
+    ],
+    "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32f410tb.pdf",
+    "observed_package": "WLCSP 36",
+    "datasheet_device_forms": ["STM32F410TBY", "STM32F410T8Y"]
+  },
+  "expected_immediate_delta_before_admission": {
+    "production_exact_icpn_rows": 304,
+    "production_base_device_count": 100,
+    "gap_base_device_count": 49,
+    "policy_ready_count": 1,
+    "policy_blocked_count": 48,
+    "policy_ready_base_devices": ["STM32F410TB"],
+    "still_blocked": {
+      "STM32F410T8": ["unsupported flash-size code 8"]
+    }
+  },
+  "production_write_applied": false,
+  "admission_applied": false,
+  "algorithm_equivalence_claimed": false,
+  "fail_closed": true
+}
