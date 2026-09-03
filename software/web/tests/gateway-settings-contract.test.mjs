@@ -15,24 +15,34 @@ const plasmaApi = await readFile(new URL("../app/plasma-api.ts", import.meta.url
 const serverBatchApi = await readFile(new URL("../app/server-batch-api.ts", import.meta.url), "utf8");
 const serverBatchRuntime = await readFile(new URL("../../python/plasma_web/batch_runtime.py", import.meta.url), "utf8");
 
-test("EMode Settings owns the server-backed shared Gateway communication policy", () => {
+test("EMode Settings owns the server-backed shared Plasma Gateway communication policy", () => {
   assert.match(engineeringPage, /active === "settings"/);
   assert.match(engineeringPage, /type SettingsSection = "gateway" \| "mock"/);
   assert.match(engineeringPage, /selectSettingsSection\("gateway"\)/);
+  assert.match(engineeringPage, /<span className="engineeringNavLabel">Plasma Gateway<\/span>/);
   assert.match(engineeringPage, /<GatewaySettingsPanel \/>/);
   assert.match(settingsApi, /\/api\/settings\/gateway/);
   assert.match(settingsApi, /ppu_request_timeout_ms: 10_000/);
   assert.match(settingsApi, /ppu_retry_count: 3/);
   assert.match(settingsPanel, /PPU Request Timeout seconds/);
   assert.match(settingsPanel, /PPU Retry Count/);
-  assert.match(settingsPanel, /GATEWAY COMMUNICATION CONFIGURATION/);
-  assert.match(settingsPanel, /Gateway 設定/);
+  assert.match(settingsPanel, /PLASMA GATEWAY COMMUNICATION CONFIGURATION/);
+  assert.match(settingsPanel, /Plasma Gateway 設定/);
+  assert.match(settingsPanel, /Plasma Gateway Settings/);
   assert.match(settingsPanel, /<SettingsGrid columns=\{3\}>/);
   assert.doesNotMatch(settingsPanel, /<SettingsTabs/);
   assert.match(serverBatchApi, /gateway_settings\?: GatewaySettings/);
 });
 
-test("Gateway uses the shared Engineering Settings UI primitives without a redundant local tab shell", () => {
+test("Plasma Gateway settings retain compatibility-sensitive internal identifiers", () => {
+  assert.match(settingsApi, /\/api\/settings\/gateway/);
+  assert.match(engineeringPage, /type SettingsSection = "gateway" \| "mock"/);
+  assert.match(engineeringPage, /selectSettingsSection\("gateway"\)/);
+  assert.match(settingsPanel, /getGatewaySettings/);
+  assert.match(settingsPanel, /updateGatewaySettings/);
+});
+
+test("Plasma Gateway uses the shared Engineering Settings UI primitives without a redundant local tab shell", () => {
   for (const primitive of ["SettingsPage", "SettingsCard", "SettingsGrid", "SettingsField", "SettingsActions", "SettingsMessage", "SettingsGuide"]) {
     assert.match(settingsPanel, new RegExp(primitive));
     assert.match(sharedSettingsUi, new RegExp(`export function ${primitive}`));
@@ -51,15 +61,15 @@ test("Shared Settings controls consume the Loopback-aligned operator surface geo
   assert.doesNotMatch(sharedSettingsCss, /--settings-control-height|--settings-action-height/);
 });
 
-test("EMode settings children share one top-aligned Settings surface and keep Gateway help on the same page", () => {
+test("EMode settings children share one top-aligned Settings surface and keep Plasma Gateway help on the same page", () => {
   assert.match(engineeringPage, /settingsSurfaceActive = active === "settings"/);
   assert.match(engineeringPage, /settingsSection === "mock"/);
   assert.match(engineeringPage, /selectSettingsSection\("gateway"\)/);
   assert.match(engineeringPage, /selectSettingsSection\("mock"\)/);
   assert.match(engineeringPage, /settingsSurfaceActive \? "settingsActive"/);
   assert.match(engineeringCss, /\.engineeringCanvas\.settingsActive\s*\{[\s\S]*?place-items:\s*start stretch;/);
-  assert.match(settingsPanel, /ariaLabel="Gateway Settings Guide"/);
-  assert.match(settingsPanel, /Gateway 設定說明/);
+  assert.match(settingsPanel, /ariaLabel="Plasma Gateway Settings Guide"/);
+  assert.match(settingsPanel, /Plasma Gateway 設定說明/);
   assert.match(settingsPanel, /測試方法/);
   assert.match(settingsPanel, /Mock 的 E\/P\/V\/R Error Rate/);
 });
