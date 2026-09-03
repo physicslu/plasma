@@ -22,14 +22,32 @@ PHASE42I_ADMITTED = {
     "STM32F405OGY6TR",
     "STM32F415OGY6TR",
 }
+POST_PHASE42I_ADMITTED = {
+    "STM32F407IEH6",
+    "STM32F407IEH6TR",
+    "STM32F407IEH7",
+    "STM32F407IET6",
+    "STM32F407IGH6",
+    "STM32F407IGH6TR",
+    "STM32F407IGH7",
+    "STM32F407IGT6",
+    "STM32F407IGT7",
+    "STM32F417IEH6",
+    "STM32F417IET6",
+    "STM32F417IGH6",
+    "STM32F417IGH6TR",
+    "STM32F417IGT6",
+    "STM32F417IGT7",
+}
 
 
 class STM32F4Phase42HOYWLCSP90PolicyTests(unittest.TestCase):
     def _historical_pre_phase42i(self, directory: Path) -> Path:
+        later_admissions = PHASE42I_ADMITTED | POST_PHASE42I_ADMITTED
         with CANONICAL.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             fields = list(reader.fieldnames or [])
-            rows = [row for row in reader if row["icpn"] not in PHASE42I_ADMITTED]
+            rows = [row for row in reader if row["icpn"] not in later_admissions]
         self.assertEqual(len(rows), 208)
 
         historical = directory / "stm32f4-commercial-icpn.csv"
@@ -44,7 +62,7 @@ class STM32F4Phase42HOYWLCSP90PolicyTests(unittest.TestCase):
 
     def test_current_production_contains_the_later_phase42i_admission(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
-        self.assertEqual(inventory["production"]["exact_icpn_rows"], 211)
+        self.assertGreaterEqual(inventory["production"]["exact_icpn_rows"], 211)
         production = set(inventory["production"]["base_devices"])
         self.assertTrue(EXPECTED_READY <= production)
 
