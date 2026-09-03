@@ -14,7 +14,7 @@ jobs:
         with: {ref: agent/device-catalog-phase4.2q-vh-admission-batch2, fetch-depth: 0}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: Materialize permanent Phase 4.2Q closure
+      - name: Materialize non-workflow permanent Phase 4.2Q closure
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -60,10 +60,6 @@ jobs:
                   if old not in text: raise SystemExit(f'missing expected closure token in {path}: {old}')
                   text=text.replace(old,new,1)
               path.write_text(text)
-          wf=Path('.github/workflows/device-catalog-current-validation.yml')
-          text=wf.read_text()
-          block='''\n      - name: Validate Phase 4.2Q V/H batch2 retained evidence and post-admission closure\n        run: |\n          python data/device-catalog/research/validate_stm32f4_phase4_2q_retained_evidence.py\n          python data/device-catalog/research/test_stm32f4_phase4_2q_vh_admission_batch2_post_admission.py\n'''
-          if 'Phase 4.2Q V/H batch2 retained evidence' not in text: wf.write_text(text.rstrip()+block+'\n')
           PY
           cat > data/device-catalog/research/validate_stm32f4_phase4_2q_retained_evidence.py <<'PY'
           #!/usr/bin/env python3
@@ -78,10 +74,7 @@ jobs:
               dst=Path(td)
               shutil.copy2(SRC/'manifest.json',dst/'manifest.json')
               for entry in manifest['files']:
-                  rel=Path(entry['path'])
-                  target=dst/rel
-                  target.parent.mkdir(parents=True,exist_ok=True)
-                  shutil.copy2(SRC/rel,target)
+                  rel=Path(entry['path']); target=dst/rel; target.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(SRC/rel,target)
               subprocess.run([sys.executable,str(VALIDATOR),'--evidence-dir',str(dst),'--baseline',str(BASELINE)],check=True)
           print('Phase 4.2Q retained-evidence replay PASS')
           PY
@@ -112,8 +105,7 @@ jobs:
           from plasma_web.device_catalog import get_default_device_catalog
           from plasma_web.gateway import PlasmaWebHandler
           EXPECTED_MIN_PRODUCTION_CATALOG_SIZE=379
-          UFBGA_ICPN='STM32F412VEH3TR'
-          LQFP_ICPN='STM32F413VGT6TR'
+          UFBGA_ICPN='STM32F412VEH3TR'; LQFP_ICPN='STM32F413VGT6TR'
           def test_phase42q_exact_icpns_are_resolved_by_runtime_catalog() -> None:
               catalog=get_default_device_catalog(); assert catalog.size>=EXPECTED_MIN_PRODUCTION_CATALOG_SIZE
               for icpn,package,flash_size in ((UFBGA_ICPN,'UFBGA','512 KiB'),(LQFP_ICPN,'LQFP','1024 KiB')):
@@ -128,17 +120,16 @@ jobs:
               finally:
                   server.shutdown(); server.server_close(); thread.join()
           PY
-          git rm .github/workflows/device-catalog-phase42q-proposal.yml .github/workflows/device-catalog-phase42q-publish.yml .github/workflows/device-catalog-phase42q-close.yml
-      - name: Validate permanent closure before commit
+      - name: Validate non-workflow permanent closure before commit
         run: |
           python data/device-catalog/research/validate_stm32f4_phase4_2q_retained_evidence.py
           python data/device-catalog/research/test_stm32f4_phase4_2q_vh_admission_batch2_post_admission.py
           python data/ic-support/test_coverage_inventory.py
           python -m compileall -q software/python/tests/test_device_catalog_phase42q.py
-      - name: Commit permanent closure
+      - name: Commit non-workflow permanent closure
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'device-catalog: close Phase 4.2Q V/H batch2 admission'
+          git add data/device-catalog/production/icpn-v1-manifest.json data/device-catalog/research/stm32f4-phase4.2q-vh-admission-batch2-plan.json data/device-catalog/research/stm32f4-phase4.2q-vh-admission-batch2-audit.json data/device-catalog/research/validate_stm32f4_phase4_2q_retained_evidence.py data/device-catalog/research/test_stm32f4_phase4_2q_vh_admission_batch2_post_admission.py data/ic-support/test_coverage_inventory.py software/python/tests/test_device_catalog.py software/python/tests/test_device_catalog_web_gateway.py software/python/tests/test_device_catalog_phase42q.py
+          git commit -m 'device-catalog: close Phase 4.2Q V/H batch2 data and runtime'
           git push origin HEAD:agent/device-catalog-phase4.2q-vh-admission-batch2
