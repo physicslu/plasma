@@ -11,6 +11,16 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'data/device-catalog/research/stm32f4_admission_policy.py'
+      - 'data/device-catalog/research/stm32f4_coverage_gap_inventory.py'
+      - 'data/device-catalog/research/test_stm32f4_phase4_1_rt_policy.py'
+      - 'data/device-catalog/research/test_stm32f4_phase4_2h_oy_wlcsp90_policy.py'
+      - '.github/workflows/device-catalog-phase42h-oy-wlcsp90-validation.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

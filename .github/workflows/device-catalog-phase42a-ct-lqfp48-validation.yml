@@ -2,9 +2,21 @@ name: Device catalog Phase 4.2A C/T LQFP48 policy
 
 on:
   pull_request:
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog.py"
+      - ".github/workflows/device-catalog-phase42a-ct-lqfp48-validation.yml"
   push:
     branches:
       - main
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog.py"
+      - ".github/workflows/device-catalog-phase42a-ct-lqfp48-validation.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

@@ -3,7 +3,19 @@ name: Device catalog Phase 4.2B STM32F410CB lifecycle
 on:
   push:
     branches: [main]
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog.py"
+      - ".github/workflows/device-catalog-phase42b-f410cb-validation.yml"
   pull_request:
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog.py"
+      - ".github/workflows/device-catalog-phase42b-f410cb-validation.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

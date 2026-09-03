@@ -3,7 +3,19 @@ name: Device catalog Phase 4.2D R/Y WLCSP64 policy
 on:
   push:
     branches: [main]
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog.py"
+      - ".github/workflows/device-catalog-phase42d-ry-wlcsp64-validation.yml"
   pull_request:
+    paths:
+      - "data/device-catalog/**"
+      - "software/python/plasma_web/device_catalog.py"
+      - ".github/workflows/device-catalog-phase42d-ry-wlcsp64-validation.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
