@@ -1,0 +1,142 @@
+name: Device catalog Phase 4.2K controlled Production publish
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2k-f407-f417-i-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42k-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2k-f407-f417-i-admission
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Rebuild, bind, and publish clean Phase 4.2K plan
+        run: |
+          set -euo pipefail
+          PYTHONPATH=data/device-catalog/research python - <<'PY'
+          import csv, hashlib, json
+          from pathlib import Path
+          from device_catalog_admission_framework import (
+              read_csv, build_admission_plan, plan_is_clean, write_canonical_dataset,
+          )
+          from stm32f4_admission_policy import build_candidate_inputs, build_canonical_row
+
+          root = Path('data/device-catalog/research')
+          evidence_dir = root / 'evidence/stm32f4-phase4.2k-f407-f417-i-admission-live-2026-09-03'
+          canonical = root / 'stm32f4-commercial-icpn.csv'
+          pilot = json.loads((evidence_dir / 'pilot-summary.json').read_text())
+          manifest = json.loads((evidence_dir / 'manifest.json').read_text())
+          evaluation = json.loads((evidence_dir / 'evaluation.json').read_text())
+
+          if evaluation.get('candidate_baseline_match') is not True or evaluation.get('candidate_drift') != [] or evaluation.get('scale_ready') is not True:
+              raise SystemExit('retained evidence is not clean/scale-ready')
+
+          fields, rows = read_csv(canonical)
+          if len(rows) != 211:
+              raise SystemExit(f'expected 211 pre-publish F4 rows, got {len(rows)}')
+          if len({r['icpn'] for r in rows}) != 211:
+              raise SystemExit('pre-publish canonical ICPNs are not unique')
+
+          with (root / 'openocd-parts-canonical.csv').open(newline='', encoding='utf-8') as f:
+              catalog_rows = list(csv.DictReader(f))
+          inputs = build_candidate_inputs(summary=pilot, evidence_id=manifest['evidence_id'], catalog_rows=catalog_rows)
+          bases = {'STM32F407IE','STM32F407IG','STM32F417IE','STM32F417IG'}
+          inputs = [x for x in inputs if x['base_device'] in bases]
+          expected = {
+              'STM32F407IEH6','STM32F407IEH6TR','STM32F407IEH7','STM32F407IET6',
+              'STM32F407IGH6','STM32F407IGH6TR','STM32F407IGH7','STM32F407IGT6','STM32F407IGT7',
+              'STM32F417IEH6','STM32F417IET6',
+              'STM32F417IGH6','STM32F417IGH6TR','STM32F417IGT6','STM32F417IGT7',
+          }
+          observed = {x['icpn'] for x in inputs}
+          if observed != expected:
+              raise SystemExit({'candidate_set_mismatch': sorted(observed ^ expected)})
+          if 'STM32F417IGH6W' in observed:
+              raise SystemExit('NRND STM32F417IGH6W must not enter admission inputs')
+
+          provenance = {
+              'evidence_id': manifest['evidence_id'],
+              'retained_manifest_sha256': hashlib.sha256((evidence_dir/'manifest.json').read_bytes()).hexdigest(),
+              'retained_pilot_sha256': hashlib.sha256((evidence_dir/'pilot-summary.json').read_bytes()).hexdigest(),
+              'discovery_artifact_id': '9876768286',
+              'retained_artifact_id': '9876857498',
+              'retained_artifact_zip_sha256': '47ed30f923fb856637e9787cc1e2c916adf2a29f52570384718418a487704a22',
+          }
+          plan = build_admission_plan(
+              candidate_inputs=inputs,
+              canonical_fields=fields,
+              canonical_rows=rows,
+              source_provenance=provenance,
+              input_bindings={'production_rows_before': len(rows)},
+              row_builder=build_canonical_row,
+          )
+          plan_bytes = (json.dumps(plan, indent=2, sort_keys=True) + '\n').encode()
+          plan_sha = hashlib.sha256(plan_bytes).hexdigest()
+          expected_plan_sha = '5bf84e7ebbac8808e6ef3f1cc072bc55ac380e0ba64a59b23a0684db0b76764f'
+          if plan_sha != expected_plan_sha:
+              raise SystemExit({'proposal_hash_mismatch': [plan_sha, expected_plan_sha]})
+          counts = plan['decision_counts']
+          if not plan_is_clean(plan) or plan['candidate_count'] != 15 or counts != {
+              'admit': 15, 'already_present': 0, 'manual_review_required': 0, 'reject': 0,
+          } or plan['conflicts'] != 0:
+              raise SystemExit({'unclean_plan': counts, 'conflicts': plan['conflicts']})
+
+          result = write_canonical_dataset(plan=plan, canonical_path=canonical)
+          if result['status'] != 'written' or result['rows_before'] != 211 or result['rows_after'] != 226 or set(result['added']) != expected:
+              raise SystemExit({'unexpected_publish_result': result})
+
+          fields_after, rows_after = read_csv(canonical)
+          if len(rows_after) != 226 or len({r['icpn'] for r in rows_after}) != 226:
+              raise SystemExit('post-publish row/uniqueness invariant failed')
+          if 'STM32F417IGH6W' in {r['icpn'] for r in rows_after}:
+              raise SystemExit('NRND STM32F417IGH6W was written to Production')
+          base_count = len({r['base_device'] for r in rows_after})
+          if base_count != 77:
+              raise SystemExit(f'expected 77 F4 Production Base Devices, got {base_count}')
+
+          (evidence_dir / 'admission-plan.json').write_bytes(plan_bytes)
+          summary = {
+              'schema_version': 1,
+              'phase': '4.2K',
+              'proposal_run_id': 33711328905,
+              'proposal_artifact_id': 9876998587,
+              'proposal_artifact_zip_sha256': '427727ceecb8f1ec6f1ce3ea3ece58660ceef6c7fb14f8f2e67fe8398dd12356',
+              'admission_plan_sha256': plan_sha,
+              'production_rows_before': 211,
+              'production_rows_after': 226,
+              'production_base_devices_before': 73,
+              'production_base_devices_after': 77,
+              'added_exact_icpns': sorted(expected),
+              'lifecycle_exclusions': ['STM32F417IGH6W'],
+              'canonical_csv_file_sha256': hashlib.sha256(canonical.read_bytes()).hexdigest(),
+              'status': 'published',
+          }
+          (evidence_dir / 'publish-summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(summary, indent=2))
+          PY
+      - name: Commit bounded Production transaction
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            data/device-catalog/research/stm32f4-commercial-icpn.csv \
+            data/device-catalog/research/evidence/stm32f4-phase4.2k-f407-f417-i-admission-live-2026-09-03/admission-plan.json \
+            data/device-catalog/research/evidence/stm32f4-phase4.2k-f407-f417-i-admission-live-2026-09-03/publish-summary.json
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'refusing no-op publish'; exit 1; }
+          git commit -m 'device-catalog: admit Phase 4.2K STM32F407/417 I-pin ICPNs'
+          git push origin HEAD:agent/device-catalog-phase4.2k-f407-f417-i-admission
