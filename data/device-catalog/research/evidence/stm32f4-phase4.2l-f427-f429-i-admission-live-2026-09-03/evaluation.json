@@ -1,0 +1,21 @@
+{
+  "candidate_baseline_match": true,
+  "candidate_drift": [],
+  "canonical_dataset_admission": false,
+  "decision": "scale_ready",
+  "expected_exact_icpn_candidates": 17,
+  "issues": [],
+  "observed_exact_icpn_candidates": 17,
+  "ordering_pattern_mapping": {
+    "mapped": 6,
+    "target_config": "tcl/target/stm32f4x.cfg"
+  },
+  "pilot_id": "stm32f4-phase4.2l-f427-f429-i-admission-2026-09-03",
+  "run_metadata": {
+    "git_sha": "0c61df6f923f7a678ff86036c0c9131e5a585801",
+    "repository": "physicslu/plasma"
+  },
+  "scale_ready": true,
+  "schema_version": 1,
+  "target_count": 6
+}
