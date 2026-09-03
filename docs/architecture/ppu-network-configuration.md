@@ -9,16 +9,23 @@ The ownership boundary is:
 ```text
 Control Console / Manager
         |
-        | future commissioning orchestration
+        | commissioning orchestration / reconnect
         v
-PPU Web REST Gateway
+PPU Web REST Gateway (unprivileged)
         |
-        +--> desired PPU network settings (Phase 1)
+        +--> desired PPU network settings
+        +--> activation transaction + durable journal
         |
-        `--> Linux network activation (Phase 2, not implemented here)
+        `--> Unix socket
+                |
+                v
+        privileged Network Activation Helper
+                |
+                v
+        Linux network subsystem
 ```
 
-PPU network configuration is separate from Gateway communication policy. In particular:
+PPU network configuration is separate from Gateway communication policy:
 
 ```text
 /api/settings/gateway       Gateway-to-PPU timeout/retry policy
@@ -27,29 +34,16 @@ PPU network configuration is separate from Gateway communication policy. In part
 
 The two resources must not be merged merely because both contain the word "gateway" in operator terminology.
 
-## Phase 1 scope
+## Phase 1 desired-state contract
 
-Phase 1 provides a validated, persistent desired-state contract only. It does **not** mutate the running Linux network stack.
-
-Canonical routes:
+Phase 1 provides a validated, persistent desired-state contract. Canonical routes:
 
 ```text
 GET  /api/settings/ppu-network
 POST /api/settings/ppu-network
 ```
 
-The configured interface is fixed to:
-
-```text
-eth0
-```
-
-Supported modes are:
-
-```text
-dhcp
-static
-```
+The configured interface is fixed to `eth0`. Supported desired modes are `dhcp` and `static`.
 
 The server owns `revision` and `interface`. Clients write exactly:
 
@@ -75,21 +69,10 @@ For DHCP mode, all static fields must be empty:
 }
 ```
 
-The Phase 1 response deliberately states that OS activation is unavailable:
+When no privileged activation helper is configured, the response retains the Phase 1 boundary:
 
 ```json
 {
-  "ok": true,
-  "rest_contract_version": "3",
-  "ppu_network_settings": {
-    "revision": 1,
-    "interface": "eth0",
-    "mode": "dhcp",
-    "address": null,
-    "prefix_length": null,
-    "gateway": null,
-    "dns_servers": []
-  },
   "activation": {
     "supported": false,
     "state": "not_implemented"
@@ -97,113 +80,240 @@ The Phase 1 response deliberately states that OS activation is unavailable:
 }
 ```
 
-A successful Phase 1 POST therefore means **the desired configuration was validated and durably stored**. It does not mean that `eth0`, routes, DNS, DHCP client state, or the current PPU endpoint changed.
+A successful desired-state POST means the configuration was validated and durably stored. It does not by itself mean that `eth0`, routes, DNS, DHCP client state, or the current PPU endpoint changed.
 
-## Validation
-
-The PPU fails closed on malformed desired state.
+## Desired-state validation and persistence
 
 Static mode requires:
 
 - a valid IPv4 address;
 - `prefix_length` in the range `1..32`;
 - no network/broadcast address for prefixes where those addresses are reserved;
-- an optional gateway that is on the configured subnet and is not the PPU address;
+- an optional gateway on the configured subnet and different from the PPU address;
 - at most three unique IPv4 DNS server addresses.
 
 DHCP mode rejects static address, prefix, gateway, and DNS values. Unknown and missing POST fields are rejected rather than silently ignored.
 
-## Persistence
-
-The default persistence file is:
+The desired-state persistence file is:
 
 ```text
 <output-root>/ppu-network-settings.yaml
 ```
 
-Updates use temporary-file write, flush, `fsync`, and atomic replacement. The in-memory desired state changes only after persistence succeeds.
+Updates use temporary-file write, flush, `fsync`, and atomic replacement. The in-memory desired state changes only after persistence succeeds. An invalid existing persistence file fails closed during Gateway startup.
 
-An invalid existing persistence file fails closed during Gateway startup. It is not silently replaced with DHCP defaults because doing so would discard operator commissioning intent.
+## Phase 2 activation API
+
+Phase 2 adds a separate activation resource; a desired-state write is never reinterpreted as an already-applied configuration.
+
+```text
+GET  /api/settings/ppu-network/activation
+POST /api/settings/ppu-network/activation
+POST /api/settings/ppu-network/activation/{activation_id}/commit
+```
+
+Apply request:
+
+```json
+{
+  "action": "apply",
+  "expected_revision": 2,
+  "expected_ppu_id": "PPU-Z2-A38F21",
+  "rollback_timeout_s": 10
+}
+```
+
+The PPU rejects the request before network mutation when:
+
+- another activation is active;
+- `expected_revision` does not equal the current desired revision;
+- `expected_ppu_id` does not equal the PPU identity reported by the local Plasma Server;
+- the rollback timeout is outside the bounded contract;
+- the privileged helper is unavailable.
+
+A successful apply returns HTTP `202 Accepted` while the old endpoint still exists. Actual mutation is deliberately delayed briefly after the ACK so the response can leave through the old network path.
+
+The transaction then follows:
+
+```text
+scheduled
+-> applying
+-> applied_waiting_commit
+       | same ppu_id confirmed on new endpoint
+       +-> committed
+       |
+       ` deadline / shutdown / failure
+          -> rolling_back
+          -> rolled_back
+```
+
+Commit request:
+
+```json
+{
+  "expected_revision": 2,
+  "expected_ppu_id": "PPU-Z2-A38F21"
+}
+```
+
+The coordinator must reconnect through the candidate endpoint and read canonical identity (normally `/api/node`) before sending commit. Reaching an IP address is not sufficient evidence; the endpoint must report the same immutable `ppu_id`.
+
+While an activation is active, the desired settings resource is read-only. This prevents candidate drift between snapshot, apply, reconnect, and commit.
+
+## Desired revision versus committed revision
+
+`revision` and `committed_revision` have different meanings:
+
+```text
+revision             latest durable desired configuration
+committed_revision   last activation explicitly committed after identity verification
+```
+
+Example:
+
+```text
+revision 2 -> apply 192.168.10.21 -> verify -> commit
+committed_revision = 2
+
+revision 3 -> apply 192.168.10.22 -> no commit -> timeout rollback
+actual network returns to revision-2 state
+revision remains 3
+committed_revision remains 2
+```
+
+The PPU therefore exposes desired/actual drift rather than silently overwriting operator intent after rollback.
+
+## Durable activation journal and recovery
+
+The activation journal is:
+
+```text
+<output-root>/ppu-network-activation.json
+```
+
+It stores the activation ID, PPU identity, desired revision, candidate settings, previous actual-network snapshot, rollback deadline, state, committed revision, and recovery reason/error.
+
+If the Gateway starts and finds an interrupted active transaction, it attempts to restore the saved previous snapshot before accepting that transaction as complete. Successful startup recovery is recorded as `rolled_back` with reason `startup_recovery`. If the helper cannot perform recovery, the transaction becomes `recovery_required`; the Gateway does not claim success.
+
+Graceful Gateway shutdown also fails safe. In particular, shutdown during a helper `apply` does not race a premature restore against an in-flight mutation: the worker observes shutdown after `apply` returns and restores the previous snapshot. A helper that fails to return within the bounded shutdown wait leaves explicit `recovery_required` evidence.
+
+## Privilege separation
+
+The Web REST Gateway must not receive `CAP_NET_ADMIN`, execute `sudo`, or run arbitrary shell network commands.
+
+Phase 2 uses a local Unix-domain socket helper contract with only three operations:
+
+```text
+snapshot
+apply(settings)
+restore(snapshot)
+```
+
+The Gateway owns admission, identity/revision checks, transaction state, journal, deadlines, commit, and rollback policy. The helper owns only the privileged OS mutation.
+
+This boundary is deliberate. A future PYNQ-Z2 adapter may use NetworkManager, `systemd-networkd`, or another mechanism without changing the REST transaction semantics.
 
 ## Secure Gateway policy
 
 When the secure Gateway boundary is active:
 
 - read access uses `settings.read`;
-- write access uses `settings.ppu_network.write`;
+- desired-state writes, activation, and commit use `settings.ppu_network.write`;
 - the built-in `admin` role owns PPU network write permission;
 - operator, engineer, viewer, and service roles do not receive this write permission by default;
-- POST is a state-changing command and therefore requires the existing `Idempotency-Key` durable command ledger.
+- every state-changing POST uses the existing durable `Idempotency-Key` command ledger.
 
-This is intentionally stricter than ordinary Programming Job operation permissions because a future Phase 2 network activation can remove the PPU from its current management path.
+Network activation intentionally does not introduce a parallel authorization model.
 
 ## Phase 1 packaged ARMv7 acceptance
 
-The canonical one-command acceptance runner is:
+The Phase 1 regression runner remains:
 
 ```bash
 source software/python/.venv/bin/activate
 python scripts/ppu-network-phase1-acceptance.py
 ```
 
-The runner is intentionally broader than a unit test. From the repository revision under test it:
+It builds the canonical `linux-armv7l` release, clean-extracts it, runs the packaged PPU under QEMU ARMv7, exercises desired-state validation/persistence, and proves that actual `eth0` does not change when no activation helper is configured.
 
-```text
-build PPU runtime
--> validate runtime
--> build canonical linux-armv7l release
--> verify detached SHA-256
--> clean-extract and verify the release
--> validate the clean runtime
--> preflight QEMU/binfmt ARMv7
--> run the packaged release in an ARMv7 container
--> start packaged Plasma Server + Gateway
--> exercise /api/settings/ppu-network
--> restart the Gateway and prove persistence
--> run negative validation tests
--> prove actual eth0 IPv4 did not change
--> emit human-readable + JSON evidence
-```
-
-The ARMv7 acceptance container is started without `CAP_NET_ADMIN` and with `no-new-privileges`. The runner also reads the actual container `eth0` IPv4 before and after the desired-state writes. A PASS therefore requires both:
-
-```text
-desired PPU network state changes and persists
-actual Linux eth0 state does not change
-```
-
-The default machine-readable report is:
+Default report:
 
 ```text
 .work/reports/ppu-network-phase1-acceptance.json
 ```
 
-The terminal summary contains the Git SHA, product version, release SHA-256, ARMv7 architecture, each acceptance check, actual/desired IPv4 values, final settings revision, and the final PASS/FAIL result. Operators normally need to paste only this summary for review.
+This regression remains important after Phase 2 because an installation without the privileged helper must preserve the original fail-closed behavior.
 
-A Phase 1 PASS does **not** claim PYNQ-Z2 hardware, Linux network activation, DHCP activation, route/DNS mutation, Manager reconnect, same-`ppu_id` revalidation, or rollback. Those remain Phase 2 acceptance work.
+## Phase 2 packaged ARMv7 acceptance
 
-The PPU release workflow also executes this same one-command runner so the acceptance tool itself is continuously exercised rather than existing only as an operator-side script.
+The canonical Phase 2 one-command acceptance runner is:
 
-## Phase 2 boundary
-
-Phase 2 will add Linux network activation semantics. It must not reinterpret a Phase 1 desired-state write as an already-applied configuration.
-
-Phase 2 is expected to own:
-
-```text
-validate candidate
--> acknowledge candidate
--> apply eth0
--> reconnect using the new endpoint
--> verify the same canonical ppu_id
--> commit on success
--> rollback on bounded reconnect failure
+```bash
+source software/python/.venv/bin/activate
+python scripts/ppu-network-phase2-acceptance.py
 ```
 
-The Linux backend (`systemd-networkd`, NetworkManager, or another mechanism) must be selected from the actual PYNQ-Z2 image rather than assumed by the browser/API contract.
+It performs:
+
+```text
+build + validate PPU runtime
+-> build canonical linux-armv7l release
+-> detached SHA-256 verification
+-> clean extraction + runtime validation
+-> ARMv7 QEMU/binfmt preflight
+-> create isolated Docker bridge
+-> start packaged PPU namespace with Docker-owned control IPv4 192.168.77.40 and no CAP_NET_ADMIN
+-> start helper sidecar in the same network namespace with CAP_NET_ADMIN only
+-> helper adds the PPU managed IPv4 192.168.77.10 on eth0
+-> start independent coordinator probe
+-> desired revision 2 = 192.168.77.21
+-> apply and receive ACK on managed old endpoint 192.168.77.10
+-> real isolated eth0 managed-address mutation .10 -> .21 while Docker control .40 remains untouched
+-> reconnect .21 and verify same ppu_id
+-> prove managed old endpoint .10 is removed
+-> commit revision 2
+-> prove .21 survives rollback deadline
+-> desired revision 3 = 192.168.77.22
+-> apply .21 -> .22 and deliberately omit commit
+-> prove automatic timeout rollback .22 -> .21
+-> prove desired revision remains 3 while committed revision remains 2
+-> emit terminal summary + JSON evidence
+```
+
+The Docker control address is deliberately outside the property being tested. Docker/IPAM owns `.40`; the privileged helper owns only the managed PPU address `.10/.21/.22`. This prevents the test harness from asking Docker to relinquish its own control-plane address while still exercising real Linux IPv4 add/delete on the same `eth0` network namespace.
+
+Default report:
+
+```text
+.work/reports/ppu-network-phase2-acceptance.json
+```
+
+A PASS proves the Phase 2 transaction semantics, real static managed-IPv4 mutation inside the isolated ARMv7 lab namespace, privilege separation, reconnect, same-`ppu_id` verification, explicit commit, old-endpoint removal, and automatic rollback.
+
+It does **not** prove:
+
+- PYNQ-Z2 hardware;
+- the final PYNQ-Z2 Linux network-manager backend;
+- primary-address replacement under Docker IPAM;
+- DHCP activation;
+- production DNS/default-route mutation;
+- boot-time network persistence;
+- production Manager integration;
+- PS-to-PL, Site I/O, target power, or IC programming.
+
+The actual Z2 image must be inspected before selecting its persistent Linux backend. The REST transaction contract is intentionally independent of that choice.
 
 ## Validation environments
 
-The Phase 1 contract is architecture-independent Python and can be exercised on the SWPC ARM virtual machine for API, validation, persistence, restart, and security behavior.
+SWPC/QEMU ARMv7 is the software qualification environment for packaged runtime and Phase 2 transaction behavior. Z2 remains the hardware/network-image qualification environment.
 
-The canonical packaged acceptance above uses SWPC/QEMU ARMv7 userspace as software evidence. That result does not prove PYNQ-Z2 Linux network activation. Actual `eth0` changes, reconnect behavior, rollback, boot-time network restoration, and PYNQ-Z2 image integration remain Phase 2 / Z2 acceptance work.
+The acceptance hierarchy is therefore:
+
+```text
+unit / REST / security tests
+-> packaged SWPC ARMv7 Phase 1 regression
+-> packaged SWPC ARMv7 Phase 2 isolated network mutation
+-> PYNQ-Z2 backend inspection and adapter
+-> Z2 native apply/reconnect/rollback acceptance
+-> commissioning UI / Manager orchestration integration
+```

@@ -8,8 +8,10 @@ from urllib.parse import urlparse
 
 from plasma_core.errors import ErrorCode, PlasmaError
 
-from . import gateway
-from .gateway_security import GatewaySecurityController
+from . import gateway_phase2 as gateway
+from .gateway_phase2 import PPUNetworkActivationSupportMixin
+from .gateway_security import GatewaySecurityController, Permission
+from .ppu_network_activation import PPUNetworkActivationError
 from .secure_gateway import SecurePlasmaWebHandler
 
 
@@ -83,12 +85,12 @@ def load_security_controller_from_env() -> GatewaySecurityController:
     return controller
 
 
-class DeployedSecurePlasmaWebHandler(SecurePlasmaWebHandler):
+class DeployedSecurePlasmaWebHandler(PPUNetworkActivationSupportMixin, SecurePlasmaWebHandler):
     """Secure handler used by the deployable Gateway launcher.
 
-    The canonical Gateway keeps its current CORS contract. Secure deployment
-    extends only the authenticated boundary so existing non-secure deployments
-    are not silently changed by this integration slice.
+    Phase 2 network activation reuses the existing Admin-only
+    `settings.ppu_network.write` permission and durable idempotency ledger. The
+    privileged network helper remains outside this Gateway process.
     """
 
     def _cors_headers(self) -> None:
@@ -105,26 +107,67 @@ class DeployedSecurePlasmaWebHandler(SecurePlasmaWebHandler):
         )
         self.send_header("Access-Control-Max-Age", "600")
 
-    def do_GET(self) -> None:
-        if urlparse(self.path).path != "/api/security/me":
-            super().do_GET()
+    def _guard_get(self) -> None:
+        path = urlparse(self.path).path.rstrip("/")
+        if path == "/api/settings/ppu-network/activation":
+            self._authorize(Permission.SETTINGS_READ)
             return
-        try:
-            principal = self._principal()
-            self._json(
-                HTTPStatus.OK,
-                {
-                    "ok": True,
-                    "principal": {
-                        "id": principal.principal_id,
-                        "roles": list(principal.roles),
-                        "permissions": sorted(permission.value for permission in principal.permissions),
-                        "scopes": [scope.to_dict() for scope in principal.scopes],
+        super()._guard_get()
+
+    def _guard_post(self) -> bool:
+        path = urlparse(self.path).path.rstrip("/")
+        if path == "/api/settings/ppu-network/activation" or self._activation_commit_id(path) is not None:
+            return self._admit_command(Permission.PPU_NETWORK_SETTINGS_WRITE)
+        return super()._guard_post()
+
+    def do_GET(self) -> None:
+        path = urlparse(self.path).path
+        if self.is_phase2_network_get_path(path):
+            try:
+                self._guard_get()
+                if self._handle_phase2_network_get(path):
+                    return
+            except PPUNetworkActivationError as exc:
+                self._activation_error(exc)
+                return
+            except Exception as exc:
+                self._error(exc)
+                return
+        if path == "/api/security/me":
+            try:
+                principal = self._principal()
+                self._json(
+                    HTTPStatus.OK,
+                    {
+                        "ok": True,
+                        "principal": {
+                            "id": principal.principal_id,
+                            "roles": list(principal.roles),
+                            "permissions": sorted(permission.value for permission in principal.permissions),
+                            "scopes": [scope.to_dict() for scope in principal.scopes],
+                        },
                     },
-                },
-            )
-        except Exception as exc:
-            self._error(exc)
+                )
+            except Exception as exc:
+                self._error(exc)
+            return
+        super().do_GET()
+
+    def do_POST(self) -> None:
+        path = urlparse(self.path).path
+        if self.is_phase2_network_post_path(path):
+            try:
+                if self._guard_post():
+                    return
+                if self._handle_phase2_network_post(path):
+                    return
+            except PPUNetworkActivationError as exc:
+                self._activation_error(exc)
+                return
+            except Exception as exc:
+                self._error(exc)
+                return
+        super().do_POST()
 
 
 def main() -> None:
