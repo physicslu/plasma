@@ -734,7 +734,7 @@ class PlasmaManagerHandler(BaseHTTPRequestHandler):
             HTTPStatus.METHOD_NOT_ALLOWED,
             {
                 "ok": False,
-                "error": {"message": "Plasma Manager rejects mutation outside the explicit runtime registry, network commissioning, and allowlisted Managed PPU routes"},
+                "error": {"message": "Plasma Manager is read-only outside the explicit runtime registry, network commissioning, and allowlisted Managed PPU routes"},
             },
         )
 
