@@ -1,0 +1,20 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2p-vh-admission-batch1-2026-09-03",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9883309972",
+    "artifact_sha256": "be0ce47454cd84f159be36d42a06f2ac276f6fdfc5f459e11787aa64bd94f1e8",
+    "source_commit": "0f3bdc6ef55f8aaf3fd4849b6e142b6e748e67f4",
+    "workflow_run_id": "33728754618"
+  },
+  "targets": [
+    {"base_device": "STM32F479ZG", "exact_icpns": ["STM32F479ZGT6"]},
+    {"base_device": "STM32F401VB", "exact_icpns": ["STM32F401VBH3", "STM32F401VBH6", "STM32F401VBT6", "STM32F401VBT6TR"]},
+    {"base_device": "STM32F401VC", "exact_icpns": ["STM32F401VCH6", "STM32F401VCH7", "STM32F401VCT6", "STM32F401VCT7"]},
+    {"base_device": "STM32F401VD", "exact_icpns": ["STM32F401VDH6", "STM32F401VDT6", "STM32F401VDT6TR"]},
+    {"base_device": "STM32F401VE", "exact_icpns": ["STM32F401VEH6", "STM32F401VEH6TR", "STM32F401VEH7", "STM32F401VET6", "STM32F401VET6TR"]},
+    {"base_device": "STM32F411VC", "exact_icpns": ["STM32F411VCT6", "STM32F411VCT6TR"]}
+  ]
+}
