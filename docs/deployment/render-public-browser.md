@@ -22,34 +22,34 @@ The acceptance intentionally exercises only non-destructive UI behavior.
 
 ### Production iPad landscape layout
 
-At a 1194 x 834 CSS viewport:
+At a 1194 x 834 CSS viewport, the current PMode V2 `Production Programming Job` must remain contained inside the Factory Console:
 
-- the expanded FPS selector leaves the Production batch toolbar in the accepted two-row tablet layout;
-- Programming Image and E/P/V/R remain on the first row;
-- E/P/V/R do not wrap;
-- Batch readiness/actions remain on the second row;
-- the toolbar does not horizontally overflow;
-- collapsing the FPS selector restores the desktop single-row toolbar.
+- the Programming Job field grid remains inside the panel;
+- E/P/V/R remain on one line and do not wrap;
+- START / status / ABORT remain inside the panel bounds;
+- the Programming Job does not horizontally overflow;
+- collapsing the `PRODUCTION SITE SELECTION` body must not cause the Programming Job to overflow or lose those constraints.
+
+This public check intentionally follows the same Programming Job contract used by deterministic local tablet-layout acceptance instead of maintaining a separate legacy batch-toolbar DOM contract.
 
 ### Mock Synthetic Image selection
 
 Against the live Mock provider:
 
-1. select `mock-facility-01 / mock-facility-01-ppu-01 / SITE-01`;
-2. confirm the selection;
-3. select Program without choosing a user Programming Image;
-4. require `Mock Synthetic Image` and `data-image-source=mock_synthetic`;
-5. require that readiness is **not** `IMAGE REQUIRED`.
+1. commit `mock-facility-01 / mock-facility-01-ppu-01 / SITE-01` into the Production Set using the current `SET PRODUCTION SITES` flow;
+2. select Program without choosing a user Programming Image;
+3. require `Mock Synthetic Image` and `data-image-source=mock_synthetic` from the current `Production Programming Job` Image field;
+4. require that Programming Job readiness is **not** `IMAGE REQUIRED`.
 
 The public Render demo is shared state. A fixed Site can legitimately be `SITE BUSY` because another browser/session or prior acceptance work is using it. Site availability therefore must not determine whether the Synthetic Image contract passes:
 
-- `BATCH READY` -> Execute must be enabled;
-- `SITE BUSY` -> Execute must remain disabled;
+- `BATCH READY` -> START must be enabled;
+- `SITE BUSY` -> START must remain disabled;
 - either state is acceptable for this public Image-selection acceptance, but `IMAGE REQUIRED` is not.
 
 Deterministic local Playwright and Mock CD tests separately prove that an idle Mock Site with Program selected and no user Image becomes `BATCH READY`.
 
-The public test deliberately does **not** click Execute. It therefore creates no Batch or Job, uploads no Programming Image, and changes no Mock Runtime settings. The page may create its normal short-lived Engineering session.
+The public test deliberately does **not** click START. It therefore creates no Batch or Job, uploads no Programming Image, and changes no Mock Runtime settings. The page may create its normal short-lived Engineering session.
 
 ## Boundary
 
