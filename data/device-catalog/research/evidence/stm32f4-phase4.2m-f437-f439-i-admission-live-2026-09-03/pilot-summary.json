@@ -1,0 +1,407 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 5,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 5,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 5,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 13,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 5,
+    "total": 5
+  },
+  "pilot_id": "stm32f4-phase4.2m-f437-f439-i-admission-2026-09-03",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "534a4d15536998eb0779ed44acddfb708c811822bb20d81897518c59e2201323",
+        "retrieved_at_utc": "2026-09-03T06:06:57Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production-admitted lifecycle control retained from prior STM32F4 bounded admissions",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F437IG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F437IGHx",
+          "icpn": "STM32F437IGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437IGTx",
+          "icpn": "STM32F437IGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F437IG",
+        "evidence_section_sha256": "0893d0d3fcffe1b1c65c2be6cd4fa11d1edfab3b96a04ad2f0c4670b8b9032b6",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F437IGH6",
+          "STM32F437IGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ig.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F437IGH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437IGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "7934c014a3ece1224b735969838b726eb84eb21e4b934e40c0c9059425a1c0dd",
+        "retrieved_at_utc": "2026-09-03T06:07:04Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ig.html"
+      },
+      "selection_reason": "policy-ready STM32F437 1024 KiB I-pin member; exact identity and lifecycle require direct evidence",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ig.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F437II",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F437IIHx",
+          "icpn": "STM32F437IIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437IIHx",
+          "icpn": "STM32F437IIH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437IITx",
+          "icpn": "STM32F437IIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437IITx",
+          "icpn": "STM32F437IIT7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F437II",
+        "evidence_section_sha256": "aa60b6d06e9119f4e47560b717659ce918bc500dc18389328b324019fe696c7b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F437IIH6",
+          "STM32F437IIH6TR",
+          "STM32F437IIT6",
+          "STM32F437IIT7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ii.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F437IIH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437IIH6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437IIT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437IIT7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5579b787bd21423a30ce3dccab36fbc9edb72a04b21c5c60da022a4bdc20074a",
+        "retrieved_at_utc": "2026-09-03T06:07:11Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ii.html"
+      },
+      "selection_reason": "policy-ready STM32F437 2048 KiB I-pin member; no equivalence inferred from sibling devices",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ii.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F439IG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F439IGHx",
+          "icpn": "STM32F439IGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F439IGTx",
+          "icpn": "STM32F439IGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F439IG",
+        "evidence_section_sha256": "786cc0d484efaa906faca5e12fd7ec6bdf2dbef828a3d405de09d2ee93512b0c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F439IGH6",
+          "STM32F439IGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ig.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F439IGH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F439IGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "25b7d65e315f35583add020fc101a1a4002d0bd88d1223e6d162c05792ac0a55",
+        "retrieved_at_utc": "2026-09-03T06:07:17Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ig.html"
+      },
+      "selection_reason": "policy-ready STM32F439 1024 KiB I-pin member; lifecycle evaluated per exact ICPN",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ig.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F439II",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F439IIHx",
+          "icpn": "STM32F439IIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F439IIHx",
+          "icpn": "STM32F439IIH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F439IIHx",
+          "icpn": "STM32F439IIH7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F439IITx",
+          "icpn": "STM32F439IIT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F439II",
+        "evidence_section_sha256": "2c68b04360dc73238a8dc623284771d391fe61956f376d4e4d61ca2ba8acf631",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F439IIH6",
+          "STM32F439IIH6TR",
+          "STM32F439IIH7",
+          "STM32F439IIT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ii.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F439IIH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F439IIH6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F439IIH7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F439IIT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e3382dfc78f4f2743db05640ac0a889800bcbf8407a587b014416b6a6b2b7501",
+        "retrieved_at_utc": "2026-09-03T06:07:24Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ii.html"
+      },
+      "selection_reason": "policy-ready STM32F439 2048 KiB I-pin member in the bounded family batch",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ii.html"
+    }
+  ],
+  "schema_version": 1
+}

@@ -75,3 +75,6 @@ jobs:
 
       - name: Validate Phase 4.2L STM32F427/429 I-pin post-admission closure
         run: python data/device-catalog/research/test_stm32f4_phase4_2l_f427_f429_i_post_admission.py
+
+      - name: Validate Phase 4.2M STM32F437/439 I-pin post-admission closure
+        run: python data/device-catalog/research/test_stm32f4_phase4_2m_f437_f439_i_post_admission.py

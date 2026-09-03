@@ -8,33 +8,25 @@ from http.server import ThreadingHTTPServer
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
-EXPECTED_MIN_PRODUCTION_CATALOG_SIZE = 317
-UFBGA_ICPN = "STM32F427IIH7"
-LQFP_ICPN = "STM32F429IIT6"
+EXPECTED_PRODUCTION_CATALOG_SIZE = 329
+UFBGA_ICPN = "STM32F439IIH7"
+LQFP_ICPN = "STM32F437IIT7"
 
 
-def test_phase42l_exact_icpns_are_resolved_by_runtime_catalog() -> None:
+def test_phase42m_exact_icpns_are_resolved_by_runtime_catalog() -> None:
     catalog = get_default_device_catalog()
-    assert catalog.size >= EXPECTED_MIN_PRODUCTION_CATALOG_SIZE
-
-    ufbga = catalog.search(UFBGA_ICPN.lower(), limit=5)
-    assert {record.icpn for record in ufbga} == {UFBGA_ICPN}
-    assert ufbga[0].package == "UFBGA"
-    assert ufbga[0].pin_count == "176"
-    assert ufbga[0].flash_size == "2048 KiB"
-    assert ufbga[0].target_config == "tcl/target/stm32f4x.cfg"
-    assert ufbga[0].production_admitted
-
-    lqfp = catalog.search(LQFP_ICPN.lower(), limit=5)
-    assert {record.icpn for record in lqfp} == {LQFP_ICPN}
-    assert lqfp[0].package == "LQFP"
-    assert lqfp[0].pin_count == "176"
-    assert lqfp[0].flash_size == "2048 KiB"
-    assert lqfp[0].target_config == "tcl/target/stm32f4x.cfg"
-    assert lqfp[0].production_admitted
+    assert catalog.size == EXPECTED_PRODUCTION_CATALOG_SIZE
+    for icpn, package in ((UFBGA_ICPN, "UFBGA"), (LQFP_ICPN, "LQFP")):
+        matches = catalog.search(icpn.lower(), limit=5)
+        assert {record.icpn for record in matches} == {icpn}
+        assert matches[0].package == package
+        assert matches[0].pin_count == "176"
+        assert matches[0].flash_size == "2048 KiB"
+        assert matches[0].target_config == "tcl/target/stm32f4x.cfg"
+        assert matches[0].production_admitted
 
 
-def test_phase42l_exact_icpn_is_exposed_by_rest_catalog() -> None:
+def test_phase42m_exact_icpn_is_exposed_by_rest_catalog() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -44,10 +36,9 @@ def test_phase42l_exact_icpn_is_exposed_by_rest_catalog() -> None:
         response = connection.getresponse()
         payload = json.loads(response.read())
         connection.close()
-
         assert response.status == 200
         assert payload["rest_contract_version"] == "3"
-        assert payload["catalog_size"] >= EXPECTED_MIN_PRODUCTION_CATALOG_SIZE
+        assert payload["catalog_size"] == EXPECTED_PRODUCTION_CATALOG_SIZE
         assert payload["count"] == 1
         result = payload["results"][0]
         assert result["icpn"] == UFBGA_ICPN

@@ -1,0 +1,34 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2m-f437-f439-i-admission-2026-09-03",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9880366389",
+    "artifact_sha256": "ebd7b48a955439db7f837610e604277974a83d3c909143de17bb4421e7e35a49",
+    "source_commit": "2c81878b14b00c19cf52d29493e77050b7810496",
+    "workflow_run_id": "33721354638"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "exact_icpns": ["STM32F479ZGT6"]
+    },
+    {
+      "base_device": "STM32F437IG",
+      "exact_icpns": ["STM32F437IGH6", "STM32F437IGT6"]
+    },
+    {
+      "base_device": "STM32F437II",
+      "exact_icpns": ["STM32F437IIH6", "STM32F437IIH6TR", "STM32F437IIT6", "STM32F437IIT7"]
+    },
+    {
+      "base_device": "STM32F439IG",
+      "exact_icpns": ["STM32F439IGH6", "STM32F439IGT6"]
+    },
+    {
+      "base_device": "STM32F439II",
+      "exact_icpns": ["STM32F439IIH6", "STM32F439IIH6TR", "STM32F439IIH7", "STM32F439IIT6"]
+    }
+  ]
+}
