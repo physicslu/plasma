@@ -9,10 +9,6 @@ on:
       - "software/python/tests/test_product_release.py"
       - "software/web/package.json"
       - ".github/workflows/product-release.yml"
-      - "docs/deployment/product-release-format.md"
-      - "docs/deployment/product-deployment-foundation.md"
-      - "docs/deployment/README.md"
-      - "docs/README.md"
   pull_request:
     paths:
       - "release/**"
@@ -21,10 +17,10 @@ on:
       - "software/python/tests/test_product_release.py"
       - "software/web/package.json"
       - ".github/workflows/product-release.yml"
-      - "docs/deployment/product-release-format.md"
-      - "docs/deployment/product-deployment-foundation.md"
-      - "docs/deployment/README.md"
-      - "docs/README.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
