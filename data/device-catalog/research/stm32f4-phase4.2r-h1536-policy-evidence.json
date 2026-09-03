@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "phase": "4.2R",
+  "policy_mapping": "STM32F413/423 flash-size code H -> 1536 KiB",
+  "official_sources": [
+    {
+      "url": "https://www.st.com/resource/en/datasheet/stm32f413zh.pdf",
+      "document": "DS11581 Rev 7",
+      "evidence": "Table 114 ordering information defines flash memory size code H as 1536 Kbytes for STM32F413xG/H."
+    },
+    {
+      "url": "https://www.st.com/resource/en/datasheet/stm32f423mh.pdf",
+      "document": "DS11580 Rev 8",
+      "evidence": "STM32F423xH devices embed 1.5 Mbytes of Flash memory."
+    },
+    {
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html",
+      "evidence": "Official product page identifies STM32F423VH as Active and 1.5 MByte Flash; Q&R lists Active STM32F423VHH6 and STM32F423VHT6/VHT6TR."
+    },
+    {
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413-423.html",
+      "evidence": "Official product-line page states STM32F413/F423 devices carry 1024 to 1536 Kbytes of Flash memory."
+    }
+  ],
+  "newly_policy_ready": ["STM32F413VH", "STM32F423VH"],
+  "production_write_applied": false,
+  "exact_icpn_admission_deferred": true,
+  "algorithm_equivalence_claimed": false
+}
