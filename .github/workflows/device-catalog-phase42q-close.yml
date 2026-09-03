@@ -62,8 +62,28 @@ jobs:
               path.write_text(text)
           wf=Path('.github/workflows/device-catalog-current-validation.yml')
           text=wf.read_text()
-          block='''\n      - name: Validate Phase 4.2Q V/H batch2 retained evidence and post-admission closure\n        run: |\n          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \\\n            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2q-vh-admission-batch2-live-2026-09-03 \\\n            --baseline data/device-catalog/research/stm32f4-phase4.2q-vh-admission-batch2-baseline.json\n          python data/device-catalog/research/test_stm32f4_phase4_2q_vh_admission_batch2_post_admission.py\n'''
+          block='''\n      - name: Validate Phase 4.2Q V/H batch2 retained evidence and post-admission closure\n        run: |\n          python data/device-catalog/research/validate_stm32f4_phase4_2q_retained_evidence.py\n          python data/device-catalog/research/test_stm32f4_phase4_2q_vh_admission_batch2_post_admission.py\n'''
           if 'Phase 4.2Q V/H batch2 retained evidence' not in text: wf.write_text(text.rstrip()+block+'\n')
+          PY
+          cat > data/device-catalog/research/validate_stm32f4_phase4_2q_retained_evidence.py <<'PY'
+          #!/usr/bin/env python3
+          import json, shutil, subprocess, sys, tempfile
+          from pathlib import Path
+          HERE=Path(__file__).resolve().parent
+          SRC=HERE/'evidence/stm32f4-phase4.2q-vh-admission-batch2-live-2026-09-03'
+          BASELINE=HERE/'stm32f4-phase4.2q-vh-admission-batch2-baseline.json'
+          VALIDATOR=HERE/'validate_stm32f4_retained_evidence.py'
+          manifest=json.loads((SRC/'manifest.json').read_text())
+          with tempfile.TemporaryDirectory(prefix='phase42q-retained-') as td:
+              dst=Path(td)
+              shutil.copy2(SRC/'manifest.json',dst/'manifest.json')
+              for entry in manifest['files']:
+                  rel=Path(entry['path'])
+                  target=dst/rel
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(SRC/rel,target)
+              subprocess.run([sys.executable,str(VALIDATOR),'--evidence-dir',str(dst),'--baseline',str(BASELINE)],check=True)
+          print('Phase 4.2Q retained-evidence replay PASS')
           PY
           cat > data/device-catalog/research/test_stm32f4_phase4_2q_vh_admission_batch2_post_admission.py <<'PY'
           #!/usr/bin/env python3
@@ -111,7 +131,7 @@ jobs:
           git rm .github/workflows/device-catalog-phase42q-proposal.yml .github/workflows/device-catalog-phase42q-publish.yml .github/workflows/device-catalog-phase42q-close.yml
       - name: Validate permanent closure before commit
         run: |
-          python data/device-catalog/research/validate_stm32f4_retained_evidence.py --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2q-vh-admission-batch2-live-2026-09-03 --baseline data/device-catalog/research/stm32f4-phase4.2q-vh-admission-batch2-baseline.json
+          python data/device-catalog/research/validate_stm32f4_phase4_2q_retained_evidence.py
           python data/device-catalog/research/test_stm32f4_phase4_2q_vh_admission_batch2_post_admission.py
           python data/ic-support/test_coverage_inventory.py
           python -m compileall -q software/python/tests/test_device_catalog_phase42q.py
