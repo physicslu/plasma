@@ -5,11 +5,10 @@ on:
     paths:
       - ".gitignore"
       - ".clineignore"
-      - "README.md"
-      - "docs/**"
       - "data/device-catalog/production/**"
       - "data/device-catalog/research/*-commercial-icpn.csv"
       - "software/python/**"
+      - "!software/python/docs/**"
       - "pl/rtl/**"
       - "pl/constraints/**"
       - "pl/projects/**"
@@ -18,17 +17,18 @@ on:
       - "scripts/render-start.sh"
       - "scripts/local-ai-harness"
       - "scripts/tests/**"
+      - "!scripts/tests/test-public-doc-sanitization.sh"
+      - "!scripts/tests/test-documentation-integrity.py"
       - "scripts/codex-cloud-*.sh"
       - ".github/workflows/python-tests.yml"
   pull_request:
     paths:
       - ".gitignore"
       - ".clineignore"
-      - "README.md"
-      - "docs/**"
       - "data/device-catalog/production/**"
       - "data/device-catalog/research/*-commercial-icpn.csv"
       - "software/python/**"
+      - "!software/python/docs/**"
       - "pl/rtl/**"
       - "pl/constraints/**"
       - "pl/projects/**"
@@ -37,6 +37,8 @@ on:
       - "scripts/render-start.sh"
       - "scripts/local-ai-harness"
       - "scripts/tests/**"
+      - "!scripts/tests/test-public-doc-sanitization.sh"
+      - "!scripts/tests/test-documentation-integrity.py"
       - "scripts/codex-cloud-*.sh"
       - ".github/workflows/python-tests.yml"
 
@@ -62,12 +64,8 @@ jobs:
           cache-dependency-path: software/python/pyproject.toml
       - name: Test repository secret-file safety
         run: bash scripts/tests/test-repository-secret-safety.sh
-      - name: Test public documentation sanitization
-        run: bash scripts/tests/test-public-doc-sanitization.sh
       - name: Test local AI launcher
         run: bash scripts/tests/test-local-ai-harness.sh
-      - name: Test documentation integrity
-        run: python scripts/tests/test-documentation-integrity.py
       - name: Test deployment config migration
         run: bash scripts/tests/test-plasmactl-config.sh
       - name: Test Engineering Mock deployment wiring

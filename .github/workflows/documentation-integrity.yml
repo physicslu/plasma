@@ -1,0 +1,43 @@
+name: Documentation integrity
+
+on:
+  push:
+    paths:
+      - "**/*.md"
+      - "scripts/tests/test-public-doc-sanitization.sh"
+      - "scripts/tests/test-documentation-integrity.py"
+      - "scripts/plasmactl"
+      - "software/python/plasma_web/gateway_settings.py"
+      - "software/python/plasma_core/errors.py"
+      - ".github/workflows/documentation-integrity.yml"
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "scripts/tests/test-public-doc-sanitization.sh"
+      - "scripts/tests/test-documentation-integrity.py"
+      - "scripts/plasmactl"
+      - "software/python/plasma_web/gateway_settings.py"
+      - "software/python/plasma_core/errors.py"
+      - ".github/workflows/documentation-integrity.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test public documentation sanitization
+        run: bash scripts/tests/test-public-doc-sanitization.sh
+      - name: Test documentation integrity
+        run: python scripts/tests/test-documentation-integrity.py
