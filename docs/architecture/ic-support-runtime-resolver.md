@@ -1,6 +1,6 @@
 # IC Support Runtime Resolver and Execution Binding
 
-Status: **Phase 3.6 route contract, extended by Phase 3.7 plan compilation**
+Status: **Current route-resolution and execution-admission contract; introduced in Phase 3.6 and extended by the OpenOCD planning/executor phases**
 
 ## 1. Purpose
 
@@ -22,22 +22,28 @@ Exact ICPN
   -> selected Site interface
 ```
 
-`ResolvedICSupport` is not a support badge and is not physical validation. It is the deterministic join between one exact ICPN and the reusable Programming, Memory Geometry, Package / Hardware, Option and Security profiles owned by `data/ic-support/`.
+`ResolvedICSupport` is not a support badge and is not physical validation. It is the deterministic join between one exact ICPN and reusable Programming, Memory Geometry, Package / Hardware, Option and Security profiles owned by `data/ic-support/`.
 
 A route or command plan being deterministically resolvable is not sufficient for execution admission. The selected backend implementation must separately be runtime-ready.
 
 ## 2. Current production knowledge baseline
 
-The baseline remains:
+The executable production baseline is:
 
-- production Device Catalog: 124 exact ICPNs;
-- normalized Base Devices: 32;
-- deterministic OpenOCD target mappings: 124;
-- direct evidence-backed IC Support bindings: 2;
-- evidence-backed Programming Profiles reachable through those bindings: 1;
-- OpenOCD plan-compiled Programming Profiles: 1;
-- OpenOCD plan-compiled exact ICPNs: 2;
-- Native PPU runtime-ready exact ICPNs: 0.
+```text
+Exact ICPNs:                           286
+Families:                                2
+  STM32F1:                              75
+  STM32F4:                             211
+Base Devices:                           91
+Deterministic OpenOCD-mapped ICPNs:    286
+Direct IC Support-bound ICPNs:           2
+Unresolved Programming Profile ICPNs:  284
+Evidence-backed Programming Profiles:    1
+OpenOCD plan-compiled Profiles:           1
+OpenOCD plan-compiled exact ICPNs:        2
+Native PPU runtime-ready exact ICPNs:     0
+```
 
 The two directly resolvable exact ICPNs are:
 
@@ -57,9 +63,11 @@ but intentionally use different Memory Geometry Profiles for 64 KiB and 128 KiB 
 
 An admitted catalog part such as `STM32F407VGT6` remains unresolved by the IC Support runtime resolver. Its deterministic OpenOCD target mapping is catalog/backend evidence, not proof of a complete Programming Profile.
 
+The production counts above are derived from the production Device Catalog and enforced by `data/ic-support/test_coverage_inventory.py`. Historical admission documents retain the counts that were true at their own checkpoints.
+
 ## 3. Resolver contract
 
-`software/python/plasma_core/ic_support.py` loads the checked-in IC Support profile and binding sets and resolves exact ICPNs case-insensitively.
+`software/python/plasma_core/ic_support.py` loads checked-in IC Support profile and binding sets and resolves exact ICPNs case-insensitively.
 
 The resolver fails closed on malformed or contradictory checked-in support data, including duplicate identities, missing required fields, dangling or wrong-kind profile references, and malformed Revision Overrides.
 
@@ -151,20 +159,20 @@ target/stm32f1x.cfg
 /usr/share/openocd/scripts/target/stm32f1x.cfg
 ```
 
-Phase 3.7 records:
+The production route still records:
 
 ```text
 backend_implementation_state: plan_compiled_not_executable
 hardware_runtime_ready: false
 ```
 
-and attaches a server-generated `openocd_execution_plan` to the route. The plan is reviewable command intent only; it is not an execution authorization.
+The server can attach a canonical `openocd_execution_plan` to the route, and the isolated software executor can validate that plan against a fake process. That software validation is not execution authorization for a physical target.
 
-See [Profile-driven OpenOCD Plan Compiler](ic-support-openocd-plan-compiler.md).
+See [Profile-driven OpenOCD Plan Compiler](ic-support-openocd-plan-compiler.md) and [OpenOCD Compiled-Plan Executor](ic-support-openocd-plan-executor.md).
 
 ### 4.3 Plasma Native / FPGA Site
 
-A resolvable F103 target can also produce a deterministic Plasma Native route identity, but the current contract records:
+A resolvable F103 target can produce a deterministic Plasma Native route identity, but the current contract records:
 
 ```text
 mode: plasma_native
@@ -172,7 +180,7 @@ backend_implementation_state: not_implemented
 hardware_runtime_ready: false
 ```
 
-and rejects the Job before queue admission. No Native PPU runtime consumes the Programming Profile yet.
+and rejects the Job before queue admission. No Native PPU runtime consumes the Programming Profile for real programming yet.
 
 Therefore:
 
@@ -181,14 +189,16 @@ Programming Profile resolved
     !=
 backend plan compiled
     !=
-backend runtime implemented
+software executor validated
+    !=
+backend hardware runtime implemented
     !=
 physical PPU / Socket verified
 ```
 
 ## 5. Handler ownership
 
-`SiteManager` no longer constructs `STM32F103Handler` unconditionally for every enabled Site.
+`SiteManager` does not construct `STM32F103Handler` unconditionally for every enabled Site.
 
 The runtime separates:
 
@@ -216,25 +226,24 @@ Route identity is carried in server-owned `resolved_ic_support` metadata. Client
 
 This prevents a client from claiming a different Programming Profile, backend route, compiled plan or readiness state than the server derived from checked-in IC Support data.
 
-## 7. Remaining OpenOCD implementation boundary
+## 7. Remaining hardware implementation boundary
 
-Phase 3.7 removes the legacy direct hard-coded 64 KiB erase path. `OpenOCDInterface.erase/program/verify/read` now fail closed until a validated compiled-plan executor exists.
+The legacy direct hard-coded 64 KiB erase path is removed. `OpenOCDInterface.erase/program/verify/read` remain fail-closed for production hardware use while the production hardware runtime gate is disabled.
 
-The compiler now translates the resolved Main Flash geometry into dry-run ERASE / PROGRAM / VERIFY / READ command plans. Remaining implementation debt includes:
+The plan compiler and isolated executor now validate deterministic command intent, artifact staging, subprocess isolation, timeout/cancellation cleanup and output collection in software. Remaining hardware work includes:
 
-- safely staging symbolic plan artifacts into process-local files;
-- executing only server-generated plan commands;
-- defining reset/finalization policy across multi-operation programming workflows;
+- selecting and validating the actual OpenOCD installation and adapter configuration on the PS runtime host;
+- validating target detection, reset/halt and finalization behavior;
+- validating erase/program/verify/read on known STM32F103 hardware;
 - consuming Option and Security profiles for non-Main-Flash operations;
-- validating OpenOCD process behavior in software acceptance;
-- validating actual erase/program/verify/read behavior on STM32F103 hardware;
-- creating independent PPU and Socket validation evidence.
+- creating independent PPU and Socket validation evidence;
+- implementing and validating a separate Plasma Native PS-to-PL programming path.
 
-Because the route remains `hardware_runtime_ready=false`, none of the compiled programming commands can enter the SiteWorker through the resolver-driven admission path.
+Because `hardware_runtime_ready=false`, no compiled programming command can enter production hardware execution through resolver-driven admission.
 
 ## 8. Scientific scale-out gate remains in force
 
-The STM32F103C IC Support architecture still requires a valid isolated blind extraction result before bulk creation of new family Programming Profiles. Phase 3.7 does not weaken that gate.
+The STM32F103C IC Support architecture still requires valid evidence before bulk creation of new family Programming Profiles. Catalog expansion alone does not authorize profile inference.
 
 The intended sequence remains:
 
@@ -242,21 +251,21 @@ The intended sequence remains:
 2. evidence-backed reusable IC Support profiles;
 3. deterministic backend route resolution;
 4. deterministic backend plan compilation;
-5. controlled backend execution implementation;
-6. runtime-readiness admission;
-7. software/hardware validation;
-8. PPU and Socket evidence as independent dimensions.
+5. controlled software executor validation;
+6. backend hardware execution implementation;
+7. runtime-readiness admission;
+8. software/hardware validation;
+9. PPU and Socket evidence as independent dimensions.
 
 This prevents catalog coverage, route resolution, plan generation and actual programming capability from collapsing into one misleading `supported=true` flag.
 
 ## 9. Non-goals
 
-The current Phase 3.7 increment does not:
+The current resolver contract does not:
 
-- add or remove Device Catalog ICPNs;
-- alter the 124 / 32 coverage baseline;
-- add STM32F4 Programming Profiles;
-- execute OpenOCD programming commands;
+- infer Programming Profiles for the 284 unresolved production exact ICPNs;
+- promote deterministic OpenOCD mapping to programming-profile support;
+- make production OpenOCD programming hardware-ready;
 - implement a Native PPU programming driver;
 - change PMode / EMode IC selection behavior;
 - create PPU or Socket validation evidence;
