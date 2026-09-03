@@ -9,13 +9,13 @@ on:
       - "scripts/control-station-runtime.py"
       - "scripts/control-station-release.py"
       - "scripts/product-release.py"
-      - "software/web/**"
-      - "software/python/plasma_manager/**"
+      - "software/web/package.json"
+      - "software/web/scripts/build-product.mjs"
+      - "software/web/scripts/validate-product-runtime.mjs"
       - "software/python/pyproject.toml"
       - "software/python/tests/test_macos_control_station_installer.py"
       - "release/product.json"
       - ".github/workflows/macos-control-station-installer.yml"
-      - "docs/deployment/**"
   pull_request:
     paths:
       - "packaging/macos/**"
@@ -24,13 +24,18 @@ on:
       - "scripts/control-station-runtime.py"
       - "scripts/control-station-release.py"
       - "scripts/product-release.py"
-      - "software/web/**"
-      - "software/python/plasma_manager/**"
+      - "software/web/package.json"
+      - "software/web/scripts/build-product.mjs"
+      - "software/web/scripts/validate-product-runtime.mjs"
       - "software/python/pyproject.toml"
       - "software/python/tests/test_macos_control_station_installer.py"
       - "release/product.json"
       - ".github/workflows/macos-control-station-installer.yml"
-      - "docs/deployment/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
