@@ -1,0 +1,86 @@
+name: Device catalog Phase 4.2K STM32F407/417 I-pin admission proposal
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-phase4.2k-f407-f417-i-admission
+    paths:
+      - ".github/workflows/device-catalog-phase42k-proposal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  propose:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-phase4.2k-f407-f417-i-admission
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build clean admission plan
+        run: |
+          set -euo pipefail
+          PYTHONPATH=data/device-catalog/research python - <<'PY'
+          import csv, json, hashlib
+          from pathlib import Path
+          from device_catalog_admission_framework import read_csv, build_admission_plan, plan_is_clean
+          from stm32f4_admission_policy import build_candidate_inputs, build_canonical_row
+
+          root = Path('data/device-catalog/research')
+          evidence_dir = root / 'evidence/stm32f4-phase4.2k-f407-f417-i-admission-live-2026-09-03'
+          pilot = json.loads((evidence_dir / 'pilot-summary.json').read_text())
+          manifest = json.loads((evidence_dir / 'manifest.json').read_text())
+          evidence_id = manifest['evidence_id']
+          fields, rows = read_csv(root / 'stm32f4-commercial-icpn.csv')
+          with (root / 'openocd-parts-canonical.csv').open(newline='', encoding='utf-8') as f:
+              catalog_rows = list(csv.DictReader(f))
+          inputs = build_candidate_inputs(summary=pilot, evidence_id=evidence_id, catalog_rows=catalog_rows)
+          admission_bases = {'STM32F407IE','STM32F407IG','STM32F417IE','STM32F417IG'}
+          inputs = [x for x in inputs if x['base_device'] in admission_bases]
+          source_provenance = {
+              'evidence_id': evidence_id,
+              'retained_manifest_sha256': hashlib.sha256((evidence_dir/'manifest.json').read_bytes()).hexdigest(),
+              'retained_pilot_sha256': hashlib.sha256((evidence_dir/'pilot-summary.json').read_bytes()).hexdigest(),
+              'discovery_artifact_id': '9876768286',
+              'retained_artifact_id': '9876857498',
+              'retained_artifact_zip_sha256': '47ed30f923fb856637e9787cc1e2c916adf2a29f52570384718418a487704a22',
+          }
+          plan = build_admission_plan(
+              candidate_inputs=inputs,
+              canonical_fields=fields,
+              canonical_rows=rows,
+              source_provenance=source_provenance,
+              input_bindings={'production_rows_before': len(rows)},
+              row_builder=build_canonical_row,
+          )
+          Path('/tmp/phase42k').mkdir(parents=True, exist_ok=True)
+          out = Path('/tmp/phase42k/admission-plan.json')
+          out.write_text(json.dumps(plan, indent=2, sort_keys=True) + '\n')
+          print(json.dumps({
+              'candidate_count': plan['candidate_count'],
+              'decision_counts': plan['decision_counts'],
+              'conflicts': plan['conflicts'],
+              'canonical_rows_before': plan['canonical_rows_before'],
+              'clean': plan_is_clean(plan),
+          }, indent=2))
+          if not plan_is_clean(plan):
+              raise SystemExit('admission plan is not clean')
+          counts = plan['decision_counts']
+          if plan['candidate_count'] != 15 or counts['admit'] != 15 or counts['already_present'] != 0 or counts['manual_review_required'] != 0 or counts['reject'] != 0 or plan['conflicts'] != 0:
+              raise SystemExit({'unexpected_plan': plan['decision_counts'], 'candidate_count': plan['candidate_count'], 'conflicts': plan['conflicts']})
+          PY
+      - name: Hash proposal
+        run: |
+          cd /tmp/phase42k
+          sha256sum admission-plan.json | tee SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase42k-stm32f407-f417-i-admission-proposal
+          path: /tmp/phase42k
+          if-no-files-found: error
+          retention-days: 30
