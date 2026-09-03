@@ -11,7 +11,7 @@ Control Console / Manager
         |
         | commissioning orchestration / reconnect
         v
-PPU Web REST Gateway (unprivileged)
+Plasma Gateway (unprivileged)
         |
         +--> desired PPU network settings
         +--> activation transaction + durable journal
@@ -25,14 +25,21 @@ PPU Web REST Gateway (unprivileged)
         Linux network subsystem
 ```
 
-PPU network configuration is separate from Gateway communication policy:
+Canonical terminology is:
+
+- **Plasma Gateway** — the northbound API service running on each PPU;
+- **Plasma Gateway API** — the REST contract exposed by that service;
+- **Plasma Gateway Endpoint** — the service network location such as `http://192.168.2.99:18080`;
+- **Default Gateway** — the Linux Layer-3 next-hop router for `eth0`, not the Plasma Gateway service.
+
+PPU network configuration is separate from Plasma Gateway communication policy:
 
 ```text
-/api/settings/gateway       Gateway-to-PPU timeout/retry policy
+/api/settings/gateway       Plasma Gateway communication timeout/retry policy
 /api/settings/ppu-network   this PPU's desired Linux eth0 configuration
 ```
 
-The two resources must not be merged merely because both contain the word "gateway" in operator terminology.
+The existing `/api/settings/gateway` path is retained for API compatibility. The `gateway` JSON field inside `/api/settings/ppu-network` is also retained for wire compatibility, but its operator-facing meaning is **Default Gateway**.
 
 ## Phase 1 desired-state contract
 
@@ -57,6 +64,8 @@ The server owns `revision` and `interface`. Clients write exactly:
 }
 ```
 
+In this schema, `gateway` means the Linux **Default Gateway**. It does not identify the Plasma Gateway service.
+
 For DHCP mode, all static fields must be empty:
 
 ```json
@@ -80,7 +89,7 @@ When no privileged activation helper is configured, the response retains the Pha
 }
 ```
 
-A successful desired-state POST means the configuration was validated and durably stored. It does not by itself mean that `eth0`, routes, DNS, DHCP client state, or the current PPU endpoint changed.
+A successful desired-state POST means the configuration was validated and durably stored. It does not by itself mean that `eth0`, routes, DNS, DHCP client state, or the current Plasma Gateway Endpoint changed.
 
 ## Desired-state validation and persistence
 
@@ -89,10 +98,10 @@ Static mode requires:
 - a valid IPv4 address;
 - `prefix_length` in the range `1..32`;
 - no network/broadcast address for prefixes where those addresses are reserved;
-- an optional gateway on the configured subnet and different from the PPU address;
+- an optional **Default Gateway** on the configured subnet and different from the PPU address;
 - at most three unique IPv4 DNS server addresses.
 
-DHCP mode rejects static address, prefix, gateway, and DNS values. Unknown and missing POST fields are rejected rather than silently ignored.
+DHCP mode rejects static address, prefix, Default Gateway, and DNS values. Unknown and missing POST fields are rejected rather than silently ignored.
 
 The desired-state persistence file is:
 
@@ -100,7 +109,7 @@ The desired-state persistence file is:
 <output-root>/ppu-network-settings.yaml
 ```
 
-Updates use temporary-file write, flush, `fsync`, and atomic replacement. The in-memory desired state changes only after persistence succeeds. An invalid existing persistence file fails closed during Gateway startup.
+Updates use temporary-file write, flush, `fsync`, and atomic replacement. The in-memory desired state changes only after persistence succeeds. An invalid existing persistence file fails closed during Plasma Gateway startup.
 
 ## Control Station desired-state integration
 
@@ -110,19 +119,19 @@ The EMode `PPU / SITE Configuration` surface can read and persist the selected P
 Control Console
   -> same-origin Manager BFF
   -> Manager alias-scoped allowlisted relay
-  -> selected PPU Gateway
+  -> selected Plasma Gateway
   -> GET/POST /api/settings/ppu-network
 ```
 
-The Browser supplies the selected Manager registry alias, not a destination URL. The Manager resolves the registered PPU endpoint and remains the routing owner. The current relay exposes only the exact desired-state resource; the Browser does not receive an arbitrary Manager reverse-proxy capability.
+The Browser supplies the selected Manager registry alias, not a destination URL. The Manager resolves the registered Plasma Gateway Endpoint and remains the routing owner. The current relay exposes only the exact desired-state resource; the Browser does not receive an arbitrary Manager reverse-proxy capability.
 
-A desired-state write through this surface requires the PPU registry lifecycle to be `commissioned` (`Validate & Enable` completed). The Console also disables the edit while it has evidence of active Site execution or an active network activation transaction. The PPU Gateway remains the authoritative validator and persistence owner.
+A desired-state write through this surface requires the PPU registry lifecycle to be `commissioned` (`Validate & Enable` completed). The Console also disables the edit while it has evidence of active Site execution or an active network activation transaction. The Plasma Gateway remains the authoritative validator and persistence owner.
 
 The panel displays:
 
 - fixed interface `eth0`;
 - desired revision and mode;
-- static IPv4 fields when applicable;
+- static IPv4 address, prefix length, **Default Gateway**, and DNS fields when applicable;
 - activation support/state;
 - last committed activation revision when available.
 
@@ -138,22 +147,22 @@ It does **not** mean:
 
 ```text
 mutate Linux eth0
-change the Manager registry endpoint
+change the Manager registry Plasma Gateway Endpoint
 prove candidate reachability
 commit an activation
 ```
 
-The Browser intentionally does not call `/api/settings/ppu-network/activation` directly. A safe endpoint migration crosses two durable ownership domains — PPU network state and Manager registry endpoint state — and must therefore be owned by a Manager commissioning transaction rather than a sequence of loosely coupled Browser requests.
+The Browser intentionally does not call `/api/settings/ppu-network/activation` directly. A safe endpoint migration crosses two durable ownership domains — PPU network state and Manager registry Plasma Gateway Endpoint state — and must therefore be owned by a Manager commissioning transaction rather than a sequence of loosely coupled Browser requests.
 
 The next commissioning gate is a Manager-owned static IPv4 transaction:
 
 ```text
 persist desired static network
--> schedule PPU activation on old endpoint
--> reconnect to deterministic candidate endpoint
+-> schedule PPU activation on old Plasma Gateway Endpoint
+-> reconnect to deterministic candidate Plasma Gateway Endpoint
 -> read /api/node and verify the same immutable ppu_id
 -> commit PPU activation
--> reconcile the Manager registry endpoint durably
+-> reconcile the Manager registry Plasma Gateway Endpoint durably
 ```
 
 Failure before commit must leave explicit rollback/recovery evidence and must not silently repoint the Manager registry. DHCP remains valid as PPU desired state, but automatic DHCP endpoint migration is not claimed until Manager has a deterministic lease/discovery and same-identity reconnect contract.
@@ -187,7 +196,7 @@ The PPU rejects the request before network mutation when:
 - the rollback timeout is outside the bounded contract;
 - the privileged helper is unavailable.
 
-A successful apply returns HTTP `202 Accepted` while the old endpoint still exists. Actual mutation is deliberately delayed briefly after the ACK so the response can leave through the old network path.
+A successful apply returns HTTP `202 Accepted` while the old Plasma Gateway Endpoint still exists. Actual mutation is deliberately delayed briefly after the ACK so the response can leave through the old network path.
 
 The transaction then follows:
 
@@ -212,7 +221,7 @@ Commit request:
 }
 ```
 
-The coordinator must reconnect through the candidate endpoint and read canonical identity (normally `/api/node`) before sending commit. Reaching an IP address is not sufficient evidence; the endpoint must report the same immutable `ppu_id`.
+The coordinator must reconnect through the candidate Plasma Gateway Endpoint and read canonical identity (normally `/api/node`) before sending commit. Reaching an IP address is not sufficient evidence; the endpoint must report the same immutable `ppu_id`.
 
 While an activation is active, the desired settings resource is read-only. This prevents candidate drift between snapshot, apply, reconnect, and commit.
 
@@ -249,13 +258,13 @@ The activation journal is:
 
 It stores the activation ID, PPU identity, desired revision, candidate settings, previous actual-network snapshot, rollback deadline, state, committed revision, and recovery reason/error.
 
-If the Gateway starts and finds an interrupted active transaction, it attempts to restore the saved previous snapshot before accepting that transaction as complete. Successful startup recovery is recorded as `rolled_back` with reason `startup_recovery`. If the helper cannot perform recovery, the transaction becomes `recovery_required`; the Gateway does not claim success.
+If the Plasma Gateway starts and finds an interrupted active transaction, it attempts to restore the saved previous snapshot before accepting that transaction as complete. Successful startup recovery is recorded as `rolled_back` with reason `startup_recovery`. If the helper cannot perform recovery, the transaction becomes `recovery_required`; the Plasma Gateway does not claim success.
 
-Graceful Gateway shutdown also fails safe. In particular, shutdown during a helper `apply` does not race a premature restore against an in-flight mutation: the worker observes shutdown after `apply` returns and restores the previous snapshot. A helper that fails to return within the bounded shutdown wait leaves explicit `recovery_required` evidence.
+Graceful Plasma Gateway shutdown also fails safe. In particular, shutdown during a helper `apply` does not race a premature restore against an in-flight mutation: the worker observes shutdown after `apply` returns and restores the previous snapshot. A helper that fails to return within the bounded shutdown wait leaves explicit `recovery_required` evidence.
 
 ## Privilege separation
 
-The Web REST Gateway must not receive `CAP_NET_ADMIN`, execute `sudo`, or run arbitrary shell network commands.
+The Plasma Gateway must not receive `CAP_NET_ADMIN`, execute `sudo`, or run arbitrary shell network commands.
 
 Phase 2 uses a local Unix-domain socket helper contract with only three operations:
 
@@ -265,13 +274,13 @@ apply(settings)
 restore(snapshot)
 ```
 
-The Gateway owns admission, identity/revision checks, transaction state, journal, deadlines, commit, and rollback policy. The helper owns only the privileged OS mutation.
+The Plasma Gateway owns admission, identity/revision checks, transaction state, journal, deadlines, commit, and rollback policy. The helper owns only the privileged OS mutation.
 
 This boundary is deliberate. A future PYNQ-Z2 adapter may use NetworkManager, `systemd-networkd`, or another mechanism without changing the REST transaction semantics.
 
-## Secure Gateway policy
+## Secure Plasma Gateway policy
 
-When the secure Gateway boundary is active:
+When the secure Plasma Gateway boundary is active:
 
 - read access uses `settings.read`;
 - desired-state writes, activation, and commit use `settings.ppu_network.write`;
