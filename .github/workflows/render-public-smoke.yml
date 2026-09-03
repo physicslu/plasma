@@ -6,7 +6,6 @@ on:
       - ".github/workflows/render-public-smoke.yml"
       - "scripts/render-start.sh"
       - "scripts/tests/test-render-public-smoke.py"
-      - "docs/deployment/render-public-smoke.md"
   workflow_dispatch:
     inputs:
       expected_commit:
