@@ -726,6 +726,14 @@ def _set_ipv4(interface: str, address: str, prefix_length: int) -> None:
     if not 1 <= prefix_length <= 32:
         raise AcceptanceError("helper prefix_length must be 1..32")
     netmask = str(ipaddress.IPv4Network(f"0.0.0.0/{prefix_length}").netmask)
+
+    # Linux SIOCSIFADDR may leave the previous AF_INET address present when a
+    # new address is applied. netdevice(7) defines deletion of an IPv4 address
+    # by setting it to 0.0.0.0 through SIOCSIFADDR. Do that first so this helper
+    # implements replace semantics: after apply, the old PPU endpoint must no
+    # longer be routable. The helper is local over a Unix socket, so the brief
+    # address-less interval does not break the transaction channel.
+    _set_sockaddr(interface, SIOCSIFADDR, "0.0.0.0")
     _set_sockaddr(interface, SIOCSIFADDR, address)
     _set_sockaddr(interface, SIOCSIFNETMASK, netmask)
 
