@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { factoryConsoleHeading } from "./production-console-helpers";
 
 const expectedCommit = process.env.EXPECTED_RENDER_COMMIT ?? "";
 const facilityId = "mock-facility-01";
@@ -39,7 +40,7 @@ test.beforeAll(async ({ request }) => {
 test("public Render keeps Production batch toolbar stable on iPad landscape", async ({ page }) => {
   await page.setViewportSize({ width: 1194, height: 834 });
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
 
   const toolbar = page.getByRole("region", { name: "Batch operation toolbar" });
   await expect(toolbar).toBeVisible();
@@ -92,7 +93,7 @@ test("public Render keeps Production batch toolbar stable on iPad landscape", as
 
 test("public Render uses Mock Synthetic Image without requiring an uploaded Image", async ({ page }) => {
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Factory Production Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: factoryConsoleHeading })).toBeVisible();
 
   const site = page.getByRole("checkbox", { name: `${facilityId} ${ppuId} SITE-01`, exact: true });
   await expect(site).toBeVisible();
