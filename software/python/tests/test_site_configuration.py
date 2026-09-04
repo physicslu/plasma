@@ -64,6 +64,19 @@ class SiteConfigurationControllerTests(unittest.TestCase):
             },
         )
 
+    def test_current_expands_effective_defaults_when_yaml_omits_target(self) -> None:
+        self.path.write_text(
+            textwrap.dedent(CONFIG).lstrip().replace(
+                "  - id: 2\n    enabled: false\n    interface: mock\n    target: TARGET-B\n",
+                "  - id: 2\n    enabled: false\n    interface: mock\n",
+            ),
+            encoding="utf-8",
+        )
+
+        current = SiteConfigurationController(self.path).current()
+
+        self.assertEqual(current["sites"][1]["target"], "STM32F103C8T6")
+
     def test_update_persists_only_writable_site_fields(self) -> None:
         saved = self.controller.update(
             1,
@@ -80,7 +93,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         self.assertEqual(site.interface, "openocd")
         self.assertEqual(site.target, "STM32F103C8T6")
         self.assertEqual(site.operation_timeout_s, 12.5)
-        self.assertEqual(site.mock.flash_size, 4096)
+        self.assertEqual(site.mock["flash_size"], 4096)
 
     def test_restart_persistence_round_trip(self) -> None:
         saved = self.controller.update(
