@@ -18,6 +18,7 @@ TARGET_CONFIG = "tcl/target/stm32f4x.cfg"
 BASE_RE = re.compile(r"^STM32F4\d{2}([A-Z])([A-Z0-9])$")
 ICPN_RE = re.compile(r"^STM32F4[0-9A-Z]+$")
 FLASH_BY_CODE = {
+    "8": "64 KiB",
     "B": "128 KiB",
     "C": "256 KiB",
     "D": "384 KiB",

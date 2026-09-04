@@ -149,3 +149,6 @@ jobs:
             --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-live-2026-09-05 \
             --baseline data/device-catalog/research/stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-baseline.json
           python data/device-catalog/research/test_stm32f4_phase4_2aa_nh_tfbga216_post_admission.py
+
+      - name: Validate Phase 4.2AB STM32F410 x8 flash-size policy boundary
+        run: python data/device-catalog/research/test_stm32f4_phase4_2ab_f410_x8_flash_policy.py
