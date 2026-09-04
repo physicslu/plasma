@@ -152,3 +152,10 @@ jobs:
 
       - name: Validate Phase 4.2AB STM32F410 x8 flash-size policy boundary
         run: python data/device-catalog/research/test_stm32f4_phase4_2ab_f410_x8_flash_policy.py
+
+      - name: Validate Phase 4.2AC STM32F410 x8 retained evidence and post-admission closure
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2ac-f410-x8-admission-live-2026-09-05 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2ac-f410-x8-admission-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_2ac_f410_x8_post_admission.py
