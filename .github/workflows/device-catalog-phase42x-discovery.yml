@@ -2,7 +2,11 @@ name: Device catalog Phase 4.2X M/Y WLCSP81 discovery
 on:
   push:
     branches: [agent/device-catalog-phase4.2x-my-wlcsp81-admission]
-    paths: [".github/workflows/device-catalog-phase42x-discovery.yml", "data/device-catalog/research/stm32f4-phase4.2x-my-wlcsp81-admission-manifest.json"]
+    paths:
+      - ".github/workflows/device-catalog-phase42x-discovery.yml"
+      - "data/device-catalog/research/stm32f4-phase4.2x-my-wlcsp81-admission-manifest.json"
+      - "data/device-catalog/research/stm32f4_admission_policy.py"
+      - "data/device-catalog/research/test_stm32f4_phase4_2x_m_option_routing.py"
   workflow_dispatch:
 permissions: {contents: read}
 jobs:
