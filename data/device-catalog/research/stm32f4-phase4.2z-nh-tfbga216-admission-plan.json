@@ -1,0 +1,356 @@
+{
+  "candidate_count": 7,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "evidence_section_sha256": "4a017504ee5fff817eace607b912fa099301af22a3f54db78b66a8f60dd0af86",
+        "rendered_dom_sha256": "323c46f06a02abdd3bbb69f74e2ef960905413241f3a82c3e3f5a27a2b73dc19",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ne.html"
+      },
+      "base_device": "STM32F429NE",
+      "base_mapping": {
+        "existing_identifier": "STM32F429NEHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F429NEH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F429NE",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F429NEHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F429NEH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F429",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ne.html#plasma-evidence=stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "evidence_section_sha256": "d98474b494cd68f347b3d8b87ef428cd527ee2fe6b18f203651edb0be870d6c3",
+        "rendered_dom_sha256": "581a4c8f868b6a281086dcfbdcc442769af054d66513c16e0abc4dcf00a911f4",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ng.html"
+      },
+      "base_device": "STM32F429NG",
+      "base_mapping": {
+        "existing_identifier": "STM32F429NGHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F429NGH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F429NG",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F429NGHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1024 KiB",
+        "icpn": "STM32F429NGH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F429",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ng.html#plasma-evidence=stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "evidence_section_sha256": "ce2e83550e218c3003347a1f2526c387a130657e1ea003e4a1100c850a469655",
+        "rendered_dom_sha256": "0f51849ef8aeed438351d7d2131badfe1ac3803b2a7ff2fa8a0a41843f75fc3d",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ni.html"
+      },
+      "base_device": "STM32F429NI",
+      "base_mapping": {
+        "existing_identifier": "STM32F429NIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F429NIH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F429NI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F429NIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F429NIH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F429",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ni.html#plasma-evidence=stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "evidence_section_sha256": "ce2e83550e218c3003347a1f2526c387a130657e1ea003e4a1100c850a469655",
+        "rendered_dom_sha256": "0f51849ef8aeed438351d7d2131badfe1ac3803b2a7ff2fa8a0a41843f75fc3d",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ni.html"
+      },
+      "base_device": "STM32F429NI",
+      "base_mapping": {
+        "existing_identifier": "STM32F429NIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F429NIH6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F429NI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F429NIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F429NIH6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F429",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ni.html#plasma-evidence=stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "evidence_section_sha256": "ce2e83550e218c3003347a1f2526c387a130657e1ea003e4a1100c850a469655",
+        "rendered_dom_sha256": "0f51849ef8aeed438351d7d2131badfe1ac3803b2a7ff2fa8a0a41843f75fc3d",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ni.html"
+      },
+      "base_device": "STM32F429NI",
+      "base_mapping": {
+        "existing_identifier": "STM32F429NIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F429NIH7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F429NI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F429NIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F429NIH7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F429",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ni.html#plasma-evidence=stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "evidence_section_sha256": "d9a9637bf339ac017bf6e6304e7e834a0d791fff127c3ace39e6a79138d65be3",
+        "rendered_dom_sha256": "3f1a39687bb2a508105995b915a57748c5625cafbb3e85b9cc065037186ba968",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ng.html"
+      },
+      "base_device": "STM32F439NG",
+      "base_mapping": {
+        "existing_identifier": "STM32F439NGHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F439NGH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F439NG",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F439NGHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1024 KiB",
+        "icpn": "STM32F439NGH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F439",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ng.html#plasma-evidence=stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "evidence_section_sha256": "fc8829f1d5f616be8de7bf9a5d3ea8557b47e8535ae4c3efa853cb1128e5dade",
+        "rendered_dom_sha256": "76949ad2d2ab5c7212d13e8014df84c470d30d31e4c3d91e14b984bf85616de2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ni.html"
+      },
+      "base_device": "STM32F439NI",
+      "base_mapping": {
+        "existing_identifier": "STM32F439NIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F439NIH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F439NI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F439NIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F439NIH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F439",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ni.html#plasma-evidence=stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 338,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 7,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+  "family": "STM32F4",
+  "inputs": {
+    "admission_base_devices": [
+      "STM32F429NE",
+      "STM32F429NG",
+      "STM32F429NI",
+      "STM32F439NG",
+      "STM32F439NI"
+    ],
+    "baseline": "stm32f4-phase4.2z-nh-tfbga216-admission-baseline.json",
+    "baseline_sha256": "692a407fea0abdb80017858e82b65bc4e6f7095cd1e6415ee7d8408551aabf00",
+    "canonical_dataset": "stm32f4-commercial-icpn.csv",
+    "canonical_input_sha256": "fc597c2bbcbebe458da22418bb57a7b9b93efe6d949fa80e0097db0fda92d4ca",
+    "family_adapter": "stm32f4-phase3.1",
+    "mapping_catalog": "openocd-parts-canonical.csv",
+    "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "retained_evidence_directory": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-live-2026-09-04"
+  },
+  "issues": [],
+  "pipeline_expected_candidate_count": 7,
+  "schema_version": 1,
+  "source_provenance": {
+    "evidence_manifest_sha256": "28f3b4fb1413bb03755391b05a6289e6f93939490189089b02bbe4041af8c5c2",
+    "executed_git_sha": "6a606b9765abf602f5a51cdff5ffc23a432f42de",
+    "repository": "physicslu/plasma"
+  }
+}
