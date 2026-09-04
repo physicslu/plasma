@@ -24,6 +24,8 @@ Therefore the governing security rule is:
 
 The persistent runner must be treated as a dedicated qualification appliance, not as a general-purpose PR execution worker.
 
+Because GitHub Action code also executes inside this host-privileged boundary, actions used by the persistent self-hosted job must be pinned to an **immutable commit SHA**, not only to a movable major-version tag.
+
 ## Evidence ladder
 
 The current validation ladder is:
@@ -49,7 +51,7 @@ The defense is layered:
 1. A GitHub-hosted `main-dispatch-guard` job rejects a dispatch whose event, repository, ref, or SHA identity does not match the expected main-only contract.
 2. The self-hosted job has an equivalent job-level `if` condition, so a rejected non-main dispatch is not scheduled onto the persistent runner.
 3. Before checkout, the self-hosted job rechecks the trusted event identity and non-root runner identity.
-4. `actions/checkout` is pinned to the exact workflow event `${{ github.sha }}` rather than an arbitrary branch name, and persisted Git credentials are disabled.
+4. `actions/checkout` is pinned to an immutable commit SHA, checks out the exact workflow event `${{ github.sha }}` rather than an arbitrary branch name, and persisted Git credentials are disabled. The evidence-upload action is likewise commit-SHA pinned.
 5. `scripts/persistent-integration-host-preflight.py` fails unless the checked-out commit exactly equals `GITHUB_SHA` and the event remains a main-branch `workflow_dispatch` for `physicslu/plasma`.
 
 These repository checks are **defense-in-depth**, not a complete protection against a write-capable attacker who can modify the workflow definition itself on another repository branch and then cause that modified workflow to execute.
