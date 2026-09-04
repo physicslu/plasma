@@ -95,23 +95,31 @@ def test_repeatability_gate_injects_dirty_state_then_runs_twice_without_own_clea
     source = _text("scripts/static-ipv4-fault-injection-repeatability.py")
     assert "_seed_dirty_state(work)" in source
     assert source.index("_seed_dirty_state(work)") < source.index("for attempt in range(1, 3):")
+    assert "old_umask = os.umask(0)" in source
+    assert "seed_root.mkdir(mode=0o733, exist_ok=False)" in source
     assert '"--network",\n            "none"' in source
     assert '"--cap-drop",\n            "ALL"' in source
     assert '"no-new-privileges:true"' in source
-    assert 'f"{work}:/work"' in source
+    assert '"--user",\n            "0:0"' in source
+    assert 'f"{seed_root}:/seed"' in source
+    assert "leaf.mkdir(mode=0o700, exist_ok=False)" in source
     assert "private-marker" in source
+    assert "root_owned.lstat()" in source
+    assert "info.st_uid != 0 or info.st_gid != 0 or mode != 0o700" in source
+    assert "expected root:root 0700" in source
     assert "for attempt in range(1, 3):" in source
     assert 'command.extend(["--work-dir", str(work), "--report", str(run_report)])' in source
     assert 'work / "manager-crash-after-commit" / "ppu-a"' in source
     assert 'str(repo / "scripts/private-ppu-evidence-verifier.py")' in source
     assert '"run_count": 2' in source
     assert '"dirty_state_injected_before_run1": True' in source
+    assert '"dirty_state_contract": "root:root 0700 directory + root:root 0600 marker"' in source
     assert '"manual_cleanup": False' in source
     assert '"sudo": False' in source
     assert '"host_verifier_non_root": True' in source
     assert '"producer_evidence_contract": "root:root 0600"' in source
     assert '"verifier_independent": True' in source
-    for forbidden in ("rmtree(", "chmod(", "rglob(", '"sudo",'):
+    for forbidden in ("rmtree(", "chmod(", "rglob(", '"sudo",', "CAP_DAC_OVERRIDE"):
         assert forbidden not in source
 
 
@@ -177,6 +185,7 @@ def test_production_manager_and_gateway_have_no_fault_switches() -> None:
 def test_release_workflow_runs_repeatability_gate_after_happy_path_and_retains_evidence() -> None:
     workflow = _text(".github/workflows/ppu-release.yml")
     assert ".github/workflows/persistent-integration-host.yml" in workflow
+    assert "timeout-minutes: 90" in workflow
     assert "scripts/static-ipv4-fault-injection-lab.py" in workflow
     assert "scripts/static-ipv4-fault-injection-repeatability.py" in workflow
     assert "scripts/private-ppu-evidence-verifier.py" in workflow
@@ -184,6 +193,11 @@ def test_release_workflow_runs_repeatability_gate_after_happy_path_and_retains_e
     assert "software/python/tests/test_static_ipv4_fault_injection_lab.py" in workflow
     assert "Capture integration environment fingerprint" in workflow
     assert "Upload PPU acceptance evidence" in workflow
+    evidence = workflow.split("- name: Upload PPU acceptance evidence", 1)[1].split(
+        "- name: Upload PPU release artifact", 1
+    )[0]
+    assert "if: always()" in evidence
+    assert "if-no-files-found: warn" in evidence
     for report in (
         "plasma-ppu-environment-fingerprint.json",
         "plasma-ppu-network-phase1.json",
@@ -213,6 +227,9 @@ def test_persistent_integration_workflow_is_manual_non_deploying_and_stateful() 
     assert '$HOME/.local/state/plasma-ci' in workflow
     assert "plasma-static-ipv4-persistent-repeatability-run1.json" in workflow
     assert "plasma-static-ipv4-persistent-repeatability-run2.json" in workflow
+    evidence = workflow.split("- name: Upload persistent-host acceptance reports", 1)[1]
+    assert "if: always()" in evidence
+    assert "if-no-files-found: warn" in evidence
     for forbidden in ("sudo", "systemctl", "plasmactl deploy", "plasmactl restart", "ssh "):
         assert forbidden not in workflow.lower()
 
