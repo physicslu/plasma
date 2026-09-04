@@ -25,6 +25,14 @@ def test_fault_lab_covers_all_approved_scenarios() -> None:
     assert "Z2 NETWORK BACKEND CLAIM    : NONE" in source
 
 
+def test_precommit_recovery_retry_is_blocked_by_recovery_required_itself() -> None:
+    source = _text("scripts/static-ipv4-fault-injection-lab.py")
+    assert '"network_commissioning_busy"' in source
+    assert 'retry_record.get("state") != "recovery_required"' in source
+    assert '"trusted_fleet_restored_before_retry": True' in source
+    assert source.index('activation = _wait_activation(') < source.index('"fault-crash-before-commit-retry"')
+
+
 def test_crash_injector_crashes_only_after_real_durable_put() -> None:
     source = _text("scripts/manager-network-commissioning-crash-injector.py")
     assert 'choices=("identity_verified", "activation_committed")' in source
