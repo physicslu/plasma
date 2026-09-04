@@ -30,8 +30,6 @@ jobs:
               'STM32F479ZG',
               'STM32F429NE', 'STM32F429NG', 'STM32F429NI',
               'STM32F439NG', 'STM32F439NI',
-              'STM32F469NE', 'STM32F469NG', 'STM32F469NI',
-              'STM32F479NG', 'STM32F479NI',
           }
           observed = {item['base_device'] for item in summary['results']}
           if summary['acquisition_failure'] or observed != expected:
