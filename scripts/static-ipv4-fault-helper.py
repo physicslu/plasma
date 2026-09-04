@@ -13,8 +13,6 @@ import json
 import platform
 import socket
 import sys
-import threading
-import time
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -109,23 +107,6 @@ def _validate_apply(interface: str, settings: object) -> dict[str, Any]:
     return settings
 
 
-def _journal_visibility_worker(path: Path) -> None:
-    """Expose only test evidence bytes to the non-root integration-host runner.
-
-    The PPU Gateway creates its durable journal with a restrictive tempfile mode.
-    In the fault lab the bind-mounted file is otherwise unreadable by the host
-    CI user. This helper is already the test-only root sidecar for the namespace;
-    it changes only the journal file mode, never its bytes or network semantics.
-    """
-    while True:
-        try:
-            if path.is_file():
-                path.chmod(0o644)
-        except OSError:
-            pass
-        time.sleep(0.01)
-
-
 def _serve(args: argparse.Namespace, phase2: Any) -> int:
     if platform.machine().lower() not in {"armv7", "armv7l"}:
         raise FaultHelperError("fault helper requires ARMv7")
@@ -139,13 +120,6 @@ def _serve(args: argparse.Namespace, phase2: Any) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path.unlink()
-
-    journal_path = args.journal_path.resolve()
-    threading.Thread(
-        target=_journal_visibility_worker,
-        args=(journal_path,),
-        daemon=True,
-    ).start()
 
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
         server.bind(str(path))
@@ -215,7 +189,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Static IPv4 fault-injection helper")
     parser.add_argument("--phase2-script", type=Path, default=Path("/acceptance.py"))
     parser.add_argument("--helper-socket", type=Path, default=Path("/work/network-helper.sock"))
-    parser.add_argument("--journal-path", type=Path, default=Path("/work/gateway-output/ppu-network-activation.json"))
     parser.add_argument("--interface", default="eth0")
     parser.add_argument("--managed-initial-address", default="192.168.78.10")
     parser.add_argument("--managed-prefix", type=int, default=24)
