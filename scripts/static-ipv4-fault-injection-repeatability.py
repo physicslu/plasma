@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""Run Static IPv4 fault acceptance twice in the same workspace.
+
+This is the CI repeatability/privilege-parity gate. It deliberately performs no
+workspace cleanup itself: the production-like lab runner must make its own stale
+root-owned disposable workspace removable, then succeed again in the identical
+work directory. After each run, a separate non-root verifier confirms that the
+canonical PPU activation journal remains root:root 0600 and is readable only via
+a locked-down read-only container.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any, Sequence
+
+DEFAULT_WORK_REL = Path(".work/static-ipv4-fault-injection")
+DEFAULT_REPORT_REL = Path(".work/reports/static-ipv4-fault-injection-repeatability.json")
+VERIFIER_RESULT_MARKER = "PLASMA_PRIVATE_PPU_EVIDENCE_VERIFIER_RESULT="
+RESULT_MARKER = "PLASMA_STATIC_IPV4_REPEATABILITY_RESULT="
+
+
+class RepeatabilityError(RuntimeError):
+    pass
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _resolve(repo: Path, path: Path) -> Path:
+    return path.resolve() if path.is_absolute() else (repo / path).resolve()
+
+
+def _run_streaming(command: Sequence[str], *, cwd: Path) -> int:
+    process = subprocess.Popen(list(command), cwd=cwd)
+    return process.wait()
+
+
+def _run_verifier(repo: Path, ppu_work: Path) -> dict[str, Any]:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "scripts/private-ppu-evidence-verifier.py"),
+            "--ppu-work",
+            str(ppu_work),
+        ],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n", flush=True)
+    if result.stderr:
+        print(result.stderr, end="" if result.stderr.endswith("\n") else "\n", file=sys.stderr, flush=True)
+    if result.returncode != 0:
+        raise RepeatabilityError(f"independent evidence verifier failed with rc={result.returncode}")
+    marker_line = next(
+        (line for line in result.stdout.splitlines() if line.startswith(VERIFIER_RESULT_MARKER)),
+        None,
+    )
+    if marker_line is None:
+        raise RepeatabilityError("independent evidence verifier result marker missing")
+    payload = json.loads(marker_line[len(VERIFIER_RESULT_MARKER) :])
+    if payload.get("overall_result") != "PASS":
+        raise RepeatabilityError(f"independent evidence verifier did not pass: {payload!r}")
+    return payload
+
+
+def _run_report_path(summary_report: Path, attempt: int) -> Path:
+    suffix = summary_report.suffix or ".json"
+    stem = summary_report.name[: -len(summary_report.suffix)] if summary_report.suffix else summary_report.name
+    return summary_report.with_name(f"{stem}-run{attempt}{suffix}")
+
+
+def _main(args: argparse.Namespace) -> int:
+    if platform.system() != "Linux":
+        raise RepeatabilityError("Static IPv4 repeatability gate requires Linux")
+    if os.geteuid() == 0:
+        raise RepeatabilityError("repeatability gate must run as a non-root host verifier")
+    if shutil.which("docker") is None or shutil.which("ip") is None:
+        raise RepeatabilityError("docker and iproute2 are required")
+
+    repo = _repo_root()
+    work = _resolve(repo, args.work_dir)
+    summary_report = _resolve(repo, args.report)
+    runtime = _resolve(repo, args.runtime_dir) if args.runtime_dir is not None else None
+    summary_report.parent.mkdir(parents=True, exist_ok=True)
+
+    runs: list[dict[str, Any]] = []
+    for attempt in range(1, 3):
+        run_report = _run_report_path(summary_report, attempt)
+        command = [
+            sys.executable,
+            str(repo / "scripts/static-ipv4-fault-injection-lab.py"),
+        ]
+        if runtime is not None:
+            command.extend(["--runtime-dir", str(runtime)])
+        command.extend(["--work-dir", str(work), "--report", str(run_report)])
+
+        print(f"[REPEATABILITY] run {attempt}/2 using work-dir {work}", flush=True)
+        started = time.monotonic()
+        returncode = _run_streaming(command, cwd=repo)
+        elapsed = time.monotonic() - started
+        if returncode != 0:
+            raise RepeatabilityError(f"fault lab run {attempt}/2 failed with rc={returncode}")
+        if not run_report.is_file():
+            raise RepeatabilityError(f"fault lab run {attempt}/2 did not produce report: {run_report}")
+
+        payload = json.loads(run_report.read_text(encoding="utf-8"))
+        if payload.get("overall_result") != "PASS":
+            raise RepeatabilityError(f"fault lab run {attempt}/2 did not pass: {payload!r}")
+
+        ppu_work = work / "manager-crash-after-commit" / "ppu-a"
+        verifier = _run_verifier(repo, ppu_work)
+        runs.append(
+            {
+                "attempt": attempt,
+                "elapsed_s": round(elapsed, 3),
+                "fault_report": str(run_report),
+                "git_sha": payload.get("git_sha"),
+                "host_uplink": payload.get("host_uplink"),
+                "evidence_level": payload.get("evidence_level"),
+                "private_journal": {
+                    "owner": verifier.get("owner"),
+                    "mode": verifier.get("mode"),
+                    "sha256": verifier.get("sha256"),
+                    "verifier_euid": verifier.get("verifier_euid"),
+                },
+            }
+        )
+        print(f"[REPEATABILITY] run {attempt}/2 PASS ({elapsed:.1f}s)", flush=True)
+
+    git_shas = {run.get("git_sha") for run in runs}
+    if len(git_shas) != 1:
+        raise RepeatabilityError(f"repeatability runs used different git revisions: {sorted(git_shas)!r}")
+
+    result = {
+        "overall_result": "PASS",
+        "same_work_dir": str(work),
+        "run_count": 2,
+        "manual_cleanup": False,
+        "sudo": False,
+        "host_verifier_non_root": True,
+        "producer_evidence_contract": "root:root 0600",
+        "verifier_independent": True,
+        "runs": runs,
+        "not_claimed": [
+            "PYNQ-Z2 hardware",
+            "final PYNQ-Z2 Linux network-manager backend",
+            "DHCP endpoint migration",
+            "boot-time network persistence",
+            "physical cable/switch behavior",
+            "PS-to-PL",
+            "FPGA Site I/O",
+            "real IC programming",
+        ],
+    }
+    summary_report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print("[REPEATABILITY] SAME WORK-DIR TWICE        : PASS")
+    print("[REPEATABILITY] NON-ROOT VERIFIER          : PASS")
+    print("[REPEATABILITY] ROOT:ROOT 0600 EVIDENCE    : PASS")
+    print("[REPEATABILITY] INDEPENDENT READ-ONLY HASH : PASS")
+    print("[REPEATABILITY] Z2 NETWORK BACKEND CLAIM   : NONE")
+    print("[REPEATABILITY] OVERALL RESULT             : PASS")
+    print(RESULT_MARKER + json.dumps(result, separators=(",", ":"), sort_keys=True))
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run Static IPv4 acceptance twice in the same work directory")
+    parser.add_argument("--runtime-dir", type=Path)
+    parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_REL)
+    parser.add_argument("--report", type=Path, default=DEFAULT_REPORT_REL)
+    args = parser.parse_args(argv)
+    try:
+        return _main(args)
+    except (RepeatabilityError, OSError, subprocess.SubprocessError, json.JSONDecodeError, ValueError) as exc:
+        print(f"static-ipv4-fault-injection-repeatability: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
