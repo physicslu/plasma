@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production lifecycle control"
+    },
+    {
+      "base_device": "STM32F413MG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mg.html",
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81"
+    },
+    {
+      "base_device": "STM32F413MH",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mh.html",
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81"
+    },
+    {
+      "base_device": "STM32F423MH",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html",
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81"
+    },
+    {
+      "base_device": "STM32F446MC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446mc.html",
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81"
+    },
+    {
+      "base_device": "STM32F446ME",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html",
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81"
+    }
+  ],
+  "admission_scope": {
+    "family": "STM32F4",
+    "base_devices": ["STM32F413MG", "STM32F413MH", "STM32F423MH", "STM32F446MC", "STM32F446ME"],
+    "production_exact_icpns_before": 331,
+    "production_base_devices_before": 109,
+    "fail_closed": true
+  }
+}
