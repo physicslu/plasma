@@ -39,7 +39,7 @@ class STM32F4Phase42STYWLCSP36PolicyTests(unittest.TestCase):
         self.assertTrue(gaps["STM32F410TB"]["admission_policy_ready"])
         self.assertEqual(gaps["STM32F410TB"]["policy_blockers"], [])
 
-    def test_stm32f410t8_stays_fail_closed_until_flash8_is_supported_or_admitted(self) -> None:
+    def test_stm32f410t8_is_ready_or_admitted_after_flash8_policy(self) -> None:
         inventory = self._inventory()
         production = set(inventory["production"]["base_devices"])
         gaps = {
@@ -52,11 +52,8 @@ class STM32F4Phase42STYWLCSP36PolicyTests(unittest.TestCase):
             return
 
         self.assertIn("STM32F410T8", gaps)
-        self.assertFalse(gaps["STM32F410T8"]["admission_policy_ready"])
-        self.assertEqual(
-            gaps["STM32F410T8"]["policy_blockers"],
-            ["unsupported flash-size code 8"],
-        )
+        self.assertTrue(gaps["STM32F410T8"]["admission_policy_ready"])
+        self.assertEqual(gaps["STM32F410T8"]["policy_blockers"], [])
 
 
 if __name__ == "__main__":

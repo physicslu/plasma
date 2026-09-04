@@ -40,16 +40,18 @@ class STM32F4Phase42ACTLQFP48PolicyTests(unittest.TestCase):
         self.assertNotIn("STM32F410CB", ready)
         self.assertNotIn("STM32F410CB", blocked)
 
-        self.assertIn("STM32F410C8", blocked)
-        self.assertEqual(
-            blocked["STM32F410C8"]["policy_blockers"],
-            ["unsupported flash-size code 8"],
-        )
+        if "STM32F410C8" in production_bases:
+            self.assertNotIn("STM32F410C8", ready)
+            self.assertNotIn("STM32F410C8", blocked)
+        else:
+            self.assertIn("STM32F410C8", ready)
+            self.assertEqual(ready["STM32F410C8"]["policy_blockers"], [])
 
-    def test_policy_mapping_does_not_implicitly_admit_other_ct_devices(self) -> None:
+    def test_c8_is_ready_or_explicitly_admitted_after_later_flash_policy(self) -> None:
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
         production_bases = set(inventory["production"]["base_devices"])
-        self.assertNotIn("STM32F410C8", production_bases)
+        ready_bases = {item["base_device"] for item in inventory["gap"]["policy_ready"]}
+        self.assertTrue("STM32F410C8" in production_bases or "STM32F410C8" in ready_bases)
 
 
 if __name__ == "__main__":
