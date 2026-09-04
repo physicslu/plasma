@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/ppu-release.yml"
+      - ".github/workflows/persistent-integration-host.yml"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/product-release.py"
@@ -14,6 +15,9 @@ on:
       - "scripts/ppu-network-phase2-acceptance.py"
       - "scripts/virtual-ppu-network-lab.py"
       - "scripts/static-ipv4-fault-injection-lab.py"
+      - "scripts/static-ipv4-fault-injection-repeatability.py"
+      - "scripts/private-ppu-evidence-verifier.py"
+      - "scripts/ci-environment-fingerprint.py"
       - "scripts/static-ipv4-fault-helper.py"
       - "scripts/manager-network-commissioning-crash-injector.py"
       - "release/**"
@@ -48,6 +52,7 @@ permissions:
 jobs:
   build-ppu-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -157,6 +162,17 @@ jobs:
           image: docker.io/tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
           platforms: arm
 
+      - name: Capture integration environment fingerprint
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.release.outputs.archive }}
+        run: |
+          set -euo pipefail
+          python scripts/ci-environment-fingerprint.py \
+            --artifact "$ARCHIVE" \
+            --work-dir "$RUNNER_TEMP" \
+            --report "$RUNNER_TEMP/plasma-ppu-environment-fingerprint.json"
+
       - name: Run PPU release under ARMv7 userspace
         shell: bash
         run: |
@@ -201,14 +217,30 @@ jobs:
             --work-dir "$RUNNER_TEMP/plasma-virtual-ppu-network-lab" \
             --report "$RUNNER_TEMP/plasma-virtual-ppu-network-lab.json"
 
-      - name: Run Static IPv4 fault-injection lab
+      - name: Run Static IPv4 repeatability and privilege-parity gate
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/static-ipv4-fault-injection-lab.py \
+          python scripts/static-ipv4-fault-injection-repeatability.py \
             --runtime-dir "$RUNNER_TEMP/plasma-ppu-verify/plasma-release/runtime" \
             --work-dir "$RUNNER_TEMP/plasma-static-ipv4-fault-injection" \
-            --report "$RUNNER_TEMP/plasma-static-ipv4-fault-injection.json"
+            --report "$RUNNER_TEMP/plasma-static-ipv4-fault-injection-repeatability.json"
+
+      - name: Upload PPU acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plasma-ppu-acceptance-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/plasma-ppu-environment-fingerprint.json
+            ${{ runner.temp }}/plasma-ppu-network-phase1.json
+            ${{ runner.temp }}/plasma-ppu-network-phase2.json
+            ${{ runner.temp }}/plasma-virtual-ppu-network-lab.json
+            ${{ runner.temp }}/plasma-static-ipv4-fault-injection-repeatability.json
+            ${{ runner.temp }}/plasma-static-ipv4-fault-injection-repeatability-run1.json
+            ${{ runner.temp }}/plasma-static-ipv4-fault-injection-repeatability-run2.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload PPU release artifact
         uses: actions/upload-artifact@v4
