@@ -121,6 +121,7 @@ jobs:
             --report "$report"
 
       - name: Upload persistent-host acceptance reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: plasma-persistent-integration-${{ github.sha }}
@@ -129,5 +130,5 @@ jobs:
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run1.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run2.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
