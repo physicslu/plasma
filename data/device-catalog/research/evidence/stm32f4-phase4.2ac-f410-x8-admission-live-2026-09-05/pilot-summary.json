@@ -1,0 +1,259 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 3,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 3,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 3,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 8,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 3,
+    "total": 3
+  },
+  "pilot_id": "stm32f4-phase4.2ac-f410-x8-admission-2026-09-05",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F410TB",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F410TBYx",
+          "icpn": "STM32F410TBY3TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F410TBYx",
+          "icpn": "STM32F410TBY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F410TBYx",
+          "icpn": "STM32F410TBY7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F410TB",
+        "evidence_section_sha256": "ba8a62fea182ee6cef89dad0d17d13bcd89c3c80bf4d4d0506c492ca77d8c007",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F410TBY3TR",
+          "STM32F410TBY6TR",
+          "STM32F410TBY7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F410TBY3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F410TBY6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F410TBY7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ff5a3018771280d9636199909b2892476d539fa1dcc15dd6bb2f152f54546767",
+        "retrieved_at_utc": "2026-09-04T17:42:06Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html"
+      },
+      "selection_reason": "same-series production lifecycle control",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F410C8",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F410C8Ux",
+          "icpn": "STM32F410C8U6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F410C8Ux",
+          "icpn": "STM32F410C8U6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F410C8Ux",
+          "icpn": "STM32F410C8U7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F410C8Ux",
+          "icpn": "STM32F410C8U7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F410C8",
+        "evidence_section_sha256": "bafd5c8285b4b1df8354e043359ca1366f463f04dd316e10e875baf0a9a8771d",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F410C8U6",
+          "STM32F410C8U6TR",
+          "STM32F410C8U7",
+          "STM32F410C8U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F410C8U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F410C8U6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F410C8U7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F410C8U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6acc4b95126d87d8252cd1e9da51983c00e45ec05283231a8854bb19b8719eda",
+        "retrieved_at_utc": "2026-09-04T17:43:28Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410c8.html"
+      },
+      "selection_reason": "Phase 4.2AB policy-ready 64-KiB STM32F410 x8 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410c8.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F410T8",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F410T8Yx",
+          "icpn": "STM32F410T8Y6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F410T8",
+        "evidence_section_sha256": "28a9b782cb7c30816f3b418294285e960d01a9053da5115d43b0737d22f05c3c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F410T8Y6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410t8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F410T8Y6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "00cf69e16cd986db0a27e5a5af3b9bec3896a016253c335cba97359374e1c2fa",
+        "retrieved_at_utc": "2026-09-04T17:43:38Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410t8.html"
+      },
+      "selection_reason": "Phase 4.2AB policy-ready 64-KiB STM32F410 x8 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410t8.html"
+    }
+  ],
+  "schema_version": 1
+}
