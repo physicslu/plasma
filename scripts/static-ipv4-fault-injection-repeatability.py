@@ -4,9 +4,10 @@
 This is the CI repeatability/privilege-parity gate. It deliberately performs no
 workspace cleanup itself: the production-like lab runner must make its own stale
 root-owned disposable workspace removable, then succeed again in the identical
-work directory. After each run, a separate non-root verifier confirms that the
-canonical PPU activation journal remains root:root 0600 and is readable only via
-a locked-down read-only container.
+work directory. Before run 1, a locked-down root producer seeds deterministic
+private filesystem residue. After each run, a separate non-root verifier confirms
+that the canonical PPU activation journal remains root:root 0600 and is readable
+only via a locked-down read-only container.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ import time
 from pathlib import Path
 from typing import Any, Sequence
 
+ARM_IMAGE = "arm32v7/python:3.12@sha256:45eb5cbc14fe248e7598eb23a5a61424d44e556aed3efa955dfab2ac9a67d91c"
 DEFAULT_WORK_REL = Path(".work/static-ipv4-fault-injection")
 DEFAULT_REPORT_REL = Path(".work/reports/static-ipv4-fault-injection-repeatability.json")
 VERIFIER_RESULT_MARKER = "PLASMA_PRIVATE_PPU_EVIDENCE_VERIFIER_RESULT="
@@ -42,6 +44,50 @@ def _resolve(repo: Path, path: Path) -> Path:
 def _run_streaming(command: Sequence[str], *, cwd: Path) -> int:
     process = subprocess.Popen(list(command), cwd=cwd)
     return process.wait()
+
+
+def _seed_dirty_state(work: Path) -> None:
+    """Create deterministic root-owned residue; the wrapper never cleans it."""
+    work.mkdir(parents=True, exist_ok=True)
+    seed = (
+        "import os\n"
+        "from pathlib import Path\n"
+        "leaf = Path('/work/dirty-state-injection/root-owned')\n"
+        "leaf.mkdir(parents=True, mode=0o700, exist_ok=True)\n"
+        "fd = os.open(str(leaf / 'private-marker'), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)\n"
+        "try:\n"
+        "    os.write(fd, b'plasma-dirty-state\\n')\n"
+        "finally:\n"
+        "    os.close(fd)\n"
+    )
+    result = subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--platform",
+            "linux/arm/v7",
+            "--network",
+            "none",
+            "--cap-drop",
+            "ALL",
+            "--security-opt",
+            "no-new-privileges:true",
+            "--volume",
+            f"{work}:/work",
+            ARM_IMAGE,
+            "python3",
+            "-c",
+            seed,
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise RepeatabilityError(f"dirty-state injection failed: {detail}")
+    print(f"[REPEATABILITY] injected root-owned dirty state under {work}", flush=True)
 
 
 def _run_verifier(repo: Path, ppu_work: Path) -> dict[str, Any]:
@@ -95,6 +141,8 @@ def _main(args: argparse.Namespace) -> int:
     runtime = _resolve(repo, args.runtime_dir) if args.runtime_dir is not None else None
     summary_report.parent.mkdir(parents=True, exist_ok=True)
 
+    _seed_dirty_state(work)
+
     runs: list[dict[str, Any]] = []
     for attempt in range(1, 3):
         run_report = _run_report_path(summary_report, attempt)
@@ -147,6 +195,7 @@ def _main(args: argparse.Namespace) -> int:
         "overall_result": "PASS",
         "same_work_dir": str(work),
         "run_count": 2,
+        "dirty_state_injected_before_run1": True,
         "manual_cleanup": False,
         "sudo": False,
         "host_verifier_non_root": True,
@@ -165,6 +214,7 @@ def _main(args: argparse.Namespace) -> int:
         ],
     }
     summary_report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print("[REPEATABILITY] DIRTY-STATE STARTUP        : PASS")
     print("[REPEATABILITY] SAME WORK-DIR TWICE        : PASS")
     print("[REPEATABILITY] NON-ROOT VERIFIER          : PASS")
     print("[REPEATABILITY] ROOT:ROOT 0600 EVIDENCE    : PASS")
