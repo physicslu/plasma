@@ -1,0 +1,19 @@
+{
+  "source_lock_id": "synthetic-source-lock-v0",
+  "source": {
+    "source_id": "synthetic_datasheet_rev1",
+    "integrity": {
+      "algorithm": "sha256",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byte_length": 1234
+    }
+  },
+  "tool": {
+    "name": "pdftotext",
+    "version": "pdftotext version synthetic-1.0",
+    "arguments": ["-layout", "-enc", "UTF-8"]
+  },
+  "builder_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "extracted_text_crlf": "1 Device identity   \r\nSee Table 3.\r\n\fTable 3. Device summary\r\n2 Memory map\r\n\fThis page deliberately has no heading.   \r\nEvidence must still survive as a PAGE unit.\r\n",
+  "extracted_text_lf": "1 Device identity\nSee Table 3.\n\fTable 3. Device summary\n2 Memory map\n\fThis page deliberately has no heading.\nEvidence must still survive as a PAGE unit.\n"
+}
