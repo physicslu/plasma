@@ -4,11 +4,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from contract import (
+    EvidenceContractError,
     build_pack,
     canonical_sha256,
     catalog_digest,
@@ -17,6 +19,7 @@ from contract import (
 )
 from preprocessing import (
     DEFAULT_NORMALIZATION,
+    PreprocessingError,
     extract_pdf_text,
     load_json,
     normalize_page_text,
@@ -118,8 +121,7 @@ def validate_policy(
         require(isinstance(rule, dict), f"section_rules[{index}] must be object")
         _validate_rule_shape(rule, taxonomy, prefix=f"section_rules[{index}]")
         require(rule["rule_id"] not in seen_rules, f"duplicate policy rule_id: {rule['rule_id']}")
-        seen_rules.add(rule["rule_id"]
-        )
+        seen_rules.add(rule["rule_id"])
         require(isinstance(rule.get("section_label"), str) and rule["section_label"], f"{rule['rule_id']}: section_label required")
         heading_regex = rule.get("heading_regex")
         require(isinstance(heading_regex, str) and heading_regex, f"{rule['rule_id']}: heading_regex required")
@@ -462,6 +464,7 @@ def _normalized_pages_from_pdf(pdf: Path, manifest: dict[str, Any], pdftotext: s
     require(len(pages) == manifest["page_count"], "materialized page count mismatch")
     for page, observed in zip(pages, manifest["pages"]):
         from hashlib import sha256
+
         actual = sha256(page.encode("utf-8")).hexdigest()
         require(actual == observed["normalized_content_sha256"], f"page {observed['pdf_page_index']}: normalized content drift")
     return pages
@@ -527,8 +530,14 @@ def main() -> int:
             f"({len(artifacts['pack']['included_units'])}/{manifest['page_count']} pages included)"
         )
         return 0
-    except (OSError, json.JSONDecodeError, SemanticPackError, Exception) as exc:
-        # Preprocessing/contract exceptions are intentionally surfaced through one fail-closed CLI boundary.
+    except (
+        OSError,
+        json.JSONDecodeError,
+        subprocess.CalledProcessError,
+        EvidenceContractError,
+        PreprocessingError,
+        SemanticPackError,
+    ) as exc:
         print(f"IC semantic Evidence Pack FAIL: {exc}", file=sys.stderr)
         return 1
 
