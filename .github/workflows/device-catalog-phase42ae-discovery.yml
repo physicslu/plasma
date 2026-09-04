@@ -21,7 +21,7 @@ jobs:
             --manifest data/device-catalog/research/stm32f4-phase4.2ae-f410-rx-admission-manifest.json \
             --catalog data/device-catalog/research/openocd-parts-canonical.csv \
             --output /tmp/phase42ae/pilot-summary.json \
-            --scope pilot --headed --timeout 75 --delay 2
+            --scope pilot --headed --timeout 150 --delay 2
           python - <<'PY'
           import json
           from pathlib import Path
