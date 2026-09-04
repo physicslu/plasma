@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1.0",
+  "source_id": "st_ds5319_rev20",
+  "physical_page_count": 114,
+  "sections": [
+    ["1", "Introduction", 8, 8],
+    ["2.1", "Device overview", 9, 12],
+    ["2.2", "Full compatibility throughout the family", 12, 13],
+    ["2.3", "Overview", 13, 20],
+    ["2.3.1", "Arm Cortex-M3 core with embedded flash and SRAM", 13, 13],
+    ["2.3.2", "Embedded flash memory", 13, 13],
+    ["2.3.7", "Clocks and startup", 14, 14],
+    ["2.3.8", "Boot modes", 14, 14],
+    ["2.3.9", "Power supply schemes", 14, 14],
+    ["2.3.10", "Power supply supervisor", 14, 15],
+    ["2.3.11", "Voltage regulator", 15, 15],
+    ["2.3.12", "Low-power modes", 15, 16],
+    ["2.3.24", "Serial wire JTAG debug port (SWJ-DP)", 19, 20],
+    ["3", "Pinouts and pin description", 20, 33],
+    ["4", "Memory mapping", 33, 34],
+    ["5.1", "Parameter conditions", 34, 36],
+    ["5.2", "Absolute maximum ratings", 36, 37],
+    ["5.3", "Operating conditions", 37, 78],
+    ["5.3.1", "General operating conditions", 37, 38],
+    ["5.3.2", "Operating conditions at power-up / power-down", 38, 38],
+    ["5.3.3", "Embedded reset and power control block characteristics", 38, 39],
+    ["5.3.6", "External clock source characteristics", 49, 53],
+    ["5.3.7", "Internal clock source characteristics", 53, 55],
+    ["5.3.8", "PLL characteristics", 55, 55],
+    ["5.3.9", "Memory characteristics", 55, 56],
+    ["5.3.11", "Absolute maximum ratings (electrical sensitivity)", 58, 59],
+    ["5.3.12", "I/O current injection characteristics", 59, 60],
+    ["5.3.13", "I/O port characteristics", 60, 65],
+    ["5.3.14", "NRST pin characteristics", 65, 66],
+    ["6", "Package information", 78, 103],
+    ["7", "Ordering information scheme", 103, 104],
+    ["8", "Important security notice", 104, 105],
+    ["9", "Revision history", 105, 113]
+  ],
+  "anchors": [
+    ["TABLE_CANDIDATE", "Table 1", "Device summary", 0]
+  ],
+  "toc_decoys": [
+    ["SECTION_CANDIDATE", "2.3.8", "Boot modes . . . . . . . . . . 15", 1],
+    ["TABLE_CANDIDATE", "Table 1", "Device summary . . . . . . . . 1", 4]
+  ]
+}
