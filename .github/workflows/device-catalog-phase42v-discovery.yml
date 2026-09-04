@@ -33,4 +33,5 @@ jobs:
           PY
           cd /tmp/phase42v && sha256sum * > SHA256SUMS
       - uses: actions/upload-artifact@v4
+        if: always()
         with: {name: phase42v-h-batch2-discovery, path: /tmp/phase42v, if-no-files-found: error, retention-days: 30}
