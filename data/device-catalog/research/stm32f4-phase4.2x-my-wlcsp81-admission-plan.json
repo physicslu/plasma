@@ -1,0 +1,356 @@
+{
+  "candidate_count": 7,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "evidence_section_sha256": "a5ac45f13df1c5d780a5f90153dce7eab034f7f2a1950976da6d5ed43c18c64e",
+        "rendered_dom_sha256": "68a1d9003bfcd143faa3ebd9a528751ec619a2afc5c6665d988d3a81517b7336",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mg.html"
+      },
+      "base_device": "STM32F413MG",
+      "base_mapping": {
+        "existing_identifier": "STM32F413MGYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F413MGY6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F413MG",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F413MGYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1024 KiB",
+        "icpn": "STM32F413MGY6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "81",
+        "series": "STM32F413",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mg.html#plasma-evidence=stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "evidence_section_sha256": "6f8aa3271ec82981fe649d0b0f18c750862a48b7f77553c3bd5268b4a1e5b508",
+        "rendered_dom_sha256": "b8b0f2991a6905955d1298f82868f40605480cacfb179052cbfe1de21fcad1aa",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mh.html"
+      },
+      "base_device": "STM32F413MH",
+      "base_mapping": {
+        "existing_identifier": "STM32F413MHYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F413MHY6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F413MH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F413MHYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F413MHY6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "81",
+        "series": "STM32F413",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mh.html#plasma-evidence=stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "evidence_section_sha256": "f4fdbec3f583cb6a962010bb14e8b4b493490e404a13350ca781f39d55bf1f01",
+        "rendered_dom_sha256": "e5a569ff5f52f9e02ab0792e9ff894d534576425d0e58f5bfdf8b9b49f200e33",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html"
+      },
+      "base_device": "STM32F423MH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423MHYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423MHY3TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423MH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423MHYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423MHY3TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "81",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html#plasma-evidence=stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "evidence_section_sha256": "f4fdbec3f583cb6a962010bb14e8b4b493490e404a13350ca781f39d55bf1f01",
+        "rendered_dom_sha256": "e5a569ff5f52f9e02ab0792e9ff894d534576425d0e58f5bfdf8b9b49f200e33",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html"
+      },
+      "base_device": "STM32F423MH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423MHYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423MHY6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423MH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423MHYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423MHY6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "81",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html#plasma-evidence=stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "evidence_section_sha256": "834d624b870ddbbbaab76378326b5b5014a6f779f30a9aed23fc700e9b328962",
+        "rendered_dom_sha256": "6d251e7d44fb91b5aac837021371ad24e4701f8948882bf1cdf495eeb616deba",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446mc.html"
+      },
+      "base_device": "STM32F446MC",
+      "base_mapping": {
+        "existing_identifier": "STM32F446MCYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F446MCY6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F446MC",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F446MCYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F446MCY6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "81",
+        "series": "STM32F446",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446mc.html#plasma-evidence=stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "evidence_section_sha256": "3205a2cacf5cf43a9f456b27b9c69cb1be7c76e645930218665583cd8854dfbd",
+        "rendered_dom_sha256": "63dd68f6732d3f693690e80bb4ad4970122939c682d519605f6dd800d2d11786",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html"
+      },
+      "base_device": "STM32F446ME",
+      "base_mapping": {
+        "existing_identifier": "STM32F446MEYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F446MEY6MTR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F446ME",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F446MEYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F446MEY6MTR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "MTR",
+        "package": "WLCSP",
+        "pin_count": "81",
+        "series": "STM32F446",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html#plasma-evidence=stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "evidence_section_sha256": "3205a2cacf5cf43a9f456b27b9c69cb1be7c76e645930218665583cd8854dfbd",
+        "rendered_dom_sha256": "63dd68f6732d3f693690e80bb4ad4970122939c682d519605f6dd800d2d11786",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html"
+      },
+      "base_device": "STM32F446ME",
+      "base_mapping": {
+        "existing_identifier": "STM32F446MEYx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F446MEY6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F446ME",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F446MEYx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F446MEY6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "WLCSP",
+        "pin_count": "81",
+        "series": "STM32F446",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html#plasma-evidence=stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 331,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 7,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+  "family": "STM32F4",
+  "inputs": {
+    "admission_base_devices": [
+      "STM32F413MG",
+      "STM32F413MH",
+      "STM32F423MH",
+      "STM32F446MC",
+      "STM32F446ME"
+    ],
+    "baseline": "stm32f4-phase4.2x-my-wlcsp81-admission-baseline.json",
+    "baseline_sha256": "e1c262ea3f3232884e7a3faf086a99c1cab86d52c694d6faf0a83181a814a6de",
+    "canonical_dataset": "stm32f4-commercial-icpn.csv",
+    "canonical_input_sha256": "6e0395c77718a7257084705eda1697c6dc88aa5ee57c399a336c301f5944a7f3",
+    "family_adapter": "stm32f4-phase3.1",
+    "mapping_catalog": "openocd-parts-canonical.csv",
+    "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "retained_evidence_directory": "stm32f4-phase4.2x-my-wlcsp81-admission-live-2026-09-04"
+  },
+  "issues": [],
+  "pipeline_expected_candidate_count": 7,
+  "schema_version": 1,
+  "source_provenance": {
+    "evidence_manifest_sha256": "017d0b359bcc2ccac769bbd9228a8046751acbb6a2b5631ac38b34d94f32868a",
+    "executed_git_sha": "94f6bdfa0b2a30e97b21c39eaf9253777c744728",
+    "repository": "physicslu/plasma"
+  }
+}
