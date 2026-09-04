@@ -56,6 +56,14 @@ def commercial_core(icpn: str) -> str:
     # build_canonical_row() still retains P in option_suffix.
     if core.startswith("STM32F412") and core.endswith("P"):
         core = core[:-1]
+    # ST's live product page exposes STM32F423ZHJ6I as an Active exact
+    # commercial part, while the STM32F423xH ordering table and OpenOCD
+    # routing pattern stop at STM32F423ZHJ6 / STM32F423ZHJx. Treat the
+    # trailing I as a commercial option only for this exact part. The
+    # canonical row still retains I in option_suffix.
+    if core == "STM32F423ZHJ6I":
+        core = core[:-1]
+
     return core
 
 

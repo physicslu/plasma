@@ -1,0 +1,424 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 5,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 5,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 5,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 11,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 5,
+    "total": 5
+  },
+  "pilot_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b0268e5270c1fc5e865d7d3ee0b7a6477adf51532f5aaae5c756715357a93364",
+        "retrieved_at_utc": "2026-09-04T01:15:28Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production lifecycle control",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F423CH",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F423CHUx",
+          "icpn": "STM32F423CHU6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F423CH",
+        "evidence_section_sha256": "06b2c4a735ac9d7e9def9a45c090452e7dca9249be73bfd0bb4ef90110eeb5ce",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F423CHU6"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F423CHU3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423ch.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F423CHU3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423CHU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "652b1e25b8c6e7cea2bc35a420d2eaa25828ee2af8ad65fcef22d0508f3704ff",
+        "retrieved_at_utc": "2026-09-04T01:15:35Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423ch.html"
+      },
+      "selection_reason": "Phase 4.2R policy-ready H=1536 KiB batch2",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423ch.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F423RH",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F423RHTx",
+          "icpn": "STM32F423RHT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F423RHTx",
+          "icpn": "STM32F423RHT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F423RH",
+        "evidence_section_sha256": "f40e0922622380a454e480dd74b31d78f37fbb0c093e24260b949427511d684c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F423RHT6",
+          "STM32F423RHT6TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F423RHT3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423rh.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F423RHT3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423RHT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423RHT6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "bcd1b794e654a1363423b16fcf6a82728c59df31f55f5acf898cf13ee7fb2200",
+        "retrieved_at_utc": "2026-09-04T01:15:41Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423rh.html"
+      },
+      "selection_reason": "Phase 4.2R policy-ready H=1536 KiB batch2",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423rh.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F423VH",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F423VHHx",
+          "icpn": "STM32F423VHH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F423VHTx",
+          "icpn": "STM32F423VHT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F423VHTx",
+          "icpn": "STM32F423VHT6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F423VH",
+        "evidence_section_sha256": "ac6efbb252988471a1d329c839941242f35568d24c6935241b1327d25547fc79",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F423VHH6",
+          "STM32F423VHT6",
+          "STM32F423VHT6TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F423VHH3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "icpn": "STM32F423VHT3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F423VHH3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423VHH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": false,
+            "icpn": "STM32F423VHT3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423VHT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423VHT6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "4f52be84713e0e018cc32ae600c7987976c063fe2931cfe460916f6d41fbabb2",
+        "retrieved_at_utc": "2026-09-04T01:15:48Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html"
+      },
+      "selection_reason": "Phase 4.2R policy-ready H=1536 KiB batch2",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F423ZH",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F423ZHJx",
+          "icpn": "STM32F423ZHJ6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F423ZHJx",
+          "icpn": "STM32F423ZHJ6I",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F423ZHTx",
+          "icpn": "STM32F423ZHT3",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F423ZHTx",
+          "icpn": "STM32F423ZHT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 4,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F423ZH",
+        "evidence_section_sha256": "3f0047fa70ee51aa7618689c3da42d0dc32b28b79f6b0d6dd26597e86243a22f",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F423ZHJ6",
+          "STM32F423ZHJ6I",
+          "STM32F423ZHT3",
+          "STM32F423ZHT6"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F423ZHJ3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F423ZHJ3",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423ZHJ6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423ZHJ6I",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423ZHT3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423ZHT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "8a36874e5d3d840b6473d7456907c47ff4674832b5c44fb6f3a6652b83abbe7f",
+        "retrieved_at_utc": "2026-09-04T01:15:54Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html"
+      },
+      "selection_reason": "Phase 4.2R policy-ready H=1536 KiB batch2",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html"
+    }
+  ],
+  "schema_version": 1
+}
