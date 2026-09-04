@@ -523,7 +523,7 @@ The actual Z2 image must be inspected before selecting its persistent Linux back
 
 ## Validation environments
 
-SWPC/QEMU ARMv7 is the software qualification environment for packaged PPU runtime and Phase 2 transaction behavior. Z2 remains the hardware/network-image qualification environment.
+SWPC/QEMU ARMv7 is the software qualification environment for packaged PPU runtime and Phase 2 transaction behavior. The [Virtual PPU Network Lab](virtual-ppu-network-lab.md) adds the production Plasma Manager across a real isolated managed-IPv4 endpoint migration. Z2 remains the hardware/network-image qualification environment.
 
 The acceptance hierarchy is therefore:
 
@@ -532,6 +532,7 @@ unit / REST / security tests
 -> Manager commissioning unit/REST/Web contract tests
 -> packaged SWPC ARMv7 Phase 1 regression
 -> packaged SWPC ARMv7 Phase 2 isolated network mutation
+-> Virtual PPU + production Manager commissioning acceptance
 -> PYNQ-Z2 backend inspection and adapter
 -> Z2 native apply/reconnect/rollback acceptance
 -> native Z2 Manager-owned commissioning acceptance
