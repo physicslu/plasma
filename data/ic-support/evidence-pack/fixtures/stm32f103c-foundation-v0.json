@@ -1,0 +1,214 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "stm32f103c-evidence-pack-foundation-v0",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "catalogs": {
+    "datasheet": {
+      "artifact_type": "evidence_unit_catalog",
+      "schema_version": "0.1.0",
+      "catalog_id": "st-ds5319-rev20-units-v0",
+      "source_lock_id": "stm32f103c-source-lock-v0",
+      "source": {
+        "source_id": "st_ds5319_rev20",
+        "algorithm": "sha256",
+        "digest": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc"
+      },
+      "preprocessor": {
+        "name": "synthetic-fixture-metadata",
+        "version": "0.1.0"
+      },
+      "normalization_contract": "evidence-unit-normalization-v0",
+      "units": [
+        {
+          "unit_id": "ds5319-title",
+          "source_id": "st_ds5319_rev20",
+          "unit_type": "PAGE_FRAGMENT",
+          "pdf_page_index": 0,
+          "printed_page_label": "1",
+          "section_path": ["Title"],
+          "categories": ["DEVICE_IDENTITY"],
+          "classification": "MUST_INCLUDE",
+          "content_sha256": "b3937bbc34466f77d652e6422adfe7a59ffc7e75326c4f8d1e91f352ca4fbad2"
+        },
+        {
+          "unit_id": "ds5319-device-summary",
+          "source_id": "st_ds5319_rev20",
+          "unit_type": "TABLE",
+          "pdf_page_index": 0,
+          "printed_page_label": "1",
+          "section_path": ["Table 1. Device summary"],
+          "categories": ["ORDERING"],
+          "classification": "MUST_INCLUDE",
+          "content_sha256": "b9e19d5fb4f48f20f00275f2aa8df2c4e493d09f975096af4bf5e7e65ba1b8e1"
+        },
+        {
+          "unit_id": "ds5319-memory-map",
+          "source_id": "st_ds5319_rev20",
+          "unit_type": "SECTION",
+          "pdf_page_index": 33,
+          "printed_page_label": "34",
+          "section_path": ["Memory map"],
+          "categories": ["MEMORY_MAP"],
+          "classification": "MUST_INCLUDE",
+          "content_sha256": "0824225a0b1c6e15b5ce2ef176f38895ba5a6591712ec368af654f2fd02b2755"
+        },
+        {
+          "unit_id": "ds5319-debug",
+          "source_id": "st_ds5319_rev20",
+          "unit_type": "SECTION",
+          "pdf_page_index": 20,
+          "printed_page_label": "21",
+          "section_path": ["Debug mode"],
+          "categories": ["DEBUG"],
+          "classification": "MUST_INCLUDE",
+          "content_sha256": "5814f3ac960b2bbfe8df7c057dc877c4f687eb3750f5315b623ba775d9a19762"
+        },
+        {
+          "unit_id": "ds5319-debug-pin-table",
+          "source_id": "st_ds5319_rev20",
+          "unit_type": "TABLE",
+          "pdf_page_index": 21,
+          "printed_page_label": "22",
+          "section_path": ["Debug mode", "Referenced pin table"],
+          "categories": ["PERIPHERAL_FUNCTIONAL"],
+          "classification": "EXCLUDE",
+          "content_sha256": "1d4c979508309b411ff173ec9879c62f71234d8aa87ee893a78ed3f1ed5cdeda"
+        },
+        {
+          "unit_id": "ds5319-adc",
+          "source_id": "st_ds5319_rev20",
+          "unit_type": "SECTION",
+          "pdf_page_index": 70,
+          "printed_page_label": "71",
+          "section_path": ["ADC characteristics"],
+          "categories": ["PERIPHERAL_FUNCTIONAL"],
+          "classification": "EXCLUDE",
+          "content_sha256": "9958fa98b83dfecd8cfffe351bc2188c337b0d6074fe6fcac999033ce5429519"
+        },
+        {
+          "unit_id": "ds5319-unknown",
+          "source_id": "st_ds5319_rev20",
+          "unit_type": "PAGE_FRAGMENT",
+          "pdf_page_index": 80,
+          "printed_page_label": "81",
+          "section_path": ["Unclassified fragment"],
+          "categories": ["UNKNOWN"],
+          "classification": "UNKNOWN",
+          "content_sha256": "47dbda25b2e9527110671ecd0b9444192353687876b158d6b2d29d6cd2393c8a"
+        }
+      ],
+      "catalog_digest": "abc2f11fc2d99f5a74adb42e43dfb4715d5e54c4fbd4997dedf05b2ee83f8755"
+    },
+    "programming_manual": {
+      "artifact_type": "evidence_unit_catalog",
+      "schema_version": "0.1.0",
+      "catalog_id": "st-pm0075-rev2-units-v0",
+      "source_lock_id": "stm32f103c-source-lock-v0",
+      "source": {
+        "source_id": "st_pm0075_rev2",
+        "algorithm": "sha256",
+        "digest": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a"
+      },
+      "preprocessor": {
+        "name": "synthetic-fixture-metadata",
+        "version": "0.1.0"
+      },
+      "normalization_contract": "evidence-unit-normalization-v0",
+      "units": [
+        {
+          "unit_id": "pm0075-title",
+          "source_id": "st_pm0075_rev2",
+          "unit_type": "PAGE_FRAGMENT",
+          "pdf_page_index": 0,
+          "printed_page_label": "1",
+          "section_path": ["Title"],
+          "categories": ["DEVICE_IDENTITY"],
+          "classification": "MUST_INCLUDE",
+          "content_sha256": "1876738453edcddc446dc23919200c0e30b79cc2eb93cfd226fbea3f650f502d"
+        },
+        {
+          "unit_id": "pm0075-flash-org",
+          "source_id": "st_pm0075_rev2",
+          "unit_type": "SECTION",
+          "pdf_page_index": 4,
+          "printed_page_label": "5",
+          "section_path": ["Flash module organization"],
+          "categories": ["FLASH", "PROGRAMMING"],
+          "classification": "MUST_INCLUDE",
+          "content_sha256": "fafb9fecd61b1f1482ee59e8c7d0b1fc62bc4ac3c1487b6161f3eab293c27a5e"
+        },
+        {
+          "unit_id": "pm0075-unlock",
+          "source_id": "st_pm0075_rev2",
+          "unit_type": "SECTION",
+          "pdf_page_index": 6,
+          "printed_page_label": "7",
+          "section_path": ["Key values"],
+          "categories": ["PROGRAMMING"],
+          "classification": "MUST_INCLUDE",
+          "content_sha256": "bda8c5e0724f02cdbdc9098ba0969636ca67f5544b76df78c768910840085691"
+        },
+        {
+          "unit_id": "pm0075-security",
+          "source_id": "st_pm0075_rev2",
+          "unit_type": "SECTION",
+          "pdf_page_index": 15,
+          "printed_page_label": "16",
+          "section_path": ["Read protection"],
+          "categories": ["SECURITY"],
+          "classification": "MUST_INCLUDE",
+          "content_sha256": "2201e08ad60cdfc6d9fc74be3315a919bbb98fe4ac9555673dbf49b157f4b286"
+        }
+      ],
+      "catalog_digest": "9ea2d48c86b02e75bf0a37361e00b9a5e2ee7175b66277acb58b15e835969a68"
+    }
+  },
+  "dependency_edges": [
+    {
+      "from_unit_id": "ds5319-debug",
+      "to_unit_id": "ds5319-debug-pin-table",
+      "edge_type": "DOCUMENT_EXPLICIT"
+    },
+    {
+      "from_unit_id": "ds5319-adc",
+      "to_unit_id": "ds5319-debug-pin-table",
+      "edge_type": "AI_SUGGESTED"
+    }
+  ],
+  "applicability_binding": {
+    "artifact_type": "applicability_binding",
+    "schema_version": "0.1.0",
+    "binding_id": "stm32f103c-evidence-applicability-v0",
+    "claims": {
+      "ds-x8": {
+        "pack_id": "stm32f103c-datasheet-programming-v0",
+        "manufacturer_expression": "STM32F103x8",
+        "evidence_unit_ids": ["ds5319-title"]
+      },
+      "ds-xb": {
+        "pack_id": "stm32f103c-datasheet-programming-v0",
+        "manufacturer_expression": "STM32F103xB",
+        "evidence_unit_ids": ["ds5319-title"]
+      },
+      "pm-f10xxx": {
+        "pack_id": "stm32f10xxx-programming-manual-v0",
+        "manufacturer_expression": "STM32F10xxx",
+        "evidence_unit_ids": ["pm0075-title"]
+      }
+    },
+    "targets": [
+      {
+        "icpn": "STM32F103C8T6",
+        "pack_ids": ["stm32f103c-datasheet-programming-v0", "stm32f10xxx-programming-manual-v0"],
+        "applicability_claim_ids": ["ds-x8", "pm-f10xxx"]
+      },
+      {
+        "icpn": "STM32F103CBT6",
+        "pack_ids": ["stm32f103c-datasheet-programming-v0", "stm32f10xxx-programming-manual-v0"],
+        "applicability_claim_ids": ["ds-xb", "pm-f10xxx"]
+      }
+    ],
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  }
+}

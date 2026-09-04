@@ -63,6 +63,8 @@ jobs:
         run: git diff --check origin/main...HEAD
       - name: Validate IC Support pilot
         run: python data/ic-support/validate.py
+      - name: Validate IC Evidence Pack contract
+        run: python data/ic-support/evidence-pack/validate_contract.py
       - name: Validate STM32F103C source lock
         run: python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
       - name: Compare STM32F103C benchmark

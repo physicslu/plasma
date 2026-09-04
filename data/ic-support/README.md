@@ -35,6 +35,12 @@ data/ic-support/
 ├── evidence/
 │   ├── sources.json
 │   └── source_integrity.py
+├── evidence-pack/
+│   ├── schema/
+│   ├── fixtures/
+│   ├── contract.py
+│   ├── taxonomy-v0.json
+│   └── rules-v0.json
 ├── profiles/
 │   ├── programming/
 │   ├── memory-geometry/
@@ -47,6 +53,7 @@ data/ic-support/
     └── stm32f103c/
         ├── source-lock.json
         ├── extraction-contract.json
+        ├── evidence-pack-benchmark-v0.json
         ├── ground-truth.json
         └── generated/
 ```
@@ -55,16 +62,19 @@ Empty directories are not Git artifacts; `revision/` is a conceptual slot only u
 
 ## Evidence rule
 
-Every technical profile must cite evidence. Evidence has two distinct layers:
+Every technical profile must cite evidence. Evidence now has three separate responsibilities:
 
-1. `evidence/sources.json` is the source catalog: document identity, revision, authority and retrieval location.
+1. `evidence/sources.json` is the logical source catalog: document identity, revision, authority and retrieval location.
 2. `benchmarks/stm32f103c/source-lock.json` is the immutable benchmark lock: exact source IDs plus content digests/byte lengths used to establish the answer key.
+3. `evidence-pack/` defines deterministic evidence-processing artifacts between a source lock and AI extraction: Evidence Unit Catalog, Evidence Pack, evidence-backed Applicability Binding and per-target Evidence Bundle.
+
+Evidence Packs do not replace source locks and do not grant IC Support or production admission. A document may be shared by many ICPNs; the pack is therefore document/purpose scoped and reusable rather than duplicated per part number. Exact ICPNs resolve packs through evidence-backed applicability claims.
 
 For the STM32F103C benchmark, ST `DS5319 Rev 20` and `PM0075 Rev 2` are SHA-256 pinned from bytes downloaded from official ST URLs. The retained Plasma STM32F1 commercial catalog is pinned by exact Git blob SHA.
 
-The external PDFs are not redistributed in Git. Reproducibility is provided by the source lock plus `source_integrity.py verify`, which downloads the official URLs and fails if the bytes no longer match the lock.
+The external PDFs are not redistributed in Git. Reproducibility is provided by the source lock plus `source_integrity.py verify`, which downloads the official URLs and fails if the bytes no longer match the lock. Evidence Pack contracts retain metadata, recipes and digests rather than redistributing large manufacturer text.
 
-No missing technical field may be filled by family-name inference. `pending_evidence` is valid; invented detail is not.
+No missing technical field may be filled by family-name inference. `pending_evidence` is valid; invented detail is not. Evidence Pack applicability follows the same rule: manufacturer scope expressions must have included evidence and an unbound exact ICPN fails closed.
 
 ## Benchmark isolation
 
@@ -76,12 +86,15 @@ A real Harness/AI benchmark run must be isolated from the answer key. `benchmark
 
 The candidate must report the exact source digests it consumed. A result generated from a different source revision or after reading the answer key is not a valid benchmark sample.
 
+The manufacturer-only Evidence Pack A/B experiment is deliberately separate from the formal blind benchmark. `evidence-pack-benchmark-v0.json` compares full DS5319 + full PM0075 against deterministic DS5319 Evidence Pack + full PM0075 while keeping the existing formal source lock unchanged.
+
 ## Validation
 
 Run the deterministic/offline checks from the repository root:
 
 ```bash
 python data/ic-support/validate.py
+python data/ic-support/evidence-pack/validate_contract.py
 python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
 python data/ic-support/compare_benchmark.py
 python data/ic-support/test_ic_support.py
@@ -89,6 +102,8 @@ python data/ic-support/benchmarks/stm32f103c/test_extraction_contract.py
 ```
 
 `validate.py` cross-checks each pilot ICPN against the existing STM32F1 commercial catalog, resolves every profile reference, validates evidence references, verifies geometry arithmetic, and enforces the intended C8/CB reuse boundary.
+
+`evidence-pack/validate_contract.py` validates the deterministic Evidence Pack foundation: exact source-lock fingerprint binding, reproducibility identities, mandatory/unknown fail-closed behavior, dependency closure, AI add-only enrichment, many-to-many pack reuse, applicability evidence and denial of canonical/production admission.
 
 `validate_source_lock.py` proves that the answer key, extraction contract and locked evidence set agree and that the retained catalog Git blob has not drifted.
 
@@ -104,7 +119,9 @@ The corresponding GitHub workflow is manual so an external ST outage cannot make
 
 ## Explicit non-goals
 
-- no runtime `ResolvedICSupport` implementation yet;
+- no PDF section classifier or generic RAG implementation in the Evidence Pack foundation;
+- no AI authority to delete deterministic evidence;
+- no runtime `ResolvedICSupport` change from this foundation;
 - no changes to `SiteManager`, Handler or OpenOCD execution;
 - no PMode/EMode behavior change;
 - no claim that Mock/CI means real IC support;

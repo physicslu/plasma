@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/evidence-pack-v0",
+  "title": "Plasma IC Evidence Pack v0",
+  "description": "Evidence-governance artifacts between immutable source locks and AI-assisted IC knowledge extraction. These artifacts never grant canonical or production admission.",
+  "oneOf": [
+    {"$ref": "#/$defs/evidence_unit_catalog"},
+    {"$ref": "#/$defs/evidence_pack"},
+    {"$ref": "#/$defs/applicability_binding"},
+    {"$ref": "#/$defs/target_evidence_bundle"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "algorithm", "digest"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "algorithm": {"enum": ["sha256", "git_blob_sha1"]},
+        "digest": {"type": "string", "minLength": 1}
+      }
+    },
+    "tool_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "evidence_unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_id", "source_id", "unit_type", "pdf_page_index", "section_path", "categories", "classification", "content_sha256"],
+      "properties": {
+        "unit_id": {"type": "string", "minLength": 1},
+        "source_id": {"type": "string", "minLength": 1},
+        "unit_type": {"enum": ["SECTION", "TABLE", "FIGURE", "PAGE_FRAGMENT"]},
+        "pdf_page_index": {"type": "integer", "minimum": 0},
+        "printed_page_label": {"type": ["string", "null"]},
+        "section_path": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "categories": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "classification": {"enum": ["MUST_INCLUDE", "OPTIONAL", "EXCLUDE", "UNKNOWN"]},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "evidence_unit_catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "schema_version", "catalog_id", "source_lock_id", "source", "preprocessor", "normalization_contract", "units", "catalog_digest"],
+      "properties": {
+        "artifact_type": {"const": "evidence_unit_catalog"},
+        "schema_version": {"const": "0.1.0"},
+        "catalog_id": {"type": "string", "minLength": 1},
+        "source_lock_id": {"type": "string", "minLength": 1},
+        "source": {"$ref": "#/$defs/source_fingerprint"},
+        "preprocessor": {"$ref": "#/$defs/tool_fingerprint"},
+        "normalization_contract": {"type": "string", "minLength": 1},
+        "units": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence_unit"}},
+        "catalog_digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "included_unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_id", "inclusion_reasons", "origin"],
+      "properties": {
+        "unit_id": {"type": "string", "minLength": 1},
+        "inclusion_reasons": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "origin": {"enum": ["DETERMINISTIC", "AI_SUPPLEMENTAL"]}
+      }
+    },
+    "dependency_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_unit_id", "to_unit_id", "edge_type"],
+      "properties": {
+        "from_unit_id": {"type": "string", "minLength": 1},
+        "to_unit_id": {"type": "string", "minLength": 1},
+        "edge_type": {"enum": ["DOCUMENT_EXPLICIT", "DETERMINISTIC_RULE", "AI_SUGGESTED"]}
+      }
+    },
+    "evidence_pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "schema_version", "pack_id", "purpose", "source_lock_id", "catalog_ids", "catalog_digests", "builder", "taxonomy_digest", "rules_digest", "included_units", "dependency_edges", "pack_digest", "canonical_dataset_admission", "production_admission"],
+      "properties": {
+        "artifact_type": {"const": "evidence_pack"},
+        "schema_version": {"const": "0.1.0"},
+        "pack_id": {"type": "string", "minLength": 1},
+        "purpose": {"type": "string", "minLength": 1},
+        "source_lock_id": {"type": "string", "minLength": 1},
+        "catalog_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "catalog_digests": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/sha256"}},
+        "builder": {"$ref": "#/$defs/tool_fingerprint"},
+        "taxonomy_digest": {"$ref": "#/$defs/sha256"},
+        "rules_digest": {"$ref": "#/$defs/sha256"},
+        "included_units": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/included_unit"}},
+        "dependency_edges": {"type": "array", "items": {"$ref": "#/$defs/dependency_edge"}},
+        "pack_digest": {"$ref": "#/$defs/sha256"},
+        "canonical_dataset_admission": {"const": false},
+        "production_admission": {"const": false}
+      }
+    },
+    "applicability_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack_id", "manufacturer_expression", "evidence_unit_ids"],
+      "properties": {
+        "pack_id": {"type": "string", "minLength": 1},
+        "manufacturer_expression": {"type": "string", "minLength": 1},
+        "evidence_unit_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "target_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["icpn", "pack_ids", "applicability_claim_ids"],
+      "properties": {
+        "icpn": {"type": "string", "minLength": 1},
+        "pack_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "applicability_claim_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "applicability_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "schema_version", "binding_id", "claims", "targets", "canonical_dataset_admission", "production_admission"],
+      "properties": {
+        "artifact_type": {"const": "applicability_binding"},
+        "schema_version": {"const": "0.1.0"},
+        "binding_id": {"type": "string", "minLength": 1},
+        "claims": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/applicability_claim"}},
+        "targets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/target_binding"}},
+        "canonical_dataset_admission": {"const": false},
+        "production_admission": {"const": false}
+      }
+    },
+    "target_evidence_bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "schema_version", "bundle_id", "target_icpn", "source_lock_id", "pack_digests", "bundle_digest", "canonical_dataset_admission", "production_admission"],
+      "properties": {
+        "artifact_type": {"const": "target_evidence_bundle"},
+        "schema_version": {"const": "0.1.0"},
+        "bundle_id": {"type": "string", "minLength": 1},
+        "target_icpn": {"type": "string", "minLength": 1},
+        "source_lock_id": {"type": "string", "minLength": 1},
+        "pack_digests": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/sha256"}},
+        "bundle_digest": {"$ref": "#/$defs/sha256"},
+        "canonical_dataset_admission": {"const": false},
+        "production_admission": {"const": false}
+      }
+    }
+  }
+}
