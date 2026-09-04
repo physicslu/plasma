@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getManagerPpuSites,
   saveManagerPpuSite,
@@ -36,21 +36,27 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
   const [payload, setPayload] = useState<PPUSiteConfigurationPayload | null>(null);
   const [drafts, setDrafts] = useState<Record<number, PPUSiteDesired>>({});
   const [dirty, setDirty] = useState<Set<number>>(new Set());
+  const dirtyRef = useRef<Set<number>>(new Set());
   const [savingSite, setSavingSite] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const replaceDirty = useCallback((next: Set<number>) => {
+    dirtyRef.current = next;
+    setDirty(next);
+  }, []);
 
   const applyPayload = useCallback((next: PPUSiteConfigurationPayload) => {
     setPayload(next);
     setDrafts(current => {
       const merged = { ...current };
       for (const site of next.site_configuration.sites) {
-        if (!dirty.has(site.site_id)) merged[site.site_id] = { ...site.desired };
+        if (!dirtyRef.current.has(site.site_id)) merged[site.site_id] = { ...site.desired };
       }
       return merged;
     });
-  }, [dirty]);
+  }, []);
 
   const refresh = useCallback(async (quiet = false) => {
     if (!alias) return;
@@ -68,7 +74,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
   useEffect(() => {
     setPayload(null);
     setDrafts({});
-    setDirty(new Set());
+    replaceDirty(new Set());
     setNotice(null);
     setError(null);
     if (!alias) return;
@@ -78,7 +84,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
-  }, [alias, refresh]);
+  }, [alias, refresh, replaceDirty]);
 
   const writeBlockReason = useMemo(() => {
     if (entry.lifecycle !== "commissioned") return "Validate & Enable this PPU before changing Site desired configuration.";
@@ -86,12 +92,24 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
     return null;
   }, [entry.lifecycle, hasActiveExecution]);
 
+  function markDirty(siteId: number) {
+    const next = new Set(dirtyRef.current);
+    next.add(siteId);
+    replaceDirty(next);
+  }
+
+  function clearDirty(siteId: number) {
+    const next = new Set(dirtyRef.current);
+    next.delete(siteId);
+    replaceDirty(next);
+  }
+
   function updateDraft(siteId: number, patch: Partial<PPUSiteDesired>) {
     const baseline = drafts[siteId]
       ?? payload?.site_configuration.sites.find(site => site.site_id === siteId)?.desired;
     if (!baseline) return;
     setDrafts(current => ({ ...current, [siteId]: { ...baseline, ...patch } }));
-    setDirty(current => new Set(current).add(siteId));
+    markDirty(siteId);
     setNotice(null);
   }
 
@@ -99,11 +117,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
     const desired = payload?.site_configuration.sites.find(site => site.site_id === siteId)?.desired;
     if (!desired) return;
     setDrafts(current => ({ ...current, [siteId]: { ...desired } }));
-    setDirty(current => {
-      const next = new Set(current);
-      next.delete(siteId);
-      return next;
-    });
+    clearDirty(siteId);
   }
 
   async function saveSite(siteId: number) {
@@ -115,11 +129,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
     setNotice(null);
     try {
       const next = await saveManagerPpuSite(alias, siteId, desired);
-      setDirty(current => {
-        const updated = new Set(current);
-        updated.delete(siteId);
-        return updated;
-      });
+      clearDirty(siteId);
       setPayload(next);
       setDrafts(current => {
         const updated = { ...current };
