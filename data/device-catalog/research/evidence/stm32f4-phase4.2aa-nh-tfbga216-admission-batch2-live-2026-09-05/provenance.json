@@ -1,0 +1,28 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_time_utc": {
+    "control": "2026-09-04T16:44:37Z",
+    "pilot_first": "2026-09-04T16:44:41Z",
+    "pilot_last": "2026-09-04T16:46:30Z"
+  },
+  "acquisition_transport": "chromium_rendered_dom",
+  "baseline": {
+    "pilot_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05",
+    "schema_version": 1,
+    "sha256": "e6a33e40cd4883052c56a8527510d5325f891d116f1f35187137d9ea8de6e414"
+  },
+  "canonical_dataset_admission": false,
+  "chromium_version": "151.0.7922.34",
+  "evaluator_result": "scale_ready",
+  "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+  "exact_icpn_candidate_count": 8,
+  "executed_git_sha": "a465a62c1330ad983c7a74ad07e31c08aeac3d1e",
+  "headed": true,
+  "manufacturer": "STMicroelectronics",
+  "playwright_version": "1.62.0",
+  "scale_ready": true,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 6
+}

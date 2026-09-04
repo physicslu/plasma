@@ -1,0 +1,361 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 6,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 6,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 8,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 6,
+    "total": 6
+  },
+  "pilot_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "35463071c68791c325da90cab24084fc46a42498065c1edd507b800ee6868077",
+        "retrieved_at_utc": "2026-09-04T16:44:41Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production lifecycle control",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469NE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469NEHx",
+          "icpn": "STM32F469NEH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469NE",
+        "evidence_section_sha256": "b04425e15897ae7b1ae7b6a0cf0d9162a567747fd94ca0e1e91e7703a5bb268b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469NEH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ne.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469NEH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5df457ba552982f035f2f5067e53d2bf30a8dca923d3ad34d3603eff112f003a",
+        "retrieved_at_utc": "2026-09-04T16:44:46Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ne.html"
+      },
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ne.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469NG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469NGHx",
+          "icpn": "STM32F469NGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469NG",
+        "evidence_section_sha256": "3be37625d6ac765acea586126be69fae62a1d76d89177e5fde7cdb84f5047f5a",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469NGH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ng.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469NGH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "50f6cec9daf7ac4399ec1a711ced87346c55f6873b70aa502125acd67b109d5a",
+        "retrieved_at_utc": "2026-09-04T16:46:09Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ng.html"
+      },
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ng.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469NI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469NIHx",
+          "icpn": "STM32F469NIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F469NIHx",
+          "icpn": "STM32F469NIH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F469NIHx",
+          "icpn": "STM32F469NIH7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469NI",
+        "evidence_section_sha256": "43a9fe746dd02c247bde221276d50c79c050189ab5a211b77aa614bae11f4968",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469NIH6",
+          "STM32F469NIH6TR",
+          "STM32F469NIH7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469NIH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F469NIH6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F469NIH7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "cb7576d62c42d79367a28fad721a1eb8b721c18019dac54a28abe5734f6662ea",
+        "retrieved_at_utc": "2026-09-04T16:46:19Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html"
+      },
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479NG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479NGHx",
+          "icpn": "STM32F479NGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479NG",
+        "evidence_section_sha256": "ff9f9c6ce51486ad05782dac6dc19c962015c08efc31f4292f24e07698208e2b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479NGH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ng.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479NGH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "1401b3dfe64874da89716b3648234725763111608936641080ea2bcc72be2b47",
+        "retrieved_at_utc": "2026-09-04T16:46:25Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ng.html"
+      },
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ng.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479NI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479NIHx",
+          "icpn": "STM32F479NIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479NI",
+        "evidence_section_sha256": "d2747721b36dbdc44db6d5c72ecaff737a2c43ef43d71a3a2d7a112cb2810c80",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479NIH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ni.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479NIH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "98f737216007defb1c70500bc9f73abb202616d4f0fbe95c94644d99c0d8e624",
+        "retrieved_at_utc": "2026-09-04T16:46:30Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ni.html"
+      },
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ni.html"
+    }
+  ],
+  "schema_version": 1
+}
