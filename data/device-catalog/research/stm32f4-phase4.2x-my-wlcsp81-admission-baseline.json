@@ -1,0 +1,37 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F413MG",
+      "icpn": "STM32F413MGY3TR",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "base_device": "STM32F413MH",
+      "icpn": "STM32F413MHY3TR",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "pilot_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9930527912",
+    "artifact_sha256": "9f2bf3e49fee69d90d2c172c7142ebd4f15bb5617bec431f930449f01bc1c294",
+    "source_commit": "8e3fa682d1e54fadabfc44d6e8d653004340b7a7",
+    "workflow_run_id": "33855548359"
+  },
+  "targets": [
+    {"base_device": "STM32F479ZG", "exact_icpns": ["STM32F479ZGT6"]},
+    {"base_device": "STM32F413MG", "exact_icpns": ["STM32F413MGY6TR"]},
+    {"base_device": "STM32F413MH", "exact_icpns": ["STM32F413MHY6TR"]},
+    {
+      "base_device": "STM32F423MH",
+      "exact_icpns": ["STM32F423MHY3TR", "STM32F423MHY6TR"]
+    },
+    {"base_device": "STM32F446MC", "exact_icpns": ["STM32F446MCY6TR"]},
+    {
+      "base_device": "STM32F446ME",
+      "exact_icpns": ["STM32F446MEY6MTR", "STM32F446MEY6TR"]
+    }
+  ]
+}
