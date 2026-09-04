@@ -33,6 +33,24 @@ def test_precommit_recovery_retry_is_blocked_by_recovery_required_itself() -> No
     assert source.index('activation = _wait_activation(') < source.index('"fault-crash-before-commit-retry"')
 
 
+def test_fault_lab_repairs_disposable_container_owned_workspace_without_sudo() -> None:
+    source = _text("scripts/static-ipv4-fault-injection-lab.py")
+    assert "_make_stale_work_host_removable" in source
+    assert '"--network", "none"' in source
+    assert '"--cap-drop", "ALL"' in source
+    assert '"no-new-privileges:true"' in source
+    assert "sudo" not in source
+    assert source.index("phase2._docker_preflight()") < source.index("_make_stale_work_host_removable(phase2, root)")
+    assert source.index("_make_stale_work_host_removable(phase2, root)") < source.index("shutil.rmtree(root)")
+
+
+def test_fault_lab_streams_scenario_progress() -> None:
+    source = _text("scripts/static-ipv4-fault-injection-lab.py")
+    assert 'print(f"[RUN ] {index}/{total} {label}", flush=True)' in source
+    assert 'print(f"[PASS] {index}/{total} {label} ({elapsed:.1f}s)", flush=True)' in source
+    assert 'print(f"[FAIL] {index}/{total} {label} ({elapsed:.1f}s)", flush=True)' in source
+
+
 def test_crash_injector_crashes_only_after_real_durable_put() -> None:
     source = _text("scripts/manager-network-commissioning-crash-injector.py")
     assert 'choices=("identity_verified", "activation_committed")' in source
