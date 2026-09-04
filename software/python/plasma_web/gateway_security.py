@@ -42,6 +42,7 @@ class Permission(StrEnum):
     ENGINEERING_SESSION_WRITE = "engineering.session.write"
     GATEWAY_SETTINGS_WRITE = "settings.gateway.write"
     PPU_NETWORK_SETTINGS_WRITE = "settings.ppu_network.write"
+    SITE_SETTINGS_WRITE = "settings.site.write"
     MOCK_SETTINGS_WRITE = "settings.mock.write"
 
 
@@ -68,7 +69,12 @@ OPERATOR_PERMISSIONS = VIEWER_PERMISSIONS | frozenset(
         Permission.JOB_OUTPUT_READ,
     }
 )
-ENGINEER_PERMISSIONS = OPERATOR_PERMISSIONS | frozenset({Permission.MOCK_SETTINGS_WRITE})
+ENGINEER_PERMISSIONS = OPERATOR_PERMISSIONS | frozenset(
+    {
+        Permission.MOCK_SETTINGS_WRITE,
+        Permission.SITE_SETTINGS_WRITE,
+    }
+)
 ADMIN_PERMISSIONS = ENGINEER_PERMISSIONS | frozenset(
     {
         Permission.GATEWAY_SETTINGS_WRITE,
