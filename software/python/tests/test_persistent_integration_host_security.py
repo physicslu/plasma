@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[3]
+CHECKOUT_SHA = "11d5960a326750d5838078e36cf38b85af677262"
+UPLOAD_ARTIFACT_SHA = "ea165f8d65b6e75b540449e92b4886f43607fa02"
 
 
 def _text(path: str) -> str:
@@ -22,20 +24,18 @@ def test_persistent_workflow_rejects_non_main_before_self_hosted_execution() -> 
     assert 'test "$GITHUB_REF" = "refs/heads/main"' in guard
 
     persistent = workflow.split("persistent-acceptance:", 1)[1]
+    checkout = f"actions/checkout@{CHECKOUT_SHA}"
     assert "needs: main-dispatch-guard" in persistent
     assert "github.event_name == 'workflow_dispatch'" in persistent
     assert "github.repository == 'physicslu/plasma'" in persistent
     assert "github.ref == 'refs/heads/main'" in persistent
     assert "runs-on: [self-hosted, linux, x64, plasma-integration]" in persistent
     assert 'test "$(id -u)" -ne 0' in persistent
-    assert persistent.index("Assert trusted event identity before checkout") < persistent.index(
-        "actions/checkout@v4"
-    )
+    assert persistent.index("Assert trusted event identity before checkout") < persistent.index(checkout)
+    assert "actions/checkout@v4" not in persistent
     assert "ref: ${{ github.sha }}" in persistent
     assert "persist-credentials: false" in persistent
-    assert persistent.index("actions/checkout@v4") < persistent.index(
-        "Run fail-closed persistent-host preflight"
-    )
+    assert persistent.index(checkout) < persistent.index("Run fail-closed persistent-host preflight")
     assert persistent.index("Run fail-closed persistent-host preflight") < persistent.index(
         "Set up repository validation dependencies"
     )
@@ -43,6 +43,7 @@ def test_persistent_workflow_rejects_non_main_before_self_hosted_execution() -> 
 
 def test_persistent_preflight_is_fail_closed_and_does_not_install_host_privilege() -> None:
     source = _text("scripts/persistent-integration-host-preflight.py")
+    compile(source, "scripts/persistent-integration-host-preflight.py", "exec")
     for token in (
         'EXPECTED_EVENT = "workflow_dispatch"',
         'EXPECTED_REF = "refs/heads/main"',
@@ -86,6 +87,8 @@ def test_persistent_workflow_retains_exact_identity_and_preflight_evidence() -> 
     assert "plasma-persistent-environment-fingerprint.json" in workflow
     assert "plasma-static-ipv4-persistent-repeatability.json" in workflow
     assert "name: plasma-persistent-integration-${{ github.sha }}" in workflow
+    assert f"actions/upload-artifact@{UPLOAD_ARTIFACT_SHA}" in workflow
+    assert "actions/upload-artifact@v4" not in workflow
     evidence = workflow.split("- name: Upload persistent-host acceptance reports", 1)[1]
     assert "if: always()" in evidence
     assert "if-no-files-found: warn" in evidence
@@ -110,6 +113,7 @@ def test_persistent_host_security_document_keeps_l4_claim_bounded() -> None:
         "workflow_dispatch",
         "post-merge qualification",
         "not a required PR gate",
+        "immutable commit SHA",
         "ephemeral",
         "pull_request_target",
         "PYNQ-Z2",
