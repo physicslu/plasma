@@ -1,0 +1,490 @@
+{
+  "candidate_count": 10,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "06b2c4a735ac9d7e9def9a45c090452e7dca9249be73bfd0bb4ef90110eeb5ce",
+        "rendered_dom_sha256": "652b1e25b8c6e7cea2bc35a420d2eaa25828ee2af8ad65fcef22d0508f3704ff",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423ch.html"
+      },
+      "base_device": "STM32F423CH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423CHUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423CHU6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423CH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423CHUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423CHU6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423ch.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "f40e0922622380a454e480dd74b31d78f37fbb0c093e24260b949427511d684c",
+        "rendered_dom_sha256": "bcd1b794e654a1363423b16fcf6a82728c59df31f55f5acf898cf13ee7fb2200",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423rh.html"
+      },
+      "base_device": "STM32F423RH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423RHTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423RHT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423RH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423RHTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423RHT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423rh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "f40e0922622380a454e480dd74b31d78f37fbb0c093e24260b949427511d684c",
+        "rendered_dom_sha256": "bcd1b794e654a1363423b16fcf6a82728c59df31f55f5acf898cf13ee7fb2200",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423rh.html"
+      },
+      "base_device": "STM32F423RH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423RHTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423RHT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423RH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423RHTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423RHT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423rh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "ac6efbb252988471a1d329c839941242f35568d24c6935241b1327d25547fc79",
+        "rendered_dom_sha256": "4f52be84713e0e018cc32ae600c7987976c063fe2931cfe460916f6d41fbabb2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html"
+      },
+      "base_device": "STM32F423VH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423VHHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423VHH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423VH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423VHHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423VHH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "100",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "ac6efbb252988471a1d329c839941242f35568d24c6935241b1327d25547fc79",
+        "rendered_dom_sha256": "4f52be84713e0e018cc32ae600c7987976c063fe2931cfe460916f6d41fbabb2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html"
+      },
+      "base_device": "STM32F423VH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423VHTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423VHT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423VH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423VHTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423VHT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "100",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "ac6efbb252988471a1d329c839941242f35568d24c6935241b1327d25547fc79",
+        "rendered_dom_sha256": "4f52be84713e0e018cc32ae600c7987976c063fe2931cfe460916f6d41fbabb2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html"
+      },
+      "base_device": "STM32F423VH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423VHTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423VHT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423VH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423VHTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423VHT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "100",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423vh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "3f0047fa70ee51aa7618689c3da42d0dc32b28b79f6b0d6dd26597e86243a22f",
+        "rendered_dom_sha256": "8a36874e5d3d840b6473d7456907c47ff4674832b5c44fb6f3a6652b83abbe7f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html"
+      },
+      "base_device": "STM32F423ZH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423ZHJx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423ZHJ6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423ZH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423ZHJx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423ZHJ6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "144",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "3f0047fa70ee51aa7618689c3da42d0dc32b28b79f6b0d6dd26597e86243a22f",
+        "rendered_dom_sha256": "8a36874e5d3d840b6473d7456907c47ff4674832b5c44fb6f3a6652b83abbe7f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html"
+      },
+      "base_device": "STM32F423ZH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423ZHJx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423ZHJ6I",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423ZH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423ZHJx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423ZHJ6I",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "I",
+        "package": "UFBGA",
+        "pin_count": "144",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "3f0047fa70ee51aa7618689c3da42d0dc32b28b79f6b0d6dd26597e86243a22f",
+        "rendered_dom_sha256": "8a36874e5d3d840b6473d7456907c47ff4674832b5c44fb6f3a6652b83abbe7f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html"
+      },
+      "base_device": "STM32F423ZH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423ZHTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423ZHT3",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423ZH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423ZHTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423ZHT3",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "144",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "evidence_section_sha256": "3f0047fa70ee51aa7618689c3da42d0dc32b28b79f6b0d6dd26597e86243a22f",
+        "rendered_dom_sha256": "8a36874e5d3d840b6473d7456907c47ff4674832b5c44fb6f3a6652b83abbe7f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html"
+      },
+      "base_device": "STM32F423ZH",
+      "base_mapping": {
+        "existing_identifier": "STM32F423ZHTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F423ZHT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F423ZH",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F423ZHTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1536 KiB",
+        "icpn": "STM32F423ZHT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "144",
+        "series": "STM32F423",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423zh.html#plasma-evidence=stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 321,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 10,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54",
+  "family": "STM32F4",
+  "inputs": {
+    "admission_base_devices": [
+      "STM32F423CH",
+      "STM32F423RH",
+      "STM32F423VH",
+      "STM32F423ZH"
+    ],
+    "baseline": "stm32f4-phase4.2v-h-admission-batch2-baseline.json",
+    "baseline_sha256": "4df4c1084dc9d2741d66c042980aa18d05ae59033937d294f72764d154993742",
+    "canonical_dataset": "stm32f4-commercial-icpn.csv",
+    "canonical_input_sha256": "2993f5f9928c604e52f2947736b8f1e2af059cdb82787c4790f72c47cceaafbf",
+    "family_adapter": "stm32f4-phase3.1",
+    "mapping_catalog": "openocd-parts-canonical.csv",
+    "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "retained_evidence_directory": "stm32f4-phase4.2v-h-admission-batch2-live-2026-09-03"
+  },
+  "issues": [],
+  "pipeline_expected_candidate_count": 10,
+  "schema_version": 1,
+  "source_provenance": {
+    "evidence_manifest_sha256": "f9cca8c10f6026f6310224bda6f7c19ced2c6c3593b28087084d7c144d8a3ed9",
+    "executed_git_sha": "cd38d548c0fa84d57277c42282543419f61aee72",
+    "repository": "physicslu/plasma"
+  }
+}
