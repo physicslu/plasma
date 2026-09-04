@@ -71,6 +71,26 @@ class DocumentPreprocessingTest(unittest.TestCase):
         self.assertEqual(page_units[-1]["pdf_page_start"], 2)
         self.assertIsNone(page_units[-1]["heading"])
 
+    def test_numbered_sections_get_deterministic_hierarchy_page_spans(self):
+        manifest = self.build(self.fixture["extracted_text_lf"])
+        sections = [unit for unit in manifest["structural_units"] if unit["type"] == "SECTION_CANDIDATE"]
+        by_label = {unit["label"]: unit for unit in sections}
+        self.assertEqual(by_label["1"]["section_level"], 1)
+        self.assertEqual(by_label["1"]["pdf_page_start"], 0)
+        self.assertEqual(by_label["1"]["pdf_page_end"], 1)
+        self.assertEqual(by_label["2"]["section_level"], 1)
+        self.assertEqual(by_label["2"]["pdf_page_start"], 1)
+        self.assertEqual(by_label["2"]["pdf_page_end"], 2)
+
+    def test_nested_section_closes_at_next_same_or_higher_level(self):
+        text = "1 Parent\n\f1.1 Child\n\f1.1.1 Leaf\n\f2 Next top\n"
+        manifest = self.build(text)
+        sections = {unit["label"]: unit for unit in manifest["structural_units"] if unit["type"] == "SECTION_CANDIDATE"}
+        self.assertEqual(sections["1"]["pdf_page_end"], 3)
+        self.assertEqual(sections["1.1"]["pdf_page_end"], 3)
+        self.assertEqual(sections["1.1.1"]["pdf_page_end"], 3)
+        self.assertEqual(sections["2"]["pdf_page_end"], 3)
+
     def test_heading_and_table_detection_are_candidates_only(self):
         manifest = self.build(self.fixture["extracted_text_lf"])
         types = {unit["type"] for unit in manifest["structural_units"]}
@@ -141,6 +161,14 @@ class DocumentPreprocessingTest(unittest.TestCase):
         duplicate = copy.deepcopy(next(unit for unit in manifest["structural_units"] if unit["type"] == "PAGE"))
         duplicate["unit_id"] = "duplicate-page-unit"
         manifest["structural_units"].append(duplicate)
+        manifest["manifest_digest"] = manifest_digest(manifest)
+        with self.assertRaises(PreprocessingError):
+            validate_manifest(manifest, source_lock=self.source_lock, normalization=self.normalization)
+
+    def test_validator_rejects_section_without_hierarchy_level(self):
+        manifest = self.build(self.fixture["extracted_text_lf"])
+        section = next(unit for unit in manifest["structural_units"] if unit["type"] == "SECTION_CANDIDATE")
+        section.pop("section_level")
         manifest["manifest_digest"] = manifest_digest(manifest)
         with self.assertRaises(PreprocessingError):
             validate_manifest(manifest, source_lock=self.source_lock, normalization=self.normalization)
