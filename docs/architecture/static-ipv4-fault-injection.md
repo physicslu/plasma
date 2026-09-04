@@ -337,7 +337,9 @@ A GitHub-hosted PASS still does **not** qualify a persistent integration host. E
 
 ## Persistent integration-host acceptance
 
-`.github/workflows/persistent-integration-host.yml` defines the dedicated persistent-host path. It is intentionally `workflow_dispatch` only and requires a pre-enrolled self-hosted runner with labels:
+`.github/workflows/persistent-integration-host.yml` defines the dedicated persistent-host path. The security and enrollment contract is defined in [Persistent Integration Host Qualification](persistent-integration-host-qualification.md).
+
+It is intentionally `workflow_dispatch` only, main-only, and requires a pre-enrolled self-hosted runner with labels:
 
 ```text
 self-hosted
@@ -348,17 +350,20 @@ plasma-integration
 
 The workflow:
 
+- rejects non-main dispatch before scheduling work onto the self-hosted runner;
+- pins checkout and packaged evidence to the exact dispatch SHA;
 - requires the host runner user to be non-root;
+- runs a fail-closed host preflight, including rootful-Docker, persistent-root, ARMv7/QEMU, and host-network evidence;
 - captures the exact Git SHA, uid/gid, kernel, Docker server/security options, Node/Python versions, OS release, and default-route signature;
 - runs canonical source/configuration validation;
 - verifies ARMv7 execution is already provisioned rather than mutating host binfmt configuration in the job;
 - builds and clean-extracts the packaged PPU runtime at the exact checked-out revision;
-- uses a persistent work root outside the Git checkout;
+- uses a persistent work root outside the Git checkout and `RUNNER_TEMP`;
 - executes the same-workdir repeatability and privilege/ownership parity gate;
-- uploads the repeatability evidence reports;
+- uploads the preflight and repeatability evidence reports;
 - performs no production deployment, service restart, SSH operation, or Z2 access.
 
-This workflow is a **persistent-host acceptance path**, not proof that a required PR gate is already operational. Until an actual persistent runner is enrolled and repository rules/branch protection require its successful exact-head result for the relevant risk classes, the repository must not describe persistent-host acceptance as automatically enforced.
+This workflow is a **persistent-host post-merge qualification path**, not proof that a required PR gate is already operational. Until an actual persistent runner is enrolled and a successful main-only execution is observed, the repository must not describe persistent-host qualification as operational evidence.
 
 Likewise, a self-hosted Linux PASS remains below PYNQ-Z2 native/HIL qualification. It does not become hardware evidence merely because the machine is persistent.
 

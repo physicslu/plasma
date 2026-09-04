@@ -11,38 +11,57 @@ permissions:
   contents: read
 
 jobs:
+  main-dispatch-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Reject non-main persistent qualification dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REPOSITORY" = "physicslu/plasma"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test -n "$GITHUB_SHA"
+          echo "Persistent L4 qualification accepted for main SHA $GITHUB_SHA"
+
   persistent-acceptance:
+    needs: main-dispatch-guard
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'physicslu/plasma' &&
+      github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64, plasma-integration]
     timeout-minutes: 120
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          clean: true
-
-      - name: Assert persistent integration-host contract
+      - name: Assert trusted event identity before checkout
         shell: bash
         run: |
           set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REPOSITORY" = "physicslu/plasma"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test -n "$GITHUB_SHA"
           test "$(id -u)" -ne 0
-          command -v docker >/dev/null
-          command -v ip >/dev/null
-          command -v python3 >/dev/null
-          command -v node >/dev/null
-          command -v npm >/dev/null
 
-          echo "git_sha=$(git rev-parse HEAD)"
-          echo "uid=$(id -u) gid=$(id -g)"
-          echo "kernel=$(uname -srmo)"
-          echo "docker_server=$(docker version --format '{{.Server.Version}}')"
-          echo "docker_security=$(docker info --format '{{json .SecurityOptions}}')"
-          echo "node=$(node --version)"
-          echo "python=$(python3 --version 2>&1)"
-          echo "default_route=$(ip route show default | tr '\n' ';')"
-          if [[ -r /etc/os-release ]]; then
-            grep -E '^(NAME|VERSION|ID|VERSION_ID)=' /etc/os-release || true
-          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          clean: true
+          persist-credentials: false
+
+      - name: Run fail-closed persistent-host preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          persistent_root="${PLASMA_PERSISTENT_CI_ROOT:-$HOME/.local/state/plasma-ci}"
+          python3 scripts/persistent-integration-host-preflight.py \
+            --expected-repository physicslu/plasma \
+            --persistent-root "$persistent_root" \
+            --report "$RUNNER_TEMP/plasma-persistent-preflight.json"
 
       - name: Set up repository validation dependencies
         shell: bash
@@ -52,18 +71,6 @@ jobs:
         shell: bash
         run: bash scripts/codex-cloud-test.sh
 
-      - name: Verify provisioned ARMv7 execution boundary
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm \
-            --platform linux/arm/v7 \
-            --network none \
-            --cap-drop ALL \
-            --security-opt no-new-privileges:true \
-            arm32v7/python@sha256:45eb5cbc14fe248e7598eb23a5a61424d44e556aed3efa955dfab2ac9a67d91c \
-            python3 -c 'import platform; assert platform.machine().startswith("arm")'
-
       - name: Build and clean-extract packaged PPU runtime
         shell: bash
         run: |
@@ -72,7 +79,8 @@ jobs:
           runtime="$RUNNER_TEMP/plasma-persistent-ppu-runtime"
           output="$RUNNER_TEMP/plasma-persistent-ppu-release"
           verify="$RUNNER_TEMP/plasma-persistent-ppu-verify"
-          sha="$(git rev-parse HEAD)"
+          sha="$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$sha"
           version="$($python -c 'import json; print(json.load(open("release/product.json"))["product_version"])')"
 
           rm -rf "$runtime" "$output" "$verify"
@@ -114,7 +122,6 @@ jobs:
           work="$persistent_root/static-ipv4-fault-injection"
           report="$RUNNER_TEMP/plasma-static-ipv4-persistent-repeatability.json"
 
-          mkdir -p "$persistent_root"
           "$python" scripts/static-ipv4-fault-injection-repeatability.py \
             --runtime-dir "$RUNNER_TEMP/plasma-persistent-ppu-verify/plasma-release/runtime" \
             --work-dir "$work" \
@@ -122,10 +129,11 @@ jobs:
 
       - name: Upload persistent-host acceptance reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: plasma-persistent-integration-${{ github.sha }}
           path: |
+            ${{ runner.temp }}/plasma-persistent-preflight.json
             ${{ runner.temp }}/plasma-persistent-environment-fingerprint.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run1.json
