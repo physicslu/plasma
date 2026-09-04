@@ -20,6 +20,7 @@ CURRENT_GUIDANCE = (
     "docs/architecture/domain-naming-migration.md",
     "docs/architecture/ppu-facility-sites.md",
     "docs/architecture/configuration-architecture.md",
+    "docs/architecture/ppu-site-configuration.md",
     "docs/architecture/gateway-communication-recovery.md",
     "docs/architecture/manager-readonly-fleet-aggregation.md",
     "docs/deployment/README.md",
@@ -65,6 +66,7 @@ CANONICAL_V33_GUIDANCE = (
     "docs/architecture/domain-naming-migration.md",
     "docs/architecture/ppu-facility-sites.md",
     "docs/architecture/configuration-architecture.md",
+    "docs/architecture/ppu-site-configuration.md",
     "docs/architecture/gateway-communication-recovery.md",
     "docs/development/swpc-deployment.md",
 )
@@ -130,6 +132,10 @@ def test_canonical_guidance_uses_current_protocol(relative_path: str) -> None:
         (
             "docs/architecture/ppu-facility-sites.md",
             ("Facility", "PPU", "SITE 1", "Protocol v3.3", "PLASMA33"),
+        ),
+        (
+            "docs/architecture/ppu-site-configuration.md",
+            ("Protocol v3.3", "enabled", "interface", "target", "settings.site.write", "restart_required"),
         ),
         (
             "docs/architecture/manager-readonly-fleet-aggregation.md",
