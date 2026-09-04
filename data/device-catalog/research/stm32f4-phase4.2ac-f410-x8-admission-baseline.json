@@ -1,0 +1,37 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2ac-f410-x8-admission-2026-09-05",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9947883221",
+    "artifact_sha256": "a5a6b69104151297e168215d422b7e1e47061773549b2e39b634f7ec53895e87",
+    "source_commit": "342de6130f96d5ce60a1e6ebc058c775f47c082f",
+    "workflow_run_id": "33901655556"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F410TB",
+      "exact_icpns": [
+        "STM32F410TBY3TR",
+        "STM32F410TBY6TR",
+        "STM32F410TBY7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F410C8",
+      "exact_icpns": [
+        "STM32F410C8U6",
+        "STM32F410C8U6TR",
+        "STM32F410C8U7",
+        "STM32F410C8U7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F410T8",
+      "exact_icpns": [
+        "STM32F410T8Y6TR"
+      ]
+    }
+  ]
+}
