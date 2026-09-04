@@ -18,11 +18,15 @@
     "ERRATA",
     "REVISION",
     "PERIPHERAL_FUNCTIONAL",
+    "DOCUMENT_STRUCTURE",
+    "PACKAGE_MECHANICAL",
+    "ELECTRICAL_OTHER",
     "UNKNOWN"
   ],
   "notes": [
     "Taxonomy describes what an Evidence Unit is about; it does not decide whether the unit is included.",
-    "PERIPHERAL_FUNCTIONAL is semantic classification, not an assertion of irrelevance.",
+    "PERIPHERAL_FUNCTIONAL describes functional peripheral material that is outside the programming-evidence seed set unless dependency closure requires it.",
+    "DOCUMENT_STRUCTURE covers table-of-contents/list/navigation pages; PACKAGE_MECHANICAL covers package-outline/mechanical material; ELECTRICAL_OTHER covers electrical material not admitted as programming-relevant general electrical evidence.",
     "UNKNOWN is a valid classification state and fails closed through the v0 rule set."
   ]
 }
