@@ -15,12 +15,18 @@ Virtual PPU + production Manager happy path
         ↓
 Static IPv4 fault injection / crash recovery
         ↓
+Repeatability + privilege / ownership parity
+        ↓
+Persistent integration-host acceptance
+        ↓
 future PYNQ-Z2 native network backend qualification
 ```
 
 The lab does not redefine the production commissioning state machine. It drives the existing production Manager, Gateway, PPU activation journal, and runtime registry through deterministic integration-host faults.
 
-## Canonical runner
+## Canonical runners
+
+For direct fault-lab debugging or one-shot acceptance:
 
 ```bash
 source software/python/.venv/bin/activate
@@ -40,6 +46,17 @@ CI can reuse an already clean-extracted and validated packaged PPU runtime:
 python scripts/static-ipv4-fault-injection-lab.py \
   --runtime-dir /path/to/plasma-release/runtime
 ```
+
+The P0 CI gate is intentionally stricter than the one-shot runner:
+
+```bash
+python scripts/static-ipv4-fault-injection-repeatability.py \
+  --runtime-dir /path/to/plasma-release/runtime \
+  --work-dir /same/work/directory \
+  --report /path/to/repeatability.json
+```
+
+It runs the complete six-scenario fault lab **twice in the exact same work directory**. The wrapper performs no cleanup of that directory between runs. The fault lab itself must make disposable root-owned residue removable without `sudo`, then the normal non-root host process removes the stale workspace and starts the next run.
 
 ## Fresh-topology rule
 
@@ -61,6 +78,8 @@ scenario N+1 starts from zero
 
 A scenario must not inherit a rollback, registry mutation, transaction ID, ARP state, or recovery marker from an earlier scenario.
 
+The repeatability gate tests a different property: while every scenario topology is fresh, the **host work directory is deliberately reused across complete lab executions**. This distinguishes scenario isolation from persistent-workspace portability.
+
 ## Privilege boundary
 
 The production privilege rule remains unchanged:
@@ -69,6 +88,8 @@ The production privilege rule remains unchanged:
 Plasma Manager      no CAP_NET_ADMIN
 Plasma Gateway      no CAP_NET_ADMIN
 fault helper        CAP_NET_ADMIN only
+host verifier       non-root
+private PPU journal root:root 0600
 host uplink         never used as PPU mutation target
 ```
 
@@ -95,6 +116,48 @@ restore-error
 `apply-drop` removes the old managed address and deliberately does not add the candidate. It creates a deterministic reconnect timeout while preserving a real Linux address-loss event.
 
 These controls do not enter the packaged PPU artifact, Plasma Gateway API, or production Manager code.
+
+## Verifier independence and private evidence contract
+
+The production-style PPU activation journal is private evidence:
+
+```text
+gateway-output/ppu-network-activation.json
+owner = root:root
+mode  = 0600
+```
+
+The host-side acceptance process is not allowed to make that file easier to read. The governing rule is:
+
+> A test harness MUST NOT relax a production security property in order to make acceptance evidence observable.
+
+`scripts/private-ppu-evidence-verifier.py` is therefore separate from the DUT, fault helper, and Manager crash injector. It must run as a non-root host user and fails unless the canonical journal is a regular non-symlink file with exactly `root:root 0600` ownership and mode.
+
+The verifier does not `chmod`, use `sudo`, search recursively, or import production Manager/Gateway code. SHA-256 is read through a disposable reader container with:
+
+```text
+bind mount        read-only
+network           none
+capabilities      none
+no-new-privileges true
+container reader  uid 0 only for the private bind-mounted file
+host verifier     non-root
+```
+
+This is an explicit producer/verifier separation:
+
+```text
+DUT / producer
+  -> creates private root:root 0600 journal
+
+fault injector
+  -> creates deterministic failure condition only
+
+independent verifier
+  -> checks path + owner + mode
+  -> hashes through locked read-only boundary
+  -> never modifies the evidence
+```
 
 ## Scenario 1 — duplicate candidate ownership
 
@@ -251,7 +314,7 @@ This preserves the state machine's meaning: `recovery_required` exists because t
 
 ## CI placement
 
-The `PPU release artifact` workflow runs the network layers in this order:
+The GitHub-hosted `PPU release artifact` workflow runs the network layers in this order:
 
 ```text
 Phase 1 packaged desired-state acceptance
@@ -260,14 +323,48 @@ Phase 2 packaged activation / rollback acceptance
         ↓
 Virtual PPU + production Manager happy path
         ↓
-Static IPv4 fault injection / crash recovery
+Static IPv4 repeatability + privilege / ownership parity
+        ├─ complete six-scenario lab, run 1
+        ├─ independent private-evidence verification
+        ├─ same work directory reused
+        ├─ complete six-scenario lab, run 2
+        └─ independent private-evidence verification
 ```
 
-The fault lab reuses the already clean-extracted packaged ARMv7 PPU runtime. It does not rebuild a different DUT artifact.
+The repeatability gate reuses the already clean-extracted packaged ARMv7 PPU runtime. It does not rebuild a different DUT artifact between the two executions.
+
+A GitHub-hosted PASS still does **not** qualify a persistent integration host. Ephemeral runner semantics do not prove behavior across jobs, machine lifetime, local Docker configuration, filesystem history, or accumulated ownership residue.
+
+## Persistent integration-host acceptance
+
+`.github/workflows/persistent-integration-host.yml` defines the dedicated persistent-host path. It is intentionally `workflow_dispatch` only and requires a pre-enrolled self-hosted runner with labels:
+
+```text
+self-hosted
+linux
+x64
+plasma-integration
+```
+
+The workflow:
+
+- requires the host runner user to be non-root;
+- captures the exact Git SHA, uid/gid, kernel, Docker server/security options, Node/Python versions, OS release, and default-route signature;
+- runs canonical source/configuration validation;
+- verifies ARMv7 execution is already provisioned rather than mutating host binfmt configuration in the job;
+- builds and clean-extracts the packaged PPU runtime at the exact checked-out revision;
+- uses a persistent work root outside the Git checkout;
+- executes the same-workdir repeatability and privilege/ownership parity gate;
+- uploads the repeatability evidence reports;
+- performs no production deployment, service restart, SSH operation, or Z2 access.
+
+This workflow is a **persistent-host acceptance path**, not proof that a required PR gate is already operational. Until an actual persistent runner is enrolled and repository rules/branch protection require its successful exact-head result for the relevant risk classes, the repository must not describe persistent-host acceptance as automatically enforced.
+
+Likewise, a self-hosted Linux PASS remains below PYNQ-Z2 native/HIL qualification. It does not become hardware evidence merely because the machine is persistent.
 
 ## Evidence boundary
 
-A PASS proves, on a Linux integration host:
+A hosted repeatability PASS proves, on that Linux execution environment:
 
 - production Manager duplicate-candidate exclusion remains fail closed;
 - wrong-device candidate identity cannot be adopted as the original PPU;
@@ -278,9 +375,13 @@ A PASS proves, on a Linux integration host:
 - Manager and Gateway remain unprivileged;
 - only the helper sidecar receives network-mutation capability;
 - the host uplink remains unchanged;
-- the DUT is the packaged ARMv7 PPU runtime used by the release workflow.
+- the DUT is the packaged ARMv7 PPU runtime used by the release workflow;
+- the complete fault lab succeeds twice in the same work directory without manual cleanup or `sudo`;
+- the host verifier is non-root;
+- the canonical private PPU activation journal remains `root:root 0600`;
+- the verifier observes that journal without permission widening or recursive evidence discovery.
 
-A PASS does **not** prove:
+A persistent integration-host PASS additionally proves those same contracts on the enrolled persistent runner and its retained workspace/environment. It still does **not** prove:
 
 - PYNQ-Z2 MAC/PHY/carrier/switch behavior;
 - the final PYNQ-Z2 Linux network-manager backend;
