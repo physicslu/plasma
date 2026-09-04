@@ -210,6 +210,7 @@ def main() -> int:
     report: dict[str, Any] = {
         "schema_version": 1,
         "status": "FAIL",
+        "qualification_state": "RUNNER_ENROLLED",
         "evidence_level": "L4_persistent_integration_preflight",
         "z2_hardware_claim": "NONE",
     }
@@ -240,6 +241,7 @@ def main() -> int:
             {
                 "identity": _identity(args.expected_repository),
                 "host": {
+                    "hostname": platform.node(),
                     "uid": uid,
                     "gid": gid,
                     "kernel_system": platform.system(),
