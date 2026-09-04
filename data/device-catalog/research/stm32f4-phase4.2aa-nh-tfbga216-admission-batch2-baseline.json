@@ -1,0 +1,23 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9944848285",
+    "artifact_sha256": "255f1f16dae2fcc572af5c6ce88565b4a2167b1e2d5facb7284e18795b15b4f3",
+    "source_commit": "ac0f6fceffd31ae9a10fb657d94a23c434bf8631",
+    "workflow_run_id": "33893521307"
+  },
+  "targets": [
+    {"base_device": "STM32F479ZG", "exact_icpns": ["STM32F479ZGT6"]},
+    {"base_device": "STM32F469NE", "exact_icpns": ["STM32F469NEH6"]},
+    {"base_device": "STM32F469NG", "exact_icpns": ["STM32F469NGH6"]},
+    {
+      "base_device": "STM32F469NI",
+      "exact_icpns": ["STM32F469NIH6", "STM32F469NIH6TR", "STM32F469NIH7"]
+    },
+    {"base_device": "STM32F479NG", "exact_icpns": ["STM32F479NGH6"]},
+    {"base_device": "STM32F479NI", "exact_icpns": ["STM32F479NIH6"]}
+  ]
+}

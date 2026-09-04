@@ -1,0 +1,356 @@
+{
+  "candidate_count": 7,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "evidence_section_sha256": "b04425e15897ae7b1ae7b6a0cf0d9162a567747fd94ca0e1e91e7703a5bb268b",
+        "rendered_dom_sha256": "5df457ba552982f035f2f5067e53d2bf30a8dca923d3ad34d3603eff112f003a",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ne.html"
+      },
+      "base_device": "STM32F469NE",
+      "base_mapping": {
+        "existing_identifier": "STM32F469NEHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F469NEH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F469NE",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F469NEHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F469NEH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F469",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ne.html#plasma-evidence=stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "evidence_section_sha256": "3be37625d6ac765acea586126be69fae62a1d76d89177e5fde7cdb84f5047f5a",
+        "rendered_dom_sha256": "50f6cec9daf7ac4399ec1a711ced87346c55f6873b70aa502125acd67b109d5a",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ng.html"
+      },
+      "base_device": "STM32F469NG",
+      "base_mapping": {
+        "existing_identifier": "STM32F469NGHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F469NGH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F469NG",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F469NGHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1024 KiB",
+        "icpn": "STM32F469NGH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F469",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ng.html#plasma-evidence=stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "evidence_section_sha256": "43a9fe746dd02c247bde221276d50c79c050189ab5a211b77aa614bae11f4968",
+        "rendered_dom_sha256": "cb7576d62c42d79367a28fad721a1eb8b721c18019dac54a28abe5734f6662ea",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html"
+      },
+      "base_device": "STM32F469NI",
+      "base_mapping": {
+        "existing_identifier": "STM32F469NIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F469NIH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F469NI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F469NIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F469NIH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F469",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html#plasma-evidence=stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "evidence_section_sha256": "43a9fe746dd02c247bde221276d50c79c050189ab5a211b77aa614bae11f4968",
+        "rendered_dom_sha256": "cb7576d62c42d79367a28fad721a1eb8b721c18019dac54a28abe5734f6662ea",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html"
+      },
+      "base_device": "STM32F469NI",
+      "base_mapping": {
+        "existing_identifier": "STM32F469NIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F469NIH6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F469NI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F469NIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F469NIH6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F469",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html#plasma-evidence=stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "evidence_section_sha256": "43a9fe746dd02c247bde221276d50c79c050189ab5a211b77aa614bae11f4968",
+        "rendered_dom_sha256": "cb7576d62c42d79367a28fad721a1eb8b721c18019dac54a28abe5734f6662ea",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html"
+      },
+      "base_device": "STM32F469NI",
+      "base_mapping": {
+        "existing_identifier": "STM32F469NIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F469NIH7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F469NI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F469NIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F469NIH7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F469",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html#plasma-evidence=stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "evidence_section_sha256": "ff9f9c6ce51486ad05782dac6dc19c962015c08efc31f4292f24e07698208e2b",
+        "rendered_dom_sha256": "1401b3dfe64874da89716b3648234725763111608936641080ea2bcc72be2b47",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ng.html"
+      },
+      "base_device": "STM32F479NG",
+      "base_mapping": {
+        "existing_identifier": "STM32F479NGHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F479NGH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F479NG",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F479NGHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1024 KiB",
+        "icpn": "STM32F479NGH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F479",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ng.html#plasma-evidence=stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "evidence_section_sha256": "d2747721b36dbdc44db6d5c72ecaff737a2c43ef43d71a3a2d7a112cb2810c80",
+        "rendered_dom_sha256": "98f737216007defb1c70500bc9f73abb202616d4f0fbe95c94644d99c0d8e624",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ni.html"
+      },
+      "base_device": "STM32F479NI",
+      "base_mapping": {
+        "existing_identifier": "STM32F479NIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F479NIH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F479NI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F479NIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F479NIH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "TFBGA",
+        "pin_count": "216",
+        "series": "STM32F479",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ni.html#plasma-evidence=stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 345,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 7,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05-retained-20260904T164441Z-a465a62",
+  "family": "STM32F4",
+  "inputs": {
+    "admission_base_devices": [
+      "STM32F469NE",
+      "STM32F469NG",
+      "STM32F469NI",
+      "STM32F479NG",
+      "STM32F479NI"
+    ],
+    "baseline": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-baseline.json",
+    "baseline_sha256": "e6a33e40cd4883052c56a8527510d5325f891d116f1f35187137d9ea8de6e414",
+    "canonical_dataset": "stm32f4-commercial-icpn.csv",
+    "canonical_input_sha256": "dc942fa8f7fe68419071cace31aa9c58309f47e5c1821c07898c28a6d1fda694",
+    "family_adapter": "stm32f4-phase3.1",
+    "mapping_catalog": "openocd-parts-canonical.csv",
+    "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "retained_evidence_directory": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-live-2026-09-05"
+  },
+  "issues": [],
+  "pipeline_expected_candidate_count": 7,
+  "schema_version": 1,
+  "source_provenance": {
+    "evidence_manifest_sha256": "4ca17f8ef1b196ccf9a18bec5ce088ad2f331038c59c80041278bd0dd6ee1489",
+    "executed_git_sha": "a465a62c1330ad983c7a74ad07e31c08aeac3d1e",
+    "repository": "physicslu/plasma"
+  }
+}
