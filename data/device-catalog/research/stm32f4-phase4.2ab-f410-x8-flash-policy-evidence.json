@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "phase": "4.2AB",
+  "policy_mapping": "STM32F410 flash-size code 8 -> 64 KiB",
+  "official_sources": [
+    {
+      "url": "https://www.st.com/resource/en/datasheet/stm32f410t8.pdf",
+      "document": "DS11144 Rev 8",
+      "evidence": "Table 87 ordering information defines flash memory size code 8 as 64 Kbytes for STM32F410x8/B."
+    },
+    {
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410/products.html",
+      "evidence": "The official STM32F410 product list identifies STM32F410R8 as a 64-Kbyte Flash device."
+    },
+    {
+      "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410t8.html",
+      "evidence": "The official STM32F410T8 product page lists active exact commercial parts for the x8 device."
+    }
+  ],
+  "affected_base_devices": [
+    "STM32F410C8",
+    "STM32F410R8",
+    "STM32F410T8"
+  ],
+  "expected_immediate_delta_before_admission": {
+    "production_exact_icpn_rows": 352,
+    "production_base_device_count": 124,
+    "gap_base_device_count": 25,
+    "policy_ready_count": 2,
+    "policy_blocked_count": 23,
+    "policy_ready_base_devices": [
+      "STM32F410C8",
+      "STM32F410T8"
+    ],
+    "still_blocked": {
+      "STM32F410R8": [
+        "unsupported STM32F4 package code: I"
+      ]
+    }
+  },
+  "production_write_applied": false,
+  "exact_icpn_admission_deferred": true,
+  "algorithm_equivalence_claimed": false,
+  "fail_closed": true
+}
