@@ -175,6 +175,7 @@ def _package_and_pins(pin_code: str, package_code: str) -> tuple[str, str]:
         ("C", "Y"): "49",
         ("I", "H"): "176",
         ("I", "T"): "176",
+        ("M", "Y"): "81",
         ("O", "Y"): "90",
         ("R", "T"): "64",
         ("R", "Y"): "64",

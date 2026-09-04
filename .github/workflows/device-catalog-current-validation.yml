@@ -121,3 +121,6 @@ jobs:
             --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2v-h-admission-batch2-live-2026-09-03 \
             --baseline data/device-catalog/research/stm32f4-phase4.2v-h-admission-batch2-baseline.json
           python data/device-catalog/research/test_stm32f4_phase4_2v_h_admission_batch2_post_admission.py
+
+      - name: Validate Phase 4.2W M/Y WLCSP81 policy boundary
+        run: python data/device-catalog/research/test_stm32f4_phase4_2w_my_wlcsp81_policy.py
