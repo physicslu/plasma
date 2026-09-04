@@ -5,12 +5,18 @@
   "status": "pilot",
   "scope": {"manufacturer": "STMicroelectronics", "family": "STM32F1", "density_class": "medium"},
   "evidence": [
-    {"source_id": "st_pm0075_rev2", "sections": ["2.4.1 Read protection", "2.4.2 Write protection", "2.5 Option byte description"]}
+    {"source_id": "st_pm0075_rev2", "sections": ["2.3.1 Key values", "2.4.1 Read protection", "2.4.2 Write protection", "2.5 Option byte description"]}
   ],
   "data": {
     "read_protection": {
       "supported": true,
       "unprotected_key": "0x00A5",
+      "representations": {
+        "logical_unprotected_byte": "0xA5",
+        "complement_byte": "0x5A",
+        "encoded_halfword": "0x5AA5",
+        "programming_halfword": "0x00A5"
+      },
       "disable_transition": {
         "destructive": true,
         "effect": "mass_erase_main_flash",
