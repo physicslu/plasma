@@ -13,9 +13,11 @@ from contract import (
 )
 
 HERE = Path(__file__).resolve().parent
+IC_SUPPORT_ROOT = HERE.parent
 FIXTURE = HERE / "fixtures" / "stm32f103c-foundation-v0.json"
 TAXONOMY = HERE / "taxonomy-v0.json"
 RULES = HERE / "rules-v0.json"
+SOURCE_LOCK = IC_SUPPORT_ROOT / "benchmarks" / "stm32f103c" / "source-lock.json"
 
 
 def load(path: Path):
@@ -27,17 +29,19 @@ class EvidencePackContractTest(unittest.TestCase):
         self.fixture = load(FIXTURE)
         self.taxonomy = load(TAXONOMY)
         self.rules = load(RULES)
-        self.source_lock_id = self.fixture["source_lock_id"]
+        self.source_lock = load(SOURCE_LOCK)
+        self.source_lock_id = self.source_lock["source_lock_id"]
         self.ds_catalog = copy.deepcopy(self.fixture["catalogs"]["datasheet"])
         self.pm_catalog = copy.deepcopy(self.fixture["catalogs"]["programming_manual"])
 
-    def build_packs(self, *, rules=None, ds_catalog=None, ai_units=()):
+    def build_packs(self, *, rules=None, ds_catalog=None, source_lock=None, ai_units=()):
         rules = rules or self.rules
         ds_catalog = ds_catalog or self.ds_catalog
+        source_lock = source_lock or self.source_lock
         ds_pack = build_pack(
             pack_id="stm32f103c-datasheet-programming-v0",
             purpose="PROGRAMMING_SUPPORT",
-            source_lock_id=self.source_lock_id,
+            source_lock=source_lock,
             catalogs=[ds_catalog],
             taxonomy=self.taxonomy,
             rules=rules,
@@ -45,11 +49,16 @@ class EvidencePackContractTest(unittest.TestCase):
             dependency_edges=self.fixture["dependency_edges"],
             ai_supplemental_unit_ids=ai_units,
         )
+        pm_catalog = copy.deepcopy(self.pm_catalog)
+        if pm_catalog["source_lock_id"] != source_lock["source_lock_id"]:
+            pm_catalog["source_lock_id"] = source_lock["source_lock_id"]
+            pm_catalog.pop("catalog_digest")
+            pm_catalog["catalog_digest"] = catalog_digest(pm_catalog)
         pm_pack = build_pack(
             pack_id="stm32f10xxx-programming-manual-v0",
             purpose="PROGRAMMING_SUPPORT",
-            source_lock_id=self.source_lock_id,
-            catalogs=[self.pm_catalog],
+            source_lock=source_lock,
+            catalogs=[pm_catalog],
             taxonomy=self.taxonomy,
             rules=rules,
             builder={"name": "contract-test-builder", "version": "0.1.0"},
@@ -77,6 +86,14 @@ class EvidencePackContractTest(unittest.TestCase):
         changed["catalog_digest"] = catalog_digest(changed)
         self.assertNotEqual(original, changed["catalog_digest"])
 
+    def test_catalog_source_must_exactly_match_source_lock(self):
+        changed = copy.deepcopy(self.ds_catalog)
+        changed["source"]["digest"] = "0" * 64
+        changed.pop("catalog_digest")
+        changed["catalog_digest"] = catalog_digest(changed)
+        with self.assertRaises(EvidenceContractError):
+            self.build_packs(ds_catalog=changed)
+
     def test_dependency_closure_overrides_exclusion_and_unknown_fails_closed(self):
         ds_pack, _ = self.build_packs()
         entries = {item["unit_id"]: item for item in ds_pack["included_units"]}
@@ -87,6 +104,16 @@ class EvidencePackContractTest(unittest.TestCase):
         self.assertNotIn("ds5319-adc", entries)
         self.assertIn("ds5319-unknown", entries)
         self.assertIn("UNKNOWN_FAIL_CLOSED", entries["ds5319-unknown"]["inclusion_reasons"])
+
+    def test_unknown_category_cannot_be_forced_to_exclude(self):
+        changed = copy.deepcopy(self.ds_catalog)
+        unknown = next(unit for unit in changed["units"] if unit["unit_id"] == "ds5319-unknown")
+        unknown["classification"] = "EXCLUDE"
+        changed.pop("catalog_digest")
+        changed["catalog_digest"] = catalog_digest(changed)
+        ds_pack, _ = self.build_packs(ds_catalog=changed)
+        ids = {item["unit_id"] for item in ds_pack["included_units"]}
+        self.assertIn("ds5319-unknown", ids)
 
     def test_ai_is_add_only_and_cannot_remove_deterministic_evidence(self):
         baseline, _ = self.build_packs()
@@ -107,13 +134,20 @@ class EvidencePackContractTest(unittest.TestCase):
         self.assertNotEqual(baseline["rules_digest"], changed["rules_digest"])
         self.assertNotEqual(baseline["pack_digest"], changed["pack_digest"])
 
-    def test_source_change_changes_pack_and_bundle_identity(self):
+    def test_locked_source_change_changes_pack_and_bundle_identity(self):
         baseline_ds, baseline_pm = self.build_packs()
+
+        changed_lock = copy.deepcopy(self.source_lock)
+        changed_lock["source_lock_id"] = "stm32f103c-source-lock-v0-test-change"
+        locked_ds = next(source for source in changed_lock["sources"] if source["source_id"] == "st_ds5319_rev20")
+        locked_ds["integrity"]["digest"] = "1" * 64
+
         changed_catalog = copy.deepcopy(self.ds_catalog)
+        changed_catalog["source_lock_id"] = changed_lock["source_lock_id"]
         changed_catalog["source"]["digest"] = "1" * 64
         changed_catalog.pop("catalog_digest")
         changed_catalog["catalog_digest"] = catalog_digest(changed_catalog)
-        changed_ds, changed_pm = self.build_packs(ds_catalog=changed_catalog)
+        changed_ds, changed_pm = self.build_packs(ds_catalog=changed_catalog, source_lock=changed_lock)
 
         baseline_packs = {baseline_ds["pack_id"]: baseline_ds, baseline_pm["pack_id"]: baseline_pm}
         changed_packs = {changed_ds["pack_id"]: changed_ds, changed_pm["pack_id"]: changed_pm}
@@ -129,7 +163,7 @@ class EvidencePackContractTest(unittest.TestCase):
             target_icpn="STM32F103C8T6",
             binding=binding,
             packs=changed_packs,
-            source_lock_id=self.source_lock_id,
+            source_lock_id=changed_lock["source_lock_id"],
         )
         self.assertNotEqual(baseline_ds["pack_digest"], changed_ds["pack_digest"])
         self.assertNotEqual(baseline_bundle["bundle_digest"], changed_bundle["bundle_digest"])
