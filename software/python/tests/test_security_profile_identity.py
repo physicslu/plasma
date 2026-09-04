@@ -79,6 +79,7 @@ def test_security_me_requires_auth_and_returns_backend_principal(
         assert payload["principal"]["id"] == "deployment-admin"
         assert payload["principal"]["roles"] == ["admin"]
         assert "settings.gateway.write" in payload["principal"]["permissions"]
+        assert "settings.site.write" in payload["principal"]["permissions"]
         assert payload["principal"]["scopes"] == [
             {"facility_id": "*", "ppu_id": "*", "site_ids": "*"}
         ]
@@ -132,15 +133,19 @@ def test_security_me_exposes_role_permission_matrix_without_ui_escalation(
 
         assert "ppu.program" not in results["viewer"]["permissions"]
         assert "engineering.session.write" not in results["viewer"]["permissions"]
+        assert "settings.site.write" not in results["viewer"]["permissions"]
 
         assert "ppu.program" in results["operator"]["permissions"]
         assert "engineering.session.write" in results["operator"]["permissions"]
         assert "settings.mock.write" not in results["operator"]["permissions"]
+        assert "settings.site.write" not in results["operator"]["permissions"]
 
         assert "settings.mock.write" in results["engineer"]["permissions"]
+        assert "settings.site.write" in results["engineer"]["permissions"]
         assert "settings.gateway.write" not in results["engineer"]["permissions"]
 
         assert "settings.mock.write" in results["admin"]["permissions"]
+        assert "settings.site.write" in results["admin"]["permissions"]
         assert "settings.gateway.write" in results["admin"]["permissions"]
 
         assert results["viewer"]["scopes"] == [

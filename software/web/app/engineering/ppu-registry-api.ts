@@ -58,6 +58,44 @@ export type PPUNetworkDesiredInput = {
   dns_servers: string[];
 };
 
+export type PPUSiteDesired = {
+  enabled: boolean;
+  interface: string;
+  target: string;
+};
+
+export type PPUSiteActual = {
+  enabled: boolean;
+  interface: string | null;
+  target: string | null;
+  state: string | null;
+  current_job_id: string | null;
+};
+
+export type PPUSiteReconciliation =
+  | "in_sync"
+  | "restart_required"
+  | "actual_unavailable"
+  | "disabled_runtime_binding_unobservable";
+
+export type PPUSiteConfigurationView = {
+  site_id: number;
+  desired: PPUSiteDesired;
+  actual: PPUSiteActual | null;
+  reconciliation: PPUSiteReconciliation;
+};
+
+export type PPUSiteConfigurationPayload = {
+  ok: true;
+  rest_contract_version: string;
+  site_configuration: {
+    source: "canonical_ppu_config";
+    runtime_apply_supported: false;
+    reconciliation: "in_sync" | "restart_required" | "actual_unavailable" | "partially_observable";
+    sites: PPUSiteConfigurationView[];
+  };
+};
+
 export type ManagerNetworkCommissioningState =
   | "requested"
   | "desired_saved"
@@ -112,6 +150,7 @@ type RegistryRemovePayload = {
 type ErrorPayload = {
   error?: {
     code?: string;
+    error_code?: number;
     error_type?: string;
     message?: string;
   };
@@ -184,6 +223,30 @@ export function saveManagerPpuNetwork(
     },
     body: JSON.stringify(settings),
   });
+}
+
+export function getManagerPpuSites(alias: string): Promise<PPUSiteConfigurationPayload> {
+  return jsonRequest<PPUSiteConfigurationPayload>(`/api/manager/registry/${encodeURIComponent(alias)}/sites`);
+}
+
+export function saveManagerPpuSite(
+  alias: string,
+  siteId: number,
+  desired: PPUSiteDesired,
+): Promise<PPUSiteConfigurationPayload> {
+  if (!Number.isInteger(siteId) || siteId < 1) {
+    return Promise.reject(new Error("Site ID must be a positive 1-based integer"));
+  }
+  return jsonRequest<PPUSiteConfigurationPayload>(
+    `/api/manager/registry/${encodeURIComponent(alias)}/sites/${siteId}`,
+    {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": `site-desired-${siteId}-${crypto.randomUUID()}`,
+      },
+      body: JSON.stringify(desired),
+    },
+  );
 }
 
 export async function getManagerPpuNetworkCommissioning(

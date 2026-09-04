@@ -4,6 +4,7 @@ import test from "node:test";
 
 const engineering = await readFile(new URL("../app/engineering/page.tsx", import.meta.url), "utf8");
 const ppuSite = await readFile(new URL("../app/engineering/ppu-site-configuration.tsx", import.meta.url), "utf8");
+const ppuSiteDesired = await readFile(new URL("../app/engineering/ppu-site-desired-configuration.tsx", import.meta.url), "utf8");
 const ppuNetwork = await readFile(new URL("../app/engineering/ppu-network-configuration.tsx", import.meta.url), "utf8");
 const registryApi = await readFile(new URL("../app/engineering/ppu-registry-api.ts", import.meta.url), "utf8");
 const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
@@ -28,12 +29,20 @@ test("PPU management uses Manager-owned registry APIs instead of browser-local i
   assert.doesNotMatch(ppuSite, /setPpus\(/);
 });
 
-test("PPU identity and Site topology remain Manager-observed rather than manually fabricated", () => {
+test("PPU topology remains observed while Site desired configuration is PPU-owned and writable", () => {
   assert.match(ppuSite, /fleetForEntry/);
-  assert.match(ppuSite, /selectedFleet\?\.topology\.site_count/);
-  assert.match(ppuSite, /SITE\{site\.site_id\}/);
-  assert.match(ppuSite, /PPU-reported topology/);
-  assert.match(ppuSite, /Site enabled state shown here is PPU-reported and read-only/);
+  assert.match(ppuSite, /fleetView\?\.topology\.site_count/);
+  assert.match(ppuSite, /import PpuSiteDesiredConfiguration/);
+  assert.match(ppuSite, /<PpuSiteDesiredConfiguration/);
+  assert.match(ppuSiteDesired, /getManagerPpuSites/);
+  assert.match(ppuSiteDesired, /saveManagerPpuSite/);
+  assert.match(ppuSiteDesired, /Desired Enabled/);
+  assert.match(ppuSiteDesired, /Desired Interface/);
+  assert.match(ppuSiteDesired, /Desired Target/);
+  assert.match(ppuSiteDesired, /<th>Actual<\/th>/);
+  assert.match(ppuSiteDesired, /<th>Reconciliation<\/th>/);
+  assert.match(ppuSiteDesired, /Stop or cancel active Jobs before changing Site desired configuration/);
+  assert.match(ppuSiteDesired, /canonical PPU configuration/);
   assert.doesNotMatch(ppuSite, /Enable All|Disable All/);
 });
 
@@ -76,8 +85,11 @@ test("Browser never sequences the PPU activation API directly", () => {
   assert.match(ppuNetwork, /verify the same <code>ppu_id<\/code>/);
 });
 
-test("browser registry client exposes add, lifecycle, remove, desired network, and commissioning through same-origin BFF", () => {
+test("browser registry client exposes registry, network, commissioning, and Site desired state through same-origin BFF", () => {
   assert.match(registryApi, /\/api\/manager\/registry/);
+  assert.match(registryApi, /getManagerPpuSites/);
+  assert.match(registryApi, /saveManagerPpuSite/);
+  assert.match(registryApi, /\/sites\/\$\{siteId\}/);
   assert.match(registryApi, /method: "POST"/);
   assert.match(registryApi, /method: "PATCH"/);
   assert.match(registryApi, /method: "DELETE"/);
@@ -100,8 +112,10 @@ test("registry BFF routes keep desired-state relay and Manager-owned commissioni
   assert.match(registryRoute, /export async function GET/);
   assert.match(registryRoute, /export async function POST/);
   assert.doesNotMatch(registryRoute, /export async function PATCH|export async function DELETE/);
-  assert.match(registryEntryRoute, /resource: "entry" \| "network" \| "network-commissioning"/);
+  assert.match(registryEntryRoute, /"entry" \| "network" \| "network-commissioning" \| "sites" \| "site"/);
   assert.match(registryEntryRoute, /relayManagerPpuAliasRequest\(request, parsed\.alias, "\/api\/settings\/ppu-network"\)/);
+  assert.match(registryEntryRoute, /relayManagerPpuAliasRequest\(request, parsed\.alias, "\/api\/settings\/sites"\)/);
+  assert.match(registryEntryRoute, /`\/api\/settings\/sites\/\$\{parsed\.siteId\}`/);
   assert.match(registryEntryRoute, /relayManagerNetworkCommissioningRequest\(request, parsed\.alias\)/);
   assert.match(registryEntryRoute, /export async function GET/);
   assert.match(registryEntryRoute, /export async function POST/);
