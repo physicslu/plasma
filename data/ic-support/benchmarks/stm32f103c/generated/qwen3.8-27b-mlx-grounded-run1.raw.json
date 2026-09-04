@@ -1,0 +1,359 @@
+{
+  "targets": {
+    "STM32F103C8T6": {
+      "base_device": "STM32F103C8",
+      "density_class": "medium-density (64–128 KB range per PM0075 Glossary, p.5)",
+      "package": "LQFP-48",
+      "pin_count": 48,
+      "flash_start": "0x08000000",
+      "flash_size_bytes": 65536,
+      "page_size_bytes": 1024,
+      "page_count": 64,
+      "page_count_evidence_type": "derived"
+    },
+    "STM32F103CBT6": {
+      "base_device": "STM32F103CB",
+      "density_class": "medium-density (64–128 KB range per PM0075 Glossary, p.5)",
+      "package": "LQFP-48",
+      "pin_count": 48,
+      "flash_start": "0x08000000",
+      "flash_size_bytes": 131072,
+      "page_size_bytes": 1024,
+      "page_count": 128,
+      "page_count_evidence_type": "documented"
+    }
+  },
+
+  "programming": {
+    "supported_external_interfaces": [
+      "JTAG (via SWJ-DP)",
+      "SWD (via SWJ-DP)",
+      "Boot loader (USART1, System memory boot mode)",
+      "In-application programming (IAP) via any on-chip communication interface"
+    ],
+    "unlock_keys": [
+      "KEY1 = 0x45670123",
+      "KEY2 = 0xCDEF89AB"
+    ],
+    "unlock_key_order": [
+      "Write KEY1 (0x45670123) to FLASH_KEYR (0x40022004) – 32-bit write",
+      "Write KEY2 (0xCDEF89AB) to FLASH_KEYR (0x40022004) – 32-bit write"
+    ],
+    "option_byte_unlock_keys": [
+      "Same KEY1 = 0x45670123 and KEY2 = 0xCDEF89AB, written to FLASH_OPTKEYR (0x40022008)"
+    ],
+    "rdprt_key": "0x00A5",
+    "program_granularity_bytes": 2,
+    "program_granularity_unit": "half-word (16-bit)",
+    "required_address_alignment_bytes": 2,
+    "required_address_alignment_evidence_type": "derived",
+    "page_erase_supported": true,
+    "mass_erase_supported": true,
+    "page_erase_sequence": [
+      "1. Check BSY bit (PM p.14 text says 'FLASH_CR register' – apparent typo; BSY is in FLASH_SR per §3.4 p.25 and Figure 2 p.15)",
+      "2. Set PER bit in FLASH_CR (0x40022010)",
+      "3. Write page start address to FLASH_AR (0x40022014)",
+      "4. Set STRT bit in FLASH_CR",
+      "5. Wait for BSY bit in FLASH_SR to clear",
+      "6. Read erased page and verify"
+    ],
+    "mass_erase_sequence": [
+      "1. Check BSY bit in FLASH_SR (0x4002200C)",
+      "2. Set MER bit in FLASH_CR (0x40022010)",
+      "3. Set STRT bit in FLASH_CR",
+      "4. Wait for BSY bit in FLASH_SR to clear",
+      "5. Read all pages and verify"
+    ],
+    "program_sequence": [
+      "1. Check BSY bit in FLASH_SR",
+      "2. Set PG bit in FLASH_CR (0x40022010)",
+      "3. Perform 16-bit (half-word) write to target Flash address",
+      "4. Wait for BSY bit in FLASH_SR to clear",
+      "5. Read back and verify programmed value"
+    ],
+    "busy_flag": "FLASH_SR bit 0 – BSY (Busy); set at start, cleared at end or on error",
+    "end_of_operation_flag": "FLASH_SR bit 5 – EOP (End of Operation); set at end of each successful program/erase; cleared by writing 1",
+    "error_flags": [
+      "FLASH_SR bit 2 – PGERR (Programming Error): address contained value ≠ 0xFFFF before programming",
+      "FLASH_SR bit 4 – WRPRTERR (Write Protection Error): programming a write-protected address"
+    ],
+    "lock_mechanism": "Write 1 to FLASH_CR bit 7 (LOCK) to lock; unlock requires re-writing KEY1 then KEY2 to FLASH_KEYR",
+    "write_erase_requires_hsi": true,
+    "external_crystal_required_for_swd_programming": "unknown"
+  },
+
+  "option_bytes": {
+    "region_start": "0x1FFFF800",
+    "region_end": "0x1FFFF80F",
+    "region_size_bytes": 16,
+    "encoding": "Complemented (inverted): each 32-bit word = [nBYTE (bits 31:24) | BYTE (bits 15:0)] where nBYTE = ~BYTE. FPEC auto-computes MSB from the LSB written by software (PM §2.3.5 p.16).",
+    "layout": [
+      "0x1FFF F800: [nUSER | USER] [nRDP | RDP] – user config + read-protection",
+      "0x1FFF F804: [nData1 | Data1] [nData0 | Data0] – user data storage",
+      "0x1FFF F808: [nWRP1 | WRP1] [nWRP0 | WRP0] – write protection bytes 0-1",
+      "0x1FFF F80C: [nWRP3 | WRP3] [nWRP2 | WRP2] – write protection bytes 2-3"
+    ],
+    "configurable_fields": [
+      "RDP – read protection (value 0x00A5 = RDPRT key enables; 0x00FF or erased = disabled/protected)",
+      "WRP0-3 – write protection (4 bytes, 4 bits each for medium-density; 0 = protected, 1 = not protected)",
+      "USER – watchdog select (WDG_SW), nRST_STOP, nRST_STDBY",
+      "Data0/Data1 – two user bytes"
+    ],
+    "programming_method": "Unlock OPTWRE (write KEY1 then KEY2 to FLASH_OPTKEYR), set OPTPG in FLASH_CR, half-word write to target option-byte address, wait BSY clear, system reset to reload",
+    "erase_method": "Unlock OPTWRE, set OPTER in FLASH_CR, set STRT, wait BSY clear; entire option-byte area erased to 0xFF",
+    "reload_trigger": "System reset (or POR reset) – option bytes are reloaded by the OBL on every system reset"
+  },
+
+  "security": {
+    "read_protection_supported": true,
+    "read_protection_states": [
+      "Protected: RDP byte = 0xFF (erased state) or any value whose complement does not match",
+      "Not protected: RDP byte = RDPRT key (0x00A5), complement = 0xFF5A"
+    ],
+    "read_unprotect_is_destructive": true,
+    "read_unprotect_evidence": "PM §2.4.1 p.17-18: 'When the Flash memory read protection option is changed from protected to unprotected, a Mass Erase of the main Flash memory is performed.' Also: 'This operation first forces a Mass Erase of the main Flash memory.'",
+    "write_protection_supported": true,
+    "write_protection_granularity_bytes": 4096,
+    "write_protection_granularity_detail": "4 pages × 1 KB per WRP bit (medium-density). WRP0 covers pages 0-31, WRP1 pages 32-63, WRP2 pages 64-95, WRP3 pages 96-127. For C8 (64 KB / 64 pages), only WRP0 and WRP1 address valid pages.",
+    "write_protection_remove_method": "Erase entire option-byte area via OPTER, then either (Case 1) program RDPRT 0x00A5 (forces mass erase) or (Case 2) leave erased, then system reset",
+    "write_protection_activation": "Program WRP[3:0] option bytes, then apply system reset to reload"
+  },
+
+  "compatibility": {
+    "programming_algorithm": "same",
+    "memory_geometry": "different",
+    "programming_granularity": "same",
+    "flash_unlock_sequence": "same",
+    "option_byte_behavior": "same",
+    "read_protection_behavior": "same",
+    "write_protection_behavior": "same"
+  },
+
+  "evidence": [
+    {
+      "claim": "STM32F103C8 = 64 KB Flash; STM32F103CB = 128 KB Flash",
+      "source": "DS5319 Table 1 'Device summary', p. 1",
+      "document_number": "DS5319",
+      "revision": "Rev 20",
+      "section": "Table 1. Device summary",
+      "page": 1,
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "C = 48 pins, 8 = 64 KB, B = 128 KB, T = LQFP, 6 = industrial −40 to +85 °C",
+      "source": "DS5319 §7 Ordering information scheme, p. 104",
+      "document_number": "DS5319",
+      "revision": "Rev 20",
+      "section": "Section 7 Ordering information scheme",
+      "page": 104,
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "STM32F103x8 and STM32F103xB are referred to as medium-density devices",
+      "source": "DS5319 §2.2, p. 13; also PM0075 Glossary p. 5",
+      "document_number": "DS5319 / PM0075",
+      "revision": "Rev 20 / Rev 2",
+      "section": "DS §2.2 / PM Glossary",
+      "page": "13 / 5",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Medium-density Flash: 128 pages × 1 KB, start 0x0800 0000",
+      "source": "PM0075 Table 3 'Flash module organization (medium-density devices)', pp. 7-8",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "Table 3",
+      "page": "7-8",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "C8 page count = 64 (64 KB ÷ 1 KB)",
+      "source": "Derived from DS5319 Table 1 (64 KB) + PM0075 Table 3 (1 KB page size)",
+      "document_number": "DS5319 + PM0075",
+      "revision": "Rev 20 + Rev 2",
+      "section": "N/A – arithmetic",
+      "page": null,
+      "evidence_type": "derived"
+    },
+    {
+      "claim": "CB page count = 128, directly tabulated",
+      "source": "PM0075 Table 3 shows Page 0 through Page 127",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "Table 3",
+      "page": "7-8",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Flash register addresses: FLASH_ACR 0x40022000, FLASH_KEYR 0x40022004, FLASH_OPTKEYR 0x40022008, FLASH_SR 0x4002200C, FLASH_CR 0x40022010, FLASH_AR 0x40022014, FLASH_OBR 0x4002201C, FLASH_WRPR 0x40022020",
+      "source": "PM0075 Table 3 (medium-density), pp. 7-8; also Table 11 'Flash interface – register map', p. 29",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "Table 3 / Table 11 / §3.1-§3.8",
+      "page": "7-8, 23-29",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "KEY1 = 0x45670123, KEY2 = 0xCDEF89AB, RDPRT key = 0x00A5",
+      "source": "PM0075 §2.3.1 'Key values', p. 12",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§2.3.1 Key values",
+      "page": 12,
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Unlock = two 32-bit writes (KEY1 then KEY2) to the SAME register FLASH_KEYR",
+      "source": "PM0075 §2.3.2 'Unlocking the Flash memory', p. 13",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§2.3.2",
+      "page": 13,
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Programming granularity = 16 bits (half-word)",
+      "source": "PM0075 §2.3.3 p. 13: 'The main Flash memory can be programmed 16 bits at a time.' Confirmed by DS5319 Table 28 p. 56: 'tprog 16-bit programming time'.",
+      "document_number": "PM0075 + DS5319",
+      "revision": "Rev 2 + Rev 20",
+      "section": "PM §2.3.3 / DS Table 28",
+      "page": "13 / 56",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Page erase sequence: check BSY → set PER → write FLASH_AR → set STRT → wait BSY → verify",
+      "source": "PM0075 §2.3.4 p. 14 + Figure 2 p. 15",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§2.3.4 / Figure 2",
+      "page": "14-15",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Mass erase sequence: check BSY → set MER → set STRT → wait BSY → verify",
+      "source": "PM0075 §2.3.4 p. 15 + Figure 3 p. 16",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§2.3.4 / Figure 3",
+      "page": "15-16",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "HSI must be ON for Flash write/erase",
+      "source": "PM0075 p. 10: 'For write and erase operations on the Flash memory (write/erase), the internal RC oscillator (HSI) must be ON.'",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§1.2 (end of section, p. 10)",
+      "page": 10,
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Option byte region: 0x1FFF F800 – 0x1FFF F80F, 16 bytes",
+      "source": "PM0075 Table 3 p. 7-8; Table 8 p. 20; DS5319 Figure 11 p. 34",
+      "document_number": "PM0075 + DS5319",
+      "revision": "Rev 2 + Rev 20",
+      "section": "PM Table 3 / Table 8 / DS Fig. 11",
+      "page": "7-8, 20, 34",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Option byte encoding is complemented: each 32-bit word = [nBYTE | BYTE]; FPEC auto-computes MSB from LSB",
+      "source": "PM0075 Table 7 p. 19; §2.3.5 p. 16: 'The FPEC takes the LSB and automatically computes the MSB (which is the complement of the LSB)'",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "Table 7 / §2.3.5",
+      "page": "16, 19",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Read-unprotect forces Mass Erase of main Flash → destructive",
+      "source": "PM0075 §2.4.1 p. 17-18: 'a Mass Erase of the main Flash memory is performed'; 'This operation first forces a Mass Erase of the main Flash memory'",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§2.4.1 Read protection / Unprotection",
+      "page": "17-18",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Write-protection granularity for medium-density = 4 pages × 1 KB = 4 KB per WRP bit",
+      "source": "PM0075 §2.4 p. 18: 'four pages for low- and medium-density devices'; Table 9 p. 21: 'one bit ... is used to protect 4 pages of 1 Kbyte'",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§2.4 / Table 9",
+      "page": "18, 21",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "External interfaces: JTAG, SWD, boot loader (ICP); IAP via any com interface",
+      "source": "PM0075 §1 p. 1; Glossary p. 5; DS5319 §2.3.24 p. 20 (SWJ-DP)",
+      "document_number": "PM0075 + DS5319",
+      "revision": "Rev 2 + Rev 20",
+      "section": "PM §1 / Glossary / DS §2.3.24",
+      "page": "1, 5, 20",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "FLASH_SR flags: BSY (bit 0), EOP (bit 5), PGERR (bit 2), WRPRTERR (bit 4)",
+      "source": "PM0075 §3.4, p. 25; Table 11 p. 29",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§3.4 / Table 11",
+      "page": "25, 29",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "FLASH_CR bits: PG (bit 0), PER (bit 1), MER (bit 2), OPTPG (bit 4), OPTER (bit 5), STRT (bit 6), LOCK (bit 7), OPTWRE (bit 9)",
+      "source": "PM0075 §3.5, p. 26; Table 11 p. 29",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§3.5 / Table 11",
+      "page": "26, 29",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Flash register access must be 32-bit word (half-word/byte not allowed for registers)",
+      "source": "PM0075 §3 note, p. 23",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§3 Register descriptions (note)",
+      "page": 23,
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Option-byte unlock: write KEY1 then KEY2 to FLASH_OPTKEYR to set OPTWRE",
+      "source": "PM0075 §2.3.5 p. 16; §2.4.3 p. 19",
+      "document_number": "PM0075",
+      "revision": "Rev 2",
+      "section": "§2.3.5 / §2.4.3",
+      "page": "16, 19",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "C8 and CB share identical programming algorithm, unlock, granularity, option-byte and protection behaviour",
+      "source": "PM0075 covers all STM32F103xx uniformly (Table 1 p.1); DS5319 covers both in one datasheet with no density-conditional programming differences. Both are classified 'medium-density' by both documents.",
+      "document_number": "PM0075 + DS5319",
+      "revision": "Rev 2 + Rev 20",
+      "section": "PM Table 1 / DS §2.2 / DS Table 1",
+      "page": "1 / 13, 1",
+      "evidence_type": "direct"
+    },
+    {
+      "claim": "Memory geometry differs: 64 KB / 64 pages (C8) vs 128 KB / 128 pages (CB)",
+      "source": "DS5319 Table 1 p.1 (flash sizes) + PM0075 Table 3 pp.7-8 (1 KB page, 128 pages max for medium-density)",
+      "document_number": "DS5319 + PM0075",
+      "revision": "Rev 20 + Rev 2",
+      "section": "DS Table 1 / PM Table 3",
+      "page": "1 / 7-8",
+      "evidence_type": "direct"
+    }
+  ],
+
+  "uncertainties": [
+    "PM0075 §2.3.4 p.14 page-erase text states 'BSY bit in the FLASH_CR register', but BSY is defined in FLASH_SR (§3.4 p.25) and Figure 2 (p.15) and the mass-erase text (p.15) both say FLASH_SR. This is an internal inconsistency in PM0075 Rev 2. The correct register is FLASH_SR based on §3.4 and Figure 2.",
+    "external_crystal_required_for_swd_programming: Neither PM0075 nor DS5319 explicitly states whether an external crystal (HSE) is or is not required for SWD-based Flash programming. PM0075 p.10 states HSI must be ON; DS5319 §2.3.7 p.15 states HSI is the default clock on reset. From this one can infer HSE is not mandatory, but no sentence in either document says 'no external crystal is needed for SWD programming.' Marked 'unknown' to respect the no-inference rule.",
+    "required_address_alignment_bytes = 2 is derived from the half-word (16-bit) programming statement in PM §2.3.3. The document does not explicitly state an alignment requirement in bytes; it states the write is a 'half-word write at the desired address', which implies 2-byte alignment.",
+    "For C8 (64 KB / 64 pages), WRP2 and WRP3 in the option bytes address pages 64-127 which do not exist. PM0075 does not explicitly state that these bits are ignored on x8 devices; this is inferred from the fact that the device only has 64 pages. Not stated in either supplied document.",
+    "PM0075 Table 28 (p.56) lists tME (mass erase time) max as 40 ms without specifying whether this applies to 64 KB or 128 KB. The mass-erase time for C8 vs CB is not differentiated in the two supplied documents.",
+    "The 'T6' suffix decoding (T = LQFP, 6 = industrial −40/+85 °C) is from DS5319 §7 p.104. The '6' vs '7' temperature suffix distinction is also on that page. This is ordering-information, not a programming parameter, but included for completeness."
+  ]
+}
