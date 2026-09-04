@@ -103,6 +103,7 @@
           "printed_page_label": {"type": ["string", "null"]},
           "heading": {"type": ["string", "null"]},
           "label": {"type": ["string", "null"]},
+          "section_level": {"type": "integer", "minimum": 1},
           "normalized_content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
           "anchor_line_index": {"type": "integer", "minimum": 0},
           "anchor_line_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
@@ -113,6 +114,10 @@
             "if": {"properties": {"type": {"const": "PAGE"}}},
             "then": {"required": ["normalized_content_sha256"]},
             "else": {"required": ["anchor_line_index", "anchor_line_sha256"]}
+          },
+          {
+            "if": {"properties": {"type": {"const": "SECTION_CANDIDATE"}}},
+            "then": {"required": ["section_level"]}
           }
         ]
       }
