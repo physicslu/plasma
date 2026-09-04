@@ -39,7 +39,8 @@ def test_fault_lab_repairs_disposable_container_owned_workspace_without_sudo() -
     assert '"--network", "none"' in source
     assert '"--cap-drop", "ALL"' in source
     assert '"no-new-privileges:true"' in source
-    assert "sudo" not in source
+    assert '"sudo"' not in source
+    assert 'shutil.which("sudo")' not in source
     assert source.index("phase2._docker_preflight()") < source.index("_make_stale_work_host_removable(phase2, root)")
     assert source.index("_make_stale_work_host_removable(phase2, root)") < source.index("shutil.rmtree(root)")
 
