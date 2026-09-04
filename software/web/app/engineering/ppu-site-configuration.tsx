@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FleetPPUView, FleetSiteView, FleetWebPayload } from "../fleet/fleet-contract";
+import type { FleetPPUView, FleetWebPayload } from "../fleet/fleet-contract";
 import {
   addManagerPpu,
   getManagerFleet,
@@ -12,6 +12,7 @@ import {
   type ManagerRegistryPayload,
 } from "./ppu-registry-api";
 import PpuNetworkConfiguration from "./ppu-network-configuration";
+import PpuSiteDesiredConfiguration from "./ppu-site-desired-configuration";
 import "./ppu-site-configuration.css";
 
 type PpuStatus = "Online" | "Pending" | "Offline" | "Disabled" | "Error" | "Unknown";
@@ -69,13 +70,6 @@ function interfaceSummary(fleetView: FleetPPUView | null): string[] {
       .map(site => site.interface)
       .filter((value): value is string => Boolean(value)),
   ));
-}
-
-function siteState(site: FleetSiteView): string {
-  if (!site.enabled) return "Disabled";
-  if (site.current_job_id || ACTIVE_SITE_STATES.has(site.state.toLowerCase())) return "Running";
-  if (site.state.toLowerCase() === "error") return "Error";
-  return site.state && site.state !== "unknown" ? site.state : "Ready";
 }
 
 export default function PpuSiteConfiguration() {
@@ -221,7 +215,7 @@ export default function PpuSiteConfiguration() {
         <div>
           <small>PPU / SITE MANAGEMENT</small>
           <h2>PPU / Site Configuration</h2>
-          <p>Add and remove Manager registry entries, validate new PPUs before use, and inspect the PPU-reported physical Site topology.</p>
+          <p>Add and remove Manager registry entries, validate new PPUs before use, and manage PPU-owned Site desired configuration.</p>
         </div>
         <span className={`ppuSiteManagerState ${managerOnline ? "" : "offline"}`}>
           {managerOnline ? "Manager Online" : "Manager Unavailable"}
@@ -419,58 +413,10 @@ export default function PpuSiteConfiguration() {
                 hasActiveExecution={selectedHasActiveExecution}
               />
 
-              <section className="ppuSiteCard" aria-label="Site Configuration">
-                <header className="ppuSiteCardHeader">
-                  <div>
-                    <h3>Site Configuration</h3>
-                  </div>
-                  <span className="ppuSiteFilter">PPU-reported topology</span>
-                </header>
-
-                <div className="ppuSiteSummary">
-                  <span>Physical Sites <strong>{selectedFleet?.topology.site_count || "—"}</strong></span>
-                  <span>Enabled Sites <strong>{selectedFleet?.topology.enabled_site_count ?? "—"}</strong></span>
-                  <span>Topology Source <strong>{selectedFleet?.topology.source ?? "none"}</strong></span>
-                </div>
-
-                {selectedFleet?.topology.sites.length ? (
-                  <div className="ppuTableWrap">
-                    <table className="ppuTable">
-                      <thead>
-                        <tr>
-                          <th>Site ID</th>
-                          <th>Enabled</th>
-                          <th>Status</th>
-                          <th>Interface</th>
-                          <th>Target</th>
-                          <th>Current Job</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedFleet.topology.sites.map(site => {
-                          const state = siteState(site);
-                          return (
-                            <tr key={`${selectedEntry.alias}-site-${site.site_id}`}>
-                              <td><span className="ppuIdLink">SITE{site.site_id}</span></td>
-                              <td><input className="ppuSiteToggle" type="checkbox" checked={site.enabled} disabled readOnly aria-label={`SITE${site.site_id} enabled state`} /></td>
-                              <td><span className={`ppuSiteStatus ${statusClass(state)}`}>{state}</span></td>
-                              <td>{site.interface ?? "—"}</td>
-                              <td>{site.target ?? "—"}</td>
-                              <td>{site.current_job_id ?? "—"}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="ppuSiteNote"><strong>Topology unavailable:</strong> Manager has not obtained a current or last-known PPU topology yet. Site count is never entered manually.</p>
-                )}
-
-                <p className="ppuSiteNote">
-                  <strong>Current boundary:</strong> Site enabled state shown here is PPU-reported and read-only in this slice. A separate PPU-owned Site configuration API is required before the Console can persist Site Enable/Disable changes.
-                </p>
-              </section>
+              <PpuSiteDesiredConfiguration
+                entry={selectedEntry}
+                hasActiveExecution={selectedHasActiveExecution}
+              />
             </>
           ) : (
             <section className="ppuSiteCard ppuEmptyRegistry" aria-label="Empty PPU registry">

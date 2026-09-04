@@ -9,7 +9,11 @@ from urllib.parse import urlparse
 from plasma_core.errors import ErrorCode, PlasmaError
 
 from . import gateway_phase2 as gateway
-from .gateway_phase2 import PPUNetworkActivationSupportMixin
+from .gateway_phase2 import (
+    PPUNetworkActivationSupportMixin,
+    SITE_SETTINGS_PATH,
+    SiteConfigurationSupportMixin,
+)
 from .gateway_security import GatewaySecurityController, Permission
 from .ppu_network_activation import PPUNetworkActivationError
 from .secure_gateway import SecurePlasmaWebHandler
@@ -85,12 +89,17 @@ def load_security_controller_from_env() -> GatewaySecurityController:
     return controller
 
 
-class DeployedSecurePlasmaWebHandler(PPUNetworkActivationSupportMixin, SecurePlasmaWebHandler):
+class DeployedSecurePlasmaWebHandler(
+    SiteConfigurationSupportMixin,
+    PPUNetworkActivationSupportMixin,
+    SecurePlasmaWebHandler,
+):
     """Secure handler used by the deployable Gateway launcher.
 
     Phase 2 network activation reuses the existing Admin-only
-    `settings.ppu_network.write` permission and durable idempotency ledger. The
-    privileged network helper remains outside this Gateway process.
+    `settings.ppu_network.write` permission. Writable Site configuration uses the
+    dedicated Engineer/Admin `settings.site.write` permission. Both state-changing
+    families remain inside the durable idempotency ledger.
     """
 
     def _cors_headers(self) -> None:
@@ -109,7 +118,7 @@ class DeployedSecurePlasmaWebHandler(PPUNetworkActivationSupportMixin, SecurePla
 
     def _guard_get(self) -> None:
         path = urlparse(self.path).path.rstrip("/")
-        if path == "/api/settings/ppu-network/activation":
+        if path in {"/api/settings/ppu-network/activation", SITE_SETTINGS_PATH}:
             self._authorize(Permission.SETTINGS_READ)
             return
         super()._guard_get()
@@ -118,10 +127,25 @@ class DeployedSecurePlasmaWebHandler(PPUNetworkActivationSupportMixin, SecurePla
         path = urlparse(self.path).path.rstrip("/")
         if path == "/api/settings/ppu-network/activation" or self._activation_commit_id(path) is not None:
             return self._admit_command(Permission.PPU_NETWORK_SETTINGS_WRITE)
+        site_id = self._site_settings_id(path)
+        if site_id is not None:
+            self._principal()  # Authenticate before local PPU identity lookup.
+            return self._admit_command(
+                Permission.SITE_SETTINGS_WRITE,
+                resources=(self._local_resource(site_id),),
+            )
         return super()._guard_post()
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
+        if path.rstrip("/") == SITE_SETTINGS_PATH:
+            try:
+                self._guard_get()
+                if self._handle_site_configuration_get(path):
+                    return
+            except Exception as exc:
+                self._error(exc)
+                return
         if self.is_phase2_network_get_path(path):
             try:
                 self._guard_get()
@@ -155,6 +179,15 @@ class DeployedSecurePlasmaWebHandler(PPUNetworkActivationSupportMixin, SecurePla
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        if self._site_settings_id(path) is not None:
+            try:
+                if self._guard_post():
+                    return
+                if self._handle_site_configuration_post(path):
+                    return
+            except Exception as exc:
+                self._error(exc)
+                return
         if self.is_phase2_network_post_path(path):
             try:
                 if self._guard_post():

@@ -12,6 +12,7 @@ on:
       - "scripts/ppu-armv7-runtime-lab.py"
       - "scripts/ppu-network-phase1-acceptance.py"
       - "scripts/ppu-network-phase2-acceptance.py"
+      - "scripts/virtual-ppu-network-lab.py"
       - "release/**"
       - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
@@ -20,6 +21,7 @@ on:
       - "software/python/plasma_handlers/**"
       - "software/python/plasma_server/**"
       - "software/python/plasma_client/**"
+      - "software/python/plasma_manager/**"
       - "software/python/plasma_web/**"
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_armv7_runtime_acceptance.py"
@@ -28,6 +30,7 @@ on:
       - "software/python/tests/test_ppu_network_activation.py"
       - "software/python/tests/test_ppu_network_activation_rest.py"
       - "software/python/tests/test_ppu_network_activation_security.py"
+      - "software/python/tests/test_virtual_ppu_network_lab.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_product_release.py"
 
@@ -64,6 +67,7 @@ jobs:
           software/python/tests/test_ppu_network_activation.py
           software/python/tests/test_ppu_network_activation_rest.py
           software/python/tests/test_ppu_network_activation_security.py
+          software/python/tests/test_virtual_ppu_network_lab.py
           software/python/tests/test_ppu_release.py
           software/python/tests/test_product_release.py
 
@@ -182,6 +186,15 @@ jobs:
           python scripts/ppu-network-phase2-acceptance.py \
             --work-dir "$RUNNER_TEMP/plasma-ppu-network-phase2" \
             --report "$RUNNER_TEMP/plasma-ppu-network-phase2.json"
+
+      - name: Run Virtual PPU Network Lab with production Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/virtual-ppu-network-lab.py \
+            --runtime-dir "$RUNNER_TEMP/plasma-ppu-verify/plasma-release/runtime" \
+            --work-dir "$RUNNER_TEMP/plasma-virtual-ppu-network-lab" \
+            --report "$RUNNER_TEMP/plasma-virtual-ppu-network-lab.json"
 
       - name: Upload PPU release artifact
         uses: actions/upload-artifact@v4
