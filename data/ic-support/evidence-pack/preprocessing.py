@@ -90,6 +90,18 @@ def canonical_label(label: str) -> str:
     return f"{words[0].title()} {words[1]}"
 
 
+def _assign_section_page_spans(units: list[dict[str, Any]], page_count: int) -> None:
+    sections = [unit for unit in units if unit.get("type") == "SECTION_CANDIDATE"]
+    for index, section in enumerate(sections):
+        end_page = page_count - 1
+        current_level = section["section_level"]
+        for later in sections[index + 1 :]:
+            if later["section_level"] <= current_level:
+                end_page = later["pdf_page_start"]
+                break
+        section["pdf_page_end"] = end_page
+
+
 def structural_candidates(pages: list[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     units: list[dict[str, Any]] = []
     references: list[dict[str, Any]] = []
@@ -115,10 +127,12 @@ def structural_candidates(pages: list[str]) -> tuple[list[dict[str, Any]], list[
             unit_type = None
             label = None
             heading = None
+            section_level = None
             if match:
                 unit_type = "SECTION_CANDIDATE"
                 label = match.group("number")
                 heading = match.group("title").strip()
+                section_level = label.count(".") + 1
             else:
                 table = _TABLE_LABEL.match(line)
                 figure = _FIGURE_LABEL.match(line)
@@ -143,6 +157,8 @@ def structural_candidates(pages: list[str]) -> tuple[list[dict[str, Any]], list[
                     "anchor_line_index": line_index,
                     "anchor_line_sha256": sha256_bytes((stripped + "\n").encode("utf-8")),
                 }
+                if section_level is not None:
+                    unit["section_level"] = section_level
                 units.append(unit)
                 if unit_type in {"TABLE_CANDIDATE", "FIGURE_CANDIDATE"} and isinstance(label, str):
                     label_to_units.setdefault(label.lower(), []).append(unit_id)
@@ -159,6 +175,7 @@ def structural_candidates(pages: list[str]) -> tuple[list[dict[str, Any]], list[
                     "resolution": "UNRESOLVED",
                 })
 
+    _assign_section_page_spans(units, len(pages))
     for reference in references:
         candidates = label_to_units.get(reference["target_label"].lower(), [])
         if len(candidates) == 1:
@@ -342,6 +359,8 @@ def validate_manifest(
             require(start == end, f"{unit_id}: PAGE unit must span exactly one page")
             require(start not in page_unit_by_index, f"duplicate PAGE unit for page {start}")
             page_unit_by_index[start] = unit
+        elif unit.get("type") == "SECTION_CANDIDATE":
+            require(isinstance(unit.get("section_level"), int) and unit["section_level"] >= 1, f"{unit_id}: section_level required")
 
     require(set(page_unit_by_index) == set(range(page_count)), "every physical page requires exactly one PAGE unit")
     for page in pages:
