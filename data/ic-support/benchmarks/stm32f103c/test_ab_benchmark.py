@@ -202,7 +202,7 @@ class ABBenchmarkTest(unittest.TestCase):
         run = synthetic_run("reduced_context", observed, evidence)
         score = scorer.score_run(run, expected)
         self.assertEqual(score["wrong_assertion_count"], 1)
-        self.assertEqual(score["missing_unknown_count"], 2)  # base_device null + package_hardware unknown
+        self.assertEqual(score["missing_unknown_count"], 1)  # only base_device changed from a known expected value to null
         self.assertEqual(score["uncited_assertion_count"], 1)
         self.assertEqual(score["out_of_context_citation_count"], 1)
         self.assertGreaterEqual(score["unsupported_inference_proxy_count"], 3)
