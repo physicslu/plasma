@@ -31,7 +31,8 @@ jobs:
       - name: Download exact locked DS5319 Rev 20
         run: |
           mkdir -p "$RUNNER_TEMP/plasma-ic-evidence"
-          curl --fail --location --silent --show-error \
+          curl --http1.1 --fail --location --silent --show-error \
+            --retry 4 --retry-all-errors --retry-delay 2 \
             --connect-timeout 30 --max-time 300 \
             --output "$RUNNER_TEMP/plasma-ic-evidence/st_ds5319_rev20.pdf" \
             "https://www.st.com/resource/en/datasheet/stm32f103c8.pdf"
