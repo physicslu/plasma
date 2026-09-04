@@ -2,6 +2,12 @@
 
 Harness/AI output belongs here only as a **candidate**, never as ground truth.
 
+## Grounded manual experiments
+
+Files named `*.raw.json` are retained AI outputs from controlled manual experiments. They are evidence of what a model actually produced and must not be edited to make them satisfy a benchmark contract.
+
+`qwen3.8-27b-mlx-grounded-run1.raw.json` is a Qwen 3.8 27B MLX result produced with DS5319 Rev 20 and PM0075 Rev 2 supplied to the model. It did **not** consume the complete `source-lock.json` input set because the locked Plasma STM32F1 catalog blob was not provided. Therefore it is useful as a manufacturer-grounded A/B experiment, but it is **not** an official source-locked blind candidate and must not be renamed to `candidate.json` or reported as a formal benchmark PASS.
+
 ## Two benchmark layers
 
 The STM32F103C pilot now separates two questions that were previously mixed:
