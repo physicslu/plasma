@@ -91,35 +91,42 @@ def test_independent_private_evidence_verifier_enforces_ownership_and_read_bound
         assert forbidden not in source
 
 
-def test_repeatability_gate_injects_dirty_state_then_runs_twice_without_own_cleanup() -> None:
+def test_repeatability_gate_injects_direct_dirty_state_then_runs_twice_without_own_cleanup() -> None:
     source = _text("scripts/static-ipv4-fault-injection-repeatability.py")
     assert "_seed_dirty_state(work)" in source
     assert source.index("_seed_dirty_state(work)") < source.index("for attempt in range(1, 3):")
-    assert "old_umask = os.umask(0)" in source
-    assert "seed_root.mkdir(mode=0o733, exist_ok=False)" in source
-    assert '"--network",\n            "none"' in source
-    assert '"--cap-drop",\n            "ALL"' in source
+    assert "original_mode = stat.S_IMODE(work.stat().st_mode)" in source
+    assert 'dirty_name = f".dirty-state-root-owned-{os.getpid()}-{time.time_ns()}"' in source
+    assert "work.chmod(original_mode | 0o003)" in source
+    assert "work.chmod(original_mode)" in source
+    assert source.count("work.chmod(") == 2
+    assert source.count(".chmod(") == 2
+    assert '"--network",\n                "none"' in source
+    assert '"--cap-drop",\n                "ALL"' in source
     assert '"no-new-privileges:true"' in source
-    assert '"--user",\n            "0:0"' in source
-    assert 'f"{seed_root}:/seed"' in source
+    assert '"--user",\n                "0:0"' in source
+    assert 'f"{work}:/work"' in source
+    assert "leaf = Path('/work') / sys.argv[1]" in source
     assert "leaf.mkdir(mode=0o700, exist_ok=False)" in source
     assert "private-marker" in source
-    assert "root_owned.lstat()" in source
+    assert "dirty_path.lstat()" in source
     assert "info.st_uid != 0 or info.st_gid != 0 or mode != 0o700" in source
     assert "expected root:root 0700" in source
+    assert "restored_mode = stat.S_IMODE(work.stat().st_mode)" in source
+    assert "dirty-state injection did not restore work-root mode" in source
     assert "for attempt in range(1, 3):" in source
     assert 'command.extend(["--work-dir", str(work), "--report", str(run_report)])' in source
     assert 'work / "manager-crash-after-commit" / "ppu-a"' in source
     assert 'str(repo / "scripts/private-ppu-evidence-verifier.py")' in source
     assert '"run_count": 2' in source
     assert '"dirty_state_injected_before_run1": True' in source
-    assert '"dirty_state_contract": "root:root 0700 directory + root:root 0600 marker"' in source
+    assert '"dirty_state_contract": "direct root:root 0700 directory + root:root 0600 marker"' in source
     assert '"manual_cleanup": False' in source
     assert '"sudo": False' in source
     assert '"host_verifier_non_root": True' in source
     assert '"producer_evidence_contract": "root:root 0600"' in source
     assert '"verifier_independent": True' in source
-    for forbidden in ("rmtree(", "chmod(", "rglob(", '"sudo",', "CAP_DAC_OVERRIDE"):
+    for forbidden in ("rmtree(", "rglob(", '"sudo",', "CAP_DAC_OVERRIDE", "CAP_FOWNER"):
         assert forbidden not in source
 
 
