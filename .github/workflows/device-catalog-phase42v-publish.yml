@@ -1,0 +1,77 @@
+name: Device catalog Phase 4.2V controlled Production publish
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2v-h-admission-batch2]
+    paths: [".github/workflows/device-catalog-phase42v-publish.yml"]
+  workflow_dispatch:
+permissions: {actions: read, contents: write}
+jobs:
+  publish:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/device-catalog-phase4.2v-h-admission-batch2, fetch-depth: 0}
+      - uses: actions/download-artifact@v4
+        with: {name: phase42v-h-batch2-admission-proposal, path: /tmp/phase42v, repository: physicslu/plasma, run-id: 33825415217, github-token: "${{ secrets.GITHUB_TOKEN }}"}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Publish exact bound proposal
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2v-h-admission-batch2-live-2026-09-03 --baseline data/device-catalog/research/stm32f4-phase4.2v-h-admission-batch2-baseline.json
+          PYTHONPATH=data/device-catalog/research python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from device_catalog_admission_framework import read_csv,write_canonical_dataset
+          from device_catalog_pipeline_framework import pipeline_plan_is_clean
+          root=Path('data/device-catalog/research')
+          canonical=root/'stm32f4-commercial-icpn.csv'
+          evidence=root/'evidence/stm32f4-phase4.2v-h-admission-batch2-live-2026-09-03'
+          plan_out=root/'stm32f4-phase4.2v-h-admission-batch2-plan.json'
+          audit_out=root/'stm32f4-phase4.2v-h-admission-batch2-audit.json'
+          raw=Path('/tmp/phase42v/admission-plan.json').read_bytes()
+          sha=hashlib.sha256(raw).hexdigest()
+          if sha!='1b223c19b01f413d7bcfa32117dc7a7222f46a6a5e66a82d86fc48787fee5042': raise SystemExit('proposal hash mismatch')
+          plan=json.loads(raw)
+          expected={'STM32F423CHU6','STM32F423RHT6','STM32F423RHT6TR','STM32F423VHH6','STM32F423VHT6','STM32F423VHT6TR','STM32F423ZHJ6','STM32F423ZHJ6I','STM32F423ZHT3','STM32F423ZHT6'}
+          if {i['icpn'] for i in plan['candidates']}!=expected or not pipeline_plan_is_clean(plan): raise SystemExit('unclean plan')
+          _,rows=read_csv(canonical)
+          if len(rows)!=321 or len({r['base_device'] for r in rows})!=105: raise SystemExit('pre-state mismatch')
+          result=write_canonical_dataset(plan=plan,canonical_path=canonical)
+          _,after=read_csv(canonical)
+          if result['rows_after']!=331 or len({r['base_device'] for r in after})!=109: raise SystemExit('post-state mismatch')
+          plan_out.write_bytes(raw)
+          manifest=json.loads((evidence/'manifest.json').read_text())
+          if manifest['evidence_id']!='stm32f4-phase4.2v-h-admission-batch2-2026-09-03-retained-20260904T011528Z-cd38d54': raise SystemExit('evidence id mismatch')
+          pilot=json.loads((evidence/'pilot-summary.json').read_text())
+          exclusions={i['icpn'] for r in pilot['results'] for i in r['evidence']['excluded_non_active_part_numbers']}
+          expected_exclusions={'STM32F423CHU3','STM32F423RHT3','STM32F423VHH3','STM32F423VHT3','STM32F423ZHJ3'}
+          if exclusions!=expected_exclusions: raise SystemExit('lifecycle exclusion mismatch')
+          if expected & exclusions: raise SystemExit('lifecycle exclusion admitted')
+          summary={
+            'schema_version':1,
+            'phase':'4.2V',
+            'proposal_run_id':33825415217,
+            'proposal_artifact_id':9919748909,
+            'proposal_artifact_zip_sha256':'9d71b28089f041a43c8b1671beb6b10d54e397b6eb8a9f6f1de6894b4b5ba862',
+            'admission_plan_sha256':sha,
+            'retained_evidence_id':manifest['evidence_id'],
+            'production_rows_before':321,
+            'production_rows_after':331,
+            'production_base_devices_before':105,
+            'production_base_devices_after':109,
+            'added_exact_icpns':sorted(expected),
+            'lifecycle_exclusions':sorted(exclusions),
+            'canonical_csv_file_sha256':hashlib.sha256(canonical.read_bytes()).hexdigest(),
+            'status':'published'
+          }
+          audit_out.write_text(json.dumps(summary,indent=2,sort_keys=True)+'\n')
+          PY
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2v-h-admission-batch2-live-2026-09-03 --baseline data/device-catalog/research/stm32f4-phase4.2v-h-admission-batch2-baseline.json
+      - name: Commit publish
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/device-catalog/research/stm32f4-commercial-icpn.csv data/device-catalog/research/stm32f4-phase4.2v-h-admission-batch2-plan.json data/device-catalog/research/stm32f4-phase4.2v-h-admission-batch2-audit.json
+          git commit -m 'device-catalog: admit Phase 4.2V STM32F423 H ICPNs'
+          git push origin HEAD:agent/device-catalog-phase4.2v-h-admission-batch2
