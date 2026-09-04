@@ -53,6 +53,27 @@ jobs:
           destination.write_bytes(payload)
           print(f"materialized {len(payload)} bytes from {final_url}")
           PY
+      - name: Inspect structural anchor lines
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          pdf = Path(os.environ["RUNNER_TEMP"]) / "plasma-ic-evidence" / "st_ds5319_rev20.pdf"
+          result = subprocess.run(
+              ["pdftotext", "-layout", "-enc", "UTF-8", str(pdf), "-"],
+              check=True,
+              stdout=subprocess.PIPE,
+          )
+          text = result.stdout.decode("utf-8")
+          matches = [line for line in text.splitlines() if "Table 1" in line or "Device summary" in line]
+          print("structural-anchor-lines:")
+          for line in matches[:20]:
+              print(repr(line))
+          if not matches:
+              print("<none>")
+          PY
       - name: Build real DS5319 Evidence Pack
         run: |
           python data/ic-support/evidence-pack/semantic_pack.py \
