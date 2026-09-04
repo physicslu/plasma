@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/evidence-pack/document-structure-v0",
+  "title": "Plasma deterministic document structure manifest v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "source_lock_id",
+    "source",
+    "preprocessor",
+    "normalization",
+    "builder",
+    "normalized_document_sha256",
+    "page_count",
+    "pages",
+    "structural_units",
+    "references",
+    "semantic_classification_performed",
+    "canonical_dataset_admission",
+    "production_admission",
+    "manifest_digest"
+  ],
+  "properties": {
+    "artifact_type": {"const": "document_structure_manifest"},
+    "schema_version": {"const": "0.1.0"},
+    "source_lock_id": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "algorithm", "digest", "byte_length"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "algorithm": {"const": "sha256"},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "byte_length": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "preprocessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "arguments"],
+      "properties": {
+        "name": {"const": "pdftotext"},
+        "version": {"type": "string", "minLength": 1},
+        "arguments": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "-layout"},
+            {"const": "-enc"},
+            {"const": "UTF-8"}
+          ],
+          "items": false
+        }
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "digest"],
+      "properties": {
+        "contract_id": {"const": "plasma-document-normalization-v0"},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "builder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["builder_id", "implementation_sha256"],
+      "properties": {
+        "builder_id": {"const": "plasma-document-preprocessor-v0"},
+        "implementation_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "normalized_document_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "page_count": {"type": "integer", "minimum": 1},
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pdf_page_index", "printed_page_label", "normalized_content_sha256"],
+        "properties": {
+          "pdf_page_index": {"type": "integer", "minimum": 0},
+          "printed_page_label": {"type": ["string", "null"]},
+          "normalized_content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "structural_units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["unit_id", "type", "pdf_page_start", "pdf_page_end", "printed_page_label", "heading", "label"],
+        "properties": {
+          "unit_id": {"type": "string", "minLength": 1},
+          "type": {"enum": ["PAGE", "SECTION_CANDIDATE", "TABLE_CANDIDATE", "FIGURE_CANDIDATE"]},
+          "pdf_page_start": {"type": "integer", "minimum": 0},
+          "pdf_page_end": {"type": "integer", "minimum": 0},
+          "printed_page_label": {"type": ["string", "null"]},
+          "heading": {"type": ["string", "null"]},
+          "label": {"type": ["string", "null"]},
+          "section_level": {"type": "integer", "minimum": 1},
+          "normalized_content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "anchor_line_index": {"type": "integer", "minimum": 0},
+          "anchor_line_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {"properties": {"type": {"const": "PAGE"}}},
+            "then": {"required": ["normalized_content_sha256"]},
+            "else": {"required": ["anchor_line_index", "anchor_line_sha256"]}
+          },
+          {
+            "if": {"properties": {"type": {"const": "SECTION_CANDIDATE"}}},
+            "then": {"required": ["section_level"]}
+          }
+        ]
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_unit_id", "pdf_page_index", "line_index", "reference_type", "target_label", "target_unit_id", "resolution"],
+        "properties": {
+          "from_unit_id": {"type": "string", "minLength": 1},
+          "pdf_page_index": {"type": "integer", "minimum": 0},
+          "line_index": {"type": "integer", "minimum": 0},
+          "reference_type": {"const": "DOCUMENT_EXPLICIT_CANDIDATE"},
+          "target_label": {"type": "string", "minLength": 1},
+          "target_unit_id": {"type": ["string", "null"]},
+          "resolution": {"enum": ["UNRESOLVED", "UNIQUE_LABEL_MATCH", "AMBIGUOUS", "NOT_FOUND"]}
+        }
+      }
+    },
+    "semantic_classification_performed": {"const": false},
+    "canonical_dataset_admission": {"const": false},
+    "production_admission": {"const": false},
+    "manifest_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

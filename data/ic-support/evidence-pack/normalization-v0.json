@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1.0",
+  "normalization_contract_id": "plasma-document-normalization-v0",
+  "line_endings": "LF",
+  "form_feed_policy": "preserve_as_page_separator",
+  "trailing_whitespace": "strip_per_line",
+  "terminal_newline": "single",
+  "unicode_normalization": "NFC",
+  "blank_line_policy": "preserve_internal",
+  "locale_dependency": "forbidden",
+  "notes": [
+    "This contract normalizes extracted text, not the source PDF bytes.",
+    "Physical PDF page boundaries remain authoritative and are represented separately from printed page labels.",
+    "Changing any normalization rule changes downstream preprocessing identity."
+  ]
+}
