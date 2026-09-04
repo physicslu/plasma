@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import sys
+import unittest
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+from stm32f4_admission_policy import _package_and_pins
+from stm32f4_coverage_gap_inventory import build_inventory
+
+CATALOG = HERE / "openocd-parts-canonical.csv"
+CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
+EVIDENCE = HERE / "stm32f4-phase4.2ad-f410-ri-ufbga64-policy-evidence.json"
+EXPECTED_READY = {"STM32F410R8", "STM32F410RB"}
+
+
+class STM32F4Phase42ADF410RIUFBGA64PolicyTests(unittest.TestCase):
+    def _inventory(self):
+        return build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)
+
+    def test_ri_maps_to_ufbga64(self) -> None:
+        self.assertEqual(_package_and_pins("R", "I"), ("UFBGA", "64"))
+
+    def test_exact_two_base_devices_become_policy_ready(self) -> None:
+        inventory = self._inventory()
+        ready = {item["base_device"]: item for item in inventory["gap"]["policy_ready"]}
+        blocked = {item["base_device"] for item in inventory["gap"]["policy_blocked"]}
+        production = set(inventory["production"]["base_devices"])
+        remaining_expected = EXPECTED_READY - production
+
+        self.assertLessEqual(remaining_expected, set(ready))
+        self.assertLessEqual(EXPECTED_READY - remaining_expected, production)
+        self.assertTrue(EXPECTED_READY.isdisjoint(blocked))
+        for base_device in remaining_expected:
+            item = ready[base_device]
+            self.assertTrue(item["admission_policy_ready"])
+            self.assertEqual(item["package_codes"], ["I", "T"])
+            self.assertEqual(item["policy_blockers"], [])
+
+        if remaining_expected == EXPECTED_READY:
+            self.assertEqual(inventory["production"]["exact_icpn_rows"], 357)
+            self.assertEqual(inventory["production"]["base_device_count"], 126)
+            self.assertEqual(inventory["gap"]["base_device_count"], 23)
+            self.assertEqual(inventory["gap"]["policy_ready_count"], 2)
+            self.assertEqual(inventory["gap"]["policy_blocked_count"], 21)
+
+    def test_policy_evidence_is_bounded_and_denies_admission(self) -> None:
+        evidence = json.loads(EVIDENCE.read_text(encoding="utf-8"))
+        expected_delta = evidence["expected_immediate_delta_before_admission"]
+        self.assertEqual(evidence["phase"], "4.2AD")
+        self.assertEqual(set(evidence["affected_base_devices"]), EXPECTED_READY)
+        self.assertEqual(set(expected_delta["policy_ready_base_devices"]), EXPECTED_READY)
+        self.assertEqual(expected_delta["policy_ready_count"], 2)
+        self.assertEqual(expected_delta["policy_blocked_count"], 21)
+        self.assertFalse(evidence["production_write_applied"])
+        self.assertTrue(evidence["exact_icpn_admission_deferred"])
+        self.assertFalse(evidence["algorithm_equivalence_claimed"])
+        self.assertTrue(evidence["fail_closed"])
+
+
+if __name__ == "__main__":
+    unittest.main()

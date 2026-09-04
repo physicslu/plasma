@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "phase": "4.2AD",
+  "base_main": "365f51466a57e60dbaf30c56e52d903c51d60796",
+  "captured_at_utc": "2026-09-04T18:19:27Z",
+  "fresh_inventory_before_policy": {
+    "production_exact_icpn_rows": 357,
+    "production_base_device_count": 126,
+    "gap_base_device_count": 23,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 23,
+    "blocker_counts": {
+      "unsupported STM32F4 package code: I": 2,
+      "unsupported STM32F4 pin/package combination: A/H": 11,
+      "unsupported STM32F4 pin/package combination: A/Y": 5,
+      "unsupported STM32F4 pin/package combination: B/T": 10
+    }
+  },
+  "policy_mapping": {
+    "pin_code": "R",
+    "package_code": "I",
+    "package": "UFBGA",
+    "pin_count": "64"
+  },
+  "affected_base_devices": [
+    "STM32F410R8",
+    "STM32F410RB"
+  ],
+  "selection_reason": "R/I is the smallest remaining single policy surface. Official STM32F410x8/B ordering information defines R as 64 pins and I as UFBGA, while the package section identifies the resulting package as UFBGA64. This bounded mapping removes the sole blocker from exactly two Base Devices without altering Production.",
+  "official_evidence": {
+    "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32f410t8.pdf",
+    "document": "DS11144 Rev 8",
+    "ordering_information": "Table 87 defines R as 64 pins and package code I as UFBGA.",
+    "package_information": "Section 7.5 identifies the package as UFBGA64 with 64 balls.",
+    "product_urls": [
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f410r8.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f410rb.html"
+    ],
+    "observed_active_representative_exact_icpns": [
+      "STM32F410R8T6",
+      "STM32F410RBI3",
+      "STM32F410RBI6",
+      "STM32F410RBT6",
+      "STM32F410RBT6TR",
+      "STM32F410RBT7",
+      "STM32F410RBT7TR"
+    ]
+  },
+  "expected_immediate_delta_before_admission": {
+    "production_exact_icpn_rows": 357,
+    "production_base_device_count": 126,
+    "gap_base_device_count": 23,
+    "policy_ready_count": 2,
+    "policy_blocked_count": 21,
+    "policy_ready_base_devices": [
+      "STM32F410R8",
+      "STM32F410RB"
+    ]
+  },
+  "production_write_applied": false,
+  "exact_icpn_admission_deferred": true,
+  "algorithm_equivalence_claimed": false,
+  "fail_closed": true
+}
