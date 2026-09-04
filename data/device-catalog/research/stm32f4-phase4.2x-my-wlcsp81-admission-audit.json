@@ -1,0 +1,28 @@
+{
+  "added_exact_icpns": [
+    "STM32F413MGY6TR",
+    "STM32F413MHY6TR",
+    "STM32F423MHY3TR",
+    "STM32F423MHY6TR",
+    "STM32F446MCY6TR",
+    "STM32F446MEY6MTR",
+    "STM32F446MEY6TR"
+  ],
+  "admission_plan_sha256": "a6789820fc0fd301556486342293bfc115538efc173211608c0e6f3ad9f4faba",
+  "canonical_csv_file_sha256": "8d2a4ccc3bcf6b29614087888b65072376a240534117e3f83877d19d193a1ba7",
+  "lifecycle_exclusions": [
+    "STM32F413MGY3TR",
+    "STM32F413MHY3TR"
+  ],
+  "phase": "4.2X",
+  "production_base_devices_after": 114,
+  "production_base_devices_before": 109,
+  "production_rows_after": 338,
+  "production_rows_before": 331,
+  "proposal_artifact_id": 9930758729,
+  "proposal_artifact_zip_sha256": "fb617885b7a5477f9b6c51f18be98eb9da52ece9244f21093e416428fdc66484",
+  "proposal_run_id": 33857494821,
+  "retained_evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+  "schema_version": 1,
+  "status": "published"
+}

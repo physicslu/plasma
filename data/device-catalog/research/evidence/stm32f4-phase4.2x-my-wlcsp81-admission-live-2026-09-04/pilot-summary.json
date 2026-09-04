@@ -1,0 +1,381 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 6,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 6,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 8,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 6,
+    "total": 6
+  },
+  "pilot_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479ZG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479ZGTx",
+          "icpn": "STM32F479ZGT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479ZG",
+        "evidence_section_sha256": "ed1f5e176e567945dcd1d66e108c47f0a7a34a2df20c97cf7c198ae7760a765b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479ZGT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479ZGT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "23fed55ea2426bf06b81b4df5ebc8dd16d5bc17423c872dbeba38e209eb3c64e",
+        "retrieved_at_utc": "2026-09-04T09:12:10Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+      },
+      "selection_reason": "production lifecycle control",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F413MG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F413MGYx",
+          "icpn": "STM32F413MGY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F413MG",
+        "evidence_section_sha256": "a5ac45f13df1c5d780a5f90153dce7eab034f7f2a1950976da6d5ed43c18c64e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F413MGY6TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F413MGY3TR",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F413MGY3TR",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F413MGY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "68a1d9003bfcd143faa3ebd9a528751ec619a2afc5c6665d988d3a81517b7336",
+        "retrieved_at_utc": "2026-09-04T09:12:17Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mg.html"
+      },
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F413MH",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F413MHYx",
+          "icpn": "STM32F413MHY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F413MH",
+        "evidence_section_sha256": "6f8aa3271ec82981fe649d0b0f18c750862a48b7f77553c3bd5268b4a1e5b508",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F413MHY6TR"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F413MHY3TR",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mh.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F413MHY3TR",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32F413MHY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b8b0f2991a6905955d1298f82868f40605480cacfb179052cbfe1de21fcad1aa",
+        "retrieved_at_utc": "2026-09-04T09:12:23Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mh.html"
+      },
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mh.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F423MH",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F423MHYx",
+          "icpn": "STM32F423MHY3TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F423MHYx",
+          "icpn": "STM32F423MHY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F423MH",
+        "evidence_section_sha256": "f4fdbec3f583cb6a962010bb14e8b4b493490e404a13350ca781f39d55bf1f01",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F423MHY3TR",
+          "STM32F423MHY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F423MHY3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F423MHY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e5a569ff5f52f9e02ab0792e9ff894d534576425d0e58f5bfdf8b9b49f200e33",
+        "retrieved_at_utc": "2026-09-04T09:12:29Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html"
+      },
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F446MC",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F446MCYx",
+          "icpn": "STM32F446MCY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F446MC",
+        "evidence_section_sha256": "834d624b870ddbbbaab76378326b5b5014a6f779f30a9aed23fc700e9b328962",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F446MCY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446mc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F446MCY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6d251e7d44fb91b5aac837021371ad24e4701f8948882bf1cdf495eeb616deba",
+        "retrieved_at_utc": "2026-09-04T09:12:36Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446mc.html"
+      },
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446mc.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F446ME",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F446MEYx",
+          "icpn": "STM32F446MEY6MTR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F446MEYx",
+          "icpn": "STM32F446MEY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F446ME",
+        "evidence_section_sha256": "3205a2cacf5cf43a9f456b27b9c69cb1be7c76e645930218665583cd8854dfbd",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F446MEY6MTR",
+          "STM32F446MEY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F446MEY6MTR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F446MEY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "63dd68f6732d3f693690e80bb4ad4970122939c682d519605f6dd800d2d11786",
+        "retrieved_at_utc": "2026-09-04T09:12:43Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html"
+      },
+      "selection_reason": "Phase 4.2W policy-ready M/Y WLCSP81",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html"
+    }
+  ],
+  "schema_version": 1
+}

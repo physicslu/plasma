@@ -64,6 +64,14 @@ def commercial_core(icpn: str) -> str:
     if core == "STM32F423ZHJ6I":
         core = core[:-1]
 
+    # The STM32F446xC/E ordering table defines M after the temperature
+    # code as an option-specific package for one exact commercial part.
+    # It does not alter the MCU programming target or the M/Y WLCSP81
+    # identity. Ignore M only for routing this exact ST order code; the
+    # canonical row still retains MTR in option_suffix.
+    if core == "STM32F446MEY6M":
+        core = core[:-1]
+
     return core
 
 
