@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/evidence-pack/semantic-policy-v0",
+  "title": "Plasma deterministic semantic evidence policy v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "policy_id",
+    "pack_id",
+    "purpose",
+    "source_lock_id",
+    "source",
+    "expected_physical_page_count",
+    "default",
+    "page_rules",
+    "section_rules",
+    "applicability"
+  ],
+  "properties": {
+    "artifact_type": {"const": "semantic_evidence_policy"},
+    "schema_version": {"const": "0.1.0"},
+    "policy_id": {"type": "string", "minLength": 1},
+    "pack_id": {"type": "string", "minLength": 1},
+    "purpose": {"type": "string", "minLength": 1},
+    "source_lock_id": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "algorithm", "digest", "byte_length"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "algorithm": {"const": "sha256"},
+        "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "byte_length": {"type": "integer", "minimum": 1}
+      }
+    },
+    "expected_physical_page_count": {"type": "integer", "minimum": 1},
+    "default": {"$ref": "#/$defs/classification"},
+    "page_rules": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {"$ref": "#/$defs/classification"},
+          {
+            "type": "object",
+            "required": ["rule_id", "pdf_page_index"],
+            "properties": {
+              "rule_id": {"type": "string", "minLength": 1},
+              "pdf_page_index": {"type": "integer", "minimum": 0}
+            }
+          }
+        ]
+      }
+    },
+    "section_rules": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {"$ref": "#/$defs/classification"},
+          {
+            "type": "object",
+            "required": ["rule_id", "section_label", "heading_regex"],
+            "properties": {
+              "rule_id": {"type": "string", "minLength": 1},
+              "section_label": {"type": "string", "minLength": 1},
+              "heading_regex": {"type": "string", "minLength": 1}
+            }
+          }
+        ]
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claims"],
+      "properties": {
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "claim_id",
+              "manufacturer_expression",
+              "anchor_type",
+              "anchor_label",
+              "anchor_heading_regex",
+              "targets"
+            ],
+            "properties": {
+              "claim_id": {"type": "string", "minLength": 1},
+              "manufacturer_expression": {"type": "string", "minLength": 1},
+              "anchor_type": {"enum": ["TABLE_CANDIDATE", "FIGURE_CANDIDATE", "SECTION_CANDIDATE"]},
+              "anchor_label": {"type": "string", "minLength": 1},
+              "anchor_heading_regex": {"type": "string", "minLength": 1},
+              "targets": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "classification": {
+      "type": "object",
+      "required": ["categories", "classification"],
+      "properties": {
+        "categories": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "classification": {"enum": ["MUST_INCLUDE", "OPTIONAL", "EXCLUDE", "UNKNOWN"]}
+      }
+    }
+  }
+}
