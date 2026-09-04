@@ -44,6 +44,15 @@ def _filesystem_type(path: Path) -> str:
     return _run(["stat", "-f", "-c", "%T", str(path)])
 
 
+def _os_release() -> dict[str, str]:
+    try:
+        release = platform.freedesktop_os_release()
+    except OSError as exc:
+        raise RuntimeError("unable to read Linux OS release metadata") from exc
+    keys = ("NAME", "VERSION", "ID", "VERSION_ID")
+    return {key: release[key] for key in keys if key in release}
+
+
 def _default_routes() -> tuple[list[dict[str, Any]], str]:
     raw = _run(["ip", "-json", "route", "show", "default"])
     routes = json.loads(raw or "[]")
@@ -236,6 +245,7 @@ def main() -> int:
                     "kernel_system": platform.system(),
                     "kernel_release": platform.release(),
                     "machine": platform.machine(),
+                    "os_release": _os_release(),
                     "python": platform.python_version(),
                     "node": _run(["node", "--version"]),
                     "npm": _run(["npm", "--version"]),
