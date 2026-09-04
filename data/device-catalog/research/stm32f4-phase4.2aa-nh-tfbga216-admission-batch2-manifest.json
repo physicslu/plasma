@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-2026-09-05",
+  "targets": [
+    {
+      "base_device": "STM32F479ZG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479zg.html",
+      "selection_reason": "production lifecycle control"
+    },
+    {
+      "base_device": "STM32F469NE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ne.html",
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1"
+    },
+    {
+      "base_device": "STM32F469NG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ng.html",
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1"
+    },
+    {
+      "base_device": "STM32F469NI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html",
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1"
+    },
+    {
+      "base_device": "STM32F479NG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ng.html",
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1"
+    },
+    {
+      "base_device": "STM32F479NI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ni.html",
+      "selection_reason": "Phase 4.2Y policy-ready N/H TFBGA216; remaining after Phase 4.2Z batch1"
+    }
+  ],
+  "admission_scope": {
+    "family": "STM32F4",
+    "base_devices": [
+      "STM32F469NE",
+      "STM32F469NG",
+      "STM32F469NI",
+      "STM32F479NG",
+      "STM32F479NI"
+    ],
+    "production_exact_icpns_before": 345,
+    "production_base_devices_before": 119,
+    "fail_closed": true
+  }
+}
