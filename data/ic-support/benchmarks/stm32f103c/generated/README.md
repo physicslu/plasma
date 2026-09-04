@@ -17,9 +17,9 @@ Later programming-profile decomposition and executable-style pseudocode experime
 
 Do not expose these review records to a model during an independent blind comparison, because they contain known failure classes and corrected representations.
 
-## Two benchmark layers
+## Three benchmark questions
 
-The STM32F103C pilot now separates two questions that were previously mixed:
+The STM32F103C pilot keeps three questions separate:
 
 1. **Blind extraction** — can an isolated extractor recover facts and reuse relationships from the locked official sources?
    - answer key: `../extraction-ground-truth.json`
@@ -28,8 +28,29 @@ The STM32F103C pilot now separates two questions that were previously mixed:
 2. **Normalization/profile binding** — does Plasma's canonical profile model resolve to the intended reusable Profile IDs?
    - answer key: `../ground-truth.json`
    - checked-in profiles/bindings are part of this later layer.
+3. **Manufacturer-only Full-vs-Pack A/B** — can deterministic DS5319 reduction lower context cost without reducing engineering correctness?
+   - contract: `../evidence-pack-benchmark-v0.json`
+   - full arm: exact locked DS5319 + exact locked PM0075.
+   - reduced arm: deterministic DS5319 Evidence Pack + exact locked PM0075.
+   - the model/runtime/prompt/source revisions and `pdftotext` fingerprint are controlled variables.
 
 An extractor cannot infer strings such as Plasma Profile IDs from ST documentation, so they must not be part of a blind-source score.
+
+## Full-vs-Pack preparation
+
+Materialize the exact locked DS5319 PDF, then build the semantic Evidence Pack **outside** the Plasma repository:
+
+```bash
+python data/ic-support/evidence-pack/semantic_pack.py \
+  --source-lock data/ic-support/benchmarks/stm32f103c/source-lock.json \
+  --policy data/ic-support/evidence-pack/policies/st-ds5319-rev20-programming-v0.json \
+  --pdf /outside/repo/st_ds5319_rev20.pdf \
+  --output-dir /outside/repo/ds5319-pack
+```
+
+The generated `evidence.txt` is the reduced datasheet context. `structure.json`, `catalog.json`, `pack.json`, `binding.json`, and the C8/CB target bundles retain the exact source/tool/policy identities needed to audit that context. These manufacturer-content-derived outputs are not checked into Git.
+
+The A/B experiment is not the formal blind benchmark. Do not inject the Plasma catalog blob into the manufacturer-only A/B arms merely to make their source sets resemble the formal benchmark.
 
 ## Blind workspace
 
