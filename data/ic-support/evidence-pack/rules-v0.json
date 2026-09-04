@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1.0",
+  "rule_set_id": "ic-programming-evidence-rules-v0",
+  "classification_policy": {
+    "MUST_INCLUDE": "INCLUDE",
+    "OPTIONAL": "OMIT_BY_DEFAULT",
+    "EXCLUDE": "OMIT_BY_DEFAULT",
+    "UNKNOWN": "INCLUDE_FAIL_CLOSED"
+  },
+  "mandatory_categories": [
+    "DEVICE_IDENTITY",
+    "ORDERING",
+    "MEMORY_MAP",
+    "FLASH",
+    "PROGRAMMING",
+    "DEBUG",
+    "BOOT",
+    "RESET",
+    "CLOCK",
+    "POWER",
+    "SECURITY",
+    "ELECTRICAL",
+    "PIN_MAPPING",
+    "ERRATA",
+    "REVISION"
+  ],
+  "normally_excluded_categories": [
+    "PERIPHERAL_FUNCTIONAL"
+  ],
+  "precedence": [
+    "DEPENDENCY_CLOSURE",
+    "MUST_INCLUDE",
+    "UNKNOWN_FAIL_CLOSED",
+    "AI_SUPPLEMENTAL_ADD_ONLY",
+    "OPTIONAL",
+    "EXCLUDE"
+  ],
+  "dependency_edge_policy": {
+    "DOCUMENT_EXPLICIT": "AUTHORITATIVE_CLOSURE",
+    "DETERMINISTIC_RULE": "AUTHORITATIVE_CLOSURE",
+    "AI_SUGGESTED": "SUPPLEMENTAL_ONLY"
+  },
+  "ai_policy": {
+    "may_add_supplemental_units": true,
+    "may_remove_deterministic_units": false,
+    "may_override_source_lock": false,
+    "may_assert_production_admission": false
+  }
+}

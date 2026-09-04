@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.1.0",
+  "taxonomy_id": "ic-programming-evidence-taxonomy-v0",
+  "categories": [
+    "DEVICE_IDENTITY",
+    "ORDERING",
+    "MEMORY_MAP",
+    "FLASH",
+    "PROGRAMMING",
+    "DEBUG",
+    "BOOT",
+    "RESET",
+    "CLOCK",
+    "POWER",
+    "SECURITY",
+    "ELECTRICAL",
+    "PIN_MAPPING",
+    "ERRATA",
+    "REVISION",
+    "PERIPHERAL_FUNCTIONAL",
+    "UNKNOWN"
+  ],
+  "notes": [
+    "Taxonomy describes what an Evidence Unit is about; it does not decide whether the unit is included.",
+    "PERIPHERAL_FUNCTIONAL is semantic classification, not an assertion of irrelevance.",
+    "UNKNOWN is a valid classification state and fails closed through the v0 rule set."
+  ]
+}
