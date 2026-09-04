@@ -90,6 +90,9 @@ def test_fault_helper_is_test_only_and_preserves_gateway_contract() -> None:
     for mode in ("apply-error", "apply-noop", "apply-drop", "restore-error"):
         assert mode in source
     assert "CAP_NET_ADMIN" not in source
+    assert "_journal_visibility_worker" not in source
+    assert '"--journal-path"' not in source
+    assert "chmod(0o644)" not in source
 
 
 def test_production_manager_and_gateway_have_no_fault_switches() -> None:
