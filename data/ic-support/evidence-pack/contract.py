@@ -39,15 +39,48 @@ def bundle_digest(bundle: dict[str, Any]) -> str:
     return canonical_sha256(_without_identity(bundle, "bundle_id", "bundle_digest"))
 
 
-def validate_catalog(catalog: dict[str, Any], taxonomy: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def locked_source_fingerprints(source_lock: dict[str, Any]) -> dict[str, dict[str, str]]:
+    source_lock_id = source_lock.get("source_lock_id")
+    require(isinstance(source_lock_id, str) and source_lock_id, "source lock requires source_lock_id")
+    sources = source_lock.get("sources")
+    require(isinstance(sources, list) and sources, "source lock requires sources")
+
+    fingerprints: dict[str, dict[str, str]] = {}
+    for source in sources:
+        require(isinstance(source, dict), "source-lock source entry must be object")
+        source_id = source.get("source_id")
+        integrity = source.get("integrity")
+        require(isinstance(source_id, str) and source_id, "source-lock source_id required")
+        require(source_id not in fingerprints, f"duplicate source-lock source_id: {source_id}")
+        require(isinstance(integrity, dict), f"{source_id}: source-lock integrity required")
+        algorithm = integrity.get("algorithm")
+        digest = integrity.get("digest")
+        require(isinstance(algorithm, str) and algorithm, f"{source_id}: source-lock algorithm required")
+        require(isinstance(digest, str) and digest, f"{source_id}: source-lock digest required")
+        fingerprints[source_id] = {"algorithm": algorithm, "digest": digest}
+    return fingerprints
+
+
+def validate_catalog(
+    catalog: dict[str, Any],
+    taxonomy: dict[str, Any],
+    source_lock: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
     require(catalog.get("artifact_type") == "evidence_unit_catalog", "catalog artifact_type mismatch")
     require(catalog.get("schema_version") == SCHEMA_VERSION, "catalog schema_version mismatch")
+    require(catalog.get("source_lock_id") == source_lock.get("source_lock_id"), "catalog/source-lock ID mismatch")
     require(catalog.get("catalog_digest") == catalog_digest(catalog), "catalog digest mismatch")
 
     source = catalog.get("source")
     require(isinstance(source, dict), "catalog source object required")
     source_id = source.get("source_id")
     require(isinstance(source_id, str) and source_id, "catalog source_id required")
+    locked = locked_source_fingerprints(source_lock)
+    require(source_id in locked, f"{source_id}: source not present in source lock")
+    require(
+        {"algorithm": source.get("algorithm"), "digest": source.get("digest")} == locked[source_id],
+        f"{source_id}: catalog source fingerprint does not match source lock",
+    )
 
     categories = set(taxonomy.get("categories", []))
     require(categories, "taxonomy categories required")
@@ -64,7 +97,10 @@ def validate_catalog(catalog: dict[str, Any], taxonomy: dict[str, Any]) -> dict[
         unit_categories = unit.get("categories")
         require(isinstance(unit_categories, list) and unit_categories, f"{unit_id}: categories required")
         require(set(unit_categories) <= categories, f"{unit_id}: unknown taxonomy category")
-        require(unit.get("classification") in {"MUST_INCLUDE", "OPTIONAL", "EXCLUDE", "UNKNOWN"}, f"{unit_id}: invalid classification")
+        require(
+            unit.get("classification") in {"MUST_INCLUDE", "OPTIONAL", "EXCLUDE", "UNKNOWN"},
+            f"{unit_id}: invalid classification",
+        )
         by_id[unit_id] = unit
     return by_id
 
@@ -75,12 +111,12 @@ def _deterministic_seed_reason(unit: dict[str, Any], rules: dict[str, Any]) -> s
     mandatory = set(rules.get("mandatory_categories", []))
     categories = set(unit["categories"])
 
+    if "UNKNOWN" in categories or policy == "INCLUDE_FAIL_CLOSED":
+        return "UNKNOWN_FAIL_CLOSED"
     if categories & mandatory:
         return "MANDATORY_CATEGORY"
     if policy == "INCLUDE":
         return "MUST_INCLUDE"
-    if policy == "INCLUDE_FAIL_CLOSED":
-        return "UNKNOWN_FAIL_CLOSED"
     return None
 
 
@@ -117,7 +153,7 @@ def build_pack(
     *,
     pack_id: str,
     purpose: str,
-    source_lock_id: str,
+    source_lock: dict[str, Any],
     catalogs: list[dict[str, Any]],
     taxonomy: dict[str, Any],
     rules: dict[str, Any],
@@ -126,13 +162,14 @@ def build_pack(
     ai_supplemental_unit_ids: Iterable[str] = (),
 ) -> dict[str, Any]:
     require(catalogs, "at least one Evidence Unit catalog is required")
+    source_lock_id = source_lock.get("source_lock_id")
+    require(isinstance(source_lock_id, str) and source_lock_id, "source lock requires source_lock_id")
     all_units: dict[str, dict[str, Any]] = {}
     catalog_ids: list[str] = []
     catalog_digests: dict[str, str] = {}
 
     for catalog in catalogs:
-        require(catalog.get("source_lock_id") == source_lock_id, "catalog/source-lock mismatch")
-        units = validate_catalog(catalog, taxonomy)
+        units = validate_catalog(catalog, taxonomy, source_lock)
         overlap = set(all_units) & set(units)
         require(not overlap, f"duplicate unit IDs across catalogs: {sorted(overlap)}")
         all_units.update(units)
@@ -241,7 +278,10 @@ def resolve_target_bundle(
     require(len(matches) == 1, f"{target_icpn}: exact applicability binding required")
     target = matches[0]
     selected = {pack_id: packs[pack_id]["pack_digest"] for pack_id in target["pack_ids"]}
-    require(all(packs[pack_id]["source_lock_id"] == source_lock_id for pack_id in selected), "pack/source-lock mismatch")
+    require(
+        all(packs[pack_id]["source_lock_id"] == source_lock_id for pack_id in selected),
+        "pack/source-lock mismatch",
+    )
 
     bundle: dict[str, Any] = {
         "artifact_type": "target_evidence_bundle",
