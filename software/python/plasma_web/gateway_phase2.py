@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from plasma_core.errors import ErrorCode, PlasmaError
+
 from . import gateway as canonical_gateway
 from . import gateway_base as base
 from .ppu_network_activation import (
@@ -15,10 +17,15 @@ from .ppu_network_activation import (
     PPUNetworkActivationError,
     PPUNetworkActivationHelperClient,
 )
+from .site_configuration import SiteConfigurationController
 
 
 NETWORK_SETTINGS_PATH = "/api/settings/ppu-network"
 NETWORK_ACTIVATION_PATH = "/api/settings/ppu-network/activation"
+SITE_SETTINGS_PATH = "/api/settings/sites"
+ACTIVE_SITE_STATES = frozenset(
+    {"queued", "submitting", "running", "stopping", "erase", "program", "verify", "read"}
+)
 
 
 class PPUNetworkActivationSupportMixin:
@@ -214,10 +221,188 @@ class PPUNetworkActivationSupportMixin:
         return False
 
 
-class Phase2PlasmaWebHandler(PPUNetworkActivationSupportMixin, canonical_gateway.PlasmaWebHandler):
+class SiteConfigurationSupportMixin:
+    """Expose PPU-owned desired Site configuration without pretending hot apply.
+
+    Desired values live in the canonical PPU YAML. Actual values come from the
+    running Plasma Server. Phase 1 persists a desired change and reports whether
+    the running process already matches it; it never restarts Plasma Server from
+    inside an HTTP request.
+    """
+
+    site_configuration: SiteConfigurationController | None = None
+
+    @classmethod
+    def configure_site_configuration(cls, config_path: Path) -> None:
+        cls.site_configuration = SiteConfigurationController(config_path)
+
+    @staticmethod
+    def _site_settings_id(path: str) -> int | None:
+        parts = [unquote(part) for part in path.strip("/").split("/") if part]
+        if len(parts) != 4 or parts[:3] != ["api", "settings", "sites"]:
+            return None
+        try:
+            return base._parse_site_id(parts[3])
+        except ValueError:
+            return None
+
+    def _site_configuration_controller(self) -> SiteConfigurationController:
+        controller = self.site_configuration
+        if controller is None:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "PPU Site configuration controller is unavailable",
+            )
+        return controller
+
+    @staticmethod
+    def _active_execution(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+        ppu = snapshot.get("ppu")
+        execution = ppu.get("execution") if isinstance(ppu, dict) else None
+        if isinstance(execution, dict) and execution.get("busy") is True:
+            return execution
+        sites = snapshot.get("sites")
+        if isinstance(sites, list):
+            for site in sites:
+                if not isinstance(site, dict):
+                    continue
+                state = str(site.get("state", "")).strip().lower()
+                if site.get("current_job_id") or state in ACTIVE_SITE_STATES:
+                    return {
+                        "busy": True,
+                        "site_id": site.get("site_id"),
+                        "current_job_id": site.get("current_job_id"),
+                        "state": state,
+                    }
+        return None
+
+    @staticmethod
+    def _site_actual_view(site: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "enabled": site.get("enabled") is True,
+            "interface": site.get("interface"),
+            "target": site.get("target"),
+            "state": site.get("state"),
+            "current_job_id": site.get("current_job_id"),
+        }
+
+    @classmethod
+    def _site_reconciliation_state(
+        cls,
+        desired: dict[str, Any],
+        actual: dict[str, Any] | None,
+    ) -> str:
+        if actual is None:
+            return "actual_unavailable"
+        if desired["enabled"] != actual["enabled"]:
+            return "restart_required"
+        if actual["enabled"]:
+            if desired["interface"] != actual["interface"] or desired["target"] != actual["target"]:
+                return "restart_required"
+            return "in_sync"
+        # Protocol v3.3 intentionally hides interface/target for a disabled Site.
+        # We can prove effective disabled state, but not the dormant loaded binding.
+        return "disabled_runtime_binding_unobservable"
+
+    def _site_configuration_payload(
+        self,
+        *,
+        actual_snapshot: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        desired = self._site_configuration_controller().current()
+        snapshot = actual_snapshot if actual_snapshot is not None else self._local_snapshot()
+        raw_actual_sites = snapshot.get("sites")
+        actual_sites = raw_actual_sites if isinstance(raw_actual_sites, list) else []
+        actual_by_id = {
+            site.get("site_id"): site
+            for site in actual_sites
+            if isinstance(site, dict) and isinstance(site.get("site_id"), int)
+        }
+
+        sites: list[dict[str, Any]] = []
+        states: list[str] = []
+        for desired_site in desired["sites"]:
+            site_id = desired_site["site_id"]
+            raw_actual = actual_by_id.get(site_id)
+            actual = self._site_actual_view(raw_actual) if isinstance(raw_actual, dict) else None
+            state = self._site_reconciliation_state(desired_site, actual)
+            states.append(state)
+            sites.append(
+                {
+                    "site_id": site_id,
+                    "desired": {
+                        "enabled": desired_site["enabled"],
+                        "interface": desired_site["interface"],
+                        "target": desired_site["target"],
+                    },
+                    "actual": actual,
+                    "reconciliation": state,
+                }
+            )
+
+        if any(state == "restart_required" for state in states):
+            overall = "restart_required"
+        elif any(state == "actual_unavailable" for state in states):
+            overall = "actual_unavailable"
+        elif any(state == "disabled_runtime_binding_unobservable" for state in states):
+            overall = "partially_observable"
+        else:
+            overall = "in_sync"
+
+        return {
+            "ok": True,
+            "rest_contract_version": canonical_gateway.WEB_REST_CONTRACT_VERSION,
+            "site_configuration": {
+                "source": desired["source"],
+                "runtime_apply_supported": False,
+                "reconciliation": overall,
+                "sites": sites,
+            },
+        }
+
+    def _handle_site_configuration_get(self, path: str) -> bool:
+        if path.rstrip("/") != SITE_SETTINGS_PATH:
+            return False
+        try:
+            snapshot = self._local_snapshot()
+        except Exception:
+            self._execution_unavailable()
+            return True
+        self._json(HTTPStatus.OK, self._site_configuration_payload(actual_snapshot=snapshot))
+        return True
+
+    def _handle_site_configuration_post(self, path: str) -> bool:
+        site_id = self._site_settings_id(path)
+        if site_id is None:
+            return False
+        try:
+            snapshot = self._local_snapshot()
+        except Exception:
+            self._execution_unavailable()
+            return True
+        active = self._active_execution(snapshot)
+        if active is not None:
+            raise PlasmaError(
+                ErrorCode.PPU_BUSY,
+                "Site desired configuration cannot change while PPU execution is active",
+                recoverable=True,
+                context={"execution": active},
+            )
+        self._site_configuration_controller().update(site_id, self._body())
+        self._json(HTTPStatus.OK, self._site_configuration_payload(actual_snapshot=snapshot))
+        return True
+
+
+class Phase2PlasmaWebHandler(
+    SiteConfigurationSupportMixin,
+    PPUNetworkActivationSupportMixin,
+    canonical_gateway.PlasmaWebHandler,
+):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         try:
+            if self._handle_site_configuration_get(path):
+                return
             if self._handle_phase2_network_get(path):
                 return
         except PPUNetworkActivationError as exc:
@@ -231,6 +416,8 @@ class Phase2PlasmaWebHandler(PPUNetworkActivationSupportMixin, canonical_gateway
     def do_POST(self) -> None:
         path = urlparse(self.path).path
         try:
+            if self._handle_site_configuration_post(path):
+                return
             if self._handle_phase2_network_post(path):
                 return
         except PPUNetworkActivationError as exc:
@@ -246,15 +433,15 @@ class Phase2PlasmaWebHandler(PPUNetworkActivationSupportMixin, canonical_gateway
 PlasmaWebHandler = Phase2PlasmaWebHandler
 
 
-def _strip_network_activation_option(argv: list[str]) -> list[str]:
+def _strip_phase2_options(argv: list[str]) -> list[str]:
     stripped: list[str] = []
     index = 0
     while index < len(argv):
         value = argv[index]
-        if value == "--network-activation-socket":
+        if value in {"--network-activation-socket", "--ppu-config"}:
             index += 2
             continue
-        if value.startswith("--network-activation-socket="):
+        if value.startswith("--network-activation-socket=") or value.startswith("--ppu-config="):
             index += 1
             continue
         stripped.append(value)
@@ -265,6 +452,7 @@ def _strip_network_activation_option(argv: list[str]) -> list[str]:
 def main() -> None:
     pre = argparse.ArgumentParser(add_help=False)
     pre.add_argument("--network-activation-socket", type=Path)
+    pre.add_argument("--ppu-config", type=Path, default=Path("config/plasma.yaml"))
     pre.add_argument("--output-root", type=Path, default=Path("output"))
     pre.add_argument("--plasma-host", default="127.0.0.1")
     pre.add_argument("--plasma-port", type=int, default=9900)
@@ -273,17 +461,20 @@ def main() -> None:
     handler = PlasmaWebHandler
     if not issubclass(handler, PPUNetworkActivationSupportMixin):
         raise RuntimeError("configured Phase 2 Gateway handler lacks PPU network activation support")
+    if not issubclass(handler, SiteConfigurationSupportMixin):
+        raise RuntimeError("configured Phase 2 Gateway handler lacks Site configuration support")
     handler.configure_network_activation(
         socket_path=known.network_activation_socket,
         output_root=known.output_root,
         plasma_host=known.plasma_host,
         plasma_port=known.plasma_port,
     )
+    handler.configure_site_configuration(known.ppu_config)
 
     original_handler = canonical_gateway.PlasmaWebHandler
     original_argv = list(sys.argv)
     canonical_gateway.PlasmaWebHandler = handler
-    sys.argv[:] = _strip_network_activation_option(sys.argv)
+    sys.argv[:] = _strip_phase2_options(sys.argv)
     try:
         canonical_gateway.main()
     finally:
