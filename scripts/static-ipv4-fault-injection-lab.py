@@ -621,19 +621,38 @@ def _scenario_manager_crash_before_commit(**common: Any) -> dict[str, Any]:
         a_endpoint, _ = _registry_endpoints(topology.virtual, topology.manager_base)
         if a_endpoint != f"http://{PPU_A_INITIAL_IP}:{PPU_PORT}":
             raise FaultLabError("pre-commit crash mutated Manager registry")
-        retry_status, _ = _commission(topology.virtual, topology.manager_base, CANDIDATE_IP, "fault-crash-before-commit-retry")
-        if retry_status != 409:
-            raise FaultLabError(f"recovery_required did not block new commissioning: HTTP {retry_status}")
         activation = _wait_activation(
             topology.virtual,
             f"http://{PPU_A_INITIAL_IP}:{PPU_PORT}",
             "rolled_back",
             timeout_s=ROLLBACK_TIMEOUT_S + 8,
         )
+        topology.wait_manager_ready()
+        retry_status, retry_payload = _commission(
+            topology.virtual,
+            topology.manager_base,
+            CANDIDATE_IP,
+            "fault-crash-before-commit-retry",
+        )
+        retry_error = retry_payload.get("error")
+        retry_record = retry_payload.get("commissioning")
+        if (
+            retry_status != 409
+            or not isinstance(retry_error, dict)
+            or retry_error.get("code") != "network_commissioning_busy"
+            or not isinstance(retry_record, dict)
+            or retry_record.get("state") != "recovery_required"
+        ):
+            raise FaultLabError(
+                "recovery_required was not the authoritative retry blocker: "
+                f"HTTP {retry_status}: {retry_payload!r}"
+            )
         return {
             "durable_crash_state": "identity_verified",
             "restart_state": "recovery_required",
             "new_commissioning_blocked": True,
+            "blocking_error_code": "network_commissioning_busy",
+            "trusted_fleet_restored_before_retry": True,
             "ppu_activation": activation.get("state"),
         }
     finally:
