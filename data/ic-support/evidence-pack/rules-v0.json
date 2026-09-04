@@ -25,7 +25,10 @@
     "REVISION"
   ],
   "normally_excluded_categories": [
-    "PERIPHERAL_FUNCTIONAL"
+    "PERIPHERAL_FUNCTIONAL",
+    "DOCUMENT_STRUCTURE",
+    "PACKAGE_MECHANICAL",
+    "ELECTRICAL_OTHER"
   ],
   "precedence": [
     "DEPENDENCY_CLOSURE",
