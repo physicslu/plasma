@@ -68,6 +68,44 @@ def test_private_activation_journal_is_hashed_through_locked_down_readonly_conta
     assert '"with path.open(\'rb\') as handle:\\n"' in sha_source
 
 
+def test_independent_private_evidence_verifier_enforces_ownership_and_read_boundary() -> None:
+    source = _text("scripts/private-ppu-evidence-verifier.py")
+    assert 'CANONICAL_RELATIVE_PATH = Path("gateway-output/ppu-network-activation.json")' in source
+    assert "host verifier must run as a non-root user" in source
+    assert "info.st_uid != 0 or info.st_gid != 0 or mode != 0o600" in source
+    assert "expected root:root 0600" in source
+    assert '"--network",\n            "none"' in source
+    assert '"--cap-drop",\n            "ALL"' in source
+    assert '"no-new-privileges:true"' in source
+    assert 'f"{ppu_work}:/evidence:ro"' in source
+    assert '"--user",\n            "0:0"' in source
+    for forbidden in (
+        "chmod(",
+        "sudo",
+        "rglob(",
+        "static-ipv4-fault-helper",
+        "manager-network-commissioning-crash-injector",
+        "plasma_manager",
+        "plasma_web",
+    ):
+        assert forbidden not in source
+
+
+def test_repeatability_gate_runs_twice_in_same_workdir_without_own_cleanup() -> None:
+    source = _text("scripts/static-ipv4-fault-injection-repeatability.py")
+    assert "for attempt in range(1, 3):" in source
+    assert 'command.extend(["--work-dir", str(work), "--report", str(run_report)])' in source
+    assert 'work / "manager-crash-after-commit" / "ppu-a"' in source
+    assert 'str(repo / "scripts/private-ppu-evidence-verifier.py")' in source
+    assert '"run_count": 2' in source
+    assert '"manual_cleanup": False' in source
+    assert '"host_verifier_non_root": True' in source
+    assert '"producer_evidence_contract": "root:root 0600"' in source
+    assert '"verifier_independent": True' in source
+    for forbidden in ("rmtree(", "chmod(", "rglob(", "sudo"):
+        assert forbidden not in source
+
+
 def test_fault_lab_streams_scenario_progress() -> None:
     source = _text("scripts/static-ipv4-fault-injection-lab.py")
     assert 'print(f"[RUN ] {index}/{total} {label}", flush=True)' in source
@@ -105,12 +143,14 @@ def test_production_manager_and_gateway_have_no_fault_switches() -> None:
     assert "fault_mode" not in combined
 
 
-def test_release_workflow_runs_fault_lab_after_happy_path() -> None:
+def test_release_workflow_runs_repeatability_gate_after_happy_path() -> None:
     workflow = _text(".github/workflows/ppu-release.yml")
     assert "scripts/static-ipv4-fault-injection-lab.py" in workflow
+    assert "scripts/static-ipv4-fault-injection-repeatability.py" in workflow
+    assert "scripts/private-ppu-evidence-verifier.py" in workflow
     assert "software/python/tests/test_static_ipv4_fault_injection_lab.py" in workflow
     happy = workflow.index("Run Virtual PPU Network Lab with production Manager")
-    faults = workflow.index("Run Static IPv4 fault-injection lab")
+    faults = workflow.index("Run Static IPv4 repeatability and privilege-parity gate")
     assert happy < faults
 
 
