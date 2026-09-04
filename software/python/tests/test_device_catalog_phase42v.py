@@ -10,25 +10,27 @@ from plasma_web.gateway import PlasmaWebHandler
 
 EXPECTED_PRODUCTION_CATALOG_SIZE = 406
 EXPECTED_ICPNS = {
-    "STM32F413CHU3": ("UFQFPN", "48", "-40 to 125 C"),
-    "STM32F413CHU3TR": ("UFQFPN", "48", "-40 to 125 C"),
-    "STM32F413CHU6": ("UFQFPN", "48", "-40 to 85 C"),
-    "STM32F413CHU6TR": ("UFQFPN", "48", "-40 to 85 C"),
-    "STM32F413RHT3": ("LQFP", "64", "-40 to 125 C"),
-    "STM32F413RHT6": ("LQFP", "64", "-40 to 85 C"),
-    "STM32F413RHT6TR": ("LQFP", "64", "-40 to 85 C"),
-    "STM32F413VHH3": ("UFBGA", "100", "-40 to 125 C"),
-    "STM32F413VHH6": ("UFBGA", "100", "-40 to 85 C"),
-    "STM32F413VHT6": ("LQFP", "100", "-40 to 85 C"),
-    "STM32F413ZHJ6": ("UFBGA", "144", "-40 to 85 C"),
-    "STM32F413ZHJ6TR": ("UFBGA", "144", "-40 to 85 C"),
-    "STM32F413ZHT3": ("LQFP", "144", "-40 to 125 C"),
-    "STM32F413ZHT6": ("LQFP", "144", "-40 to 85 C"),
+    "STM32F423CHU6": ("UFQFPN", "48", "-40 to 85 C"),
+    "STM32F423RHT6": ("LQFP", "64", "-40 to 85 C"),
+    "STM32F423RHT6TR": ("LQFP", "64", "-40 to 85 C"),
+    "STM32F423VHH6": ("UFBGA", "100", "-40 to 85 C"),
+    "STM32F423VHT6": ("LQFP", "100", "-40 to 85 C"),
+    "STM32F423VHT6TR": ("LQFP", "100", "-40 to 85 C"),
+    "STM32F423ZHJ6": ("UFBGA", "144", "-40 to 85 C"),
+    "STM32F423ZHJ6I": ("UFBGA", "144", "-40 to 85 C"),
+    "STM32F423ZHT3": ("LQFP", "144", "-40 to 125 C"),
+    "STM32F423ZHT6": ("LQFP", "144", "-40 to 85 C"),
 }
-EXCLUDED = {"STM32F413VHT3", "STM32F413ZHJ3"}
+EXCLUDED = {
+    "STM32F423CHU3",
+    "STM32F423RHT3",
+    "STM32F423VHH3",
+    "STM32F423VHT3",
+    "STM32F423ZHJ3",
+}
 
 
-def test_phase42u_exact_icpns_are_resolved_by_runtime_catalog() -> None:
+def test_phase42v_exact_icpns_are_resolved_by_runtime_catalog() -> None:
     catalog = get_default_device_catalog()
     assert catalog.size == EXPECTED_PRODUCTION_CATALOG_SIZE
     for icpn, (package, pin_count, temperature_grade) in EXPECTED_ICPNS.items():
@@ -45,7 +47,7 @@ def test_phase42u_exact_icpns_are_resolved_by_runtime_catalog() -> None:
         assert catalog.search(icpn, limit=5) == []
 
 
-def test_phase42u_exact_icpns_are_exposed_by_rest_catalog() -> None:
+def test_phase42v_exact_icpns_are_exposed_by_rest_catalog() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
