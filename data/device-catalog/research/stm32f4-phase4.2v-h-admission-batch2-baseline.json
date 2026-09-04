@@ -1,0 +1,54 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [
+    {
+      "base_device": "STM32F423CH",
+      "icpn": "STM32F423CHU3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "base_device": "STM32F423RH",
+      "icpn": "STM32F423RHT3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "base_device": "STM32F423VH",
+      "icpn": "STM32F423VHH3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "base_device": "STM32F423VH",
+      "icpn": "STM32F423VHT3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    },
+    {
+      "base_device": "STM32F423ZH",
+      "icpn": "STM32F423ZHJ3",
+      "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+    }
+  ],
+  "pilot_id": "stm32f4-phase4.2v-h-admission-batch2-2026-09-03",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9919495176",
+    "artifact_sha256": "085956f057ab17e03f95f0279d95eb38b92d23068d4e79b110c0cc1fecb77c2a",
+    "source_commit": "dd70b7ff5628684c4915dc6c5b1114c3b0a283b4",
+    "workflow_run_id": "33824351539"
+  },
+  "targets": [
+    {"base_device": "STM32F479ZG", "exact_icpns": ["STM32F479ZGT6"]},
+    {"base_device": "STM32F423CH", "exact_icpns": ["STM32F423CHU6"]},
+    {
+      "base_device": "STM32F423RH",
+      "exact_icpns": ["STM32F423RHT6", "STM32F423RHT6TR"]
+    },
+    {
+      "base_device": "STM32F423VH",
+      "exact_icpns": ["STM32F423VHH6", "STM32F423VHT6", "STM32F423VHT6TR"]
+    },
+    {
+      "base_device": "STM32F423ZH",
+      "exact_icpns": ["STM32F423ZHJ6", "STM32F423ZHJ6I", "STM32F423ZHT3", "STM32F423ZHT6"]
+    }
+  ]
+}
