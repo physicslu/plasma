@@ -81,7 +81,7 @@ def test_independent_private_evidence_verifier_enforces_ownership_and_read_bound
     assert '"--user",\n            "0:0"' in source
     for forbidden in (
         "chmod(",
-        "sudo",
+        '"sudo",',
         "rglob(",
         "static-ipv4-fault-helper",
         "manager-network-commissioning-crash-injector",
@@ -91,19 +91,50 @@ def test_independent_private_evidence_verifier_enforces_ownership_and_read_bound
         assert forbidden not in source
 
 
-def test_repeatability_gate_runs_twice_in_same_workdir_without_own_cleanup() -> None:
+def test_repeatability_gate_injects_dirty_state_then_runs_twice_without_own_cleanup() -> None:
     source = _text("scripts/static-ipv4-fault-injection-repeatability.py")
+    assert "_seed_dirty_state(work)" in source
+    assert source.index("_seed_dirty_state(work)") < source.index("for attempt in range(1, 3):")
+    assert '"--network",\n            "none"' in source
+    assert '"--cap-drop",\n            "ALL"' in source
+    assert '"no-new-privileges:true"' in source
+    assert 'f"{work}:/work"' in source
+    assert "private-marker" in source
     assert "for attempt in range(1, 3):" in source
     assert 'command.extend(["--work-dir", str(work), "--report", str(run_report)])' in source
     assert 'work / "manager-crash-after-commit" / "ppu-a"' in source
     assert 'str(repo / "scripts/private-ppu-evidence-verifier.py")' in source
     assert '"run_count": 2' in source
+    assert '"dirty_state_injected_before_run1": True' in source
     assert '"manual_cleanup": False' in source
+    assert '"sudo": False' in source
     assert '"host_verifier_non_root": True' in source
     assert '"producer_evidence_contract": "root:root 0600"' in source
     assert '"verifier_independent": True' in source
-    for forbidden in ("rmtree(", "chmod(", "rglob(", "sudo"):
+    for forbidden in ("rmtree(", "chmod(", "rglob(", '"sudo",'):
         assert forbidden not in source
+
+
+def test_environment_fingerprint_captures_execution_parity_evidence() -> None:
+    source = _text("scripts/ci-environment-fingerprint.py")
+    for token in (
+        '"uid": os.geteuid()',
+        '"gid": os.getegid()',
+        '"rootless": any(',
+        '"filesystem"',
+        '"host_uplink"',
+        '"artifact"',
+        '"sha256": _sha256_file(artifact)',
+        '"z2_network_backend_claim": "NONE"',
+    ):
+        assert token in source
+    assert '["stat", "-f", "-c", "%T", str(work_dir)]' in source
+    assert '["ip", "-json", "route", "show", "default"]' in source
+    assert '"--platform",\n            "linux/arm/v7"' in source
+    assert '"--network",\n            "none"' in source
+    assert '"--cap-drop",\n            "ALL"' in source
+    assert '"no-new-privileges:true"' in source
+    assert "@sha256:" in source
 
 
 def test_fault_lab_streams_scenario_progress() -> None:
@@ -143,13 +174,26 @@ def test_production_manager_and_gateway_have_no_fault_switches() -> None:
     assert "fault_mode" not in combined
 
 
-def test_release_workflow_runs_repeatability_gate_after_happy_path() -> None:
+def test_release_workflow_runs_repeatability_gate_after_happy_path_and_retains_evidence() -> None:
     workflow = _text(".github/workflows/ppu-release.yml")
     assert ".github/workflows/persistent-integration-host.yml" in workflow
     assert "scripts/static-ipv4-fault-injection-lab.py" in workflow
     assert "scripts/static-ipv4-fault-injection-repeatability.py" in workflow
     assert "scripts/private-ppu-evidence-verifier.py" in workflow
+    assert "scripts/ci-environment-fingerprint.py" in workflow
     assert "software/python/tests/test_static_ipv4_fault_injection_lab.py" in workflow
+    assert "Capture integration environment fingerprint" in workflow
+    assert "Upload PPU acceptance evidence" in workflow
+    for report in (
+        "plasma-ppu-environment-fingerprint.json",
+        "plasma-ppu-network-phase1.json",
+        "plasma-ppu-network-phase2.json",
+        "plasma-virtual-ppu-network-lab.json",
+        "plasma-static-ipv4-fault-injection-repeatability.json",
+        "plasma-static-ipv4-fault-injection-repeatability-run1.json",
+        "plasma-static-ipv4-fault-injection-repeatability-run2.json",
+    ):
+        assert report in workflow
     happy = workflow.index("Run Virtual PPU Network Lab with production Manager")
     faults = workflow.index("Run Static IPv4 repeatability and privilege-parity gate")
     assert happy < faults
@@ -163,6 +207,8 @@ def test_persistent_integration_workflow_is_manual_non_deploying_and_stateful() 
     assert "cancel-in-progress: false" in workflow
     assert 'test "$(id -u)" -ne 0' in workflow
     assert "scripts/codex-cloud-test.sh" in workflow
+    assert "scripts/ci-environment-fingerprint.py" in workflow
+    assert "plasma-persistent-environment-fingerprint.json" in workflow
     assert "scripts/static-ipv4-fault-injection-repeatability.py" in workflow
     assert '$HOME/.local/state/plasma-ci' in workflow
     assert "plasma-static-ipv4-persistent-repeatability-run1.json" in workflow
@@ -178,3 +224,5 @@ def test_fault_injection_document_is_indexed_and_keeps_hardware_claim_closed() -
     assert "PYNQ-Z2" in doc
     assert "does **not** prove" in doc
     assert "recovery_required" in doc
+    assert "A test harness MUST NOT relax a production security property" in doc
+    assert "not proof that a required PR gate is already operational" in doc
