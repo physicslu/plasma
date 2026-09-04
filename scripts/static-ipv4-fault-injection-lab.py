@@ -84,6 +84,42 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _make_stale_work_host_removable(phase2: Any, root: Path) -> None:
+    """Repair disposable bind-mount permissions without sudo or host privileges.
+
+    Packaged PPU containers run as uid 0 inside Docker and can leave dated log
+    directories owned by host uid 0. The integration user then cannot remove a
+    previous lab workspace. A no-network, no-capability disposable container
+    using the same pinned ARMv7 image makes only that bind-mounted test tree
+    removable before the host process deletes it.
+    """
+    if not root.exists():
+        return
+    repair = (
+        "from pathlib import Path\n"
+        "root = Path('/work')\n"
+        "paths = [root, *root.rglob('*')]\n"
+        "for path in paths:\n"
+        "    try:\n"
+        "        if path.is_dir():\n"
+        "            path.chmod(0o777)\n"
+        "        elif path.is_file():\n"
+        "            path.chmod(0o666)\n"
+        "    except OSError:\n"
+        "        pass\n"
+    )
+    phase2._run([
+        "docker", "run", "--rm",
+        "--platform", "linux/arm/v7",
+        "--network", "none",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges:true",
+        "-v", f"{root}:/work",
+        phase2.ARM_IMAGE,
+        "python3", "-c", repair,
+    ])
+
+
 def _write_manager_config(
     path: Path,
     *,
@@ -724,12 +760,14 @@ def _main(args: argparse.Namespace) -> int:
     git_sha = virtual._git_sha(repo)
     root = (repo / args.work_dir).resolve() if not args.work_dir.is_absolute() else args.work_dir.resolve()
     report = (repo / args.report).resolve() if not args.report.is_absolute() else args.report.resolve()
+
+    phase2._docker_preflight()
     if root.exists():
+        _make_stale_work_host_removable(phase2, root)
         shutil.rmtree(root)
     root.mkdir(parents=True)
     report.parent.mkdir(parents=True, exist_ok=True)
 
-    phase2._docker_preflight()
     runtime, release_artifact = virtual._runtime_from_args(repo, args, phase2, python, root, git_sha)
 
     common = {
@@ -749,8 +787,19 @@ def _main(args: argparse.Namespace) -> int:
         ("manager_crash_after_commit", _scenario_manager_crash_after_commit),
     )
     results: dict[str, Any] = {}
-    for name, scenario in scenarios:
-        results[name] = scenario(**common)
+    total = len(scenarios)
+    for index, (name, scenario) in enumerate(scenarios, start=1):
+        label = name.replace("_", " ").title()
+        print(f"[RUN ] {index}/{total} {label}", flush=True)
+        started = time.monotonic()
+        try:
+            results[name] = scenario(**common)
+        except Exception:
+            elapsed = time.monotonic() - started
+            print(f"[FAIL] {index}/{total} {label} ({elapsed:.1f}s)", flush=True)
+            raise
+        elapsed = time.monotonic() - started
+        print(f"[PASS] {index}/{total} {label} ({elapsed:.1f}s)", flush=True)
 
     uplink = virtual._host_uplink_interface()
     result = {
