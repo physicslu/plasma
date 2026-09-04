@@ -51,6 +51,23 @@ def test_postcommit_evidence_uses_canonical_activation_journal_path() -> None:
     assert 'ppu_work.rglob("ppu-network-activation.json")' not in source
 
 
+def test_private_activation_journal_is_hashed_through_locked_down_readonly_container() -> None:
+    source = _text("scripts/static-ipv4-fault-injection-lab.py")
+    sha_source = source.split("def _sha256(path: Path) -> str:", 1)[1].split(
+        "def _make_stale_work_host_removable", 1
+    )[0]
+    assert "root:root 0600" in sha_source
+    assert "tempfile.mkstemp()" in sha_source
+    assert '"--network", "none"' in sha_source
+    assert '"--cap-drop", "ALL"' in sha_source
+    assert '"no-new-privileges:true"' in sha_source
+    assert 'f"{ppu_work}:/work:ro"' in sha_source
+    assert "phase2.ARM_IMAGE" in sha_source
+    assert "chmod" not in sha_source
+    assert 'with path.open("rb")' not in sha_source
+    assert '"with path.open(\'rb\') as handle:\\n"' in sha_source
+
+
 def test_fault_lab_streams_scenario_progress() -> None:
     source = _text("scripts/static-ipv4-fault-injection-lab.py")
     assert 'print(f"[RUN ] {index}/{total} {label}", flush=True)' in source
