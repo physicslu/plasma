@@ -8,6 +8,15 @@ Files named `*.raw.json` are retained AI outputs from controlled manual experime
 
 `qwen3.8-27b-mlx-grounded-run1.raw.json` is a Qwen 3.8 27B MLX result produced with DS5319 Rev 20 and PM0075 Rev 2 supplied to the model. It did **not** consume the complete `source-lock.json` input set because the locked Plasma STM32F1 catalog blob was not provided. Therefore it is useful as a manufacturer-grounded A/B experiment, but it is **not** an official source-locked blind candidate and must not be renamed to `candidate.json` or reported as a formal benchmark PASS.
 
+## Review and handover records
+
+Later programming-profile decomposition and executable-style pseudocode experiments are reviewed separately from immutable raw model evidence. Review notes are not answer keys and are not inputs to a blind model run.
+
+- [Qwen 3.8 27B MLX programming-decomposition review](../reviews/qwen3.8-27b-mlx-programming-decomposition-review.md) records known corrections, unresolved failure modes, and candidate semantic-validator invariants.
+- [IC Support Local-AI Benchmark Handover](../../../../../docs/development/ic-support-ai-benchmark-handover.md) records the current model-role conclusion and the control conditions for the next independent model comparison.
+
+Do not expose these review records to a model during an independent blind comparison, because they contain known failure classes and corrected representations.
+
 ## Two benchmark layers
 
 The STM32F103C pilot now separates two questions that were previously mixed:
