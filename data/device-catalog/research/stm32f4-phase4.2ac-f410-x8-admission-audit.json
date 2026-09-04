@@ -1,0 +1,23 @@
+{
+  "added_exact_icpns": [
+    "STM32F410C8U6",
+    "STM32F410C8U6TR",
+    "STM32F410C8U7",
+    "STM32F410C8U7TR",
+    "STM32F410T8Y6TR"
+  ],
+  "admission_plan_sha256": "99ae4906573f168574c4ac6bce0b35b9e692a67a8d05183c020b96f5251b61a9",
+  "canonical_csv_file_sha256": "8f6db734cc62b37b2de349c186b5f0d7fcfe8489dbda6ccf8ed121b4cbd75883",
+  "lifecycle_exclusions": [],
+  "phase": "4.2AC",
+  "production_base_devices_after": 126,
+  "production_base_devices_before": 124,
+  "production_rows_after": 357,
+  "production_rows_before": 352,
+  "proposal_artifact_id": 9948137100,
+  "proposal_artifact_zip_sha256": "8b573829635247fcaee096df4e73826c31bfb08bf5a52e85a49970d83776f782",
+  "proposal_run_id": 33902426600,
+  "retained_evidence_id": "stm32f4-phase4.2ac-f410-x8-admission-2026-09-05-retained-20260904T174206Z-160bb17",
+  "schema_version": 1,
+  "status": "published"
+}
