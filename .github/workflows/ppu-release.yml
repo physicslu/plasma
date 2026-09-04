@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/ppu-release.yml"
       - ".github/workflows/persistent-integration-host.yml"
+      - "scripts/persistent-integration-host-preflight.py"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/product-release.py"
@@ -39,6 +40,7 @@ on:
       - "software/python/tests/test_ppu_network_activation_security.py"
       - "software/python/tests/test_virtual_ppu_network_lab.py"
       - "software/python/tests/test_static_ipv4_fault_injection_lab.py"
+      - "software/python/tests/test_persistent_integration_host_security.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_product_release.py"
 
@@ -78,6 +80,7 @@ jobs:
           software/python/tests/test_ppu_network_activation_security.py
           software/python/tests/test_virtual_ppu_network_lab.py
           software/python/tests/test_static_ipv4_fault_injection_lab.py
+          software/python/tests/test_persistent_integration_host_security.py
           software/python/tests/test_ppu_release.py
           software/python/tests/test_product_release.py
 
