@@ -79,8 +79,8 @@ def split_physical_pages(extracted_text: str) -> list[str]:
 
 
 _NUMBERED_HEADING = re.compile(r"^\s*(?P<number>\d+(?:\.\d+){0,5})\s+(?P<title>\S.*)$")
-_TABLE_LABEL = re.compile(r"^\s*(?P<label>Table\s+\d+[A-Za-z]?)\s*[.:\-]\s*(?P<title>\S.*)$", re.IGNORECASE)
-_FIGURE_LABEL = re.compile(r"^\s*(?P<label>Figure\s+\d+[A-Za-z]?)\s*[.:\-]\s*(?P<title>\S.*)$", re.IGNORECASE)
+_TABLE_LABEL = re.compile(r"\b(?P<label>Table\s+\d+[A-Za-z]?)\s*[.:\-]\s*(?P<title>\S.*)$", re.IGNORECASE)
+_FIGURE_LABEL = re.compile(r"\b(?P<label>Figure\s+\d+[A-Za-z]?)\s*[.:\-]\s*(?P<title>\S.*)$", re.IGNORECASE)
 _EXPLICIT_REFERENCE = re.compile(r"\b(?:see|refer(?:\s+to)?|shown\s+in|described\s+in)\s+(?P<label>(?:Table|Figure)\s+\d+[A-Za-z]?)\b", re.IGNORECASE)
 
 
@@ -134,8 +134,8 @@ def structural_candidates(pages: list[str]) -> tuple[list[dict[str, Any]], list[
                 heading = match.group("title").strip()
                 section_level = label.count(".") + 1
             else:
-                table = _TABLE_LABEL.match(line)
-                figure = _FIGURE_LABEL.match(line)
+                table = _TABLE_LABEL.search(line)
+                figure = _FIGURE_LABEL.search(line)
                 if table:
                     unit_type = "TABLE_CANDIDATE"
                     label = canonical_label(table.group("label"))
