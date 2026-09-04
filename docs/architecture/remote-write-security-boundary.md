@@ -78,8 +78,12 @@ ppu.read
 programming_asset.write
 engineering.session.write
 settings.gateway.write
+settings.ppu_network.write
+settings.site.write
 settings.mock.write
 ```
+
+`settings.site.write` is a dedicated Site-configuration permission. The default `engineer` and `admin` bundles include it; `viewer`, `operator`, and `service` do not. Site writes are also checked against the exact Facility / PPU / Site resource scope.
 
 Batch authorization is two-dimensional:
 
