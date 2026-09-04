@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/ppu-release.yml"
+      - ".github/workflows/persistent-integration-host.yml"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/product-release.py"
