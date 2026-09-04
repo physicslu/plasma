@@ -1,0 +1,42 @@
+{
+  "schema_version": "0.1.0",
+  "experiment_id": "stm32f103c-full-vs-evidence-pack-v0",
+  "status": "design_contract",
+  "targets": ["STM32F103C8T6", "STM32F103CBT6"],
+  "manufacturer_only_source_ids": ["st_ds5319_rev20", "st_pm0075_rev2"],
+  "formal_blind_benchmark": {
+    "source_lock_path": "data/ic-support/benchmarks/stm32f103c/source-lock.json",
+    "unchanged": true,
+    "note": "The formal blind benchmark retains its existing three-source lock and must not be redefined by this A/B experiment."
+  },
+  "arms": {
+    "full_context": {
+      "datasheet": "FULL_LOCKED_SOURCE",
+      "programming_manual": "FULL_LOCKED_SOURCE"
+    },
+    "reduced_context": {
+      "datasheet": "DETERMINISTIC_EVIDENCE_PACK",
+      "programming_manual": "FULL_LOCKED_SOURCE"
+    }
+  },
+  "controlled_variables": [
+    "model_id",
+    "model_runtime",
+    "quantization",
+    "prompt",
+    "target_set",
+    "source_revisions",
+    "generation_parameters"
+  ],
+  "metrics": [
+    "extraction_accuracy",
+    "unsupported_inference_count",
+    "missed_required_evidence_count",
+    "ttft_ms",
+    "total_time_ms",
+    "input_tokens",
+    "generation_tokens",
+    "peak_memory_bytes"
+  ],
+  "acceptance_principle": "Reduced context must not reduce engineering correctness."
+}
