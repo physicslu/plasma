@@ -72,17 +72,18 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
   }, [alias, applyPayload]);
 
   useEffect(() => {
-    setPayload(null);
-    setDrafts({});
-    replaceDirty(new Set());
-    setNotice(null);
-    setError(null);
-    if (!alias) return;
-    const initial = window.setTimeout(() => { void refresh(); }, 0);
-    const timer = window.setInterval(() => { void refresh(true); }, 2500);
+    const initial = window.setTimeout(() => {
+      setPayload(null);
+      setDrafts({});
+      replaceDirty(new Set());
+      setNotice(null);
+      setError(null);
+      if (alias) void refresh();
+    }, 0);
+    const timer = alias ? window.setInterval(() => { void refresh(true); }, 2500) : null;
     return () => {
       window.clearTimeout(initial);
-      window.clearInterval(timer);
+      if (timer !== null) window.clearInterval(timer);
     };
   }, [alias, refresh, replaceDirty]);
 
