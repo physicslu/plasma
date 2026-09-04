@@ -145,6 +145,7 @@ def test_production_manager_and_gateway_have_no_fault_switches() -> None:
 
 def test_release_workflow_runs_repeatability_gate_after_happy_path() -> None:
     workflow = _text(".github/workflows/ppu-release.yml")
+    assert ".github/workflows/persistent-integration-host.yml" in workflow
     assert "scripts/static-ipv4-fault-injection-lab.py" in workflow
     assert "scripts/static-ipv4-fault-injection-repeatability.py" in workflow
     assert "scripts/private-ppu-evidence-verifier.py" in workflow
@@ -152,6 +153,22 @@ def test_release_workflow_runs_repeatability_gate_after_happy_path() -> None:
     happy = workflow.index("Run Virtual PPU Network Lab with production Manager")
     faults = workflow.index("Run Static IPv4 repeatability and privilege-parity gate")
     assert happy < faults
+
+
+def test_persistent_integration_workflow_is_manual_non_deploying_and_stateful() -> None:
+    workflow = _text(".github/workflows/persistent-integration-host.yml")
+    assert "workflow_dispatch:" in workflow
+    assert "pull_request:" not in workflow
+    assert "runs-on: [self-hosted, linux, x64, plasma-integration]" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert 'test "$(id -u)" -ne 0' in workflow
+    assert "scripts/codex-cloud-test.sh" in workflow
+    assert "scripts/static-ipv4-fault-injection-repeatability.py" in workflow
+    assert '$HOME/.local/state/plasma-ci' in workflow
+    assert "plasma-static-ipv4-persistent-repeatability-run1.json" in workflow
+    assert "plasma-static-ipv4-persistent-repeatability-run2.json" in workflow
+    for forbidden in ("sudo", "systemctl", "plasmactl deploy", "plasmactl restart", "ssh "):
+        assert forbidden not in workflow.lower()
 
 
 def test_fault_injection_document_is_indexed_and_keeps_hardware_claim_closed() -> None:
