@@ -91,6 +91,8 @@ $HOME/.local/state/plasma-ci
 
 It may be overridden with `PLASMA_PERSISTENT_CI_ROOT`, subject to the same preflight rules.
 
+Before GitHub runner enrollment, `scripts/persistent-integration-host-readiness.py` provides a **non-provisioning** `HOST_READY` check. It requires prerequisites to already exist, refuses rootless Docker, uses the pinned ARMv7 image with `--pull=never`, and does not install packages, create the persistent state root, configure binfmt, mutate networking, or enroll a runner. The operational procedure is defined in `docs/development/persistent-integration-runner-enrollment.md`.
+
 ## Fail-closed preflight
 
 `scripts/persistent-integration-host-preflight.py` runs before repository setup or tests on the persistent host.
@@ -107,6 +109,8 @@ It verifies and records:
 - already-provisioned ARMv7 execution through the pinned ARMv7 image with no network, no capabilities, and no-new-privileges;
 - host default-route evidence and a normalized route signature.
 
+A PASS preflight records `qualification_state = RUNNER_ENROLLED`; it does not by itself prove `L4_PASS`.
+
 Rootless Docker fails the preflight. Rootless container uid 0 does not provide the real host `root:root` ownership parity required by the Static IPv4 private-evidence contract.
 
 The preflight does not use `sudo`, add Linux capabilities, install QEMU/binfmt, deploy software, restart services, access a Z2, or modify production networking.
@@ -120,7 +124,8 @@ After preflight passes, the workflow:
 3. clean-extracts and validates the immutable `linux-armv7l` PPU release;
 4. captures the environment and packaged-artifact fingerprint;
 5. executes Static IPv4 same-workdir repeatability and privilege/ownership parity using the persistent state root;
-6. uploads exact-SHA acceptance evidence.
+6. creates `plasma-persistent-l4-qualification.json` with `scripts/persistent-integration-qualification-summary.py` only if preflight, exact-SHA environment fingerprint, and both repeatability runs agree and PASS;
+7. uploads exact-SHA acceptance evidence.
 
 The retained artifacts include:
 
@@ -130,9 +135,38 @@ plasma-persistent-environment-fingerprint.json
 plasma-static-ipv4-persistent-repeatability.json
 plasma-static-ipv4-persistent-repeatability-run1.json
 plasma-static-ipv4-persistent-repeatability-run2.json
+plasma-persistent-l4-qualification.json
 ```
 
 The artifact name also contains the exact GitHub SHA.
+
+## Qualification state model
+
+The L4 infrastructure lifecycle is:
+
+```text
+UNPROVISIONED
+  -> HOST_READY
+  -> RUNNER_ENROLLED
+  -> L4_PASS
+  -> STALE or REVOKED
+```
+
+`L4_PASS` is an exact-run decision, not a permanent machine badge. The canonical summary binds the result to:
+
+- repository and exact `main` SHA;
+- GitHub run ID and attempt;
+- runner name/OS/architecture;
+- host identity, uid/gid, OS and kernel;
+- rootful Docker version/root boundary;
+- pinned ARMv7/QEMU execution evidence;
+- persistent-root path, mode and filesystem;
+- default-route signature;
+- SHA-256 digests of preflight, environment fingerprint and repeatability source evidence.
+
+The GitHub Actions job-start log for the same run ID is the runner-version evidence source because GitHub does not expose runner version as a stable default workflow environment variable.
+
+A previous `L4_PASS` becomes `STALE` when current-main exact-SHA qualification is required and `main` moved, or when a bound host fingerprint materially changed. Administrative `REVOKED` state overrides any prior PASS. No fixed time-to-live is encoded today; adding a future time-based policy must not weaken exact-SHA or host-fingerprint staleness.
 
 ## What L4 currently means
 
