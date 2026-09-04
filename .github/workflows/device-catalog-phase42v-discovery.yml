@@ -2,7 +2,11 @@ name: Device catalog Phase 4.2V STM32F423 H discovery
 on:
   push:
     branches: [agent/device-catalog-phase4.2v-h-admission-batch2]
-    paths: [".github/workflows/device-catalog-phase42v-discovery.yml", "data/device-catalog/research/stm32f4-phase4.2v-h-admission-batch2-manifest.json"]
+    paths:
+      - ".github/workflows/device-catalog-phase42v-discovery.yml"
+      - "data/device-catalog/research/stm32f4-phase4.2v-h-admission-batch2-manifest.json"
+      - "data/device-catalog/research/stm32f4_admission_policy.py"
+      - "data/device-catalog/research/test_stm32f4_phase4_2v_i_option_routing.py"
   workflow_dispatch:
 permissions: {contents: read}
 jobs:
