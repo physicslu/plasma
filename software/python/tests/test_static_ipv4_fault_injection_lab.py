@@ -45,6 +45,12 @@ def test_fault_lab_repairs_disposable_container_owned_workspace_without_sudo() -
     assert source.index("_make_stale_work_host_removable(phase2, root)") < source.index("shutil.rmtree(root)")
 
 
+def test_postcommit_evidence_uses_canonical_activation_journal_path() -> None:
+    source = _text("scripts/static-ipv4-fault-injection-lab.py")
+    assert 'ppu_work / "gateway-output" / "ppu-network-activation.json"' in source
+    assert 'ppu_work.rglob("ppu-network-activation.json")' not in source
+
+
 def test_fault_lab_streams_scenario_progress() -> None:
     source = _text("scripts/static-ipv4-fault-injection-lab.py")
     assert 'print(f"[RUN ] {index}/{total} {label}", flush=True)' in source
