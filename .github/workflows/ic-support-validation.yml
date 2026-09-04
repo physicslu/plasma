@@ -63,6 +63,10 @@ jobs:
         run: git diff --check origin/main...HEAD
       - name: Validate IC Support pilot
         run: python data/ic-support/validate.py
+      - name: Validate IC Support semantic invariants
+        run: python data/ic-support/semantic_validate.py
+      - name: Run IC Support semantic-validator regression
+        run: python data/ic-support/test_semantic_validate.py
       - name: Validate IC Evidence Pack contract
         run: python data/ic-support/evidence-pack/validate_contract.py
       - name: Validate deterministic document preprocessing
