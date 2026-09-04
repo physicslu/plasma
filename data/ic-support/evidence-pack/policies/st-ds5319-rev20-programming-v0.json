@@ -1,0 +1,288 @@
+{
+  "artifact_type": "semantic_evidence_policy",
+  "schema_version": "0.1.0",
+  "policy_id": "st-ds5319-rev20-programming-v0",
+  "pack_id": "st-ds5319-rev20-programming-evidence-v0",
+  "purpose": "IC_PROGRAMMING_SUPPORT",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "source": {
+    "source_id": "st_ds5319_rev20",
+    "algorithm": "sha256",
+    "digest": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc",
+    "byte_length": 1965230
+  },
+  "expected_physical_page_count": 114,
+  "default": {
+    "categories": ["DOCUMENT_STRUCTURE"],
+    "classification": "EXCLUDE"
+  },
+  "page_rules": [
+    {
+      "rule_id": "cover-device-summary",
+      "pdf_page_index": 0,
+      "categories": [
+        "DEVICE_IDENTITY",
+        "ORDERING",
+        "FLASH",
+        "DEBUG",
+        "CLOCK",
+        "POWER",
+        "PIN_MAPPING"
+      ],
+      "classification": "MUST_INCLUDE"
+    }
+  ],
+  "section_rules": [
+    {
+      "rule_id": "introduction",
+      "section_label": "1",
+      "heading_regex": "^Introduction$",
+      "categories": ["DEVICE_IDENTITY"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "device-overview",
+      "section_label": "2.1",
+      "heading_regex": "^Device overview$",
+      "categories": ["DEVICE_IDENTITY", "FLASH"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "family-compatibility",
+      "section_label": "2.2",
+      "heading_regex": "^Full compatibility throughout the family$",
+      "categories": ["DEVICE_IDENTITY"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "overview-default-peripheral",
+      "section_label": "2.3",
+      "heading_regex": "^Overview$",
+      "categories": ["PERIPHERAL_FUNCTIONAL"],
+      "classification": "EXCLUDE"
+    },
+    {
+      "rule_id": "core-flash-sram",
+      "section_label": "2.3.1",
+      "heading_regex": "^.*core with embedded flash and SRAM$",
+      "categories": ["DEVICE_IDENTITY", "FLASH"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "embedded-flash",
+      "section_label": "2.3.2",
+      "heading_regex": "^Embedded flash memory$",
+      "categories": ["FLASH"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "clocks-startup",
+      "section_label": "2.3.7",
+      "heading_regex": "^Clocks and startup$",
+      "categories": ["CLOCK", "RESET"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "boot-modes",
+      "section_label": "2.3.8",
+      "heading_regex": "^Boot modes$",
+      "categories": ["BOOT"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "power-supply-schemes",
+      "section_label": "2.3.9",
+      "heading_regex": "^Power supply schemes$",
+      "categories": ["POWER"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "power-supervisor",
+      "section_label": "2.3.10",
+      "heading_regex": "^Power supply supervisor$",
+      "categories": ["POWER", "RESET"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "voltage-regulator",
+      "section_label": "2.3.11",
+      "heading_regex": "^Voltage regulator$",
+      "categories": ["POWER"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "low-power-modes",
+      "section_label": "2.3.12",
+      "heading_regex": "^Low-power modes$",
+      "categories": ["POWER"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "swj-debug",
+      "section_label": "2.3.24",
+      "heading_regex": "^Serial wire JTAG debug port \\(SWJ-DP\\)$",
+      "categories": ["DEBUG", "PIN_MAPPING"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "pinouts",
+      "section_label": "3",
+      "heading_regex": "^Pinouts and pin description$",
+      "categories": ["PIN_MAPPING"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "memory-map",
+      "section_label": "4",
+      "heading_regex": "^Memory mapping$",
+      "categories": ["MEMORY_MAP", "FLASH"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "electrical-parameter-conditions",
+      "section_label": "5.1",
+      "heading_regex": "^Parameter conditions$",
+      "categories": ["ELECTRICAL"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "electrical-absolute-maximum",
+      "section_label": "5.2",
+      "heading_regex": "^Absolute maximum ratings$",
+      "categories": ["ELECTRICAL"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "electrical-operating-default",
+      "section_label": "5.3",
+      "heading_regex": "^Operating conditions$",
+      "categories": ["ELECTRICAL_OTHER"],
+      "classification": "EXCLUDE"
+    },
+    {
+      "rule_id": "general-operating-conditions",
+      "section_label": "5.3.1",
+      "heading_regex": "^General operating conditions$",
+      "categories": ["ELECTRICAL", "POWER"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "power-up-down",
+      "section_label": "5.3.2",
+      "heading_regex": "^Operating conditions at power-up / power-down$",
+      "categories": ["ELECTRICAL", "POWER", "RESET"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "reset-power-control",
+      "section_label": "5.3.3",
+      "heading_regex": "^Embedded reset and power control block characteristics$",
+      "categories": ["ELECTRICAL", "POWER", "RESET"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "external-clock",
+      "section_label": "5.3.6",
+      "heading_regex": "^External clock source characteristics$",
+      "categories": ["ELECTRICAL", "CLOCK"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "internal-clock",
+      "section_label": "5.3.7",
+      "heading_regex": "^Internal clock source characteristics$",
+      "categories": ["ELECTRICAL", "CLOCK"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "pll",
+      "section_label": "5.3.8",
+      "heading_regex": "^PLL characteristics$",
+      "categories": ["ELECTRICAL", "CLOCK"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "memory-characteristics",
+      "section_label": "5.3.9",
+      "heading_regex": "^Memory characteristics$",
+      "categories": ["ELECTRICAL", "FLASH"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "electrical-sensitivity",
+      "section_label": "5.3.11",
+      "heading_regex": "^Absolute maximum ratings \\(electrical sensitivity\\)$",
+      "categories": ["ELECTRICAL"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "io-current-injection",
+      "section_label": "5.3.12",
+      "heading_regex": "^I/O current injection characteristics$",
+      "categories": ["ELECTRICAL", "PIN_MAPPING"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "io-port",
+      "section_label": "5.3.13",
+      "heading_regex": "^I/O port characteristics$",
+      "categories": ["ELECTRICAL", "PIN_MAPPING"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "nrst-pin",
+      "section_label": "5.3.14",
+      "heading_regex": "^NRST pin characteristics$",
+      "categories": ["ELECTRICAL", "RESET", "PIN_MAPPING"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "package-mechanical",
+      "section_label": "6",
+      "heading_regex": "^Package information$",
+      "categories": ["PACKAGE_MECHANICAL"],
+      "classification": "EXCLUDE"
+    },
+    {
+      "rule_id": "ordering-information",
+      "section_label": "7",
+      "heading_regex": "^Ordering information scheme$",
+      "categories": ["ORDERING", "DEVICE_IDENTITY"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "security-notice",
+      "section_label": "8",
+      "heading_regex": "^Important security notice$",
+      "categories": ["SECURITY"],
+      "classification": "MUST_INCLUDE"
+    },
+    {
+      "rule_id": "revision-history",
+      "section_label": "9",
+      "heading_regex": "^Revision history$",
+      "categories": ["REVISION"],
+      "classification": "MUST_INCLUDE"
+    }
+  ],
+  "applicability": {
+    "claims": [
+      {
+        "claim_id": "ds5319-stm32f103x8",
+        "manufacturer_expression": "STM32F103x8",
+        "anchor_type": "TABLE_CANDIDATE",
+        "anchor_label": "Table 1",
+        "anchor_heading_regex": "^Device summary$",
+        "targets": ["STM32F103C8T6"]
+      },
+      {
+        "claim_id": "ds5319-stm32f103xb",
+        "manufacturer_expression": "STM32F103xB",
+        "anchor_type": "TABLE_CANDIDATE",
+        "anchor_label": "Table 1",
+        "anchor_heading_regex": "^Device summary$",
+        "targets": ["STM32F103CBT6"]
+      }
+    ]
+  }
+}

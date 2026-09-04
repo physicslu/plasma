@@ -1,7 +1,7 @@
 {
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "experiment_id": "stm32f103c-full-vs-evidence-pack-v0",
-  "status": "design_contract",
+  "status": "runnable_contract",
   "targets": ["STM32F103C8T6", "STM32F103CBT6"],
   "manufacturer_only_source_ids": ["st_ds5319_rev20", "st_pm0075_rev2"],
   "formal_blind_benchmark": {
@@ -9,13 +9,37 @@
     "unchanged": true,
     "note": "The formal blind benchmark retains its existing three-source lock and must not be redefined by this A/B experiment."
   },
+  "evidence_pack": {
+    "policy_path": "data/ic-support/evidence-pack/policies/st-ds5319-rev20-programming-v0.json",
+    "builder_path": "data/ic-support/evidence-pack/semantic_pack.py",
+    "pack_id": "st-ds5319-rev20-programming-evidence-v0",
+    "source_id": "st_ds5319_rev20",
+    "generated_files": [
+      "structure.json",
+      "catalog.json",
+      "pack.json",
+      "binding.json",
+      "bundles/STM32F103C8T6.json",
+      "bundles/STM32F103CBT6.json",
+      "evidence.txt"
+    ],
+    "build_command_template": "python data/ic-support/evidence-pack/semantic_pack.py --source-lock data/ic-support/benchmarks/stm32f103c/source-lock.json --policy data/ic-support/evidence-pack/policies/st-ds5319-rev20-programming-v0.json --pdf <locked-ds5319.pdf> --output-dir <outside-repo-output-dir>"
+  },
   "arms": {
     "full_context": {
-      "datasheet": "FULL_LOCKED_SOURCE",
+      "datasheet": {
+        "mode": "FULL_LOCKED_SOURCE",
+        "source_id": "st_ds5319_rev20",
+        "text_extraction": "same pdftotext fingerprint used by Evidence Pack generation"
+      },
       "programming_manual": "FULL_LOCKED_SOURCE"
     },
     "reduced_context": {
-      "datasheet": "DETERMINISTIC_EVIDENCE_PACK",
+      "datasheet": {
+        "mode": "DETERMINISTIC_EVIDENCE_PACK",
+        "pack_id": "st-ds5319-rev20-programming-evidence-v0",
+        "context_file": "evidence.txt"
+      },
       "programming_manual": "FULL_LOCKED_SOURCE"
     }
   },
@@ -26,12 +50,15 @@
     "prompt",
     "target_set",
     "source_revisions",
+    "pdftotext_fingerprint",
     "generation_parameters"
   ],
   "metrics": [
     "extraction_accuracy",
     "unsupported_inference_count",
     "missed_required_evidence_count",
+    "included_datasheet_pages",
+    "datasheet_input_bytes",
     "ttft_ms",
     "total_time_ms",
     "input_tokens",

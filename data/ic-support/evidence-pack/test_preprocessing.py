@@ -100,6 +100,22 @@ class DocumentPreprocessingTest(unittest.TestCase):
         self.assertFalse(manifest["canonical_dataset_admission"])
         self.assertFalse(manifest["production_admission"])
 
+    def test_multicolumn_inline_caption_is_detected(self):
+        text = "- left-column bullet                         Table 1. Device summary\n"
+        manifest = self.build(text)
+        tables = [unit for unit in manifest["structural_units"] if unit["type"] == "TABLE_CANDIDATE"]
+        self.assertEqual(len(tables), 1)
+        self.assertEqual(tables[0]["label"], "Table 1")
+        self.assertEqual(tables[0]["heading"], "Device summary")
+
+    def test_plain_table_reference_is_not_misclassified_as_caption(self):
+        text = "Refer to Table 11 for the values of VPOR/PDR and VPVD.\n"
+        manifest = self.build(text)
+        tables = [unit for unit in manifest["structural_units"] if unit["type"] == "TABLE_CANDIDATE"]
+        self.assertEqual(tables, [])
+        self.assertEqual(len(manifest["references"]), 1)
+        self.assertEqual(manifest["references"][0]["target_label"], "Table 11")
+
     def test_explicit_reference_unique_match_is_not_dependency_authority(self):
         manifest = self.build(self.fixture["extracted_text_lf"])
         self.assertEqual(len(manifest["references"]), 1)
