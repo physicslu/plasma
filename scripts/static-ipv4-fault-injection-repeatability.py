@@ -16,6 +16,7 @@ import json
 import os
 import platform
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -47,14 +48,27 @@ def _run_streaming(command: Sequence[str], *, cwd: Path) -> int:
 
 
 def _seed_dirty_state(work: Path) -> None:
-    """Create deterministic root-owned residue; the wrapper never cleans it."""
+    """Create deterministic root-owned residue; the wrapper never cleans it.
+
+    The host creates one dedicated staging directory that is writable/traversable
+    by the container uid but not readable/listable by it. The container still runs
+    uid 0 with every capability dropped, so the test does not depend on DAC bypass.
+    The root-owned child remains for the formal fault lab startup cleanup to remove.
+    """
     work.mkdir(parents=True, exist_ok=True)
+    seed_root = work / f".dirty-state-seed-{os.getpid()}-{time.time_ns()}"
+    old_umask = os.umask(0)
+    try:
+        seed_root.mkdir(mode=0o733, exist_ok=False)
+    finally:
+        os.umask(old_umask)
+
     seed = (
         "import os\n"
         "from pathlib import Path\n"
-        "leaf = Path('/work/dirty-state-injection/root-owned')\n"
-        "leaf.mkdir(parents=True, mode=0o700, exist_ok=True)\n"
-        "fd = os.open(str(leaf / 'private-marker'), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)\n"
+        "leaf = Path('/seed/root-owned')\n"
+        "leaf.mkdir(mode=0o700, exist_ok=False)\n"
+        "fd = os.open(str(leaf / 'private-marker'), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)\n"
         "try:\n"
         "    os.write(fd, b'plasma-dirty-state\\n')\n"
         "finally:\n"
@@ -73,8 +87,10 @@ def _seed_dirty_state(work: Path) -> None:
             "ALL",
             "--security-opt",
             "no-new-privileges:true",
+            "--user",
+            "0:0",
             "--volume",
-            f"{work}:/work",
+            f"{seed_root}:/seed",
             ARM_IMAGE,
             "python3",
             "-c",
@@ -87,7 +103,19 @@ def _seed_dirty_state(work: Path) -> None:
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise RepeatabilityError(f"dirty-state injection failed: {detail}")
-    print(f"[REPEATABILITY] injected root-owned dirty state under {work}", flush=True)
+
+    root_owned = seed_root / "root-owned"
+    try:
+        info = root_owned.lstat()
+    except FileNotFoundError as exc:
+        raise RepeatabilityError(f"dirty-state root-owned residue missing: {root_owned}") from exc
+    mode = stat.S_IMODE(info.st_mode)
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_gid != 0 or mode != 0o700:
+        raise RepeatabilityError(
+            "dirty-state residue ownership/mode mismatch: "
+            f"uid={info.st_uid} gid={info.st_gid} mode={mode:04o}; expected root:root 0700"
+        )
+    print(f"[REPEATABILITY] injected root:root 0700 dirty state under {seed_root}", flush=True)
 
 
 def _run_verifier(repo: Path, ppu_work: Path) -> dict[str, Any]:
@@ -196,6 +224,7 @@ def _main(args: argparse.Namespace) -> int:
         "same_work_dir": str(work),
         "run_count": 2,
         "dirty_state_injected_before_run1": True,
+        "dirty_state_contract": "root:root 0700 directory + root:root 0600 marker",
         "manual_cleanup": False,
         "sudo": False,
         "host_verifier_non_root": True,
