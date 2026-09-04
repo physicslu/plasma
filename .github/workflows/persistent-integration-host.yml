@@ -127,6 +127,17 @@ jobs:
             --work-dir "$work" \
             --report "$report"
 
+      - name: Record canonical persistent L4 qualification summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python="software/python/.venv/bin/python"
+          "$python" scripts/persistent-integration-qualification-summary.py \
+            --preflight "$RUNNER_TEMP/plasma-persistent-preflight.json" \
+            --fingerprint "$RUNNER_TEMP/plasma-persistent-environment-fingerprint.json" \
+            --repeatability "$RUNNER_TEMP/plasma-static-ipv4-persistent-repeatability.json" \
+            --report "$RUNNER_TEMP/plasma-persistent-l4-qualification.json"
+
       - name: Upload persistent-host acceptance reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -138,5 +149,6 @@ jobs:
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run1.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run2.json
+            ${{ runner.temp }}/plasma-persistent-l4-qualification.json
           if-no-files-found: warn
           retention-days: 14
