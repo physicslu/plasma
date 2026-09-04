@@ -1,0 +1,27 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32f4-phase4.2x-my-wlcsp81-admission-2026-09-04-retained-20260904T091210Z-94f6bdf",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "9d84a0aae4a99f5d5be3e7f4f2f11e5e0814320fd37ad4b7009a2b3bf5c036a1"
+    },
+    {
+      "path": "control-summary.json",
+      "sha256": "37296a69aba309cb1517005a6c9fae0f41e4effa34cd4848a47b27c60ad46e9d"
+    },
+    {
+      "path": "evaluation.json",
+      "sha256": "f1318174d2a7356918040d67a1bece63d746760e2a3868b59391674ebd8c3d34"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "c9f2c64542fb3ad9c9e7da40749571c6b38fd546655d5e416787f06af04a0880"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "528eca820c6a6271c0b12211de9df7f89fcf62c136c8e91f7c5f3ddc090cccf5"
+    }
+  ],
+  "schema_version": 1
+}
