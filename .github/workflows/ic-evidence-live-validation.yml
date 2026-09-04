@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "data/ic-support/evidence-pack/**"
+      - "data/ic-support/evidence/source_integrity.py"
       - "data/ic-support/benchmarks/stm32f103c/source-lock.json"
       - "data/ic-support/benchmarks/stm32f103c/evidence-pack-benchmark-v0.json"
       - ".github/workflows/ic-evidence-live-validation.yml"
@@ -28,16 +29,30 @@ jobs:
             sudo apt-get install -y poppler-utils
           fi
           pdftotext -v 2>&1 | head -n 1
-      - name: Download exact locked DS5319 Rev 20
+      - name: Materialize DS5319 through canonical source transport
         run: |
           mkdir -p "$RUNNER_TEMP/plasma-ic-evidence"
-          curl --http1.1 --fail --location --silent --show-error \
-            --retry 4 --retry-all-errors --retry-delay 2 \
-            --connect-timeout 30 --max-time 300 \
-            --output "$RUNNER_TEMP/plasma-ic-evidence/st_ds5319_rev20.pdf" \
-            "https://www.st.com/resource/en/datasheet/stm32f103c8.pdf"
-          test "$(stat -c %s "$RUNNER_TEMP/plasma-ic-evidence/st_ds5319_rev20.pdf")" = "1965230"
-          echo "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc  $RUNNER_TEMP/plasma-ic-evidence/st_ds5319_rev20.pdf" | sha256sum --check --strict
+          python - <<'PY'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+
+          repo = Path.cwd()
+          module_path = repo / "data/ic-support/evidence/source_integrity.py"
+          spec = importlib.util.spec_from_file_location("plasma_ic_source_integrity", module_path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("cannot load source_integrity.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          lock = json.loads((repo / "data/ic-support/benchmarks/stm32f103c/source-lock.json").read_text())
+          source = next(item for item in lock["sources"] if item.get("source_id") == "st_ds5319_rev20")
+          payload, final_url = module.fetch_bytes(source["requested_url"])
+          destination = Path(os.environ["RUNNER_TEMP"]) / "plasma-ic-evidence" / "st_ds5319_rev20.pdf"
+          destination.write_bytes(payload)
+          print(f"materialized {len(payload)} bytes from {final_url}")
+          PY
       - name: Build real DS5319 Evidence Pack
         run: |
           python data/ic-support/evidence-pack/semantic_pack.py \
