@@ -69,6 +69,10 @@ jobs:
         run: python data/ic-support/evidence-pack/validate_preprocessing.py
       - name: Validate deterministic DS5319 semantic Evidence Pack
         run: python data/ic-support/evidence-pack/validate_semantic_pack.py
+      - name: Validate Evidence Pack A/B benchmark harness
+        run: |
+          python data/ic-support/benchmarks/stm32f103c/test_ab_benchmark.py
+          python data/ic-support/benchmarks/stm32f103c/test_ab_score_pipeline.py
       - name: Validate STM32F103C source lock
         run: python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
       - name: Compare STM32F103C benchmark

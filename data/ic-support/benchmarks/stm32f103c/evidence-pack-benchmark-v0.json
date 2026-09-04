@@ -1,13 +1,13 @@
 {
-  "schema_version": "0.2.0",
+  "schema_version": "0.3.0",
   "experiment_id": "stm32f103c-full-vs-evidence-pack-v0",
-  "status": "runnable_contract",
+  "status": "runnable_harness",
   "targets": ["STM32F103C8T6", "STM32F103CBT6"],
   "manufacturer_only_source_ids": ["st_ds5319_rev20", "st_pm0075_rev2"],
   "formal_blind_benchmark": {
     "source_lock_path": "data/ic-support/benchmarks/stm32f103c/source-lock.json",
     "unchanged": true,
-    "note": "The formal blind benchmark retains its existing three-source lock and must not be redefined by this A/B experiment."
+    "note": "The formal blind benchmark retains its existing three-source lock and must not be redefined by this manufacturer-only A/B experiment."
   },
   "evidence_pack": {
     "policy_path": "data/ic-support/evidence-pack/policies/st-ds5319-rev20-programming-v0.json",
@@ -22,8 +22,18 @@
       "bundles/STM32F103C8T6.json",
       "bundles/STM32F103CBT6.json",
       "evidence.txt"
-    ],
-    "build_command_template": "python data/ic-support/evidence-pack/semantic_pack.py --source-lock data/ic-support/benchmarks/stm32f103c/source-lock.json --policy data/ic-support/evidence-pack/policies/st-ds5319-rev20-programming-v0.json --pdf <locked-ds5319.pdf> --output-dir <outside-repo-output-dir>"
+    ]
+  },
+  "harness": {
+    "generation_path": "data/ic-support/benchmarks/stm32f103c/ab_benchmark.py",
+    "scoring_path": "data/ic-support/benchmarks/stm32f103c/score_ab_benchmark.py",
+    "prompt_template_path": "data/ic-support/benchmarks/stm32f103c/ab-benchmark-prompt-v0.txt",
+    "observed_schema_path": "data/ic-support/benchmarks/stm32f103c/extraction-observed.schema.json",
+    "transport": "openai_compatible_chat_completions",
+    "streaming": true,
+    "generation_ground_truth_access": false,
+    "scoring_ground_truth_path": "data/ic-support/benchmarks/stm32f103c/extraction-ground-truth.json",
+    "result_storage": "outside_git_by_default"
   },
   "arms": {
     "full_context": {
@@ -32,7 +42,10 @@
         "source_id": "st_ds5319_rev20",
         "text_extraction": "same pdftotext fingerprint used by Evidence Pack generation"
       },
-      "programming_manual": "FULL_LOCKED_SOURCE"
+      "programming_manual": {
+        "mode": "FULL_LOCKED_SOURCE",
+        "source_id": "st_pm0075_rev2"
+      }
     },
     "reduced_context": {
       "datasheet": {
@@ -40,30 +53,66 @@
         "pack_id": "st-ds5319-rev20-programming-evidence-v0",
         "context_file": "evidence.txt"
       },
-      "programming_manual": "FULL_LOCKED_SOURCE"
+      "programming_manual": {
+        "mode": "FULL_LOCKED_SOURCE",
+        "source_id": "st_pm0075_rev2"
+      }
     }
+  },
+  "trial_design": {
+    "default_trial_count": 3,
+    "order": [
+      "odd trials: full_context then reduced_context",
+      "even trials: reduced_context then full_context"
+    ],
+    "purpose": "Balance first-run/warm-cache ordering effects without changing the prompt task."
+  },
+  "prompt_isolation": {
+    "arm_identity_exposed_to_model": false,
+    "answer_key_exposed_to_model": false,
+    "repository_profiles_or_bindings_exposed_to_model": false,
+    "required_model_output": ["observed", "evidence"],
+    "evidence_reference": "source_id plus zero-based physical_page_index"
   },
   "controlled_variables": [
     "model_id",
     "model_runtime",
-    "quantization",
-    "prompt",
+    "generation_parameters",
+    "prompt_template",
+    "observed_schema",
     "target_set",
     "source_revisions",
+    "programming_manual_context",
     "pdftotext_fingerprint",
-    "generation_parameters"
+    "normalization_contract"
   ],
-  "metrics": [
-    "extraction_accuracy",
-    "unsupported_inference_count",
-    "missed_required_evidence_count",
-    "included_datasheet_pages",
-    "datasheet_input_bytes",
-    "ttft_ms",
-    "total_time_ms",
-    "input_tokens",
-    "generation_tokens",
-    "peak_memory_bytes"
-  ],
-  "acceptance_principle": "Reduced context must not reduce engineering correctness."
+  "metrics": {
+    "correctness": [
+      "exact_field_count",
+      "exact_accuracy",
+      "wrong_assertion_count",
+      "missing_unknown_count"
+    ],
+    "provenance_discipline": [
+      "uncited_assertion_count",
+      "out_of_context_citation_count",
+      "unsupported_inference_proxy_count"
+    ],
+    "performance": [
+      "datasheet_input_bytes",
+      "rendered_prompt_bytes",
+      "ttft_ms",
+      "total_time_ms",
+      "input_tokens",
+      "generation_tokens",
+      "peak_memory_bytes"
+    ]
+  },
+  "metric_semantics": {
+    "input_tokens": "Use runtime-reported prompt_tokens only; record null if the endpoint does not report usage.",
+    "ttft_ms": "Measured from request start to first non-empty streamed content. Non-stream fallback cannot claim TTFT.",
+    "peak_memory_bytes": "Record null unless independently reported by the model runtime; the remote HTTP client must not estimate it.",
+    "unsupported_inference_proxy_count": "Union of wrong asserted fields and asserted fields without any valid in-arm citation. This is a deterministic proxy, not semantic proof that a cited page entails the claim."
+  },
+  "acceptance_principle": "Reduced context must not reduce engineering correctness. Performance is reported after correctness and is not itself an admission gate."
 }
