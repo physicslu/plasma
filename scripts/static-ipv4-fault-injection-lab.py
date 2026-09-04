@@ -77,11 +77,48 @@ def _run(
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+    """Hash a private PPU journal without weakening its 0600 permissions.
+
+    The packaged PPU runs as uid 0 in a rootful Docker deployment and persists
+    the activation journal with tempfile.mkstemp(), so the bind-mounted host
+    file can correctly be root:root 0600. Read it through a no-network,
+    no-capability, read-only disposable container instead of assuming the host
+    integration uid can open it directly.
+    """
+    ppu_work = path.parent.parent.resolve()
+    canonical = ppu_work / "gateway-output" / "ppu-network-activation.json"
+    if path.resolve() != canonical:
+        raise FaultLabError(f"refusing to hash non-canonical PPU activation journal: {path}")
+    phase2 = _load_module(
+        _repo_root() / "scripts/ppu-network-phase2-acceptance.py",
+        "_plasma_fault_evidence_phase2",
+    )
+    reader = (
+        "import hashlib\n"
+        "from pathlib import Path\n"
+        "path = Path('/work/gateway-output/ppu-network-activation.json')\n"
+        "if not path.is_file():\n"
+        "    raise SystemExit('canonical activation journal missing')\n"
+        "digest = hashlib.sha256()\n"
+        "with path.open('rb') as handle:\n"
+        "    for block in iter(lambda: handle.read(1024 * 1024), b''):\n"
+        "        digest.update(block)\n"
+        "print(digest.hexdigest())\n"
+    )
+    result = phase2._run([
+        "docker", "run", "--rm",
+        "--platform", "linux/arm/v7",
+        "--network", "none",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges:true",
+        "-v", f"{ppu_work}:/work:ro",
+        phase2.ARM_IMAGE,
+        "python3", "-c", reader,
+    ])
+    digest = result.stdout.strip()
+    if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+        raise FaultLabError(f"invalid activation journal SHA-256 evidence: {digest!r}")
+    return digest
 
 
 def _make_stale_work_host_removable(phase2: Any, root: Path) -> None:
