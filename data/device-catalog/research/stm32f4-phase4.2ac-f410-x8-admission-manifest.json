@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2ac-f410-x8-admission-2026-09-05",
+  "targets": [
+    {
+      "base_device": "STM32F410TB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410tb.html",
+      "selection_reason": "same-series production lifecycle control"
+    },
+    {
+      "base_device": "STM32F410C8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410c8.html",
+      "selection_reason": "Phase 4.2AB policy-ready 64-KiB STM32F410 x8 device"
+    },
+    {
+      "base_device": "STM32F410T8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f410t8.html",
+      "selection_reason": "Phase 4.2AB policy-ready 64-KiB STM32F410 x8 device"
+    }
+  ],
+  "admission_scope": {
+    "family": "STM32F4",
+    "base_devices": [
+      "STM32F410C8",
+      "STM32F410T8"
+    ],
+    "production_exact_icpns_before": 352,
+    "production_base_devices_before": 124,
+    "fail_closed": true
+  }
+}
