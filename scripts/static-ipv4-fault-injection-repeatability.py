@@ -48,25 +48,23 @@ def _run_streaming(command: Sequence[str], *, cwd: Path) -> int:
 
 
 def _seed_dirty_state(work: Path) -> None:
-    """Create deterministic root-owned residue; the wrapper never cleans it.
+    """Create direct root-owned residue without granting the producer capabilities.
 
-    The host creates one dedicated staging directory that is writable/traversable
-    by the container uid but not readable/listable by it. The container still runs
-    uid 0 with every capability dropped, so the test does not depend on DAC bypass.
-    The root-owned child remains for the formal fault lab startup cleanup to remove.
+    The host owns the disposable work root. It temporarily adds only write/execute
+    for "other" so a uid-0, cap-drop-all container can create one known child
+    directly under that root. The original work-root mode is restored before the
+    formal fault lab starts. The resulting child is root:root 0700, so the host
+    user cannot traverse or delete it until the lab's production-like cleanup
+    path repairs the disposable tree.
     """
     work.mkdir(parents=True, exist_ok=True)
-    seed_root = work / f".dirty-state-seed-{os.getpid()}-{time.time_ns()}"
-    old_umask = os.umask(0)
-    try:
-        seed_root.mkdir(mode=0o733, exist_ok=False)
-    finally:
-        os.umask(old_umask)
-
+    original_mode = stat.S_IMODE(work.stat().st_mode)
+    dirty_name = f".dirty-state-root-owned-{os.getpid()}-{time.time_ns()}"
+    dirty_path = work / dirty_name
     seed = (
-        "import os\n"
+        "import os, sys\n"
         "from pathlib import Path\n"
-        "leaf = Path('/seed/root-owned')\n"
+        "leaf = Path('/work') / sys.argv[1]\n"
         "leaf.mkdir(mode=0o700, exist_ok=False)\n"
         "fd = os.open(str(leaf / 'private-marker'), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)\n"
         "try:\n"
@@ -74,48 +72,58 @@ def _seed_dirty_state(work: Path) -> None:
         "finally:\n"
         "    os.close(fd)\n"
     )
-    result = subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "--platform",
-            "linux/arm/v7",
-            "--network",
-            "none",
-            "--cap-drop",
-            "ALL",
-            "--security-opt",
-            "no-new-privileges:true",
-            "--user",
-            "0:0",
-            "--volume",
-            f"{seed_root}:/seed",
-            ARM_IMAGE,
-            "python3",
-            "-c",
-            seed,
-        ],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        work.chmod(original_mode | 0o003)
+        result = subprocess.run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--platform",
+                "linux/arm/v7",
+                "--network",
+                "none",
+                "--cap-drop",
+                "ALL",
+                "--security-opt",
+                "no-new-privileges:true",
+                "--user",
+                "0:0",
+                "--volume",
+                f"{work}:/work",
+                ARM_IMAGE,
+                "python3",
+                "-c",
+                seed,
+                dirty_name,
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    finally:
+        work.chmod(original_mode)
+
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise RepeatabilityError(f"dirty-state injection failed: {detail}")
 
-    root_owned = seed_root / "root-owned"
     try:
-        info = root_owned.lstat()
+        info = dirty_path.lstat()
     except FileNotFoundError as exc:
-        raise RepeatabilityError(f"dirty-state root-owned residue missing: {root_owned}") from exc
+        raise RepeatabilityError(f"dirty-state root-owned residue missing: {dirty_path}") from exc
     mode = stat.S_IMODE(info.st_mode)
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_gid != 0 or mode != 0o700:
         raise RepeatabilityError(
             "dirty-state residue ownership/mode mismatch: "
             f"uid={info.st_uid} gid={info.st_gid} mode={mode:04o}; expected root:root 0700"
         )
-    print(f"[REPEATABILITY] injected root:root 0700 dirty state under {seed_root}", flush=True)
+    restored_mode = stat.S_IMODE(work.stat().st_mode)
+    if restored_mode != original_mode:
+        raise RepeatabilityError(
+            f"dirty-state injection did not restore work-root mode: {restored_mode:04o} != {original_mode:04o}"
+        )
+    print(f"[REPEATABILITY] injected direct root:root 0700 dirty state at {dirty_path}", flush=True)
 
 
 def _run_verifier(repo: Path, ppu_work: Path) -> dict[str, Any]:
@@ -224,7 +232,7 @@ def _main(args: argparse.Namespace) -> int:
         "same_work_dir": str(work),
         "run_count": 2,
         "dirty_state_injected_before_run1": True,
-        "dirty_state_contract": "root:root 0700 directory + root:root 0600 marker",
+        "dirty_state_contract": "direct root:root 0700 directory + root:root 0600 marker",
         "manual_cleanup": False,
         "sudo": False,
         "host_verifier_non_root": True,
