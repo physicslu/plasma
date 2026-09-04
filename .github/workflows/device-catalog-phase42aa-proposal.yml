@@ -1,0 +1,38 @@
+name: Device catalog Phase 4.2AA N/H TFBGA216 batch2 admission proposal
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2aa-nh-tfbga216-admission-batch2]
+    paths: [".github/workflows/device-catalog-phase42aa-proposal.yml"]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  propose:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/device-catalog-phase4.2aa-nh-tfbga216-admission-batch2}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Build proposal
+        run: |
+          mkdir -p /tmp/phase42aa
+          PYTHONPATH=data/device-catalog/research python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-live-2026-09-05 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2aa-nh-tfbga216-admission-batch2-baseline.json \
+            --admit-base STM32F469NE --admit-base STM32F469NG --admit-base STM32F469NI --admit-base STM32F479NG --admit-base STM32F479NI \
+            --output /tmp/phase42aa/admission-plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/phase42aa/admission-plan.json').read_text())
+          expected={'admit':7,'already_present':0,'manual_review_required':0,'reject':0}
+          expected_icpns={'STM32F469NEH6','STM32F469NGH6','STM32F469NIH6','STM32F469NIH6TR','STM32F469NIH7','STM32F479NGH6','STM32F479NIH6'}
+          if p['candidate_count'] != 7 or p['decision_counts'] != expected or p['conflicts'] != 0 or p['canonical_rows_before'] != 345:
+              raise SystemExit('unclean Phase 4.2AA plan')
+          if {x['icpn'] for x in p['candidates']} != expected_icpns:
+              raise SystemExit('unexpected Phase 4.2AA candidate set')
+          PY
+          cd /tmp/phase42aa && sha256sum admission-plan.json > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with: {name: phase42aa-nh-tfbga216-batch2-admission-proposal, path: /tmp/phase42aa, if-no-files-found: error, retention-days: 30}
