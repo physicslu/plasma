@@ -1,0 +1,142 @@
+name: Persistent integration host acceptance
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: persistent-integration-host
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  main-dispatch-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Reject non-main persistent qualification dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REPOSITORY" = "physicslu/plasma"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test -n "$GITHUB_SHA"
+          echo "Persistent L4 qualification accepted for main SHA $GITHUB_SHA"
+
+  persistent-acceptance:
+    needs: main-dispatch-guard
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'physicslu/plasma' &&
+      github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, plasma-integration]
+    timeout-minutes: 120
+
+    steps:
+      - name: Assert trusted event identity before checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REPOSITORY" = "physicslu/plasma"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test -n "$GITHUB_SHA"
+          test "$(id -u)" -ne 0
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          clean: true
+          persist-credentials: false
+
+      - name: Run fail-closed persistent-host preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          persistent_root="${PLASMA_PERSISTENT_CI_ROOT:-$HOME/.local/state/plasma-ci}"
+          python3 scripts/persistent-integration-host-preflight.py \
+            --expected-repository physicslu/plasma \
+            --persistent-root "$persistent_root" \
+            --report "$RUNNER_TEMP/plasma-persistent-preflight.json"
+
+      - name: Set up repository validation dependencies
+        shell: bash
+        run: bash scripts/codex-cloud-setup.sh
+
+      - name: Run canonical source and configuration validation
+        shell: bash
+        run: bash scripts/codex-cloud-test.sh
+
+      - name: Build and clean-extract packaged PPU runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python="software/python/.venv/bin/python"
+          runtime="$RUNNER_TEMP/plasma-persistent-ppu-runtime"
+          output="$RUNNER_TEMP/plasma-persistent-ppu-release"
+          verify="$RUNNER_TEMP/plasma-persistent-ppu-verify"
+          sha="$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$sha"
+          version="$($python -c 'import json; print(json.load(open("release/product.json"))["product_version"])')"
+
+          rm -rf "$runtime" "$output" "$verify"
+          "$python" scripts/ppu-runtime.py build --output-dir "$runtime"
+          "$python" scripts/ppu-runtime.py validate "$runtime"
+          "$python" scripts/ppu-release.py \
+            --runtime-dir "$runtime" \
+            --output-dir "$output" \
+            --git-sha "$sha"
+
+          archive="$output/plasma-ppu-$version-linux-armv7l.tar.gz"
+          "$python" scripts/product-release.py verify \
+            "$archive" \
+            --expect-role ppu \
+            --expect-platform linux \
+            --expect-architecture armv7l \
+            --expect-version "$version" \
+            --extract-to "$verify"
+          "$python" scripts/ppu-runtime.py validate "$verify/plasma-release/runtime"
+          echo "PLASMA_PERSISTENT_ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Capture persistent integration environment fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python="software/python/.venv/bin/python"
+          persistent_root="${PLASMA_PERSISTENT_CI_ROOT:-$HOME/.local/state/plasma-ci}"
+          "$python" scripts/ci-environment-fingerprint.py \
+            --artifact "$PLASMA_PERSISTENT_ARCHIVE" \
+            --work-dir "$persistent_root" \
+            --report "$RUNNER_TEMP/plasma-persistent-environment-fingerprint.json"
+
+      - name: Run persistent same-workdir repeatability and privilege-parity gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python="software/python/.venv/bin/python"
+          persistent_root="${PLASMA_PERSISTENT_CI_ROOT:-$HOME/.local/state/plasma-ci}"
+          work="$persistent_root/static-ipv4-fault-injection"
+          report="$RUNNER_TEMP/plasma-static-ipv4-persistent-repeatability.json"
+
+          "$python" scripts/static-ipv4-fault-injection-repeatability.py \
+            --runtime-dir "$RUNNER_TEMP/plasma-persistent-ppu-verify/plasma-release/runtime" \
+            --work-dir "$work" \
+            --report "$report"
+
+      - name: Upload persistent-host acceptance reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plasma-persistent-integration-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/plasma-persistent-preflight.json
+            ${{ runner.temp }}/plasma-persistent-environment-fingerprint.json
+            ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability.json
+            ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run1.json
+            ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run2.json
+          if-no-files-found: warn
+          retention-days: 14

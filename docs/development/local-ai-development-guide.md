@@ -58,7 +58,7 @@ A practical setup may use:
 
 | Role | Example model | Purpose |
 |---|---|---|
-| Chat / Edit / Apply / Agent | `qwen3.8:27b-mlx` | Main reasoning and coding model |
+| Chat / Edit / Apply / Agent | `qwen3.8:27b-mlx` | Main interactive reasoning model; for IC Support ingestion, use as a manufacturer-document-grounded specification candidate generator rather than a production-code authority |
 | Autocomplete | `qwen2.5-coder:1.5b` | Low-latency inline completion |
 | Embeddings | `qwen3-embedding:0.6b` | Semantic codebase indexing |
 
@@ -71,6 +71,51 @@ ollama pull qwen3-embedding:0.6b
 ```
 
 For Apple Silicon systems with sufficient unified memory, context size is a machine-local tuning decision. The current DeepSeek Harness configuration uses a 32,768-token context; preserve that value unless measurement and the installed provider configuration justify a change. These tuning values are not Plasma product requirements.
+
+### 4.1 IC Support model-role experiment
+
+The STM32F103C manufacturer-grounded experiment showed that model roles should be separated by the kind of error they are expected to make.
+
+Observed with `qwen3.8:27b-mlx` and exact ST manufacturer documentation:
+
+- strong technical fact extraction and cross-document reasoning;
+- strong profile decomposition after explicit architecture guidance;
+- useful evidence/provenance classification;
+- materially weaker consistency when converting the same facts into detailed executable-style pseudocode.
+
+The recommended IC Support research pipeline is therefore:
+
+```text
+Manufacturer documents
+        |
+        v
+IC Knowledge / Specification Agent
+        |
+        v
+Candidate IC Support
+        |
+        v
+Deterministic schema + semantic validation
+        |
+        v
+Validated canonical specification
+        |
+        v
+Coding-specialized model
+        |
+        v
+Driver / executor / tests candidate
+        |
+        v
+Independent different-family reviewer
+        |
+        v
+Compiler / static checks / simulation / HIL
+```
+
+The coding model should consume a validated canonical specification rather than independently rediscovering register/security semantics from the PDFs. A second AI reviewer can improve defect discovery, but agreement between models is not a trust boundary. Manufacturer evidence, deterministic validation, and real-target acceptance remain authoritative.
+
+See [IC Support Local-AI Benchmark Handover](ic-support-ai-benchmark-handover.md) and the STM32F103C benchmark review record for the current experiment scope and known failure classes.
 
 ## 5. DeepSeek Harness launcher
 
