@@ -159,10 +159,10 @@ def _read_durable_record(registry_state: Path) -> dict[str, Any]:
 
 
 def _find_activation_journal(ppu_work: Path) -> Path:
-    matches = list(ppu_work.rglob("ppu-network-activation.json"))
-    if len(matches) != 1:
-        raise FaultLabError(f"expected one PPU activation journal, found: {matches!r}")
-    return matches[0]
+    path = ppu_work / "gateway-output" / "ppu-network-activation.json"
+    if not path.is_file():
+        raise FaultLabError(f"PPU activation journal missing at canonical path: {path}")
+    return path
 
 
 def _start_fault_ppu(
