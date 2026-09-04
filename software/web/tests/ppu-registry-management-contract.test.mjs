@@ -31,7 +31,7 @@ test("PPU management uses Manager-owned registry APIs instead of browser-local i
 
 test("PPU topology remains observed while Site desired configuration is PPU-owned and writable", () => {
   assert.match(ppuSite, /fleetForEntry/);
-  assert.match(ppuSite, /selectedFleet\?\.topology\.site_count/);
+  assert.match(ppuSite, /fleetView\?\.topology\.site_count/);
   assert.match(ppuSite, /import PpuSiteDesiredConfiguration/);
   assert.match(ppuSite, /<PpuSiteDesiredConfiguration/);
   assert.match(ppuSiteDesired, /getManagerPpuSites/);
@@ -39,6 +39,8 @@ test("PPU topology remains observed while Site desired configuration is PPU-owne
   assert.match(ppuSiteDesired, /Desired Enabled/);
   assert.match(ppuSiteDesired, /Desired Interface/);
   assert.match(ppuSiteDesired, /Desired Target/);
+  assert.match(ppuSiteDesired, /<th>Actual<\/th>/);
+  assert.match(ppuSiteDesired, /<th>Reconciliation<\/th>/);
   assert.match(ppuSiteDesired, /Stop or cancel active Jobs before changing Site desired configuration/);
   assert.match(ppuSiteDesired, /canonical PPU configuration/);
   assert.doesNotMatch(ppuSite, /Enable All|Disable All/);
