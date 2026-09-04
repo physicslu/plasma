@@ -14,8 +14,6 @@ from typing import Any
 
 
 ARM_IMAGE = "arm32v7/python:3.12@sha256:45eb5cbc14fe248e7598eb23a5a61424d44e556aed3efa955dfab2ac9a67d91c"
-EXPECTED_EVENT = "workflow_dispatch"
-EXPECTED_REF = "refs/heads/main"
 
 
 def _run(command: list[str]) -> str:
@@ -36,10 +34,6 @@ def _require_tool(name: str) -> str:
     return path
 
 
-def _inside(child: Path, parent: Path) -> bool:
-    return child == parent or parent in child.parents
-
-
 def _filesystem_type(path: Path) -> str:
     return _run(["stat", "-f", "-c", "%T", str(path)])
 
@@ -57,7 +51,7 @@ def _default_routes() -> tuple[list[dict[str, Any]], str]:
     raw = _run(["ip", "-json", "route", "show", "default"])
     routes = json.loads(raw or "[]")
     if not isinstance(routes, list) or not routes:
-        raise RuntimeError("persistent integration host has no default route")
+        raise RuntimeError("candidate integration host has no default route")
     normalized = json.dumps(routes, sort_keys=True, separators=(",", ":"))
     signature = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
     return routes, signature
@@ -85,12 +79,19 @@ def _docker_boundary() -> dict[str, Any]:
         "root_dir": root_dir,
         "host_security_note": (
             "non-root runner access to a rootful Docker daemon is host-privileged; "
-            "this runner is not a sandbox"
+            "this host is not a sandbox"
         ),
     }
 
 
 def _armv7_boundary() -> dict[str, Any]:
+    try:
+        _run(["docker", "image", "inspect", ARM_IMAGE, "--format", "{{.Id}}"])
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            "pinned ARMv7 image is not pre-provisioned locally; readiness will not pull it"
+        ) from exc
+
     program = (
         "import json,platform; "
         "print(json.dumps({'machine': platform.machine(), 'python': platform.python_version()}))"
@@ -100,6 +101,7 @@ def _armv7_boundary() -> dict[str, Any]:
             "docker",
             "run",
             "--rm",
+            "--pull=never",
             "--platform",
             "linux/arm/v7",
             "--network",
@@ -121,30 +123,35 @@ def _armv7_boundary() -> dict[str, Any]:
     machine = str(evidence.get("machine", ""))
     if not machine.startswith("arm"):
         raise RuntimeError(f"ARMv7 execution boundary returned unexpected machine: {machine!r}")
-    evidence["image"] = ARM_IMAGE
-    evidence["network"] = "none"
-    evidence["capabilities"] = "none"
-    evidence["no_new_privileges"] = True
+    evidence.update(
+        {
+            "image": ARM_IMAGE,
+            "image_preprovisioned": True,
+            "pull_policy": "never",
+            "network": "none",
+            "capabilities": "none",
+            "no_new_privileges": True,
+        }
+    )
     return evidence
 
 
-def _persistent_root(path: Path, *, uid: int, gid: int, workspace: Path, runner_temp: Path) -> dict[str, Any]:
-    if path.exists() and path.is_symlink():
-        raise RuntimeError(f"persistent root must not be a symlink: {path}")
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    resolved = path.resolve(strict=True)
-    if _inside(resolved, workspace):
-        raise RuntimeError("persistent root must live outside GITHUB_WORKSPACE")
-    if _inside(resolved, runner_temp):
-        raise RuntimeError("persistent root must live outside RUNNER_TEMP")
-
+def _persistent_root(path: Path, *, uid: int, gid: int) -> dict[str, Any]:
+    expanded = path.expanduser().absolute()
+    if not expanded.exists():
+        raise RuntimeError(
+            f"persistent root must be provisioned before readiness is run: {expanded}"
+        )
+    if expanded.is_symlink():
+        raise RuntimeError(f"persistent root must not be a symlink: {expanded}")
+    resolved = expanded.resolve(strict=True)
     info = resolved.lstat()
     mode = stat.S_IMODE(info.st_mode)
     if not stat.S_ISDIR(info.st_mode):
         raise RuntimeError(f"persistent root is not a directory: {resolved}")
     if info.st_uid != uid or info.st_gid != gid:
         raise RuntimeError(
-            "persistent root must be owned by the non-root runner identity "
+            "persistent root must be owned by the intended non-root runner identity "
             f"(expected {uid}:{gid}, found {info.st_uid}:{info.st_gid})"
         )
     if mode & 0o022:
@@ -157,36 +164,7 @@ def _persistent_root(path: Path, *, uid: int, gid: int, workspace: Path, runner_
         "gid": info.st_gid,
         "mode": f"{mode:04o}",
         "filesystem": _filesystem_type(resolved),
-        "outside_workspace": True,
-        "outside_runner_temp": True,
-    }
-
-
-def _identity(expected_repository: str) -> dict[str, Any]:
-    event_name = os.environ.get("GITHUB_EVENT_NAME", "")
-    repository = os.environ.get("GITHUB_REPOSITORY", "")
-    ref = os.environ.get("GITHUB_REF", "")
-    event_sha = os.environ.get("GITHUB_SHA", "")
-    if event_name != EXPECTED_EVENT:
-        raise RuntimeError(f"expected {EXPECTED_EVENT}, found {event_name!r}")
-    if repository != expected_repository:
-        raise RuntimeError(f"expected repository {expected_repository!r}, found {repository!r}")
-    if ref != EXPECTED_REF:
-        raise RuntimeError(f"persistent qualification is main-only; found ref {ref!r}")
-    checked_out_sha = _run(["git", "rev-parse", "HEAD"])
-    if not event_sha or checked_out_sha != event_sha:
-        raise RuntimeError(
-            "checked-out commit does not match workflow dispatch SHA "
-            f"(checkout={checked_out_sha!r}, event={event_sha!r})"
-        )
-    return {
-        "event": event_name,
-        "repository": repository,
-        "ref": ref,
-        "event_sha": event_sha,
-        "checked_out_sha": checked_out_sha,
-        "main_only": True,
-        "pre_merge_pr_gate_claim": "NONE",
+        "preexisting": True,
     }
 
 
@@ -197,11 +175,13 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Fail-closed preflight for the persistent Plasma integration host."
+        description=(
+            "Non-provisioning readiness check for a candidate Plasma persistent "
+            "integration host."
+        )
     )
     parser.add_argument("--persistent-root", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
-    parser.add_argument("--expected-repository", required=True)
     return parser
 
 
@@ -210,36 +190,30 @@ def main() -> int:
     report: dict[str, Any] = {
         "schema_version": 1,
         "status": "FAIL",
-        "qualification_state": "RUNNER_ENROLLED",
-        "evidence_level": "L4_persistent_integration_preflight",
+        "qualification_state": "UNPROVISIONED",
+        "evidence_level": "L4_host_readiness",
+        "mutates_host_configuration": False,
         "z2_hardware_claim": "NONE",
     }
     try:
         if platform.system() != "Linux":
-            raise RuntimeError(f"persistent integration host must be Linux, found {platform.system()!r}")
+            raise RuntimeError(f"candidate integration host must be Linux, found {platform.system()!r}")
         if platform.machine() not in {"x86_64", "amd64"}:
             raise RuntimeError(
-                f"persistent integration host must be x64, found {platform.machine()!r}"
+                f"candidate integration host must be x64, found {platform.machine()!r}"
             )
 
         uid = os.geteuid()
         gid = os.getegid()
         if uid == 0:
-            raise RuntimeError("persistent integration runner must run as a non-root host user")
+            raise RuntimeError("intended GitHub Actions runner identity must be non-root")
 
-        for tool in ("docker", "git", "ip", "node", "npm", "python3", "stat"):
-            _require_tool(tool)
-
-        workspace_raw = os.environ.get("GITHUB_WORKSPACE", "")
-        runner_temp_raw = os.environ.get("RUNNER_TEMP", "")
-        if not workspace_raw or not runner_temp_raw:
-            raise RuntimeError("GITHUB_WORKSPACE and RUNNER_TEMP are required")
-        workspace = Path(workspace_raw).resolve(strict=True)
-        runner_temp = Path(runner_temp_raw).resolve(strict=True)
-
+        tools = {
+            name: _require_tool(name)
+            for name in ("docker", "git", "ip", "node", "npm", "python3", "stat")
+        }
         report.update(
             {
-                "identity": _identity(args.expected_repository),
                 "host": {
                     "hostname": platform.node(),
                     "uid": uid,
@@ -249,18 +223,12 @@ def main() -> int:
                     "machine": platform.machine(),
                     "os_release": _os_release(),
                     "python": platform.python_version(),
+                    "git": _run(["git", "--version"]),
                     "node": _run(["node", "--version"]),
                     "npm": _run(["npm", "--version"]),
-                    "workspace": str(workspace),
-                    "runner_temp": str(runner_temp),
+                    "tools": tools,
                 },
-                "persistent_root": _persistent_root(
-                    args.persistent_root.expanduser().absolute(),
-                    uid=uid,
-                    gid=gid,
-                    workspace=workspace,
-                    runner_temp=runner_temp,
-                ),
+                "persistent_root": _persistent_root(args.persistent_root, uid=uid, gid=gid),
                 "docker": _docker_boundary(),
                 "armv7": _armv7_boundary(),
             }
@@ -269,11 +237,13 @@ def main() -> int:
         report["network"] = {
             "default_routes": routes,
             "default_route_signature_sha256": route_signature,
+            "configuration_mutated": False,
         }
+        report["qualification_state"] = "HOST_READY"
         report["status"] = "PASS"
         _write_report(args.report, report)
         print(
-            "PLASMA_PERSISTENT_INTEGRATION_PREFLIGHT="
+            "PLASMA_PERSISTENT_INTEGRATION_HOST_READINESS="
             + json.dumps(report, sort_keys=True, separators=(",", ":")),
             flush=True,
         )
@@ -281,7 +251,7 @@ def main() -> int:
     except Exception as exc:
         report["error"] = f"{type(exc).__name__}: {exc}"
         _write_report(args.report, report)
-        print(f"[FAIL] persistent integration preflight: {exc}", file=sys.stderr, flush=True)
+        print(f"[FAIL] persistent integration host readiness: {exc}", file=sys.stderr, flush=True)
         return 1
 
 

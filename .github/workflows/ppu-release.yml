@@ -6,7 +6,9 @@ on:
     paths:
       - ".github/workflows/ppu-release.yml"
       - ".github/workflows/persistent-integration-host.yml"
+      - "scripts/persistent-integration-host-readiness.py"
       - "scripts/persistent-integration-host-preflight.py"
+      - "scripts/persistent-integration-qualification-summary.py"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/product-release.py"
