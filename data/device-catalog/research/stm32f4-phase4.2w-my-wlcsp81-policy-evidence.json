@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "phase": "4.2W",
+  "base_main": "df1b606a2b0a2e31ca6c4affb7c20928a25fcf5e",
+  "captured_at_utc": "2026-09-04T06:52:02Z",
+  "fresh_inventory_before_policy": {
+    "production_exact_icpn_rows": 331,
+    "production_base_device_count": 109,
+    "gap_base_device_count": 40,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 40,
+    "blocker_counts": {
+      "unsupported flash-size code 8": 3,
+      "unsupported STM32F4 package code: I": 2,
+      "unsupported STM32F4 pin/package combination: A/H": 11,
+      "unsupported STM32F4 pin/package combination: A/Y": 5,
+      "unsupported STM32F4 pin/package combination: B/T": 10,
+      "unsupported STM32F4 pin/package combination: M/Y": 5,
+      "unsupported STM32F4 pin/package combination: N/H": 10
+    }
+  },
+  "policy_mapping": {
+    "pin_code": "M",
+    "package_code": "Y",
+    "package": "WLCSP",
+    "pin_count": "81"
+  },
+  "affected_base_devices": [
+    "STM32F413MG",
+    "STM32F413MH",
+    "STM32F423MH",
+    "STM32F446MC",
+    "STM32F446ME"
+  ],
+  "selection_reason": "M/Y is tied for the smallest single pin/package blocker surface, introduces no new package-code or flash-size semantics, and official ST product pages plus the STM32F413/423 and STM32F446 datasheets independently identify the M/Y device forms as WLCSP81. The bounded mapping immediately makes five Base Devices policy-ready while preserving all lifecycle decisions for a later live-evidence admission phase.",
+  "official_evidence": {
+    "product_urls": [
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mg.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f413mh.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f423mh.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f446mc.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f446me.html"
+    ],
+    "datasheet_urls": [
+      "https://www.st.com/resource/en/datasheet/stm32f413vh.pdf",
+      "https://www.st.com/resource/en/datasheet/stm32f423mh.pdf",
+      "https://www.st.com/resource/en/datasheet/stm32f446mc.pdf"
+    ],
+    "observed_package": "WLCSP 81",
+    "observed_active_exact_icpns": [
+      "STM32F413MGY6TR",
+      "STM32F413MHY6TR",
+      "STM32F423MHY3TR",
+      "STM32F423MHY6TR",
+      "STM32F446MCY6TR",
+      "STM32F446MEY6MTR",
+      "STM32F446MEY6TR"
+    ],
+    "observed_non_active_exact_icpns": [
+      {
+        "icpn": "STM32F413MGY3TR",
+        "marketing_status": "Proposal"
+      },
+      {
+        "icpn": "STM32F413MHY3TR",
+        "marketing_status": "Proposal"
+      }
+    ]
+  },
+  "expected_immediate_delta_before_admission": {
+    "production_exact_icpn_rows": 331,
+    "production_base_device_count": 109,
+    "gap_base_device_count": 40,
+    "policy_ready_count": 5,
+    "policy_blocked_count": 35,
+    "policy_ready_base_devices": [
+      "STM32F413MG",
+      "STM32F413MH",
+      "STM32F423MH",
+      "STM32F446MC",
+      "STM32F446ME"
+    ]
+  },
+  "production_write_applied": false,
+  "exact_icpn_admission_deferred": true,
+  "algorithm_equivalence_claimed": false,
+  "fail_closed": true
+}
