@@ -1,0 +1,25 @@
+{
+  "added_exact_icpns": [
+    "STM32F429NEH6",
+    "STM32F429NGH6",
+    "STM32F429NIH6",
+    "STM32F429NIH6TR",
+    "STM32F429NIH7",
+    "STM32F439NGH6",
+    "STM32F439NIH6"
+  ],
+  "admission_plan_sha256": "0717c9717fd3c4c9d3ab608a216fe8745cf47731cd59783a03850302caee489a",
+  "canonical_csv_file_sha256": "d1ffdeed2d6cc2bc2aea0688f4da213cade3e8e567aec159458ed873837cd07c",
+  "lifecycle_exclusions": [],
+  "phase": "4.2Z",
+  "production_base_devices_after": 119,
+  "production_base_devices_before": 114,
+  "production_rows_after": 345,
+  "production_rows_before": 338,
+  "proposal_artifact_id": 9937768684,
+  "proposal_artifact_zip_sha256": "dd73f7b74475e83350241528cccb04387fca5a8c4a2d5fd2c0ba57f4776fa24d",
+  "proposal_run_id": 33875778983,
+  "retained_evidence_id": "stm32f4-phase4.2z-nh-tfbga216-admission-batch1-2026-09-04-retained-20260904T124757Z-6a606b9",
+  "schema_version": 1,
+  "status": "published"
+}
