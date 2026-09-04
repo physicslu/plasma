@@ -92,6 +92,18 @@ jobs:
             --expect-version "$version" \
             --extract-to "$verify"
           "$python" scripts/ppu-runtime.py validate "$verify/plasma-release/runtime"
+          echo "PLASMA_PERSISTENT_ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Capture persistent integration environment fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python="software/python/.venv/bin/python"
+          persistent_root="${PLASMA_PERSISTENT_CI_ROOT:-$HOME/.local/state/plasma-ci}"
+          "$python" scripts/ci-environment-fingerprint.py \
+            --artifact "$PLASMA_PERSISTENT_ARCHIVE" \
+            --work-dir "$persistent_root" \
+            --report "$RUNNER_TEMP/plasma-persistent-environment-fingerprint.json"
 
       - name: Run persistent same-workdir repeatability and privilege-parity gate
         shell: bash
@@ -113,6 +125,7 @@ jobs:
         with:
           name: plasma-persistent-integration-${{ github.sha }}
           path: |
+            ${{ runner.temp }}/plasma-persistent-environment-fingerprint.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run1.json
             ${{ runner.temp }}/plasma-static-ipv4-persistent-repeatability-run2.json
