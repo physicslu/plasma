@@ -1,0 +1,50 @@
+{
+  "artifact_type": "evidence_pack_live_validation_receipt",
+  "schema_version": "0.1.0",
+  "receipt_id": "st-ds5319-rev20-live-validation-v0",
+  "status": "observed_pass",
+  "observed_at_utc": "2026-09-04T17:58:58Z",
+  "validated_head_commit": "335abda8d7bab8576cb1e78b619fd30fa750fa51",
+  "source": {
+    "source_id": "st_ds5319_rev20",
+    "algorithm": "sha256",
+    "digest": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc",
+    "byte_length": 1965230
+  },
+  "preprocessor": {
+    "name": "pdftotext",
+    "version": "pdftotext version 24.02.0",
+    "arguments": [
+      "-layout",
+      "-enc",
+      "UTF-8"
+    ]
+  },
+  "normalization": {
+    "contract_id": "plasma-document-normalization-v0",
+    "digest": "e5282cff74dda2f290cec48d752fff18226020b9382a767e3fdf78e23ce83224"
+  },
+  "structure_manifest_digest": "07eb12e12f007a4da76c670a20347702b6e91c219fccb8a794b13c32d7b50ce4",
+  "catalog_digest": "89898706aa0a718f397c062fb811b1e4d5f9162f1fd4f4190a0cc1ff94f44dcc",
+  "pack_id": "st-ds5319-rev20-programming-evidence-v0",
+  "pack_digest": "d0503c1c1334a19fdc78543aa2a3064cafad5c4940e4b7dd223f3bee81eb16d8",
+  "physical_page_count": 114,
+  "included_page_count": 45,
+  "dependency_edge_count": 10,
+  "targets": [
+    "STM32F103C8T6",
+    "STM32F103CBT6"
+  ],
+  "workflow": {
+    "name": "IC Evidence live source validation",
+    "run_id": 33903408824,
+    "artifact_id": 9948507590,
+    "artifact_zip_sha256": "016b9e09118d5c93526169fd74c16aaad42dff9edf85df4c56d95a99a1784ee1"
+  },
+  "trust_boundary": {
+    "informational_observation_only": true,
+    "canonical_dataset_admission": false,
+    "production_admission": false,
+    "note": "This receipt records one successful reconstruction from the exact locked manufacturer PDF. It is not source authority and must not be reused after any source, preprocessing, normalization, policy, rules, taxonomy, or builder fingerprint changes."
+  }
+}

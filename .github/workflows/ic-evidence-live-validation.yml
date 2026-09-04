@@ -1,0 +1,94 @@
+name: IC Evidence live source validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-ds5319-live-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ensure pdftotext is available
+        run: |
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
+          pdftotext -v 2>&1 | head -n 1
+      - name: Materialize DS5319 through canonical source transport
+        run: |
+          mkdir -p "$RUNNER_TEMP/plasma-ic-evidence"
+          python - <<'PY'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+
+          repo = Path.cwd()
+          module_path = repo / "data/ic-support/evidence/source_integrity.py"
+          spec = importlib.util.spec_from_file_location("plasma_ic_source_integrity", module_path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("cannot load source_integrity.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          lock = json.loads((repo / "data/ic-support/benchmarks/stm32f103c/source-lock.json").read_text())
+          source = next(item for item in lock["sources"] if item.get("source_id") == "st_ds5319_rev20")
+          payload, final_url = module.fetch_bytes(source["requested_url"])
+          destination = Path(os.environ["RUNNER_TEMP"]) / "plasma-ic-evidence" / "st_ds5319_rev20.pdf"
+          destination.write_bytes(payload)
+          print(f"materialized {len(payload)} bytes from {final_url}")
+          PY
+      - name: Build real DS5319 Evidence Pack
+        run: |
+          python data/ic-support/evidence-pack/semantic_pack.py \
+            --source-lock data/ic-support/benchmarks/stm32f103c/source-lock.json \
+            --policy data/ic-support/evidence-pack/policies/st-ds5319-rev20-programming-v0.json \
+            --pdf "$RUNNER_TEMP/plasma-ic-evidence/st_ds5319_rev20.pdf" \
+            --output-dir "$RUNNER_TEMP/plasma-ic-evidence/output"
+      - name: Emit non-content validation report
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "plasma-ic-evidence" / "output"
+          structure = json.loads((root / "structure.json").read_text())
+          catalog = json.loads((root / "catalog.json").read_text())
+          pack = json.loads((root / "pack.json").read_text())
+          binding = json.loads((root / "binding.json").read_text())
+          report = {
+              "schema_version": "0.1.0",
+              "source": structure["source"],
+              "preprocessor": structure["preprocessor"],
+              "normalization": structure["normalization"],
+              "structure_manifest_digest": structure["manifest_digest"],
+              "catalog_digest": catalog["catalog_digest"],
+              "pack_id": pack["pack_id"],
+              "pack_digest": pack["pack_digest"],
+              "physical_page_count": structure["page_count"],
+              "included_page_count": len(pack["included_units"]),
+              "dependency_edge_count": len(pack["dependency_edges"]),
+              "targets": sorted(target["icpn"] for target in binding["targets"]),
+              "canonical_dataset_admission": pack["canonical_dataset_admission"],
+              "production_admission": pack["production_admission"],
+          }
+          report_path = Path(os.environ["RUNNER_TEMP"]) / "plasma-ic-evidence" / "validation-report.json"
+          report_path.write_text(json.dumps(report, indent=2) + "\n")
+          print(json.dumps(report, indent=2))
+          PY
+      - name: Upload metadata-only evidence report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ds5319-semantic-evidence-validation
+          path: ${{ runner.temp }}/plasma-ic-evidence/validation-report.json
+          if-no-files-found: error
+          retention-days: 30
