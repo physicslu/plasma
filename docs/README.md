@@ -65,6 +65,7 @@
 - **Current** — [AI-assisted Git Workflow](development/ai-git-development-workflow.md)
 - **Current** — [Codex Cloud Environment](development/codex-cloud-environment.md)
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
+- **Reference** — [IC Support Local-AI Benchmark Handover](development/ic-support-ai-benchmark-handover.md)：整理 STM32F103C Qwen 實驗的能力邊界、已知 failure classes、multi-model role separation，以及下一輪獨立 Gemma 比較的 blind-control 條件。
 - **Current** — [Multi-machine Development Guide](development/multi-machine-development-guide.md)
 - **Current** — [VS Code Remote Workspace Standard](development/vscode-remote-workspace.md)
 - **Current** — [Integration Host Deployment Guide](development/swpc-deployment.md)
