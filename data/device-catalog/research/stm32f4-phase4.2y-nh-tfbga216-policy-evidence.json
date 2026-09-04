@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "phase": "4.2Y",
+  "base_main": "8ba3db48908cc9f970acc19a8e2f77c5a85fd607",
+  "captured_at_utc": "2026-09-04T11:58:39Z",
+  "fresh_inventory_before_policy": {
+    "production_exact_icpn_rows": 338,
+    "production_base_device_count": 114,
+    "gap_base_device_count": 35,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 35,
+    "blocker_counts": {
+      "unsupported flash-size code 8": 3,
+      "unsupported STM32F4 package code: I": 2,
+      "unsupported STM32F4 pin/package combination: A/H": 11,
+      "unsupported STM32F4 pin/package combination: A/Y": 5,
+      "unsupported STM32F4 pin/package combination: B/T": 10,
+      "unsupported STM32F4 pin/package combination: N/H": 10
+    }
+  },
+  "policy_mapping": {
+    "pin_code": "N",
+    "package_code": "H",
+    "package": "TFBGA",
+    "pin_count": "216"
+  },
+  "affected_base_devices": [
+    "STM32F429NE",
+    "STM32F429NG",
+    "STM32F429NI",
+    "STM32F439NG",
+    "STM32F439NI",
+    "STM32F469NE",
+    "STM32F469NG",
+    "STM32F469NI",
+    "STM32F479NG",
+    "STM32F479NI"
+  ],
+  "selection_reason": "N/H is the largest remaining single policy surface that has no residual blocker: one bounded mapping makes ten Base Devices policy-ready. Official STM32F427/429 and STM32F469 datasheets identify N as 216 pins and the N/H package surface as TFBGA216. Current ST product/Q&R pages expose Active representative N/H exact parts across STM32F429, STM32F439, STM32F469, and STM32F479. A/H alone would immediately unlock only six Base Devices because five also require A/Y; B/T remains lifecycle-deprioritized because representative parts were NRND.",
+  "official_evidence": {
+    "product_urls": [
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ne.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ng.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ni.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ng.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ni.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ne.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ng.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ni.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ng.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ni.html"
+    ],
+    "datasheet_urls": [
+      "https://www.st.com/resource/en/datasheet/stm32f429ne.pdf",
+      "https://www.st.com/resource/en/datasheet/stm32f469ne.pdf"
+    ],
+    "observed_package": "TFBGA 216",
+    "observed_active_representative_exact_icpns": [
+      "STM32F429NEH6",
+      "STM32F439NIH6",
+      "STM32F469NEH6",
+      "STM32F469NIH6",
+      "STM32F469NIH6TR",
+      "STM32F469NIH7",
+      "STM32F479NGH6",
+      "STM32F479NIH6"
+    ]
+  },
+  "expected_immediate_delta_before_admission": {
+    "production_exact_icpn_rows": 338,
+    "production_base_device_count": 114,
+    "gap_base_device_count": 35,
+    "policy_ready_count": 10,
+    "policy_blocked_count": 25,
+    "policy_ready_base_devices": [
+      "STM32F429NE",
+      "STM32F429NG",
+      "STM32F429NI",
+      "STM32F439NG",
+      "STM32F439NI",
+      "STM32F469NE",
+      "STM32F469NG",
+      "STM32F469NI",
+      "STM32F479NG",
+      "STM32F479NI"
+    ]
+  },
+  "production_write_applied": false,
+  "exact_icpn_admission_deferred": true,
+  "algorithm_equivalence_claimed": false,
+  "fail_closed": true
+}

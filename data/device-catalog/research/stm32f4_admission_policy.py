@@ -184,6 +184,7 @@ def _package_and_pins(pin_code: str, package_code: str) -> tuple[str, str]:
         ("I", "H"): "176",
         ("I", "T"): "176",
         ("M", "Y"): "81",
+        ("N", "H"): "216",
         ("O", "Y"): "90",
         ("R", "T"): "64",
         ("R", "Y"): "64",
@@ -200,6 +201,8 @@ def _package_and_pins(pin_code: str, package_code: str) -> tuple[str, str]:
         raise CandidateManualReview(
             f"unsupported STM32F4 pin/package combination: {pin_code}/{package_code}"
         )
+    if (pin_code, package_code) == ("N", "H"):
+        package = "TFBGA"
     return package, pins
 
 
