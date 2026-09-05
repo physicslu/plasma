@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "phase": "4.2AF",
+  "base_main": "0423b025f76e0cf99632d22b1e2c3082262eacf7",
+  "captured_at_utc": "2026-09-05T03:46:24Z",
+  "fresh_inventory_before_policy": {
+    "production_exact_icpn_rows": 364,
+    "production_base_device_count": 128,
+    "gap_base_device_count": 21,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 21,
+    "blocker_counts": {
+      "unsupported STM32F4 pin/package combination: A/H": 11,
+      "unsupported STM32F4 pin/package combination: A/Y": 5,
+      "unsupported STM32F4 pin/package combination: B/T": 10
+    }
+  },
+  "policy_mapping": {
+    "pin_code": "A",
+    "package_code": "H",
+    "package": "UFBGA",
+    "pin_count": "169"
+  },
+  "affected_base_devices": [
+    "STM32F427AG",
+    "STM32F427AI",
+    "STM32F429AG",
+    "STM32F429AI",
+    "STM32F437AI",
+    "STM32F439AI",
+    "STM32F469AE",
+    "STM32F469AG",
+    "STM32F469AI",
+    "STM32F479AG",
+    "STM32F479AI"
+  ],
+  "selection_reason": "A/H is the next bounded non-NRND policy surface. Official STM32F427/429 and STM32F469/479 datasheets define A/H as the 169-pin BGA surface and identify the physical package as UFBGA169. Current ST product and Sample & Buy pages expose Active A/H exact parts across all six affected device subfamilies. This single mapping removes the sole blocker from exactly six Base Devices; five STM32F469/479 A-pin Base Devices remain fail-closed because their independent A/Y surface is deliberately deferred. B/T remains lifecycle-deprioritized by prior retained evidence.",
+  "official_evidence": {
+    "datasheet_findings": [
+      {
+        "url": "https://www.st.com/resource/en/datasheet/stm32f429ne.pdf",
+        "ordering_section": "PDF page 225, Section 8 identifies pin-count code A as 169 pins and package code H as BGA.",
+        "package_section": "Section 7.7 identifies UFBGA169 package information."
+      },
+      {
+        "url": "https://www.st.com/resource/en/datasheet/stm32f469ne.pdf",
+        "ordering_section": "PDF page 219, Section 7 identifies pin-count code A as 168 and 169 pins and package code H as BGA.",
+        "package_section": "Section 6.5 identifies UFBGA169 package information; Section 6.4 separately identifies WLCSP168."
+      }
+    ],
+    "product_urls": [
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ai.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ai.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ai.html",
+      "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ai.html"
+    ],
+    "observed_package": "UFBGA 169 7x7x0.6 P 0.5 mm",
+    "observed_active_representative_exact_icpns": [
+      "STM32F427AIH6",
+      "STM32F427AIH6TR",
+      "STM32F429AIH6",
+      "STM32F437AIH6",
+      "STM32F437AIH6TR",
+      "STM32F439AIH6",
+      "STM32F469AIH6",
+      "STM32F479AIH6"
+    ]
+  },
+  "expected_immediate_delta_before_admission": {
+    "production_exact_icpn_rows": 364,
+    "production_base_device_count": 128,
+    "gap_base_device_count": 21,
+    "policy_ready_count": 6,
+    "policy_blocked_count": 15,
+    "policy_ready_base_devices": [
+      "STM32F427AG",
+      "STM32F427AI",
+      "STM32F429AG",
+      "STM32F429AI",
+      "STM32F437AI",
+      "STM32F439AI"
+    ],
+    "residual_a_y_blocked_base_devices": [
+      "STM32F469AE",
+      "STM32F469AG",
+      "STM32F469AI",
+      "STM32F479AG",
+      "STM32F479AI"
+    ]
+  },
+  "production_write_applied": false,
+  "exact_icpn_admission_deferred": true,
+  "a_y_policy_deferred": true,
+  "algorithm_equivalence_claimed": false,
+  "fail_closed": true
+}
