@@ -42,6 +42,14 @@ def main() -> int:
     module.validate_ir(good)
 
     bad = copy.deepcopy(good)
+    step(bad, "flash_program_unit", "write_unit")["kind"] = "arbitrary_python"
+    expect_rule(module, bad, "IR")
+
+    bad = copy.deepcopy(good)
+    step(bad, "flash_unlock", "ensure_unlocked")["when_mismatch"][0]["register"] = "FLASH_FAKE"
+    expect_rule(module, bad, "IR")
+
+    bad = copy.deepcopy(good)
     step(bad, "flash_program_unit", "wait_not_busy")["expect"] = 1
     expect_rule(module, bad, "V002")
 
