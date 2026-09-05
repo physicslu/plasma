@@ -1,0 +1,41 @@
+name: Device catalog Phase 4.2AG A/H UFBGA169 admission proposal
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2ag-ah-ufbga169-admission]
+    paths: [".github/workflows/device-catalog-phase42ag-proposal.yml"]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  propose:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/device-catalog-phase4.2ag-ah-ufbga169-admission}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Build proposal
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase42ag
+          PYTHONPATH=data/device-catalog/research python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2ag-ah-ufbga169-admission-live-2026-09-05 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2ag-ah-ufbga169-admission-baseline.json \
+            --admit-base STM32F427AG --admit-base STM32F427AI \
+            --admit-base STM32F429AG --admit-base STM32F429AI \
+            --admit-base STM32F437AI --admit-base STM32F439AI \
+            --output /tmp/phase42ag/admission-plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/phase42ag/admission-plan.json').read_text())
+          expected={'admit':9,'already_present':0,'manual_review_required':0,'reject':0}
+          expected_icpns={'STM32F427AGH6','STM32F427AIH6','STM32F427AIH6TR','STM32F429AGH6','STM32F429AGH6TR','STM32F429AIH6','STM32F437AIH6','STM32F437AIH6TR','STM32F439AIH6'}
+          if p['candidate_count'] != 9 or p['decision_counts'] != expected or p['conflicts'] != 0 or p['canonical_rows_before'] != 364:
+              raise SystemExit('unclean Phase 4.2AG plan')
+          if {x['icpn'] for x in p['candidates']} != expected_icpns:
+              raise SystemExit('unexpected Phase 4.2AG candidate set')
+          PY
+          cd /tmp/phase42ag && sha256sum admission-plan.json > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with: {name: phase42ag-ah-ufbga169-admission-proposal, path: /tmp/phase42ag, if-no-files-found: error, retention-days: 30}
