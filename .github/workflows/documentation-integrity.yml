@@ -1,28 +1,7 @@
 name: Documentation integrity
 
 on:
-  push:
-    paths:
-      - "**/*.md"
-      - "scripts/tests/test-public-doc-sanitization.sh"
-      - "scripts/tests/test-documentation-integrity.py"
-      - "scripts/plasmactl"
-      - "software/python/plasma_web/gateway_settings.py"
-      - "software/python/plasma_core/errors.py"
-      - ".github/workflows/documentation-integrity.yml"
-  pull_request:
-    paths:
-      - "**/*.md"
-      - "scripts/tests/test-public-doc-sanitization.sh"
-      - "scripts/tests/test-documentation-integrity.py"
-      - "scripts/plasmactl"
-      - "software/python/plasma_web/gateway_settings.py"
-      - "software/python/plasma_core/errors.py"
-      - ".github/workflows/documentation-integrity.yml"
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  workflow_call:
 
 permissions:
   contents: read
