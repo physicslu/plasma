@@ -1,0 +1,47 @@
+name: Device catalog Phase 4.2AG A/H UFBGA169 discovery
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2ag-ah-ufbga169-admission]
+    paths: [".github/workflows/device-catalog-phase42ag-discovery.yml", "data/device-catalog/research/stm32f4-phase4.2ag-ah-ufbga169-admission-manifest.json"]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  discover:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install playwright==1.62.0 && python -m playwright install --with-deps chromium
+      - run: |
+          mkdir -p /tmp/phase42ag
+          xvfb-run -a python data/device-catalog/research/run_stm32f4_browser_pilot.py \
+            --manifest data/device-catalog/research/stm32f4-phase4.2ag-ah-ufbga169-admission-manifest.json \
+            --catalog data/device-catalog/research/openocd-parts-canonical.csv \
+            --output /tmp/phase42ag/pilot-summary.json \
+            --scope pilot --headed --timeout 150 --delay 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          summary = json.loads(Path('/tmp/phase42ag/pilot-summary.json').read_text())
+          expected = {
+              'STM32F427AG',
+              'STM32F427AI',
+              'STM32F429AG',
+              'STM32F429AI',
+              'STM32F437AI',
+              'STM32F439AI',
+          }
+          observed = {item['base_device'] for item in summary['results']}
+          if summary['acquisition_failure'] or observed != expected:
+              raise SystemExit(
+                  f'Phase 4.2AG discovery failed: expected={sorted(expected)} '
+                  f'observed={sorted(observed)} failures={summary["acquisition_failure"]}'
+              )
+          PY
+          cd /tmp/phase42ag && sha256sum * > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: phase42ag-ah-ufbga169-discovery, path: /tmp/phase42ag, if-no-files-found: error, retention-days: 30}

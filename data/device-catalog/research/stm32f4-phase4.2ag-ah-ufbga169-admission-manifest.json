@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05",
+  "targets": [
+    {
+      "base_device": "STM32F427AG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ag.html",
+      "selection_reason": "Phase 4.2AF policy-ready A/H 1024-KiB STM32F427 device"
+    },
+    {
+      "base_device": "STM32F427AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html",
+      "selection_reason": "Phase 4.2AF policy-ready A/H 2048-KiB STM32F427 device"
+    },
+    {
+      "base_device": "STM32F429AG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ag.html",
+      "selection_reason": "Phase 4.2AF policy-ready A/H 1024-KiB STM32F429 device"
+    },
+    {
+      "base_device": "STM32F429AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ai.html",
+      "selection_reason": "Phase 4.2AF policy-ready A/H 2048-KiB STM32F429 device"
+    },
+    {
+      "base_device": "STM32F437AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html",
+      "selection_reason": "Phase 4.2AF policy-ready A/H 2048-KiB STM32F437 device"
+    },
+    {
+      "base_device": "STM32F439AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ai.html",
+      "selection_reason": "Phase 4.2AF policy-ready A/H 2048-KiB STM32F439 device"
+    }
+  ],
+  "admission_scope": {
+    "family": "STM32F4",
+    "base_devices": [
+      "STM32F427AG",
+      "STM32F427AI",
+      "STM32F429AG",
+      "STM32F429AI",
+      "STM32F437AI",
+      "STM32F439AI"
+    ],
+    "production_exact_icpns_before": 364,
+    "production_base_devices_before": 128,
+    "fail_closed": true
+  }
+}
