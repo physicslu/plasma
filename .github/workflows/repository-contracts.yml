@@ -1,0 +1,129 @@
+name: Repository contracts
+
+on:
+  push:
+    paths:
+      - "**/*.md"
+      - "scripts/tests/test-public-doc-sanitization.sh"
+      - "scripts/tests/test-documentation-integrity.py"
+      - "scripts/tests/test-canonical-terminology-guard.py"
+      - "scripts/plasmactl"
+      - "software/python/**"
+      - "software/web/**"
+      - ".github/workflows/repository-contracts.yml"
+      - ".github/workflows/documentation-integrity.yml"
+      - ".github/workflows/terminology-contract.yml"
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "scripts/tests/test-public-doc-sanitization.sh"
+      - "scripts/tests/test-documentation-integrity.py"
+      - "scripts/tests/test-canonical-terminology-guard.py"
+      - "scripts/plasmactl"
+      - "software/python/**"
+      - "software/web/**"
+      - ".github/workflows/repository-contracts.yml"
+      - ".github/workflows/documentation-integrity.yml"
+      - ".github/workflows/terminology-contract.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  route-contracts:
+    runs-on: ubuntu-latest
+    outputs:
+      documentation: ${{ steps.route.outputs.documentation }}
+      terminology: ${{ steps.route.outputs.terminology }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Route changed files to contract owners
+        id: route
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          event = os.environ["EVENT_NAME"]
+          if event == "pull_request":
+              base = os.environ["PR_BASE_SHA"]
+              head = os.environ["PR_HEAD_SHA"]
+          elif event == "push":
+              base = os.environ.get("BEFORE_SHA", "")
+              head = os.environ["GITHUB_SHA"]
+          else:
+              raise SystemExit(f"unsupported event: {event}")
+
+          zero = base and set(base) == {"0"}
+          if base and not zero:
+              command = ["git", "diff", "--name-only", base, head]
+          else:
+              command = ["git", "show", "--pretty=", "--name-only", head]
+
+          changed = {
+              line.strip()
+              for line in subprocess.check_output(command, text=True).splitlines()
+              if line.strip()
+          }
+          print("Changed files:")
+          for path in sorted(changed):
+              print(f"  {path}")
+
+          documentation_exact = {
+              "scripts/tests/test-public-doc-sanitization.sh",
+              "scripts/tests/test-documentation-integrity.py",
+              "scripts/plasmactl",
+              "software/python/plasma_web/gateway_settings.py",
+              "software/python/plasma_core/errors.py",
+              ".github/workflows/repository-contracts.yml",
+              ".github/workflows/documentation-integrity.yml",
+          }
+          terminology_exact = {
+              "scripts/tests/test-canonical-terminology-guard.py",
+              ".github/workflows/repository-contracts.yml",
+              ".github/workflows/terminology-contract.yml",
+          }
+
+          documentation = any(
+              path.endswith(".md") or path in documentation_exact
+              for path in changed
+          )
+          terminology = any(
+              path.startswith("software/python/")
+              or path.startswith("software/web/")
+              or path in terminology_exact
+              for path in changed
+          )
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as stream:
+              stream.write(f"documentation={'true' if documentation else 'false'}\n")
+              stream.write(f"terminology={'true' if terminology else 'false'}\n")
+
+          if not documentation and not terminology:
+              raise SystemExit("repository-contract trigger matched but no contract owner was selected")
+          PY
+
+  documentation:
+    needs: route-contracts
+    if: needs.route-contracts.outputs.documentation == 'true'
+    uses: ./.github/workflows/documentation-integrity.yml
+
+  terminology:
+    needs: route-contracts
+    if: needs.route-contracts.outputs.terminology == 'true'
+    uses: ./.github/workflows/terminology-contract.yml
