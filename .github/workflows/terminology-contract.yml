@@ -1,18 +1,7 @@
 name: Canonical terminology contract
 
 on:
-  push:
-    paths:
-      - "software/python/**"
-      - "software/web/**"
-      - "scripts/tests/test-canonical-terminology-guard.py"
-      - ".github/workflows/terminology-contract.yml"
-  pull_request:
-    paths:
-      - "software/python/**"
-      - "software/web/**"
-      - "scripts/tests/test-canonical-terminology-guard.py"
-      - ".github/workflows/terminology-contract.yml"
+  workflow_call:
 
 permissions:
   contents: read
