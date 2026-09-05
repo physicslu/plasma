@@ -1,0 +1,26 @@
+name: Canonical terminology contract
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  terminology:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Self-test terminology guard
+        run: python scripts/tests/test-canonical-terminology-guard.py --self-test
+      - name: Reject new retired domain vocabulary
+        env:
+          PLASMA_TERMINOLOGY_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python scripts/tests/test-canonical-terminology-guard.py
