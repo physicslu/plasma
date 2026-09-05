@@ -25,6 +25,8 @@ correctness
 
 Runner savings are useful, but they must never be purchased by hiding a real dependency.
 
+GitHub Actions entrypoints are also treated as operator-facing infrastructure. Closely related gates may share one top-level workflow when their original event semantics and failure boundaries can remain explicit jobs. This reduces Actions-sidebar noise without weakening evidence.
+
 ## 2. Validation topology
 
 The current repository topology is:
@@ -35,10 +37,10 @@ The current repository topology is:
         +-----------------------+-----------------------+
         |                       |                       |
         v                       v                       v
- Documentation             Web / Console          Python / PL source
- integrity gate                 |                       |
-                                +--> Web Fast           +--> Python / PL tests
-                                |    lint/build/source
+ Repository contracts       Web validation        Python / PL source
+    |        |                  |                       |
+    |        +--> Terminology   +--> Web Fast           +--> Python / PL tests
+    +--> Documentation          |    lint/build/source
                                 |
                                 +--> Web E2E + visual
                                 |
@@ -93,15 +95,17 @@ GitHub software CI PASS
 
 ## 3. Fast source gates
 
-### 3.1 Documentation integrity
+### 3.1 Repository contracts: documentation and terminology
 
-Workflow:
+Top-level workflow:
 
 ```text
-.github/workflows/documentation-integrity.yml
+.github/workflows/repository-contracts.yml
 ```
 
-Primary responsibility:
+The dispatcher computes the changed-file set and routes it to distinct `documentation` and `terminology` jobs. The jobs remain separate failure domains even though they share one Actions entrypoint.
+
+Documentation responsibility:
 
 - Markdown structure and local-link integrity;
 - documentation index coverage;
@@ -109,14 +113,20 @@ Primary responsibility:
 - selected executable documentation contracts;
 - canonical documentation facts that must track source values.
 
-Markdown-only changes should normally terminate at this layer unless a specific higher-level workflow actually consumes the Markdown as build/runtime input.
+Terminology responsibility:
+
+- self-test the canonical terminology guard;
+- reject newly introduced retired domain vocabulary in Python/Web source and the terminology guard contract itself.
+
+Markdown-only changes should normally terminate at the documentation job unless a specific higher-level workflow actually consumes the Markdown as build/runtime input. A Markdown-only change must not pay the terminology job merely because both contracts share one top-level entrypoint.
 
 ### 3.2 Web Fast
 
-Workflow:
+Top-level workflow and job:
 
 ```text
 .github/workflows/web-tests.yml
+job: test
 ```
 
 Primary responsibility:
@@ -125,14 +135,15 @@ Primary responsibility:
 - lint;
 - build and source/SSR tests.
 
-This is the fast Web source gate. It is intentionally separate from Playwright/browser installation.
+This is the fast Web source gate. Its job remains separate from Playwright/browser installation.
 
 ### 3.3 Web E2E and visual regression
 
-Workflow:
+Top-level workflow and job:
 
 ```text
-.github/workflows/web-e2e.yml
+.github/workflows/web-tests.yml
+job: e2e
 ```
 
 Primary responsibility:
@@ -140,6 +151,8 @@ Primary responsibility:
 - Playwright browser acceptance;
 - Chromium/browser runtime;
 - visual regression diagnostics and artifacts.
+
+Event semantics remain intentionally different from the fast job: E2E runs on pull requests, `main` pushes, and manual dispatch; the fast job runs on push/pull-request source changes and is skipped for manual E2E-only dispatch.
 
 Browser tests are validation assets, not deployable runtime. A test-only E2E change must not automatically be treated as a Control Station or Mock CD runtime-source change unless that downstream workflow directly executes the changed test/helper/config.
 
@@ -291,6 +304,8 @@ data/device-catalog/research/stm32f4-commercial-icpn.csv
 
 This dependency prevents the production catalog from expanding while IC Support coverage snapshots remain stale.
 
+The same top-level workflow also owns the manual official-source-lock verification job. Manual dispatch runs the bounded source-integrity verification rather than the normal IC Support regression job; push/PR events keep their normal deterministic validation path.
+
 The current enforced production coverage is:
 
 ```text
@@ -334,6 +349,7 @@ Use these rules when changing workflow `paths`:
 5. **Production data is a runtime dependency when code reads it.** Device Catalog manifest/source changes legitimately cross into IC Support and release/runtime validation where consumed.
 6. **Do not use workflow count as the optimization metric.** One workflow with ten expensive matrix jobs can cost more than ten small workflows.
 7. **Do not weaken coverage during topology cleanup.** First change when/where validation runs; only deduplicate commands after proving identical invocations add no distinct fixture, state or failure domain.
+8. **Prefer fewer operator-facing entrypoints only when semantics stay explicit.** Sidebar cleanup is a usability benefit, not permission to merge unrelated evidence boundaries.
 
 ## 10. Required validation for CI/CD changes
 
