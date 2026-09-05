@@ -1,0 +1,377 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 6,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 6,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 9,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 6,
+    "total": 6
+  },
+  "pilot_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F427AG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F427AGHx",
+          "icpn": "STM32F427AGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F427AG",
+        "evidence_section_sha256": "1987415b90d6006024cd2f0b8914bcbdc066b4c9a6a5d8e10bd555a25dc795e7",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F427AGH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ag.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F427AGH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "94c4928e484834d69be92d2788c052d19ef1876a64b21972c157fb018655a131",
+        "retrieved_at_utc": "2026-09-05T04:15:56Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ag.html"
+      },
+      "selection_reason": "Phase 4.2AF policy-ready A/H 1024-KiB STM32F427 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ag.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F427AI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F427AIHx",
+          "icpn": "STM32F427AIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F427AIHx",
+          "icpn": "STM32F427AIH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F427AI",
+        "evidence_section_sha256": "4fb33d4121e1a462ecebebf1a7d5e3a95275cab6ca6cd726e711b0667cdd7f27",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F427AIH6",
+          "STM32F427AIH6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F427AIH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F427AIH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "2fa4669534e6768693ff8799b6659fa55612d774fdf8d9210ccc479bcb4c973b",
+        "retrieved_at_utc": "2026-09-05T04:16:09Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html"
+      },
+      "selection_reason": "Phase 4.2AF policy-ready A/H 2048-KiB STM32F427 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F429AG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F429AGHx",
+          "icpn": "STM32F429AGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F429AGHx",
+          "icpn": "STM32F429AGH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F429AG",
+        "evidence_section_sha256": "504a7d2ab078b70924aab0938021f58fe6c609e5b53e5c523f5b2c21e0f1eee8",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F429AGH6",
+          "STM32F429AGH6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ag.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F429AGH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F429AGH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ded89dc29382996783ca1fa4cb77c5e6a0ab4064186366e5646e9970b1a9134c",
+        "retrieved_at_utc": "2026-09-05T04:16:16Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ag.html"
+      },
+      "selection_reason": "Phase 4.2AF policy-ready A/H 1024-KiB STM32F429 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ag.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F429AI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F429AIHx",
+          "icpn": "STM32F429AIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F429AI",
+        "evidence_section_sha256": "472f9ce75b40e84e6cf9a5e182e598a3e1a0966dccf2be082e03dd951912ea49",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F429AIH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ai.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F429AIH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3776ec320bc4846fe8ab5b4e8176574250cd8485b79abbbe6ec6743215e51438",
+        "retrieved_at_utc": "2026-09-05T04:16:30Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ai.html"
+      },
+      "selection_reason": "Phase 4.2AF policy-ready A/H 2048-KiB STM32F429 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ai.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F437AI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F437AIHx",
+          "icpn": "STM32F437AIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F437AIHx",
+          "icpn": "STM32F437AIH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F437AI",
+        "evidence_section_sha256": "599e4191f889a8594d7553bd410de34722c8df806fc4345e0de18ae6ee01b4ae",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F437AIH6",
+          "STM32F437AIH6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F437AIH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F437AIH6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "77478ffd4fee37ff9fd3bec46fa46db2d5ec53c46bcc4eed8832df9df2877a6f",
+        "retrieved_at_utc": "2026-09-05T04:16:35Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html"
+      },
+      "selection_reason": "Phase 4.2AF policy-ready A/H 2048-KiB STM32F437 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F439AI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F439AIHx",
+          "icpn": "STM32F439AIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F439AI",
+        "evidence_section_sha256": "2ccc371e4299e762380499b319a993e5d325c76ca2b339bb62fc1a5a18e6351e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F439AIH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ai.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F439AIH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6fd4d63e81503cb9e8fccd1b354572b8126f6bd69e21452de7c9401ceba3328e",
+        "retrieved_at_utc": "2026-09-05T04:16:42Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ai.html"
+      },
+      "selection_reason": "Phase 4.2AF policy-ready A/H 2048-KiB STM32F439 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ai.html"
+    }
+  ],
+  "schema_version": 1
+}

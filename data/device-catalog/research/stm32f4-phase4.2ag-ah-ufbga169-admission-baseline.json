@@ -1,0 +1,53 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9962694588",
+    "artifact_sha256": "71c485dd08cc8f042a731c2efc328510ba2d7f8af5fc6b12e43128e379aa818e",
+    "source_commit": "7244f4cc1190f801f313a3c1ff2015610bf4de13",
+    "workflow_run_id": "33943361309"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F427AG",
+      "exact_icpns": [
+        "STM32F427AGH6"
+      ]
+    },
+    {
+      "base_device": "STM32F427AI",
+      "exact_icpns": [
+        "STM32F427AIH6",
+        "STM32F427AIH6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F429AG",
+      "exact_icpns": [
+        "STM32F429AGH6",
+        "STM32F429AGH6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F429AI",
+      "exact_icpns": [
+        "STM32F429AIH6"
+      ]
+    },
+    {
+      "base_device": "STM32F437AI",
+      "exact_icpns": [
+        "STM32F437AIH6",
+        "STM32F437AIH6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F439AI",
+      "exact_icpns": [
+        "STM32F439AIH6"
+      ]
+    }
+  ]
+}

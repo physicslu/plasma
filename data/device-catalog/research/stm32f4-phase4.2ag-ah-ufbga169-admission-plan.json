@@ -1,0 +1,447 @@
+{
+  "candidate_count": 9,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "1987415b90d6006024cd2f0b8914bcbdc066b4c9a6a5d8e10bd555a25dc795e7",
+        "rendered_dom_sha256": "94c4928e484834d69be92d2788c052d19ef1876a64b21972c157fb018655a131",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ag.html"
+      },
+      "base_device": "STM32F427AG",
+      "base_mapping": {
+        "existing_identifier": "STM32F427AGHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F427AGH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F427AG",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F427AGHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1024 KiB",
+        "icpn": "STM32F427AGH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F427",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ag.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "4fb33d4121e1a462ecebebf1a7d5e3a95275cab6ca6cd726e711b0667cdd7f27",
+        "rendered_dom_sha256": "2fa4669534e6768693ff8799b6659fa55612d774fdf8d9210ccc479bcb4c973b",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html"
+      },
+      "base_device": "STM32F427AI",
+      "base_mapping": {
+        "existing_identifier": "STM32F427AIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F427AIH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F427AI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F427AIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F427AIH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F427",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "4fb33d4121e1a462ecebebf1a7d5e3a95275cab6ca6cd726e711b0667cdd7f27",
+        "rendered_dom_sha256": "2fa4669534e6768693ff8799b6659fa55612d774fdf8d9210ccc479bcb4c973b",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html"
+      },
+      "base_device": "STM32F427AI",
+      "base_mapping": {
+        "existing_identifier": "STM32F427AIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F427AIH6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F427AI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F427AIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F427AIH6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F427",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f427ai.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "504a7d2ab078b70924aab0938021f58fe6c609e5b53e5c523f5b2c21e0f1eee8",
+        "rendered_dom_sha256": "ded89dc29382996783ca1fa4cb77c5e6a0ab4064186366e5646e9970b1a9134c",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ag.html"
+      },
+      "base_device": "STM32F429AG",
+      "base_mapping": {
+        "existing_identifier": "STM32F429AGHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F429AGH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F429AG",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F429AGHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1024 KiB",
+        "icpn": "STM32F429AGH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F429",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ag.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "504a7d2ab078b70924aab0938021f58fe6c609e5b53e5c523f5b2c21e0f1eee8",
+        "rendered_dom_sha256": "ded89dc29382996783ca1fa4cb77c5e6a0ab4064186366e5646e9970b1a9134c",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ag.html"
+      },
+      "base_device": "STM32F429AG",
+      "base_mapping": {
+        "existing_identifier": "STM32F429AGHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F429AGH6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F429AG",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F429AGHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "1024 KiB",
+        "icpn": "STM32F429AGH6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F429",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ag.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "472f9ce75b40e84e6cf9a5e182e598a3e1a0966dccf2be082e03dd951912ea49",
+        "rendered_dom_sha256": "3776ec320bc4846fe8ab5b4e8176574250cd8485b79abbbe6ec6743215e51438",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ai.html"
+      },
+      "base_device": "STM32F429AI",
+      "base_mapping": {
+        "existing_identifier": "STM32F429AIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F429AIH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F429AI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F429AIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F429AIH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F429",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429ai.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "599e4191f889a8594d7553bd410de34722c8df806fc4345e0de18ae6ee01b4ae",
+        "rendered_dom_sha256": "77478ffd4fee37ff9fd3bec46fa46db2d5ec53c46bcc4eed8832df9df2877a6f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html"
+      },
+      "base_device": "STM32F437AI",
+      "base_mapping": {
+        "existing_identifier": "STM32F437AIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F437AIH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F437AI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F437AIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F437AIH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F437",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "599e4191f889a8594d7553bd410de34722c8df806fc4345e0de18ae6ee01b4ae",
+        "rendered_dom_sha256": "77478ffd4fee37ff9fd3bec46fa46db2d5ec53c46bcc4eed8832df9df2877a6f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html"
+      },
+      "base_device": "STM32F437AI",
+      "base_mapping": {
+        "existing_identifier": "STM32F437AIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F437AIH6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F437AI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F437AIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F437AIH6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "TR",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F437",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f437ai.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "evidence_section_sha256": "2ccc371e4299e762380499b319a993e5d325c76ca2b339bb62fc1a5a18e6351e",
+        "rendered_dom_sha256": "6fd4d63e81503cb9e8fccd1b354572b8126f6bd69e21452de7c9401ceba3328e",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ai.html"
+      },
+      "base_device": "STM32F439AI",
+      "base_mapping": {
+        "existing_identifier": "STM32F439AIHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F439AIH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F439AI",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F439AIHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F4",
+        "flash_size": "2048 KiB",
+        "icpn": "STM32F439AIH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f4x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "169",
+        "series": "STM32F439",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439ai.html#plasma-evidence=stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 364,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 9,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+  "family": "STM32F4",
+  "inputs": {
+    "admission_base_devices": [
+      "STM32F427AG",
+      "STM32F427AI",
+      "STM32F429AG",
+      "STM32F429AI",
+      "STM32F437AI",
+      "STM32F439AI"
+    ],
+    "baseline": "stm32f4-phase4.2ag-ah-ufbga169-admission-baseline.json",
+    "baseline_sha256": "195df7b1bd83e936ea3cbcea7d1aec9d4768b852bd565d9a538801837d75a97a",
+    "canonical_dataset": "stm32f4-commercial-icpn.csv",
+    "canonical_input_sha256": "89d1c3ce2bac7637322477b294931708d687539a743bbcf9ce0e6c687c724645",
+    "family_adapter": "stm32f4-phase3.1",
+    "mapping_catalog": "openocd-parts-canonical.csv",
+    "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "retained_evidence_directory": "stm32f4-phase4.2ag-ah-ufbga169-admission-live-2026-09-05"
+  },
+  "issues": [],
+  "pipeline_expected_candidate_count": 9,
+  "schema_version": 1,
+  "source_provenance": {
+    "evidence_manifest_sha256": "27d9e9c4ed4ed9216bebb11fe392b6289232ba2a1eacb1eba2892ec8ebb4d20b",
+    "executed_git_sha": "bee616fcb93cdd0a9b64a6b70f44568ee6ebe7e3",
+    "repository": "physicslu/plasma"
+  }
+}
