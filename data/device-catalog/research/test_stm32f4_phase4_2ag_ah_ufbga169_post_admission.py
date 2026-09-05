@@ -27,7 +27,7 @@ EXPECTED = {
     "STM32F437AIH6TR": ("STM32F437AI", "2048 KiB", "TR"),
     "STM32F439AIH6": ("STM32F439AI", "2048 KiB", ""),
 }
-A_Y_BLOCKED = {
+A_Y_READY = {
     "STM32F469AE",
     "STM32F469AG",
     "STM32F469AI",
@@ -108,16 +108,15 @@ def main() -> int:
         inventory["production"]["base_devices"]
     )
     assert inventory["gap"]["base_device_count"] == 15
-    assert inventory["gap"]["policy_ready_count"] == 0
-    assert inventory["gap"]["policy_blocked_count"] == 15
-    assert inventory["gap"]["policy_ready"] == []
+    assert inventory["gap"]["policy_ready_count"] == 5
+    assert inventory["gap"]["policy_blocked_count"] == 10
+    ready = {item["base_device"]: item for item in inventory["gap"]["policy_ready"]}
+    assert set(ready) == A_Y_READY
+    for base_device in A_Y_READY:
+        assert ready[base_device]["package_codes"] == ["H", "Y"]
+        assert ready[base_device]["policy_blockers"] == []
     blocked = {item["base_device"]: item for item in inventory["gap"]["policy_blocked"]}
-    assert set(blocked) == A_Y_BLOCKED | B_T_BLOCKED
-    for base_device in A_Y_BLOCKED:
-        assert blocked[base_device]["package_codes"] == ["H", "Y"]
-        assert blocked[base_device]["policy_blockers"] == [
-            "unsupported STM32F4 pin/package combination: A/Y"
-        ]
+    assert set(blocked) == B_T_BLOCKED
     for base_device in B_T_BLOCKED:
         assert blocked[base_device]["package_codes"] == ["T"]
         assert blocked[base_device]["policy_blockers"] == [

@@ -180,6 +180,7 @@ def _package_and_pins(pin_code: str, package_code: str) -> tuple[str, str]:
 
     direct = {
         ("A", "H"): "169",
+        ("A", "Y"): "168",
         ("C", "T"): "48",
         ("C", "U"): "48",
         ("C", "F"): "49",

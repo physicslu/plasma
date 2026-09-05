@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "phase": "4.2AH",
+  "base_main": "ea3b1cb17de166e2762ca28284dc532b2cc785df",
+  "captured_at_utc": "2026-09-05T13:19:29Z",
+  "fresh_inventory_before_policy": {
+    "production_exact_icpn_rows": 373,
+    "production_base_device_count": 134,
+    "gap_base_device_count": 15,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 15,
+    "blocker_counts": {
+      "unsupported STM32F4 pin/package combination: A/Y": 5,
+      "unsupported STM32F4 pin/package combination: B/T": 10
+    }
+  },
+  "policy_mapping": {
+    "pin_code": "A",
+    "package_code": "Y",
+    "package": "WLCSP",
+    "pin_count": "168"
+  },
+  "affected_base_devices": [
+    "STM32F469AE",
+    "STM32F469AG",
+    "STM32F469AI",
+    "STM32F479AG",
+    "STM32F479AI"
+  ],
+  "selection_reason": "A/Y is the next bounded non-NRND policy surface. The official STM32F469/479 datasheet maps pin-count code A to 168 or 169 pins, package code Y to WLCSP, and separately identifies WLCSP168 package information. The five affected Base Devices are currently blocked solely by A/Y. Current official ST product pages show every affected base as Active; Sample & Buy exposes Active A/Y exact parts for representative F469 and F479 devices, while this policy evidence does not infer unobserved A/Y exact parts for STM32F469AE or STM32F479AG. B/T remains deliberately fail-closed and lifecycle-deprioritized by prior retained evidence.",
+  "official_evidence": {
+    "datasheet_findings": [
+      {
+        "url": "https://www.st.com/resource/en/datasheet/stm32f469ne.pdf",
+        "document": "DS11189 Rev 8, November 2023, STM32F469xx/STM32F479xx production datasheet",
+        "ordering_section": "PDF page 219, Section 7 maps pin-count code A to 168 and 169 pins and package code Y to WLCSP.",
+        "package_section": "Section 6.4 identifies WLCSP168 package information; the device summary also lists WLCSP168."
+      }
+    ],
+    "observed_package": "WLCSP 168 5.7x4.9x0.6 P 0.4 mm",
+    "observed_active_representative_exact_icpns": [
+      "STM32F469AGY6TR",
+      "STM32F469AIY6TR",
+      "STM32F479AIY6TR"
+    ],
+    "product_page_observations": [
+      {
+        "base_device": "STM32F469AE",
+        "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ae.html#sample-buy",
+        "base_marketing_status": "ACTIVE",
+        "observed_active_exact_icpns": [
+          "STM32F469AEH6",
+          "STM32F469AEH7",
+          "STM32F469AEH7TR"
+        ],
+        "observed_active_a_y_exact_icpns": [],
+        "observation_boundary": "No A/Y exact ICPN was visible in Sample & Buy at capture time; none is inferred."
+      },
+      {
+        "base_device": "STM32F469AG",
+        "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ag.html#sample-buy",
+        "base_marketing_status": "ACTIVE",
+        "observed_active_exact_icpns": [
+          "STM32F469AGH6",
+          "STM32F469AGH6TR",
+          "STM32F469AGY6TR"
+        ],
+        "observed_active_a_y_exact_icpns": [
+          "STM32F469AGY6TR"
+        ]
+      },
+      {
+        "base_device": "STM32F469AI",
+        "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ai.html#sample-buy",
+        "base_marketing_status": "ACTIVE",
+        "observed_active_exact_icpns": [
+          "STM32F469AIH6",
+          "STM32F469AIY6TR"
+        ],
+        "observed_active_a_y_exact_icpns": [
+          "STM32F469AIY6TR"
+        ]
+      },
+      {
+        "base_device": "STM32F479AG",
+        "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ag.html#sample-buy",
+        "base_marketing_status": "ACTIVE",
+        "observed_active_exact_icpns": [
+          "STM32F479AGH6"
+        ],
+        "observed_active_a_y_exact_icpns": [],
+        "observation_boundary": "No A/Y exact ICPN was visible in Sample & Buy at capture time; none is inferred."
+      },
+      {
+        "base_device": "STM32F479AI",
+        "url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ai.html#sample-buy",
+        "base_marketing_status": "ACTIVE",
+        "observed_active_exact_icpns": [
+          "STM32F479AIH6",
+          "STM32F479AIY6TR"
+        ],
+        "observed_active_a_y_exact_icpns": [
+          "STM32F479AIY6TR"
+        ]
+      }
+    ]
+  },
+  "expected_immediate_delta_before_admission": {
+    "production_exact_icpn_rows": 373,
+    "production_base_device_count": 134,
+    "gap_base_device_count": 15,
+    "policy_ready_count": 5,
+    "policy_blocked_count": 10,
+    "policy_ready_base_devices": [
+      "STM32F469AE",
+      "STM32F469AG",
+      "STM32F469AI",
+      "STM32F479AG",
+      "STM32F479AI"
+    ],
+    "residual_b_t_blocked_base_devices": [
+      "STM32F429BE",
+      "STM32F429BG",
+      "STM32F429BI",
+      "STM32F439BG",
+      "STM32F439BI",
+      "STM32F469BE",
+      "STM32F469BG",
+      "STM32F469BI",
+      "STM32F479BG",
+      "STM32F479BI"
+    ]
+  },
+  "production_write_applied": false,
+  "exact_icpn_admission_deferred": true,
+  "b_t_policy_deferred": true,
+  "live_y_exact_not_assumed_for_every_base": true,
+  "algorithm_equivalence_claimed": false,
+  "fail_closed": true
+}
