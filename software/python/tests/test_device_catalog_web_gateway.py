@@ -10,7 +10,7 @@ from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 448
+EXPECTED_PRODUCTION_CATALOG_SIZE = 459
 
 
 class DeviceCatalogWebGatewayTests(unittest.TestCase):
