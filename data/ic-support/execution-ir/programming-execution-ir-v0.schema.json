@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://plasma.local/schemas/programming-execution-ir-v0.schema.json",
+  "title": "Plasma Programming Execution IR v0",
+  "description": "Restricted, reviewable programming-flow IR. Semantic invariants are enforced by validate.py; arbitrary code/expressions are intentionally excluded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ir_id",
+    "status",
+    "profiles",
+    "targets",
+    "operations"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "ir_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "status": {"const": "pilot"},
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["programming", "option", "security"],
+      "properties": {
+        "programming": {"type": "string", "minLength": 1},
+        "option": {"type": "string", "minLength": 1},
+        "security": {"type": "string", "minLength": 1}
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["icpn", "memory_geometry_profile"],
+        "properties": {
+          "icpn": {"type": "string", "minLength": 1},
+          "memory_geometry_profile": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/operation"}
+    }
+  },
+  "$defs": {
+    "operation": {
+      "type": "object",
+      "required": [
+        "operation_id",
+        "category",
+        "risk",
+        "requires_authorization",
+        "continuation",
+        "steps",
+        "terminal"
+      ],
+      "properties": {
+        "operation_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "category": {"enum": ["flash", "option", "security"]},
+        "risk": {"enum": ["normal", "destructive"]},
+        "requires_authorization": {"type": "boolean"},
+        "continuation": {"enum": ["return", "stop_after_reset"]},
+        "runtime_compile_ready": {"type": "boolean"},
+        "mode_bit": {"type": "string"},
+        "address_constraints": {"type": "object"},
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/step"}
+        },
+        "terminal": {
+          "type": "object",
+          "required": ["success_state"],
+          "properties": {
+            "success_state": {"enum": ["known_idle", "reset_required"]}
+          }
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "kind": {
+          "enum": [
+            "ensure_bit_state",
+            "write_register_ref",
+            "clear_status_flags",
+            "enter_mode",
+            "exit_mode",
+            "write_memory",
+            "write_address_register",
+            "set_control_bit",
+            "poll_bit",
+            "inspect_status",
+            "verify_memory",
+            "verify_erased",
+            "authorization_barrier",
+            "call",
+            "semantic_action",
+            "semantic_side_effect",
+            "system_reset",
+            "reidentify_target"
+          ]
+        }
+      }
+    }
+  }
+}
