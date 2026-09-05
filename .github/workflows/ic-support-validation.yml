@@ -83,6 +83,7 @@ jobs:
         run: |
           python data/ic-support/benchmarks/stm32f103c/test_ab_benchmark.py
           python data/ic-support/benchmarks/stm32f103c/test_ab_score_pipeline.py
+          python data/ic-support/benchmarks/stm32f103c/test_ollama_context_probe.py
       - name: Validate STM32F103C source lock
         run: python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
       - name: Compare STM32F103C benchmark
