@@ -17,9 +17,9 @@
       "manufacturer": "STMicroelectronics",
       "family": "STM32F4",
       "path": "../research/stm32f4-commercial-icpn.csv",
-      "row_count": 373,
-      "git_blob_sha": "f201ddd46b357617567e97ad3b68173b35103fef",
-      "sha256": "c3b4ae36d659226224b64941860631444f8d1bd7f52c44729ad46dfa90cd13ae"
+      "row_count": 384,
+      "git_blob_sha": "2f2a9edec7f7a9024a184ec363d5dd1b9d8c8863",
+      "sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
     }
   ]
 }

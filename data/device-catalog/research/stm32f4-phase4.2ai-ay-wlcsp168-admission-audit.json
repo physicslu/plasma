@@ -1,0 +1,29 @@
+{
+  "added_exact_icpns": [
+    "STM32F469AEH6",
+    "STM32F469AEH7",
+    "STM32F469AEH7TR",
+    "STM32F469AGH6",
+    "STM32F469AGH6TR",
+    "STM32F469AGY6TR",
+    "STM32F469AIH6",
+    "STM32F469AIY6TR",
+    "STM32F479AGH6",
+    "STM32F479AIH6",
+    "STM32F479AIY6TR"
+  ],
+  "admission_plan_sha256": "c64c7c5d9d6248fc6042322785041b4326293a143cb7f5a859a86ac7433ab3c9",
+  "canonical_csv_file_sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359",
+  "lifecycle_exclusions": [],
+  "phase": "4.2AI",
+  "production_base_devices_after": 139,
+  "production_base_devices_before": 134,
+  "production_rows_after": 384,
+  "production_rows_before": 373,
+  "proposal_artifact_id": 9970915767,
+  "proposal_artifact_zip_sha256": "c7bddf328cbedaf15227cda783ec1334ea05083e13b2fb84f3764458609d82cf",
+  "proposal_run_id": 33971024145,
+  "retained_evidence_id": "stm32f4-phase4.2ai-ay-wlcsp168-admission-2026-09-05-retained-20260905T133254Z-de33e30",
+  "schema_version": 1,
+  "status": "published"
+}

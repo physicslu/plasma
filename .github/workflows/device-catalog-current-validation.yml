@@ -182,3 +182,10 @@ jobs:
 
       - name: Validate Phase 4.2AH A/Y WLCSP168 policy boundary
         run: python data/device-catalog/research/test_stm32f4_phase4_2ah_ay_wlcsp168_policy.py
+
+      - name: Validate Phase 4.2AI A/Y WLCSP168 retained evidence and post-admission closure
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2ai-ay-wlcsp168-admission-live-2026-09-05 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2ai-ay-wlcsp168-admission-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_2ai_ay_wlcsp168_post_admission.py

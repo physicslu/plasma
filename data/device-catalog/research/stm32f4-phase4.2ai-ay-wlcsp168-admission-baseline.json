@@ -1,0 +1,50 @@
+{
+  "canonical_dataset_admission": false,
+  "excluded_non_active_observations": [],
+  "pilot_id": "stm32f4-phase4.2ai-ay-wlcsp168-admission-2026-09-05",
+  "schema_version": 1,
+  "source_discovery": {
+    "artifact_id": "9970351344",
+    "artifact_sha256": "934d7bd2966502980e3200212f056af7005e618aa04049897950cc2946901072",
+    "source_commit": "a2c4e0ea94b7c05fab898f24b732ea97eebe48b4",
+    "workflow_run_id": "33968886242"
+  },
+  "targets": [
+    {
+      "base_device": "STM32F469AE",
+      "exact_icpns": [
+        "STM32F469AEH6",
+        "STM32F469AEH7",
+        "STM32F469AEH7TR"
+      ]
+    },
+    {
+      "base_device": "STM32F469AG",
+      "exact_icpns": [
+        "STM32F469AGH6",
+        "STM32F469AGH6TR",
+        "STM32F469AGY6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F469AI",
+      "exact_icpns": [
+        "STM32F469AIH6",
+        "STM32F469AIY6TR"
+      ]
+    },
+    {
+      "base_device": "STM32F479AG",
+      "exact_icpns": [
+        "STM32F479AGH6"
+      ]
+    },
+    {
+      "base_device": "STM32F479AI",
+      "exact_icpns": [
+        "STM32F479AIH6",
+        "STM32F479AIY6TR"
+      ]
+    }
+  ]
+}

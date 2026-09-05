@@ -11,41 +11,27 @@ from stm32f4_coverage_gap_inventory import build_inventory
 HERE = Path(__file__).resolve().parent
 CATALOG = HERE / "stm32f4-commercial-icpn.csv"
 OPENOCD_CATALOG = HERE / "openocd-parts-canonical.csv"
-PLAN = HERE / "stm32f4-phase4.2ag-ah-ufbga169-admission-plan.json"
-AUDIT = HERE / "stm32f4-phase4.2ag-ah-ufbga169-admission-audit.json"
-PLAN_SHA256 = "b2d8976f6562c1d7e7aee90f25e466399d4f72216161a14510bc4d4ef8ca4ad0"
-PUBLISHED_CATALOG_SHA256 = "c3b4ae36d659226224b64941860631444f8d1bd7f52c44729ad46dfa90cd13ae"
-CURRENT_CATALOG_SHA256 = "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
-EVIDENCE_ID = "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f"
+PLAN = HERE / "stm32f4-phase4.2ai-ay-wlcsp168-admission-plan.json"
+AUDIT = HERE / "stm32f4-phase4.2ai-ay-wlcsp168-admission-audit.json"
+PLAN_SHA256 = "c64c7c5d9d6248fc6042322785041b4326293a143cb7f5a859a86ac7433ab3c9"
+PUBLISHED_CATALOG_SHA256 = "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
+EVIDENCE_ID = "stm32f4-phase4.2ai-ay-wlcsp168-admission-2026-09-05-retained-20260905T133254Z-de33e30"
 EXPECTED = {
-    "STM32F427AGH6": ("STM32F427AG", "1024 KiB", ""),
-    "STM32F427AIH6": ("STM32F427AI", "2048 KiB", ""),
-    "STM32F427AIH6TR": ("STM32F427AI", "2048 KiB", "TR"),
-    "STM32F429AGH6": ("STM32F429AG", "1024 KiB", ""),
-    "STM32F429AGH6TR": ("STM32F429AG", "1024 KiB", "TR"),
-    "STM32F429AIH6": ("STM32F429AI", "2048 KiB", ""),
-    "STM32F437AIH6": ("STM32F437AI", "2048 KiB", ""),
-    "STM32F437AIH6TR": ("STM32F437AI", "2048 KiB", "TR"),
-    "STM32F439AIH6": ("STM32F439AI", "2048 KiB", ""),
-}
-A_Y_READY = {
-    "STM32F469AE",
-    "STM32F469AG",
-    "STM32F469AI",
-    "STM32F479AG",
-    "STM32F479AI",
+    "STM32F469AEH6": ("STM32F469AE", "UFBGA", "169", "512 KiB", "-40 to 85 C", ""),
+    "STM32F469AEH7": ("STM32F469AE", "UFBGA", "169", "512 KiB", "-40 to 105 C", ""),
+    "STM32F469AEH7TR": ("STM32F469AE", "UFBGA", "169", "512 KiB", "-40 to 105 C", "TR"),
+    "STM32F469AGH6": ("STM32F469AG", "UFBGA", "169", "1024 KiB", "-40 to 85 C", ""),
+    "STM32F469AGH6TR": ("STM32F469AG", "UFBGA", "169", "1024 KiB", "-40 to 85 C", "TR"),
+    "STM32F469AGY6TR": ("STM32F469AG", "WLCSP", "168", "1024 KiB", "-40 to 85 C", "TR"),
+    "STM32F469AIH6": ("STM32F469AI", "UFBGA", "169", "2048 KiB", "-40 to 85 C", ""),
+    "STM32F469AIY6TR": ("STM32F469AI", "WLCSP", "168", "2048 KiB", "-40 to 85 C", "TR"),
+    "STM32F479AGH6": ("STM32F479AG", "UFBGA", "169", "1024 KiB", "-40 to 85 C", ""),
+    "STM32F479AIH6": ("STM32F479AI", "UFBGA", "169", "2048 KiB", "-40 to 85 C", ""),
+    "STM32F479AIY6TR": ("STM32F479AI", "WLCSP", "168", "2048 KiB", "-40 to 85 C", "TR"),
 }
 B_T_BLOCKED = {
-    "STM32F429BE",
-    "STM32F429BG",
-    "STM32F429BI",
-    "STM32F439BG",
-    "STM32F439BI",
-    "STM32F469BE",
-    "STM32F469BG",
-    "STM32F469BI",
-    "STM32F479BG",
-    "STM32F479BI",
+    "STM32F429BE", "STM32F429BG", "STM32F429BI", "STM32F439BG", "STM32F439BI",
+    "STM32F469BE", "STM32F469BG", "STM32F469BI", "STM32F479BG", "STM32F479BI",
 }
 
 
@@ -58,13 +44,14 @@ def main() -> int:
 
     by_icpn = {row["icpn"]: row for row in rows}
     assert set(EXPECTED) <= set(by_icpn)
-    for icpn, (base_device, flash_size, option_suffix) in EXPECTED.items():
+    for icpn, expected in EXPECTED.items():
+        base_device, package, pin_count, flash_size, temperature_grade, option_suffix = expected
         row = by_icpn[icpn]
         assert row["base_device"] == base_device
-        assert row["package"] == "UFBGA"
-        assert row["pin_count"] == "169"
+        assert row["package"] == package
+        assert row["pin_count"] == pin_count
         assert row["flash_size"] == flash_size
-        assert row["temperature_grade"] == "-40 to 85 C"
+        assert row["temperature_grade"] == temperature_grade
         assert row["option_suffix"] == option_suffix
         assert row["mapping_status"] == "deterministic_ordering_pattern"
         assert row["openocd_target_config"] == "tcl/target/stm32f4x.cfg"
@@ -73,29 +60,29 @@ def main() -> int:
         assert row["verification_status"] == "verified_direct_st_retained_browser_exact_icpn"
         assert EVIDENCE_ID in row["source_reference"]
 
-    assert hashlib.sha256(CATALOG.read_bytes()).hexdigest() == CURRENT_CATALOG_SHA256
+    assert hashlib.sha256(CATALOG.read_bytes()).hexdigest() == PUBLISHED_CATALOG_SHA256
     assert hashlib.sha256(PLAN.read_bytes()).hexdigest() == PLAN_SHA256
     plan = json.loads(PLAN.read_text(encoding="utf-8"))
-    assert plan["candidate_count"] == 9
+    assert plan["candidate_count"] == 11
     assert plan["decision_counts"] == {
-        "admit": 9,
+        "admit": 11,
         "already_present": 0,
         "manual_review_required": 0,
         "reject": 0,
     }
     assert plan["conflicts"] == 0
-    assert plan["canonical_rows_before"] == 364
+    assert plan["canonical_rows_before"] == 373
     assert {candidate["icpn"] for candidate in plan["candidates"]} == set(EXPECTED)
 
     audit = json.loads(AUDIT.read_text(encoding="utf-8"))
     assert audit["status"] == "published"
-    assert audit["proposal_run_id"] == 33944452604
-    assert audit["proposal_artifact_id"] == 9962871328
-    assert audit["proposal_artifact_zip_sha256"] == "a82aaa78b3378b71fc48cfd2d04dc0f761293afa8cae34ecad9f1e28cdd42478"
-    assert audit["production_rows_before"] == 364
-    assert audit["production_rows_after"] == 373
-    assert audit["production_base_devices_before"] == 128
-    assert audit["production_base_devices_after"] == 134
+    assert audit["proposal_run_id"] == 33971024145
+    assert audit["proposal_artifact_id"] == 9970915767
+    assert audit["proposal_artifact_zip_sha256"] == "c7bddf328cbedaf15227cda783ec1334ea05083e13b2fb84f3764458609d82cf"
+    assert audit["production_rows_before"] == 373
+    assert audit["production_rows_after"] == 384
+    assert audit["production_base_devices_before"] == 134
+    assert audit["production_base_devices_after"] == 139
     assert set(audit["added_exact_icpns"]) == set(EXPECTED)
     assert audit["lifecycle_exclusions"] == []
     assert audit["admission_plan_sha256"] == PLAN_SHA256
@@ -105,14 +92,13 @@ def main() -> int:
     inventory = build_inventory(catalog_path=OPENOCD_CATALOG, canonical_path=CATALOG)
     assert inventory["production"]["exact_icpn_rows"] == 384
     assert inventory["production"]["base_device_count"] == 139
-    assert {base for base, _flash, _option in EXPECTED.values()} <= set(
+    assert {expected[0] for expected in EXPECTED.values()} <= set(
         inventory["production"]["base_devices"]
     )
     assert inventory["gap"]["base_device_count"] == 10
     assert inventory["gap"]["policy_ready_count"] == 0
     assert inventory["gap"]["policy_blocked_count"] == 10
     assert inventory["gap"]["policy_ready"] == []
-    assert A_Y_READY <= set(inventory["production"]["base_devices"])
     blocked = {item["base_device"]: item for item in inventory["gap"]["policy_blocked"]}
     assert set(blocked) == B_T_BLOCKED
     for base_device in B_T_BLOCKED:
@@ -121,7 +107,7 @@ def main() -> int:
             "unsupported STM32F4 pin/package combination: B/T"
         ]
 
-    print("Phase 4.2AG post-admission closure PASS")
+    print("Phase 4.2AI post-admission closure PASS")
     return 0
 
 
