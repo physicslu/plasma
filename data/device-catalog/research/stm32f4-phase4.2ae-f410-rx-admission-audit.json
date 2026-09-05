@@ -1,0 +1,25 @@
+{
+  "added_exact_icpns": [
+    "STM32F410R8T6",
+    "STM32F410RBI3",
+    "STM32F410RBI6",
+    "STM32F410RBT6",
+    "STM32F410RBT6TR",
+    "STM32F410RBT7",
+    "STM32F410RBT7TR"
+  ],
+  "admission_plan_sha256": "6fd04aa2c1dfa1a362bb881f69c614b597604d1e2f14550e53e80f449fe14a9a",
+  "canonical_csv_file_sha256": "0a471928141fdd07529904bd74c952275b97eb225979ad8fcc596263dec785c7",
+  "lifecycle_exclusions": [],
+  "phase": "4.2AE",
+  "production_base_devices_after": 128,
+  "production_base_devices_before": 126,
+  "production_rows_after": 364,
+  "production_rows_before": 357,
+  "proposal_artifact_id": 9960336185,
+  "proposal_artifact_zip_sha256": "1fc390581bab2c469826e429ff98a93d6e6d37e330a2c33566e9eb011732c416",
+  "proposal_run_id": 33936475732,
+  "retained_evidence_id": "stm32f4-phase4.2ae-f410-rx-admission-2026-09-05-retained-20260904T223827Z-38671c7",
+  "schema_version": 1,
+  "status": "published"
+}
