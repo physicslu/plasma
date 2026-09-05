@@ -210,6 +210,11 @@ def probe_workspace(
     reduced_tokens = arms["reduced_context"]["measurement"].get("prompt_tokens")
     full_tokens = full_tokens if isinstance(full_tokens, int) else None
     reduced_tokens = reduced_tokens if isinstance(reduced_tokens, int) else None
+    runtime_snapshot = running_model_snapshot(
+        ollama_url=ollama_url,
+        model=model,
+        timeout_seconds=timeout_seconds,
+    )
     report: dict[str, Any] = {
         "schema_version": PROBE_SCHEMA_VERSION,
         "experiment_id": harness.EXPERIMENT_ID,
@@ -224,10 +229,10 @@ def probe_workspace(
             "shift": False,
             "num_predict": 1,
             "thinking": False,
-            "running_model_before": running_model_snapshot(
-                ollama_url=ollama_url,
-                model=model,
-                timeout_seconds=timeout_seconds,
+            "running_model_after_probe": runtime_snapshot,
+            "running_context_matches_configured": (
+                runtime_snapshot is not None
+                and runtime_snapshot.get("context_length") == num_ctx
             ),
         },
         "arms": arms,
@@ -287,7 +292,7 @@ def main() -> int:
         print(
             "Ollama context probe PASS: "
             f"token reduction={comparison['token_reduction_percent']}; "
-            f"both_fit_32k={comparison['both_fit_configured_context']}"
+            f"both_fit_configured_context={comparison['both_fit_configured_context']}"
         )
         return 0
     except (OSError, json.JSONDecodeError, harness.ABBenchmarkError, OllamaProbeError) as exc:
