@@ -89,6 +89,8 @@ Odd trials run `full -> reduced`; even trials run `reduced -> full`. This balanc
 
 The endpoint must be OpenAI chat-completions compatible. TTFT is only claimed when streamed content is actually observed. Token counts are accepted only when the runtime reports usage; the harness does not invent tokenizer estimates. Remote peak memory remains `null` unless independently measured by the runtime.
 
+A transport timeout is retained as an arm-level error record rather than aborting the pair. The timed-out arm still writes its `.run.json`, and the other arm is executed. A timeout is an experiment outcome, not evidence of semantic correctness and not by itself proof that the reduced arm is better.
+
 ### 4. Score after generation
 
 ```bash
