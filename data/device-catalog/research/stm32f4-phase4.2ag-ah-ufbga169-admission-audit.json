@@ -1,0 +1,27 @@
+{
+  "added_exact_icpns": [
+    "STM32F427AGH6",
+    "STM32F427AIH6",
+    "STM32F427AIH6TR",
+    "STM32F429AGH6",
+    "STM32F429AGH6TR",
+    "STM32F429AIH6",
+    "STM32F437AIH6",
+    "STM32F437AIH6TR",
+    "STM32F439AIH6"
+  ],
+  "admission_plan_sha256": "b2d8976f6562c1d7e7aee90f25e466399d4f72216161a14510bc4d4ef8ca4ad0",
+  "canonical_csv_file_sha256": "c3b4ae36d659226224b64941860631444f8d1bd7f52c44729ad46dfa90cd13ae",
+  "lifecycle_exclusions": [],
+  "phase": "4.2AG",
+  "production_base_devices_after": 134,
+  "production_base_devices_before": 128,
+  "production_rows_after": 373,
+  "production_rows_before": 364,
+  "proposal_artifact_id": 9962871328,
+  "proposal_artifact_zip_sha256": "a82aaa78b3378b71fc48cfd2d04dc0f761293afa8cae34ecad9f1e28cdd42478",
+  "proposal_run_id": 33944452604,
+  "retained_evidence_id": "stm32f4-phase4.2ag-ah-ufbga169-admission-2026-09-05-retained-20260905T041556Z-bee616f",
+  "schema_version": 1,
+  "status": "published"
+}
