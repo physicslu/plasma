@@ -43,7 +43,35 @@ python data/ic-support/benchmarks/stm32f103c/ab_benchmark.py prepare \
 
 Preparation verifies the exact source-lock bytes, records the `pdftotext`/normalization fingerprint, materializes full DS/PM text with physical-page markers, and rebuilds the deterministic DS5319 Evidence Pack. Manufacturer source bytes and generated text remain outside Git.
 
-### 2. Run paired trials
+### 2. Probe a bounded Ollama context budget
+
+For local Ollama runs, first measure the exact prompt-token demand without increasing the deployable context budget. The probe uses Ollama's native chat API with truncation, context shifting, and model thinking disabled. It asks for only one output token. An over-budget prompt is expected to fail closed rather than be silently truncated.
+
+Example for a 32K local-GPU envelope:
+
+```bash
+python data/ic-support/benchmarks/stm32f103c/ollama_context_probe.py \
+  --workspace /tmp/plasma-ab \
+  --ollama-url http://127.0.0.1:11434 \
+  --model qwen3.8:27b-mlx \
+  --num-ctx 32768 \
+  --output /tmp/plasma-ab-context-probe.json
+```
+
+The probe records:
+
+- exact runtime-reported prompt tokens when Ollama provides them;
+- whether each arm fits the configured context budget;
+- token headroom or deficit relative to that budget;
+- prompt-evaluation timing when the prompt fits;
+- the prepared prompt digest and byte length;
+- the active Ollama model snapshot when available.
+
+This is a **capacity diagnostic**, not an accuracy benchmark. It does not read ground truth and its output must not be treated as proof that an Evidence Pack is semantically complete. Do not enlarge `num_ctx` merely to force the full-document arm to fit if that causes CPU offload, memory pressure, or swap. The intended question is whether the evidence pipeline can operate inside the actual deployable inference envelope.
+
+If the deterministic Evidence Pack still exceeds the bounded context budget, the next engineering step is finer task-specific evidence selection / Target Evidence Bundles, not silent truncation.
+
+### 3. Run paired trials
 
 ```bash
 python data/ic-support/benchmarks/stm32f103c/ab_benchmark.py run-pair \
@@ -61,7 +89,9 @@ Odd trials run `full -> reduced`; even trials run `reduced -> full`. This balanc
 
 The endpoint must be OpenAI chat-completions compatible. TTFT is only claimed when streamed content is actually observed. Token counts are accepted only when the runtime reports usage; the harness does not invent tokenizer estimates. Remote peak memory remains `null` unless independently measured by the runtime.
 
-### 3. Score after generation
+A transport timeout is retained as an arm-level error record rather than aborting the pair. The timed-out arm still writes its `.run.json`, and the other arm is executed. A timeout is an experiment outcome, not evidence of semantic correctness and not by itself proof that the reduced arm is better.
+
+### 4. Score after generation
 
 ```bash
 python data/ic-support/benchmarks/stm32f103c/score_ab_benchmark.py \
