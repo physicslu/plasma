@@ -41,6 +41,7 @@ on:
       - "software/python/tests/test_openocd_plan.py"
       - "software/python/tests/test_openocd_executor.py"
       - ".github/workflows/ic-support-validation.yml"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -51,6 +52,7 @@ permissions:
 
 jobs:
   validate-ic-support:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -107,3 +109,14 @@ jobs:
         run: python data/ic-support/benchmarks/stm32f103c/test_extraction_contract.py
       - name: Test blind extraction workspace
         run: python data/ic-support/benchmarks/stm32f103c/test_blind_workspace.py
+
+  verify-official-source-lock:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify locked official PDF bytes
+        run: python data/ic-support/evidence/source_integrity.py verify

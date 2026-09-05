@@ -141,8 +141,8 @@ Current primary test owners:
 | Operator Site selection / same-Gateway reconnect / bad-Gateway round trip / explicit zero selection | `software/web/e2e/tests/engineering-site-selection-reconnect.spec.ts` |
 | Programming Image cache behavior through real browser + real Gateway/Provider/Server | `software/web/e2e/tests/engineering-programming-asset-cache-runtime.spec.ts` |
 | Baseline real-stack PPU operator and batch acceptance | `software/web/e2e/tests/mock-cd-runtime.spec.ts` |
-| Web fast source gate: lint + build/source tests | `.github/workflows/web-tests.yml` |
-| Browser E2E + visual regression CI | `.github/workflows/web-e2e.yml` |
+| Web fast source gate: lint + build/source tests | `.github/workflows/web-tests.yml` (`test` job) |
+| Browser E2E + visual regression CI | `.github/workflows/web-tests.yml` (`e2e` job) |
 | Full software-stack acceptance | `.github/workflows/mock-cd.yml` |
 | Real browser + persistent Mock CD stack | `.github/workflows/mock-cd-browser.yml` |
 | Provider/server Programming Asset cache and PPU Image lease | `software/python/tests/test_engineering_targets.py` and Gateway tests |
