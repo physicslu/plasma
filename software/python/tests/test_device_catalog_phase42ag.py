@@ -10,36 +10,40 @@ from plasma_web.gateway import PlasmaWebHandler
 
 EXPECTED_PRODUCTION_CATALOG_SIZE = 448
 EXPECTED_ICPNS = {
-    "STM32F410C8U6": ("STM32F410C8", "UFQFPN", "48", "-40 to 85 C"),
-    "STM32F410C8U6TR": ("STM32F410C8", "UFQFPN", "48", "-40 to 85 C"),
-    "STM32F410C8U7": ("STM32F410C8", "UFQFPN", "48", "-40 to 105 C"),
-    "STM32F410C8U7TR": ("STM32F410C8", "UFQFPN", "48", "-40 to 105 C"),
-    "STM32F410T8Y6TR": ("STM32F410T8", "WLCSP", "36", "-40 to 85 C"),
+    "STM32F427AGH6": ("STM32F427AG", "1024 KiB"),
+    "STM32F427AIH6": ("STM32F427AI", "2048 KiB"),
+    "STM32F427AIH6TR": ("STM32F427AI", "2048 KiB"),
+    "STM32F429AGH6": ("STM32F429AG", "1024 KiB"),
+    "STM32F429AGH6TR": ("STM32F429AG", "1024 KiB"),
+    "STM32F429AIH6": ("STM32F429AI", "2048 KiB"),
+    "STM32F437AIH6": ("STM32F437AI", "2048 KiB"),
+    "STM32F437AIH6TR": ("STM32F437AI", "2048 KiB"),
+    "STM32F439AIH6": ("STM32F439AI", "2048 KiB"),
 }
 
 
-def test_phase42ac_exact_icpns_are_resolved_by_runtime_catalog() -> None:
+def test_phase42ag_exact_icpns_are_resolved_by_runtime_catalog() -> None:
     catalog = get_default_device_catalog()
     assert catalog.size == EXPECTED_PRODUCTION_CATALOG_SIZE
-    for icpn, (base_device, package, pin_count, temperature_grade) in EXPECTED_ICPNS.items():
+    for icpn, (base_device, flash_size) in EXPECTED_ICPNS.items():
         matches = catalog.search(icpn.lower(), limit=5)
         assert matches[0].icpn == icpn
         row = next(record for record in matches if record.icpn == icpn)
         assert row.base_device == base_device
-        assert row.package == package
-        assert row.pin_count == pin_count
-        assert row.flash_size == "64 KiB"
-        assert row.temperature_grade == temperature_grade
+        assert row.package == "UFBGA"
+        assert row.pin_count == "169"
+        assert row.flash_size == flash_size
+        assert row.temperature_grade == "-40 to 85 C"
         assert row.target_config == "tcl/target/stm32f4x.cfg"
         assert row.production_admitted
 
 
-def test_phase42ac_exact_icpns_are_exposed_by_rest_catalog() -> None:
+def test_phase42ag_exact_icpns_are_exposed_by_rest_catalog() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        for icpn, (base_device, package, pin_count, _temperature_grade) in EXPECTED_ICPNS.items():
+        for icpn, (base_device, flash_size) in EXPECTED_ICPNS.items():
             connection = HTTPConnection("127.0.0.1", server.server_port)
             connection.request("GET", f"/api/devices/search?q={icpn}&limit=5")
             response = connection.getresponse()
@@ -52,9 +56,9 @@ def test_phase42ac_exact_icpns_are_exposed_by_rest_catalog() -> None:
             assert payload["results"][0]["icpn"] == icpn
             result = next(item for item in payload["results"] if item["icpn"] == icpn)
             assert result["base_device"] == base_device
-            assert result["package"] == package
-            assert result["pin_count"] == pin_count
-            assert result["flash_size"] == "64 KiB"
+            assert result["package"] == "UFBGA"
+            assert result["pin_count"] == "169"
+            assert result["flash_size"] == flash_size
             assert result["backend"]["target_config"] == "tcl/target/stm32f4x.cfg"
             assert result["catalog"]["scope"] == "production_admitted"
     finally:

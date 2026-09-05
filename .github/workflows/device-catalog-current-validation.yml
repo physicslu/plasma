@@ -172,3 +172,10 @@ jobs:
 
       - name: Validate Phase 4.2AF A/H UFBGA169 policy boundary
         run: python data/device-catalog/research/test_stm32f4_phase4_2af_ah_ufbga169_policy.py
+
+      - name: Validate Phase 4.2AG A/H UFBGA169 retained evidence and post-admission closure
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2ag-ah-ufbga169-admission-live-2026-09-05 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2ag-ah-ufbga169-admission-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_2ag_ah_ufbga169_post_admission.py
