@@ -27,9 +27,9 @@ EXPECTED = {
 def main() -> int:
     with CATALOG.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
-    assert len(rows) == 357
+    assert len(rows) == 364
     assert len(rows) == len({row["icpn"] for row in rows})
-    assert len({row["base_device"] for row in rows}) == 126
+    assert len({row["base_device"] for row in rows}) == 128
 
     by_icpn = {row["icpn"]: row for row in rows}
     assert set(EXPECTED) <= set(by_icpn)

@@ -8,7 +8,7 @@ from http.server import ThreadingHTTPServer
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 432
+EXPECTED_PRODUCTION_CATALOG_SIZE = 439
 EXPECTED_ICPNS = {
     "STM32F469NEH6": ("STM32F469NE", "512 KiB", "-40 to 85 C"),
     "STM32F469NGH6": ("STM32F469NG", "1024 KiB", "-40 to 85 C"),

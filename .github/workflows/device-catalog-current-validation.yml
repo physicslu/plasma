@@ -162,3 +162,10 @@ jobs:
 
       - name: Validate Phase 4.2AD STM32F410 R/I UFBGA64 policy boundary
         run: python data/device-catalog/research/test_stm32f4_phase4_2ad_f410_ri_ufbga64_policy.py
+
+      - name: Validate Phase 4.2AE STM32F410 Rx retained evidence and post-admission closure
+        run: |
+          python data/device-catalog/research/validate_stm32f4_retained_evidence.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2ae-f410-rx-admission-live-2026-09-05 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2ae-f410-rx-admission-baseline.json
+          python data/device-catalog/research/test_stm32f4_phase4_2ae_f410_rx_post_admission.py
