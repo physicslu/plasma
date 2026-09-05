@@ -68,6 +68,7 @@
 - **Current** — [Local AI Development Guide](development/local-ai-development-guide.md)
 - **Current** — [Persistent Integration Runner Enrollment](development/persistent-integration-runner-enrollment.md)：定義 L4 host readiness、GitHub runner enrollment/restriction、首次 qualification、staleness、upgrade、revoke 與 recovery lifecycle；不把 registration token 或 host provisioning 寫入 repository automation。
 - **Reference** — [IC Support Local-AI Benchmark Handover](development/ic-support-ai-benchmark-handover.md)：整理 STM32F103C Qwen 實驗的能力邊界、已知 failure classes、multi-model role separation，以及下一輪獨立 Gemma 比較的 blind-control 條件。
+- **Current** — [IC Support Semantic Validator v0](development/ic-support-semantic-validator-v0.md)：把 Qwen／Gemma 已觀察到的機械性 failure class 轉成 deterministic semantic invariants、negative regressions 與 CI gate；未具 execution IR 的規則明確維持未實作狀態。
 - **Current** — [Multi-machine Development Guide](development/multi-machine-development-guide.md)
 - **Current** — [VS Code Remote Workspace Standard](development/vscode-remote-workspace.md)
 - **Current** — [Integration Host Deployment Guide](development/swpc-deployment.md)

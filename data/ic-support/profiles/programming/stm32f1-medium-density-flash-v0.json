@@ -17,6 +17,7 @@
         "2.3.2 Unlocking the Flash memory",
         "2.3.3 Main Flash memory programming",
         "2.3.4 Flash memory erase",
+        "3.5 Flash control register (FLASH_CR)",
         "3.9 Flash register map"
       ]
     }
@@ -33,6 +34,18 @@
       "FLASH_OBR": "0x4002201C",
       "FLASH_WRPR": "0x40022020"
     },
+    "control_bits": {
+      "PG": "0x00000001",
+      "PER": "0x00000002",
+      "MER": "0x00000004",
+      "OPTPG": "0x00000010",
+      "OPTER": "0x00000020",
+      "STRT": "0x00000040",
+      "LOCK": "0x00000080",
+      "OPTWRE": "0x00000200"
+    },
+    "operation_mode_bits": ["PG", "PER", "MER", "OPTPG", "OPTER"],
+    "operation_mode_mask": "0x00000037",
     "unlock_keys": ["0x45670123", "0xCDEF89AB"],
     "program_granularity_bytes": 2,
     "program_sequence": [
