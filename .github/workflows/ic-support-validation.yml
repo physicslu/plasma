@@ -22,7 +22,6 @@ on:
       - "software/python/tests/test_openocd_plan.py"
       - "software/python/tests/test_openocd_executor.py"
       - ".github/workflows/ic-support-validation.yml"
-      - ".github/workflows/ic-support-source-integrity.yml"
   pull_request:
     paths:
       - "data/ic-support/**"
@@ -42,7 +41,6 @@ on:
       - "software/python/tests/test_openocd_plan.py"
       - "software/python/tests/test_openocd_executor.py"
       - ".github/workflows/ic-support-validation.yml"
-      - ".github/workflows/ic-support-source-integrity.yml"
   workflow_dispatch:
 
 concurrency:
@@ -114,4 +112,11 @@ jobs:
 
   verify-official-source-lock:
     if: github.event_name == 'workflow_dispatch'
-    uses: ./.github/workflows/ic-support-source-integrity.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify locked official PDF bytes
+        run: python data/ic-support/evidence/source_integrity.py verify
