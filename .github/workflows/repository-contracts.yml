@@ -11,8 +11,6 @@ on:
       - "software/python/**"
       - "software/web/**"
       - ".github/workflows/repository-contracts.yml"
-      - ".github/workflows/documentation-integrity.yml"
-      - ".github/workflows/terminology-contract.yml"
   pull_request:
     paths:
       - "**/*.md"
@@ -23,8 +21,6 @@ on:
       - "software/python/**"
       - "software/web/**"
       - ".github/workflows/repository-contracts.yml"
-      - ".github/workflows/documentation-integrity.yml"
-      - ".github/workflows/terminology-contract.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -90,12 +86,10 @@ jobs:
               "software/python/plasma_web/gateway_settings.py",
               "software/python/plasma_core/errors.py",
               ".github/workflows/repository-contracts.yml",
-              ".github/workflows/documentation-integrity.yml",
           }
           terminology_exact = {
               "scripts/tests/test-canonical-terminology-guard.py",
               ".github/workflows/repository-contracts.yml",
-              ".github/workflows/terminology-contract.yml",
           }
 
           documentation = any(
@@ -121,9 +115,33 @@ jobs:
   documentation:
     needs: route-contracts
     if: needs.route-contracts.outputs.documentation == 'true'
-    uses: ./.github/workflows/documentation-integrity.yml
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test public documentation sanitization
+        run: bash scripts/tests/test-public-doc-sanitization.sh
+      - name: Test documentation integrity
+        run: python scripts/tests/test-documentation-integrity.py
 
   terminology:
     needs: route-contracts
     if: needs.route-contracts.outputs.terminology == 'true'
-    uses: ./.github/workflows/terminology-contract.yml
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Self-test terminology guard
+        run: python scripts/tests/test-canonical-terminology-guard.py --self-test
+      - name: Reject new retired domain vocabulary
+        env:
+          PLASMA_TERMINOLOGY_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python scripts/tests/test-canonical-terminology-guard.py
