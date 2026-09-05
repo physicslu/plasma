@@ -11,6 +11,29 @@ PROFILE_ROOT = IC_SUPPORT_ROOT / "profiles"
 DEFAULT_IR = HERE / "stm32f103c-programming-execution-ir-v0.json"
 SCHEMA_FILE = HERE / "programming-execution-ir-v0.schema.json"
 
+ALLOWED_STEP_KINDS = {
+    "observe_bit",
+    "ensure_bit_state",
+    "write_register_ref",
+    "clear_status_flags",
+    "enter_mode",
+    "exit_mode",
+    "write_memory",
+    "write_address_register",
+    "set_control_bit",
+    "poll_bit",
+    "inspect_status",
+    "verify_memory",
+    "verify_erased",
+    "authorization_barrier",
+    "call",
+    "semantic_action",
+    "semantic_side_effect",
+    "system_reset",
+    "reidentify_target",
+}
+NESTED_ENSURE_ACTION_KINDS = {"write_register_ref", "set_control_bit"}
+
 
 class ExecutionIRValidationError(RuntimeError):
     pass
@@ -50,6 +73,7 @@ def _steps(operation: dict[str, Any]) -> list[dict[str, Any]]:
     require(isinstance(steps, list) and steps, "IR", f"{operation.get('operation_id')}: steps must be non-empty")
     for step in steps:
         require(isinstance(step, dict), "IR", f"{operation.get('operation_id')}: every step must be an object")
+        require(step.get("kind") in ALLOWED_STEP_KINDS, "IR", f"{operation.get('operation_id')}: unsupported step kind {step.get('kind')!r}")
     return steps
 
 
@@ -99,6 +123,24 @@ def validate_symbol_references(operation: dict[str, Any], programming: dict[str,
         if kind in {"ensure_bit_state", "enter_mode", "exit_mode", "set_control_bit"}:
             bit = step.get("bit")
             require(bit in control_bits, "IR", f"{op_id}.{step['id']}: unknown control bit {bit!r}")
+        if kind == "ensure_bit_state":
+            nested = step.get("when_mismatch")
+            require(isinstance(nested, list) and nested, "IR", f"{op_id}.{step['id']}: when_mismatch must be a non-empty restricted action list")
+            for index, action in enumerate(nested):
+                require(isinstance(action, dict), "IR", f"{op_id}.{step['id']}.when_mismatch[{index}]: action must be an object")
+                action_kind = action.get("kind")
+                require(action_kind in NESTED_ENSURE_ACTION_KINDS, "IR", f"{op_id}.{step['id']}.when_mismatch[{index}]: unsupported action {action_kind!r}")
+                action_register = action.get("register")
+                require(action_register in registers, "IR", f"{op_id}.{step['id']}.when_mismatch[{index}]: unknown register {action_register!r}")
+                if action_kind == "set_control_bit":
+                    action_bit = action.get("bit")
+                    require(action_bit in control_bits, "IR", f"{op_id}.{step['id']}.when_mismatch[{index}]: unknown control bit {action_bit!r}")
+            terminal = step.get("terminal_observation")
+            require(isinstance(terminal, dict), "V003", f"{op_id}.{step['id']}: terminal observation is required")
+            terminal_register = terminal.get("register")
+            terminal_bit = terminal.get("bit")
+            require(terminal_register in registers, "IR", f"{op_id}.{step['id']}: unknown terminal register {terminal_register!r}")
+            require(terminal_bit in control_bits or terminal_bit in status_bits, "IR", f"{op_id}.{step['id']}: unknown terminal bit {terminal_bit!r}")
         if kind in {"observe_bit", "poll_bit"}:
             bit = step.get("bit")
             require(bit in status_bits or bit in control_bits, "IR", f"{op_id}.{step['id']}: unknown bit {bit!r}")
