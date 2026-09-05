@@ -76,15 +76,13 @@ def test_v009_rejects_unaligned_and_out_of_range_access(module) -> None:
     expect_failure(module, "V009", module.validate_program_address, data, 0x0800FFFF, 2, 2)
 
 
-def test_rule_registry_preserves_unimplemented_boundary(module) -> None:
+def test_rule_registry_tracks_execution_ir_boundary(module) -> None:
     registry = module.load_json(module.RULES_FILE)
     by_id = {entry["id"]: entry for entry in registry["rules"]}
-    assert by_id["V001"]["status"] == "implemented"
-    assert by_id["V007"]["status"] == "implemented"
-    assert by_id["V008"]["status"] == "implemented"
+    for rule_id in {"V001", "V002", "V003", "V004", "V005", "V006", "V007", "V008", "V011", "V012", "V013"}:
+        assert by_id[rule_id]["status"] == "implemented"
     assert by_id["V009"]["status"] == "partial"
-    for rule_id in {"V002", "V003", "V004", "V005", "V006", "V010", "V011", "V012", "V013"}:
-        assert by_id[rule_id]["status"] == "requires_execution_ir"
+    assert by_id["V010"]["status"] == "requires_execution_ir"
     assert by_id["V014"]["status"] == "requires_review_artifact_contract"
 
 
@@ -95,7 +93,7 @@ def main() -> int:
     test_v007_rejects_representation_mix(module)
     test_v008_rejects_bad_geometry(module)
     test_v009_rejects_unaligned_and_out_of_range_access(module)
-    test_rule_registry_preserves_unimplemented_boundary(module)
+    test_rule_registry_tracks_execution_ir_boundary(module)
     print("IC Support semantic-validator tests PASS")
     return 0
 
