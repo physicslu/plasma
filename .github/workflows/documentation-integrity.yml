@@ -1,0 +1,22 @@
+name: Documentation integrity
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test public documentation sanitization
+        run: bash scripts/tests/test-public-doc-sanitization.sh
+      - name: Test documentation integrity
+        run: python scripts/tests/test-documentation-integrity.py
