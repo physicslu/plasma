@@ -67,6 +67,10 @@ jobs:
         run: python data/ic-support/semantic_validate.py
       - name: Run IC Support semantic-validator regression
         run: python data/ic-support/test_semantic_validate.py
+      - name: Validate Programming Execution IR
+        run: python data/ic-support/execution-ir/validate.py
+      - name: Run Programming Execution IR regressions
+        run: python data/ic-support/execution-ir/test_validate.py
       - name: Validate IC Evidence Pack contract
         run: python data/ic-support/evidence-pack/validate_contract.py
       - name: Validate deterministic document preprocessing

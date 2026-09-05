@@ -1,0 +1,209 @@
+{
+  "schema_version": "0.1.0",
+  "ir_id": "stm32f103c-programming-execution-ir-v0",
+  "status": "pilot",
+  "profiles": {
+    "programming": "stm32f1-medium-density-flash-v0",
+    "option": "stm32f1-option-bytes-v0",
+    "security": "stm32f1-medium-density-security-v0"
+  },
+  "targets": [
+    {"icpn": "STM32F103C8T6", "memory_geometry_profile": "stm32f103c8-64k-v0"},
+    {"icpn": "STM32F103CBT6", "memory_geometry_profile": "stm32f103cb-128k-v0"}
+  ],
+  "operations": [
+    {
+      "operation_id": "flash_unlock",
+      "category": "flash",
+      "risk": "normal",
+      "requires_authorization": false,
+      "continuation": "return",
+      "steps": [
+        {
+          "id": "ensure_unlocked",
+          "kind": "ensure_bit_state",
+          "register": "FLASH_CR",
+          "bit": "LOCK",
+          "desired": "clear",
+          "when_mismatch": [
+            {"kind": "write_register_ref", "register": "FLASH_KEYR", "value_ref": "programming.unlock_keys[0]"},
+            {"kind": "write_register_ref", "register": "FLASH_KEYR", "value_ref": "programming.unlock_keys[1]"}
+          ],
+          "terminal_observation": {"register": "FLASH_CR", "bit": "LOCK", "expect": "clear"}
+        }
+      ],
+      "terminal": {"success_state": "known_idle"}
+    },
+    {
+      "operation_id": "flash_program_unit",
+      "category": "flash",
+      "risk": "normal",
+      "requires_authorization": false,
+      "continuation": "return",
+      "mode_bit": "PG",
+      "address_constraints": {
+        "space": "main_flash",
+        "bounds_source": "target_geometry",
+        "alignment_source": "programming.program_granularity_bytes"
+      },
+      "steps": [
+        {"id": "clear_status", "kind": "clear_status_flags", "register": "FLASH_SR", "flags": ["PGERR", "WRPRTERR", "EOP"], "write_semantics": "w1c_explicit"},
+        {"id": "enter_mode", "kind": "enter_mode", "register": "FLASH_CR", "bit": "PG"},
+        {"id": "write_unit", "kind": "write_memory", "width_source": "programming.program_granularity_bytes", "address_source": "input.address", "value_source": "input.value"},
+        {"id": "wait_not_busy", "kind": "poll_bit", "register": "FLASH_SR", "bit": "BSY", "expect": "clear", "on_timeout": {"result": "ERR_TIMEOUT", "controller_state": "uncertain", "terminate": true}},
+        {"id": "inspect_status", "kind": "inspect_status", "register": "FLASH_SR", "error_flags": ["PGERR", "WRPRTERR"], "completion_flag": "EOP", "require_completion": true},
+        {"id": "exit_mode", "kind": "exit_mode", "register": "FLASH_CR", "bit": "PG"},
+        {"id": "verify", "kind": "verify_memory", "width_source": "programming.program_granularity_bytes", "address_source": "input.address", "value_source": "input.value"}
+      ],
+      "terminal": {"success_state": "known_idle"}
+    },
+    {
+      "operation_id": "flash_erase_page",
+      "category": "flash",
+      "risk": "normal",
+      "requires_authorization": false,
+      "continuation": "return",
+      "mode_bit": "PER",
+      "address_constraints": {
+        "space": "main_flash",
+        "bounds_source": "target_geometry",
+        "alignment_source": "target_geometry.page_size_bytes"
+      },
+      "steps": [
+        {"id": "clear_status", "kind": "clear_status_flags", "register": "FLASH_SR", "flags": ["PGERR", "WRPRTERR", "EOP"], "write_semantics": "w1c_explicit"},
+        {"id": "enter_mode", "kind": "enter_mode", "register": "FLASH_CR", "bit": "PER"},
+        {"id": "set_address", "kind": "write_address_register", "register": "FLASH_AR", "address_source": "input.page_address"},
+        {"id": "start", "kind": "set_control_bit", "register": "FLASH_CR", "bit": "STRT"},
+        {"id": "wait_not_busy", "kind": "poll_bit", "register": "FLASH_SR", "bit": "BSY", "expect": "clear", "on_timeout": {"result": "ERR_TIMEOUT", "controller_state": "uncertain", "terminate": true}},
+        {"id": "inspect_status", "kind": "inspect_status", "register": "FLASH_SR", "error_flags": ["PGERR", "WRPRTERR"], "completion_flag": "EOP", "require_completion": true},
+        {"id": "exit_mode", "kind": "exit_mode", "register": "FLASH_CR", "bit": "PER"},
+        {"id": "verify", "kind": "verify_erased", "address_source": "input.page_address", "length_source": "target_geometry.page_size_bytes", "policy": "enabled"}
+      ],
+      "terminal": {"success_state": "known_idle"}
+    },
+    {
+      "operation_id": "flash_mass_erase",
+      "category": "flash",
+      "risk": "destructive",
+      "requires_authorization": true,
+      "continuation": "return",
+      "mode_bit": "MER",
+      "steps": [
+        {"id": "authorize", "kind": "authorization_barrier", "scope": "mass_erase_main_flash"},
+        {"id": "clear_status", "kind": "clear_status_flags", "register": "FLASH_SR", "flags": ["PGERR", "WRPRTERR", "EOP"], "write_semantics": "w1c_explicit"},
+        {"id": "enter_mode", "kind": "enter_mode", "register": "FLASH_CR", "bit": "MER"},
+        {"id": "start", "kind": "set_control_bit", "register": "FLASH_CR", "bit": "STRT"},
+        {"id": "wait_not_busy", "kind": "poll_bit", "register": "FLASH_SR", "bit": "BSY", "expect": "clear", "on_timeout": {"result": "ERR_TIMEOUT", "controller_state": "uncertain", "terminate": true}},
+        {"id": "inspect_status", "kind": "inspect_status", "register": "FLASH_SR", "error_flags": ["PGERR", "WRPRTERR"], "completion_flag": "EOP", "require_completion": true},
+        {"id": "exit_mode", "kind": "exit_mode", "register": "FLASH_CR", "bit": "MER"}
+      ],
+      "terminal": {"success_state": "known_idle"}
+    },
+    {
+      "operation_id": "flash_lock",
+      "category": "flash",
+      "risk": "normal",
+      "requires_authorization": false,
+      "continuation": "return",
+      "steps": [
+        {
+          "id": "ensure_locked",
+          "kind": "ensure_bit_state",
+          "register": "FLASH_CR",
+          "bit": "LOCK",
+          "desired": "set",
+          "when_mismatch": [{"kind": "set_control_bit", "register": "FLASH_CR", "bit": "LOCK"}],
+          "terminal_observation": {"register": "FLASH_CR", "bit": "LOCK", "expect": "set"}
+        }
+      ],
+      "terminal": {"success_state": "known_idle"}
+    },
+    {
+      "operation_id": "option_program",
+      "category": "option",
+      "risk": "normal",
+      "requires_authorization": false,
+      "continuation": "return",
+      "mode_bit": "OPTPG",
+      "address_constraints": {"space": "option_bytes", "bounds_source": "option_profile", "alignment_bytes": 2},
+      "steps": [
+        {
+          "id": "ensure_option_write",
+          "kind": "ensure_bit_state",
+          "register": "FLASH_CR",
+          "bit": "OPTWRE",
+          "desired": "set",
+          "when_mismatch": [
+            {"kind": "write_register_ref", "register": "FLASH_OPTKEYR", "value_ref": "option.unlock_keys[0]"},
+            {"kind": "write_register_ref", "register": "FLASH_OPTKEYR", "value_ref": "option.unlock_keys[1]"}
+          ],
+          "terminal_observation": {"register": "FLASH_CR", "bit": "OPTWRE", "expect": "set"}
+        },
+        {"id": "clear_status", "kind": "clear_status_flags", "register": "FLASH_SR", "flags": ["PGERR", "WRPRTERR", "EOP"], "write_semantics": "w1c_explicit"},
+        {"id": "enter_mode", "kind": "enter_mode", "register": "FLASH_CR", "bit": "OPTPG"},
+        {"id": "write_option", "kind": "write_memory", "width_bytes": 2, "address_source": "input.address", "value_source": "input.programming_halfword"},
+        {"id": "wait_not_busy", "kind": "poll_bit", "register": "FLASH_SR", "bit": "BSY", "expect": "clear", "on_timeout": {"result": "ERR_TIMEOUT", "controller_state": "uncertain", "terminate": true}},
+        {"id": "inspect_status", "kind": "inspect_status", "register": "FLASH_SR", "error_flags": ["PGERR", "WRPRTERR"], "completion_flag": "EOP", "require_completion": true},
+        {"id": "exit_mode", "kind": "exit_mode", "register": "FLASH_CR", "bit": "OPTPG"}
+      ],
+      "terminal": {"success_state": "known_idle"}
+    },
+    {
+      "operation_id": "option_erase",
+      "category": "option",
+      "risk": "destructive",
+      "requires_authorization": true,
+      "continuation": "return",
+      "mode_bit": "OPTER",
+      "steps": [
+        {"id": "authorize", "kind": "authorization_barrier", "scope": "option_bytes_erase"},
+        {
+          "id": "ensure_option_write",
+          "kind": "ensure_bit_state",
+          "register": "FLASH_CR",
+          "bit": "OPTWRE",
+          "desired": "set",
+          "when_mismatch": [
+            {"kind": "write_register_ref", "register": "FLASH_OPTKEYR", "value_ref": "option.unlock_keys[0]"},
+            {"kind": "write_register_ref", "register": "FLASH_OPTKEYR", "value_ref": "option.unlock_keys[1]"}
+          ],
+          "terminal_observation": {"register": "FLASH_CR", "bit": "OPTWRE", "expect": "set"}
+        },
+        {"id": "clear_status", "kind": "clear_status_flags", "register": "FLASH_SR", "flags": ["PGERR", "WRPRTERR", "EOP"], "write_semantics": "w1c_explicit"},
+        {"id": "enter_mode", "kind": "enter_mode", "register": "FLASH_CR", "bit": "OPTER"},
+        {"id": "start", "kind": "set_control_bit", "register": "FLASH_CR", "bit": "STRT"},
+        {"id": "wait_not_busy", "kind": "poll_bit", "register": "FLASH_SR", "bit": "BSY", "expect": "clear", "on_timeout": {"result": "ERR_TIMEOUT", "controller_state": "uncertain", "terminate": true}},
+        {"id": "inspect_status", "kind": "inspect_status", "register": "FLASH_SR", "error_flags": ["PGERR", "WRPRTERR"], "completion_flag": "EOP", "require_completion": true},
+        {"id": "exit_mode", "kind": "exit_mode", "register": "FLASH_CR", "bit": "OPTER"}
+      ],
+      "terminal": {"success_state": "known_idle"}
+    },
+    {
+      "operation_id": "rdp_disable_transition",
+      "category": "security",
+      "risk": "destructive",
+      "requires_authorization": true,
+      "continuation": "stop_after_reset",
+      "runtime_compile_ready": false,
+      "steps": [
+        {"id": "authorize", "kind": "authorization_barrier", "scope": "rdp_disable_mass_erase"},
+        {"id": "erase_options", "kind": "call", "operation_id": "option_erase", "on_failure": "propagate", "on_uncertain": "propagate"},
+        {
+          "id": "program_unprotected",
+          "kind": "call",
+          "operation_id": "option_program",
+          "arguments": {
+            "semantic_target": "read_protection",
+            "programming_value_ref": "security.read_protection.representations.programming_halfword"
+          },
+          "on_failure": "propagate",
+          "on_uncertain": "propagate"
+        },
+        {"id": "record_side_effect", "kind": "semantic_side_effect", "effect": "mass_erase_main_flash"},
+        {"id": "reset", "kind": "system_reset"},
+        {"id": "reidentify", "kind": "reidentify_target"}
+      ],
+      "terminal": {"success_state": "reset_required"}
+    }
+  ]
+}
