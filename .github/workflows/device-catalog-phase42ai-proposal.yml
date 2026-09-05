@@ -1,0 +1,40 @@
+name: Device catalog Phase 4.2AI A/Y WLCSP168 admission proposal
+on:
+  push:
+    branches: [agent/device-catalog-phase4.2ai-ay-wlcsp168-admission]
+    paths: [".github/workflows/device-catalog-phase42ai-proposal.yml"]
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  propose:
+    if: github.actor == 'physicslu'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/device-catalog-phase4.2ai-ay-wlcsp168-admission}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Build proposal
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase42ai
+          PYTHONPATH=data/device-catalog/research python data/device-catalog/research/stm32f4_admission.py \
+            --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.2ai-ay-wlcsp168-admission-live-2026-09-05 \
+            --baseline data/device-catalog/research/stm32f4-phase4.2ai-ay-wlcsp168-admission-baseline.json \
+            --admit-base STM32F469AE --admit-base STM32F469AG --admit-base STM32F469AI \
+            --admit-base STM32F479AG --admit-base STM32F479AI \
+            --output /tmp/phase42ai/admission-plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/phase42ai/admission-plan.json').read_text())
+          expected={'admit':11,'already_present':0,'manual_review_required':0,'reject':0}
+          expected_icpns={'STM32F469AEH6','STM32F469AEH7','STM32F469AEH7TR','STM32F469AGH6','STM32F469AGH6TR','STM32F469AGY6TR','STM32F469AIH6','STM32F469AIY6TR','STM32F479AGH6','STM32F479AIH6','STM32F479AIY6TR'}
+          if p['candidate_count'] != 11 or p['decision_counts'] != expected or p['conflicts'] != 0 or p['canonical_rows_before'] != 373:
+              raise SystemExit('unclean Phase 4.2AI plan')
+          if {x['icpn'] for x in p['candidates']} != expected_icpns:
+              raise SystemExit('unexpected Phase 4.2AI candidate set')
+          PY
+          cd /tmp/phase42ai && sha256sum admission-plan.json > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with: {name: phase42ai-ay-wlcsp168-admission-proposal, path: /tmp/phase42ai, if-no-files-found: error, retention-days: 30}
