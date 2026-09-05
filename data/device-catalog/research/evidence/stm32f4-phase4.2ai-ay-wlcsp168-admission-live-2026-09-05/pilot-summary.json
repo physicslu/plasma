@@ -1,0 +1,375 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 5,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 5,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 5,
+    "unmapped": 0
+  },
+  "exact_icpn_candidates": 11,
+  "manual_intervention_required": 0,
+  "openocd_cfg_mapping": {
+    "mapped": 5,
+    "total": 5
+  },
+  "pilot_id": "stm32f4-phase4.2ai-ay-wlcsp168-admission-2026-09-05",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469AE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469AEHx",
+          "icpn": "STM32F469AEH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F469AEHx",
+          "icpn": "STM32F469AEH7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F469AEHx",
+          "icpn": "STM32F469AEH7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469AE",
+        "evidence_section_sha256": "340385f4395cbe19eedf1d8b678de420756d1de383413c7a441aec6e5f91c562",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469AEH6",
+          "STM32F469AEH7",
+          "STM32F469AEH7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ae.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469AEH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F469AEH7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F469AEH7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e4d790e72ac228c1d84af5f655f22dc1ef7b3f4d742e937a7ba4dcac77448ddf",
+        "retrieved_at_utc": "2026-09-05T13:32:54Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ae.html"
+      },
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 512-KiB STM32F469 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ae.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469AG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469AGHx",
+          "icpn": "STM32F469AGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F469AGHx",
+          "icpn": "STM32F469AGH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F469AGYx",
+          "icpn": "STM32F469AGY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469AG",
+        "evidence_section_sha256": "897803e874aab318551f65195cb90f83f9828e89d90e83935166489ae7db8a1a",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469AGH6",
+          "STM32F469AGH6TR",
+          "STM32F469AGY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ag.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469AGH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F469AGH6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F469AGY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3956105c63e6bc1ce43ba40b8b37bd9d3a28a1bece58d96c4841f9b49cbe41bc",
+        "retrieved_at_utc": "2026-09-05T13:33:04Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ag.html"
+      },
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 1024-KiB STM32F469 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ag.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469AI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F469AIHx",
+          "icpn": "STM32F469AIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F469AIYx",
+          "icpn": "STM32F469AIY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469AI",
+        "evidence_section_sha256": "25b10db68e0475c7aa69b568c06009f8a2eb57c1beb87ddb93d9e909914001ea",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F469AIH6",
+          "STM32F469AIY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ai.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F469AIH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F469AIY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "bef09cb6a6700cdec131959ca1ba30bb6ec3318f33b0188f7d7cc33e4826d9b1",
+        "retrieved_at_utc": "2026-09-05T13:33:10Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ai.html"
+      },
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 2048-KiB STM32F469 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ai.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479AG",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479AGHx",
+          "icpn": "STM32F479AGH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479AG",
+        "evidence_section_sha256": "474135df2db4c6a7e275789439c050e815dfc44f9071c93025c5ccc5b3ecffed",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479AGH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ag.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479AGH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "145a147bc2fdf1da4eab7f9d7aef3cc83f929fa67d7186f17e5a6346052302cb",
+        "retrieved_at_utc": "2026-09-05T13:33:17Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ag.html"
+      },
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 1024-KiB STM32F479 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ag.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479AI",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F479AIHx",
+          "icpn": "STM32F479AIH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F479AIYx",
+          "icpn": "STM32F479AIY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f4x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f4x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479AI",
+        "evidence_section_sha256": "193f50f80cfa3d3c8df79df8ed14fe699c53e7e91bfd43d6edb8bebe303192c6",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F479AIH6",
+          "STM32F479AIY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ai.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F479AIH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F479AIY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "89a78b29b7a92599fd951fbf98a2182fee216b73bc102a0b57cdbdf4addf7753",
+        "retrieved_at_utc": "2026-09-05T13:33:23Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ai.html"
+      },
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 2048-KiB STM32F479 device",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ai.html"
+    }
+  ],
+  "schema_version": 1
+}

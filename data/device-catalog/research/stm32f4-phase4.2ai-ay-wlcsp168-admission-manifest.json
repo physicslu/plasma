@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2ai-ay-wlcsp168-admission-2026-09-05",
+  "targets": [
+    {
+      "base_device": "STM32F469AE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ae.html",
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 512-KiB STM32F469 device"
+    },
+    {
+      "base_device": "STM32F469AG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ag.html",
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 1024-KiB STM32F469 device"
+    },
+    {
+      "base_device": "STM32F469AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469ai.html",
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 2048-KiB STM32F469 device"
+    },
+    {
+      "base_device": "STM32F479AG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ag.html",
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 1024-KiB STM32F479 device"
+    },
+    {
+      "base_device": "STM32F479AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479ai.html",
+      "selection_reason": "Phase 4.2AH policy-ready A/Y 2048-KiB STM32F479 device"
+    }
+  ],
+  "admission_scope": {
+    "family": "STM32F4",
+    "base_devices": [
+      "STM32F469AE",
+      "STM32F469AG",
+      "STM32F469AI",
+      "STM32F479AG",
+      "STM32F479AI"
+    ],
+    "production_exact_icpns_before": 373,
+    "production_base_devices_before": 134,
+    "fail_closed": true
+  }
+}

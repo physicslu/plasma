@@ -49,9 +49,9 @@ B_T_BLOCKED = {
 def main() -> int:
     with CATALOG.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
-    assert len(rows) == 373
+    assert len(rows) == 384
     assert len(rows) == len({row["icpn"] for row in rows})
-    assert len({row["base_device"] for row in rows}) == 134
+    assert len({row["base_device"] for row in rows}) == 139
 
     by_icpn = {row["icpn"]: row for row in rows}
     assert set(EXPECTED) <= set(by_icpn)
@@ -95,12 +95,13 @@ def main() -> int:
     assert audit["retained_evidence_id"] == EVIDENCE_ID
 
     inventory = build_inventory(catalog_path=OPENOCD_CATALOG, canonical_path=CATALOG)
-    assert inventory["production"]["exact_icpn_rows"] == 373
-    assert inventory["production"]["base_device_count"] == 134
-    assert inventory["gap"]["base_device_count"] == 15
-    assert inventory["gap"]["policy_ready_count"] == 5
+    assert inventory["production"]["exact_icpn_rows"] == 384
+    assert inventory["production"]["base_device_count"] == 139
+    assert inventory["gap"]["base_device_count"] == 10
+    assert inventory["gap"]["policy_ready_count"] == 0
     assert inventory["gap"]["policy_blocked_count"] == 10
-    assert {item["base_device"] for item in inventory["gap"]["policy_ready"]} == A_Y_READY
+    assert inventory["gap"]["policy_ready"] == []
+    assert A_Y_READY <= set(inventory["production"]["base_devices"])
     assert {
         "STM32F427AG",
         "STM32F427AI",
