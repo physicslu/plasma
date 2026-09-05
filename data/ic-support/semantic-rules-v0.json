@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "registry_id": "ic-support-semantic-rules-v0",
+  "purpose": "Convert recurring Qwen/Gemma IC-support failures into deterministic engineering invariants.",
+  "rules": [
+    {"id": "V001", "name": "numeric_mask_consistency", "status": "implemented", "stage": "canonical_profile", "invariant": "declared numeric masks must equal the OR of their declared symbolic bits"},
+    {"id": "V002", "name": "bit_mask_predicate_semantics", "status": "implemented", "stage": "programming_execution_ir", "invariant": "masked bit predicates must compare against zero or the mask value unless explicitly normalized to Boolean; Execution IR v0 removes raw literal comparisons and permits only symbolic set/clear predicates"},
+    {"id": "V003", "name": "retry_requires_terminal_observation", "status": "implemented", "stage": "programming_execution_ir", "invariant": "retry and ensure-state paths must end in an observed and verified terminal state"},
+    {"id": "V004", "name": "timeout_enters_uncertain_state", "status": "implemented", "stage": "programming_execution_ir", "invariant": "an unresolved hardware timeout must transition the controller model to an uncertain state"},
+    {"id": "V005", "name": "uncertain_state_forbids_normal_cleanup", "status": "implemented", "stage": "programming_execution_ir", "invariant": "normal register cleanup must not assume controller accessibility after an unresolved busy timeout"},
+    {"id": "V006", "name": "destructive_transition_no_fallthrough", "status": "implemented", "stage": "programming_execution_ir", "invariant": "destructive operations require an authorization barrier and destructive reset workflows must stop after reset/re-identification"},
+    {"id": "V007", "name": "option_security_representation_separation", "status": "implemented", "stage": "canonical_profile", "invariant": "logical byte, complement byte, encoded storage representation, and programming transaction representation must be distinct and arithmetically consistent"},
+    {"id": "V008", "name": "memory_geometry_consistency", "status": "implemented", "stage": "canonical_profile", "invariant": "flash size, page size, page count, erase granularity, and address range must be mutually consistent"},
+    {"id": "V009", "name": "target_address_bounds", "status": "partial", "stage": "canonical_profile_and_programming_execution_ir", "invariant": "program/erase accesses must declare exact target-geometry or option-profile bounds and alignment; runtime concrete-address enforcement remains a backend responsibility"},
+    {"id": "V010", "name": "policy_semantic_isolation", "status": "requires_execution_ir", "stage": "execution_policy", "invariant": "one policy field must not control semantically unrelated behavior; a separate execution-policy contract is still required"},
+    {"id": "V011", "name": "suboperation_error_propagation", "status": "implemented", "stage": "programming_execution_ir", "invariant": "failed or uncertain sub-operations must propagate failure and block dependent actions"},
+    {"id": "V012", "name": "operation_mode_lifecycle", "status": "implemented", "stage": "programming_execution_ir", "invariant": "operation-control modes must have explicit entry, terminal observation, and safe normal-path exit semantics"},
+    {"id": "V013", "name": "status_flag_lifecycle", "status": "implemented", "stage": "programming_execution_ir", "invariant": "stale status and W1C flags must be explicitly cleared before an operation and must not be mistaken for current-operation status"},
+    {"id": "V014", "name": "self_check_requires_evidence", "status": "requires_review_artifact_contract", "stage": "ai_review", "invariant": "a model self-check may report PASS only when the reviewed mechanism exists and coverage evidence is present; otherwise use NOT_APPLICABLE or FAIL"}
+  ]
+}
