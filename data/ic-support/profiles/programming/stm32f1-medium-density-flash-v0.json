@@ -17,6 +17,7 @@
         "2.3.2 Unlocking the Flash memory",
         "2.3.3 Main Flash memory programming",
         "2.3.4 Flash memory erase",
+        "3.4 Flash status register (FLASH_SR)",
         "3.5 Flash control register (FLASH_CR)",
         "3.9 Flash register map"
       ]
@@ -46,6 +47,13 @@
     },
     "operation_mode_bits": ["PG", "PER", "MER", "OPTPG", "OPTER"],
     "operation_mode_mask": "0x00000037",
+    "status_bits": {
+      "BSY": "0x00000001",
+      "PGERR": "0x00000004",
+      "WRPRTERR": "0x00000010",
+      "EOP": "0x00000020"
+    },
+    "w1c_status_flags": ["PGERR", "WRPRTERR", "EOP"],
     "unlock_keys": ["0x45670123", "0xCDEF89AB"],
     "program_granularity_bytes": 2,
     "program_sequence": [
