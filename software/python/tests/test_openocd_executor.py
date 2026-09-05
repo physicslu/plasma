@@ -108,15 +108,41 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
         )
 
     @staticmethod
-    def _fake_launcher(script: Path, launched: list[tuple[str, ...]]):
+    async def _wait_for_path(path: Path, *, timeout_s: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_s
+        while not path.exists():
+            if loop.time() >= deadline:
+                raise AssertionError(f"fake process did not reach lifecycle checkpoint: {path}")
+            await asyncio.sleep(0.01)
+
+    @staticmethod
+    def _fake_launcher(
+        script: Path,
+        launched: list[tuple[str, ...]],
+        *,
+        ready_path: Path | None = None,
+        processes: list[asyncio.subprocess.Process] | None = None,
+    ):
         async def launcher(*arguments, **kwargs):
             launched.append(tuple(str(value) for value in arguments))
-            return await asyncio.create_subprocess_exec(
+            process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 str(script),
                 *arguments[1:],
                 **kwargs,
             )
+            if processes is not None:
+                processes.append(process)
+            if ready_path is not None:
+                try:
+                    await OpenOCDExecutorTests._wait_for_path(ready_path)
+                except BaseException:
+                    if process.returncode is None:
+                        process.kill()
+                        await process.wait()
+                    raise
+            return process
 
         return launcher
 
@@ -128,6 +154,8 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
         plan=None,
         timeout_s: float = 2.0,
         env: dict[str, str] | None = None,
+        synchronize_process_start: bool = False,
+        processes: list[asyncio.subprocess.Process] | None = None,
     ):
         script = root / "fake_openocd.py"
         script.write_text(textwrap.dedent(FAKE_OPENOCD), encoding="utf-8")
@@ -141,7 +169,12 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
                 "work_dir": str(root),
                 "command_timeout_s": timeout_s,
             },
-            process_launcher=self._fake_launcher(script, launched),
+            process_launcher=self._fake_launcher(
+                script,
+                launched,
+                ready_path=log if synchronize_process_start else None,
+                processes=processes,
+            ),
         )
         selected_plan = plan or self._plan(request)
         process_env = {"FAKE_OPENOCD_LOG": str(log), **(env or {})}
@@ -259,6 +292,7 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
             request = self._request(Operation.PROGRAM, image=b"timeout-image")
             log = root_path / "fake-openocd-log.json"
             completed = root_path / "completed.txt"
+            processes: list[asyncio.subprocess.Process] = []
             with self.assertRaises(PlasmaError) as caught:
                 await self._execute(
                     root_path,
@@ -268,8 +302,12 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
                         "FAKE_OPENOCD_SLEEP_S": "2",
                         "FAKE_OPENOCD_COMPLETED": str(completed),
                     },
+                    synchronize_process_start=True,
+                    processes=processes,
                 )
             self.assertEqual(caught.exception.code, ErrorCode.OPERATION_TIMEOUT)
+            self.assertEqual(len(processes), 1)
+            self.assertIsNotNone(processes[0].returncode)
             record = json.loads(log.read_text(encoding="utf-8"))
             self.assertFalse(Path(record["workspace"]).exists())
             self.assertFalse(completed.exists())
@@ -282,6 +320,7 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
             log = root_path / "fake-openocd-log.json"
             completed = root_path / "completed.txt"
             launched: list[tuple[str, ...]] = []
+            processes: list[asyncio.subprocess.Process] = []
             request = self._request(Operation.PROGRAM, image=b"cancel-image")
             plan = self._plan(request)
             executor = OpenOCDPlanExecutor(
@@ -292,7 +331,7 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
                     "work_dir": str(root_path),
                     "command_timeout_s": 5.0,
                 },
-                process_launcher=self._fake_launcher(script, launched),
+                process_launcher=self._fake_launcher(script, launched, processes=processes),
             )
             with patch.dict(
                 os.environ,
@@ -303,17 +342,15 @@ class OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
                 },
             ):
                 task = asyncio.create_task(executor.execute(plan, self.support, request))
-                for _ in range(100):
-                    if log.exists():
-                        break
-                    await asyncio.sleep(0.01)
-                self.assertTrue(log.exists(), "fake process did not reach its lifecycle checkpoint")
+                await self._wait_for_path(log)
                 record = json.loads(log.read_text(encoding="utf-8"))
                 task.cancel()
                 with self.assertRaises(asyncio.CancelledError):
                     await task
 
             self.assertEqual(len(launched), 1)
+            self.assertEqual(len(processes), 1)
+            self.assertIsNotNone(processes[0].returncode)
             self.assertFalse(Path(record["workspace"]).exists())
             self.assertFalse(completed.exists())
 
