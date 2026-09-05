@@ -518,6 +518,8 @@ def openai_compatible_chat(
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise ABBenchmarkError(f"model endpoint HTTP {exc.code}: {body[:500]}") from exc
+    except TimeoutError as exc:
+        raise ABBenchmarkError(f"model endpoint timed out after {timeout_seconds:g} seconds") from exc
     except urllib.error.URLError as exc:
         raise ABBenchmarkError(f"model endpoint unavailable: {exc}") from exc
     end_ns = time.perf_counter_ns()
