@@ -787,6 +787,10 @@ show_logs() {
   journalctl --user "${units[@]}" -n 100 -f
 }
 
+render_deploy() {
+  bash "$repo/scripts/render-deploy.sh"
+}
+
 deploy() {
   if [[ "${PLASMACTL_DEPLOY_REEXEC:-0}" != "1" ]]; then
     update_code
@@ -813,6 +817,7 @@ Commands:
   web-restart          只重新啟動 Vite Web Console 並執行 Web HTTP health check
   deploy               update → re-exec latest plasmactl → test → reconcile units → restart
   update-and-restart   deploy 的別名
+  render-deploy        透過 secret Render Deploy Hook 觸發 linked branch 最新 commit 部署
   verify fleet         唯讀驗證 Manager/Fleet 部署後 runtime chain；不取代人工 UI 驗收
   start | stop         啟動或停止 Plasma 服務；Manager 只有 opt-in enabled 時會啟動
   status               顯示 Git、systemd、Manager/Engineering Mock opt-in 與 Port 狀態
@@ -835,6 +840,7 @@ case "$command" in
   restart) restart_services ;;
   web-restart|restart-web) restart_web_console ;;
   deploy|update-and-restart) deploy ;;
+  render-deploy|deploy-render) render_deploy ;;
   verify) bash "$repo/scripts/plasmactl-verify" "${1:-}" ;;
   start) start_services ;;
   stop) stop_services ;;
