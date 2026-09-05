@@ -66,23 +66,14 @@ class STM32F4Phase42AFAHUFBGA169PolicyTests(unittest.TestCase):
             self.assertEqual(inventory["gap"]["policy_ready_count"], 6)
             self.assertEqual(inventory["gap"]["policy_blocked_count"], 15)
 
-    def test_f469_f479_a_y_surface_remains_fail_closed(self) -> None:
-        inventory = self._inventory()
-        blocked = {
-            item["base_device"]: item for item in inventory["gap"]["policy_blocked"]
-        }
-        production = set(inventory["production"]["base_devices"])
-        remaining_expected = EXPECTED_RESIDUAL_A_Y_BLOCKED - production
-
-        self.assertLessEqual(remaining_expected, set(blocked))
-        for base_device in remaining_expected:
-            item = blocked[base_device]
-            self.assertFalse(item["admission_policy_ready"])
-            self.assertEqual(item["package_codes"], ["H", "Y"])
-            self.assertEqual(
-                item["policy_blockers"],
-                ["unsupported STM32F4 pin/package combination: A/Y"],
-            )
+    def test_a_y_surface_was_explicitly_deferred_by_phase_evidence(self) -> None:
+        evidence = json.loads(EVIDENCE.read_text(encoding="utf-8"))
+        expected_delta = evidence["expected_immediate_delta_before_admission"]
+        self.assertTrue(evidence["a_y_policy_deferred"])
+        self.assertEqual(
+            set(expected_delta["residual_a_y_blocked_base_devices"]),
+            EXPECTED_RESIDUAL_A_Y_BLOCKED,
+        )
 
     def test_policy_evidence_is_bounded_and_denies_admission(self) -> None:
         evidence = json.loads(EVIDENCE.read_text(encoding="utf-8"))

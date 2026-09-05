@@ -25,6 +25,25 @@ EXPECTED = {
     "STM32F410RBT7": ("STM32F410RB", "LQFP", "64", "128 KiB", "-40 to 105 C", ""),
     "STM32F410RBT7TR": ("STM32F410RB", "LQFP", "64", "128 KiB", "-40 to 105 C", "TR"),
 }
+A_Y_READY = {
+    "STM32F469AE",
+    "STM32F469AG",
+    "STM32F469AI",
+    "STM32F479AG",
+    "STM32F479AI",
+}
+B_T_BLOCKED = {
+    "STM32F429BE",
+    "STM32F429BG",
+    "STM32F429BI",
+    "STM32F439BG",
+    "STM32F439BI",
+    "STM32F469BE",
+    "STM32F469BG",
+    "STM32F469BI",
+    "STM32F479BG",
+    "STM32F479BI",
+}
 
 
 def main() -> int:
@@ -79,9 +98,9 @@ def main() -> int:
     assert inventory["production"]["exact_icpn_rows"] == 373
     assert inventory["production"]["base_device_count"] == 134
     assert inventory["gap"]["base_device_count"] == 15
-    assert inventory["gap"]["policy_ready_count"] == 0
-    assert inventory["gap"]["policy_blocked_count"] == 15
-    assert inventory["gap"]["policy_ready"] == []
+    assert inventory["gap"]["policy_ready_count"] == 5
+    assert inventory["gap"]["policy_blocked_count"] == 10
+    assert {item["base_device"] for item in inventory["gap"]["policy_ready"]} == A_Y_READY
     assert {
         "STM32F427AG",
         "STM32F427AI",
@@ -90,6 +109,14 @@ def main() -> int:
         "STM32F437AI",
         "STM32F439AI",
     } <= set(inventory["production"]["base_devices"])
+
+    blocked = {item["base_device"]: item for item in inventory["gap"]["policy_blocked"]}
+    assert set(blocked) == B_T_BLOCKED
+    for base_device in B_T_BLOCKED:
+        assert blocked[base_device]["package_codes"] == ["T"]
+        assert blocked[base_device]["policy_blockers"] == [
+            "unsupported STM32F4 pin/package combination: B/T"
+        ]
 
     print("Phase 4.2AE post-admission closure PASS")
     return 0
