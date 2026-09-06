@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -12,6 +13,12 @@ SPEC = importlib.util.spec_from_file_location("ppu_network_phase1_acceptance", S
 assert SPEC and SPEC.loader
 acceptance = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(acceptance)
+
+PHASE2_SCRIPT = ROOT / "scripts" / "ppu-network-phase2-acceptance.py"
+PHASE2_SPEC = importlib.util.spec_from_file_location("ppu_network_phase2_acceptance", PHASE2_SCRIPT)
+assert PHASE2_SPEC and PHASE2_SPEC.loader
+phase2_acceptance = importlib.util.module_from_spec(PHASE2_SPEC)
+PHASE2_SPEC.loader.exec_module(phase2_acceptance)
 
 
 def test_network_settings_requires_phase1_activation_boundary() -> None:
@@ -76,6 +83,42 @@ def test_verify_sidecar_requires_matching_archive_hash(tmp_path: Path) -> None:
     sidecar.write_text(f"{'0' * 64}  {archive.name}\n", encoding="utf-8")
     with pytest.raises(acceptance.AcceptanceError, match="SHA-256 mismatch"):
         acceptance._verify_sidecar(archive, sidecar)
+
+
+@pytest.mark.parametrize(
+    "module",
+    [acceptance, phase2_acceptance],
+    ids=["phase1", "phase2"],
+)
+def test_release_artifact_uses_canonical_builder_output(module: ModuleType, tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    release_dir = repo / "work" / "release"
+    release_dir.mkdir(parents=True)
+    artifact = release_dir / "plasma-ppu-0.1.1-123456789abc-linux-armv7l.tar.gz"
+    artifact.write_bytes(b"release-identity-v2")
+
+    relative_output = artifact.relative_to(repo)
+    assert module._release_artifact_from_builder_output(
+        f"{relative_output}\n",
+        repo=repo,
+        release_dir=release_dir,
+    ) == artifact.resolve()
+
+    outside = repo / "plasma-ppu-0.1.1-123456789abc-linux-armv7l.tar.gz"
+    outside.write_bytes(b"outside")
+    with pytest.raises(module.AcceptanceError, match="outside release directory"):
+        module._release_artifact_from_builder_output(
+            f"{outside}\n",
+            repo=repo,
+            release_dir=release_dir,
+        )
+
+    with pytest.raises(module.AcceptanceError, match="exactly one artifact path"):
+        module._release_artifact_from_builder_output(
+            f"{artifact}\n{artifact}\n",
+            repo=repo,
+            release_dir=release_dir,
+        )
 
 
 def test_parse_result_uses_last_machine_readable_marker() -> None:
