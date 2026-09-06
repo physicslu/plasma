@@ -186,6 +186,7 @@ jobs:
           python data/device-catalog/research/test_stm32f4_phase4_1_rt_admission_batch3_post_admission.py
       - name: Inventory STM32F4 production coverage gaps
         run: |
+          python data/device-catalog/research/test_stm32f4_phase4_2al_lifecycle_gap_classification.py
           python data/device-catalog/research/stm32f4_coverage_gap_inventory.py \
             --output /tmp/stm32f4-coverage-gap.json
           python - <<'PY'
@@ -200,6 +201,11 @@ jobs:
               'policy_ready_count': report['gap']['policy_ready_count'],
               'policy_blocked_count': report['gap']['policy_blocked_count'],
               'policy_ready_bases': [item['base_device'] for item in report['gap']['policy_ready']],
+              'lifecycle_closed_base_devices': report['lifecycle_closure']['base_device_count'],
+              'lifecycle_closed_exact_part_numbers': report['lifecycle_closure']['exact_part_number_count'],
+              'actionable_gap_base_devices': report['actionable_gap']['base_device_count'],
+              'actionable_policy_ready_count': report['actionable_gap']['policy_ready_count'],
+              'actionable_policy_blocked_count': report['actionable_gap']['policy_blocked_count'],
           }, indent=2, sort_keys=True))
           PY
       - name: Report admitted production source SHA-256

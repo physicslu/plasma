@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "phase": "4.2AL",
+  "scope": "STM32F4 lifecycle-aware coverage-gap classification",
+  "production_write_authorized": false,
+  "policy_change_authorized": false,
+  "production_invariants": {
+    "stm32f4_exact_icpns": 384,
+    "stm32f4_base_devices": 139,
+    "st_exact_icpns": 459,
+    "st_base_devices": 157,
+    "stm32f4_catalog_sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
+  },
+  "raw_gap": {
+    "base_device_count": 10,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 10
+  },
+  "lifecycle_closure": {
+    "classification_basis": "validated retained official ST evidence with zero Active exact ICPN candidates",
+    "evidence_package_count": 2,
+    "evidence_ids": [
+      "stm32f4-phase4.2aj-f429-f439-bt-lifecycle-2026-09-06-retained-20260906T040501Z-4f50746",
+      "stm32f4-phase4.2ak-f469-f479-bt-lifecycle-2026-09-06-retained-20260906T053223Z-f75188f"
+    ],
+    "base_device_count": 10,
+    "exact_part_number_count": 13,
+    "lifecycle_status_counts": {
+      "NRND": 12,
+      "Proposal": 1
+    },
+    "base_devices": [
+      "STM32F429BE",
+      "STM32F429BG",
+      "STM32F429BI",
+      "STM32F439BG",
+      "STM32F439BI",
+      "STM32F469BE",
+      "STM32F469BG",
+      "STM32F469BI",
+      "STM32F479BG",
+      "STM32F479BI"
+    ]
+  },
+  "actionable_gap": {
+    "base_device_count": 0,
+    "policy_ready_count": 0,
+    "policy_blocked_count": 0
+  }
+}
