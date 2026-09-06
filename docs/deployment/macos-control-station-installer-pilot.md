@@ -28,32 +28,44 @@ per-user launchd LaunchAgents
 Console/BFF + Manager
 ```
 
-`scripts/macos-control-station-pkg.py` accepts `--release-artifact`; it does not accept a raw `--runtime-dir`. This preserves the Common Release Format as the single integrity and identity boundary between build output and installer construction.
+`scripts/macos-control-station-pkg.py` accepts `--release-artifact`; it does not accept a raw `--runtime-dir`. This preserves the Common Release Format as the single integrity and source-identity boundary between build output and installer construction.
 
-The pilot does **not** add Linux or Windows installers, bundled Python/Node runtimes, Developer ID signing, notarization, full upgrade migration, deterministic rollback, PPU/Z2 deployment, FPGA execution, or real IC programming.
+Release Identity v2 applies to both the package filename and installed immutable directory:
+
+```text
+release_id = <product-version>-<first-12-git-sha>
+```
+
+The package manifest retains the full source Git SHA and source release artifact SHA-256.
+
+The pilot does **not** add bundled Python/Node runtimes, Developer ID signing, notarization, full upgrade migration, deterministic rollback, PPU/Z2 deployment, FPGA execution, or real IC programming.
 
 ## 2. Filesystem boundary
-
-The pilot deliberately separates immutable application runtime from mutable operator data.
 
 System-owned immutable payload:
 
 ```text
 /Library/Application Support/Plasma/
 ├── releases/
-│   └── <version>/
+│   └── <release-id>/
 │       ├── runtime/
 │       ├── bin/
 │       ├── launchd/
 │       └── macos-installer.json
-├── current -> releases/<version>/
+├── current -> releases/<release-id>/
 └── install/
     ├── node-path
     ├── python-path
     └── user
 ```
 
-Per-user mutable data:
+Example:
+
+```text
+/Library/Application Support/Plasma/releases/0.1.1-abcdef123456/
+```
+
+Per-user mutable data remains separate:
 
 ```text
 ~/Library/Application Support/Plasma/
@@ -71,13 +83,13 @@ Per-user mutable data:
 └── com.plasma.console.plist
 ```
 
-The `.pkg` therefore does not need to guess a user's home while laying down the immutable payload. The postinstall step identifies the operator account and creates only the per-user mutable/service state for that account.
+The `.pkg` does not guess a user's home while laying down immutable payload. Postinstall identifies the operator account and creates only per-user mutable/service state.
 
-Acceptance verifies that the system application root, activation symlink, runtime payload, and recorded runtime bindings are root-owned and not group/world writable. It separately verifies that generated operator config and LaunchAgent files belong to the operator user.
+Acceptance verifies the system application root, activation symlink, runtime payload, and recorded runtime bindings are root-owned and not group/world writable. Generated operator config and LaunchAgent files must belong to the operator user.
 
 ## 3. External runtime prerequisites
 
-The pilot deliberately keeps the PR #224 runtime policy:
+The pilot currently requires:
 
 ```text
 Python >= 3.11
@@ -86,23 +98,24 @@ Node.js >= 22.13
 
 The target does not run `pip install`, `npm install`, Git, Vite, Vinext CLI, or Wrangler.
 
-`launchd` must not depend on `.zshrc`, `.bashrc`, nvm shell activation, pyenv shell activation, or an interactive `PATH`. During installation, the postinstall logic resolves and validates concrete executable paths from stable common locations, including `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, `~/.nvm/versions/node/*/bin/node`, and `~/.pyenv/versions/*/bin/python3`.
-
-The selected executable paths are persisted as absolute paths in `/Library/Application Support/Plasma/install/node-path` and `/Library/Application Support/Plasma/install/python-path`. The LaunchAgents start fixed shell wrappers, and those wrappers `exec` the recorded absolute runtime path.
+`launchd` must not depend on an interactive shell profile or PATH. Installation resolves concrete executable paths from stable locations, records them under `/Library/Application Support/Plasma/install/`, and LaunchAgents execute those recorded paths.
 
 ## 4. Service contract
 
 The pilot uses per-user LaunchAgents `com.plasma.manager` and `com.plasma.console`.
 
-Default local bindings are `Manager: 127.0.0.1:18180` and `Console: 127.0.0.1:18000`. The Console wrapper keeps `PLASMA_MANAGER_API_URL=http://127.0.0.1:18180` loopback-only.
+Default local bindings are:
 
-The selected PPU alias remains explicit. The installer creates an empty `selected-ppu-alias` file and an empty Manager PPU registry by default; it does not silently infer or invent a command target.
+```text
+Manager  127.0.0.1:18180
+Console  127.0.0.1:18000
+```
 
-The included pilot service helper supports `start`, `stop`, `restart`, and `status` through `/Library/Application Support/Plasma/current/bin/service-control.sh`.
+The Console wrapper keeps the Manager URL loopback-only. The installer creates an empty selected PPU alias and empty runtime registry by default; it never invents a command target.
+
+The service helper remains `/Library/Application Support/Plasma/current/bin/service-control.sh` and supports start/stop/restart/status.
 
 ## 5. Build
-
-A macOS build host first produces the standalone Console and common Control Station runtime, wraps that runtime in the canonical Common Release Format, and only then builds the `.pkg`:
 
 ```bash
 cd software/web
@@ -128,61 +141,63 @@ python3 scripts/macos-control-station-pkg.py \
   --output-dir /tmp/plasma-macos-installer
 ```
 
-The Common Release Format builder creates the release archive and detached `.sha256`, and verifies its internal `release.json`, `SHA256SUMS`, exact file set, target identity and safe extraction rules. The macOS package builder repeats verification before staging installer files and rejects a missing/tampered sidecar or a release for the wrong role/platform/architecture.
+For product version `0.1.1` and source SHA prefix `abcdef123456`, the installer filename is:
 
-The installer builder emits `plasma-control-station-<version>-macos-<arch>.pkg` and a matching `.pkg.sha256`. `macos-installer.json` records the verified source release artifact SHA-256, Git SHA, target and contracts so the installed adapter retains provenance back to the canonical release input. The package is intentionally unsigned in this pilot.
+```text
+plasma-control-station-0.1.1-abcdef123456-macos-<arch>.pkg
+```
+
+A matching `.pkg.sha256` is emitted. `macos-installer.json` records:
+
+```text
+product_version
+release_id
+source_release.git_sha          # full 40-character source SHA
+source_release.artifact_sha256  # Common Release Format input bytes
+source_release.target
+source_release.contracts
+```
+
+The package itself remains unsigned in this pilot.
 
 ## 6. Install and local access
 
-Install with `sudo installer -pkg plasma-control-station-<version>-macos-<arch>.pkg -target /`. After the LaunchAgents are healthy, the local Console is expected at `http://127.0.0.1:18000/`.
+Install the exact identity-qualified file, for example:
 
-The installer must fail if it cannot resolve Python >= 3.11 or Node.js >= 22.13 for the selected operator account.
+```bash
+sudo installer \
+  -pkg plasma-control-station-0.1.1-abcdef123456-macos-arm64.pkg \
+  -target /
+```
+
+After LaunchAgents are healthy, Console is local at `http://127.0.0.1:18000/`.
+
+The installer fails if it cannot resolve Python >=3.11 or Node.js >=22.13 for the operator account.
 
 ## 7. Basic uninstall
 
-The pilot ships `sudo "/Library/Application Support/Plasma/current/bin/uninstall-pilot.sh"`.
+The pilot ships:
 
-The uninstall contract removes LaunchAgent definitions/jobs, immutable releases/current/install metadata, and the package receipt. It intentionally preserves mutable operator config, state, and logs. Full uninstall-data policy, upgrade migration, rollback, and multi-user handling remain future product work.
+```text
+/Library/Application Support/Plasma/current/bin/uninstall-pilot.sh
+```
+
+Uninstall removes LaunchAgent jobs/definitions, immutable releases/current/install metadata, and package receipt. Mutable operator config, state, and logs are intentionally preserved. Full data policy, upgrade migration, rollback, and multi-user behavior remain future work.
 
 ## 8. CI acceptance
 
-`.github/workflows/macos-control-station-installer.yml` runs on a GitHub-hosted macOS environment and performs:
+`.github/workflows/macos-control-station-installer.yml` performs build, Common Release Format verification, `.pkg` construction, installation, ownership checks, absolute runtime binding checks, LaunchAgent lifecycle, Manager/Console readiness, Browser-style Console/BFF→Manager smoke, restart, stop/start, and uninstall.
+
+The downloadable GitHub Actions artifact itself is also identity-qualified:
 
 ```text
-build standalone Console
-→ build common Control Station runtime
-→ build + verify Common Release Format artifact
-→ package builder independently verifies release artifact
-→ build unsigned .pkg
-→ sudo installer
-→ verify root-owned immutable / user-owned mutable boundary
-→ verify absolute Node/Python runtime bindings
-→ verify both LaunchAgents
-→ Manager health
-→ Console health
-→ deterministic unreachable smoke PPU
-→ Browser-style Fetch → Console/BFF → Manager
-→ expected 504 ppu_transport_error
-→ restart persistence
-→ stop/start
-→ basic uninstall
-→ upload .pkg + .pkg.sha256
+plasma-control-station-macos-installer-<release-id>
 ```
 
-The workflow uploads the `.pkg` and detached SHA-256 text file as the Actions artifact `plasma-control-station-macos-installer-pilot`.
+This prevents two same-SemVer builds from appearing under the same Actions artifact name.
 
 ## 9. Claims and non-claims
 
-A passing pilot on a specific runner architecture supports only that tested architecture. For the current macOS arm64 CI path, supported claims are:
+A passing pilot supports only the tested macOS architecture and installer/control-plane boundaries. It does not prove Developer ID signing, notarization, Gatekeeper production distribution, upgrade/rollback, multi-user product installation, PPU/Z2 deployment, PS↔PL, or real IC programming.
 
-```text
-macOS arm64 unsigned Installer Pilot PASS
-Common Release Format → verified installer input PASS
-macOS launchd LaunchAgent activation PASS
-system-owned immutable / user-owned mutable ownership boundary PASS
-install/start/restart/stop-start/basic-uninstall PASS
-installed Browser → Console/BFF → Manager PASS
-external Node/Python absolute runtime binding PASS
-```
-
-It does not support macOS x86_64 installer acceptance unless a separate x86_64 installer run is performed. It also does not support Developer ID signing, Apple notarization, Gatekeeper production distribution, upgrade migration, rollback, multi-user product install, Linux/Windows installers, PPU/Z2 deployment, or real IC programming.
+Release Identity v2 improves traceability; it does not by itself make an artifact production-signed or hardware-qualified.
