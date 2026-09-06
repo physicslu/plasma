@@ -1,0 +1,32 @@
+{
+  "schema_version": "0.2.0",
+  "canonicalization_id": "stm32f103c-canonicalization-v1",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "semantic_schema_id": "plasma://ic-support/stm32f103c/semantic-extraction-v1",
+  "canonical_schema_id": "plasma://ic-support/stm32f103c/canonical-spec-v0",
+  "base_canonicalization_contract": "canonicalization-contract-v0.json",
+  "trust_boundary": {
+    "generation_visibility": false,
+    "ai_may_select_canonical_vocabulary": false,
+    "ai_may_infer_commercial_part_base": false,
+    "free_form_semantic_matching": false,
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  },
+  "structured_option_encoding_mapping": {
+    "byte_plus_complement": {
+      "logical_value_width_bits": 8,
+      "stored_pair_width_bits": 16,
+      "companion_value_present": true,
+      "companion_relation": "bitwise_not"
+    }
+  },
+  "rules": [
+    "Structured option encoding fields are compared as exact semantic facts; free-form text, substring matching, regex inference, and fuzzy matching are forbidden.",
+    "A complete structured option encoding must match exactly one admitted mapping or canonicalization fails closed.",
+    "If any structured option encoding field is null or unknown, canonical option encoding remains unresolved rather than fabricated.",
+    "Evidence for a canonical option encoding is the deterministic union of evidence attached to every asserted structured encoding leaf used by the mapping.",
+    "All non-option canonicalization behavior remains delegated to the source-locked v0 deterministic contract.",
+    "Canonicalization does not grant canonical-dataset or production admission."
+  ]
+}
