@@ -1,12 +1,10 @@
 # Plasma Product Release Format v1
 
-> Status: **Current**. PR #222 established the first machine-verifiable Plasma product release contract. This document does not define or claim host installation, service registration, upgrade activation, Z2 runtime acceptance, FPGA behavior, or real IC programming.
+> Status: **Current**. The manifest schema remains v1. Current deployment identity policy is **Release Identity v2**: every deployable artifact is named by product version plus a 12-character source Git SHA prefix, while the manifest retains the full 40-character Git SHA and detached SHA-256 integrity evidence.
 
 ## 1. Purpose
 
 Plasma product deployment must consume immutable release artifacts rather than interpret the source repository on the target machine.
-
-The boundary is:
 
 ```text
 source repository
@@ -28,41 +26,36 @@ Control Station or PPU
 
 `product-release.py` is a build/release tool. It is not an installer and does not run npm, pip, source compilation, service mutation, FPGA loading, or IC programming.
 
-## 2. Product version versus component versions
+## 2. Version, release identity, and digest
 
-Plasma has one product release identity that is separate from component package versions.
-
-Canonical source metadata is stored in:
+Canonical product metadata lives in `release/product.json`. The current product version is:
 
 ```text
-release/product.json
+product_version = 0.1.1
 ```
 
-The first product version is:
+Product version is independent from Web/Python component package versions.
+
+Release Identity v2 separates three concerns:
 
 ```text
-product_version = 0.1.0
+product_version = 0.1.1
+full git_sha    = abcdef1234567890...40 hex characters...
+release_id      = 0.1.1-abcdef123456
+artifact_sha256 = <64 hex characters>
 ```
 
-This is intentionally independent from current component package versions:
+Their meanings are deliberately different:
 
-```text
-Web package version     = software/web/package.json
-Python package version  = software/python/pyproject.toml
-```
+- `product_version` is the SemVer product version used for product evolution and platform package-version semantics.
+- `release_id` is the immutable deployment/build identity: `<product-version>-<first-12-git-sha>`.
+- `artifact_sha256` identifies the exact artifact bytes and proves transport/integrity equality.
 
-The release manifest records both the product version and the relevant source component versions. Therefore:
+A different source Git SHA MUST NOT reuse the same deployable artifact filename or immutable release directory even when `product_version` is unchanged. Rebuilding the same source may retain the same `release_id`, but the detached artifact digest remains the exact-byte identity.
 
-```text
-Product Version != Web package version
-Product Version != Python package version
-```
-
-A future published release process must ensure one published product version maps to one intended Git commit/release lineage. PR #222 does not publish GitHub Releases or define tag policy.
+The full Git SHA remains authoritative provenance. The 12-character prefix is a human-operational identity used in filenames and install paths; it does not replace the full SHA in `release.json`.
 
 ## 3. Supported v1 release targets
-
-The canonical v1 matrix follows the Product Deployment Foundation.
 
 ### Control Station
 
@@ -80,29 +73,42 @@ windows-x86_64
 linux-armv7l
 ```
 
-Unsupported role/platform/architecture combinations fail closed. In particular, Windows ARM64 is not a supported v1 release target merely because Windows is a supported Control Station operating system.
+Unsupported role/platform/architecture combinations fail closed.
 
 ## 4. Artifact naming and archive format
 
-Canonical names are:
+Canonical Common Release Format names are now:
 
 ```text
-plasma-control-station-<product-version>-macos-arm64.tar.gz
-plasma-control-station-<product-version>-macos-x86_64.tar.gz
-plasma-control-station-<product-version>-linux-arm64.tar.gz
-plasma-control-station-<product-version>-linux-x86_64.tar.gz
-plasma-control-station-<product-version>-windows-x86_64.zip
-plasma-ppu-<product-version>-linux-armv7l.tar.gz
+plasma-control-station-<release-id>-macos-arm64.tar.gz
+plasma-control-station-<release-id>-macos-x86_64.tar.gz
+plasma-control-station-<release-id>-linux-arm64.tar.gz
+plasma-control-station-<release-id>-linux-x86_64.tar.gz
+plasma-control-station-<release-id>-windows-x86_64.zip
+plasma-ppu-<release-id>-linux-armv7l.tar.gz
 ```
 
-Common Release Format does not mean every operating system must use the same archive container. The common contract is the logical layout, manifest, target identity, integrity model, and verification behavior.
+Example:
 
-- macOS/Linux/PPU use `tar.gz`.
+```text
+plasma-ppu-0.1.1-abcdef123456-linux-armv7l.tar.gz
+```
+
+Common Release Format does not mean every operating system uses the same archive container:
+
+- macOS/Linux/PPU use `tar.gz`;
 - Windows uses ZIP.
+
+Platform installers inherit the same release identity. Examples:
+
+```text
+plasma-control-station-0.1.1-abcdef123456-macos-arm64.pkg
+plasma-control-station-0.1.1-abcdef123456-windows-x86_64.msi
+```
 
 ## 5. Canonical bundle layout
 
-Every archive has exactly one canonical root:
+Every archive has one canonical root:
 
 ```text
 plasma-release/
@@ -113,32 +119,30 @@ plasma-release/
     └── defaults/
 ```
 
-`runtime/` contains an already-built runtime payload supplied to the release builder. The Common Release Format does not decide how Console/Manager or Gateway/Server are built; those are later runtime-packaging phases.
-
-`config/defaults/` is optional and may contain non-secret product defaults. Persistent site/fleet configuration, credentials, operator state, logs, and secrets are not release payloads.
+`runtime/` is already-built product runtime content. `config/defaults/` is optional and must not contain persistent operator state, credentials, logs, or secrets.
 
 ## 6. `release.json` schema v1
 
-A v1 manifest contains exactly these fields:
+Release Identity v2 does **not** change the release manifest schema. A representative v1 manifest is:
 
 ```json
 {
   "schema_version": 1,
   "product": "plasma",
-  "product_version": "0.1.0",
-  "git_sha": "<40-character commit SHA>",
+  "product_version": "0.1.1",
+  "git_sha": "abcdef1234567890abcdef1234567890abcdef12",
   "role": "control-station",
   "platform": "linux",
   "architecture": "x86_64",
   "target": "linux-x86_64",
-  "build_timestamp": "2026-08-30T00:00:00Z",
+  "build_timestamp": "2026-09-06T00:00:00Z",
   "archive_format": "tar.gz",
   "contracts": {
     "web_rest_api": "3"
   },
   "components": {
-    "python": "0.3.2",
-    "web": "0.1.0"
+    "python": "<component-version>",
+    "web": "<component-version>"
   },
   "layout": {
     "runtime": "runtime",
@@ -147,7 +151,7 @@ A v1 manifest contains exactly these fields:
 }
 ```
 
-The PPU role carries the contracts currently relevant to that role:
+The PPU role carries:
 
 ```json
 {
@@ -156,34 +160,28 @@ The PPU role carries the contracts currently relevant to that role:
 }
 ```
 
-No Manager/fleet contract version is invented in v1 because the repository does not yet define a canonical numbered Manager API compatibility contract. A future explicit contract can be added through a release-schema change when the architecture defines it.
-
 ## 7. Compatibility metadata
 
-Product version is release identity. Protocol/API versions are interoperability identity.
-
-The current canonical compatibility metadata is:
+Product/release identity and protocol compatibility are separate dimensions.
 
 ```text
 Web REST API contract = 3
 Plasma wire protocol  = 3.3 / PLASMA33
 ```
 
-A later installer or fleet compatibility checker should compare the contracts required between Control Station and PPU rather than assuming a numerically newer product version is automatically compatible.
+A numerically newer product version is not automatically protocol-compatible. Installers and Managers must compare the relevant contracts rather than infer compatibility from SemVer alone.
 
 ## 8. Integrity model
 
-Release v1 intentionally has two SHA-256 layers.
+Release v1 has two SHA-256 layers.
 
-### 8.1 Internal bundle integrity
+### Internal bundle integrity
 
-`SHA256SUMS` contains a SHA-256 entry for every regular file in the bundle except `SHA256SUMS` itself, including `release.json`.
+`SHA256SUMS` hashes every regular bundle file except itself. Verification requires the exact file set and exact hashes.
 
-Verification requires the actual file set to match the hashed file set exactly. Missing files, extra files, duplicate entries, or hash mismatches fail closed.
+### Archive integrity
 
-### 8.2 Archive integrity
-
-The complete archive has a detached sidecar:
+The complete artifact has a detached sidecar:
 
 ```text
 <artifact>.sha256
@@ -192,68 +190,37 @@ The complete archive has a detached sidecar:
 Example:
 
 ```text
-plasma-control-station-0.1.0-linux-x86_64.tar.gz
-plasma-control-station-0.1.0-linux-x86_64.tar.gz.sha256
+plasma-control-station-0.1.1-abcdef123456-linux-x86_64.tar.gz
+plasma-control-station-0.1.1-abcdef123456-linux-x86_64.tar.gz.sha256
 ```
 
-The detached form is intentional. Putting an archive's own SHA-256 inside `release.json` inside that same archive would create a self-referential hashing cycle.
-
-The future deployment order is therefore:
+Verification order is:
 
 ```text
-verify detached archive SHA-256
+verify detached artifact SHA-256
     ↓
 safe extraction
     ↓
-verify release.json schema/target/contracts
+verify release.json full source identity / target / contracts
     ↓
-verify SHA256SUMS and exact file set
+verify SHA256SUMS + exact file set
     ↓
 installer-specific checks
 ```
 
-SHA-256 proves integrity, not publisher authenticity. v1 must not be described as signed software distribution.
-
-Future distribution security may add platform-appropriate authenticity mechanisms, for example macOS code signing/notarization, Windows Authenticode, and signed Linux/release metadata. Those are outside the Release Format v1 integrity scope.
+SHA-256 proves integrity, not publisher authenticity. Signing/notarization/Authenticode remain separate controls.
 
 ## 9. Extraction safety
 
-The verifier rejects archive structures that are unsafe or outside the v1 contract, including:
-
-- absolute paths;
-- `..` path traversal;
-- non-canonical backslash archive paths;
-- entries outside `plasma-release/`;
-- duplicate archive members;
-- tar/ZIP symlinks;
-- non-regular tar members;
-- excessive file count or expanded size beyond verifier safety limits.
-
-Verification occurs in a temporary directory first. `--extract-to` copies the bundle to the requested clean destination only after integrity and manifest validation pass.
+The verifier rejects absolute paths, traversal, non-canonical archive paths, entries outside `plasma-release/`, duplicates, symlinks, non-regular tar entries, case-insensitive portability collisions, and safety-limit breaches.
 
 ## 10. Payload hygiene
 
-The release builder rejects common source-tree/development content such as:
-
-```text
-.git/
-.hg/
-.svn/
-node_modules/
-.venv/
-venv/
-__pycache__/
-.pytest_cache/
-tests/
-```
-
-It also rejects common secret/config filenames such as `.env`, `.env.*`, `credentials.json`, `secrets.json`, and common SSH private-key filenames.
-
-This is a defense-in-depth guard, not a complete secret-scanning system. Release construction must still provide a deliberate runtime staging directory rather than point the builder at the repository root.
+The builder rejects common source/development material such as `.git`, `node_modules`, virtual environments, caches, tests, and common secret filenames. This is defense in depth; the input must still be a deliberate runtime staging tree.
 
 ## 11. CLI
 
-Build an artifact from an already-built payload:
+Build:
 
 ```bash
 python3 scripts/product-release.py build \
@@ -262,88 +229,39 @@ python3 scripts/product-release.py build \
   --architecture x86_64 \
   --runtime-dir /path/to/prebuilt-runtime \
   --config-defaults-dir /path/to/defaults \
-  --output-dir /path/to/releases
+  --output-dir /path/to/releases \
+  --git-sha "$(git rev-parse HEAD)"
 ```
 
-In a Git worktree the builder can discover the current full Git SHA. Non-Git build environments must pass `--git-sha` explicitly.
+For source SHA `abcdef123456...`, product version `0.1.1` produces a filename containing:
 
-Verify an artifact:
+```text
+0.1.1-abcdef123456
+```
+
+Verify:
 
 ```bash
 python3 scripts/product-release.py verify \
-  plasma-control-station-0.1.0-linux-x86_64.tar.gz \
+  plasma-control-station-0.1.1-abcdef123456-linux-x86_64.tar.gz \
   --expect-role control-station \
   --expect-platform linux \
   --expect-architecture x86_64 \
-  --expect-version 0.1.0
-```
-
-Clean extraction after verification:
-
-```bash
-python3 scripts/product-release.py verify \
-  plasma-control-station-0.1.0-linux-x86_64.tar.gz \
-  --extract-to /tmp/plasma-clean
-```
-
-The extracted root becomes:
-
-```text
-/tmp/plasma-clean/plasma-release/
+  --expect-version 0.1.1
 ```
 
 ## 12. CI acceptance
 
-`.github/workflows/product-release.yml` validates the release format independently from deployment.
+`.github/workflows/product-release.yml` validates representative Linux Control Station, Windows Control Station, and Linux/armv7l PPU artifacts, detached hashes, manifest/internal integrity, clean verification, and clean extraction.
 
-It covers:
+Regression coverage explicitly verifies that two different Git SHAs under the same product version produce different artifact filenames.
 
-1. release-format unit/regression tests;
-2. representative Linux Control Station `tar.gz` build;
-3. representative Windows Control Station ZIP build;
-4. representative Linux/armv7l PPU build;
-5. detached archive SHA-256 verification;
-6. manifest and internal `SHA256SUMS` verification;
-7. clean-directory verification using a copied standalone verifier script and no source-repository data;
-8. clean extraction checks.
+A passing workflow supports only release-format/integrity claims. It does not prove host deployment, service activation, Z2 HIL, PS↔PL, or real IC programming.
 
-A passing workflow supports only these claims:
+## 13. Operational rule
 
-```text
-Plasma Release Format PASS
-Release Manifest PASS
-Artifact Integrity PASS
-Clean Extraction PASS
-```
+The deployment rule is now fail-closed:
 
-It does not support:
+> Every deployable Plasma artifact and immutable installed release must be traceable as `product_version + full source Git SHA + artifact digest`. Human-facing artifact names and immutable release directories use `product_version + 12-character Git SHA prefix`; manifests retain the full SHA.
 
-```text
-macOS Deployment PASS
-Linux Deployment PASS
-Windows Deployment PASS
-Z2 Deployment PASS
-service activation PASS
-PS <-> PL PASS
-real IC programming PASS
-```
-
-## 13. Next phases
-
-With this release contract established, later work can build real role-specific runtime payloads:
-
-```text
-Common Release Format
-    ↓
-Control Station runtime packaging
-    ↓
-PPU/Z2 runtime packaging
-    ↓
-platform installers/service adapters
-    ↓
-upgrade/rollback
-    ↓
-Control Station -> Manager -> Z2 -> PS Loopback acceptance
-```
-
-The installer layer must consume verified release artifacts. It must not reintroduce target-side Git pulls, source builds, npm installation, or repository-relative runtime dependencies.
+This rule exists because version-only names such as `plasma-control-station-0.1.0-macos-arm64.pkg` allowed different source commits to look identical during field qualification. Version-only deployment identity is no longer acceptable.
