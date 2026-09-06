@@ -55,6 +55,14 @@ jobs:
           node-version: "22.23.0"
           cache: npm
           cache-dependency-path: software/web/package-lock.json
+      - name: Resolve release identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(python -c 'import json; print(json.load(open("release/product.json"))["product_version"])')"
+          sha_prefix="$(git rev-parse --short=12 HEAD)"
+          echo "value=$version-$sha_prefix" >> "$GITHUB_OUTPUT"
       - name: Install build/test dependencies
         run: python -m pip install ./software/python pytest
       - name: Install Web build dependencies
@@ -104,10 +112,10 @@ jobs:
           PKG="$(find "${{ runner.temp }}/plasma-macos-installer" -maxdepth 1 -name '*.pkg' -print -quit)"
           test -n "$PKG"
           python scripts/macos-control-station-installer-acceptance.py --pkg "$PKG"
-      - name: Upload unsigned installer pilot
+      - name: Upload unsigned macOS installer pilot
         uses: actions/upload-artifact@v4
         with:
-          name: plasma-control-station-macos-installer-pilot
+          name: plasma-control-station-macos-installer-${{ steps.identity.outputs.value }}
           path: |
             ${{ runner.temp }}/plasma-macos-installer/*.pkg
             ${{ runner.temp }}/plasma-macos-installer/*.sha256

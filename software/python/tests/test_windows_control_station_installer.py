@@ -162,12 +162,14 @@ def test_stage_and_wix_source_keep_scm_mutable_config_and_bundled_runtime_bounda
     winsw.write_bytes(b"winsw-test")
     monkeypatch.setattr(module, "WINSW_X64_SHA256", hashlib.sha256(winsw.read_bytes()).hexdigest())
 
+    release_id = "1.2.3-abcdef123456"
     release_root, seed = module.stage_payload(
         repo_root=repo,
         runtime_dir=runtime,
         staging_root=tmp_path / "stage",
         version="1.2.3",
-        source_release={"git_sha": "abc", "target": "windows-x86_64"},
+        release_id=release_id,
+        source_release={"git_sha": "abcdef123456" + "0" * 28, "target": "windows-x86_64"},
         winsw_exe=winsw,
         python_runtime_dir=python_runtime,
         node_runtime_dir=node_runtime,
@@ -185,6 +187,8 @@ def test_stage_and_wix_source_keep_scm_mutable_config_and_bundled_runtime_bounda
 
     manifest = json.loads((release_root / "windows-installer.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 2
+    assert manifest["release_id"] == release_id
+    assert manifest["program_files_root"] == rf"%ProgramFiles%\Plasma\releases\{release_id}"
     assert manifest["runtime_ownership"] == "bundled"
     assert "external_prerequisites" not in manifest
     assert manifest["bundled_runtimes"]["python"]["version"] == "3.12.10"
@@ -195,10 +199,12 @@ def test_stage_and_wix_source_keep_scm_mutable_config_and_bundled_runtime_bounda
         release_root=release_root,
         program_data_seed=seed,
         version="1.2.3",
+        release_id=release_id,
         output_path=wxs,
     )
     text = wxs.read_text(encoding="utf-8")
     assert '<Files Directory="PlasmaVersion"' in text
+    assert f'Name="{release_id}"' in text
     assert 'Name="PlasmaManager"' in text
     assert 'Name="PlasmaControlStationConsole"' in text
     assert 'ServiceDependency Id="PlasmaManager"' in text
@@ -207,3 +213,9 @@ def test_stage_and_wix_source_keep_scm_mutable_config_and_bundled_runtime_bounda
     assert 'Permanent="yes"' in text
     assert 'NeverOverwrite="yes"' in text
     assert "Task Scheduler" not in text
+
+
+def test_msi_filename_is_source_sha_qualified() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert 'release_id(version, source_git_sha)' in source
+    assert 'plasma-control-station-{identity}-windows-x86_64.msi' in source

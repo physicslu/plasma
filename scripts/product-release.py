@@ -32,6 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RELEASE_ROOT = "plasma-release"
 RELEASE_SCHEMA_VERSION = 1
 PRODUCT_DESCRIPTOR_SCHEMA_VERSION = 1
+GIT_SHA_PREFIX_LENGTH = 12
 MAX_ARCHIVE_FILES = 10_000
 MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
 
@@ -128,6 +129,13 @@ def _validate_git_sha(value: str) -> str:
     if GIT_SHA_RE.fullmatch(value or "") is None:
         raise ReleaseError("git_sha must be a full 40-character hexadecimal commit SHA")
     return value.lower()
+
+
+def release_id(version: str, git_sha: str) -> str:
+    """Return the deployment identity shared by artifact and install paths."""
+    version = _validate_semver(version, field="product_version")
+    git_sha = _validate_git_sha(git_sha)
+    return f"{version}-{git_sha[:GIT_SHA_PREFIX_LENGTH]}"
 
 
 def _validate_build_timestamp(value: str) -> str:
@@ -311,9 +319,16 @@ def _archive_format(platform_name: str) -> tuple[str, str]:
     return ("zip", ".zip") if platform_name == "windows" else ("tar.gz", ".tar.gz")
 
 
-def _artifact_name(role: str, version: str, platform_name: str, architecture: str) -> str:
+def _artifact_name(
+    role: str,
+    version: str,
+    git_sha: str,
+    platform_name: str,
+    architecture: str,
+) -> str:
     _, suffix = _archive_format(platform_name)
-    return f"plasma-{role}-{version}-{platform_name}-{architecture}{suffix}"
+    identity = release_id(version, git_sha)
+    return f"plasma-{role}-{identity}-{platform_name}-{architecture}{suffix}"
 
 
 def _manifest(
@@ -720,7 +735,7 @@ def build_release(
     archive_format, _ = _archive_format(platform_name)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    artifact = output_dir / _artifact_name(role, version, platform_name, architecture)
+    artifact = output_dir / _artifact_name(role, version, git_sha, platform_name, architecture)
     sidecar = Path(str(artifact) + ".sha256")
     if artifact.exists() or sidecar.exists():
         raise ReleaseError(

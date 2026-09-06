@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -8,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 RUNTIME_SCRIPT = ROOT / "scripts" / "ppu-runtime.py"
 RELEASE_SCRIPT = ROOT / "scripts" / "ppu-release.py"
 PRODUCT_RELEASE_SCRIPT = ROOT / "scripts" / "product-release.py"
+PRODUCT_VERSION = json.loads((ROOT / "release" / "product.json").read_text(encoding="utf-8"))["product_version"]
 
 
 def _load(path: Path, name: str):
@@ -26,17 +28,18 @@ product_release = _load(PRODUCT_RELEASE_SCRIPT, "product_release_ppu_test")
 def test_ppu_release_builds_and_verifies_linux_armv7l_artifact(tmp_path: Path) -> None:
     runtime_dir = tmp_path / "runtime"
     runtime.build_runtime(repo_root=ROOT, output_dir=runtime_dir)
+    git_sha = "a" * 40
 
     artifact = release.build_ppu_release(
         repo_root=ROOT,
         runtime_dir=runtime_dir,
         output_dir=tmp_path / "releases",
-        git_sha="a" * 40,
+        git_sha=git_sha,
         build_timestamp="2026-08-30T00:00:00Z",
     )
 
     assert artifact.is_file()
-    assert artifact.name.endswith("-linux-armv7l.tar.gz")
+    assert artifact.name == f"plasma-ppu-{PRODUCT_VERSION}-{git_sha[:12]}-linux-armv7l.tar.gz"
     assert Path(str(artifact) + ".sha256").is_file()
 
     manifest = product_release.verify_release(
@@ -47,5 +50,6 @@ def test_ppu_release_builds_and_verifies_linux_armv7l_artifact(tmp_path: Path) -
         expect_architecture="armv7l",
     )
     assert manifest["role"] == "ppu"
+    assert manifest["git_sha"] == git_sha
     assert manifest["target"] == "linux-armv7l"
     assert manifest["contracts"] == {"plasma_protocol": "3.3", "web_rest_api": "3"}

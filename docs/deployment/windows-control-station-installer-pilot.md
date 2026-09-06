@@ -10,6 +10,14 @@ It consumes the same Control Station application runtime as macOS/Linux. It does
 
 The Windows distribution owns its language runtimes. A target workstation does **not** need a preinstalled Python or Node.js runtime.
 
+Release Identity v2 applies to both the MSI filename and immutable Program Files release directory:
+
+```text
+release_id = <product-version>-<first-12-git-sha>
+```
+
+The installed manifest retains the full source Git SHA and source Common Release Format artifact digest.
+
 ## Boundary
 
 ```text
@@ -19,7 +27,7 @@ verified Control Station release
   -> pinned WinSW service adapter
   -> pinned WiX v5 build tool
   -> unsigned self-contained MSI
-  -> %ProgramFiles% immutable versioned release
+  -> %ProgramFiles% immutable release-id directory
      |- application runtime
      |- bundled host runtimes
      `- Windows service adapters
@@ -29,14 +37,14 @@ verified Control Station release
      `- PlasmaControlStationConsole
 ```
 
-The MSI does not contain PPU Gateway/Server, Z2 software, FPGA assets, PL access, target-power behavior, or real-IC programming logic.
+The MSI contains no PPU Gateway/Server, Z2 software, FPGA assets, PL access, target-power behavior, or real-IC programming logic.
 
 ## Filesystem contract
 
 Immutable application payload:
 
 ```text
-%ProgramFiles%\Plasma\releases\<version>\
+%ProgramFiles%\Plasma\releases\<release-id>\
 |- runtime\
 |  |- manager\manager.pyz
 |  `- console\server.js
@@ -46,6 +54,12 @@ Immutable application payload:
 |- bin\
 |- THIRD_PARTY_LICENSES\WinSW.txt
 `- windows-installer.json
+```
+
+Example:
+
+```text
+%ProgramFiles%\Plasma\releases\0.1.1-abcdef123456\
 ```
 
 Mutable machine state:
@@ -58,50 +72,41 @@ Mutable machine state:
 `- logs\
 ```
 
-The config seed components are `Permanent` and `NeverOverwrite`. Basic uninstall removes the immutable release and SCM registrations but preserves mutable configuration. Upgrade/rollback migration remains a separate milestone.
+The config seed components remain `Permanent` and `NeverOverwrite`. Basic uninstall removes immutable release content and SCM registrations but preserves mutable configuration. Upgrade/rollback migration remains a separate milestone.
 
 ## Service adapter
 
-The pilot uses WinSW `2.12.0` as the thin SCM adapter. The workflow downloads the official `WinSW-x64.exe` release asset and verifies the pinned SHA-256 before packaging:
+The pilot uses WinSW `2.12.0` as the thin SCM adapter. The workflow downloads the official `WinSW-x64.exe` and verifies the pinned SHA-256:
 
 ```text
 05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da
 ```
 
-The WinSW MIT license is shipped in the installed release. The binary is not checked into Plasma source control.
-
-SCM services are installed by Windows Installer itself; Task Scheduler is not used. The Console service declares an SCM dependency on the Manager service. The Windows Console launcher explicitly enables the Control Station fleet UI instead of inheriting the standalone PPU default.
+SCM services are installed by Windows Installer; Task Scheduler is not used. Console declares an SCM dependency on Manager.
 
 ## Vinext Windows static-asset compatibility boundary
 
-Plasma currently pins `vinext` `0.0.50`. Its production `StaticFileCache` stores the result of `path.relative()` directly as the lookup key. On Windows, that produces backslash-separated nested paths such as `assets\chunk.js`, while browser URL pathnames use forward slashes such as `/assets/chunk.js`. The result is a Windows-only failure mode where SSR HTML returns HTTP 200 but packaged CSS/JavaScript under `/assets/*` returns 404.
+Plasma currently pins `vinext` `0.0.50`. Its production `StaticFileCache` can otherwise retain Windows backslash-separated relative asset paths while browser URL paths use forward slashes, producing Windows-only packaged asset 404s.
 
-This matches upstream Vinext issue #2696. Until Plasma upgrades to a Vinext release that contains the fix natively, `software/web/scripts/patch-vinext-windows-static-assets.mjs` applies the narrow upstream normalization before the product build:
+Until the pinned dependency contains the fix natively, `software/web/scripts/patch-vinext-windows-static-assets.mjs` applies the narrow normalization:
 
 ```text
 path.relative(base, file)
   -> path.relative(base, file).split(path.sep).join("/")
 ```
 
-The compatibility patch is deliberately fail-closed:
-
-- it accepts only the pinned Vinext version `0.0.50`;
-- it requires exactly one vulnerable call site;
-- an unexpected Vinext layout/version fails the product build instead of silently shipping an unverified patch;
-- the patch is applied at build time, so the immutable packaged Console runtime contains the corrected behavior and the target workstation does not mutate `node_modules`.
-
-The earlier hypothesis that the Windows service working directory caused the asset failure was rejected by CI evidence: starting from `runtime\console` still reproduced the same `/assets/*` 404. The launcher therefore does not carry a product-specific CWD workaround.
+The patch fails closed on version/layout drift and runs at build time; the installed target does not patch dependencies.
 
 ## Self-contained runtime ownership
 
-Windows no longer treats Python or Node.js as host prerequisites. The MSI contains pinned runtimes under the immutable release tree:
+The MSI contains pinned runtimes:
 
 ```text
 CPython 3.12.10 Windows embeddable x64
 Node.js 22.23.0 Windows x64
 ```
 
-The pinned source archive digests are:
+Pinned source archive digests:
 
 ```text
 CPython 3.12.10 embed-amd64 ZIP
@@ -111,22 +116,7 @@ Node.js 22.23.0 win-x64 ZIP
 425a5bd68cc95e8eb16bcccd0a75081b48983fc6a26f67126bd4d6c7198231e8
 ```
 
-The build workflow downloads these official archives and fails closed on SHA-256 mismatch before MSI construction. The CPython license and Node.js license are shipped with the installed bundled runtimes.
-
-The service launchers resolve exactly one runtime path each:
-
-```text
-Manager -> <release>\host-runtime\python\python.exe
-Console -> <release>\host-runtime\node\node.exe
-```
-
-They do not inspect HKCU, HKLM Python registration, the user PATH, or the machine PATH for alternative interpreters. This removes the earlier privilege-boundary ambiguity where a `LocalSystem` service could accidentally depend on a workstation-managed interpreter.
-
-The CPython embeddable `_pth` file remains isolated. Packaging adds the Manager zipapp to that explicit path contract rather than enabling global `site-packages`. The Manager application's PyYAML dependency remains inside `manager.pyz`.
-
-This changes operational ownership: Plasma must now track Python/Node security updates and deliberately issue a new Control Station build when those runtimes need patching. That is preferable to allowing the behavior of an installed production tool to vary with arbitrary workstation runtime state.
-
-npm, pip, Git, Vite and the source worktree remain build-time concerns and are not target-runtime requirements.
+The service launchers bind only to bundled runtime paths under the immutable release. They do not inspect user/machine PATH or alternate Python registrations.
 
 ## MSI build
 
@@ -134,77 +124,42 @@ npm, pip, Git, Vite and the source worktree remain build-time concerns and are n
 
 1. verifies the Common Release Format input as `control-station/windows/x86_64`;
 2. validates the packaged common runtime;
-3. verifies the pinned WinSW binary digest;
-4. stages the pinned bundled Python and Node.js target runtimes;
-5. stages the Windows service wrapper, PowerShell launchers and third-party licenses;
-6. emits WiX v5 authoring using built-in `Files` harvesting for the immutable release tree;
-7. builds `plasma-control-station-<version>-windows-x86_64.msi`;
-8. emits a detached `.sha256` sidecar.
+3. derives `release_id` from product version plus source SHA prefix;
+4. verifies the pinned WinSW binary digest;
+5. stages pinned bundled Python and Node.js runtimes;
+6. stages service wrappers, launchers and licenses;
+7. emits WiX v5 authoring with an immutable `<release-id>` Program Files directory;
+8. builds `plasma-control-station-<release-id>-windows-x86_64.msi`;
+9. emits a detached `.sha256` sidecar.
 
-WiX Toolset `5.0.2` is pinned as a build dependency. WiX v5 is required because built-in `Files` harvesting is a WiX v5 feature; WiX v4 and earlier require a separate harvesting mechanism. WiX is build-host tooling and is not installed on the Control Station by the MSI.
+Example:
+
+```text
+plasma-control-station-0.1.1-abcdef123456-windows-x86_64.msi
+```
+
+The MSI package version remains the SemVer `product_version` (for Windows Installer upgrade semantics); the immutable filesystem/build identity is the SHA-qualified `release_id`. These are intentionally different concepts.
+
+`windows-installer.json` records `product_version`, `release_id`, bundled runtime ownership, and full source release provenance.
+
+WiX Toolset `5.0.2` is pinned as build tooling and is not installed on the target Control Station.
 
 ## CI acceptance
 
-`.github/workflows/windows-control-station-installer.yml` runs on `windows-latest` and performs:
+`.github/workflows/windows-control-station-installer.yml` covers pinned runtime downloads and hashes, product runtime build, Common Release Format verification, packaging tests, WinSW/WiX, MSI installation, installed manifest/runtime binding, SCM lifecycle, Manager/Console health, packaged static assets, Browser-style BFF→Manager smoke, restart, stop/start, uninstall and mutable config preservation.
+
+The downloadable GitHub Actions artifact is identity-qualified:
 
 ```text
-source checkout
-  -> download pinned CPython embeddable archive + SHA-256 verify
-  -> download pinned Node.js archive + SHA-256 verify
-  -> apply fail-closed pinned Vinext Windows asset compatibility patch
-  -> common Control Station runtime build
-  -> Windows Common Release Format build
-  -> focused packaging tests
-  -> pinned WinSW download + SHA-256 verification
-  -> pinned WiX CLI install
-  -> self-contained MSI build
-  -> MSI install
-  -> assert installed manifest runtime_ownership=bundled
-  -> assert launchers bind to installed bundled Python/Node paths
-  -> SCM registration + initial service start
-  -> Manager health
-  -> Console root HTML
-  -> fetch every referenced packaged CSS/JavaScript asset and require HTTP 200 + non-empty content
-  -> Browser-style Fetch using installed bundled Node: Console/BFF -> Manager
-  -> SCM restart persistence
-  -> revalidate packaged CSS/JavaScript assets after restart
-  -> SCM stop/start
-  -> MSI uninstall
-  -> service removal
-  -> mutable config preservation
-  -> upload MSI + SHA-256 artifact
+plasma-control-station-windows-installer-<release-id>
 ```
 
-The static-asset check closes a gap that a plain HTTP-200 Console readiness probe cannot detect: the standalone server can render SSR HTML while the client asset cache is unusable on Windows. It is therefore an acceptance invariant, not merely a packaging-unit assertion.
-
-The Browser/BFF smoke points Manager at a deliberately unused loopback PPU endpoint and expects the existing structured `ppu_transport_error` path. This proves the installed Console/BFF -> Manager boundary without claiming PPU or Z2 acceptance.
+This prevents same-SemVer builds from being indistinguishable in the Actions UI/download directory.
 
 ## Evidence boundary
 
-A passing Windows installer workflow supports:
+A passing workflow supports Windows x86_64 common runtime, MSI construction, Program Files/ProgramData placement, bundled runtime ownership, SCM services, packaged static assets and installer lifecycle for the tested runner.
 
-```text
-Windows x86_64 Common Runtime                PASS
-Windows MSI construction                     PASS
-ProgramFiles / ProgramData placement         PASS
-bundled CPython runtime ownership             PASS
-bundled Node.js runtime ownership             PASS
-SCM Manager service                          PASS
-SCM Console/BFF service                      PASS
-packaged Console CSS/JavaScript serving      PASS
-install / restart / stop-start / uninstall   PASS
-mutable config preservation                  PASS
-```
+It does **not** prove code signing, trusted publisher distribution, upgrade/rollback migration, a real operator workstation, Manager→real Z2, PS↔PL, or real IC programming.
 
-It does not prove:
-
-```text
-code signing / trusted publisher             NOT PROVEN
-runtime CVE update automation                NOT IMPLEMENTED
-upgrade / rollback migration                 NOT IMPLEMENTED
-real operator Windows machine                NOT PROVEN BY CI
-Manager -> real Z2                           NOT PROVEN
-PS <-> PL / hardware / real IC               NOT PROVEN
-```
-
-The CI artifact is an unsigned installer pilot, not production Windows distribution readiness.
+Release Identity v2 improves provenance and field traceability; it is not publisher-authenticity evidence.

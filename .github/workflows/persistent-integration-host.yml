@@ -82,6 +82,8 @@ jobs:
           sha="$GITHUB_SHA"
           test "$(git rev-parse HEAD)" = "$sha"
           version="$($python -c 'import json; print(json.load(open("release/product.json"))["product_version"])')"
+          sha_prefix="${sha:0:12}"
+          identity="$version-$sha_prefix"
 
           rm -rf "$runtime" "$output" "$verify"
           "$python" scripts/ppu-runtime.py build --output-dir "$runtime"
@@ -91,7 +93,7 @@ jobs:
             --output-dir "$output" \
             --git-sha "$sha"
 
-          archive="$output/plasma-ppu-$version-linux-armv7l.tar.gz"
+          archive="$output/plasma-ppu-$identity-linux-armv7l.tar.gz"
           "$python" scripts/product-release.py verify \
             "$archive" \
             --expect-role ppu \

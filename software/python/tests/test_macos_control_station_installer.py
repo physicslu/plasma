@@ -85,15 +85,19 @@ def test_stage_payload_separates_immutable_runtime_from_user_state(tmp_path: Pat
         "target": "macos-arm64",
         "contracts": {"web_rest_api": "3"},
     }
+    release_id = "9.8.7-" + "a" * 12
     release = pkg.stage_payload(
         repo_root=REPO_ROOT,
         runtime_dir=runtime,
         staging_root=stage,
         version="9.8.7",
+        release_id=release_id,
         architecture="arm64",
         source_release=source_release,
     )
-    assert release == stage / "Library" / "Application Support" / "Plasma" / "releases" / "9.8.7"
+    assert release == (
+        stage / "Library" / "Application Support" / "Plasma" / "releases" / release_id
+    )
     assert (release / "runtime" / "console" / "server.js").is_file()
     assert (release / "bin" / "run-manager.sh").stat().st_mode & 0o111
     assert (release / "bin" / "run-console.sh").stat().st_mode & 0o111
@@ -102,6 +106,10 @@ def test_stage_payload_separates_immutable_runtime_from_user_state(tmp_path: Pat
     assert (release / "launchd" / "com.plasma.manager.plist").is_file()
     assert (release / "launchd" / "com.plasma.console.plist").is_file()
     manifest = json.loads((release / "macos-installer.json").read_text(encoding="utf-8"))
+    assert manifest["release_id"] == release_id
+    assert manifest["runtime_root"] == (
+        f"/Library/Application Support/Plasma/releases/{release_id}/runtime"
+    )
     assert manifest["service_manager"] == "launchd-launchagent"
     assert manifest["external_prerequisites"] == {"node": ">=22.13", "python": ">=3.11"}
     assert manifest["console"] == {"host": "127.0.0.1", "port": 18000}
@@ -159,6 +167,7 @@ def test_public_pkg_cli_requires_release_artifact_not_raw_runtime() -> None:
     assert "verify_release(" in source
     assert "expect_role=release_tool.ROLE_CONTROL_STATION" in source
     assert 'expect_platform="macos"' in source
+    assert 'release_id(version, source_git_sha)' in source
 
 
 def test_launch_wrappers_use_recorded_absolute_runtime_paths_not_shell_path() -> None:
@@ -173,6 +182,8 @@ def test_launch_wrappers_use_recorded_absolute_runtime_paths_not_shell_path() ->
     assert ".pyenv/versions/*/bin/python3" in postinstall
     assert "Python >= 3.11" in postinstall
     assert "Node.js >= 22.13" in postinstall
+    assert 'RELEASE_ID="__PLASMA_RELEASE_ID__"' in postinstall
+    assert 'RELEASE_ROOT="$PRODUCT_ROOT/releases/$RELEASE_ID"' in postinstall
     assert "source " not in manager
     assert "source " not in console
 

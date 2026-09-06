@@ -65,7 +65,9 @@ def test_build_and_verify_linux_control_station_tar_gz_with_clean_extraction(
         build_timestamp=BUILD_TIMESTAMP,
     )
 
-    assert artifact.name == f"plasma-control-station-{PRODUCT_VERSION}-linux-x86_64.tar.gz"
+    assert artifact.name == (
+        f"plasma-control-station-{PRODUCT_VERSION}-{GIT_SHA[:12]}-linux-x86_64.tar.gz"
+    )
     assert Path(str(artifact) + ".sha256").is_file()
 
     clean = tmp_path / "clean"
@@ -108,7 +110,9 @@ def test_windows_control_station_uses_zip_and_normalizes_amd64(tmp_path: Path) -
         build_timestamp=BUILD_TIMESTAMP,
     )
 
-    assert artifact.name == f"plasma-control-station-{PRODUCT_VERSION}-windows-x86_64.zip"
+    assert artifact.name == (
+        f"plasma-control-station-{PRODUCT_VERSION}-{GIT_SHA[:12]}-windows-x86_64.zip"
+    )
     result = product_release.verify_release(
         artifact,
         expect_role="control-station",
@@ -137,6 +141,37 @@ def test_ppu_release_has_ppu_contracts_and_python_component_only(tmp_path: Path)
         "plasma_protocol": "3.3",
         "web_rest_api": "3",
     }
+
+
+def test_same_version_different_source_sha_produce_distinct_artifact_names(tmp_path: Path) -> None:
+    runtime = make_runtime(tmp_path)
+    first_sha = "1" * 40
+    second_sha = "2" * 40
+
+    first = product_release.build_release(
+        repo_root=REPO_ROOT,
+        runtime_dir=runtime,
+        output_dir=tmp_path / "out",
+        role="ppu",
+        platform_name="linux",
+        architecture="armv7l",
+        git_sha=first_sha,
+        build_timestamp=BUILD_TIMESTAMP,
+    )
+    second = product_release.build_release(
+        repo_root=REPO_ROOT,
+        runtime_dir=runtime,
+        output_dir=tmp_path / "out",
+        role="ppu",
+        platform_name="linux",
+        architecture="armv7l",
+        git_sha=second_sha,
+        build_timestamp=BUILD_TIMESTAMP,
+    )
+
+    assert first.name != second.name
+    assert f"-{first_sha[:12]}-" in first.name
+    assert f"-{second_sha[:12]}-" in second.name
 
 
 def test_unsupported_target_fails_closed(tmp_path: Path) -> None:
