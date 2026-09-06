@@ -209,3 +209,6 @@ jobs:
 
       - name: Validate Phase 4.2AL lifecycle-aware actionable-gap classification
         run: python data/device-catalog/research/test_stm32f4_phase4_2al_lifecycle_gap_classification.py
+
+      - name: Validate Phase 4.3A next STM32 family prioritization
+        run: python data/device-catalog/research/test_stm32_phase4_3a_next_family_prioritization.py
