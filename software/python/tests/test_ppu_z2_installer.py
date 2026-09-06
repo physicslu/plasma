@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
-import os
 import sys
 import tarfile
 import types
@@ -226,7 +225,13 @@ def test_gateway_bind_is_explicit_and_not_wildcard() -> None:
             installer._validate_gateway_host(value)
 
 
-def test_failed_activation_restores_previous_current_release(
+def test_local_health_probe_is_explicitly_proxy_free() -> None:
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "ProxyHandler({})" in source
+    assert "build_opener" in source
+
+
+def test_failed_activation_restores_previous_release_config_and_units(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -244,12 +249,21 @@ def test_failed_activation_restores_previous_current_release(
     paths.current.parent.mkdir(parents=True, exist_ok=True)
     paths.current.symlink_to(previous)
 
+    old_config = "old-config\n"
+    old_server = "old-server-unit\n"
+    old_gateway = "old-gateway-unit\n"
+    paths.config_root.mkdir(parents=True)
+    paths.systemd_root.mkdir(parents=True)
+    (paths.config_root / "ppu.yaml").write_text(old_config, encoding="utf-8")
+    (paths.systemd_root / "plasma-server.service").write_text(old_server, encoding="utf-8")
+    (paths.systemd_root / "plasma-web.service").write_text(old_gateway, encoding="utf-8")
+
     monkeypatch.setattr(installer, "_chown_tree", lambda *args: None)
     monkeypatch.setattr(installer.os, "chown", lambda *args: None)
     monkeypatch.setattr(
         installer.pwd,
         "getpwnam",
-        lambda name: types.SimpleNamespace(pw_uid=1001),
+        lambda name: types.SimpleNamespace(pw_uid=1001, pw_gid=1001),
     )
     monkeypatch.setattr(
         installer.grp,
@@ -270,7 +284,7 @@ def test_failed_activation_restores_previous_current_release(
         "3.11.9",
         "armv7l",
     )
-    with pytest.raises(installer.Z2InstallerError, match="rolled back"):
+    with pytest.raises(installer.Z2InstallerError, match="previous configuration/release was restored"):
         installer.install_release(
             verified,
             python_runtime=runtime,
@@ -285,8 +299,67 @@ def test_failed_activation_restores_previous_current_release(
         )
 
     assert paths.current.resolve() == previous.resolve()
+    assert (paths.config_root / "ppu.yaml").read_text(encoding="utf-8") == old_config
+    assert (paths.systemd_root / "plasma-server.service").read_text(encoding="utf-8") == old_server
+    assert (paths.systemd_root / "plasma-web.service").read_text(encoding="utf-8") == old_gateway
+    assert ("daemon-reload",) in calls
     assert ("restart", "plasma-server.service") in calls
     assert ("restart", "plasma-web.service") in calls
+
+
+def test_first_install_failure_removes_candidate_managed_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact = _fake_release(tmp_path)
+    verified = installer.verify_release(artifact, extract_to=tmp_path / "verified")
+    paths = installer.InstallPaths(
+        product_root=tmp_path / "opt" / "plasma",
+        config_root=tmp_path / "etc" / "plasma",
+        state_root=tmp_path / "var" / "lib" / "plasma",
+        log_root=tmp_path / "var" / "log" / "plasma",
+        systemd_root=tmp_path / "etc" / "systemd" / "system",
+    )
+    monkeypatch.setattr(installer, "_chown_tree", lambda *args: None)
+    monkeypatch.setattr(installer.os, "chown", lambda *args: None)
+    monkeypatch.setattr(
+        installer.pwd,
+        "getpwnam",
+        lambda name: types.SimpleNamespace(pw_uid=1001, pw_gid=1001),
+    )
+    monkeypatch.setattr(
+        installer.grp,
+        "getgrnam",
+        lambda name: types.SimpleNamespace(gr_gid=1001),
+    )
+    calls: list[tuple[str, ...]] = []
+
+    with pytest.raises(installer.Z2InstallerError, match="restored"):
+        installer.install_release(
+            verified,
+            python_runtime=installer.PythonRuntime(
+                paths.product_root / "python" / "3.11.9" / "bin" / "python3",
+                "3.11.9",
+                "armv7l",
+            ),
+            gateway_host="192.168.2.99",
+            paths=paths,
+            ppu_id="z2-dev-01",
+            facility_id="lab",
+            display_name="Plasma Z2 PS",
+            systemctl=lambda *args: calls.append(args),
+            health_check=lambda host: (_ for _ in ()).throw(
+                installer.Z2InstallerError("synthetic readiness failure")
+            ),
+            ensure_service_account=lambda: None,
+        )
+
+    assert not paths.current.exists() and not paths.current.is_symlink()
+    assert not (paths.config_root / "ppu.yaml").exists()
+    assert not (paths.systemd_root / "plasma-server.service").exists()
+    assert not (paths.systemd_root / "plasma-web.service").exists()
+    assert ("disable", "--now", "plasma-web.service") in calls
+    assert ("disable", "--now", "plasma-server.service") in calls
 
 
 def test_bootstrap_source_does_not_import_project_or_python311_only_tomllib() -> None:
