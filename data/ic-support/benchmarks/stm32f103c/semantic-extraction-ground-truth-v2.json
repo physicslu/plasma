@@ -17,7 +17,7 @@
         "page_size_bytes": 1024,
         "page_count": 64,
         "package_hardware": {
-          "package": "LQFP",
+          "package_family": "LQFP",
           "pin_count": 48,
           "debug_programming_interfaces": ["SWD", "JTAG"]
         }
@@ -28,7 +28,7 @@
         "page_size_bytes": 1024,
         "page_count": 128,
         "package_hardware": {
-          "package": "LQFP",
+          "package_family": "LQFP",
           "pin_count": 48,
           "debug_programming_interfaces": ["SWD", "JTAG"]
         }
