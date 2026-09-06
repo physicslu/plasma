@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2ak-f469-f479-bt-lifecycle-2026-09-06",
+  "targets": [
+    {
+      "base_device": "STM32F469BE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469be.html",
+      "selection_reason": "Phase 4.2 residual B/T 512-KiB STM32F469 lifecycle characterization"
+    },
+    {
+      "base_device": "STM32F469BG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469bg.html",
+      "selection_reason": "Phase 4.2 residual B/T 1024-KiB STM32F469 lifecycle characterization"
+    },
+    {
+      "base_device": "STM32F469BI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469bi.html",
+      "selection_reason": "Phase 4.2 residual B/T 2048-KiB STM32F469 lifecycle characterization"
+    },
+    {
+      "base_device": "STM32F479BG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479bg.html",
+      "selection_reason": "Phase 4.2 residual B/T 1024-KiB STM32F479 lifecycle characterization"
+    },
+    {
+      "base_device": "STM32F479BI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479bi.html",
+      "selection_reason": "Phase 4.2 residual B/T 2048-KiB STM32F479 lifecycle characterization"
+    }
+  ],
+  "lifecycle_closure_scope": {
+    "family": "STM32F4",
+    "pin_package_surface": "B/T",
+    "base_devices": [
+      "STM32F469BE",
+      "STM32F469BG",
+      "STM32F469BI",
+      "STM32F479BG",
+      "STM32F479BI"
+    ],
+    "production_exact_icpns_before": 384,
+    "production_base_devices_before": 139,
+    "policy_change_authorized": false,
+    "production_write_authorized": false,
+    "fail_closed": true
+  }
+}

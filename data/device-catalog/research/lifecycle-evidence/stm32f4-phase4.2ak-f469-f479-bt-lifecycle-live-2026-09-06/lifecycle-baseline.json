@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2ak-f469-f479-bt-lifecycle-2026-09-06",
+  "canonical_dataset_admission": false,
+  "policy_change_authorized": false,
+  "production_write_authorized": false,
+  "source_discovery": {
+    "workflow_run_id": 34013977825,
+    "artifact_id": 9983397262,
+    "artifact_zip_sha256": "b26ff78897c83b988300d0c8b5d5e764d60434957cef6af50eedb23ae7283a22",
+    "pilot_summary_sha256": "f85712cc4b4c122bcda44e0d57c205e52871fc682fe2c1c3ff3edcb59bb35dd0",
+    "source_commit": "f75188f17924738fa3563dfcda199e6d647e7609"
+  },
+  "production_invariants": {
+    "stm32f4_exact_icpns": 384,
+    "stm32f4_base_devices": 139,
+    "st_exact_icpns": 459,
+    "st_base_devices": 157,
+    "stm32f4_catalog_sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359",
+    "residual_gap_base_devices": 10,
+    "policy_ready_base_devices": 0,
+    "policy_blocked_base_devices": 10
+  },
+  "lifecycle_status_counts": {
+    "NRND": 6,
+    "total": 6
+  },
+  "targets": [
+    {
+      "base_device": "STM32F469BE",
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F469BET6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ]
+    },
+    {
+      "base_device": "STM32F469BG",
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F469BGT6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ]
+    },
+    {
+      "base_device": "STM32F469BI",
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F469BIT6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        },
+        {
+          "icpn": "STM32F469BIT7",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ]
+    },
+    {
+      "base_device": "STM32F479BG",
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F479BGT6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ]
+    },
+    {
+      "base_device": "STM32F479BI",
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F479BIT6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ]
+    }
+  ]
+}

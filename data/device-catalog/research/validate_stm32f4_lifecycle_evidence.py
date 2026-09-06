@@ -47,6 +47,30 @@ def validate_lifecycle_evidence(evidence_dir: Path) -> dict[str, Any]:
     pilot = read_json(evidence_dir / "pilot-summary.json")
     provenance = read_json(evidence_dir / "provenance.json")
 
+    expected_targets = baseline.get("targets")
+    require(isinstance(expected_targets, list) and expected_targets, "baseline targets mismatch")
+    expected = {
+        item["base_device"]: item["excluded_non_active_part_numbers"]
+        for item in expected_targets
+    }
+    require(len(expected) == len(expected_targets), "baseline target identities are not unique")
+    target_count = len(expected)
+    lifecycle_counts = baseline.get("lifecycle_status_counts")
+    require(isinstance(lifecycle_counts, dict), "baseline lifecycle counts missing")
+    require(set(lifecycle_counts) <= {"NRND", "Proposal", "total"}, "unsupported baseline lifecycle count")
+    require(
+        all(type(lifecycle_counts.get(status, 0)) is int and lifecycle_counts.get(status, 0) >= 0 for status in ("NRND", "Proposal")),
+        "invalid baseline lifecycle status count",
+    )
+    expected_exclusions = lifecycle_counts.get("total")
+    require(type(expected_exclusions) is int and expected_exclusions > 0, "invalid baseline exclusion total")
+    expected_status_counts = {
+        status: lifecycle_counts.get(status, 0)
+        for status in ("NRND", "Proposal")
+        if lifecycle_counts.get(status, 0) > 0
+    }
+    require(sum(expected_status_counts.values()) == expected_exclusions, "baseline lifecycle accounting mismatch")
+
     require(provenance.get("schema_version") == 1, "provenance schema mismatch")
     require(provenance.get("evidence_id") == manifest["evidence_id"], "evidence ID mismatch")
     require(provenance.get("manufacturer") == MANUFACTURER, "manufacturer mismatch")
@@ -55,12 +79,12 @@ def validate_lifecycle_evidence(evidence_dir: Path) -> dict[str, Any]:
     require(isinstance(executed_sha, str) and GIT_SHA_RE.fullmatch(executed_sha), "invalid Git SHA")
     require(provenance.get("acquisition_transport") == TRANSPORT, "transport mismatch")
     require(provenance.get("headed") is True, "lifecycle evidence must use headed Chromium")
-    require(provenance.get("target_count") == 5, "provenance target count mismatch")
-    require(provenance.get("acquisition_success") == 5, "provenance success count mismatch")
+    require(provenance.get("target_count") == target_count, "provenance target count mismatch")
+    require(provenance.get("acquisition_success") == target_count, "provenance success count mismatch")
     require(provenance.get("acquisition_failure") == 0, "provenance failure count mismatch")
     require(provenance.get("exact_icpn_candidate_count") == 0, "Active candidate count must be zero")
-    require(provenance.get("lifecycle_exclusion_count") == 7, "exclusion count mismatch")
-    require(provenance.get("lifecycle_status_counts") == {"NRND": 6, "Proposal": 1}, "status counts mismatch")
+    require(provenance.get("lifecycle_exclusion_count") == expected_exclusions, "exclusion count mismatch")
+    require(provenance.get("lifecycle_status_counts") == expected_status_counts, "status counts mismatch")
     require(provenance.get("canonical_dataset_admission") is False, "canonical admission must be denied")
     require(provenance.get("policy_change_authorized") is False, "policy change must be denied")
     require(provenance.get("production_write_authorized") is False, "Production write must be denied")
@@ -84,21 +108,15 @@ def validate_lifecycle_evidence(evidence_dir: Path) -> dict[str, Any]:
     require(pilot.get("browser_scope") == "pilot", "browser scope mismatch")
     require(pilot.get("acquisition_transport") == TRANSPORT, "pilot transport mismatch")
     require(pilot.get("canonical_dataset_admission") is False, "pilot canonical admission must be denied")
-    require(pilot.get("attempted") == 5, "pilot target count mismatch")
-    require(pilot.get("acquisition_success") == 5 and pilot.get("acquisition_failure") == 0, "pilot acquisition incomplete")
+    require(pilot.get("attempted") == target_count, "pilot target count mismatch")
+    require(pilot.get("acquisition_success") == target_count and pilot.get("acquisition_failure") == 0, "pilot acquisition incomplete")
     require(pilot.get("exact_icpn_candidates") == 0, "pilot exposed an Active candidate")
-    require(pilot.get("canonical_mapping") == {"unique": 0, "ambiguous": 0, "unmapped": 5}, "pilot mapping mismatch")
-    require(pilot.get("openocd_cfg_mapping") == {"mapped": 0, "total": 5}, "pilot OpenOCD mapping mismatch")
-    require(pilot.get("manual_intervention_required") == 5, "pilot manual-intervention accounting mismatch")
+    require(pilot.get("canonical_mapping") == {"unique": 0, "ambiguous": 0, "unmapped": target_count}, "pilot mapping mismatch")
+    require(pilot.get("openocd_cfg_mapping") == {"mapped": 0, "total": target_count}, "pilot OpenOCD mapping mismatch")
+    require(pilot.get("manual_intervention_required") == target_count, "pilot manual-intervention accounting mismatch")
 
-    expected_targets = baseline.get("targets")
-    require(isinstance(expected_targets, list) and len(expected_targets) == 5, "baseline targets mismatch")
-    expected = {
-        item["base_device"]: item["excluded_non_active_part_numbers"]
-        for item in expected_targets
-    }
     results = pilot.get("results")
-    require(isinstance(results, list) and len(results) == 5, "pilot result set mismatch")
+    require(isinstance(results, list) and len(results) == target_count, "pilot result set mismatch")
     observed: dict[str, list[dict[str, str]]] = {}
     statuses: Counter[str] = Counter()
     for result in results:
@@ -142,14 +160,13 @@ def validate_lifecycle_evidence(evidence_dir: Path) -> dict[str, Any]:
         observed[base] = normalized
 
     require(observed == expected, "retained lifecycle evidence differs from frozen baseline")
-    require(dict(statuses) == {"NRND": 6, "Proposal": 1}, "observed lifecycle status counts mismatch")
-    require(baseline.get("lifecycle_status_counts") == {"NRND": 6, "Proposal": 1, "total": 7}, "baseline lifecycle counts mismatch")
+    require(dict(statuses) == expected_status_counts, "observed lifecycle status counts mismatch")
     return {
         "evidence_id": manifest["evidence_id"],
-        "targets": 5,
-        "acquisition_success": 5,
+        "targets": target_count,
+        "acquisition_success": target_count,
         "exact_icpn_candidates": 0,
-        "lifecycle_exclusions": 7,
+        "lifecycle_exclusions": expected_exclusions,
         "lifecycle_status_counts": dict(statuses),
         "canonical_dataset_admission": False,
         "policy_change_authorized": False,
