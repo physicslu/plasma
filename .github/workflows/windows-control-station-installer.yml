@@ -60,6 +60,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
+      - name: Resolve release identity
+        id: identity
+        shell: pwsh
+        run: |
+          $version = python -c "import json; print(json.load(open('release/product.json'))['product_version'])"
+          $shaPrefix = "${{ github.sha }}".Substring(0, 12)
+          "value=$version-$shaPrefix" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - name: Fetch pinned self-contained target runtimes
         shell: pwsh
         run: |
@@ -150,7 +157,7 @@ jobs:
       - name: Upload unsigned Windows installer pilot
         uses: actions/upload-artifact@v4
         with:
-          name: plasma-control-station-windows-installer-pilot
+          name: plasma-control-station-windows-installer-${{ steps.identity.outputs.value }}
           path: |
             ${{ runner.temp }}/plasma-windows-installer/*.msi
             ${{ runner.temp }}/plasma-windows-installer/*.sha256
