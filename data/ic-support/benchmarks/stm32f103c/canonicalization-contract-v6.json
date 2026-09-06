@@ -1,0 +1,35 @@
+{
+  "schema_version": "0.7.0",
+  "canonicalization_id": "stm32f103c-canonicalization-v6",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "semantic_schema_id": "plasma://ic-support/stm32f103c/semantic-extraction-v6",
+  "canonical_schema_id": "plasma://ic-support/stm32f103c/canonical-spec-v0",
+  "base_relationship_canonicalization_contract": "canonicalization-contract-v5.json",
+  "relationship_derivation": {
+    "security": {
+      "scope": "benchmark_profile_projection_only",
+      "source": "evidence_backed_applicability",
+      "applicability_file": "security-applicability-v0.json",
+      "complete_same_contract": "shared",
+      "complete_different_contract": "different",
+      "incomplete": "unknown"
+    }
+  },
+  "trust_boundary": {
+    "generation_visibility": false,
+    "ai_emits_programming_relationship": false,
+    "ai_emits_option_relationship": false,
+    "ai_emits_security_relationship": false,
+    "ai_emits_memory_geometry_relationship": false,
+    "ai_emits_package_hardware_relationship": false,
+    "relationship_inference_from_free_form_text": false,
+    "relationship_substring_matching": false,
+    "relationship_regex_inference": false,
+    "relationship_fuzzy_matching": false,
+    "security_relationship_from_raw_generated_field_equality": false,
+    "security_relationship_implies_destructive_transition_safety": false,
+    "destructive_security_operation_admission": false,
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  }
+}
