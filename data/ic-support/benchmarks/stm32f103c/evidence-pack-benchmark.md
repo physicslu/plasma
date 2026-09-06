@@ -71,6 +71,50 @@ This is a **capacity diagnostic**, not an accuracy benchmark. It does not read g
 
 If the deterministic Evidence Pack still exceeds the bounded context budget, the next engineering step is finer task-specific evidence selection / Target Evidence Bundles, not silent truncation.
 
+### 2.1 Run one bounded native-Ollama extraction for quality scoring
+
+The OpenAI-compatible endpoint is retained for controlled Full-vs-Pack A/B trials, but it does not provide a portable request field for selecting Ollama context size. For a single-arm capacity-to-quality follow-up, use `ollama_extraction_run.py`, which calls Ollama native `/api/chat` and records the explicit context budget in the run artifact.
+
+The generator does not read the benchmark answer key. It reuses the exact prepared arm, prompt template, observed schema, source digests, and evidence-page set from the A/B harness.
+
+Example for the measured 64K Reduced arm:
+
+```bash
+python data/ic-support/benchmarks/stm32f103c/ollama_extraction_run.py \
+  --workspace /tmp/plasma-ab \
+  --output-dir /tmp/plasma-ab-64k-reduced \
+  --ollama-url http://127.0.0.1:11434 \
+  --model qwen3.8:27b-mlx \
+  --runtime-label local-ollama-qwen3.8-27b-mlx-64k \
+  --arm reduced_context \
+  --num-ctx 65536 \
+  --max-tokens 4096 \
+  --temperature 0 \
+  --seed 7 \
+  --timeout-seconds 1800
+```
+
+The native request is fail-closed with:
+
+```text
+stream = false
+think = false
+truncate = false
+shift = false
+```
+
+The run artifact records runtime-reported prompt/evaluation token counts, cached prompt tokens, model durations, exact rendered-prompt digest, supplied Evidence pages, context budget, and the parsed `observed + evidence` response. Non-streaming native chat intentionally reports no TTFT.
+
+After generation, score only the retained run artifact in a separate process:
+
+```bash
+python data/ic-support/benchmarks/stm32f103c/score_single_run.py \
+  --run /tmp/plasma-ab-64k-reduced/reduced_context.run.json \
+  --output /tmp/plasma-ab-64k-reduced/score.json
+```
+
+This single-run score answers a narrower question than the paired A/B benchmark: whether the already-proven 64K Reduced capacity point can produce a schema-valid, evidence-cited extraction with acceptable field-level correctness. It does **not** establish Full-vs-Pack non-regression because there is no paired Full run under the same transport/configuration.
+
 ### 3. Run paired trials
 
 ```bash
