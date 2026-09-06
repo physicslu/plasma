@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1.0",
+  "applicability_id": "stm32f103c-option-applicability-v0",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "authority_file": "../../evidence-pack/fixtures/stm32f103c-foundation-v0.json",
+  "relationship_scope": "benchmark_profile_projection_only",
+  "option_contract_id": "stm32f10xxx-programming-manual-v0",
+  "contract_identity_semantics": "evidence_pack_identity_for_benchmark_relationship_only",
+  "targets": {
+    "STM32F103C8T6": {
+      "contract_id": "stm32f10xxx-programming-manual-v0",
+      "applicability_claim_id": "pm-f10xxx",
+      "manufacturer_expression": "STM32F10xxx",
+      "evidence": [
+        {"source_id": "st_pm0075_rev2", "physical_page_index": 0}
+      ]
+    },
+    "STM32F103CBT6": {
+      "contract_id": "stm32f10xxx-programming-manual-v0",
+      "applicability_claim_id": "pm-f10xxx",
+      "manufacturer_expression": "STM32F10xxx",
+      "evidence": [
+        {"source_id": "st_pm0075_rev2", "physical_page_index": 0}
+      ]
+    }
+  },
+  "canonical_dataset_admission": false,
+  "production_admission": false
+}
