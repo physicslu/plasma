@@ -120,17 +120,46 @@ def _docker_preflight() -> bool:
     return installed
 
 
+def _release_artifact_from_builder_output(
+    stdout: str,
+    *,
+    repo: Path,
+    release_dir: Path,
+) -> Path:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if len(lines) != 1:
+        raise AcceptanceError(
+            f"PPU release builder must emit exactly one artifact path, got {lines!r}"
+        )
+    artifact = Path(lines[0])
+    if not artifact.is_absolute():
+        artifact = repo / artifact
+    artifact = artifact.resolve()
+    release_root = release_dir.resolve()
+    if artifact.parent != release_root:
+        raise AcceptanceError(
+            f"PPU release builder emitted artifact outside release directory: {artifact}"
+        )
+    if not artifact.is_file():
+        raise AcceptanceError(f"canonical PPU release artifact is missing: {artifact}")
+    return artifact
+
+
 def _build_release(repo: Path, work: Path, python: Path, git_sha: str, version: str) -> tuple[Path, Path, str]:
     runtime = work / "build-runtime"
     release = work / "release"
     extracted = work / "extracted"
     _run([str(python), "scripts/ppu-runtime.py", "build", "--output-dir", str(runtime)], cwd=repo)
     _run([str(python), "scripts/ppu-runtime.py", "validate", str(runtime)], cwd=repo)
-    _run([str(python), "scripts/ppu-release.py", "--runtime-dir", str(runtime), "--output-dir", str(release), "--git-sha", git_sha], cwd=repo)
-    archive = release / f"plasma-ppu-{version}-linux-armv7l.tar.gz"
+    release_build = _run([str(python), "scripts/ppu-release.py", "--runtime-dir", str(runtime), "--output-dir", str(release), "--git-sha", git_sha], cwd=repo)
+    archive = _release_artifact_from_builder_output(
+        release_build.stdout,
+        repo=repo,
+        release_dir=release,
+    )
     sidecar = Path(str(archive) + ".sha256")
-    if not archive.is_file() or not sidecar.is_file():
-        raise AcceptanceError("canonical ARMv7 release was not produced")
+    if not sidecar.is_file():
+        raise AcceptanceError(f"canonical ARMv7 release sidecar is missing: {sidecar}")
     parts = sidecar.read_text(encoding="utf-8").strip().split()
     actual_sha = _sha256(archive)
     if len(parts) != 2 or parts[0] != actual_sha or parts[1] != archive.name:
