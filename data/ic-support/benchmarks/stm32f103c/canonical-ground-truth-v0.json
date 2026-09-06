@@ -1,0 +1,56 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "stm32f103c-canonical-spec-v0",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "canonicalization_id": "stm32f103c-canonicalization-v0",
+  "status": "source_locked_canonical_ground_truth",
+  "expected": {
+    "profile_relationships": {
+      "programming": "shared",
+      "memory_geometry": "different",
+      "package_hardware": "shared",
+      "option": "shared",
+      "security": "shared"
+    },
+    "targets": {
+      "STM32F103C8T6": {
+        "icpn": "STM32F103C8T6",
+        "manufacturer_device_reference": "STM32F103x8",
+        "commercial_part_base": "STM32F103C8",
+        "flash_size_bytes": 65536,
+        "page_size_bytes": 1024,
+        "page_count": 64
+      },
+      "STM32F103CBT6": {
+        "icpn": "STM32F103CBT6",
+        "manufacturer_device_reference": "STM32F103xB",
+        "commercial_part_base": "STM32F103CB",
+        "flash_size_bytes": 131072,
+        "page_size_bytes": 1024,
+        "page_count": 128
+      }
+    },
+    "programming_contract": {
+      "program_granularity_bytes": 2,
+      "unlock_keys": [
+        "0x45670123",
+        "0xCDEF89AB"
+      ],
+      "write_erase_requires_hsi": true
+    },
+    "option_contract": {
+      "region_start": "0x1FFFF800",
+      "region_size_bytes": 16,
+      "encoding": "byte_plus_complement"
+    },
+    "security_contract": {
+      "read_unprotect_is_destructive": true,
+      "write_protection_granularity_bytes": 4096
+    }
+  },
+  "trust_boundary": {
+    "visible_to_generation": false,
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  }
+}
