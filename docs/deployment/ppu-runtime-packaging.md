@@ -41,9 +41,9 @@ python3 ppu/ppu.pyz gateway <gateway arguments>
 
 The `gateway` CLI subcommand is an implementation identifier; the running northbound service is the **Plasma Gateway**.
 
-The PPU runtime does not contain the Control Console, Plasma Manager, Node.js/npm payloads, Git metadata, tests, FPGA bitstreams, or PL/real-target activation logic.
+The PPU runtime does not contain the Control Console, Plasma Manager, Node.js/npm payloads, Git metadata, tests, FPGA bitstreams, PL access, or real-target activation logic.
 
-The production Device Catalog is included as runtime data so the Plasma Gateway does not depend on a source-tree-relative `data/` directory when later Device Catalog routes are used. A deployed service should set `PLASMA_DEVICE_CATALOG_MANIFEST` to the installed manifest path.
+The production Device Catalog is included as runtime data so the Plasma Gateway does not depend on a source-tree-relative `data/` directory when later Device Catalog routes are used. A deployed service sets `PLASMA_DEVICE_CATALOG_MANIFEST` to the installed manifest path.
 
 ## Canonical release
 
@@ -57,7 +57,7 @@ platform     = linux
 architecture = armv7l
 ```
 
-The resulting artifact is conceptually:
+The resulting release artifact is:
 
 ```text
 plasma-ppu-<version>-linux-armv7l.tar.gz
@@ -87,60 +87,72 @@ python3 scripts/ppu-release.py \
 
 The target PPU does not need Git, npm, Node.js, Vite, or a source checkout merely to run the packaged PPU runtime.
 
-## GitHub Actions release artifact
+## GitHub Actions release and installer kit
 
-`.github/workflows/ppu-release.yml` provides the CI build boundary for the same canonical `ppu/linux/armv7l` release. It runs on relevant pull requests and can also be started explicitly with `workflow_dispatch`.
+`.github/workflows/ppu-release.yml` provides the CI build boundary for the canonical `ppu/linux/armv7l` release. It runs on relevant pull requests and can also be started explicitly with `workflow_dispatch`.
 
 The workflow:
 
 ```text
 checkout
-  -> install Python build/test dependencies
-  -> PPU packaging regression tests
+  -> Python 3.10 bootstrap compatibility regression
+  -> install Python 3.12 build/test dependencies
+  -> PPU packaging + installer regression tests
   -> build + validate ppu-runtime
   -> build canonical linux-armv7l release
   -> Common Release Format clean verification
   -> closed hardware-boundary verification
   -> detached SHA-256 verification
-  -> upload GitHub Actions artifact
+  -> independent Z2-installer release verification
+  -> ARMv7 userspace/network acceptance
+  -> upload GitHub Actions artifacts
 ```
 
-The uploaded Actions artifact is a transport envelope containing exactly the deployable release archive and its detached digest:
+The deployable Actions transport envelope contains:
 
 ```text
 plasma-ppu-<version>-linux-armv7l.tar.gz
 plasma-ppu-<version>-linux-armv7l.tar.gz.sha256
+plasma-ppu-z2-installer.py
+plasma-ppu-z2-installer.py.sha256
 ```
 
-Pull-request artifacts are validation evidence for the PR merge ref and must not be confused with a released `main` build. For a Z2 deployment candidate, run the workflow explicitly against the intended `main` revision and retain the resulting artifact/SHA evidence. This workflow does not deploy to a Z2 and does not create a GitHub Release.
+The installer is a bootstrap transport component rather than part of the Common Release Format payload. Pull-request artifacts are validation evidence for the PR merge ref and must not be confused with a released `main` build. For a Z2 deployment candidate, run the workflow explicitly against the intended `main` revision and retain the resulting artifact/SHA evidence. CI does not deploy to a Z2 and does not create a GitHub Release.
 
-## Z2 deployment prerequisites
+## Z2 deployment prerequisites and Python ownership
 
-Before mutating the Z2, run the existing read-only PPU readiness audit on the target and record the result:
+ADR-0001 requires Plasma to remain isolated from the PYNQ System Python.
+
+The current real development board baseline is ARMv7 PynqLinux 3.0, glibc 2.35, systemd 249, PYNQ 3.1.1, and System Python 3.10.4. Plasma requires Python >= 3.11, so `/usr/bin/python3` and the PYNQ venv are not valid Plasma service interpreters.
+
+The installer therefore requires an explicit, separately qualified interpreter below:
+
+```text
+/opt/plasma/python/
+```
+
+It validates that interpreter by actually starting it and checking Python >= 3.11 plus ARMv7 identity. It does not upgrade or replace the System Python.
+
+When the read-only `product-deploy.py` audit is available on the target, it should be executed with the effective isolated Plasma interpreter rather than the PYNQ Python 3.10 interpreter:
 
 ```bash
-python3 product-deploy.py audit ppu --json
+/opt/plasma/python/<version>/bin/python3 product-deploy.py audit ppu --json
 ```
 
-The current product baseline requires:
+An isolated-runtime failure is a deployment blocker. Do not weaken the Python requirement or reinterpret a System-Python failure as product readiness.
 
-- Linux on an ARM target;
-- Python >= 3.11;
-- system-level systemd;
-- network reachability suitable for the Control Station Manager to reach the PPU Plasma Gateway Endpoint.
-
-An audit failure is a deployment blocker to resolve explicitly. Do not bypass a Python/runtime mismatch by claiming the product runtime has been validated.
+The detailed installer contract and current real-Z2 procedure are defined in [PYNQ-Z2 PS Installer and Managed Loopback Acceptance](z2-ps-installer.md).
 
 ## Phase-1 PS-only configuration
 
-The first Z2 deployment must keep Site/hardware execution closed. A valid PS-only Plasma Server configuration may declare the canonical PPU identity and zero active Sites while the PS diagnostic route is being accepted:
+The first Z2 deployment must keep Site/hardware execution closed. The installer writes the canonical PPU identity with zero active Sites while the PS diagnostic route is being accepted:
 
 ```yaml
 ppu:
   id: z2-dev-01
   facility_id: lab
   model: PYNQ-Z2
-  display_name: Plasma Z2 PS Phase 1
+  display_name: Plasma Z2 PS
 
 server:
   host: 127.0.0.1
@@ -161,24 +173,24 @@ This is not a claim that the physical PPU has zero Sites. It is a deliberate fai
 
 ## Service topology
 
-The intended first Z2 service topology is:
+The Z2 PS installer creates system-level units with an explicit Plasma-owned interpreter:
 
 ```text
 systemd
 ├── plasma-server.service
-│     -> Python >= 3.11
-│     -> ppu.pyz server
+│     -> /opt/plasma/python/.../python3 >= 3.11
+│     -> /opt/plasma/current/runtime/ppu/ppu.pyz server
 │     -> 127.0.0.1:9900
 └── plasma-web.service
-      -> Python >= 3.11
-      -> ppu.pyz gateway
-      -> externally reachable Plasma Gateway port (normally 18080)
+      -> /opt/plasma/python/.../python3 >= 3.11
+      -> /opt/plasma/current/runtime/ppu/ppu.pyz gateway
+      -> explicit trusted Z2 IPv4 :18080
       -> local Plasma Server 127.0.0.1:9900
 ```
 
 `plasma-web.service` is the existing systemd unit name and remains unchanged for compatibility. Its product role is Plasma Gateway.
 
-The Plasma Gateway listen address is a deployment/security choice. Do not default an externally reachable service to an arbitrary public interface without confirming the intended trusted network path. The Plasma Server remains loopback-only.
+The installer requires an explicit non-loopback unicast IPv4 address and rejects wildcard `0.0.0.0` during this qualification stage. The Plasma Server remains loopback-only.
 
 ## Manager enrollment
 
@@ -197,12 +209,14 @@ After enrollment, the Control Station selected PPU alias can be switched from th
 The first runtime evidence must prove the real deployed process chain, not only package integrity:
 
 ```text
-Z2 readiness audit                         PASS
-Z2 plasma-server service                  active
-Z2 plasma-web service                     active
+isolated Plasma Python                     PASS
+Z2 installer local activation              PASS
+Z2 plasma-server service                   active
+Z2 plasma-web service                      active
 GET Z2 /api/health/ready                  PASS
 Control Station Manager selected alias    z2
 Managed PS Loopback                       PASS
+PYNQ System Python/PYNQ regression         PASS
 ```
 
 Run the existing managed runtime scenario from the Control Station using its BFF base URL:
@@ -215,11 +229,12 @@ python3 scripts/runtime_acceptance/run.py ps-loopback \
 
 A PASS proves only the PS software node and network/control-plane path. It does **not** prove PS <-> PL, FPGA execution, PMOD/Site I/O, target power, socket behavior, or real IC programming.
 
-## Deferred after Phase 1
+## Deferred after this PS installer phase
 
-The following are intentionally outside this milestone:
+The following remain outside this milestone:
 
-- production-grade PPU installer/upgrade/rollback adapter;
+- bundled/embedded Plasma-qualified Python runtime inside the release;
+- production publisher signing/authenticity policy;
 - PL bitstream packaging/loading;
 - FPGA interface activation;
 - physical Site topology enablement;
