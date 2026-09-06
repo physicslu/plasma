@@ -12,7 +12,7 @@ import ab_benchmark as harness
 
 HERE = Path(__file__).resolve().parent
 GROUND_TRUTH = HERE / "extraction-ground-truth.json"
-SCORE_SCHEMA_VERSION = "0.1.0"
+SCORE_SCHEMA_VERSION = "0.2.0"
 
 
 class ABScoreError(RuntimeError):
@@ -37,6 +37,11 @@ def flatten_leaves(value: Any, path: str = "$") -> dict[str, Any]:
             out.update(flatten_leaves(value[key], f"{path}.{key}"))
         return out
     return {path: value}
+
+
+def evidence_path_for_observed_leaf(path: str) -> str:
+    require(path == "$" or path.startswith("$."), f"invalid observed JSONPath: {path}")
+    return "$.observed" + path[1:]
 
 
 def is_missing_or_unknown(value: Any) -> bool:
@@ -69,6 +74,7 @@ def score_run(run: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
             "uncited_assertion_count": 0,
             "out_of_context_citation_count": 0,
             "unsupported_inference_proxy_count": 0,
+            "legacy_evidence_path_count": 0,
             "paths": {},
         }
 
@@ -90,6 +96,7 @@ def score_run(run: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
     uncited_paths: list[str] = []
     out_of_context_paths: list[str] = []
     unsupported_proxy_paths: set[str] = set()
+    legacy_evidence_paths: list[str] = []
 
     for path, expected_value in expected_leaves.items():
         actual = observed_leaves[path]
@@ -103,7 +110,13 @@ def score_run(run: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
 
         if is_missing_or_unknown(actual):
             continue
-        citations = evidence.get(path)
+
+        canonical_evidence_path = evidence_path_for_observed_leaf(path)
+        citations = evidence.get(canonical_evidence_path)
+        if citations is None and path in evidence:
+            citations = evidence.get(path)
+            legacy_evidence_paths.append(path)
+
         valid_citation = False
         invalid_citation = False
         if not isinstance(citations, list) or not citations:
@@ -130,7 +143,13 @@ def score_run(run: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
         if not valid_citation:
             unsupported_proxy_paths.add(path)
 
-    unexpected_evidence_paths = sorted(set(evidence) - set(expected_leaves))
+    canonical_evidence_paths = {
+        evidence_path_for_observed_leaf(path) for path in expected_leaves
+    }
+    legacy_evidence_path_set = set(expected_leaves)
+    unexpected_evidence_paths = sorted(
+        set(evidence) - canonical_evidence_paths - legacy_evidence_path_set
+    )
     total = len(expected_leaves)
     return {
         "status": "scored",
@@ -143,6 +162,7 @@ def score_run(run: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
         "out_of_context_citation_count": len(set(out_of_context_paths)),
         "unsupported_inference_proxy_count": len(unsupported_proxy_paths),
         "unexpected_evidence_path_count": len(unexpected_evidence_paths),
+        "legacy_evidence_path_count": len(legacy_evidence_paths),
         "paths": {
             "wrong": sorted(wrong_paths),
             "missing_unknown": sorted(missing_paths),
@@ -150,6 +170,7 @@ def score_run(run: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
             "out_of_context_citation": sorted(set(out_of_context_paths)),
             "unsupported_inference_proxy": sorted(unsupported_proxy_paths),
             "unexpected_evidence": unexpected_evidence_paths,
+            "legacy_evidence": sorted(legacy_evidence_paths),
         },
     }
 
@@ -304,7 +325,7 @@ def score_results(results_dir: Path) -> dict[str, Any]:
             "exact_accuracy": "Exact field-level match against the source-locked extraction ground truth; arrays count as one leaf field.",
             "wrong_assertion_count": "Asserted non-null/non-unknown leaf values that differ from ground truth.",
             "missing_unknown_count": "Ground-truth leaf fields returned as null or unknown.",
-            "uncited_assertion_count": "Asserted leaf fields without any citation entry.",
+            "uncited_assertion_count": "Asserted leaf fields without any citation entry under the canonical full-response `$.observed...` JSONPath; legacy observed-root paths remain accepted for retained older runs.",
             "out_of_context_citation_count": "Asserted leaf fields containing at least one citation outside the arm's supplied source/page set.",
             "unsupported_inference_proxy_count": "Union of wrong asserted fields and asserted fields lacking any valid in-arm citation. This is a deterministic proxy, not semantic proof that a cited page entails the claim.",
         },
