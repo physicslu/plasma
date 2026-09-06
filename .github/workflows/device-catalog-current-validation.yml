@@ -206,3 +206,6 @@ jobs:
           python data/device-catalog/research/test_stm32f4_phase4_2ak_f469_f479_bt_lifecycle_closure.py
           python data/ic-support/test_phase42ak_lifecycle_closure.py
           PYTHONPATH=software/python python software/python/tests/test_device_catalog_phase42ak.py
+
+      - name: Validate Phase 4.2AL lifecycle-aware actionable-gap classification
+        run: python data/device-catalog/research/test_stm32f4_phase4_2al_lifecycle_gap_classification.py
