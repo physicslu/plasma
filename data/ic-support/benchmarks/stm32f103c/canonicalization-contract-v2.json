@@ -7,12 +7,14 @@
   "base_structured_canonicalization_contract": "canonicalization-contract-v1.json",
   "relationship_derivation": {
     "package_hardware": {
+      "scope": "benchmark_profile_projection_only",
       "source": "per_target_package_hardware_facts",
-      "fields": ["package", "pin_count", "debug_programming_interfaces"],
+      "fields": ["package_family", "pin_count", "debug_programming_interfaces"],
       "interface_list_semantics": "set",
       "complete_equal": "shared",
       "complete_unequal": "different",
-      "incomplete": "unknown"
+      "incomplete": "unknown",
+      "does_not_prove_pin_level_minimum_programming_hardware": true
     }
   },
   "trust_boundary": {
@@ -22,6 +24,7 @@
     "relationship_substring_matching": false,
     "relationship_regex_inference": false,
     "relationship_fuzzy_matching": false,
+    "pin_level_minimum_programming_hardware_admission": false,
     "canonical_dataset_admission": false,
     "production_admission": false
   }
