@@ -86,34 +86,36 @@ jobs:
         run: |
           set -euo pipefail
           version="$(python -c 'import json; print(json.load(open("release/product.json"))["product_version"])')"
+          sha_prefix="$(git rev-parse --short=12 HEAD)"
+          identity="$version-$sha_prefix"
           clean="$RUNNER_TEMP/clean-verifier"
           source="$RUNNER_TEMP/releases"
           mkdir -p "$clean"
           cp scripts/product-release.py "$clean/product-release.py"
-          cp "$source/plasma-control-station-$version-linux-x86_64.tar.gz" "$clean/"
-          cp "$source/plasma-control-station-$version-linux-x86_64.tar.gz.sha256" "$clean/"
-          cp "$source/plasma-control-station-$version-windows-x86_64.zip" "$clean/"
-          cp "$source/plasma-control-station-$version-windows-x86_64.zip.sha256" "$clean/"
-          cp "$source/plasma-ppu-$version-linux-armv7l.tar.gz" "$clean/"
-          cp "$source/plasma-ppu-$version-linux-armv7l.tar.gz.sha256" "$clean/"
+          cp "$source/plasma-control-station-$identity-linux-x86_64.tar.gz" "$clean/"
+          cp "$source/plasma-control-station-$identity-linux-x86_64.tar.gz.sha256" "$clean/"
+          cp "$source/plasma-control-station-$identity-windows-x86_64.zip" "$clean/"
+          cp "$source/plasma-control-station-$identity-windows-x86_64.zip.sha256" "$clean/"
+          cp "$source/plasma-ppu-$identity-linux-armv7l.tar.gz" "$clean/"
+          cp "$source/plasma-ppu-$identity-linux-armv7l.tar.gz.sha256" "$clean/"
 
           cd "$clean"
           python product-release.py verify \
-            "plasma-control-station-$version-linux-x86_64.tar.gz" \
+            "plasma-control-station-$identity-linux-x86_64.tar.gz" \
             --expect-role control-station \
             --expect-platform linux \
             --expect-architecture x86_64 \
             --expect-version "$version" \
             --extract-to linux-clean
           python product-release.py verify \
-            "plasma-control-station-$version-windows-x86_64.zip" \
+            "plasma-control-station-$identity-windows-x86_64.zip" \
             --expect-role control-station \
             --expect-platform windows \
             --expect-architecture x86_64 \
             --expect-version "$version" \
             --extract-to windows-clean
           python product-release.py verify \
-            "plasma-ppu-$version-linux-armv7l.tar.gz" \
+            "plasma-ppu-$identity-linux-armv7l.tar.gz" \
             --expect-role ppu \
             --expect-platform linux \
             --expect-architecture armv7l \
