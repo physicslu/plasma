@@ -30,7 +30,7 @@ def relationship_facts() -> dict:
                 "page_size_bytes": 1024,
                 "page_count": 64,
                 "package_hardware": {
-                    "package": "LQFP",
+                    "package_family": "LQFP",
                     "pin_count": 48,
                     "debug_programming_interfaces": ["SWD", "JTAG"],
                 },
@@ -41,7 +41,7 @@ def relationship_facts() -> dict:
                 "page_size_bytes": 1024,
                 "page_count": 128,
                 "package_hardware": {
-                    "package": "LQFP",
+                    "package_family": "LQFP",
                     "pin_count": 48,
                     "debug_programming_interfaces": ["SWD", "JTAG"],
                 },
@@ -157,6 +157,7 @@ class RelationshipDerivationV4PipelineTest(unittest.TestCase):
         self.assertEqual(result["transformations"][0]["kind"], "DETERMINISTIC_RELATIONSHIP_DERIVATION")
         self.assertFalse(result["trust_boundary"]["ai_emits_package_hardware_relationship"])
         self.assertTrue(result["trust_boundary"]["package_hardware_relationship_is_deterministic"])
+        self.assertFalse(result["trust_boundary"]["pin_level_minimum_programming_hardware_admission"])
 
         canonical = canonical_score.score_report(report)
         self.assertEqual(canonical["total_field_count"], 25)
@@ -176,8 +177,7 @@ class RelationshipDerivationV4PipelineTest(unittest.TestCase):
         self.assertLess(score["literal_exact_accuracy"], 1.0)
         self.assertEqual(score["paths"]["representation_difference"], [path])
 
-        payload = run["response"]
-        result = canonicalizer.canonicalize_response(payload, self.contract)
+        result = canonicalizer.canonicalize_response(run["response"], self.contract)
         self.assertEqual(result["canonical_spec"]["profile_relationships"]["package_hardware"], "shared")
 
     def test_complete_different_package_derives_different(self):
@@ -189,6 +189,8 @@ class RelationshipDerivationV4PipelineTest(unittest.TestCase):
         self.assertEqual(result["canonical_spec"]["profile_relationships"]["package_hardware"], "different")
         transformation = result["transformations"][0]
         self.assertEqual(transformation["kind"], "DETERMINISTIC_RELATIONSHIP_DERIVATION")
+        self.assertEqual(transformation["scope"], "benchmark_profile_projection_only")
+        self.assertTrue(transformation["does_not_prove_pin_level_minimum_programming_hardware"])
         self.assertEqual(transformation["output"], "different")
 
     def test_incomplete_package_facts_fail_closed_to_unknown(self):
@@ -210,6 +212,12 @@ class RelationshipDerivationV4PipelineTest(unittest.TestCase):
     def test_ai_cannot_add_package_relationship_to_generation_schema(self):
         facts = relationship_facts()
         facts["profile_relationships"]["package_hardware"] = "shared"
+        with self.assertRaises(semantic.SemanticExtractionError):
+            semantic.validate_semantic_facts(facts)
+
+    def test_debug_interface_vocabulary_is_schema_bounded(self):
+        facts = relationship_facts()
+        facts["targets"]["STM32F103C8T6"]["package_hardware"]["debug_programming_interfaces"] = ["SWD", "SWIM"]
         with self.assertRaises(semantic.SemanticExtractionError):
             semantic.validate_semantic_facts(facts)
 
