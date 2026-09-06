@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "evidence_id": "stm32f4-phase4.2aj-f429-f439-bt-lifecycle-2026-09-06-retained-20260906T040501Z-4f50746",
+  "canonical_dataset_admission": false,
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "34c566c84ee07728f1615bde3bf8aaa6d8ecf6474a972bdad598a62eefe86529"
+    },
+    {
+      "path": "lifecycle-baseline.json",
+      "sha256": "b3e6465cef35ea460a7db3f21bf483879a67929c33a1c5311986349f0e537837"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "d1ab99a49e06fee273bc693461da4e1d45ddf8e0d14fba14d205f831e661c581"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "42e07f76f175e418f6b6cc8816abfd22c5b2bea56e95338bf91605d560a0a0b4"
+    }
+  ]
+}

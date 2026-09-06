@@ -202,21 +202,21 @@ def _extract_quality_part_number_records(
 
     if not by_icpn:
         raise AcquisitionError(f"no exact commercial ICPN records found for {base_device}")
-    active_records = [record for record in by_icpn.values() if record["active"] is True]
-    if not active_records:
-        raise AcquisitionError(f"no Active commercial ICPN candidates found for {base_device}")
     return list(by_icpn.values()), section_text
 
 
 def extract_part_number_records(html_text: str, base_device: str) -> tuple[list[dict[str, object]], str]:
-    """Return audited Q&R part-number rows including Marketing Status."""
+    """Return all audited Q&R part-number rows including Marketing Status."""
     return _extract_quality_part_number_records(html_text, base_device)
 
 
 def extract_exact_icpns(html_text: str, base_device: str) -> tuple[list[str], str]:
     """Return only exact ICPNs whose official ST Marketing Status is Active."""
     records, section_text = _extract_quality_part_number_records(html_text, base_device)
-    return [str(record["icpn"]) for record in records if record["active"] is True], section_text
+    exact_icpns = [str(record["icpn"]) for record in records if record["active"] is True]
+    if not exact_icpns:
+        raise AcquisitionError(f"no Active commercial ICPN candidates found for {base_device}")
+    return exact_icpns, section_text
 
 
 def fetch_html(source_url: str, timeout_seconds: float) -> tuple[bytes, str, str | None, str | None]:

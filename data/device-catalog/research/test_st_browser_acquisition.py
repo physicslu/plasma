@@ -187,6 +187,30 @@ class BrowserAcquisitionTests(unittest.TestCase):
         self.assertEqual(page.text_request, ("Quality and Reliability", True))
         self.assertEqual(page.heading.state, "attached")
 
+    def test_rendered_dom_retains_lifecycle_only_rows(self) -> None:
+        html = """
+        <h2>Quality and Reliability</h2>
+        <table>
+          <tr><th>Part Number</th><th>Marketing Status</th></tr>
+          <tr><td>STM32F429BIT6</td><td>NRND Not Recommended for New Designs.</td></tr>
+          <tr><td>STM32F429BIT6TR</td><td>NRND Not Recommended for New Designs.</td></tr>
+        </table>
+        <h2>Documentation</h2>
+        """
+        evidence = build_browser_evidence_record(
+            body=html.encode("utf-8"),
+            source_url="https://www.st.com/en/microcontrollers-microprocessors/stm32f429bi.html",
+            final_url="https://www.st.com/en/microcontrollers-microprocessors/stm32f429bi.html",
+            base_device="STM32F429BI",
+            retrieved_at_utc="2026-09-06T00:00:00Z",
+        )
+        self.assertEqual(evidence["exact_icpns"], [])
+        self.assertEqual(len(evidence["part_number_records"]), 2)
+        self.assertEqual(
+            [row["icpn"] for row in evidence["excluded_non_active_part_numbers"]],
+            ["STM32F429BIT6", "STM32F429BIT6TR"],
+        )
+
     def test_live_browser_defaults_to_headed_with_explicit_headless_opt_in(self) -> None:
         default_args = parse_args(["--output", "/tmp/control.json"])
         self.assertFalse(default_args.headless)

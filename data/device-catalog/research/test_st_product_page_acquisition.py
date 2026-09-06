@@ -92,6 +92,47 @@ class ProductPageAcquisitionTests(unittest.TestCase):
             {"icpn": "STM32F446ZCT7", "marketing_status": "Proposal Customer feedback requested."}
         ])
 
+    def test_lifecycle_only_rows_are_retained_without_active_admission_candidates(self) -> None:
+        html = """
+        <h2>Quality and Reliability</h2>
+        <table>
+          <tr><th>Part Number</th><th>Marketing Status</th><th>Package</th></tr>
+          <tr><td>STM32F429BIT6</td><td>NRND Not Recommended for New Designs.</td><td>LQFP 208</td></tr>
+          <tr><td>STM32F429BIT6TR</td><td>NRND Not Recommended for New Designs.</td><td>LQFP 208</td></tr>
+        </table>
+        <h2>Sample &amp; Buy</h2>
+        """
+        records, _section = extract_part_number_records(html, "STM32F429BI")
+        self.assertEqual(
+            [record["icpn"] for record in records],
+            ["STM32F429BIT6", "STM32F429BIT6TR"],
+        )
+        self.assertEqual([record["active"] for record in records], [False, False])
+        with self.assertRaisesRegex(AcquisitionError, "no Active commercial ICPN"):
+            extract_exact_icpns(html, "STM32F429BI")
+
+        record = build_evidence_record(
+            body=html.encode("utf-8"),
+            source_url="https://www.st.com/en/microcontrollers-microprocessors/stm32f429bi.html",
+            final_url="https://www.st.com/en/microcontrollers-microprocessors/stm32f429bi.html",
+            base_device="STM32F429BI",
+            retrieved_at_utc="2026-09-06T00:00:00Z",
+        )
+        self.assertEqual(record["exact_icpns"], [])
+        self.assertEqual(
+            record["excluded_non_active_part_numbers"],
+            [
+                {
+                    "icpn": "STM32F429BIT6",
+                    "marketing_status": "NRND Not Recommended for New Designs.",
+                },
+                {
+                    "icpn": "STM32F429BIT6TR",
+                    "marketing_status": "NRND Not Recommended for New Designs.",
+                },
+            ],
+        )
+
     def test_evidence_record_hashes_raw_and_normalized_evidence(self) -> None:
         body = SYNTHETIC_HTML.encode("utf-8")
         record = build_evidence_record(
