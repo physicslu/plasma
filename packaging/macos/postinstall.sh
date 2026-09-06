@@ -3,7 +3,8 @@ set -eu
 
 PRODUCT_ROOT="/Library/Application Support/Plasma"
 VERSION="__PLASMA_VERSION__"
-RELEASE_ROOT="$PRODUCT_ROOT/releases/$VERSION"
+RELEASE_ID="__PLASMA_RELEASE_ID__"
+RELEASE_ROOT="$PRODUCT_ROOT/releases/$RELEASE_ID"
 INSTALL_ROOT="$PRODUCT_ROOT/install"
 
 fail() {
@@ -164,7 +165,7 @@ done
 /bin/launchctl enable "$DOMAIN/com.plasma.console" >/dev/null 2>&1 || true
 /bin/launchctl kickstart -k "$DOMAIN/com.plasma.console" || fail "cannot start Console LaunchAgent"
 
-echo "Plasma Control Station $VERSION installed for $INSTALL_USER"
+echo "Plasma Control Station $VERSION ($RELEASE_ID) installed for $INSTALL_USER"
 echo "Python: $PYTHON_PATH"
 echo "Node.js: $NODE_PATH"
 exit 0
