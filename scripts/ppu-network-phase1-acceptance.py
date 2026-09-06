@@ -166,13 +166,38 @@ def _docker_preflight() -> bool:
     return installed_binfmt
 
 
+def _release_artifact_from_builder_output(
+    stdout: str,
+    *,
+    repo: Path,
+    release_dir: Path,
+) -> Path:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if len(lines) != 1:
+        raise AcceptanceError(
+            f"PPU release builder must emit exactly one artifact path, got {lines!r}"
+        )
+    artifact = Path(lines[0])
+    if not artifact.is_absolute():
+        artifact = repo / artifact
+    artifact = artifact.resolve()
+    release_root = release_dir.resolve()
+    if artifact.parent != release_root:
+        raise AcceptanceError(
+            f"PPU release builder emitted artifact outside release directory: {artifact}"
+        )
+    if not artifact.is_file():
+        raise AcceptanceError(f"canonical PPU release artifact is missing: {artifact}")
+    return artifact
+
+
 def _build_release(repo: Path, work_root: Path, python: Path, git_sha: str, version: str) -> tuple[Path, Path, Path]:
     runtime = work_root / "build-runtime"
     release_dir = work_root / "release"
     extracted = work_root / "extracted"
     _run([str(python), "scripts/ppu-runtime.py", "build", "--output-dir", str(runtime)], cwd=repo)
     _run([str(python), "scripts/ppu-runtime.py", "validate", str(runtime)], cwd=repo)
-    _run(
+    release_build = _run(
         [
             str(python),
             "scripts/ppu-release.py",
@@ -185,10 +210,14 @@ def _build_release(repo: Path, work_root: Path, python: Path, git_sha: str, vers
         ],
         cwd=repo,
     )
-    archive = release_dir / f"plasma-ppu-{version}-linux-armv7l.tar.gz"
+    archive = _release_artifact_from_builder_output(
+        release_build.stdout,
+        repo=repo,
+        release_dir=release_dir,
+    )
     sidecar = Path(f"{archive}.sha256")
-    if not archive.is_file() or not sidecar.is_file():
-        raise AcceptanceError(f"canonical PPU release was not produced under {release_dir}")
+    if not sidecar.is_file():
+        raise AcceptanceError(f"canonical PPU release sidecar is missing: {sidecar}")
     _verify_sidecar(archive, sidecar)
     _run(
         [
