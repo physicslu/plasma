@@ -76,6 +76,7 @@ def canonicalize_run(run_path: Path, contract_path: Path = DEFAULT_CONTRACT) -> 
             "generation_visibility_of_canonicalization_contract": False,
             "ai_emits_package_hardware_relationship": False,
             "package_hardware_relationship_is_deterministic": True,
+            "pin_level_minimum_programming_hardware_admission": False,
             "canonical_dataset_admission": False,
             "production_admission": False,
         },
@@ -99,6 +100,7 @@ def main() -> int:
         print(f"- transformations: {len(result['transformations'])}")
         print(f"- unresolved paths: {len(result['unresolved_paths'])}")
         print("- package relationship emitted by AI: false")
+        print("- pin-level programming-hardware admission: false")
         print("- canonical dataset admission: false")
         print("- production admission: false")
         return 0
