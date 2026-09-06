@@ -1,0 +1,247 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 5,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 5,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 0,
+    "unmapped": 5
+  },
+  "exact_icpn_candidates": 0,
+  "manual_intervention_required": 5,
+  "openocd_cfg_mapping": {
+    "mapped": 0,
+    "total": 5
+  },
+  "pilot_id": "stm32f4-phase4.2aj-f429-f439-bt-lifecycle-2026-09-06",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F429BE",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F429BE",
+        "evidence_section_sha256": "80a4d377d54eb9f210732058f2a17d759db2162f185a6d13dc839a5f712d243c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F429BET6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429be.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F429BET6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "754c0e7e8678d1b5390e9e333500edb76317f32cec933a92527dd4ebe4b68427",
+        "retrieved_at_utc": "2026-09-06T04:02:04Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429be.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 512-KiB STM32F429 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429be.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F429BG",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F429BG",
+        "evidence_section_sha256": "6eebf980a48a16a2da984b4bd471205889f4af28731184a20e0375322b9fd661",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F429BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429bg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F429BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "3530992417c1986c793c091c0bafb51213ebcce50683cec6ad1cebe61d3804ac",
+        "retrieved_at_utc": "2026-09-06T04:04:42Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429bg.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 1024-KiB STM32F429 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429bg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F429BI",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F429BI",
+        "evidence_section_sha256": "bf210afc466b051f6e0c960a0d9b70dd6311ddcb7bfa29802ee212f70861bcba",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F429BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32F429BIT7",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429bi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F429BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32F429BIT7",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "5fc3579d656d981d2822bb833b147fe44dbbc8e0ecf4fd1f1e9e8d1d739c0911",
+        "retrieved_at_utc": "2026-09-06T04:04:48Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429bi.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 2048-KiB STM32F429 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429bi.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F439BG",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F439BG",
+        "evidence_section_sha256": "a20ec54552f880429f63a1aa0fde8c4f29467146ccd235f55d2388b007d655de",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F439BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439bg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F439BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "c895f34e2588d79d4a2a74ea92fb1f661eb03e7bce6e98379eefbf189b9e05bb",
+        "retrieved_at_utc": "2026-09-06T04:04:55Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439bg.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 1024-KiB STM32F439 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439bg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F439BI",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F439BI",
+        "evidence_section_sha256": "66acf62aa91d64f2cb4007fb824322c0ce355d0b06697579d70aeecbc8ba659a",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F439BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32F439BIT7",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439bi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F439BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32F439BIT7",
+            "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+          }
+        ],
+        "rendered_dom_sha256": "de8ff5885f37957ed7960bb04c53903ec4d01cd96f501887e373728416b866d0",
+        "retrieved_at_utc": "2026-09-06T04:05:00Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439bi.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 2048-KiB STM32F439 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439bi.html"
+    }
+  ],
+  "schema_version": 1
+}

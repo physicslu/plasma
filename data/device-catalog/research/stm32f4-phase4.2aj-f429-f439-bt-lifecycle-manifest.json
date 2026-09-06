@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "pilot_id": "stm32f4-phase4.2aj-f429-f439-bt-lifecycle-2026-09-06",
+  "targets": [
+    {
+      "base_device": "STM32F429BE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429be.html",
+      "selection_reason": "Phase 4.2 residual B/T 512-KiB STM32F429 lifecycle characterization"
+    },
+    {
+      "base_device": "STM32F429BG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429bg.html",
+      "selection_reason": "Phase 4.2 residual B/T 1024-KiB STM32F429 lifecycle characterization"
+    },
+    {
+      "base_device": "STM32F429BI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f429bi.html",
+      "selection_reason": "Phase 4.2 residual B/T 2048-KiB STM32F429 lifecycle characterization"
+    },
+    {
+      "base_device": "STM32F439BG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439bg.html",
+      "selection_reason": "Phase 4.2 residual B/T 1024-KiB STM32F439 lifecycle characterization"
+    },
+    {
+      "base_device": "STM32F439BI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f439bi.html",
+      "selection_reason": "Phase 4.2 residual B/T 2048-KiB STM32F439 lifecycle characterization"
+    }
+  ],
+  "lifecycle_closure_scope": {
+    "family": "STM32F4",
+    "pin_package_surface": "B/T",
+    "base_devices": [
+      "STM32F429BE",
+      "STM32F429BG",
+      "STM32F429BI",
+      "STM32F439BG",
+      "STM32F439BI"
+    ],
+    "production_exact_icpns_before": 384,
+    "production_base_devices_before": 139,
+    "policy_change_authorized": false,
+    "production_write_authorized": false,
+    "fail_closed": true
+  }
+}

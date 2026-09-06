@@ -2,7 +2,7 @@
 
 Status: Reference
 
-Last updated: 2026-09-04
+Last updated: 2026-09-06
 
 ## Purpose
 
@@ -176,7 +176,93 @@ Review record:
 
 - `data/ic-support/benchmarks/stm32f103c/reviews/qwen3.8-27b-mlx-programming-decomposition-review.md`
 
-## 8. Next experiment: independent Gemma comparison
+## 8. Context-capacity experiment: 32K versus 64K
+
+A controlled local Ollama capacity experiment was run on 2026-09-06 using the prepared STM32F103C manufacturer-only Reduced context and `qwen3.8:27b-mlx`.
+
+The probe path was first proven independently with a real inference request through the same remote-to-local Ollama transport used by the development workflow. Capacity measurements then used Ollama native `/api/chat` with:
+
+```text
+think = false
+stream = false
+truncate = false
+shift = false
+temperature = 0
+num_predict = 1
+```
+
+The probe is a capacity diagnostic, not an accuracy benchmark. Runtime-reported prompt-token counts are authoritative for these measurements; elapsed times are recorded only as observations because warm state and prefix caching were not isolated.
+
+### 8.1 32K measurements
+
+With `num_ctx = 32768`:
+
+| Real prompt slice | Runtime prompt tokens | Headroom | Observed elapsed | Result |
+|---:|---:|---:|---:|---|
+| 40,000 chars | 7,526 | 25,242 | 38.16 s | fits |
+| 80,000 chars | 14,227 | 18,541 | 80.07 s | fits |
+| 120,000 chars | 21,732 | 11,036 | 76.17 s | fits |
+| 160,000 chars | 28,859 | 3,909 | 177.83 s | fits, near ceiling |
+| complete Reduced prompt, 280,638 chars / 281,398 bytes | later measured as 55,732 tokens | negative | 300 s timeout in the 32K probe | does not fit 32K |
+
+The complete Reduced prompt token count was obtained later under the 64K run. Because the same rendered prompt was used, `55,732 > 32,768` establishes that the complete Reduced prompt cannot fit a 32K context without truncation or some finer evidence selection.
+
+### 8.2 64K measurements
+
+The probe then set `num_ctx = 65536` per request. `ollama ps` reported an active context of `65536` and `100% GPU` placement. Here `100% GPU` is an Ollama placement indicator, not a claim that instantaneous GPU utilization was 100%.
+
+| Real prompt | Runtime prompt tokens | Headroom | Observed elapsed | Result |
+|---:|---:|---:|---:|---|
+| 160,000 chars | 28,859 | 36,677 | 171.16 s | fits |
+| 200,000 chars | 38,350 | 27,186 | 101.40 s | fits; proves useful capability beyond 32K |
+| complete Reduced prompt, 280,638 chars / 281,398 bytes | 55,732 | 9,804 | 176.75 s | fits |
+
+The 38,350-token run is the clean capability threshold result: the workload is larger than a 32K context but completed under 64K. The complete Reduced prompt also fit under 64K, consuming about 85% of the context budget.
+
+### 8.3 Memory-pressure observation
+
+During the later 64K/full-Reduced runs, the reported Ollama model/runtime footprint increased from roughly 20-22 GB to roughly 25 GB, while macOS swap usage was also observed to rise late in the experiment.
+
+Do **not** attribute the exact swap delta to one request: the experiment did not start from a clean rebooted/swap-free baseline, multiple large prompts had already been run, and macOS swap is cumulative and may not be reclaimed immediately. The valid engineering conclusion is narrower:
+
+> 64K is a proven functional mode, but routinely filling it with a roughly 56K-token input introduces materially less output margin and was accompanied by higher memory pressure in this run.
+
+### 8.4 Operating conclusion
+
+The measured conclusion is no longer "32K only" and is also not "use the largest native model context available".
+
+Use two operating profiles until stronger cold-cache, memory-pressure, and accuracy data justify another policy:
+
+```text
+32K profile
+  -> conservative interactive / development use
+  -> smaller extraction tasks
+
+64K profile
+  -> larger offline Evidence extraction / batch work
+  -> proven to accept a 38,350-token real Evidence prompt
+  -> complete 55,732-token Reduced prompt fits, but should not be the normal target payload
+```
+
+The model advertises a larger native context capability, but that number is not a Plasma deployment target by itself. Context configuration remains a measured runtime decision.
+
+The Evidence architecture therefore remains layered:
+
+```text
+Evidence Pack
+    = trusted reusable evidence pool
+        |
+        v
+TargetEvidenceBundle
+    = task-specific operational AI payload
+        |
+        v
+Local AI extraction
+```
+
+The 64K result changes the reason for `TargetEvidenceBundle`; it is not required merely because the current Reduced Evidence Pack is impossible to fit. The full Reduced prompt does fit 64K. `TargetEvidenceBundle` remains important for latency, output headroom, memory pressure, and precision. A provisional measured candidate range is roughly 20K-40K input tokens for large Evidence tasks, pending isolated cold-cache latency and correctness benchmarks. This range is guidance, not a schema-level constant.
+
+## 9. Next experiment: independent Gemma comparison
 
 The user is running a separate Gemma experiment. Treat it as an independent model-family comparison, not as a correction pass over Qwen.
 
@@ -221,7 +307,7 @@ Do not judge only by prose quality. Compare at least:
 
 Particular Qwen failure categories should be used **after** Gemma produces its independent answer to classify differences. Do not leak those expected answers into the blind-generation prompt.
 
-## 9. Candidate future model roles
+## 10. Candidate future model roles
 
 Current hypotheses, not yet benchmark conclusions:
 
@@ -231,7 +317,7 @@ Current hypotheses, not yet benchmark conclusions:
 
 A coding-specialized model has not yet been qualified by this experiment. Do not claim one is production-approved merely because it is marketed for coding.
 
-## 10. Recommended next engineering steps after Gemma A/B
+## 11. Recommended next engineering steps after Gemma A/B
 
 After the independent Gemma result exists:
 
@@ -243,7 +329,9 @@ After the independent Gemma result exists:
 6. Only then test a coding-specialized model using a validated specification as input.
 7. Keep real programming, RDP transitions, option-byte operations, and other destructive behavior behind explicit security/HIL gates.
 
-## 11. What this handover does not authorize
+Before using the complete 55,732-token Reduced prompt as a normal extraction payload, run a real extraction with a nontrivial output budget and score its correctness. Capacity fit alone is not evidence that the model remains accurate or operationally efficient at that context occupancy.
+
+## 12. What this handover does not authorize
 
 This document does not authorize or claim completion of:
 
