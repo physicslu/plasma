@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/stm32f103c/semantic-extraction-v5",
+  "title": "STM32F103C manufacturer-near facts with deterministic programming, option, memory, and package relationships",
+  "description": "Evidence-backed semantic facts before Plasma canonicalization. AI emits manufacturer-near contract facts and per-target memory/package facts; Plasma derives programming and option from evidence-backed applicability and derives memory/package relationships deterministically.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile_relationships", "targets", "programming_contract", "option_contract", "security_contract"],
+  "properties": {
+    "profile_relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["security"],
+      "properties": {
+        "security": {"type": "string", "enum": ["shared", "different", "unknown"]}
+      }
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["STM32F103C8T6", "STM32F103CBT6"],
+      "properties": {
+        "STM32F103C8T6": {"$ref": "#/$defs/targetFacts"},
+        "STM32F103CBT6": {"$ref": "#/$defs/targetFacts"}
+      }
+    },
+    "programming_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program_granularity_bytes", "unlock_keys", "write_erase_requires_hsi"],
+      "properties": {
+        "program_granularity_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "unlock_keys": {"type": ["array", "null"], "items": {"type": "string"}},
+        "write_erase_requires_hsi": {"type": ["boolean", "null"]}
+      }
+    },
+    "option_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_start_text", "region_size_bytes", "encoding_structure"],
+      "properties": {
+        "region_start_text": {"type": ["string", "null"]},
+        "region_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "encoding_structure": {"$ref": "#/$defs/encodingStructure"}
+      }
+    },
+    "security_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_unprotect_is_destructive", "write_protection_granularity_bytes"],
+      "properties": {
+        "read_unprotect_is_destructive": {"type": ["boolean", "null"]},
+        "write_protection_granularity_bytes": {"type": ["integer", "null"], "minimum": 1}
+      }
+    }
+  },
+  "$defs": {
+    "targetFacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manufacturer_device_reference", "flash_size_bytes", "page_size_bytes", "page_count", "package_hardware"],
+      "properties": {
+        "manufacturer_device_reference": {"type": ["string", "null"]},
+        "flash_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "page_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "page_count": {"type": ["integer", "null"], "minimum": 1},
+        "package_hardware": {"$ref": "#/$defs/packageHardwareFacts"}
+      }
+    },
+    "packageHardwareFacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_family", "pin_count", "debug_programming_interfaces"],
+      "properties": {
+        "package_family": {"type": ["string", "null"]},
+        "pin_count": {"type": ["integer", "null"], "minimum": 1},
+        "debug_programming_interfaces": {
+          "type": ["array", "null"],
+          "items": {"type": "string", "enum": ["SWD", "JTAG"]}
+        }
+      }
+    },
+    "encodingStructure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logical_value_width_bits", "stored_pair_width_bits", "companion_value_present", "companion_relation"],
+      "properties": {
+        "logical_value_width_bits": {"type": ["integer", "null"], "minimum": 1},
+        "stored_pair_width_bits": {"type": ["integer", "null"], "minimum": 1},
+        "companion_value_present": {"type": ["boolean", "null"]},
+        "companion_relation": {
+          "type": ["string", "null"],
+          "enum": ["bitwise_not", "identical", "none", "other", "unknown", null]
+        }
+      }
+    }
+  }
+}
