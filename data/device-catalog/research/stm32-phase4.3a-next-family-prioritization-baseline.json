@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "phase": "4.3A",
+  "inputs": {
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "production_manifest_sha256": "1bcab39dbec4014bff2205d7efc2ddf4bb5558f6787e9dc5b45608a8066174b5"
+  },
+  "production_invariants": {
+    "manufacturer": "STMicroelectronics",
+    "production_series": [
+      "STM32F1",
+      "STM32F4"
+    ],
+    "exact_icpn_count": 459,
+    "base_device_count": 157,
+    "family_exact_icpn_counts": {
+      "STM32F1": 75,
+      "STM32F4": 384
+    },
+    "family_base_device_counts": {
+      "STM32F1": 18,
+      "STM32F4": 139
+    }
+  },
+  "inventory": {
+    "stm32_catalog_series_count": 23,
+    "candidate_series_count": 21,
+    "eligible_f_line_series_count": 4,
+    "candidate_source_row_count": 2105,
+    "candidate_manufacturer_part_number_rows": 0
+  },
+  "eligible_ranking": [
+    {
+      "selection_rank": 1,
+      "plasma_series": "STM32F2",
+      "row_count": 47,
+      "target_config": "tcl/target/stm32f2x.cfg"
+    },
+    {
+      "selection_rank": 2,
+      "plasma_series": "STM32F3",
+      "row_count": 90,
+      "target_config": "tcl/target/stm32f3x.cfg"
+    },
+    {
+      "selection_rank": 3,
+      "plasma_series": "STM32F0",
+      "row_count": 111,
+      "target_config": "tcl/target/stm32f0x.cfg"
+    },
+    {
+      "selection_rank": 4,
+      "plasma_series": "STM32F7",
+      "row_count": 123,
+      "target_config": "tcl/target/stm32f7x.cfg"
+    }
+  ],
+  "selected_next_research_family": {
+    "plasma_series": "STM32F2",
+    "row_count": 47,
+    "target_config": "tcl/target/stm32f2x.cfg",
+    "selection_rank": 1,
+    "selection_basis": [
+      "not already present in the Production manifest",
+      "STM32 F-line cohort bounds architectural novelty for the first third-family pilot",
+      "all source rows are ordering_pattern identifiers",
+      "all source rows use one non-blank OpenOCD target config",
+      "smallest source-row surface in the eligible cohort"
+    ]
+  },
+  "selected_candidate_contract": {
+    "plasma_series": "STM32F2",
+    "row_count": 47,
+    "subfamilies": [
+      "STM32F205",
+      "STM32F207",
+      "STM32F215",
+      "STM32F217"
+    ],
+    "identifier_kind_counts": {
+      "ordering_pattern": 47
+    },
+    "manufacturer_part_number_rows": 0,
+    "target_configs": [
+      "tcl/target/stm32f2x.cfg"
+    ],
+    "mapping_status_counts": {
+      "mapping_candidate": 47
+    },
+    "validation_status_counts": {
+      "not_verified": 47
+    },
+    "expected_openocd_candidate_contract": true,
+    "risk_flags": [
+      "openocd_mapping_not_verified"
+    ]
+  }
+}
