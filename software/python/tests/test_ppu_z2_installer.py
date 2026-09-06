@@ -385,5 +385,5 @@ def test_bootstrap_source_does_not_import_project_or_python311_only_tomllib() ->
         line for line in source.splitlines() if line.startswith("import ") or line.startswith("from ")
     )
     assert "--plasma-python" in source
-    assert "Python >= 3.11" in source
+    assert "release >= 3.11" in source
     assert "releaselevel" in source
