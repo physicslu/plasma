@@ -101,6 +101,7 @@ def stage_payload(
     runtime_dir: Path,
     staging_root: Path,
     version: str,
+    release_id: str,
     architecture: str,
     source_release: Mapping[str, object],
 ) -> Path:
@@ -111,7 +112,7 @@ def stage_payload(
     if staging_root.exists():
         raise MacOSInstallerError(f"refusing to overwrite staging root: {staging_root}")
 
-    release_root = staging_root / PRODUCT_ROOT_REL / "releases" / version
+    release_root = staging_root / PRODUCT_ROOT_REL / "releases" / release_id
     runtime_target = release_root / "runtime"
     bin_target = release_root / "bin"
     launchd_target = release_root / "launchd"
@@ -147,8 +148,9 @@ def stage_payload(
         "platform": "macos",
         "architecture": architecture,
         "product_version": version,
+        "release_id": release_id,
         "package_identifier": PACKAGE_ID,
-        "runtime_root": f"/Library/Application Support/Plasma/releases/{version}/runtime",
+        "runtime_root": f"/Library/Application Support/Plasma/releases/{release_id}/runtime",
         "activation_link": "/Library/Application Support/Plasma/current",
         "service_manager": "launchd-launchagent",
         "console": {"host": "127.0.0.1", "port": 18000},
@@ -166,13 +168,22 @@ def stage_payload(
     return release_root
 
 
-def _stage_scripts(*, repo_root: Path, scripts_dir: Path, version: str) -> None:
+def _stage_scripts(
+    *,
+    repo_root: Path,
+    scripts_dir: Path,
+    version: str,
+    release_id: str,
+) -> None:
     scripts_dir.mkdir(parents=True)
     template = (repo_root / "packaging" / "macos" / "postinstall.sh").read_text(encoding="utf-8")
-    if "__PLASMA_VERSION__" not in template:
-        raise MacOSInstallerError("postinstall template is missing version placeholder")
+    if "__PLASMA_VERSION__" not in template or "__PLASMA_RELEASE_ID__" not in template:
+        raise MacOSInstallerError("postinstall template is missing release identity placeholders")
     postinstall = scripts_dir / "postinstall"
-    postinstall.write_text(template.replace("__PLASMA_VERSION__", version), encoding="utf-8")
+    postinstall.write_text(
+        template.replace("__PLASMA_VERSION__", version).replace("__PLASMA_RELEASE_ID__", release_id),
+        encoding="utf-8",
+    )
     postinstall.chmod(0o755)
 
 
@@ -212,7 +223,9 @@ def build_pkg(
             architecture=architecture,
         )
         version = str(manifest["product_version"])
-        package_path = output_dir / f"plasma-control-station-{version}-macos-{architecture}.pkg"
+        source_git_sha = str(manifest["git_sha"])
+        identity = _release_tool(repo_root).release_id(version, source_git_sha)
+        package_path = output_dir / f"plasma-control-station-{identity}-macos-{architecture}.pkg"
         sidecar_path = package_path.with_suffix(package_path.suffix + ".sha256")
         if package_path.exists() or sidecar_path.exists():
             raise MacOSInstallerError(
@@ -226,10 +239,16 @@ def build_pkg(
             runtime_dir=canonical_release_root / "runtime",
             staging_root=root,
             version=version,
+            release_id=identity,
             architecture=architecture,
             source_release=manifest,
         )
-        _stage_scripts(repo_root=repo_root, scripts_dir=scripts, version=version)
+        _stage_scripts(
+            repo_root=repo_root,
+            scripts_dir=scripts,
+            version=version,
+            release_id=identity,
+        )
         command = [
             pkgbuild,
             "--root",
