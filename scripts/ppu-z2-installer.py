@@ -3,7 +3,8 @@
 
 The bootstrap is deliberately compatible with Python 3.10 so the stock PYNQ
 image can launch it. Plasma Server and Plasma Gateway never use that interpreter:
-``--plasma-python`` must identify a separate Plasma-owned ARMv7 Python >= 3.11.
+``--plasma-python`` must identify a separate Plasma-owned ARMv7 final Python
+release >= 3.11.
 
 This installer keeps the hardware boundary closed. It installs only the PS
 software node and cannot load PL, control target power, or program a real IC.
@@ -56,6 +57,7 @@ class PythonRuntime:
     path: Path
     version: str
     architecture: str
+    releaselevel: str = "final"
 
 
 @dataclass(frozen=True)
@@ -180,7 +182,6 @@ def _extract_verified_tar(artifact: Path, destination: Path) -> Path:
                 raise Z2InstallerError(f"cannot read archive member: {canonical}")
             with source, target.open("wb") as output:
                 shutil.copyfileobj(source, output)
-            # Preserve executable bits and make the verified extraction read-only.
             target.chmod((member.mode & 0o555) | 0o400)
     return destination / RELEASE_ROOT
 
@@ -324,6 +325,7 @@ def _default_python_probe(path: Path) -> Mapping[str, object]:
     code = (
         "import json,platform,sys;"
         "print(json.dumps({'version':list(sys.version_info[:3]),"
+        "'releaselevel':sys.version_info.releaselevel,"
         "'machine':platform.machine(),'executable':sys.executable}))"
     )
     try:
@@ -382,6 +384,11 @@ def validate_plasma_python(
         raise Z2InstallerError(
             f"isolated Plasma Python {version_tuple[0]}.{version_tuple[1]}.{version_tuple[2]} < required 3.11"
         )
+    releaselevel = str(payload.get("releaselevel", ""))
+    if releaselevel != "final":
+        raise Z2InstallerError(
+            f"isolated Plasma Python must be a final release, got releaselevel={releaselevel!r}"
+        )
     architecture = str(payload.get("machine", "")).lower()
     if architecture not in {"armv7", "armv7l"}:
         raise Z2InstallerError(
@@ -396,6 +403,7 @@ def validate_plasma_python(
         path=resolved,
         version=".".join(str(item) for item in version_tuple),
         architecture=architecture,
+        releaselevel=releaselevel,
     )
 
 
@@ -710,11 +718,10 @@ def _rollback_activation(
     errors: list[str] = []
 
     if previous is None:
-        # Stop while the candidate units still exist, then restore/remove files.
         for service in ("plasma-web.service", "plasma-server.service"):
             try:
                 systemctl("disable", "--now", service)
-            except Exception as exc:  # rollback is best-effort but reported exactly
+            except Exception as exc:
                 errors.append(f"disable {service}: {exc}")
         try:
             paths.current.unlink()
@@ -841,6 +848,7 @@ def install_release(
             "path": str(python_runtime.path),
             "version": python_runtime.version,
             "architecture": python_runtime.architecture,
+            "releaselevel": python_runtime.releaselevel,
         },
         "gateway_host": gateway_host,
         "gateway_readiness": {
