@@ -1,0 +1,56 @@
+{
+  "schema_version": "0.1.0",
+  "canonicalization_id": "stm32f103c-canonicalization-v0",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "semantic_schema_id": "plasma://ic-support/stm32f103c/semantic-extraction-v0",
+  "canonical_schema_id": "plasma://ic-support/stm32f103c/canonical-spec-v0",
+  "trust_boundary": {
+    "generation_visibility": false,
+    "ai_may_select_canonical_vocabulary": false,
+    "ai_may_infer_commercial_part_base": false,
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  },
+  "target_identity_context": {
+    "STM32F103C8T6": {
+      "commercial_part_base": "STM32F103C8",
+      "authority": {
+        "source_id": "st_ds5319_rev20",
+        "physical_page_index": 0,
+        "selector": "Table 1. Device summary"
+      }
+    },
+    "STM32F103CBT6": {
+      "commercial_part_base": "STM32F103CB",
+      "authority": {
+        "source_id": "st_ds5319_rev20",
+        "physical_page_index": 0,
+        "selector": "Table 1. Device summary"
+      }
+    }
+  },
+  "hex_address": {
+    "input_semantics": "hexadecimal integer text; ASCII/Unicode whitespace may appear as document formatting",
+    "output_semantics": "lowercase 0x prefix, uppercase hexadecimal digits, no separators, no leading zero padding"
+  },
+  "controlled_vocabulary": {
+    "option_encoding": {
+      "byte_plus_complement": [
+        "byte_plus_complement",
+        "complemented",
+        "byte plus complement",
+        "byte+complement",
+        "byte + complement"
+      ]
+    }
+  },
+  "rules": [
+    "Manufacturer-near identifiers are retained independently from Plasma commercial-part identity.",
+    "commercial_part_base comes only from deterministic target identity context and is never inferred from an AI-provided manufacturer reference.",
+    "Hexadecimal formatting differences are deterministic representation transformations, not AI semantic decisions.",
+    "Controlled vocabulary aliases are deterministic transformations; an unrecognized non-null label fails closed.",
+    "Evidence attached to an AI semantic fact must be propagated to canonical fields derived from that fact.",
+    "Canonical identity fields introduced from deterministic target context use the context authority citation rather than fabricated AI evidence.",
+    "Canonicalization does not grant canonical-dataset or production admission."
+  ]
+}

@@ -344,3 +344,87 @@ This document does not authorize or claim completion of:
 - real-target/HIL programming readiness.
 
 Continue to follow `AGENTS.md` for the exact two-gate engineering workflow and hardware/security scope control.
+
+## 13. 64K real extraction result and semantic/canonical split
+
+The complete Reduced prompt was subsequently run as a real extraction through native Ollama at `num_ctx=65536`, `think=false`, `truncate=false`, `shift=false`, `temperature=0`, with a 4096-token output budget.
+
+Runtime-reported result:
+
+```text
+input_tokens       = 55,732
+generation_tokens  = 1,510
+done_reason        = stop
+total_time         = about 443.5 s
+```
+
+The output was schema-valid and asserted all 21 benchmark leaves. After correcting a scorer JSONPath defect (`$.observed...` versus legacy `$...` evidence roots), the retained run scored:
+
+```text
+exact accuracy                = 17 / 21 = 80.95%
+wrong assertions              = 4
+missing / unknown             = 0
+uncited assertions            = 0
+out-of-context citations      = 0
+unsupported-inference proxy   = 4
+legacy evidence paths         = 0
+```
+
+The corrected provenance result is important: Qwen supplied a canonical `$.observed...` evidence entry for every asserted leaf, and every citation was within the supplied arm context. The earlier 21/21 uncited result was a benchmark scorer defect, not model provenance failure.
+
+The four exact-match disagreements were:
+
+```text
+STM32F103C8T6 base_device:  STM32F103x8  vs benchmark STM32F103C8
+STM32F103CBT6 base_device:  STM32F103xB  vs benchmark STM32F103CB
+option region_start:        0x1FFF F800 vs benchmark 0x1FFFF800
+option encoding:            complemented vs benchmark byte_plus_complement
+```
+
+These observations exposed a contract problem: the v0 extraction shape mixed manufacturer-near semantics with Plasma canonical representation. In particular, `base_device` did not specify whether it meant a manufacturer reference grouping or a commercial part-number stem, while address formatting and the `byte_plus_complement` label are deterministic representation policy rather than facts the model should have to guess.
+
+The architecture is therefore refined to:
+
+```text
+Manufacturer Evidence
+        |
+        v
+AI semantic extraction
+        |
+        | evidence-backed manufacturer-near facts
+        v
+Semantic Facts
+        |
+        v
+Deterministic Canonicalization
+        |
+        v
+Canonical IC Specification
+        |
+        v
+Semantic Validation / later admission gates
+```
+
+Foundation artifacts:
+
+- `data/ic-support/benchmarks/stm32f103c/semantic-extraction.schema.json`
+- `data/ic-support/benchmarks/stm32f103c/canonicalization-contract-v0.json`
+- `data/ic-support/benchmarks/stm32f103c/canonical-spec.schema.json`
+- `data/ic-support/benchmarks/stm32f103c/canonicalize_semantic_facts.py`
+- `data/ic-support/benchmarks/stm32f103c/CANONICALIZATION.md`
+
+The new identity model separates:
+
+```text
+manufacturer_device_reference = STM32F103x8
+commercial_part_base           = STM32F103C8
+icpn                           = STM32F103C8T6
+```
+
+The AI extractor owns only the evidence-backed manufacturer reference. `commercial_part_base` comes from deterministic evidence-backed target identity context. Hexadecimal presentation and controlled-vocabulary aliases are also deterministic canonicalizer responsibilities.
+
+Canonicalization preserves provenance: evidence for an AI semantic fact is propagated to the canonical field derived from that fact, while identity introduced from deterministic target context carries that context's manufacturer evidence authority. Unknown non-null controlled-vocabulary values fail closed.
+
+This does **not** establish that all 21 model assertions are semantically entailed by their cited pages; the current scorer proves citation availability/in-context validity, not semantic entailment. It also does not grant canonical dataset or production admission.
+
+The next high-value model experiment is no longer another larger-context capacity test. It is a fresh extraction against `semantic-extraction-v0`, followed by deterministic canonicalization, so semantic correctness and representation correctness can be evaluated independently.

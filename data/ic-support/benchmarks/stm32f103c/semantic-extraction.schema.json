@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/stm32f103c/semantic-extraction-v0",
+  "title": "STM32F103C manufacturer-near semantic extraction facts",
+  "description": "Evidence-backed semantic facts before Plasma canonicalization. This schema deliberately preserves manufacturer-near identifiers and representations instead of requiring Plasma-internal canonical strings from the AI extractor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_relationships",
+    "targets",
+    "programming_contract",
+    "option_contract",
+    "security_contract"
+  ],
+  "properties": {
+    "profile_relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["programming", "memory_geometry", "package_hardware", "option", "security"],
+      "properties": {
+        "programming": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "memory_geometry": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "package_hardware": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "option": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "security": {"type": "string", "enum": ["shared", "different", "unknown"]}
+      }
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["STM32F103C8T6", "STM32F103CBT6"],
+      "properties": {
+        "STM32F103C8T6": {"$ref": "#/$defs/targetFacts"},
+        "STM32F103CBT6": {"$ref": "#/$defs/targetFacts"}
+      }
+    },
+    "programming_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program_granularity_bytes", "unlock_keys", "write_erase_requires_hsi"],
+      "properties": {
+        "program_granularity_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "unlock_keys": {"type": ["array", "null"], "items": {"type": "string"}},
+        "write_erase_requires_hsi": {"type": ["boolean", "null"]}
+      }
+    },
+    "option_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_start_text", "region_size_bytes", "encoding_semantics"],
+      "properties": {
+        "region_start_text": {
+          "type": ["string", "null"],
+          "description": "Manufacturer-near hexadecimal address text. Formatting such as embedded spaces is preserved for deterministic canonicalization."
+        },
+        "region_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "encoding_semantics": {
+          "type": ["string", "null"],
+          "description": "Evidence-backed semantic description or label for the option-byte encoding. This is not required to use Plasma's canonical vocabulary."
+        }
+      }
+    },
+    "security_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_unprotect_is_destructive", "write_protection_granularity_bytes"],
+      "properties": {
+        "read_unprotect_is_destructive": {"type": ["boolean", "null"]},
+        "write_protection_granularity_bytes": {"type": ["integer", "null"], "minimum": 1}
+      }
+    }
+  },
+  "$defs": {
+    "targetFacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manufacturer_device_reference",
+        "flash_size_bytes",
+        "page_size_bytes",
+        "page_count"
+      ],
+      "properties": {
+        "manufacturer_device_reference": {
+          "type": ["string", "null"],
+          "description": "Manufacturer document device/reference grouping, for example STM32F103x8. This is intentionally distinct from a commercial part-number stem."
+        },
+        "flash_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "page_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "page_count": {"type": ["integer", "null"], "minimum": 1}
+      }
+    }
+  }
+}
