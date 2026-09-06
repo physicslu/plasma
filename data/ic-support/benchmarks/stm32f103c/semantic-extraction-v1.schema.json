@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/stm32f103c/semantic-extraction-v1",
+  "title": "STM32F103C structured manufacturer-near semantic extraction facts",
+  "description": "Evidence-backed semantic facts before Plasma canonicalization. Option-byte encoding is represented as structured physical semantics rather than free-form prose or Plasma canonical vocabulary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_relationships",
+    "targets",
+    "programming_contract",
+    "option_contract",
+    "security_contract"
+  ],
+  "properties": {
+    "profile_relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["programming", "memory_geometry", "package_hardware", "option", "security"],
+      "properties": {
+        "programming": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "memory_geometry": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "package_hardware": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "option": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "security": {"type": "string", "enum": ["shared", "different", "unknown"]}
+      }
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["STM32F103C8T6", "STM32F103CBT6"],
+      "properties": {
+        "STM32F103C8T6": {"$ref": "#/$defs/targetFacts"},
+        "STM32F103CBT6": {"$ref": "#/$defs/targetFacts"}
+      }
+    },
+    "programming_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program_granularity_bytes", "unlock_keys", "write_erase_requires_hsi"],
+      "properties": {
+        "program_granularity_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "unlock_keys": {"type": ["array", "null"], "items": {"type": "string"}},
+        "write_erase_requires_hsi": {"type": ["boolean", "null"]}
+      }
+    },
+    "option_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_start_text", "region_size_bytes", "encoding_structure"],
+      "properties": {
+        "region_start_text": {
+          "type": ["string", "null"],
+          "description": "Manufacturer-near hexadecimal address text. Document formatting such as embedded spaces may be preserved."
+        },
+        "region_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "encoding_structure": {"$ref": "#/$defs/encodingStructure"}
+      }
+    },
+    "security_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_unprotect_is_destructive", "write_protection_granularity_bytes"],
+      "properties": {
+        "read_unprotect_is_destructive": {"type": ["boolean", "null"]},
+        "write_protection_granularity_bytes": {"type": ["integer", "null"], "minimum": 1}
+      }
+    }
+  },
+  "$defs": {
+    "targetFacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manufacturer_device_reference",
+        "flash_size_bytes",
+        "page_size_bytes",
+        "page_count"
+      ],
+      "properties": {
+        "manufacturer_device_reference": {
+          "type": ["string", "null"],
+          "description": "Manufacturer document device/reference grouping; intentionally distinct from a commercial part-number stem."
+        },
+        "flash_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "page_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "page_count": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "encodingStructure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "logical_value_width_bits",
+        "stored_pair_width_bits",
+        "companion_value_present",
+        "companion_relation"
+      ],
+      "properties": {
+        "logical_value_width_bits": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Width of the primary logical option value described by the evidence."
+        },
+        "stored_pair_width_bits": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Combined stored width of the primary value and its companion when the evidence defines such a pair."
+        },
+        "companion_value_present": {
+          "type": ["boolean", "null"],
+          "description": "Whether the evidence defines a stored companion value alongside the primary value."
+        },
+        "companion_relation": {
+          "type": ["string", "null"],
+          "enum": ["bitwise_not", "identical", "none", "other", "unknown", null],
+          "description": "Evidence-backed mathematical relation between the primary and companion values. Use unknown or null when evidence is insufficient; do not return prose."
+        }
+      }
+    }
+  }
+}
