@@ -91,6 +91,7 @@ jobs:
           python data/ic-support/benchmarks/stm32f103c/test_semantic_v2_pipeline.py
           python data/ic-support/benchmarks/stm32f103c/test_semantic_v3_pipeline.py
           python data/ic-support/benchmarks/stm32f103c/test_semantic_v4_relationship_pipeline.py
+          python data/ic-support/benchmarks/stm32f103c/test_semantic_v5_memory_relationship_pipeline.py
       - name: Validate STM32F103C source lock
         run: python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
       - name: Compare STM32F103C benchmark
