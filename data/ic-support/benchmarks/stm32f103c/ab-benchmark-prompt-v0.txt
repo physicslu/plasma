@@ -11,7 +11,7 @@ Return exactly one JSON object and no Markdown or explanatory prose. The object 
 {
   "observed": <object conforming exactly to OBSERVED_SCHEMA>,
   "evidence": {
-    "<JSONPath to each asserted observed leaf>": [
+    "<full-response JSONPath to each asserted observed leaf, rooted at $.observed>": [
       {"source_id": "<source id>", "physical_page_index": <zero-based physical PDF page index>}
     ]
   }
@@ -21,7 +21,7 @@ Rules:
 1. `observed` must conform exactly to OBSERVED_SCHEMA. Do not add fields.
 2. Where the schema permits `null`, use `null` if the supplied evidence is insufficient.
 3. For profile relationships, use `unknown` if the supplied evidence is insufficient.
-4. Every asserted leaf value that is neither `null` nor `unknown` must have at least one evidence entry keyed by its JSONPath. Treat an array value as one leaf and cite the array field path.
+4. Every asserted leaf value that is neither `null` nor `unknown` must have at least one evidence entry keyed by the full-response JSONPath rooted at `$.observed`. For example, cite `$.observed.parts.STM32F103C8T6.flash_size_bytes`, not `$.parts.STM32F103C8T6.flash_size_bytes`. Treat an array value as one leaf and cite the array field path.
 5. Evidence citations must refer only to source IDs and physical page indices present in MANUFACTURER_EVIDENCE_CONTEXT.
 6. A derived value may cite all pages needed for the derivation. Do not invent a value merely because it is plausible.
 7. Do not expose chain-of-thought. Return only the requested JSON result.
