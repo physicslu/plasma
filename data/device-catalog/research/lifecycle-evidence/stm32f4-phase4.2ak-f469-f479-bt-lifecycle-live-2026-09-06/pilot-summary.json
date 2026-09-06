@@ -1,0 +1,238 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 5,
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted": 5,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "browser_scope": "pilot",
+  "canonical_dataset_admission": false,
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 0,
+    "unmapped": 5
+  },
+  "exact_icpn_candidates": 0,
+  "manual_intervention_required": 5,
+  "openocd_cfg_mapping": {
+    "mapped": 0,
+    "total": 5
+  },
+  "pilot_id": "stm32f4-phase4.2ak-f469-f479-bt-lifecycle-2026-09-06",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469BE",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469BE",
+        "evidence_section_sha256": "2e171dce1533d9fdd7e9699a9b748efa5fa8f00b4a6c58f30dd259206b2e39d4",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F469BET6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469be.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F469BET6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "374abf6674a7553059dcc156cab5abb5e58a220384af19dfa23ae06f03b7ff6b",
+        "retrieved_at_utc": "2026-09-06T05:26:54Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469be.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 512-KiB STM32F469 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469be.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469BG",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469BG",
+        "evidence_section_sha256": "895b1ddf19638ae23828794fb42a7f879ce6be7d3d864624a8b0666a3d8a7ece",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F469BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469bg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F469BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "08a4c716d60b8a507a783c1f5a4d9e462a4cfa0e31009e948df885f82ab94e48",
+        "retrieved_at_utc": "2026-09-06T05:29:32Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469bg.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 1024-KiB STM32F469 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469bg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F469BI",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F469BI",
+        "evidence_section_sha256": "4513fde75d26e408edbb0dd89c1064290a1d00c077c4e830f0b8dad564c58892",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F469BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32F469BIT7",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469bi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F469BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32F469BIT7",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "0461d2405d2bba6b2ee54e8ffdee6902a2bd4726865ec5f4fb3e820dd40d7dca",
+        "retrieved_at_utc": "2026-09-06T05:32:09Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469bi.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 2048-KiB STM32F469 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f469bi.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479BG",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479BG",
+        "evidence_section_sha256": "dd9d5630d6f6514a2832d638dcf57eba72f4880438a227db40b25419b28ce7b9",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F479BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479bg.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F479BGT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "10546a1448f10b4f6424fdf19130bb784254b38663253af086a296119aa39840",
+        "retrieved_at_utc": "2026-09-06T05:32:16Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479bg.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 1024-KiB STM32F479 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479bg.html"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F479BI",
+      "candidate_mappings": [],
+      "canonical_mapping": {
+        "candidate_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F479BI",
+        "evidence_section_sha256": "040bcfa58af4d4fd2323e173f5239db4de50a43de7232a1e60b0950847f7936f",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32F479BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479bi.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32F479BIT6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "efb26c857bf8ef03a3e28387db49b87284ac69dcd15fe73dd5c9b7b1d18ad7fa",
+        "retrieved_at_utc": "2026-09-06T05:32:22Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479bi.html"
+      },
+      "selection_reason": "Phase 4.2 residual B/T 2048-KiB STM32F479 lifecycle characterization",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f479bi.html"
+    }
+  ],
+  "schema_version": 1
+}

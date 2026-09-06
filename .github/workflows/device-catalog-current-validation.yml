@@ -198,3 +198,11 @@ jobs:
           python data/ic-support/test_phase42aj_lifecycle_closure.py
           python -m pip install -e software/python
           PYTHONPATH=software/python python software/python/tests/test_device_catalog_phase42aj.py
+
+      - name: Validate Phase 4.2AK complete B/T lifecycle-only closure
+        run: |
+          python data/device-catalog/research/validate_stm32f4_lifecycle_evidence.py \
+            --evidence-dir data/device-catalog/research/lifecycle-evidence/stm32f4-phase4.2ak-f469-f479-bt-lifecycle-live-2026-09-06
+          python data/device-catalog/research/test_stm32f4_phase4_2ak_f469_f479_bt_lifecycle_closure.py
+          python data/ic-support/test_phase42ak_lifecycle_closure.py
+          PYTHONPATH=software/python python software/python/tests/test_device_catalog_phase42ak.py
