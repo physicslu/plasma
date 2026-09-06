@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "evidence_id": "stm32f4-phase4.2ak-f469-f479-bt-lifecycle-2026-09-06-retained-20260906T053223Z-f75188f",
+  "manufacturer": "STMicroelectronics",
+  "source_repository": "physicslu/plasma",
+  "executed_git_sha": "f75188f17924738fa3563dfcda199e6d647e7609",
+  "workflow_run_id": 34013977825,
+  "artifact_id": 9983397262,
+  "artifact_zip_sha256": "b26ff78897c83b988300d0c8b5d5e764d60434957cef6af50eedb23ae7283a22",
+  "pilot_summary_sha256": "f85712cc4b4c122bcda44e0d57c205e52871fc682fe2c1c3ff3edcb59bb35dd0",
+  "acquisition_transport": "chromium_rendered_dom",
+  "headed": true,
+  "playwright_version": "1.62.0",
+  "chromium_version": "151.0.7922.34",
+  "acquisition_time_utc": {
+    "first": "2026-09-06T05:26:54Z",
+    "last": "2026-09-06T05:32:22Z"
+  },
+  "target_count": 5,
+  "acquisition_success": 5,
+  "acquisition_failure": 0,
+  "exact_icpn_candidate_count": 0,
+  "lifecycle_exclusion_count": 6,
+  "lifecycle_status_counts": {
+    "NRND": 6
+  },
+  "canonical_dataset_admission": false,
+  "policy_change_authorized": false,
+  "production_write_authorized": false,
+  "evaluator_result": "lifecycle_closed"
+}
