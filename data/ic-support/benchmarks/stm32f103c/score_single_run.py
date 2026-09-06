@@ -12,7 +12,7 @@ import score_ab_benchmark as scorer
 
 HERE = Path(__file__).resolve().parent
 GROUND_TRUTH = HERE / "extraction-ground-truth.json"
-SINGLE_SCORE_SCHEMA_VERSION = "0.1.0"
+SINGLE_SCORE_SCHEMA_VERSION = "0.2.0"
 
 
 class SingleScoreError(RuntimeError):
@@ -69,15 +69,22 @@ def main() -> int:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         score = report["score"]
-        print("IC Evidence single-run score PASS" if score.get("status") == "scored" else "IC Evidence single-run score RUN_ERROR")
+        print(
+            "IC Evidence single-run scoring COMPLETE"
+            if score.get("status") == "scored"
+            else "IC Evidence single-run scoring RUN_ERROR"
+        )
+        print("- scoring completion is not a quality or production acceptance decision")
         print(f"- exact accuracy: {score.get('exact_accuracy')}")
         print(f"- wrong assertions: {score.get('wrong_assertion_count')}")
         print(f"- missing/unknown: {score.get('missing_unknown_count')}")
         print(f"- uncited assertions: {score.get('uncited_assertion_count')}")
+        print(f"- out-of-context citations: {score.get('out_of_context_citation_count')}")
         print(f"- unsupported-inference proxy: {score.get('unsupported_inference_proxy_count')}")
+        print(f"- legacy evidence paths: {score.get('legacy_evidence_path_count')}")
         return 0 if score.get("status") == "scored" else 1
     except (OSError, json.JSONDecodeError, SingleScoreError, scorer.ABScoreError, harness.ABBenchmarkError) as exc:
-        print(f"IC Evidence single-run score FAIL: {exc}", file=sys.stderr)
+        print(f"IC Evidence single-run scoring FAIL: {exc}", file=sys.stderr)
         return 1
 
 
