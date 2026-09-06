@@ -33,11 +33,13 @@ PYNQ              3.1.1
 Ethernet          192.168.2.99/24
 ```
 
-The PYNQ System Python is not a valid Plasma interpreter because the Plasma baseline is Python >= 3.11. The installer bootstrap itself remains Python-3.10-compatible so the stock image can verify and launch the installation transaction, but `--plasma-python` must identify an executable ARMv7 Python >= 3.11 beneath:
+The PYNQ System Python is not a valid Plasma interpreter because the Plasma baseline is Python >= 3.11. The installer bootstrap itself remains Python-3.10-compatible so the stock image can verify and launch the installation transaction, but `--plasma-python` must identify an executable ARMv7 **final** Python release >= 3.11 beneath:
 
 ```text
 /opt/plasma/python/
 ```
+
+A numeric `3.11.x` version alone is not sufficient. The probe also requires `sys.version_info.releaselevel == "final"`. This matters on the current Ubuntu 22.04 base because Jammy exposes an ARMHF `python3.11` package at `3.11.0~rc1`; that prerelease must not be accepted as a Plasma-qualified runtime.
 
 Typical ownership is therefore:
 
@@ -48,7 +50,7 @@ Typical ownership is therefore:
 /opt/plasma/current                    active release symlink
 ```
 
-The installer fails closed rather than replacing `/usr/bin/python3`, changing the PYNQ venv, or silently running Plasma under Python 3.10.
+The installer fails closed rather than replacing `/usr/bin/python3`, changing the PYNQ venv, silently running Plasma under Python 3.10, or accepting an alpha/beta/RC interpreter as production runtime evidence.
 
 ## Installer kit
 
@@ -75,7 +77,7 @@ The bootstrap validates, in order:
 6. PPU runtime manifest identity;
 7. closed hardware boundary;
 8. production Device Catalog presence;
-9. explicit Plasma-owned ARMv7 Python >= 3.11.
+9. explicit Plasma-owned ARMv7 final Python release >= 3.11.
 
 Read-only verification can run before root access:
 
@@ -123,7 +125,7 @@ For the currently observed development board:
 192.168.2.99
 ```
 
-The Plasma Server remains bound to `127.0.0.1:9900`. The Plasma Gateway binds the explicit Z2 address on port `18080` and connects locally to the Server.
+The Plasma Server remains bound to `127.0.0.1:9900`. The Plasma Gateway binds the explicit Z2 address on port `18080` and connects locally to the Server. Installer-local `/api/health/ready` uses a proxy-free urllib opener so host `HTTP_PROXY` / `HTTPS_PROXY` state cannot redirect or fabricate the local qualification path.
 
 ## Installation
 
@@ -148,20 +150,21 @@ Installation is side-by-side and exact-SHA aware:
 ```text
 verify everything
   -> copy immutable release
-  -> write PS-only config and systemd units
+  -> snapshot managed config + systemd units
+  -> write candidate PS-only config and systemd units
   -> atomically move /opt/plasma/current
   -> daemon-reload
   -> enable/start Server
   -> enable/start Gateway
-  -> wait for /api/health/ready
+  -> direct/no-proxy /api/health/ready
 ```
 
-If activation/readiness fails:
+If activation/readiness fails, rollback is transactional across the active release link and managed service configuration:
 
-- an existing previous `current` release is restored and its services are restarted;
-- on first installation, new services are stopped/disabled and the failed `current` activation link is removed.
+- with an existing installation, the previous `current` release, `/etc/plasma/ppu.yaml`, `plasma-server.service`, and `plasma-web.service` bytes/metadata are restored, systemd is reloaded, and the previous services are restarted;
+- on first installation, candidate services are stopped/disabled, the candidate `current` link is removed, and newly created managed config/unit files are removed.
 
-The failed immutable candidate may remain under `releases/` for evidence/debugging; it is not considered active.
+If rollback itself is incomplete, installation reports that fact explicitly instead of claiming recovery. The failed immutable candidate may remain under `releases/` for evidence/debugging; it is not considered active.
 
 ## Evidence levels in this phase
 
@@ -175,7 +178,7 @@ That evidence supports only:
 
 ```text
 exact PPU release installed       PASS
-isolated Plasma Python binding    PASS
+isolated final Plasma Python      PASS
 systemd activation                PASS
 Z2-local Gateway readiness        PASS
 ```
