@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/stm32f103c/canonical-spec-v0",
+  "title": "STM32F103C Plasma canonical specification projection",
+  "description": "Deterministically canonicalized IC specification projection. Canonical identifiers, hexadecimal formatting, and controlled vocabulary are owned by Plasma canonicalization, not by the AI extractor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_relationships",
+    "targets",
+    "programming_contract",
+    "option_contract",
+    "security_contract"
+  ],
+  "properties": {
+    "profile_relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["programming", "memory_geometry", "package_hardware", "option", "security"],
+      "properties": {
+        "programming": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "memory_geometry": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "package_hardware": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "option": {"type": "string", "enum": ["shared", "different", "unknown"]},
+        "security": {"type": "string", "enum": ["shared", "different", "unknown"]}
+      }
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["STM32F103C8T6", "STM32F103CBT6"],
+      "properties": {
+        "STM32F103C8T6": {"$ref": "#/$defs/targetSpec"},
+        "STM32F103CBT6": {"$ref": "#/$defs/targetSpec"}
+      }
+    },
+    "programming_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program_granularity_bytes", "unlock_keys", "write_erase_requires_hsi"],
+      "properties": {
+        "program_granularity_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "unlock_keys": {"type": ["array", "null"], "items": {"type": "string"}},
+        "write_erase_requires_hsi": {"type": ["boolean", "null"]}
+      }
+    },
+    "option_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_start", "region_size_bytes", "encoding"],
+      "properties": {
+        "region_start": {
+          "type": ["string", "null"],
+          "pattern": "^0x[0-9A-F]+$",
+          "description": "Canonical hexadecimal address: lowercase 0x prefix, uppercase digits, no separators or leading zero padding."
+        },
+        "region_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "encoding": {
+          "type": ["string", "null"],
+          "enum": ["byte_plus_complement", null]
+        }
+      }
+    },
+    "security_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_unprotect_is_destructive", "write_protection_granularity_bytes"],
+      "properties": {
+        "read_unprotect_is_destructive": {"type": ["boolean", "null"]},
+        "write_protection_granularity_bytes": {"type": ["integer", "null"], "minimum": 1}
+      }
+    }
+  },
+  "$defs": {
+    "targetSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "icpn",
+        "manufacturer_device_reference",
+        "commercial_part_base",
+        "flash_size_bytes",
+        "page_size_bytes",
+        "page_count"
+      ],
+      "properties": {
+        "icpn": {"type": "string", "minLength": 1},
+        "manufacturer_device_reference": {"type": ["string", "null"]},
+        "commercial_part_base": {"type": "string", "minLength": 1},
+        "flash_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "page_size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "page_count": {"type": ["integer", "null"], "minimum": 1}
+      }
+    }
+  }
+}
