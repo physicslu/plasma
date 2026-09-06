@@ -13,7 +13,7 @@ import semantic_extraction_v4 as semantic
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_CONTRACT = HERE / "canonicalization-contract-v2.json"
-PACKAGE_FIELDS = ("package", "pin_count", "debug_programming_interfaces")
+PACKAGE_FIELDS = ("package_family", "pin_count", "debug_programming_interfaces")
 TARGETS = ("STM32F103C8T6", "STM32F103CBT6")
 
 CanonicalizationError = common.CanonicalizationError
@@ -49,20 +49,23 @@ def _normalized_package_facts(values: dict[str, Any]) -> tuple[str, int, tuple[s
     if any(_is_unresolved(values[field]) for field in PACKAGE_FIELDS):
         return None
 
-    package = values["package"]
+    package_family = values["package_family"]
     pin_count = values["pin_count"]
     interfaces = values["debug_programming_interfaces"]
-    require(isinstance(package, str) and package != "", "package_hardware.package must be non-empty string")
+    require(
+        isinstance(package_family, str) and package_family != "",
+        "package_hardware.package_family must be non-empty string",
+    )
     require(
         isinstance(pin_count, int) and not isinstance(pin_count, bool) and pin_count > 0,
         "package_hardware.pin_count must be positive integer",
     )
     require(
-        isinstance(interfaces, list) and all(isinstance(item, str) and item != "" for item in interfaces),
-        "package_hardware.debug_programming_interfaces must be string array",
+        isinstance(interfaces, list) and all(item in {"SWD", "JTAG"} for item in interfaces),
+        "package_hardware.debug_programming_interfaces must use schema vocabulary",
     )
     normalized_interfaces = tuple(sorted(set(interfaces)))
-    return package, pin_count, normalized_interfaces
+    return package_family, pin_count, normalized_interfaces
 
 
 def derive_package_hardware_relationship(
@@ -72,8 +75,16 @@ def derive_package_hardware_relationship(
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     relationship_contract = contract.get("relationship_derivation", {}).get("package_hardware")
     require(isinstance(relationship_contract, dict), "package_hardware relationship derivation contract required")
+    require(
+        relationship_contract.get("scope") == "benchmark_profile_projection_only",
+        "package_hardware derivation scope mismatch",
+    )
     require(relationship_contract.get("fields") == list(PACKAGE_FIELDS), "package_hardware derivation fields mismatch")
     require(relationship_contract.get("interface_list_semantics") == "set", "package_hardware interface semantics must be set")
+    require(
+        relationship_contract.get("does_not_prove_pin_level_minimum_programming_hardware") is True,
+        "package_hardware derivation must not imply pin-level programming-hardware admission",
+    )
 
     target_inputs: dict[str, Any] = {}
     normalized: dict[str, tuple[str, int, tuple[str, ...]] | None] = {}
@@ -115,6 +126,7 @@ def derive_package_hardware_relationship(
         "kind": "DETERMINISTIC_RELATIONSHIP_DERIVATION",
         "path": "$.canonical_spec.profile_relationships.package_hardware",
         "relationship": "package_hardware",
+        "scope": "benchmark_profile_projection_only",
         "source_paths": source_paths,
         "input": target_inputs,
         "comparison": {
@@ -122,6 +134,7 @@ def derive_package_hardware_relationship(
             "debug_programming_interfaces": "set_equality",
         },
         "output": relationship,
+        "does_not_prove_pin_level_minimum_programming_hardware": True,
     }
     return relationship, _dedupe_citations(citations), transformation
 
@@ -207,6 +220,7 @@ def canonicalize_response(payload: dict[str, Any], contract: dict[str, Any]) -> 
         "ai_emits_package_hardware_relationship": False,
         "package_hardware_relationship_is_deterministic": True,
         "relationship_free_form_semantic_matching": False,
+        "pin_level_minimum_programming_hardware_admission": False,
         "canonical_dataset_admission": False,
         "production_admission": False,
     }
@@ -231,6 +245,7 @@ def main() -> int:
         print(f"- transformations: {len(report['transformations'])}")
         print(f"- unresolved paths: {len(report['unresolved_paths'])}")
         print("- package relationship emitted by AI: false")
+        print("- pin-level programming-hardware admission: false")
         print("- canonical dataset admission: false")
         print("- production admission: false")
         return 0
