@@ -149,7 +149,7 @@ def _stage_bundled_runtimes(*, release_root: Path, python_runtime_dir: Path, nod
 
 def stage_payload(
     *, repo_root: Path, runtime_dir: Path, staging_root: Path, version: str,
-    source_release: Mapping[str, object], winsw_exe: Path,
+    release_id: str, source_release: Mapping[str, object], winsw_exe: Path,
     python_runtime_dir: Path, node_runtime_dir: Path,
 ) -> tuple[Path, Path]:
     if staging_root.exists():
@@ -182,9 +182,10 @@ def stage_payload(
         "platform": "windows",
         "architecture": "x86_64",
         "product_version": version,
+        "release_id": release_id,
         "service_manager": "windows-scm-via-winsw",
         "services": [SERVICE_MANAGER, SERVICE_CONSOLE],
-        "program_files_root": rf"%ProgramFiles%\Plasma\releases\{version}",
+        "program_files_root": rf"%ProgramFiles%\Plasma\releases\{release_id}",
         "program_data_root": r"%ProgramData%\Plasma",
         "runtime_ownership": "bundled",
         "bundled_runtimes": {
@@ -224,7 +225,14 @@ def _xml_path(path: Path) -> str:
     return escape(str(path.resolve()), {'"': '&quot;'})
 
 
-def generate_wix_source(*, release_root: Path, program_data_seed: Path, version: str, output_path: Path) -> None:
+def generate_wix_source(
+    *,
+    release_root: Path,
+    program_data_seed: Path,
+    version: str,
+    release_id: str,
+    output_path: Path,
+) -> None:
     root = _xml_path(release_root)
     manager_exe = _xml_path(release_root / "bin" / "plasma-manager-service.exe")
     console_exe = _xml_path(release_root / "bin" / "plasma-console-service.exe")
@@ -239,7 +247,7 @@ def generate_wix_source(*, release_root: Path, program_data_seed: Path, version:
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="PlasmaProgramFiles" Name="Plasma">
         <Directory Id="PlasmaReleases" Name="releases">
-          <Directory Id="PlasmaVersion" Name="{escape(version)}">
+          <Directory Id="PlasmaVersion" Name="{escape(release_id)}">
             <Directory Id="PlasmaBin" Name="bin" />
           </Directory>
         </Directory>
@@ -297,17 +305,25 @@ def build_msi(
         work = Path(temporary)
         manifest, canonical = verify_release(repo_root.resolve(), release_artifact.resolve(), work / "verified")
         version = str(manifest["product_version"])
-        package = output_dir / f"plasma-control-station-{version}-windows-x86_64.msi"
+        source_git_sha = str(manifest["git_sha"])
+        identity = _release_tool(repo_root.resolve()).release_id(version, source_git_sha)
+        package = output_dir / f"plasma-control-station-{identity}-windows-x86_64.msi"
         sidecar = package.with_suffix(".msi.sha256")
         if package.exists() or sidecar.exists():
             raise WindowsInstallerError(f"refusing to overwrite immutable installer output: {package}")
         release_root, seed = stage_payload(
             repo_root=repo_root.resolve(), runtime_dir=canonical / "runtime", staging_root=work / "stage",
-            version=version, source_release=manifest, winsw_exe=winsw_exe.resolve(),
+            version=version, release_id=identity, source_release=manifest, winsw_exe=winsw_exe.resolve(),
             python_runtime_dir=python_runtime_dir.resolve(), node_runtime_dir=node_runtime_dir.resolve(),
         )
         wxs = work / "installer.wxs"
-        generate_wix_source(release_root=release_root, program_data_seed=seed, version=version, output_path=wxs)
+        generate_wix_source(
+            release_root=release_root,
+            program_data_seed=seed,
+            version=version,
+            release_id=identity,
+            output_path=wxs,
+        )
         try:
             subprocess.run([wix, "build", "-arch", "x64", "-o", str(package), str(wxs)], check=True)
         except (OSError, subprocess.CalledProcessError) as exc:
