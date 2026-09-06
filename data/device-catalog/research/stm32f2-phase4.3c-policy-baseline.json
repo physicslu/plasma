@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "phase": "4.3C",
+  "family": "STM32F2",
+  "adapter_id": "stm32f2-phase4.3c",
+  "base_main": "5fdaa608692e82088f3e67ff5b85c7569338ebcc",
+  "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+  "retained_evidence_directory": "stm32f2-phase4.3b-official-st-discovery-live-2026-09-06",
+  "candidate_count": 9,
+  "base_devices": [
+    "STM32F205RB",
+    "STM32F207IC",
+    "STM32F215RE",
+    "STM32F217IE"
+  ],
+  "policy_ready_exact_icpns": [
+    "STM32F205RBT6",
+    "STM32F205RBT6TR",
+    "STM32F205RBT7",
+    "STM32F207ICH6",
+    "STM32F207ICT6",
+    "STM32F215RET6",
+    "STM32F215RET6TR",
+    "STM32F217IEH6",
+    "STM32F217IET6"
+  ],
+  "decision_counts": {
+    "admit": 9,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "conflicts": 0,
+  "metadata_contract": {
+    "flash_by_code": {
+      "B": "128 KiB",
+      "C": "256 KiB",
+      "E": "512 KiB"
+    },
+    "temperature_by_code": {
+      "6": "-40 to 85 C",
+      "7": "-40 to 105 C"
+    },
+    "package_by_code": {
+      "H": "UFBGA",
+      "T": "LQFP"
+    },
+    "pins_by_combination": {
+      "I/H": "176",
+      "I/T": "176",
+      "R/T": "64"
+    },
+    "allowed_option_suffixes": [
+      "",
+      "TR"
+    ],
+    "openocd_target_config": "tcl/target/stm32f2x.cfg"
+  },
+  "production_snapshot": {
+    "exact_icpn_count": 459,
+    "base_device_count": 157,
+    "family_exact_icpn_counts": {
+      "STM32F1": 75,
+      "STM32F4": 384
+    },
+    "stm32f2_exact_icpn_count": 0
+  },
+  "production_write_applied": false,
+  "exact_icpn_admission_deferred": true,
+  "programming_algorithm_equivalence_claimed": false,
+  "runtime_support_claimed": false,
+  "full_stm32f2_surface_covered": false,
+  "fail_closed": true
+}
