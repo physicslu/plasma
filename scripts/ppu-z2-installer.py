@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Install a verified Plasma PPU release on a PYNQ-Z2 PS-only Linux target.
 
-The bootstrap is intentionally compatible with Python 3.10 so it can be launched
-from the stock PYNQ image. Plasma Server and Plasma Gateway are never launched
-with that interpreter: --plasma-python must identify a separate Plasma-owned
-Python >= 3.11 runtime.
+The bootstrap is deliberately compatible with Python 3.10 so the stock PYNQ
+image can launch it. Plasma Server and Plasma Gateway never use that interpreter:
+``--plasma-python`` must identify a separate Plasma-owned ARMv7 Python >= 3.11.
+
+This installer keeps the hardware boundary closed. It installs only the PS
+software node and cannot load PL, control target power, or program a real IC.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import os
 import platform
 import pwd
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -45,7 +48,7 @@ SERVICE_GROUP = "plasma"
 
 
 class Z2InstallerError(RuntimeError):
-    pass
+    """Raised when installer verification, activation, or rollback fails."""
 
 
 @dataclass(frozen=True)
@@ -96,6 +99,16 @@ class InstallPaths:
         return self.product_root / "install"
 
 
+@dataclass(frozen=True)
+class FileSnapshot:
+    path: Path
+    existed: bool
+    content: bytes | None
+    mode: int | None
+    uid: int | None
+    gid: int | None
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -107,12 +120,12 @@ def _sha256(path: Path) -> str:
 def _verify_sidecar(artifact: Path, sidecar: Path | None = None) -> str:
     sidecar = Path(str(artifact) + ".sha256") if sidecar is None else sidecar
     try:
-        parts = sidecar.read_text(encoding="utf-8").strip().split()
+        fields = sidecar.read_text(encoding="utf-8").strip().split()
     except OSError as exc:
         raise Z2InstallerError(f"cannot read detached SHA-256 sidecar: {exc}") from exc
-    if len(parts) != 2 or parts[1].lstrip("*") != artifact.name:
+    if len(fields) != 2 or fields[1].lstrip("*") != artifact.name:
         raise Z2InstallerError("detached SHA-256 sidecar does not identify the release artifact")
-    expected = parts[0].lower()
+    expected = fields[0].lower()
     if len(expected) != 64 or any(ch not in "0123456789abcdef" for ch in expected):
         raise Z2InstallerError("detached SHA-256 sidecar contains an invalid digest")
     actual = _sha256(artifact)
@@ -142,6 +155,7 @@ def _extract_verified_tar(artifact: Path, destination: Path) -> Path:
         archive = tarfile.open(artifact, "r:gz")
     except (OSError, tarfile.TarError) as exc:
         raise Z2InstallerError(f"cannot open PPU release archive: {exc}") from exc
+
     with archive:
         for member in archive.getmembers():
             pure = _safe_member_name(member.name)
@@ -166,6 +180,7 @@ def _extract_verified_tar(artifact: Path, destination: Path) -> Path:
                 raise Z2InstallerError(f"cannot read archive member: {canonical}")
             with source, target.open("wb") as output:
                 shutil.copyfileobj(source, output)
+            # Preserve executable bits and make the verified extraction read-only.
             target.chmod((member.mode & 0o555) | 0o400)
     return destination / RELEASE_ROOT
 
@@ -186,14 +201,15 @@ def _verify_internal_hashes(root: Path) -> None:
         lines = sums.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
         raise Z2InstallerError(f"cannot read SHA256SUMS: {exc}") from exc
+
     expected: dict[str, str] = {}
     for line in lines:
         if not line.strip():
             continue
-        parts = line.split(maxsplit=1)
-        if len(parts) != 2:
+        fields = line.split(maxsplit=1)
+        if len(fields) != 2:
             raise Z2InstallerError("invalid SHA256SUMS entry")
-        digest, name = parts
+        digest, name = fields
         name = name.lstrip("*").strip()
         pure = PurePosixPath(name)
         if (
@@ -268,9 +284,11 @@ def _verify_runtime(root: Path) -> dict[str, object]:
         raise Z2InstallerError("invalid PPU runtime identity/schema")
     if manifest.get("hardware_boundary") != EXPECTED_HARDWARE_BOUNDARY:
         raise Z2InstallerError("PPU runtime hardware boundary is not closed")
+
     app = runtime / "ppu" / "ppu.pyz"
     if not app.is_file() or app.stat().st_size <= 0:
         raise Z2InstallerError("PPU runtime is missing ppu/ppu.pyz")
+
     data = manifest.get("data")
     if not isinstance(data, dict):
         raise Z2InstallerError("PPU runtime data manifest is invalid")
@@ -350,6 +368,7 @@ def validate_plasma_python(
         ) from exc
     if not resolved.is_file() or not os.access(resolved, os.X_OK):
         raise Z2InstallerError(f"isolated Plasma Python is not executable: {resolved}")
+
     payload = probe(resolved)
     raw_version = payload.get("version")
     if (
@@ -506,29 +525,45 @@ def render_systemd_units(
 
 def _ensure_service_account() -> None:
     try:
-        pwd.getpwnam(SERVICE_USER)
-        grp.getgrnam(SERVICE_GROUP)
-        return
+        user = pwd.getpwnam(SERVICE_USER)
     except KeyError:
-        pass
-    subprocess.run(
-        [
-            "useradd",
-            "--system",
-            "--home-dir",
-            "/var/lib/plasma",
-            "--shell",
-            "/usr/sbin/nologin",
-            "--user-group",
-            SERVICE_USER,
-        ],
-        check=True,
-    )
+        user = None
     try:
-        pwd.getpwnam(SERVICE_USER)
-        grp.getgrnam(SERVICE_GROUP)
+        group = grp.getgrnam(SERVICE_GROUP)
+    except KeyError:
+        group = None
+
+    if user is not None or group is not None:
+        if user is None or group is None or user.pw_gid != group.gr_gid:
+            raise Z2InstallerError(
+                "existing plasma user/group identity is incomplete or mismatched; refusing to mutate it"
+            )
+        return
+
+    try:
+        subprocess.run(
+            [
+                "useradd",
+                "--system",
+                "--home-dir",
+                "/var/lib/plasma",
+                "--shell",
+                "/usr/sbin/nologin",
+                "--user-group",
+                SERVICE_USER,
+            ],
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise Z2InstallerError(f"cannot create plasma service identity: {exc}") from exc
+
+    try:
+        user = pwd.getpwnam(SERVICE_USER)
+        group = grp.getgrnam(SERVICE_GROUP)
     except KeyError as exc:
         raise Z2InstallerError("plasma service identity was not created") from exc
+    if user.pw_gid != group.gr_gid:
+        raise Z2InstallerError("created plasma user/group identity is inconsistent")
 
 
 def _chown_tree(path: Path, user: str, group: str) -> None:
@@ -557,12 +592,14 @@ def _systemctl(*args: str) -> None:
 
 
 def _health_ready(gateway_host: str, *, deadline_s: float = 30.0) -> dict[str, object]:
+    """Probe the local Z2 Gateway without inheriting HTTP proxy settings."""
     url = f"http://{gateway_host}:18080/api/health/ready"
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     deadline = time.monotonic() + deadline_s
     last = "no response"
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(url, timeout=2.0) as response:
+            with opener.open(url, timeout=2.0) as response:
                 raw = response.read()
                 status = int(response.status)
             payload = json.loads(raw.decode("utf-8"))
@@ -583,22 +620,67 @@ def _health_ready(gateway_host: str, *, deadline_s: float = 30.0) -> dict[str, o
 
 def _write_text_atomic(path: Path, content: str, mode: int = 0o644) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + ".new")
-    temp.write_text(content, encoding="utf-8")
-    temp.chmod(mode)
-    os.replace(temp, path)
+    temporary = path.with_name(path.name + ".new")
+    temporary.write_text(content, encoding="utf-8")
+    temporary.chmod(mode)
+    os.replace(temporary, path)
+
+
+def _write_bytes_atomic(path: Path, content: bytes, mode: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".rollback")
+    with temporary.open("wb") as stream:
+        stream.write(content)
+    temporary.chmod(mode)
+    os.replace(temporary, path)
+
+
+def _snapshot_file(path: Path) -> FileSnapshot:
+    if not path.exists() and not path.is_symlink():
+        return FileSnapshot(path, False, None, None, None, None)
+    if not path.is_file() or path.is_symlink():
+        raise Z2InstallerError(f"refusing to overwrite non-regular managed file: {path}")
+    metadata = path.stat()
+    return FileSnapshot(
+        path=path,
+        existed=True,
+        content=path.read_bytes(),
+        mode=stat.S_IMODE(metadata.st_mode),
+        uid=metadata.st_uid,
+        gid=metadata.st_gid,
+    )
+
+
+def _restore_file(snapshot: FileSnapshot) -> None:
+    if not snapshot.existed:
+        try:
+            snapshot.path.unlink()
+        except FileNotFoundError:
+            pass
+        return
+    assert snapshot.content is not None
+    assert snapshot.mode is not None
+    assert snapshot.uid is not None
+    assert snapshot.gid is not None
+    _write_bytes_atomic(snapshot.path, snapshot.content, snapshot.mode)
+    os.chown(snapshot.path, snapshot.uid, snapshot.gid)
 
 
 def _copy_release(verified: VerifiedRelease, target: Path) -> None:
     if target.exists():
+        if not target.is_dir() or target.is_symlink():
+            raise Z2InstallerError(f"release target is not a regular directory: {target}")
         existing = _read_object(target / "release.json", "installed release.json")
         if existing.get("git_sha") != verified.git_sha:
             raise Z2InstallerError(f"release directory collision at {target}")
         _verify_internal_hashes(target)
         _verify_runtime(target)
         return
+
     staging = target.with_name(target.name + ".staging")
     if staging.exists():
+        if staging.is_symlink() or not staging.is_dir():
+            raise Z2InstallerError(f"unsafe stale release staging path: {staging}")
         shutil.rmtree(staging)
     shutil.copytree(verified.root, staging)
     for item in [staging, *staging.rglob("*")]:
@@ -610,10 +692,62 @@ def _copy_release(verified: VerifiedRelease, target: Path) -> None:
 
 
 def _previous_current(current: Path) -> Path | None:
-    if not current.is_symlink():
+    if not current.exists() and not current.is_symlink():
         return None
+    if not current.is_symlink():
+        raise Z2InstallerError(f"managed current path is not a symlink: {current}")
     raw = Path(os.readlink(current))
     return raw if raw.is_absolute() else (current.parent / raw).resolve()
+
+
+def _rollback_activation(
+    *,
+    paths: InstallPaths,
+    previous: Path | None,
+    snapshots: Sequence[FileSnapshot],
+    systemctl: Callable[..., None],
+) -> None:
+    errors: list[str] = []
+
+    if previous is None:
+        # Stop while the candidate units still exist, then restore/remove files.
+        for service in ("plasma-web.service", "plasma-server.service"):
+            try:
+                systemctl("disable", "--now", service)
+            except Exception as exc:  # rollback is best-effort but reported exactly
+                errors.append(f"disable {service}: {exc}")
+        try:
+            paths.current.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            errors.append(f"remove current: {exc}")
+    else:
+        try:
+            _atomic_symlink(paths.current, previous)
+        except OSError as exc:
+            errors.append(f"restore current: {exc}")
+
+    for snapshot in snapshots:
+        try:
+            _restore_file(snapshot)
+        except OSError as exc:
+            errors.append(f"restore {snapshot.path}: {exc}")
+
+    try:
+        systemctl("daemon-reload")
+    except Exception as exc:
+        errors.append(f"daemon-reload: {exc}")
+
+    if previous is not None:
+        for service in ("plasma-server.service", "plasma-web.service"):
+            try:
+                systemctl("restart", service)
+            except Exception as exc:
+                errors.append(f"restart {service}: {exc}")
+
+    if errors:
+        raise Z2InstallerError("rollback incomplete: " + "; ".join(errors))
 
 
 def install_release(
@@ -632,6 +766,11 @@ def install_release(
     gateway_host = _validate_gateway_host(gateway_host)
     release_target = paths.releases_root / verified.release_id
     previous = _previous_current(paths.current)
+
+    config_path = paths.config_root / "ppu.yaml"
+    server_unit = paths.systemd_root / "plasma-server.service"
+    gateway_unit = paths.systemd_root / "plasma-web.service"
+    snapshots = tuple(_snapshot_file(path) for path in (config_path, server_unit, gateway_unit))
 
     paths.releases_root.mkdir(parents=True, exist_ok=True)
     paths.install_root.mkdir(parents=True, exist_ok=True)
@@ -656,44 +795,37 @@ def install_release(
         gateway_host=gateway_host,
         catalog_relative=_catalog_relative(verified.runtime_manifest),
     )
-    config_path = paths.config_root / "ppu.yaml"
+
     _write_text_atomic(config_path, config, 0o640)
     os.chown(
         config_path,
         pwd.getpwnam(SERVICE_USER).pw_uid,
         grp.getgrnam(SERVICE_GROUP).gr_gid,
     )
-    for name, text in units.items():
-        _write_text_atomic(paths.systemd_root / name, text)
-
+    _write_text_atomic(server_unit, units["plasma-server.service"])
+    _write_text_atomic(gateway_unit, units["plasma-web.service"])
     _atomic_symlink(paths.current, release_target)
+
     try:
         systemctl("daemon-reload")
         systemctl("enable", "--now", "plasma-server.service")
         systemctl("enable", "--now", "plasma-web.service")
         readiness = dict(health_check(gateway_host))
-    except Exception as exc:
-        if previous is not None and previous.exists():
-            _atomic_symlink(paths.current, previous)
-            try:
-                systemctl("daemon-reload")
-                systemctl("restart", "plasma-server.service")
-                systemctl("restart", "plasma-web.service")
-            except Exception as rollback_exc:
-                raise Z2InstallerError(
-                    f"activation failed ({exc}); rollback also failed ({rollback_exc})"
-                ) from rollback_exc
-        else:
-            try:
-                systemctl("disable", "--now", "plasma-web.service")
-                systemctl("disable", "--now", "plasma-server.service")
-            except Exception:
-                pass
-            try:
-                paths.current.unlink()
-            except FileNotFoundError:
-                pass
-        raise Z2InstallerError(f"activation failed and was rolled back: {exc}") from exc
+    except Exception as activation_exc:
+        try:
+            _rollback_activation(
+                paths=paths,
+                previous=previous,
+                snapshots=snapshots,
+                systemctl=systemctl,
+            )
+        except Exception as rollback_exc:
+            raise Z2InstallerError(
+                f"activation failed ({activation_exc}); rollback also failed ({rollback_exc})"
+            ) from rollback_exc
+        raise Z2InstallerError(
+            f"activation failed and previous configuration/release was restored: {activation_exc}"
+        ) from activation_exc
 
     evidence = {
         "schema_version": 1,
@@ -751,6 +883,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Install a verified Plasma PPU release on PYNQ-Z2 without replacing PYNQ System Python"
     )
     sub = parser.add_subparsers(dest="command", required=True)
+
     verify = sub.add_parser("verify", help="verify release integrity and PS-only runtime boundary")
     verify.add_argument("--release-artifact", required=True, type=Path)
     verify.add_argument("--sidecar", type=Path)
