@@ -59,11 +59,11 @@ def validate_lifecycle_evidence(evidence_dir: Path) -> dict[str, Any]:
     require(isinstance(lifecycle_counts, dict), "baseline lifecycle counts missing")
     require(set(lifecycle_counts) <= {"NRND", "Proposal", "total"}, "unsupported baseline lifecycle count")
     require(
-        all(isinstance(lifecycle_counts.get(status, 0), int) and lifecycle_counts.get(status, 0) >= 0 for status in ("NRND", "Proposal")),
+        all(type(lifecycle_counts.get(status, 0)) is int and lifecycle_counts.get(status, 0) >= 0 for status in ("NRND", "Proposal")),
         "invalid baseline lifecycle status count",
     )
     expected_exclusions = lifecycle_counts.get("total")
-    require(isinstance(expected_exclusions, int) and expected_exclusions > 0, "invalid baseline exclusion total")
+    require(type(expected_exclusions) is int and expected_exclusions > 0, "invalid baseline exclusion total")
     expected_status_counts = {
         status: lifecycle_counts.get(status, 0)
         for status in ("NRND", "Proposal")
