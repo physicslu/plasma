@@ -135,7 +135,7 @@ def test_release_verifier_rejects_open_hardware_boundary(tmp_path: Path) -> None
         installer.verify_release(artifact, extract_to=tmp_path / "verified")
 
 
-def test_isolated_python_must_be_plasma_owned_armv7_and_311_or_newer(tmp_path: Path) -> None:
+def test_isolated_python_must_be_plasma_owned_armv7_final_and_311_or_newer(tmp_path: Path) -> None:
     product_root = tmp_path / "opt" / "plasma"
     python_path = product_root / "python" / "3.11.9" / "bin" / "python3"
     python_path.parent.mkdir(parents=True)
@@ -147,12 +147,14 @@ def test_isolated_python_must_be_plasma_owned_armv7_and_311_or_newer(tmp_path: P
         product_root=product_root,
         probe=lambda path: {
             "version": [3, 11, 9],
+            "releaselevel": "final",
             "machine": "armv7l",
             "executable": str(path),
         },
     )
     assert runtime.version == "3.11.9"
     assert runtime.architecture == "armv7l"
+    assert runtime.releaselevel == "final"
 
     with pytest.raises(installer.Z2InstallerError, match="required 3.11"):
         installer.validate_plasma_python(
@@ -160,6 +162,19 @@ def test_isolated_python_must_be_plasma_owned_armv7_and_311_or_newer(tmp_path: P
             product_root=product_root,
             probe=lambda path: {
                 "version": [3, 10, 4],
+                "releaselevel": "final",
+                "machine": "armv7l",
+                "executable": str(path),
+            },
+        )
+
+    with pytest.raises(installer.Z2InstallerError, match="final release"):
+        installer.validate_plasma_python(
+            python_path,
+            product_root=product_root,
+            probe=lambda path: {
+                "version": [3, 11, 0],
+                "releaselevel": "candidate",
                 "machine": "armv7l",
                 "executable": str(path),
             },
@@ -175,6 +190,7 @@ def test_isolated_python_must_be_plasma_owned_armv7_and_311_or_newer(tmp_path: P
             product_root=product_root,
             probe=lambda path: {
                 "version": [3, 12, 0],
+                "releaselevel": "final",
                 "machine": "armv7l",
                 "executable": str(path),
             },
@@ -370,3 +386,4 @@ def test_bootstrap_source_does_not_import_project_or_python311_only_tomllib() ->
     )
     assert "--plasma-python" in source
     assert "Python >= 3.11" in source
+    assert "releaselevel" in source
