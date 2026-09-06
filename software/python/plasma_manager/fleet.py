@@ -203,8 +203,8 @@ class FleetAggregator:
                 raise PPUHTTPError(f"/api/node is missing ppu.{key}")
         site_count = ppu.get("site_count")
         enabled_site_count = ppu.get("enabled_site_count")
-        if isinstance(site_count, bool) or not isinstance(site_count, int) or site_count < 1:
-            raise PPUHTTPError("/api/node ppu.site_count must be a positive integer")
+        if isinstance(site_count, bool) or not isinstance(site_count, int) or site_count < 0:
+            raise PPUHTTPError("/api/node ppu.site_count must be a non-negative integer")
         if (
             isinstance(enabled_site_count, bool)
             or not isinstance(enabled_site_count, int)
