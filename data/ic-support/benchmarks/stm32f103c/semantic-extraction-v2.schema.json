@@ -91,11 +91,11 @@
     "packageHardwareFacts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["package", "pin_count", "debug_programming_interfaces"],
+      "required": ["package_family", "pin_count", "debug_programming_interfaces"],
       "properties": {
-        "package": {
+        "package_family": {
           "type": ["string", "null"],
-          "description": "Manufacturer package family/name applicable to the target, for example LQFP. Preserve manufacturer terminology rather than a Plasma profile identifier."
+          "description": "Manufacturer package family applicable to the target, excluding pin-count suffixes when the document exposes the family separately; for example LQFP."
         },
         "pin_count": {
           "type": ["integer", "null"],
@@ -104,8 +104,8 @@
         },
         "debug_programming_interfaces": {
           "type": ["array", "null"],
-          "items": {"type": "string", "minLength": 1},
-          "description": "Manufacturer-named hardware debug/programming interfaces supported by this target/package. Do not infer a shared/different relationship from this list."
+          "items": {"type": "string", "enum": ["SWD", "JTAG"]},
+          "description": "Evidence-backed supported hardware debug/programming interfaces selected from the schema vocabulary. List order has no semantic significance."
         }
       }
     },
