@@ -1,0 +1,30 @@
+{
+  "schema_version": "0.5.0",
+  "canonicalization_id": "stm32f103c-canonicalization-v4",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "semantic_schema_id": "plasma://ic-support/stm32f103c/semantic-extraction-v4",
+  "canonical_schema_id": "plasma://ic-support/stm32f103c/canonical-spec-v0",
+  "base_relationship_canonicalization_contract": "canonicalization-contract-v3.json",
+  "relationship_derivation": {
+    "programming": {
+      "scope": "benchmark_profile_projection_only",
+      "source": "evidence_backed_applicability",
+      "applicability_file": "programming-applicability-v0.json",
+      "complete_same_contract": "shared",
+      "complete_different_contract": "different",
+      "incomplete": "unknown"
+    }
+  },
+  "trust_boundary": {
+    "generation_visibility": false,
+    "ai_emits_programming_relationship": false,
+    "ai_emits_memory_geometry_relationship": false,
+    "ai_emits_package_hardware_relationship": false,
+    "relationship_inference_from_free_form_text": false,
+    "relationship_substring_matching": false,
+    "relationship_regex_inference": false,
+    "relationship_fuzzy_matching": false,
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  }
+}
