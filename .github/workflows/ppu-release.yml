@@ -48,6 +48,7 @@ on:
       - "software/python/tests/test_persistent_integration_host_security.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
+      - "software/python/tests/test_manager_ps_only_topology.py"
       - "software/python/tests/test_product_release.py"
 
 concurrency:
@@ -106,6 +107,7 @@ jobs:
           software/python/tests/test_persistent_integration_host_security.py
           software/python/tests/test_ppu_release.py
           software/python/tests/test_ppu_z2_installer.py
+          software/python/tests/test_manager_ps_only_topology.py
           software/python/tests/test_product_release.py
 
       - name: Build and validate PPU runtime
@@ -125,24 +127,28 @@ jobs:
           output="$RUNNER_TEMP/plasma-ppu-release"
           sha="$(git rev-parse HEAD)"
           version="$(python -c 'import json; print(json.load(open("release/product.json"))["product_version"])')"
+          sha_prefix="${sha:0:12}"
+          identity="$version-$sha_prefix"
 
           python scripts/ppu-release.py \
             --runtime-dir "$runtime" \
             --output-dir "$output" \
             --git-sha "$sha"
 
-          archive="$output/plasma-ppu-$version-linux-armv7l.tar.gz"
+          archive="$output/plasma-ppu-$identity-linux-armv7l.tar.gz"
           sidecar="$archive.sha256"
-          installer="$output/plasma-ppu-z2-installer.py"
+          installer="$output/plasma-ppu-z2-installer-$identity.py"
           installer_sidecar="$installer.sha256"
           test -f "$archive"
           test -f "$sidecar"
           cp scripts/ppu-z2-installer.py "$installer"
-          sha256sum "$(basename "$installer")" > "$installer_sidecar" 2>/dev/null || (
-            cd "$output" && sha256sum "$(basename "$installer")" > "$(basename "$installer_sidecar")"
+          (
+            cd "$output"
+            sha256sum "$(basename "$installer")" > "$(basename "$installer_sidecar")"
           )
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
           echo "sidecar=$sidecar" >> "$GITHUB_OUTPUT"
           echo "installer=$installer" >> "$GITHUB_OUTPUT"
@@ -276,7 +282,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: plasma-ppu-acceptance-${{ github.sha }}
+          name: plasma-ppu-acceptance-${{ steps.release.outputs.identity }}
           path: |
             ${{ runner.temp }}/plasma-ppu-environment-fingerprint.json
             ${{ runner.temp }}/plasma-ppu-network-phase1.json
@@ -291,7 +297,7 @@ jobs:
       - name: Upload PPU release and Z2 installer kit
         uses: actions/upload-artifact@v4
         with:
-          name: plasma-ppu-linux-armv7l-${{ github.sha }}
+          name: plasma-ppu-linux-armv7l-${{ steps.release.outputs.identity }}
           path: |
             ${{ steps.release.outputs.archive }}
             ${{ steps.release.outputs.sidecar }}
