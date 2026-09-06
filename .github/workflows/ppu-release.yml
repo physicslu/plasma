@@ -11,6 +11,7 @@ on:
       - "scripts/persistent-integration-qualification-summary.py"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
+      - "scripts/ppu-z2-installer.py"
       - "scripts/product-release.py"
       - "scripts/ppu-armv7-runtime-acceptance.py"
       - "scripts/ppu-armv7-runtime-lab.py"
@@ -23,6 +24,8 @@ on:
       - "scripts/ci-environment-fingerprint.py"
       - "scripts/static-ipv4-fault-helper.py"
       - "scripts/manager-network-commissioning-crash-injector.py"
+      - "docs/deployment/ppu-runtime-packaging.md"
+      - "docs/deployment/z2-ps-installer.md"
       - "release/**"
       - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
@@ -44,6 +47,7 @@ on:
       - "software/python/tests/test_static_ipv4_fault_injection_lab.py"
       - "software/python/tests/test_persistent_integration_host_security.py"
       - "software/python/tests/test_ppu_release.py"
+      - "software/python/tests/test_ppu_z2_installer.py"
       - "software/python/tests/test_product_release.py"
 
 concurrency:
@@ -54,6 +58,23 @@ permissions:
   contents: read
 
 jobs:
+  z2-installer-python310-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Prove bootstrap parses under the stock PYNQ Python generation
+        run: |
+          python -m py_compile scripts/ppu-z2-installer.py
+          python scripts/ppu-z2-installer.py --help
+      - name: Run installer-only regressions without the Plasma Python package
+        run: |
+          python -m pip install pytest
+          python -m pytest -q software/python/tests/test_ppu_z2_installer.py
+
   build-ppu-release:
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -84,6 +105,7 @@ jobs:
           software/python/tests/test_static_ipv4_fault_injection_lab.py
           software/python/tests/test_persistent_integration_host_security.py
           software/python/tests/test_ppu_release.py
+          software/python/tests/test_ppu_z2_installer.py
           software/python/tests/test_product_release.py
 
       - name: Build and validate PPU runtime
@@ -111,12 +133,20 @@ jobs:
 
           archive="$output/plasma-ppu-$version-linux-armv7l.tar.gz"
           sidecar="$archive.sha256"
+          installer="$output/plasma-ppu-z2-installer.py"
+          installer_sidecar="$installer.sha256"
           test -f "$archive"
           test -f "$sidecar"
+          cp scripts/ppu-z2-installer.py "$installer"
+          sha256sum "$(basename "$installer")" > "$installer_sidecar" 2>/dev/null || (
+            cd "$output" && sha256sum "$(basename "$installer")" > "$(basename "$installer_sidecar")"
+          )
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
           echo "sidecar=$sidecar" >> "$GITHUB_OUTPUT"
+          echo "installer=$installer" >> "$GITHUB_OUTPUT"
+          echo "installer_sidecar=$installer_sidecar" >> "$GITHUB_OUTPUT"
 
       - name: Verify release and closed hardware boundary from clean extraction
         shell: bash
@@ -160,6 +190,17 @@ jobs:
           set -euo pipefail
           cd "$(dirname "$ARCHIVE")"
           sha256sum --check "$(basename "$SIDECAR")"
+
+      - name: Verify Z2 installer consumes the canonical release independently
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.release.outputs.archive }}
+          SIDECAR: ${{ steps.release.outputs.sidecar }}
+        run: |
+          set -euo pipefail
+          python scripts/ppu-z2-installer.py verify \
+            --release-artifact "$ARCHIVE" \
+            --sidecar "$SIDECAR"
 
       - name: Set up QEMU for ARMv7 runtime acceptance
         uses: docker/setup-qemu-action@v4
@@ -247,12 +288,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload PPU release artifact
+      - name: Upload PPU release and Z2 installer kit
         uses: actions/upload-artifact@v4
         with:
           name: plasma-ppu-linux-armv7l-${{ github.sha }}
           path: |
             ${{ steps.release.outputs.archive }}
             ${{ steps.release.outputs.sidecar }}
+            ${{ steps.release.outputs.installer }}
+            ${{ steps.release.outputs.installer_sidecar }}
           if-no-files-found: error
           retention-days: 14
