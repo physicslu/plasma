@@ -184,6 +184,12 @@ jobs:
             --evidence-dir data/device-catalog/research/evidence/stm32f4-phase4.1-rt-admission-batch3-live-2026-09-01 \
             --baseline data/device-catalog/research/stm32f4-phase4.1-rt-admission-batch3-baseline.json
           python data/device-catalog/research/test_stm32f4_phase4_1_rt_admission_batch3_post_admission.py
+      - name: Validate STM32 Phase 4.3 prioritization and STM32F2 discovery
+        run: |
+          python data/device-catalog/research/test_stm32_phase4_3a_next_family_prioritization.py
+          python data/device-catalog/research/test_stm32f2_phase4_3b_discovery.py
+          python data/device-catalog/research/validate_stm32f2_phase4_3b_retained_evidence.py
+          python data/device-catalog/research/test_stm32f2_phase4_3b_retained_evidence.py
       - name: Inventory STM32F4 production coverage gaps
         run: |
           python data/device-catalog/research/test_stm32f4_phase4_2al_lifecycle_gap_classification.py

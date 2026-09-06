@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "phase": "4.3B",
+  "pilot_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06",
+  "executed_git_sha": "a17d9e4d778bac9f2d5360f0f55fd396277db14f",
+  "workflow_run_id": 34041745112,
+  "inputs": {
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "discovery_manifest_sha256": "398bbb89745316568510a2c69a91aa44372e239879bce8c200128862c4eab734",
+    "production_manifest_sha256_at_discovery": "1bcab39dbec4014bff2205d7efc2ddf4bb5558f6787e9dc5b45608a8066174b5"
+  },
+  "production_snapshot": {
+    "exact_icpn_count": 459,
+    "base_device_count": 157,
+    "family_exact_icpn_counts": {
+      "STM32F1": 75,
+      "STM32F4": 384
+    },
+    "stm32f2_exact_icpn_count": 0
+  },
+  "result": {
+    "attempted": 4,
+    "acquisition_success": 4,
+    "acquisition_failure": 0,
+    "active_exact_icpn_candidates": 9,
+    "excluded_non_active_part_numbers": 0,
+    "canonical_mapping": {
+      "unique": 4,
+      "ambiguous": 0,
+      "unmapped": 0
+    },
+    "manual_intervention_required": 0
+  },
+  "targets": [
+    {
+      "subfamily": "STM32F205",
+      "base_device": "STM32F205RB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205rb.html",
+      "retrieved_at_utc": "2026-09-06T15:17:30Z",
+      "rendered_dom_sha256": "2dffbdcdfe977ca78faef656334d5f915c44083e1ea6d7eae71e57fcd812bbdb",
+      "evidence_section_sha256": "18f361abcc0bd79687956f5e3ed651c46231de8311b1d35ebe844d705e75aa3e",
+      "active_exact_icpns": [
+        "STM32F205RBT6",
+        "STM32F205RBT6TR",
+        "STM32F205RBT7"
+      ],
+      "excluded_non_active_part_numbers": []
+    },
+    {
+      "subfamily": "STM32F207",
+      "base_device": "STM32F207IC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207ic.html",
+      "retrieved_at_utc": "2026-09-06T15:18:52Z",
+      "rendered_dom_sha256": "63ad89c6843ad324efc34dd0c41480bbeb34e2876cd1237c4e86ab980f523cec",
+      "evidence_section_sha256": "36ef20b031b7cbac0ddd394ce4b6a36b9f80693dc6b8f982ed907d8bbfa6f85f",
+      "active_exact_icpns": [
+        "STM32F207ICH6",
+        "STM32F207ICT6"
+      ],
+      "excluded_non_active_part_numbers": []
+    },
+    {
+      "subfamily": "STM32F215",
+      "base_device": "STM32F215RE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215re.html",
+      "retrieved_at_utc": "2026-09-06T15:20:14Z",
+      "rendered_dom_sha256": "cf076d33f756596842964385950d995dc9a4226895bdf7a6b10efee4a7a5a099",
+      "evidence_section_sha256": "d79d328e27860975c9feb14f1731c80e14c622deeb664100cec63381827a16bb",
+      "active_exact_icpns": [
+        "STM32F215RET6",
+        "STM32F215RET6TR"
+      ],
+      "excluded_non_active_part_numbers": []
+    },
+    {
+      "subfamily": "STM32F217",
+      "base_device": "STM32F217IE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ie.html",
+      "retrieved_at_utc": "2026-09-06T15:20:20Z",
+      "rendered_dom_sha256": "c860975baf862b18d422f18ececc1b592b736ba9c836a23b37fc516745bbd704",
+      "evidence_section_sha256": "2c8ec477f1203b8a83d93214719e5429e71a17946b78707b2a44eef410a2feef",
+      "active_exact_icpns": [
+        "STM32F217IEH6",
+        "STM32F217IET6"
+      ],
+      "excluded_non_active_part_numbers": []
+    }
+  ],
+  "claims": {
+    "production_write_authorized": false,
+    "production_admission_ready": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false,
+    "full_stm32f2_surface_discovered": false
+  }
+}

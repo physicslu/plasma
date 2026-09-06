@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "phase": "4.3B",
+  "pilot_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06",
+  "targets": [
+    {
+      "subfamily": "STM32F205",
+      "base_device": "STM32F205RB",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205rb.html",
+      "selection_reason": "lexicographically first Base Device in the guarded STM32F205 OpenOCD surface"
+    },
+    {
+      "subfamily": "STM32F207",
+      "base_device": "STM32F207IC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207ic.html",
+      "selection_reason": "lexicographically first Base Device in the guarded STM32F207 OpenOCD surface"
+    },
+    {
+      "subfamily": "STM32F215",
+      "base_device": "STM32F215RE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215re.html",
+      "selection_reason": "lexicographically first Base Device in the guarded STM32F215 OpenOCD surface"
+    },
+    {
+      "subfamily": "STM32F217",
+      "base_device": "STM32F217IE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ie.html",
+      "selection_reason": "lexicographically first Base Device in the guarded STM32F217 OpenOCD surface"
+    }
+  ]
+}
