@@ -212,3 +212,9 @@ jobs:
 
       - name: Validate Phase 4.3A next STM32 family prioritization
         run: python data/device-catalog/research/test_stm32_phase4_3a_next_family_prioritization.py
+
+      - name: Validate Phase 4.3B STM32F2 official-ST discovery closure
+        run: |
+          python data/device-catalog/research/test_stm32f2_phase4_3b_discovery.py
+          python data/device-catalog/research/validate_stm32f2_phase4_3b_retained_evidence.py
+          python data/device-catalog/research/test_stm32f2_phase4_3b_retained_evidence.py
