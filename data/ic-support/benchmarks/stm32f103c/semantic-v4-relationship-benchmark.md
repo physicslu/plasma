@@ -1,6 +1,6 @@
 # STM32F103C Relationship Derivation v4 Benchmark
 
-Status: research / engineering benchmark. No canonical-dataset, runtime, HIL, or production admission.
+Status: research / engineering benchmark. No canonical-dataset, runtime, HIL, pin-level programming-hardware, or production admission.
 
 ## Why v4 exists
 
@@ -24,7 +24,7 @@ Locked Manufacturer Evidence
         v
 AI semantic extraction
         |
-        +--> per-target package
+        +--> per-target package family
         +--> per-target pin count
         +--> per-target debug/programming interfaces
         |
@@ -55,22 +55,24 @@ The AI cannot emit `profile_relationships.package_hardware`; the field does not 
 Each target emits only these manufacturer-near facts:
 
 ```text
-package
+package_family
 pin_count
 debug_programming_interfaces
 ```
 
 For the v4 foundation:
 
-- `package` is compared as an exact manufacturer-near string;
+- `package_family` is compared as an exact manufacturer-near package-family string;
 - `pin_count` is compared as an exact positive integer;
-- `debug_programming_interfaces` is compared as a set, so list order is representation-only;
+- `debug_programming_interfaces` is selected from the schema vocabulary (`SWD`, `JTAG`) and compared as a set, so list order is representation-only;
 - if any required package-hardware fact for either target is unknown/null, the relationship is `unknown`;
 - complete unequal facts produce `different`;
 - complete equal facts produce `shared`;
 - no free-form text interpretation, substring matching, regex inference, or fuzzy matching is permitted.
 
 The canonical relationship evidence is the deterministic union of citations attached to the per-target package-hardware facts.
+
+The derived `package_hardware` relationship is explicitly a **benchmark profile projection** over these admitted fields. It does not prove that all pin-level minimum programming hardware is known or identical. The current package-hardware profile still treats pin-level minimum programming hardware as a separate evidence/admission problem.
 
 ## Trust boundary
 
@@ -162,4 +164,4 @@ Deterministic mapping/canonicalization result
 
 Do not collapse those categories into one accuracy number.
 
-No result from this benchmark authorizes production programming, option-byte writes, destructive security transitions, runtime admission, HIL readiness, or real-target behavior.
+No result from this benchmark authorizes production programming, option-byte writes, destructive security transitions, runtime admission, HIL readiness, pin-level minimum programming-hardware readiness, or real-target behavior.
