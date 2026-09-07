@@ -106,9 +106,9 @@
   },
   "admission": {
     "applicability_candidate_evidence": true,
-    "scope_bridge": false,
-    "evidence_unit_catalog": false,
-    "applicability_binding": false,
+    "scope_bridge": true,
+    "evidence_unit_catalog": true,
+    "applicability_binding": true,
     "evidence_pack": false,
     "semantic_extraction": false,
     "canonical_dataset": false,
