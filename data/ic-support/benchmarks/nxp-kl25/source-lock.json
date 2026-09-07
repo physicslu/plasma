@@ -1,0 +1,46 @@
+{
+  "schema_version": "0.1.0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "benchmark_id": "nxp-kl25-cross-vendor-foundation-v0",
+  "targets": [
+    "MKL25Z128VLK4"
+  ],
+  "sources": [
+    {
+      "source_id": "nxp_kl25_ds_rev5",
+      "authority": "manufacturer_official",
+      "document_role": "datasheet",
+      "document_number": "KL25P80M48SF0",
+      "revision": "5",
+      "requested_url": "https://www.nxp.com/docs/en/data-sheet/KL25P80M48SF0.pdf",
+      "final_url": "https://www.nxp.com/docs/en/data-sheet/KL25P80M48SF0.pdf",
+      "local_filename": "KL25P80M48SF0.pdf",
+      "integrity": {
+        "algorithm": "sha256",
+        "digest": "e42271b7f612ac1b0812001e62bef10d217be4a61dbee5bb0a1e5c4076209a3b",
+        "byte_length": 1280088
+      }
+    },
+    {
+      "source_id": "nxp_kl25_rm_rev3",
+      "authority": "manufacturer_official",
+      "document_role": "reference_manual_programming_authority",
+      "document_number": "KL25P80M48SF0RM",
+      "revision": "3",
+      "requested_url": "https://www.nxp.com/docs/en/reference-manual/KL25P80M48SF0RM.pdf",
+      "final_url": "https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/kinetis/8734/1/KL25P80M48SF0RM.pdf",
+      "local_filename": "KL25P80M48SF0RM.pdf",
+      "integrity": {
+        "algorithm": "sha256",
+        "digest": "7911a7d9f8192fa317960feabc9377d0fd81a9b90d31f8070cae9612cb237241",
+        "byte_length": 6637765
+      }
+    }
+  ],
+  "trust_boundary": {
+    "source_lock_complete": true,
+    "evidence_pack_admission": false,
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  }
+}
