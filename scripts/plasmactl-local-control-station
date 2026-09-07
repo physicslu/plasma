@@ -19,6 +19,7 @@ unit_dir="$config_home/systemd/user"
 manager_unit="$unit_dir/plasma-local-manager.service"
 console_unit="$unit_dir/plasma-control-station.service"
 unit_marker="# Managed by Plasma local-control-station profile"
+prepared_release=""
 
 # Environment overrides win over persisted profile configuration.
 env_python="${PLASMA_LOCAL_CONTROL_STATION_PYTHON-}"
@@ -73,7 +74,7 @@ validate_port() {
 
 validate_endpoint() {
   [[ -n "$ppu_endpoint" ]] || die "PPU endpoint is required; use --ppu-endpoint URL"
-  python3 - "$ppu_endpoint" <<'PY'
+  "$base_python" - "$ppu_endpoint" <<'PY'
 import sys
 from urllib.parse import urlsplit
 
@@ -177,7 +178,7 @@ prepare_release() {
   release="$(release_dir_for_sha "$sha")"
   if [[ -e "$release" ]]; then
     validate_release "$release" "$sha" || die "existing release is incomplete or belongs to another revision: $release"
-    printf '%s\n' "$release"
+    prepared_release="$release"
     return 0
   fi
 
@@ -192,13 +193,13 @@ prepare_release() {
   staging="$release.tmp-$PPID"
   [[ ! -e "$staging" ]] || rm -rf --one-file-system "$staging"
   mkdir -p "$staging"
-  cleanup_staging() {
+  cleanup_staging_on_exit() {
     local rc=$?
-    trap - RETURN
+    trap - EXIT
     (( rc == 0 )) || rm -rf --one-file-system "$staging"
-    return "$rc"
+    exit "$rc"
   }
-  trap cleanup_staging RETURN
+  trap cleanup_staging_on_exit EXIT
 
   say "building immutable local Control Station release ${sha:0:12}"
   "$base_python" -m venv "$staging/venv"
@@ -217,12 +218,12 @@ with open(path, "w", encoding="utf-8") as handle:
     handle.write("\n")
 PY
   mv "$staging" "$release"
-  trap - RETURN
-  printf '%s\n' "$release"
+  trap - EXIT
+  prepared_release="$release"
 }
 
 write_profile_config() {
-  mkdir -p "$config_dir"
+  mkdir -p "$config_dir" "$(dirname "$config_file")"
   {
     printf '# Plasma local Control Station reference deployment\n'
     printf 'PLASMA_LOCAL_CONTROL_STATION_PYTHON=%q\n' "$base_python"
@@ -442,7 +443,8 @@ install_profile() {
   require_clean_first_install_boundary
   local sha release
   sha="$(current_sha)"
-  release="$(prepare_release "$sha")"
+  prepare_release "$sha"
+  release="$prepared_release"
   write_profile_config
   write_manager_config
   mkdir -p "$(dirname "$current_link")"
@@ -451,7 +453,7 @@ install_profile() {
   write_evidence "$sha" "$release"
   systemctl --user daemon-reload
   systemctl --user enable plasma-local-manager.service plasma-control-station.service >/dev/null
-  say "installed Linux reference profile at ${sha:0:12}; services remain stopped until deploy/start activation"
+  say "installed Linux reference profile at ${sha:0:12}; services remain stopped until deploy activation"
   say "Console is loopback-only by design: http://$console_host:$console_port"
 }
 
@@ -471,7 +473,8 @@ deploy_profile() {
 
   local sha release previous_release backup_dir
   sha="$(current_sha)"
-  release="$(prepare_release "$sha")"
+  prepare_release "$sha"
+  release="$prepared_release"
   previous_release="$(readlink -f "$current_link")"
   backup_dir="$(mktemp -d "$state_dir/deploy-backup.XXXXXX")"
   backup_file_if_present "$config_file" "$backup_dir/profile.env"
@@ -511,7 +514,9 @@ deploy_profile() {
   wait_for_http "http://$manager_host:$manager_port/api/health/live" "Manager"
   systemctl --user restart plasma-control-station.service
   wait_for_http "http://$console_host:$console_port/" "Control Station Console"
-  verify_profile
+  if ! (trap - ERR; verify_profile); then
+    false
+  fi
   trap - ERR
   rm -rf --one-file-system "$backup_dir"
   say "deployment complete: ${sha:0:12}"
