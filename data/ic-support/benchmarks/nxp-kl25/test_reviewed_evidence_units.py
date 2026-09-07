@@ -8,14 +8,14 @@ HERE = Path(__file__).resolve().parent
 
 
 class KL25ReviewedEvidenceUnitsTest(unittest.TestCase):
-    def test_reviewed_unit_definitions_are_fail_closed(self):
+    def test_reviewed_unit_definitions_admit_only_catalog_and_binding(self):
         doc = json.loads((HERE / "reviewed-evidence-unit-definitions.json").read_text(encoding="utf-8"))
-        self.assertEqual(doc["status"], "reviewed_definitions_not_admitted_catalog")
+        self.assertEqual(doc["status"], "admitted_evidence_unit_catalog")
         self.assertTrue(doc["trust_boundary"]["reviewed_unit_definitions_complete"])
+        self.assertTrue(doc["trust_boundary"]["evidence_unit_catalog_admission"])
+        self.assertTrue(doc["trust_boundary"]["applicability_binding_admission"])
         for key in [
-            "evidence_unit_catalog_admission",
             "evidence_pack_admission",
-            "applicability_binding_admission",
             "semantic_extraction_admission",
             "canonical_dataset_admission",
             "hil_admission",
@@ -53,7 +53,10 @@ class KL25ReviewedEvidenceUnitsTest(unittest.TestCase):
         debug_lo, debug_hi = rm_ranges["debug_security_recovery_candidate"]
         for unit in doc["units"]:
             lo, hi = unit["pdf_page_range"]
-            if unit["role"] == "DEBUG_PROGRAMMING_INTERFACE" or unit["unit_id"] == "nxp-kl25-debug-security-interaction-v0":
+            if (
+                unit["role"] == "DEBUG_PROGRAMMING_INTERFACE"
+                or unit["unit_id"] == "nxp-kl25-debug-security-interaction-v0"
+            ):
                 self.assertGreaterEqual(lo, debug_lo)
                 self.assertLessEqual(hi, debug_hi)
             else:
@@ -66,8 +69,13 @@ class KL25ReviewedEvidenceUnitsTest(unittest.TestCase):
         self.assertEqual(doc["exclusions"]["bit_name_only_headings"], "NOT_UNIT_BOUNDARY")
         self.assertIn("NORMALIZE", doc["exclusions"]["pdftotext_numbering_artifact_27_33_x"])
         self.assertEqual(doc["heading_normalization"]["27.33.x"], "27.3.3.x")
-        register_unit = next(u for u in doc["units"] if u["unit_id"] == "nxp-kl25-ftfa-register-model-v0")
-        self.assertIn("27.3.3.5 Flash Common Command Object Registers", register_unit["section_scope"])
+        register_unit = next(
+            u for u in doc["units"] if u["unit_id"] == "nxp-kl25-ftfa-register-model-v0"
+        )
+        self.assertIn(
+            "27.3.3.5 Flash Common Command Object Registers",
+            register_unit["section_scope"],
+        )
 
 
 if __name__ == "__main__":
