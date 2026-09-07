@@ -125,6 +125,9 @@ def execute_semantic_run(
             packs=packs,
             evidence_text=evidence_text,
         )
+        output_schema = semantic.build_output_json_schema(contract, packs=packs)
+        record["runtime"]["output_format"] = "json_schema"
+        record["runtime"]["output_schema_sha256"] = builder.canonical_sha256(output_schema)
         prompt, prompt_meta = semantic.render_prompt(
             manufacturer_context,
             contract=contract,
@@ -136,24 +139,34 @@ def execute_semantic_run(
             "byte_length": len(prompt.encode("utf-8")),
         }
 
+        transport_options = dict(request_options or {})
+        # The structured-output schema is derived here from the admitted
+        # semantic contract and packs. Callers cannot silently substitute a
+        # weaker provider schema through request options.
+        transport_options["format_schema"] = output_schema
+
         transport_invoked = True
         response = _validate_transport_response(
             transport(
                 prompt=prompt,
                 model_id=model_id,
                 runtime_label=runtime_label,
-                options=dict(request_options or {}),
+                options=transport_options,
             )
         )
         raw_text = response["raw_text"]
-        parsed = semantic.parse_model_result(raw_text, contract=contract, packs=packs)
-        record["status"] = "success"
-        record["response"] = parsed
+        # Retain provider completion metadata before parsing model content so a
+        # malformed model document does not erase evidence that transport and
+        # generation completed. This keeps root-cause and secondary integrity
+        # failures distinct.
         record["transport_metadata"] = {
             key: value
             for key, value in response.items()
             if key in {"response_model", "done", "done_reason", "usage", "timing"}
         }
+        parsed = semantic.parse_model_result(raw_text, contract=contract, packs=packs)
+        record["status"] = "success"
+        record["response"] = parsed
     except Exception as exc:  # fail closed; do not convert invalid model output into partial facts
         record["status"] = "error"
         record["error"] = {

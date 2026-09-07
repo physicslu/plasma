@@ -6,10 +6,12 @@ on:
       - main
     paths:
       - "data/ic-support/benchmarks/nxp-kl25/**"
+      - "scripts/ic-support-kl25-live.sh"
       - ".github/workflows/nxp-kl25-semantic-runner-ci.yml"
   pull_request:
     paths:
       - "data/ic-support/benchmarks/nxp-kl25/**"
+      - "scripts/ic-support-kl25-live.sh"
       - ".github/workflows/nxp-kl25-semantic-runner-ci.yml"
   workflow_dispatch:
 
@@ -38,11 +40,18 @@ jobs:
             data/ic-support/benchmarks/nxp-kl25/run_ollama_semantic.py \
             data/ic-support/benchmarks/nxp-kl25/ollama_live_runtime.py \
             data/ic-support/benchmarks/nxp-kl25/qualify_semantic_run.py \
-            data/ic-support/benchmarks/nxp-kl25/run_live_model_qualification.py
+            data/ic-support/benchmarks/nxp-kl25/run_live_model_qualification.py \
+            data/ic-support/benchmarks/nxp-kl25/test_output_contract_hardening.py
+      - name: Validate KL25 operator helper syntax
+        run: |
+          bash -n scripts/ic-support-kl25-live.sh
+          bash scripts/ic-support-kl25-live.sh help >/dev/null
       - name: Revalidate pre-AI boundary
         run: python data/ic-support/benchmarks/nxp-kl25/test_pre_ai_ci.py
       - name: Validate semantic runner failure matrix
         run: python data/ic-support/benchmarks/nxp-kl25/test_semantic_runner.py
+      - name: Validate structured output hardening regressions
+        run: python data/ic-support/benchmarks/nxp-kl25/test_output_contract_hardening.py
       - name: Validate real Ollama transport code without model weights
         run: python data/ic-support/benchmarks/nxp-kl25/test_ollama_transport.py
       - name: Validate Gate 3 workspace through executable Ollama semantic path
