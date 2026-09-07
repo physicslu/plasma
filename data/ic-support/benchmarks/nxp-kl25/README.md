@@ -56,6 +56,8 @@ Keyword hits remain navigation evidence only. They are not semantic authority.
 
 The generated artifact is an **Evidence Unit construction candidate catalog**, not an admitted Evidence Unit Catalog. Section boundaries must be reviewed from document structure before Evidence Unit admission.
 
+The next review must consider section headings, contiguous page spans, manufacturer-native terms, programming-operation role, security/recovery role, and separate applicability evidence.
+
 ## Trust boundary
 
 The following remain denied:
