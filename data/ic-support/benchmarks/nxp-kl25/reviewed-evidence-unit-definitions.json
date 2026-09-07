@@ -10,7 +10,7 @@
     {
       "unit_id": "nxp-kl25-ftfa-register-model-v0",
       "source_id": "nxp_kl25_rm_rev3",
-      "section_scope": ["27.3 Memory Map and Registers", "27.3.1 Flash Configuration Field Description", "27.3.3 Register Descriptions", "27.3.5 Flash Common Command Object Registers"],
+      "section_scope": ["27.3 Memory Map and Registers", "27.3.1 Flash Configuration Field Description", "27.3.3 Register Descriptions", "27.3.3.5 Flash Common Command Object Registers"],
       "pdf_page_range": [422, 431],
       "role": "FLASH_COMMAND_ENGINE",
       "manufacturer_native_terms": ["FTFA", "FSTAT", "FCNFG", "FSEC", "FOPT", "FCCOB", "FPROT"],
@@ -80,6 +80,10 @@
       "disposition": "REVIEWED_UNIT_DEFINITION"
     }
   ],
+  "heading_normalization": {
+    "27.33.x": "27.3.3.x",
+    "basis": "pdftotext layout extraction artifact observed in the locked RM; normalized only when the enclosing section 27.3.3 Register Descriptions establishes the hierarchy"
+  },
   "exclusions": {
     "caution_headings": "NOT_UNIT_BOUNDARY",
     "bit_name_only_headings": "NOT_UNIT_BOUNDARY",
