@@ -61,6 +61,9 @@ def execute_live_qualification(
     required = contract["required_input"]
     runtime = contract["live_runtime"]
     generation = runtime["generation"]
+    output_protocol = runtime.get("output_protocol", {})
+    require(output_protocol.get("format") == "json_schema", "qualification output protocol must use json_schema")
+    require(output_protocol.get("structured_output_required") is True, "structured output must be required")
 
     # Validate all Gate 3 bytes/digests before any local-model HTTP request.
     manifest, packs, _, _ = run_ollama_semantic.load_pre_ai_workspace(input_dir)
@@ -93,8 +96,9 @@ def execute_live_qualification(
 
     raw_path = output_dir / "raw-response.txt"
     raw_response = raw_path.read_text(encoding="utf-8")
+    semantic_runtime = record.get("runtime", {})
     provenance: dict[str, Any] = {
-        "schema_version": "0.1.0",
+        "schema_version": "0.2.0",
         "artifact_type": "kl25_live_model_run_provenance",
         "target": contract["target"],
         "bundle_digest": record.get("bundle_digest"),
@@ -107,6 +111,10 @@ def execute_live_qualification(
             "model_id": runtime["model_id"],
             "runtime_label": runtime["runtime_label"],
             "ollama_endpoint_policy": "loopback_only",
+            "output_protocol": {
+                **dict(output_protocol),
+                "output_schema_sha256": semantic_runtime.get("output_schema_sha256"),
+            },
             "generation": dict(generation),
             "host": {
                 "system": platform.system(),
