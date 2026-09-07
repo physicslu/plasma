@@ -52,7 +52,7 @@ def main() -> int:
     sources = {(source["manufacturer"], source["family"]): source for source in manifest["sources"]}
     assert sources[("STMicroelectronics", "STM32F1")]["row_count"] == 75
     assert sources[("STMicroelectronics", "STM32F4")]["row_count"] == 384
-    assert sum(source["row_count"] for source in sources.values()) == 468
+    assert sum(source["row_count"] for source in sources.values()) == 481
     assert sources[("STMicroelectronics", "STM32F4")]["sha256"] == EXPECTED_CATALOG_SHA256
 
     inventory = build_inventory(catalog_path=OPENOCD_CATALOG, canonical_path=CATALOG)
