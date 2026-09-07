@@ -19,6 +19,7 @@ plasma_python=""
 ppu_id=""
 facility_id=""
 proxy_port="18081"
+nginx_marker="# Managed by Plasma SWPC Z2-like lab installer"
 
 while (($#)); do
   case "$1" in
@@ -46,7 +47,7 @@ if [[ ! -x "$plasma_python" ]]; then
   printf 'swpc-z2like-ppu-install: Plasma Python is not executable: %s\n' "$plasma_python" >&2
   exit 78
 fi
-if [[ ! "$proxy_port" =~ ^[0-9]+$ ]] || (( proxy_port < 1 || proxy_port > 65535 || proxy_port == 18080 )); then
+if [[ ! "$proxy_port" =~ ^[0-9]+$ ]] || (( proxy_port < 1 || proxy_port > 65535 || proxy_port == 9900 || proxy_port == 18080 )); then
   printf 'swpc-z2like-ppu-install: invalid restricted proxy port: %s\n' "$proxy_port" >&2
   exit 64
 fi
@@ -54,6 +55,26 @@ if [[ -n "$(git -C "$repo_root" status --porcelain)" ]]; then
   printf 'swpc-z2like-ppu-install: repository must be clean for qualification staging\n' >&2
   exit 78
 fi
+for command in git ss systemctl nginx install useradd; do
+  command -v "$command" >/dev/null 2>&1 || {
+    printf 'swpc-z2like-ppu-install: required host command is missing: %s\n' "$command" >&2
+    exit 69
+  }
+done
+
+nginx_conf="/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf"
+if [[ -e "$nginx_conf" ]] && ! grep -Fxq "$nginx_marker" "$nginx_conf"; then
+  printf 'swpc-z2like-ppu-install: refusing to overwrite unmanaged Nginx config: %s\n' "$nginx_conf" >&2
+  exit 78
+fi
+
+for port in 9900 18080 "$proxy_port"; do
+  if ss -H -ltn "sport = :$port" | grep -q .; then
+    printf 'swpc-z2like-ppu-install: TCP port %s is already in use; stop or migrate the owning service explicitly before installation\n' "$port" >&2
+    ss -H -ltnp "sport = :$port" >&2 || true
+    exit 78
+  fi
+done
 
 read -r py_version py_releaselevel py_machine < <("$plasma_python" - <<'PY'
 import platform, sys
@@ -78,7 +99,6 @@ runtime_dir="${release_dir}/runtime"
 config_path="/etc/plasma/ppu.yaml"
 state_root="/var/lib/plasma"
 log_root="/var/log/plasma"
-nginx_conf="/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf"
 
 printf '[swpc-z2like] release_id=%s source_sha=%s python=%s machine=%s\n' \
   "$release_id" "$sha" "$py_version" "$py_machine"
@@ -188,12 +208,13 @@ chmod 0644 /etc/systemd/system/plasma-server.service /etc/systemd/system/plasma-
 
 # The public tunnel must terminate on this restricted proxy, never on :18080.
 cat >"$nginx_conf" <<EOF
+$nginx_marker
 server {
     listen 127.0.0.1:$proxy_port;
     server_name _;
 
     proxy_http_version 1.1;
-    proxy_set_header Host \\$host;
+    proxy_set_header Host \$host;
     proxy_set_header X-Forwarded-Proto https;
 
     location = /api/health/live {
