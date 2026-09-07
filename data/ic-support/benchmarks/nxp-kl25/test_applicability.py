@@ -24,15 +24,35 @@ class KL25ApplicabilityFoundationTest(unittest.TestCase):
         ]:
             self.assertFalse(contract["admission"][key])
 
-    def test_identity_and_family_scope_are_distinct(self):
+    def test_identity_family_and_document_membership_are_distinct(self):
         contract = json.loads((HERE / "applicability-contract.json").read_text(encoding="utf-8"))
         bridge = contract["scope_bridge"]
-        self.assertTrue(bridge["generic_family_header_may_establish_family_scope"])
+        self.assertFalse(bridge["generic_family_header_alone_may_establish_family_scope"])
+        self.assertTrue(bridge["explicit_family_section_anchor_may_establish_family_scope"])
         self.assertFalse(bridge["generic_family_header_may_establish_commercial_identity"])
         self.assertFalse(bridge["fuzzy_target_matching_allowed"])
         self.assertFalse(bridge["substring_identity_equivalence_allowed"])
-        self.assertEqual(contract["candidate_claims"]["TARGET_EXACT_IDENTITY"]["terms"], ["MKL25Z128VLK4"])
-        self.assertEqual(contract["candidate_claims"]["TARGET_DEVICE_EXPRESSION"]["terms"], ["MKL25Z128"])
+        self.assertFalse(bridge["missing_intermediate_device_expression_blocks_bridge"])
+        self.assertEqual(
+            bridge["required_claims"],
+            ["TARGET_EXACT_IDENTITY", "RM_TARGET_MEMBERSHIP", "KL25_FAMILY_SCOPE"],
+        )
+        self.assertEqual(bridge["optional_observation_claims"], ["TARGET_DEVICE_EXPRESSION"])
+
+    def test_missing_device_expression_must_not_be_synthesized(self):
+        contract = json.loads((HERE / "applicability-contract.json").read_text(encoding="utf-8"))
+        claim = contract["candidate_claims"]["TARGET_DEVICE_EXPRESSION"]
+        self.assertTrue(claim["optional"])
+        self.assertEqual(claim["absence_policy"], "DO_NOT_INFER_OR_SYNTHESIZE")
+        self.assertEqual(claim["terms"], ["MKL25Z128"])
+
+    def test_family_and_module_claims_are_section_bounded(self):
+        contract = json.loads((HERE / "applicability-contract.json").read_text(encoding="utf-8"))
+        claims = contract["candidate_claims"]
+        self.assertEqual(claims["KL25_FAMILY_SCOPE"]["page_ranges"]["nxp_kl25_rm_rev3"], [[38, 44]])
+        self.assertEqual(claims["FTFA_MODULE_PRESENCE"]["page_ranges"]["nxp_kl25_rm_rev3"], [[72, 74], [419, 456]])
+        self.assertEqual(claims["MDM_AP_PRESENCE"]["page_ranges"]["nxp_kl25_rm_rev3"], [[149, 157]])
+        self.assertTrue(contract["unit_binding_policy"]["document_wide_header_hits_are_not_applicability_evidence"])
 
     def test_all_reviewed_units_have_explicit_applicability_requirements(self):
         definitions = json.loads((HERE / "reviewed-evidence-unit-definitions.json").read_text(encoding="utf-8"))
