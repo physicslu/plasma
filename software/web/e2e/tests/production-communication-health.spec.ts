@@ -158,10 +158,19 @@ test("transport failure marks Gateway UNREACHABLE and PPU UNKNOWN", async ({ pag
   await expect(page.getByRole("button", { name: /START PROGRAMMING/ })).toBeDisabled();
 });
 
-test("provider HTTP failure keeps PPU online and reports Programming unavailable", async ({ page }) => {
+test("provider HTTP failure keeps PPU online, reports Programming unavailable, and does not create an Engineering session", async ({ page }) => {
+  let sessionRequests = 0;
+  page.on("request", request => {
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/engineering/session" && request.method() === "POST") sessionRequests += 1;
+  });
+
   await installHealthMock(page, { catalogMode: "provider-http-failure" });
   await page.goto("/fleet");
 
   await expect(communicationHealth(page)).toContainText("Gateway ONLINE · PPU ONLINE · PROGRAMMING UNAVAILABLE");
-  await expect(page.getByRole("status")).toContainText(/Mock Provider|provider/i);
+  const notice = page.getByRole("status");
+  await expect(notice).toContainText(/Programming.*unavailable/i);
+  await expect(notice).not.toContainText(/Mock Provider|non-JSON|Engineering provider unavailable/i);
+  expect(sessionRequests).toBe(0);
 });
