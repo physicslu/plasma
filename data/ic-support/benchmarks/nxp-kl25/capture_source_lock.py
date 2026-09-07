@@ -49,7 +49,7 @@ def main() -> int:
             "document_number": source["document_number"],
             "revision": source["revision"],
             "requested_url": source["official_url"],
-            "final_url": source.get("final_url", source["official_url"]),
+            "final_url": source.get("retained_final_url", source["official_url"]),
             "local_filename": source["local_filename"],
             "integrity": {
                 "algorithm": "sha256",
