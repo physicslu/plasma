@@ -1,0 +1,34 @@
+{
+  "schema_version": "0.1.0",
+  "contract_id": "nxp-kl25-preprocessing-v0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "toolchain": {
+    "pdf_text_extractor": "pdftotext",
+    "layout_mode": true,
+    "encoding": "UTF-8"
+  },
+  "document_roles": {
+    "datasheet": {
+      "required_categories": ["DEVICE_IDENTITY", "ORDERING", "MEMORY_GEOMETRY", "PACKAGE_HARDWARE", "DEBUG_PROGRAMMING_INTERFACE"]
+    },
+    "reference_manual_programming_authority": {
+      "required_categories": ["FLASH_MEMORY_MODULE", "PROGRAM_COMMAND", "ERASE_COMMAND", "COMMAND_STATUS", "PROTECTION_SECURITY"]
+    }
+  },
+  "discovery_terms": {
+    "datasheet": ["Part identification", "program flash memory", "SWD", "LQFP", "MKL25Z128VLK4"],
+    "reference_manual_programming_authority": ["Flash Memory Module", "FTFA", "FCCOB", "Program Longword", "Erase Flash Sector", "FSTAT", "FSEC", "FPROT"]
+  },
+  "invariants": {
+    "preprocess_once_per_locked_source_and_toolchain": true,
+    "physical_pdf_page_index_is_zero_based": true,
+    "unknown_classification_fails_closed": true,
+    "ai_may_add_evidence_but_may_not_remove_required_evidence": true,
+    "document_role_name_does_not_imply_vendor_specific_register_model": true
+  },
+  "trust_boundary": {
+    "evidence_pack_admission": false,
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.1.0",
+  "foundation_id": "nxp-kl25-evidence-foundation-v0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "target": "MKL25Z128VLK4",
+  "pack_roles": {
+    "datasheet_programming_context": {
+      "required_document_role": "datasheet",
+      "required_categories": ["DEVICE_IDENTITY", "ORDERING", "MEMORY_GEOMETRY", "PACKAGE_HARDWARE", "DEBUG_PROGRAMMING_INTERFACE"]
+    },
+    "flash_programming_contract": {
+      "required_document_role": "reference_manual_programming_authority",
+      "required_categories": ["FLASH_MEMORY_MODULE", "PROGRAM_COMMAND", "ERASE_COMMAND", "COMMAND_STATUS", "PROTECTION_SECURITY"]
+    }
+  },
+  "applicability_requirements": {
+    "target_identity": "MKL25Z128VLK4",
+    "manufacturer_expression_must_be_evidence_backed": true,
+    "target_may_bind_multiple_packs": true,
+    "wildcard_applicability_without_evidence": false,
+    "unknown_applicability_fails_closed": true
+  },
+  "cross_vendor_invariants": {
+    "reference_manual_may_fill_programming_authority_role": true,
+    "programming_manual_document_name_required": false,
+    "stm32_register_names_are_not_canonical_semantics": true,
+    "vendor_command_engine_must_be_preserved_as_manufacturer_near_facts": true,
+    "relationships_are_not_ai_owned": true
+  },
+  "admission": {
+    "evidence_pack": false,
+    "semantic_extraction": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}

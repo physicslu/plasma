@@ -99,6 +99,7 @@ jobs:
           python data/ic-support/benchmarks/stm32f103c/test_semantic_v8_security_relationship_pipeline.py
           python data/ic-support/benchmarks/stm32f103c/test_retained_semantic_v8.py
           python data/ic-support/benchmarks/stm32f103c/test_semantic_v9_device_identity_ontology.py
+          python data/ic-support/benchmarks/nxp-kl25/test_foundation.py
       - name: Validate STM32F103C source lock
         run: python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
       - name: Compare STM32F103C benchmark
