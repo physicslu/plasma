@@ -29,6 +29,14 @@
     "ftfa_fccob_fstat_are_manufacturer_near_terms": true,
     "mdm_ap_security_recovery_is_not_flash_command_equivalence": true
   },
+  "expected_next_review_dimensions": [
+    "section_heading",
+    "contiguous_page_span",
+    "manufacturer_native_terms",
+    "programming_operation_role",
+    "security_or_recovery_role",
+    "applicability_evidence"
+  ],
   "admission": {
     "construction_candidate_catalog": true,
     "evidence_unit_catalog": false,
