@@ -126,6 +126,12 @@
   color: var(--amber);
 }
 
+/* Raw provider / transport details remain available in Engineering Log only.
+ * The operator boundary surface reports capability state, not implementation errors. */
+.engineeringProgrammingV2 .engineeringBoundaryNote.warning > span {
+  display: none;
+}
+
 .engineeringProgrammingV2 .engineeringOperationWarning {
   grid-column: 1 / -1;
   display: flex;
