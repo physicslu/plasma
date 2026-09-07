@@ -123,7 +123,7 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
                 "ollama_endpoint_policy": "loopback_only",
                 "generation": copy.deepcopy(self.contract["live_runtime"]["generation"]),
             },
-            "code_fingerprints": {},
+            "code_fingerprints": {"qualify_semantic_run.py": "f" * 64},
             "manufacturer_text_retained_in_provenance": False,
         }
         provenance["provenance_digest"] = builder.canonical_sha256(provenance)
@@ -194,6 +194,14 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
         report, _ = self.assess(mutate_run=mutate)
         self.assertEqual(report["status"], "REJECTED_SCREENING")
         self.assertTrue(any("primary Evidence Unit" in item for item in report["semantic_screening"]["errors"]))
+
+    def test_raw_response_and_parsed_response_must_be_identical(self):
+        def mutate(run):
+            run["response"]["unit_results"][0]["facts"][0]["statement"] += " Additional FTFA context."
+
+        report, _ = self.assess(mutate_run=mutate)
+        self.assertEqual(report["status"], "REJECTED_INTEGRITY")
+        self.assertTrue(any("raw response and parsed" in item for item in report["integrity"]["errors"]))
 
     def test_reviewed_verdict_is_required_before_qualified(self):
         report, run = self.assess()
