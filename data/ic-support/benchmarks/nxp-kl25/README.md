@@ -20,7 +20,8 @@ Expected architecture:
 ```text
 locked manufacturer bytes
   -> deterministic preprocessing
-  -> evidence unit catalog
+  -> deterministic candidate discovery
+  -> reviewed Evidence Unit Catalog
   -> Evidence Packs
   -> evidence-backed Applicability Binding
   -> TargetEvidenceBundle
@@ -28,27 +29,18 @@ locked manufacturer bytes
   -> deterministic canonicalization / relationship derivation
 ```
 
-## Retained source lock
+## Current status
 
-The exact SWPC-downloaded PDF identities are retained in `source-lock.json`:
+The two manufacturer PDFs are source-locked. Discovery is intentionally split into two stages:
 
-```text
-nxp_kl25_ds_rev5
-sha256 e42271b7f612ac1b0812001e62bef10d217be4a61dbee5bb0a1e5c4076209a3b
-bytes  1280088
+1. deterministic candidate discovery based on source-locked bytes and explicit search terms;
+2. reviewed Evidence Unit retention before any Evidence Pack admission.
 
-nxp_kl25_rm_rev3
-sha256 7911a7d9f8192fa317960feabc9377d0fd81a9b90d31f8070cae9612cb237241
-bytes  6637765
-```
+Candidate hits are navigation aids only. They are not proof of applicability or programming semantics.
 
-The retained RM artifact was independently sanity-checked on SWPC as PDF 1.6 with 807 pages. A prior 10-byte failed download was rejected and is not part of the source lock.
+A first SWPC discovery run exposed a useful regression: generic `Kinetis KL25` / `KL25 Sub-Family` document headers caused `DEVICE_IDENTITY` to match every page. The identity rule was tightened to discriminating commercial/device expressions (`MKL25Z128VLK4`, `MKL25Z128`) and generic family headers are now explicitly forbidden as identity evidence.
 
-`capture_source_lock.py` now fails closed for implausibly small artifacts and files without a `%PDF-` header.
-
-## Current admission status
-
-Source identity is locked. Deterministic evidence-unit discovery has not yet been retained, so all of the following remain denied:
+All downstream admissions remain false:
 
 - Evidence Pack admission
 - semantic extraction admission
@@ -56,13 +48,3 @@ Source identity is locked. Deterministic evidence-unit discovery has not yet bee
 - HIL admission
 - production admission
 - destructive security operation admission
-
-## Reproduce SWPC integrity capture
-
-```bash
-python3 data/ic-support/benchmarks/nxp-kl25/capture_source_lock.py \
-  --source-dir /storage/projects/plasma-benchmark/nxp-kl25/source \
-  --output /tmp/nxp-kl25-source-lock.json
-```
-
-The generated file contains only document identity metadata, SHA-256 digests, and byte lengths. It does not copy PDF contents into the repository.
