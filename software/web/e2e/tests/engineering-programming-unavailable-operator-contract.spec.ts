@@ -48,5 +48,5 @@ test("EMode keeps raw managed-provider detail out of the operator availability n
   await expect(page.locator(".engineeringGateway")).toHaveClass(/online/);
 
   // The diagnostic detail is still retained by the Engineering Job Log.
-  await expect(page.locator(".engineeringProgrammingV2")).toContainText(rawManagedProviderError);
+  await expect(page.locator(".engineeringOperatorLog")).toContainText(rawManagedProviderError);
 });
