@@ -130,11 +130,29 @@ def test_swpc_backend_verifies_restricted_ingress_and_ps_only_boundary() -> None
     assert "no Z2/ARMv7/PL/FPGA/Site/IC claim" in source
 
 
-def test_swpc_deploy_has_explicit_rollback_and_does_not_mutate_git() -> None:
+def test_swpc_activation_requires_evidence_current_and_system_ownership_consistency() -> None:
+    source = SWPC_Z2LIKE.read_text(encoding="utf-8")
+    assert "PPU configuration is missing" in source
+    assert "install evidence/current release mismatch" in source
+    assert "plasma-server.service is not owned by the Plasma system runtime" in source
+    assert "restricted Nginx ingress is not Plasma-owned" in source
+
+
+def test_swpc_deploy_has_explicit_rollback_retry_cleanup_and_does_not_mutate_git() -> None:
     source = SWPC_Z2LIKE.read_text(encoding="utf-8")
     assert "repository must be clean" in source
     assert "deployment failed; restoring previous qualified SWPC Z2-like activation" in source
     assert "rollback restored" in source
+    assert "stale unqualified target exists from a prior failed activation" in source
+    assert "removing unqualified inactive release" in source
+    assert "rm -rf --one-file-system" in source
     assert "git -C \"$repo_root\" rev-parse HEAD" in source
     for forbidden in ("git pull", "git merge", "git reset", "git checkout"):
         assert forbidden not in source
+
+
+def test_swpc_first_install_is_fail_closed_and_cleans_only_a_prechecked_clean_boundary() -> None:
+    source = SWPC_Z2LIKE.read_text(encoding="utf-8")
+    assert "first install found unmanaged/pre-existing appliance artifact without install evidence" in source
+    assert "first install failed; removing only artifacts created inside the clean SWPC Z2-like boundary" in source
+    assert "require_clean_first_install_boundary" in source
