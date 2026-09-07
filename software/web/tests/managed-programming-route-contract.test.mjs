@@ -8,6 +8,7 @@ const securityTransport = await readFile(new URL("../app/security-transport.ts",
 const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
 const managedRoute = await readFile(new URL("../app/api/manager/ppu/[...path]/route.ts", import.meta.url), "utf8");
 const managedConfig = await readFile(new URL("../app/api/manager/ppu/route.ts", import.meta.url), "utf8");
+const communicationHealth = await readFile(new URL("../app/fleet/communication-health.ts", import.meta.url), "utf8");
 const macConsoleLauncher = await readFile(new URL("../../../packaging/macos/run-console.sh", import.meta.url), "utf8");
 
 test("Control Station bootstrap makes BFF managed discovery authoritative over legacy localStorage", () => {
@@ -87,6 +88,12 @@ test("BFF preserves only the required security/content headers and keeps Manager
   assert.match(managerBff, /\["Accept", "Authorization", "Content-Type", "Idempotency-Key"\]/);
   assert.match(managerBff, /MAX_MANAGED_REQUEST_BYTES = 24 \* 1024 \* 1024/);
   assert.doesNotMatch(managerBff, /Cookie|Set-Cookie|target_url/);
+});
+
+test("managed non-JSON upstream errors remain HTTP failures instead of transport failures", () => {
+  assert.match(managerBff, /managed_upstream_non_json/);
+  assert.match(managerBff, /response\.status >= 400 \? response\.status : 502/);
+  assert.match(communicationHealth, /error instanceof PlasmaApiError && error\.status !== undefined \? "online" : "unreachable"/);
 });
 
 test("security transport recognizes managed PPU paths and keeps idempotency protection", () => {

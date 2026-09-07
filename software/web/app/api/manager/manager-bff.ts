@@ -2,6 +2,12 @@ const DEFAULT_MANAGER_API_URL = "http://127.0.0.1:18180";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const MAX_MANAGED_REQUEST_BYTES = 24 * 1024 * 1024;
 const MANAGER_TIMEOUT_MS = 130_000;
+const MANAGED_BINARY_GET_PATHS = [
+  /^\/api\/jobs\/[^/]+\/files\/[^/]+$/,
+  /^\/api\/engineering\/targets\/[^/]+\/[^/]+\/api\/jobs\/[^/]+\/files\/[^/]+$/,
+];
+
+type RelayResponseContract = "passthrough" | "managed-ppu";
 
 function json(status: number, payload: object): Response {
   return Response.json(payload, {
@@ -73,11 +79,53 @@ function responseHeaders(response: Response): Headers {
   return headers;
 }
 
+function responseMediaType(response: Response): string {
+  return (response.headers.get("Content-Type") ?? "")
+    .split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+}
+
+function isJsonResponse(response: Response): boolean {
+  const mediaType = responseMediaType(response);
+  return mediaType === "application/json" || mediaType.endsWith("+json");
+}
+
+function managedPpuAllowsBinary(request: Request, targetPath: string): boolean {
+  return request.method === "GET" && MANAGED_BINARY_GET_PATHS.some(pattern => pattern.test(targetPath));
+}
+
+function isManagedBinaryResponse(response: Response): boolean {
+  if (response.headers.get("Content-Disposition")) return true;
+  return responseMediaType(response) === "application/octet-stream";
+}
+
+function managedPpuResponse(response: Response, payload: ArrayBuffer, allowBinary: boolean): Response {
+  if (isJsonResponse(response) || (allowBinary && isManagedBinaryResponse(response)) || response.status === 204) {
+    return new Response(payload, {
+      status: response.status,
+      headers: responseHeaders(response),
+    });
+  }
+
+  const browserStatus = response.status >= 400 ? response.status : 502;
+  return json(browserStatus, {
+    ok: false,
+    error: {
+      code: "managed_upstream_non_json",
+      message: "Managed PPU returned a non-JSON response for a JSON API route",
+      upstream_status: response.status,
+    },
+  });
+}
+
 async function relayManagerRequest(
   request: Request,
   target: string,
   bodyAllowed: boolean,
   requireManagedMode = false,
+  responseContract: RelayResponseContract = "passthrough",
+  allowBinaryResponse = false,
 ): Promise<Response> {
   let managerBase: string;
   try {
@@ -115,6 +163,9 @@ async function relayManagerRequest(
       signal: AbortSignal.timeout(MANAGER_TIMEOUT_MS),
     });
     const payload = await response.arrayBuffer();
+    if (responseContract === "managed-ppu") {
+      return managedPpuResponse(response, payload, allowBinaryResponse);
+    }
     return new Response(payload, {
       status: response.status,
       headers: responseHeaders(response),
@@ -148,7 +199,14 @@ export async function relayManagerPpuRequest(request: Request, targetPath: strin
   const incoming = new URL(request.url);
   const target = `/api/ppus/${encodeURIComponent(ppuAlias)}/gateway${targetPath}${incoming.search}`;
   const bodyAllowed = request.method !== "GET" && request.method !== "HEAD";
-  return await relayManagerRequest(request, target, bodyAllowed);
+  return await relayManagerRequest(
+    request,
+    target,
+    bodyAllowed,
+    false,
+    "managed-ppu",
+    managedPpuAllowsBinary(request, targetPath),
+  );
 }
 
 export async function relayManagerPpuAliasRequest(
@@ -172,7 +230,14 @@ export async function relayManagerPpuAliasRequest(
   const incoming = new URL(request.url);
   const target = `/api/ppus/${encodeURIComponent(normalizedAlias)}/gateway${targetPath}${incoming.search}`;
   const bodyAllowed = request.method !== "GET" && request.method !== "HEAD";
-  return await relayManagerRequest(request, target, bodyAllowed, true);
+  return await relayManagerRequest(
+    request,
+    target,
+    bodyAllowed,
+    true,
+    "managed-ppu",
+    managedPpuAllowsBinary(request, targetPath),
+  );
 }
 
 export async function relayManagerRegistryRequest(request: Request, alias?: string): Promise<Response> {
