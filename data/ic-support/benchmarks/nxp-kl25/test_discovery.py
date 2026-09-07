@@ -59,6 +59,9 @@ class KL25DiscoveryContractTest(unittest.TestCase):
             boundary["exclusion_policy"]["isolated_rm_keyword_hits_outside_reviewed_clusters"],
             "DO_NOT_ADMIT_BY_KEYWORD_ALONE",
         )
+        self.assertTrue(boundary["construction_policy"]["section_boundaries_must_come_from_document_structure"])
+        self.assertTrue(boundary["construction_policy"]["manual_subrange_guessing_is_not_authoritative"])
+        self.assertTrue(boundary["trust_boundary"]["evidence_unit_construction_candidate_catalog"])
         for key in [
             "evidence_unit_catalog_admission",
             "evidence_pack_admission",
