@@ -1,846 +1,186 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-default_repo="$(cd "$(dirname "$script_path")/.." && pwd)"
-config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
-config_file="${PLASMACTL_CONFIG:-$config_home/plasma/plasmactl.env}"
-current_config_version=6
-default_public_api_url=""
-default_manager_config="$config_home/plasma/manager.yaml"
+wrapper_path="$(readlink -f "${BASH_SOURCE[0]}")"
+repo_root="$(cd "$(dirname "$wrapper_path")/.." && pwd)"
+integration_backend="${PLASMACTL_INTEGRATION_BACKEND:-$repo_root/scripts/plasmactl-integration}"
+swpc_z2like_backend="${PLASMA_SWPC_Z2LIKE_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like}"
 
-if [[ -f "$config_file" ]]; then
-  # shellcheck source=/dev/null
-  source "$config_file"
-fi
-
-repo="${PLASMA_REPO:-$default_repo}"
-branch="${PLASMA_BRANCH:-main}"
-python_dir="$repo/software/python"
-web_dir="$repo/software/web"
-python_bin="${PLASMA_PYTHON:-$python_dir/.venv/bin/python}"
-npm_bin="${PLASMA_NPM:-$(command -v npm 2>/dev/null || true)}"
-uv_bin="${PLASMA_UV:-$(command -v uv 2>/dev/null || true)}"
-if [[ -z "$uv_bin" && -x "$HOME/.local/bin/uv" ]]; then
-  uv_bin="$HOME/.local/bin/uv"
-fi
-if [[ -n "$npm_bin" ]]; then
-  export PATH="$(dirname "$npm_bin"):$PATH"
-fi
-gateway_host="${PLASMA_GATEWAY_HOST:-0.0.0.0}"
-gateway_port="${PLASMA_GATEWAY_PORT:-18080}"
-cors_origin="${PLASMA_CORS_ORIGIN:-*}"
-vite_host="${PLASMA_VITE_HOST:-127.0.0.1}"
-vite_port="${PLASMA_VITE_PORT:-5173}"
-public_api_url="${PLASMA_PUBLIC_API_URL:-$default_public_api_url}"
-manager_enabled="${PLASMA_MANAGER_ENABLED:-0}"
-manager_config="${PLASMA_MANAGER_CONFIG:-$default_manager_config}"
-manager_ppu_alias="${PLASMA_MANAGER_PPU_ALIAS:-}"
-engineering_mock_enabled="${PLASMA_ENGINEERING_MOCK_ENABLED:-0}"
-engineering_mock_root="${PLASMA_ENGINEERING_MOCK_ROOT:-$state_home/plasma/engineering-mock}"
-config_version="${PLASMA_CONFIG_VERSION:-1}"
-unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-bin_dir="${PLASMACTL_BIN_DIR:-$HOME/.local/bin}"
-core_services=(plasma-server.service plasma-web.service plasma-vite.service)
-services=("${core_services[@]}")
-if [[ "$manager_enabled" == "1" ]]; then
-  services+=(plasma-manager.service)
-fi
-status_services=("${core_services[@]}" plasma-manager.service)
-
-say() {
-  printf '[plasmactl] %s\n' "$*"
-}
-
-die() {
+wrapper_die() {
   printf '[plasmactl] ERROR: %s\n' "$*" >&2
   exit 1
 }
 
-require_command() {
-  command -v "$1" >/dev/null 2>&1 || die "找不到必要指令：$1"
+require_backend() {
+  local path="$1" label="$2"
+  [[ -f "$path" ]] || wrapper_die "$label backend is missing: $path"
 }
 
-require_repo() {
-  [[ -d "$repo/.git" ]] || die "PLASMA_REPO 不是 Git repository：$repo"
-  [[ -d "$python_dir" && -d "$web_dir" ]] || die "Plasma 專案目錄不完整：$repo"
-}
-
-require_runtime() {
-  [[ -x "$python_bin" ]] || die "找不到 Python venv：$python_bin；請先執行 ./scripts/plasmactl install"
-  [[ -n "$npm_bin" && -x "$npm_bin" ]] || die "找不到 npm；請先安裝 Node.js 22 與 npm"
-}
-
-require_clean_tree() {
-  local changes
-  changes="$(git -C "$repo" status --porcelain --untracked-files=normal)"
-  [[ -z "$changes" ]] || {
-    printf '%s\n' "$changes" >&2
-    die "工作目錄有尚未提交的修改，取消更新以免覆蓋 SWPC 上的工作"
-  }
-}
-
-require_user_units() {
-  local service
-  for service in "${core_services[@]}"; do
-    [[ -f "$unit_dir/$service" ]] || die "尚未安裝 $service；請先執行 ./scripts/plasmactl install"
-  done
-}
-
-validate_manager_settings() {
-  [[ "$manager_enabled" == "0" || "$manager_enabled" == "1" ]] || \
-    die "PLASMA_MANAGER_ENABLED 只接受 0 或 1：$manager_enabled"
-  [[ "$manager_config" == /* ]] || \
-    die "PLASMA_MANAGER_CONFIG 必須是絕對路徑：$manager_config"
-  if [[ -n "$manager_ppu_alias" ]]; then
-    [[ "${#manager_ppu_alias}" -le 128 && "$manager_ppu_alias" =~ ^[A-Za-z0-9._:-]+$ ]] || \
-      die "PLASMA_MANAGER_PPU_ALIAS 只接受 1-128 字元的 A-Z/a-z/0-9/._:-：$manager_ppu_alias"
+load_integration_backend() {
+  require_backend "$integration_backend" "integration"
+  local previous_lib_only="${PLASMACTL_LIB_ONLY-__unset__}"
+  PLASMACTL_LIB_ONLY=1
+  # shellcheck source=/dev/null
+  source "$integration_backend"
+  if [[ "$previous_lib_only" == "__unset__" ]]; then
+    unset PLASMACTL_LIB_ONLY
+  else
+    PLASMACTL_LIB_ONLY="$previous_lib_only"
   fi
-  if [[ "$manager_enabled" == "1" ]]; then
-    [[ -n "$manager_ppu_alias" ]] || \
-      die "Plasma Manager 已啟用，但 PLASMA_MANAGER_PPU_ALIAS 未設定"
-  fi
+  # The legacy implementation deliberately keeps all integration-host behavior.
+  # Reset only its re-exec/install entrypoint so `plasmactl deploy` and the
+  # installed ~/.local/bin/plasmactl symlink continue through this profile router.
+  script_path="$wrapper_path"
 }
 
-validate_engineering_mock_settings() {
-  [[ "$engineering_mock_enabled" == "0" || "$engineering_mock_enabled" == "1" ]] || \
-    die "PLASMA_ENGINEERING_MOCK_ENABLED 只接受 0 或 1：$engineering_mock_enabled"
-  [[ "$engineering_mock_root" == /* ]] || \
-    die "PLASMA_ENGINEERING_MOCK_ROOT 必須是絕對路徑：$engineering_mock_root"
-  case "$engineering_mock_root/" in
-    "$repo/"*) die "PLASMA_ENGINEERING_MOCK_ROOT 不可位於 Git worktree 內：$engineering_mock_root" ;;
+run_swpc_z2like_backend() {
+  require_backend "$swpc_z2like_backend" "swpc-z2like"
+  bash "$swpc_z2like_backend" "$@"
+}
+
+profile_for_optional_arg() {
+  case "${1:-}" in
+    ""|integration) printf '%s\n' integration ;;
+    swpc-z2like) printf '%s\n' swpc-z2like ;;
+    *) return 1 ;;
   esac
-}
-
-manager_bff_url() {
-  "$python_bin" -c '
-from plasma_manager.config import load_manager_config
-import sys
-config = load_manager_config(sys.argv[1])
-host = config.host.strip()
-if host in {"127.0.0.1", "localhost", "0.0.0.0"}:
-    host = "127.0.0.1"
-elif host in {"::1", "::"}:
-    host = "[::1]"
-else:
-    raise SystemExit("Manager BFF requires a local loopback or wildcard bind")
-print(f"http://{host}:{config.port}")
-' "$manager_config"
-}
-
-require_manager_config() {
-  validate_manager_settings
-  [[ "$manager_enabled" == "1" ]] || return 0
-  [[ -f "$manager_config" ]] || \
-    die "Plasma Manager 已啟用，但找不到設定檔：$manager_config"
-  "$python_bin" -c \
-    'from plasma_manager.config import load_manager_config; import sys; load_manager_config(sys.argv[1])' \
-    "$manager_config" >/dev/null || die "Plasma Manager 設定檔驗證失敗：$manager_config"
-  "$python_bin" -c '
-from plasma_manager.config import load_manager_config
-import sys
-config = load_manager_config(sys.argv[1])
-alias = sys.argv[2]
-if alias not in {entry.alias for entry in config.ppus if entry.alias is not None}:
-    raise SystemExit(1)
-' "$manager_config" "$manager_ppu_alias" >/dev/null || \
-    die "PLASMA_MANAGER_PPU_ALIAS 未登錄於 Manager registry：$manager_ppu_alias"
-  manager_bff_url >/dev/null || \
-    die "Manager BFF 只支援本機 loopback/wildcard bind：$manager_config"
-}
-
-manager_probe_url() {
-  "$python_bin" -c '
-from plasma_manager.config import load_manager_config
-import sys
-config = load_manager_config(sys.argv[1])
-host = config.host
-if host in {"0.0.0.0", "::"}:
-    host = "127.0.0.1"
-if ":" in host and not host.startswith("["):
-    host = f"[{host}]"
-print(f"http://{host}:{config.port}")
-' "$manager_config"
-}
-
-manager_config_port() {
-  "$python_bin" -c \
-    'from plasma_manager.config import load_manager_config; import sys; print(load_manager_config(sys.argv[1]).port)' \
-    "$manager_config"
-}
-
-replace_config_assignment() {
-  local key="$1" value="$2" temporary
-  temporary="$(mktemp "${config_file}.tmp.XXXXXX")"
-  awk -v key="$key" -v value="$value" '
-    BEGIN { replaced = 0 }
-    $0 ~ ("^" key "=") {
-      if (!replaced) {
-        print key "=" value
-        replaced = 1
-      }
-      next
-    }
-    { print }
-    END {
-      if (!replaced) {
-        print key "=" value
-      }
-    }
-  ' "$config_file" >"$temporary"
-  mv "$temporary" "$config_file"
-}
-
-config_has_assignment() {
-  local key="$1"
-  grep -Eq "^${key}=" "$config_file"
-}
-
-ensure_config_completeness() {
-  local repaired=0
-
-  if ! config_has_assignment PLASMA_MANAGER_ENABLED; then
-    replace_config_assignment PLASMA_MANAGER_ENABLED "$manager_enabled"
-    PLASMA_MANAGER_ENABLED="$manager_enabled"
-    repaired=1
-  fi
-
-  if ! config_has_assignment PLASMA_MANAGER_CONFIG; then
-    replace_config_assignment PLASMA_MANAGER_CONFIG "$manager_config"
-    PLASMA_MANAGER_CONFIG="$manager_config"
-    repaired=1
-  fi
-
-  if ! config_has_assignment PLASMA_MANAGER_PPU_ALIAS; then
-    replace_config_assignment PLASMA_MANAGER_PPU_ALIAS "$manager_ppu_alias"
-    PLASMA_MANAGER_PPU_ALIAS="$manager_ppu_alias"
-    repaired=1
-  fi
-
-  if ! config_has_assignment PLASMA_ENGINEERING_MOCK_ENABLED; then
-    replace_config_assignment PLASMA_ENGINEERING_MOCK_ENABLED "$engineering_mock_enabled"
-    PLASMA_ENGINEERING_MOCK_ENABLED="$engineering_mock_enabled"
-    repaired=1
-  fi
-
-  if ! config_has_assignment PLASMA_ENGINEERING_MOCK_ROOT; then
-    replace_config_assignment PLASMA_ENGINEERING_MOCK_ROOT "$engineering_mock_root"
-    PLASMA_ENGINEERING_MOCK_ROOT="$engineering_mock_root"
-    repaired=1
-  fi
-
-  if (( repaired )); then
-    say "補齊 schema v$current_config_version 缺少的 deployment 欄位：$config_file"
-  fi
-}
-
-migrate_config() {
-  [[ -f "$config_file" ]] || return 0
-  [[ "$config_version" =~ ^[0-9]+$ ]] || die "PLASMA_CONFIG_VERSION 必須是整數：$config_version"
-  (( config_version <= current_config_version )) || \
-    die "設定檔 schema v$config_version 高於此 plasmactl 支援的 v$current_config_version，拒絕修改"
-
-  local previous_public_api_url="$public_api_url" migrated=0
-  if (( config_version < 2 )); then
-    case "$public_api_url" in
-      https://swpc.tail820e64.ts.net|https://swpc.tail820e64.ts.net:8443|http://127.0.0.1:8080)
-        public_api_url="$default_public_api_url"
-        PLASMA_PUBLIC_API_URL="$public_api_url"
-        ;;
-      *)
-        # Unknown values were historically treated as explicit operator overrides.
-        ;;
-    esac
-    replace_config_assignment PLASMA_PUBLIC_API_URL "$public_api_url"
-  fi
-
-  if (( config_version < 3 )); then
-    replace_config_assignment PLASMA_MANAGER_ENABLED "$manager_enabled"
-    replace_config_assignment PLASMA_MANAGER_CONFIG "$manager_config"
-    PLASMA_MANAGER_ENABLED="$manager_enabled"
-    PLASMA_MANAGER_CONFIG="$manager_config"
-  fi
-
-  if (( config_version < 4 )); then
-    replace_config_assignment PLASMA_ENGINEERING_MOCK_ENABLED "$engineering_mock_enabled"
-    replace_config_assignment PLASMA_ENGINEERING_MOCK_ROOT "$engineering_mock_root"
-    PLASMA_ENGINEERING_MOCK_ENABLED="$engineering_mock_enabled"
-    PLASMA_ENGINEERING_MOCK_ROOT="$engineering_mock_root"
-  fi
-
-  if (( config_version < 5 )); then
-    replace_config_assignment PLASMA_MANAGER_PPU_ALIAS "$manager_ppu_alias"
-    PLASMA_MANAGER_PPU_ALIAS="$manager_ppu_alias"
-  fi
-
-  if (( config_version < 6 )); then
-    # Schema v6 retires Browser-owned direct Gateway endpoints. The integration
-    # host keeps the Gateway and Engineering Mock Provider behind same-origin
-    # Vite routing; managed Control Stations route through Manager/BFF.
-    public_api_url=""
-    PLASMA_PUBLIC_API_URL=""
-    replace_config_assignment PLASMA_PUBLIC_API_URL "$public_api_url"
-  fi
-
-  if (( config_version < current_config_version )); then
-    replace_config_assignment PLASMA_CONFIG_VERSION "$current_config_version"
-    config_version="$current_config_version"
-    PLASMA_CONFIG_VERSION="$current_config_version"
-    migrated=1
-  fi
-
-  ensure_config_completeness
-
-  if (( migrated )); then
-    if [[ "$previous_public_api_url" != "$public_api_url" ]]; then
-      say "設定檔已升級至 schema v$current_config_version；Browser direct API Base 已退役，改用 same-origin routing"
-    else
-      say "設定檔已升級至 schema v$current_config_version；API routing ownership 不變"
-    fi
-  fi
-}
-
-write_config() {
-  mkdir -p "$(dirname "$config_file")"
-  if [[ ! -f "$config_file" ]]; then
-    cat >"$config_file" <<EOF
-# Plasma integration-host deployment settings
-PLASMA_CONFIG_VERSION=$current_config_version
-PLASMA_REPO=$repo
-PLASMA_BRANCH=$branch
-PLASMA_NPM=$npm_bin
-PLASMA_UV=$uv_bin
-PLASMA_GATEWAY_HOST=$gateway_host
-PLASMA_GATEWAY_PORT=$gateway_port
-PLASMA_CORS_ORIGIN=$cors_origin
-PLASMA_VITE_HOST=$vite_host
-PLASMA_VITE_PORT=$vite_port
-# Compatibility field. Leave empty: Browser traffic uses same-origin routing.
-PLASMA_PUBLIC_API_URL=$public_api_url
-# Plasma Manager is an optional control-plane service. Existing PPU deployments remain standalone by default.
-PLASMA_MANAGER_ENABLED=$manager_enabled
-# Operator-local Manager registry/configuration; keep fleet endpoints outside the Git worktree.
-PLASMA_MANAGER_CONFIG=$manager_config
-# Fixed Manager Phase-0 BFF command target. Required when Manager is enabled; must match one registry alias.
-PLASMA_MANAGER_PPU_ALIAS=$manager_ppu_alias
-# Engineering Mock PPU Provider is opt-in. Keep simulation state outside the Git worktree.
-PLASMA_ENGINEERING_MOCK_ENABLED=$engineering_mock_enabled
-PLASMA_ENGINEERING_MOCK_ROOT=$engineering_mock_root
-EOF
-    config_version="$current_config_version"
-    say "建立設定檔：$config_file"
-  else
-    migrate_config
-    say "保留既有設定檔：$config_file"
-  fi
-}
-
-validate_unit_values() {
-  local value
-  validate_manager_settings
-  validate_engineering_mock_settings
-  for value in "$repo" "$python_bin" "$npm_bin" "$gateway_host" "$gateway_port" \
-    "$cors_origin" "$vite_host" "$vite_port" "$public_api_url" "$manager_config" "$manager_ppu_alias" \
-    "$engineering_mock_root"; do
-    [[ "$value" != *$'\n'* ]] || die "systemd 設定值不可包含換行"
-  done
-  [[ "$repo" != *' '* && "$python_bin" != *' '* && "$npm_bin" != *' '* && "$manager_config" != *' '* && \
-    "$engineering_mock_root" != *' '* ]] || \
-    die "目前安裝腳本不支援含空白的 repository、Python、npm、Manager config 或 Engineering Mock root 路徑"
-}
-
-write_units() {
-  local node_path public_api_environment engineering_mock_args manager_api_environment manager_alias_environment
-  local manager_mode_environment fleet_ui_environment manager_api_url vite_after vite_wants
-  node_path="$(dirname "$npm_bin"):/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-  public_api_environment=""
-  engineering_mock_args=""
-  manager_api_environment=""
-  manager_alias_environment=""
-  manager_mode_environment=""
-  fleet_ui_environment=""
-  manager_api_url=""
-  vite_after="network-online.target plasma-web.service"
-  vite_wants="network-online.target plasma-web.service"
-  if [[ -n "$public_api_url" ]]; then
-    public_api_environment="Environment=NEXT_PUBLIC_PLASMA_API_URL=$public_api_url"
-  fi
-  if [[ "$engineering_mock_enabled" == "1" ]]; then
-    engineering_mock_args=" --engineering-mock --engineering-mock-root $engineering_mock_root"
-  fi
-  if [[ "$manager_enabled" == "1" ]]; then
-    [[ -n "$manager_ppu_alias" ]] || die "Plasma Manager BFF target alias 未設定"
-    manager_api_url="$(manager_bff_url)" || die "無法建立本機 Manager BFF URL"
-    manager_mode_environment="Environment=PLASMA_CONTROL_STATION_MODE=managed"
-    fleet_ui_environment="Environment=PLASMA_FLEET_UI_ENABLED=1"
-    manager_api_environment="Environment=PLASMA_MANAGER_API_URL=$manager_api_url"
-    manager_alias_environment="Environment=PLASMA_MANAGER_PPU_ALIAS=$manager_ppu_alias"
-    vite_after="$vite_after plasma-manager.service"
-    vite_wants="$vite_wants plasma-manager.service"
-  fi
-
-  mkdir -p "$unit_dir"
-  cat >"$unit_dir/plasma-server.service" <<EOF
-[Unit]
-Description=Plasma PPU Programming Server
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-WorkingDirectory=$python_dir
-Environment=PYTHONUNBUFFERED=1
-ExecStart=$python_bin -m plasma_server.server --config config/plasma.yaml
-Restart=on-failure
-RestartSec=3
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=default.target
-EOF
-
-  cat >"$unit_dir/plasma-web.service" <<EOF
-[Unit]
-Description=Plasma Web REST Gateway
-After=network-online.target plasma-server.service
-Wants=network-online.target plasma-server.service
-
-[Service]
-Type=simple
-WorkingDirectory=$python_dir
-Environment=PYTHONUNBUFFERED=1
-ExecStart=$python_bin -m plasma_web.gateway --host $gateway_host --port $gateway_port --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $python_dir/output --cors-origin $cors_origin$engineering_mock_args
-Restart=on-failure
-RestartSec=3
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=default.target
-EOF
-
-  cat >"$unit_dir/plasma-vite.service" <<EOF
-[Unit]
-Description=Plasma Vite Web Console
-After=$vite_after
-Wants=$vite_wants
-
-[Service]
-Type=simple
-WorkingDirectory=$web_dir
-Environment=PATH=$node_path
-$public_api_environment
-$manager_mode_environment
-$fleet_ui_environment
-$manager_api_environment
-$manager_alias_environment
-ExecStart=$npm_bin run dev -- --host $vite_host --port $vite_port
-Restart=on-failure
-RestartSec=3
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=default.target
-EOF
-
-  cat >"$unit_dir/plasma-manager.service" <<EOF
-[Unit]
-Description=Plasma Manager Read-only Fleet Control Plane
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-WorkingDirectory=$python_dir
-Environment=PYTHONUNBUFFERED=1
-ExecStart=$python_bin -m plasma_manager.server --config $manager_config
-Restart=on-failure
-RestartSec=3
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=default.target
-EOF
-}
-
-install_dependencies() {
-  require_command python3
-  if [[ ! -x "$python_bin" ]]; then
-    say "建立 Python virtual environment"
-    python3 -m venv "$python_dir/.venv"
-  fi
-  say "同步 Python 開發相依套件"
-  install_python_dependencies
-
-  [[ -n "$npm_bin" && -x "$npm_bin" ]] || die "找不到 npm；請先安裝 Node.js 22 與 npm"
-  say "同步 Web 相依套件"
-  (cd "$web_dir" && "$npm_bin" ci)
-}
-
-install_python_dependencies() {
-  if "$python_bin" -m pip --version >/dev/null 2>&1; then
-    "$python_bin" -m pip install -e "$python_dir[dev]"
-  elif [[ -n "$uv_bin" && -x "$uv_bin" ]]; then
-    say "Python venv 沒有 pip，改用 uv：$uv_bin"
-    "$uv_bin" pip install --python "$python_bin" -e "$python_dir[dev]"
-  else
-    die "Python venv 沒有 pip，且找不到 uv；請確認 $HOME/.local/bin/uv"
-  fi
-}
-
-reconcile_service_enablement() {
-  systemctl --user enable "${core_services[@]}" >/dev/null
-  if [[ "$manager_enabled" == "1" ]]; then
-    systemctl --user enable plasma-manager.service >/dev/null
-  else
-    systemctl --user disable plasma-manager.service >/dev/null 2>&1 || true
-  fi
-}
-
-install_services() {
-  local login_user
-  require_repo
-  require_command systemctl
-  install_dependencies
-  write_config
-  validate_unit_values
-  require_manager_config
-  write_units
-  mkdir -p "$bin_dir"
-  ln -sfn "$script_path" "$bin_dir/plasmactl"
-  systemctl --user daemon-reload
-  reconcile_service_enablement
-  login_user="${USER:-$(id -un)}"
-  say "已安裝 user systemd units，但尚未啟動，避免與目前手動程序爭用 Port"
-  if [[ "$manager_enabled" == "1" ]]; then
-    say "Plasma Manager 已設定為 opt-in enabled：$manager_config"
-    say "Manager BFF 固定 command target：$manager_ppu_alias"
-  else
-    say "Plasma Manager 保持 disabled；PPU standalone execution 不依賴 Manager"
-  fi
-  if [[ "$engineering_mock_enabled" == "1" ]]; then
-    say "Engineering Mock PPU Provider 已設定為 opt-in enabled：$engineering_mock_root"
-  else
-    say "Engineering Mock PPU Provider 保持 disabled"
-  fi
-  say "管理指令：$bin_dir/plasmactl"
-  say "先執行 plasmactl ports，確認舊程序後，再執行 plasmactl start"
-  say "若要開機後不登入也自動啟動，另執行：sudo loginctl enable-linger $login_user"
-}
-
-web_runtime_changed() {
-  local changed="$1"
-  grep -Eq '^software/web/' <<<"$changed"
-}
-
-web_dependencies_changed() {
-  local changed="$1"
-  grep -Eq '^software/web/package-lock\.json$' <<<"$changed"
-}
-
-web_manifest_matches_lock() {
-  "$python_bin" - "$web_dir/package.json" "$web_dir/package-lock.json" <<'PY'
-import json
-import sys
-
-package_path, lock_path = sys.argv[1:]
-with open(package_path, encoding="utf-8") as handle:
-    package = json.load(handle)
-with open(lock_path, encoding="utf-8") as handle:
-    lock = json.load(handle)
-
-root = lock.get("packages", {}).get("", {})
-keys = ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies")
-for key in keys:
-    if package.get(key, {}) != root.get(key, {}):
-        raise SystemExit(1)
-PY
-}
-
-sync_changed_dependencies() {
-  local before="$1" after="$2" changed
-  [[ "$before" != "$after" ]] || return 0
-  changed="$(git -C "$repo" diff --name-only "$before" "$after")"
-  if grep -Eq '^software/python/(pyproject.toml|.*requirements.*)$' <<<"$changed"; then
-    say "Python 相依設定有更新，重新安裝"
-    install_python_dependencies
-  fi
-  if web_dependencies_changed "$changed"; then
-    say "Web lockfile 有更新，執行 npm ci"
-    (cd "$web_dir" && "$npm_bin" ci)
-  elif grep -Eq '^software/web/package\.json$' <<<"$changed"; then
-    if ! web_manifest_matches_lock; then
-      die "software/web/package.json 的 dependency manifest 與 package-lock.json 不一致"
-    fi
-    say "Web package metadata 有更新但 lockfile 未變；略過 npm ci，避免擾動執行中的 Vite runtime"
-  fi
-}
-
-update_code() {
-  local before local_ahead remote_ahead after changed
-  require_repo
-  require_runtime
-  require_clean_tree
-  [[ "$(git -C "$repo" branch --show-current)" == "$branch" ]] || die "目前分支不是 $branch"
-
-  before="$(git -C "$repo" rev-parse HEAD)"
-  say "從 origin/$branch 取得最新程式"
-  git -C "$repo" fetch --prune origin "$branch"
-  read -r local_ahead remote_ahead < <(
-    git -C "$repo" rev-list --left-right --count "HEAD...origin/$branch"
-  )
-  [[ "$local_ahead" == "0" ]] || die "SWPC 有 $local_ahead 個尚未推送的本機 commit，拒絕自動部署"
-  git -C "$repo" merge --ff-only "origin/$branch"
-  after="$(git -C "$repo" rev-parse HEAD)"
-  changed="$(git -C "$repo" diff --name-only "$before" "$after")"
-  sync_changed_dependencies "$before" "$after"
-  say "目前版本：$(git -C "$repo" log -1 --oneline)"
-  if web_runtime_changed "$changed"; then
-    say "Web source 已更新；長駐 Vite/HMR 不視為已完成部署"
-    say "瀏覽器驗證前請執行 plasmactl web-restart；plasmactl deploy 會在測試通過後自動重新啟動全部服務"
-  fi
-}
-
-run_tests() {
-  require_repo
-  require_runtime
-  say "執行 deployment config migration、Manager service、Engineering Mock Provider 與 Web lifecycle 測試"
-  bash "$repo/scripts/tests/test-plasmactl-config.sh" || return 1
-  bash "$repo/scripts/tests/test-plasmactl-engineering-mock.sh" || return 1
-  say "執行 Python 與 PL source-layout pytest"
-  (cd "$python_dir" && "$python_bin" -m pytest -q tests "$repo/pl/tests") || return 1
-  say "執行 Web lint、test 與 artifact validation"
-  (cd "$web_dir" && "$npm_bin" run lint) || return 1
-  (cd "$web_dir" && "$npm_bin" test) || return 1
-  (cd "$web_dir" && "$npm_bin" run validate:artifact) || return 1
-  say "所有測試通過"
-}
-
-wait_for_port() {
-  local host="$1" port="$2" label="$3" attempt
-  for attempt in {1..30}; do
-    if (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null; then
-      exec 3>&-
-      exec 3<&-
-      say "$label 已監聽 $host:$port"
-      return 0
-    fi
-    sleep 0.5
-  done
-  die "$label 未在期限內監聽 $host:$port"
-}
-
-wait_for_http() {
-  local url="$1" label="$2" attempt
-  for attempt in {1..30}; do
-    if curl --fail --silent --max-time 2 "$url" >/dev/null 2>&1; then
-      say "$label 正常"
-      return 0
-    fi
-    sleep 0.5
-  done
-  die "$label 未在期限內通過健康檢查：$url"
-}
-
-web_health_check() {
-  require_command curl
-  wait_for_http "http://127.0.0.1:$vite_port/" "Vite Web Console"
-}
-
-engineering_mock_health_check() {
-  [[ "$engineering_mock_enabled" == "1" ]] || return 0
-  require_command curl
-  wait_for_http "http://127.0.0.1:$gateway_port/api/engineering/targets" "Engineering Mock PPU Provider"
-}
-
-manager_health_check() {
-  [[ "$manager_enabled" == "1" ]] || return 0
-  require_manager_config
-  require_command systemctl
-  systemctl --user is-active --quiet plasma-manager.service || \
-    die "Plasma Manager systemd service 未處於 active 狀態"
-  local manager_url
-  manager_url="$(manager_probe_url)"
-  wait_for_http "$manager_url/api/health/live" "Plasma Manager"
-  systemctl --user is-active --quiet plasma-manager.service || \
-    die "Plasma Manager liveness 回應存在，但 systemd service 已離開 active 狀態"
-}
-
-health_check() {
-  require_command curl
-  wait_for_port 127.0.0.1 9900 "Plasma Server"
-  wait_for_http "http://127.0.0.1:$gateway_port/api/status" "Plasma Web REST Gateway"
-  engineering_mock_health_check
-  web_health_check
-  manager_health_check
-}
-
-reconcile_service_units() {
-  require_user_units
-  require_command systemctl
-  write_config
-  validate_unit_values
-  require_manager_config
-  write_units
-  systemctl --user daemon-reload
-  reconcile_service_enablement
-}
-
-stop_disabled_manager() {
-  if [[ "$manager_enabled" != "1" ]]; then
-    systemctl --user stop plasma-manager.service >/dev/null 2>&1 || true
-  fi
-}
-
-start_services() {
-  reconcile_service_units
-  stop_disabled_manager
-  systemctl --user start "${services[@]}"
-  health_check
-}
-
-restart_services() {
-  reconcile_service_units
-  stop_disabled_manager
-  say "重新啟動 Plasma 服務"
-  systemctl --user restart "${services[@]}"
-  health_check
-}
-
-restart_web_console() {
-  require_repo
-  require_runtime
-  reconcile_service_units
-  say "重新啟動 Vite Web Console，丟棄舊的 in-memory module graph / HMR state"
-  systemctl --user restart plasma-vite.service
-  web_health_check
-  say "Web runtime 已重新載入；若瀏覽器仍持有舊 ESM module，請執行 hard reload"
-}
-
-stop_services() {
-  require_user_units
-  systemctl --user stop plasma-manager.service >/dev/null 2>&1 || true
-  systemctl --user stop plasma-vite.service plasma-web.service plasma-server.service
-  say "Plasma 服務已停止"
-}
-
-show_ports() {
-  local manager_port_value=""
-  if [[ "$manager_enabled" == "1" && -f "$manager_config" ]]; then
-    manager_port_value="$(manager_config_port 2>/dev/null || true)"
-  fi
-  if [[ -n "$manager_port_value" ]]; then
-    printf '\nListening ports (9900 / %s / %s / Manager %s):\n' "$gateway_port" "$vite_port" "$manager_port_value"
-  else
-    printf '\nListening ports (9900 / %s / %s):\n' "$gateway_port" "$vite_port"
-  fi
-  ss -lntp 2>/dev/null | awk \
-    -v gateway=":$gateway_port" -v vite=":$vite_port" -v manager=":$manager_port_value" \
-    '$4 ~ /:9900$/ || index($4, gateway) || index($4, vite) || (manager != ":" && index($4, manager))'
-}
-
-show_status() {
-  require_repo
-  printf 'Version:  %s\n' "$(git -C "$repo" log -1 --oneline)"
-  printf 'Branch:   %s\n' "$(git -C "$repo" branch --show-current)"
-  printf 'Worktree: %s\n' "$(if [[ -z "$(git -C "$repo" status --porcelain)" ]]; then echo clean; else echo modified; fi)"
-  printf 'Manager:  %s\n' "$(if [[ "$manager_enabled" == "1" ]]; then echo "enabled (BFF target $manager_ppu_alias)"; else echo disabled; fi)"
-  printf 'Eng Mock: %s\n' "$(if [[ "$engineering_mock_enabled" == "1" ]]; then echo "enabled ($engineering_mock_root)"; else echo disabled; fi)"
-  printf '\n%-24s %s\n' SERVICE STATE
-  local service state load_state
-  for service in "${status_services[@]}"; do
-    load_state="$(systemctl --user show "$service" --property=LoadState --value 2>/dev/null || true)"
-    state="$(systemctl --user show "$service" --property=ActiveState --value 2>/dev/null || true)"
-    if [[ "$load_state" == "not-found" || -z "$load_state" ]]; then
-      state="not-installed"
-    elif [[ "$state" =~ ^(active|inactive|failed|activating|deactivating|reloading)$ ]]; then
-      :
-    else
-      state="systemd-unavailable"
-    fi
-    if [[ "$service" == "plasma-manager.service" && "$manager_enabled" != "1" ]]; then
-      if [[ "$state" == "active" ]]; then
-        state="active (config-disabled)"
-      else
-        state="disabled"
-      fi
-    fi
-    printf '%-24s %s\n' "$service" "$state"
-  done
-  show_ports
-}
-
-show_logs() {
-  local target="${1:-all}" units=()
-  case "$target" in
-    all) units=(-u plasma-server.service -u plasma-web.service -u plasma-vite.service -u plasma-manager.service) ;;
-    server) units=(-u plasma-server.service) ;;
-    web|gateway) units=(-u plasma-web.service) ;;
-    vite|console) units=(-u plasma-vite.service) ;;
-    manager) units=(-u plasma-manager.service) ;;
-    *) die "logs 只接受 all、server、web/gateway、vite/console 或 manager" ;;
-  esac
-  journalctl --user "${units[@]}" -n 100 -f
-}
-
-deploy() {
-  if [[ "${PLASMACTL_DEPLOY_REEXEC:-0}" != "1" ]]; then
-    update_code
-    say "重新載入更新後的部署邏輯"
-    PLASMACTL_DEPLOY_REEXEC=1 exec "$script_path" deploy
-  fi
-
-  if ! run_tests; then
-    die "測試失敗；程式已更新，但既有服務未重新啟動"
-  fi
-  restart_services
-  say "部署完成：$(git -C "$repo" log -1 --oneline)"
 }
 
 usage() {
   cat <<'EOF'
-Usage: plasmactl COMMAND
+Usage: plasmactl COMMAND [PROFILE] [OPTIONS]
 
-Commands:
-  install              安裝相依套件與 user systemd units（不立即啟動）
-  update               從 GitHub main 做 fast-forward 更新；Web 變更後需 restart 才算 runtime 完成
-  test                 執行 deployment migration/Manager/Engineering Mock lifecycle、Python、PL source-layout 與 Web 測試
-  restart              重新產生 systemd units、重新啟動已啟用服務並執行 health check
-  web-restart          只重新啟動 Vite Web Console 並執行 Web HTTP health check
-  deploy               update → re-exec latest plasmactl → test → reconcile units → restart
-  update-and-restart   deploy 的別名
-  verify fleet         唯讀驗證 Manager/Fleet 部署後 runtime chain；不取代人工 UI 驗收
-  start | stop         啟動或停止 Plasma 服務；Manager 只有 opt-in enabled 時會啟動
-  status               顯示 Git、systemd、Manager/Engineering Mock opt-in 與 Port 狀態
-  ports                顯示 9900、Gateway、Vite，以及啟用時的 Manager Port
-  logs [TARGET]        即時顯示 Log；TARGET: all/server/web/vite/manager
-  help                 顯示本說明
+Deployment profiles:
+  integration    SWPC development/integration host; user systemd, Vite, optional Manager/Mock
+  swpc-z2like    x86_64 PS-only PPU surrogate; root/system systemd, immutable release, restricted ingress
+
+Profile-aware commands:
+  install [integration]              Legacy integration-host install (default; backward compatible)
+  deploy [integration]               Legacy update -> test -> restart deployment (default)
+  status [integration]               Legacy integration-host runtime status
+  verify fleet                       Legacy Manager/Fleet read-only verification
+
+  sudo plasmactl install swpc-z2like [--plasma-python PATH] [--ppu-id ID] [--facility-id ID] [--proxy-port PORT]
+  sudo plasmactl deploy swpc-z2like  [same options]
+  plasmactl verify swpc-z2like       Read-only local surrogate readiness/restricted-ingress/PS-loopback checks
+  plasmactl status swpc-z2like       Installed release identity and system-service state
+
+Integration-only commands retained unchanged:
+  update | test | restart | web-restart | start | stop | ports | logs [TARGET]
+  update-and-restart                  Alias of `deploy integration`
+
+Safety boundary:
+  `swpc-z2like` is not Z2/ARMv7 qualification and proves no PL, FPGA, Site electrical,
+  real-IC programming, eight-site hardware concurrency, or production readiness.
 EOF
 }
 
 if [[ "${PLASMACTL_LIB_ONLY:-0}" == "1" ]]; then
+  load_integration_backend
   return 0 2>/dev/null || exit 0
 fi
 
 command="${1:-help}"
 shift || true
+
 case "$command" in
-  install) install_services ;;
-  update) update_code ;;
-  test) run_tests ;;
-  restart) restart_services ;;
-  web-restart|restart-web) restart_web_console ;;
-  deploy|update-and-restart) deploy ;;
-  verify) bash "$repo/scripts/plasmactl-verify" "${1:-}" ;;
-  start) start_services ;;
-  stop) stop_services ;;
-  status) show_status ;;
-  ports) show_ports ;;
-  logs) show_logs "${1:-all}" ;;
-  help|-h|--help) usage ;;
-  *) usage >&2; die "未知指令：$command" ;;
+  install)
+    profile="$(profile_for_optional_arg "${1:-}")" || wrapper_die "unknown deployment profile: ${1:-}"
+    [[ "${1:-}" == "$profile" ]] && shift || true
+    if [[ "$profile" == "swpc-z2like" ]]; then
+      run_swpc_z2like_backend install "$@"
+    else
+      (($# == 0)) || wrapper_die "integration install does not accept profile options"
+      load_integration_backend
+      install_services
+    fi
+    ;;
+  deploy|update-and-restart)
+    profile="$(profile_for_optional_arg "${1:-}")" || wrapper_die "unknown deployment profile: ${1:-}"
+    [[ "${1:-}" == "$profile" ]] && shift || true
+    if [[ "$profile" == "swpc-z2like" ]]; then
+      run_swpc_z2like_backend deploy "$@"
+    else
+      (($# == 0)) || wrapper_die "integration deploy does not accept profile options"
+      load_integration_backend
+      deploy
+    fi
+    ;;
+  status)
+    profile="$(profile_for_optional_arg "${1:-}")" || wrapper_die "unknown deployment profile: ${1:-}"
+    [[ "${1:-}" == "$profile" ]] && shift || true
+    (($# == 0)) || wrapper_die "status accepts one deployment profile only"
+    if [[ "$profile" == "swpc-z2like" ]]; then
+      run_swpc_z2like_backend status
+    else
+      load_integration_backend
+      show_status
+    fi
+    ;;
+  verify)
+    case "${1:-}" in
+      swpc-z2like)
+        shift
+        run_swpc_z2like_backend verify "$@"
+        ;;
+      integration)
+        shift
+        load_integration_backend
+        bash "$repo/scripts/plasmactl-verify" "${1:-}"
+        ;;
+      *)
+        load_integration_backend
+        bash "$repo/scripts/plasmactl-verify" "${1:-}"
+        ;;
+    esac
+    ;;
+  update)
+    (($# == 0)) || wrapper_die "update is integration-only and accepts no profile argument"
+    load_integration_backend
+    update_code
+    ;;
+  test)
+    (($# == 0)) || wrapper_die "test is integration-only and accepts no profile argument"
+    load_integration_backend
+    run_tests
+    ;;
+  restart)
+    (($# == 0)) || wrapper_die "restart is integration-only and accepts no profile argument"
+    load_integration_backend
+    restart_services
+    ;;
+  web-restart|restart-web)
+    (($# == 0)) || wrapper_die "web-restart is integration-only and accepts no profile argument"
+    load_integration_backend
+    restart_web_console
+    ;;
+  start)
+    (($# == 0)) || wrapper_die "start is integration-only and accepts no profile argument"
+    load_integration_backend
+    start_services
+    ;;
+  stop)
+    (($# == 0)) || wrapper_die "stop is integration-only and accepts no profile argument"
+    load_integration_backend
+    stop_services
+    ;;
+  ports)
+    (($# == 0)) || wrapper_die "ports is integration-only and accepts no profile argument"
+    load_integration_backend
+    show_ports
+    ;;
+  logs)
+    target="${1:-all}"
+    shift || true
+    (($# == 0)) || wrapper_die "logs accepts at most one integration log target"
+    load_integration_backend
+    show_logs "$target"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage >&2
+    wrapper_die "unknown command: $command"
+    ;;
 esac
