@@ -65,6 +65,9 @@ class KL25ReviewedEvidenceUnitsTest(unittest.TestCase):
         self.assertEqual(doc["exclusions"]["caution_headings"], "NOT_UNIT_BOUNDARY")
         self.assertEqual(doc["exclusions"]["bit_name_only_headings"], "NOT_UNIT_BOUNDARY")
         self.assertIn("NORMALIZE", doc["exclusions"]["pdftotext_numbering_artifact_27_33_x"])
+        self.assertEqual(doc["heading_normalization"]["27.33.x"], "27.3.3.x")
+        register_unit = next(u for u in doc["units"] if u["unit_id"] == "nxp-kl25-ftfa-register-model-v0")
+        self.assertIn("27.3.3.5 Flash Common Command Object Registers", register_unit["section_scope"])
 
 
 if __name__ == "__main__":
