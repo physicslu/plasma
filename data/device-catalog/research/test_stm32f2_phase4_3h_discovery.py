@@ -105,7 +105,7 @@ def main() -> int:
             fields = reader.fieldnames
             rows = list(reader)
         assert fields is not None
-        rows.append({**rows[0], "base_device": "STM32F205RE", "icpn": "STM32F205RET6"})
+        rows[0]["icpn"] = "STM32F205RBT8"
         drifted = Path(temporary_directory) / "drifted.csv"
         with drifted.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields)

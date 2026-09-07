@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "evidence_id": "stm32f2-phase4.3h-official-st-discovery-2026-09-07-retained-20260907T135555Z-52a8e198",
+  "canonical_dataset_admission": false,
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "cebdcb7c910f2ff094839587c131d4e6b8a9e7c683b53cb40e07f36d46adc485"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "9f2dffae084969708ab2cdfc2b061b0f34cddab02a7544d2230293b9b358c49b"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "e5d7cda46cb230d900b4c571f566781fbf2aeb4736812f57f132f43bf3c507da"
+    }
+  ]
+}

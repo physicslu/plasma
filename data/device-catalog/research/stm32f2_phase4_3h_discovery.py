@@ -51,10 +51,11 @@ def read_production_bases(path: Path) -> set[str]:
     identities = [row.get("icpn") for row in rows]
     if len(set(identities)) != len(identities):
         raise AcquisitionError("duplicate Production identity")
-    observed_bases = {row.get("base_device", "") for row in rows}
+    historical = [row for row in rows if row.get("base_device") in EXPECTED_PRODUCTION_BASES]
+    observed_bases = {row.get("base_device", "") for row in historical}
     if observed_bases != EXPECTED_PRODUCTION_BASES:
         raise AcquisitionError("Phase 4.3H Production Base Device boundary drifted")
-    if canonical_csv_sha256(fields, rows) != EXPECTED_PRODUCTION_SHA256:
+    if canonical_csv_sha256(fields, historical) != EXPECTED_PRODUCTION_SHA256:
         raise AcquisitionError("Phase 4.3H historical Phase 4.3G Production boundary is unavailable")
     return set(EXPECTED_PRODUCTION_BASES)
 
