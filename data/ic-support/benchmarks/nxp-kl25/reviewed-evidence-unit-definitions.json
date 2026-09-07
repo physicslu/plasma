@@ -1,0 +1,99 @@
+{
+  "schema_version": "0.1.0",
+  "definition_set_id": "nxp-kl25-reviewed-evidence-unit-definitions-v0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "reviewed_boundary_id": "nxp-kl25-reviewed-candidate-boundary-v0",
+  "construction_id": "nxp-kl25-evidence-unit-construction-v0",
+  "target": "MKL25Z128VLK4",
+  "status": "reviewed_definitions_not_admitted_catalog",
+  "units": [
+    {
+      "unit_id": "nxp-kl25-ftfa-register-model-v0",
+      "source_id": "nxp_kl25_rm_rev3",
+      "section_scope": ["27.3 Memory Map and Registers", "27.3.1 Flash Configuration Field Description", "27.3.3 Register Descriptions", "27.3.5 Flash Common Command Object Registers"],
+      "pdf_page_range": [422, 431],
+      "role": "FLASH_COMMAND_ENGINE",
+      "manufacturer_native_terms": ["FTFA", "FSTAT", "FCNFG", "FSEC", "FOPT", "FCCOB", "FPROT"],
+      "disposition": "REVIEWED_UNIT_DEFINITION"
+    },
+    {
+      "unit_id": "nxp-kl25-ftfa-command-sequencing-v0",
+      "source_id": "nxp_kl25_rm_rev3",
+      "section_scope": ["27.4.7 Flash Program and Erase", "27.4.8 Flash Command Operations", "27.4.8.1 Command Write Sequence", "27.4.8.2 Flash Commands", "27.4.8.3 Flash Commands by Mode"],
+      "pdf_page_range": [435, 439],
+      "role": "PROGRAMMING_SEQUENCE",
+      "manufacturer_native_terms": ["FCCOB", "CCIF", "ACCERR", "FPVIOL", "MGSTAT0"],
+      "disposition": "REVIEWED_UNIT_DEFINITION"
+    },
+    {
+      "unit_id": "nxp-kl25-program-longword-v0",
+      "source_id": "nxp_kl25_rm_rev3",
+      "section_scope": ["27.4.10.4 Program Longword Command"],
+      "pdf_page_range": [444, 445],
+      "role": "PROGRAM_COMMAND",
+      "manufacturer_native_terms": ["Program Longword", "FCCOB", "FSTAT", "CCIF"],
+      "disposition": "REVIEWED_UNIT_DEFINITION"
+    },
+    {
+      "unit_id": "nxp-kl25-erase-sector-v0",
+      "source_id": "nxp_kl25_rm_rev3",
+      "section_scope": ["27.4.10.5 Erase Flash Sector Command", "27.4.10.5.1 Suspending an Erase Flash Sector Operation", "27.4.10.5.2 Resuming a Suspended Erase Flash Sector Operation", "27.4.10.5.3 Aborting a Suspended Erase Flash Sector Operation"],
+      "pdf_page_range": [446, 448],
+      "role": "ERASE_COMMAND",
+      "manufacturer_native_terms": ["Erase Flash Sector", "ERSSUSP", "ERSSCR", "FCCOB"],
+      "disposition": "REVIEWED_UNIT_DEFINITION"
+    },
+    {
+      "unit_id": "nxp-kl25-erase-all-blocks-v0",
+      "source_id": "nxp_kl25_rm_rev3",
+      "section_scope": ["27.4.10.9 Erase All Blocks Command", "27.4.10.9.1 Triggering an Erase All External to the Flash Memory Module"],
+      "pdf_page_range": [451, 452],
+      "role": "ERASE_COMMAND",
+      "manufacturer_native_terms": ["Erase All Blocks", "FCCOB", "FSTAT", "CCIF"],
+      "disposition": "REVIEWED_UNIT_DEFINITION"
+    },
+    {
+      "unit_id": "nxp-kl25-flash-security-v0",
+      "source_id": "nxp_kl25_rm_rev3",
+      "section_scope": ["27.4.11 Security", "27.4.11.1 Flash Memory Access by Mode and Security", "27.4.11.2 Changing the Security State", "27.4.11.2.1 Unsecuring the Chip Using Backdoor Key Access"],
+      "pdf_page_range": [454, 455],
+      "role": "PROTECTION_SECURITY",
+      "manufacturer_native_terms": ["FSEC", "security state", "backdoor key"],
+      "disposition": "REVIEWED_UNIT_DEFINITION"
+    },
+    {
+      "unit_id": "nxp-kl25-debug-security-interaction-v0",
+      "source_id": "nxp_kl25_rm_rev3",
+      "section_scope": ["8.2 Flash Security", "8.3 Security Interactions with other Modules", "8.3.1 Security Interactions with Debug"],
+      "pdf_page_range": [149, 150],
+      "role": "PROTECTION_SECURITY",
+      "manufacturer_native_terms": ["security", "debug", "mass erase"],
+      "disposition": "REVIEWED_UNIT_DEFINITION"
+    },
+    {
+      "unit_id": "nxp-kl25-swd-mdm-ap-v0",
+      "source_id": "nxp_kl25_rm_rev3",
+      "section_scope": ["9.2 Debug Port Pin Descriptions", "9.3 SWD status and control registers", "9.3.1 MDM-AP Control Register", "9.3.2 MDM-AP Status Register", "9.4 Debug Resets", "9.7 Debug & Security"],
+      "pdf_page_range": [151, 157],
+      "role": "DEBUG_PROGRAMMING_INTERFACE",
+      "manufacturer_native_terms": ["SWD", "MDM-AP", "AHB-AP", "debug reset", "security"],
+      "disposition": "REVIEWED_UNIT_DEFINITION"
+    }
+  ],
+  "exclusions": {
+    "caution_headings": "NOT_UNIT_BOUNDARY",
+    "bit_name_only_headings": "NOT_UNIT_BOUNDARY",
+    "pdftotext_numbering_artifact_27_33_x": "NORMALIZE_TO_DOCUMENT_SECTION_CONTEXT_BEFORE_ADMISSION"
+  },
+  "trust_boundary": {
+    "reviewed_unit_definitions_complete": true,
+    "evidence_unit_catalog_admission": false,
+    "evidence_pack_admission": false,
+    "applicability_binding_admission": false,
+    "semantic_extraction_admission": false,
+    "canonical_dataset_admission": false,
+    "hil_admission": false,
+    "production_admission": false,
+    "destructive_security_operation_admission": false
+  }
+}
