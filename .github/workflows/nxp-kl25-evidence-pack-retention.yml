@@ -1,0 +1,87 @@
+name: NXP KL25 Evidence Pack retention
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/nxp-kl25-evidence-pack-retention.yml"
+      - "data/ic-support/benchmarks/nxp-kl25/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build-real-kl25-evidence-packs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ensure deterministic PDF tooling
+        run: |
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
+          pdftotext -v 2>&1 | head -n 1
+      - name: Acquire source-locked KL25 programming authority
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          root = Path("data/ic-support/benchmarks/nxp-kl25")
+          lock = json.loads((root / "source-lock.json").read_text())
+          source = next(item for item in lock["sources"] if item["source_id"] == "nxp_kl25_rm_rev3")
+          source_dir = Path("${{ runner.temp }}") / "nxp-kl25-source"
+          source_dir.mkdir(parents=True, exist_ok=True)
+          destination = source_dir / source["local_filename"]
+          subprocess.run(
+              [
+                  "curl",
+                  "--fail",
+                  "--location",
+                  "--retry",
+                  "3",
+                  "--output",
+                  str(destination),
+                  source["final_url"],
+              ],
+              check=True,
+          )
+          print(f"materialized {destination}")
+          PY
+      - name: Build real KL25 Evidence Packs through pre-AI context assembly
+        run: |
+          python data/ic-support/benchmarks/nxp-kl25/build_evidence_pack.py \
+            --source-dir "${{ runner.temp }}/nxp-kl25-source" \
+            --output-dir "${{ runner.temp }}/nxp-kl25-pack-output"
+      - name: Retain metadata only
+        run: |
+          set -euo pipefail
+          src="${{ runner.temp }}/nxp-kl25-pack-output"
+          dst="${{ runner.temp }}/nxp-kl25-pack-metadata"
+          mkdir -p "$dst/packs"
+          cp "$src/build-report.json" "$dst/"
+          cp "$src/target-bundle.json" "$dst/"
+          cp "$src/pre-ai-input.json" "$dst/"
+          cp "$src"/packs/*.json "$dst/packs/"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("${{ runner.temp }}") / "nxp-kl25-pack-metadata"
+          report = json.loads((root / "build-report.json").read_text())
+          assert report["manufacturer_text_in_report"] is False
+          assert report["semantic_extraction_executed"] is False
+          assert report["pack_count"] == 8
+          print(json.dumps(report, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nxp-kl25-evidence-pack-metadata
+          path: ${{ runner.temp }}/nxp-kl25-pack-metadata
+          if-no-files-found: error
+          retention-days: 1
