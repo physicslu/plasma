@@ -1,0 +1,348 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 4,
+  "acquisition_transport": "chromium_rendered_dom",
+  "active_exact_icpn_candidates": 11,
+  "attempted": 4,
+  "browser_runtime": {
+    "browser_version": "151.0.7922.34",
+    "engine": "chromium",
+    "headless": false,
+    "playwright_requirement": "1.62.0"
+  },
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 4,
+    "unmapped": 0
+  },
+  "claims": {
+    "production_admission_ready": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  },
+  "excluded_non_active_part_numbers": 0,
+  "manual_intervention_required": 0,
+  "phase": "4.3H",
+  "pilot_id": "stm32f2-phase4.3h-official-st-discovery-2026-09-07",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F205RE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F205RETx",
+          "icpn": "STM32F205RET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F205RETx",
+          "icpn": "STM32F205RET6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F205RETx",
+          "icpn": "STM32F205RET7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F205RETx",
+          "icpn": "STM32F205RET7TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F205REYx",
+          "icpn": "STM32F205REY6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 5,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F205RE",
+        "evidence_section_sha256": "2211ed41febc784fc92df2b65c276c6179329cab449c6a7ec83ac8a06d45ea44",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F205RET6",
+          "STM32F205RET6TR",
+          "STM32F205RET7",
+          "STM32F205RET7TR",
+          "STM32F205REY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205re.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F205RET6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F205RET6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F205RET7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F205RET7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F205REY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3c01d9a441a57d63dabf0b87e8399265868c261d5492926cde4038492b15d8ed",
+        "retrieved_at_utc": "2026-09-07T13:55:55Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205re.html"
+      },
+      "selection_reason": "lexicographically first unadmitted Base Device after Phase 4.3G in the guarded STM32F205 OpenOCD surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205re.html",
+      "subfamily": "STM32F205"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F207IF",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F207IFHx",
+          "icpn": "STM32F207IFH6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F207IFHx",
+          "icpn": "STM32F207IFH6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F207IFTx",
+          "icpn": "STM32F207IFT6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F207IF",
+        "evidence_section_sha256": "0c934fcf9e55e224cf55d1361e247a4281b539e26e5a14dc32af2440eb0d811a",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F207IFH6",
+          "STM32F207IFH6TR",
+          "STM32F207IFT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207if.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F207IFH6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F207IFH6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F207IFT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "8712d0dbf551e890f5f11956b8877129ca3a241cd77d2499e6ca600c128df933",
+        "retrieved_at_utc": "2026-09-07T13:56:06Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207if.html"
+      },
+      "selection_reason": "lexicographically first unadmitted Base Device after Phase 4.3G in the guarded STM32F207 OpenOCD surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207if.html",
+      "subfamily": "STM32F207"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F215VE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F215VETx",
+          "icpn": "STM32F215VET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F215VE",
+        "evidence_section_sha256": "9eabdb6e1a6e9b3c39a644742e9617ccdc48f9cbf35755d21e22493f6d02384e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F215VET6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215ve.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F215VET6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "50546fabae8386379d3371a00878c18c90329f8ad55ac0ebd2d873709a7ffa9e",
+        "retrieved_at_utc": "2026-09-07T13:56:13Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215ve.html"
+      },
+      "selection_reason": "lexicographically first unadmitted Base Device after Phase 4.3G in the guarded STM32F215 OpenOCD surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215ve.html",
+      "subfamily": "STM32F215"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F217VE",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F217VETx",
+          "icpn": "STM32F217VET6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F217VETx",
+          "icpn": "STM32F217VET6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f2x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F217VE",
+        "evidence_section_sha256": "7bb35391a24589103699fbbb5fb9acd31a4e2a19313633ff6183dfbefe101702",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32F217VET6",
+          "STM32F217VET6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ve.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F217VET6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F217VET6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ea2565683a2e0a74113f66dee07bea1d50d7b49b522cdb55944b5cc98681b35a",
+        "retrieved_at_utc": "2026-09-07T13:56:23Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ve.html"
+      },
+      "selection_reason": "lexicographically first unadmitted Base Device after Phase 4.3G in the guarded STM32F217 OpenOCD surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ve.html",
+      "subfamily": "STM32F217"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "third bounded read-only official-ST STM32F2 discovery"
+}

@@ -238,3 +238,9 @@ jobs:
           python data/device-catalog/research/test_stm32f2_phase4_3f_policy.py
           python data/device-catalog/research/test_stm32f2_phase4_3g_admission.py
           PYTHONPATH=software/python python software/python/tests/test_device_catalog_phase43g.py
+
+      - name: Validate Phase 4.3H STM32F2 third bounded discovery
+        run: |
+          python data/device-catalog/research/test_stm32f2_phase4_3h_discovery.py
+          python data/device-catalog/research/validate_stm32f2_phase4_3h_retained_evidence.py
+          python data/device-catalog/research/test_stm32f2_phase4_3h_retained_evidence.py
