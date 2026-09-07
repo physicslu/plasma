@@ -8,13 +8,16 @@ HERE = Path(__file__).resolve().parent
 
 
 class KL25ApplicabilityFoundationTest(unittest.TestCase):
-    def test_applicability_remains_fail_closed(self):
+    def test_applicability_admits_only_reviewed_binding_layers(self):
         contract = json.loads((HERE / "applicability-contract.json").read_text(encoding="utf-8"))
-        self.assertTrue(contract["admission"]["applicability_candidate_evidence"])
         for key in [
+            "applicability_candidate_evidence",
             "scope_bridge",
             "evidence_unit_catalog",
             "applicability_binding",
+        ]:
+            self.assertTrue(contract["admission"][key])
+        for key in [
             "evidence_pack",
             "semantic_extraction",
             "canonical_dataset",
@@ -50,13 +53,21 @@ class KL25ApplicabilityFoundationTest(unittest.TestCase):
         contract = json.loads((HERE / "applicability-contract.json").read_text(encoding="utf-8"))
         claims = contract["candidate_claims"]
         self.assertEqual(claims["KL25_FAMILY_SCOPE"]["page_ranges"]["nxp_kl25_rm_rev3"], [[38, 44]])
-        self.assertEqual(claims["FTFA_MODULE_PRESENCE"]["page_ranges"]["nxp_kl25_rm_rev3"], [[72, 74], [419, 456]])
+        self.assertEqual(
+            claims["FTFA_MODULE_PRESENCE"]["page_ranges"]["nxp_kl25_rm_rev3"],
+            [[72, 74], [419, 456]],
+        )
         self.assertEqual(claims["MDM_AP_PRESENCE"]["page_ranges"]["nxp_kl25_rm_rev3"], [[149, 157]])
-        self.assertTrue(contract["unit_binding_policy"]["document_wide_header_hits_are_not_applicability_evidence"])
+        self.assertTrue(
+            contract["unit_binding_policy"]["document_wide_header_hits_are_not_applicability_evidence"]
+        )
 
     def test_all_reviewed_units_have_explicit_applicability_requirements(self):
-        definitions = json.loads((HERE / "reviewed-evidence-unit-definitions.json").read_text(encoding="utf-8"))
+        definitions = json.loads(
+            (HERE / "reviewed-evidence-unit-definitions.json").read_text(encoding="utf-8")
+        )
         contract = json.loads((HERE / "applicability-contract.json").read_text(encoding="utf-8"))
+        self.assertEqual(definitions["status"], "admitted_evidence_unit_catalog")
         unit_ids = {unit["unit_id"] for unit in definitions["units"]}
         self.assertEqual(unit_ids, set(contract["unit_requirements"]))
         for requirements in contract["unit_requirements"].values():
@@ -75,8 +86,14 @@ class KL25ApplicabilityFoundationTest(unittest.TestCase):
         self.assertIn("SWD_DEBUG_PRESENCE", contract["candidate_claims"])
         self.assertIn("MDM_AP_PRESENCE", contract["candidate_claims"])
         self.assertIn("FLASH_SECURITY_MODEL", contract["candidate_claims"])
-        self.assertIn("FTFA_MODULE_PRESENCE", contract["unit_requirements"]["nxp-kl25-program-longword-v0"])
-        self.assertIn("MDM_AP_PRESENCE", contract["unit_requirements"]["nxp-kl25-swd-mdm-ap-v0"])
+        self.assertIn(
+            "FTFA_MODULE_PRESENCE",
+            contract["unit_requirements"]["nxp-kl25-program-longword-v0"],
+        )
+        self.assertIn(
+            "MDM_AP_PRESENCE",
+            contract["unit_requirements"]["nxp-kl25-swd-mdm-ap-v0"],
+        )
 
 
 if __name__ == "__main__":
