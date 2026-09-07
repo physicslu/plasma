@@ -5,6 +5,9 @@ wrapper_path="$(readlink -f "${BASH_SOURCE[0]}")"
 repo_root="$(cd "$(dirname "$wrapper_path")/.." && pwd)"
 integration_backend="${PLASMACTL_INTEGRATION_BACKEND:-$repo_root/scripts/plasmactl-integration}"
 swpc_z2like_backend="${PLASMA_SWPC_Z2LIKE_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like}"
+# Compatibility marker for repository documentation/contracts. The integration
+# backend owns migration behavior; the operator entrypoint publishes its schema.
+current_config_version=6
 
 wrapper_die() {
   printf '[plasmactl] ERROR: %s\n' "$*" >&2
