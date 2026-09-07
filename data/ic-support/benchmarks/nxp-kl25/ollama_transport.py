@@ -25,6 +25,7 @@ def ollama_native_chat_transport(
     temperature = float(options.get("temperature", 0.0))
     timeout_seconds = float(options.get("timeout_seconds", 1800.0))
     seed = options.get("seed")
+    format_schema = options.get("format_schema")
 
     if not prompt:
         raise runner.SemanticTransportProtocolError("Ollama prompt must not be empty")
@@ -32,6 +33,8 @@ def ollama_native_chat_transport(
         raise runner.SemanticTransportProtocolError("Ollama model_id must not be empty")
     if num_ctx <= 0 or max_tokens <= 0 or timeout_seconds <= 0:
         raise runner.SemanticTransportProtocolError("Ollama numeric request bounds must be positive")
+    if not isinstance(format_schema, dict) or not format_schema:
+        raise runner.SemanticTransportProtocolError("Ollama structured output requires a non-empty JSON Schema object")
 
     generation_options: dict[str, Any] = {
         "num_ctx": num_ctx,
@@ -47,6 +50,7 @@ def ollama_native_chat_transport(
         "think": False,
         "truncate": False,
         "shift": False,
+        "format": format_schema,
         "options": generation_options,
     }
     request = urllib.request.Request(
