@@ -9,6 +9,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+from device_catalog_admission_framework import canonical_csv_sha256, read_csv
 
 from st_browser_acquisition import BROWSER_TRANSPORT, STBrowserAcquirer
 from st_product_page_acquisition import AcquisitionError, validate_source_url
@@ -36,11 +37,14 @@ EXPECTED_PRODUCTION_BASES = frozenset(
 
 
 def read_production_bases(path: Path) -> set[str]:
-    rows = read_catalog(path)
-    bases = {row.get("base_device", "") for row in rows}
-    if bases != EXPECTED_PRODUCTION_BASES or len(rows) != 9:
-        raise AcquisitionError("Phase 4.3E requires the guarded Phase 4.3D STM32F2 Production boundary")
-    return bases
+    fields, rows = read_csv(path)
+    historical = [row for row in rows if row.get("base_device") in EXPECTED_PRODUCTION_BASES]
+    identities = [row.get("icpn") for row in rows]
+    if len(set(identities)) != len(identities):
+        raise AcquisitionError("duplicate Production identity")
+    if canonical_csv_sha256(fields, historical) != "dab17b2892497a32e555e57c5349da4ebe6f37136d90c0cab87a4df08a8fe0c9":
+        raise AcquisitionError("Phase 4.3E historical Phase 4.3D Production boundary is unavailable")
+    return set(EXPECTED_PRODUCTION_BASES)
 
 
 def deterministic_targets(

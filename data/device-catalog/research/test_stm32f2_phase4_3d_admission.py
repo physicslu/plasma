@@ -67,15 +67,19 @@ class STM32F2Phase43DAdmissionTests(unittest.TestCase):
             reader = csv.DictReader(handle)
             self.assertEqual(tuple(reader.fieldnames or ()), CANONICAL_FIELDS)
             rows = list(reader)
-        self.assertEqual({row["icpn"] for row in rows}, EXPECTED)
-        self.assertEqual(len(rows), 9)
+        historical_rows = [row for row in rows if row["icpn"] in EXPECTED]
+        self.assertEqual({row["icpn"] for row in historical_rows}, EXPECTED)
+        self.assertEqual(len(historical_rows), 9)
+        self.assertEqual(canonical_csv_sha256(list(CANONICAL_FIELDS), historical_rows),
+                         "dab17b2892497a32e555e57c5349da4ebe6f37136d90c0cab87a4df08a8fe0c9")
         self.assertTrue(all(row["family"] == "STM32F2" for row in rows))
         self.assertTrue(all(row["openocd_target_config"] == "tcl/target/stm32f2x.cfg" for row in rows))
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         source = next(item for item in manifest["sources"] if item["family"] == "STM32F2")
-        self.assertEqual(source["row_count"], 9)
+        self.assertEqual(source["row_count"], len(rows))
         self.assertEqual(source["sha256"], file_sha256(DEFAULT_CANONICAL))
-        self.assertEqual(source["sha256"], self.audit["canonical_csv_file_sha256"])
+        self.assertEqual(self.audit["canonical_csv_file_sha256"],
+                         "935477152326adfa531b21cd1b87374e10b78c6deed19f11353a56f92f11ec26")
         self.assertEqual(self.audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
         self.assertEqual(self.audit["status"], "published")
         self.assertEqual(self.audit["lifecycle_exclusions"], [])

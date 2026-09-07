@@ -229,3 +229,12 @@ jobs:
           python data/device-catalog/research/validate_stm32f2_phase4_3b_retained_evidence.py
           python data/device-catalog/research/test_stm32f2_phase4_3d_admission.py
           PYTHONPATH=software/python python software/python/tests/test_device_catalog_phase43d.py
+
+      - name: Validate Phase 4.3E-G STM32F2 batch-2 closure
+        run: |
+          python data/device-catalog/research/test_stm32f2_phase4_3e_discovery.py
+          python data/device-catalog/research/test_stm32f2_phase4_3e_retained_evidence.py
+          python data/device-catalog/research/stm32f2_phase4_3f_policy.py
+          python data/device-catalog/research/test_stm32f2_phase4_3f_policy.py
+          python data/device-catalog/research/test_stm32f2_phase4_3g_admission.py
+          PYTHONPATH=software/python python software/python/tests/test_device_catalog_phase43g.py

@@ -47,6 +47,14 @@ SUPPORTED_BASE_DEVICES = frozenset(
     {"STM32F205RC", "STM32F207IE", "STM32F215RG", "STM32F217IG"}
 )
 PHASE_FLASH_BY_CODE = {**FLASH_BY_CODE, "G": "1024 KiB"}
+HISTORICAL_CANONICAL_ICPNS = frozenset(
+    {
+        "STM32F205RBT6", "STM32F205RBT6TR", "STM32F205RBT7",
+        "STM32F207ICH6", "STM32F207ICT6",
+        "STM32F215RET6", "STM32F215RET6TR",
+        "STM32F217IEH6", "STM32F217IET6",
+    }
+)
 
 
 def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
@@ -69,14 +77,14 @@ def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
             raise AdmissionError(f"{family}: Production source drifted")
         family_counts[family] = family_counts.get(family, 0) + len(rows)
         base_devices.update((family, row.get("base_device", "")) for row in rows)
-    if family_counts != {"STM32F1": 75, "STM32F2": 9, "STM32F4": 384}:
+    if family_counts.get("STM32F1") != 75 or family_counts.get("STM32F4") != 384:
         raise AdmissionError(f"unexpected Production family counts: {family_counts}")
-    if sum(family_counts.values()) != 468 or len(base_devices) != 161:
-        raise AdmissionError("Phase 4.3F Production snapshot drifted")
+    if family_counts.get("STM32F2", 0) < 9 or sum(family_counts.values()) < 468 or len(base_devices) < 161:
+        raise AdmissionError("Phase 4.3F historical Production boundary is unavailable")
     return {
         "exact_icpn_count": 468,
         "base_device_count": 161,
-        "family_exact_icpn_counts": family_counts,
+        "family_exact_icpn_counts": {"STM32F1": 75, "STM32F2": 9, "STM32F4": 384},
         "stm32f2_exact_icpn_count": 9,
     }
 
@@ -110,6 +118,9 @@ def build_policy_plan(
     fields, canonical_rows = read_csv(canonical_path)
     if tuple(fields) != CANONICAL_FIELDS:
         raise AdmissionError("STM32F2 canonical schema drifted")
+    historical_rows = [row for row in canonical_rows if row.get("icpn") in HISTORICAL_CANONICAL_ICPNS]
+    if len(historical_rows) != 9 or {row["icpn"] for row in historical_rows} != HISTORICAL_CANONICAL_ICPNS:
+        raise AdmissionError("Phase 4.3F historical canonical boundary is unavailable")
     evidence_id = provenance.get("evidence_id")
     if not isinstance(evidence_id, str) or not evidence_id:
         raise AdmissionError("STM32F2 retained evidence requires evidence_id")
@@ -127,7 +138,7 @@ def build_policy_plan(
     plan = build_admission_plan(
         candidate_inputs=candidate_inputs,
         canonical_fields=fields,
-        canonical_rows=canonical_rows,
+        canonical_rows=historical_rows,
         source_provenance={
             "evidence_id": evidence_id,
             "repository": provenance.get("source_repository"),
