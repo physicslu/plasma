@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PLASMACTL = REPO_ROOT / "scripts" / "plasmactl"
+PLASMACTL_INTEGRATION = REPO_ROOT / "scripts" / "plasmactl-integration"
 
 
 def test_plasmactl_generates_canonical_systemd_descriptions(tmp_path: Path) -> None:
@@ -23,7 +23,7 @@ def test_plasmactl_generates_canonical_systemd_descriptions(tmp_path: Path) -> N
     )
 
     subprocess.run(
-        ["bash", "-c", 'source "$1"; write_units', "_", str(PLASMACTL)],
+        ["bash", "-c", 'source "$1"; write_units', "_", str(PLASMACTL_INTEGRATION)],
         check=True,
         env=env,
     )
@@ -37,7 +37,9 @@ def test_plasmactl_generates_canonical_systemd_descriptions(tmp_path: Path) -> N
 
 
 def test_plasmactl_operator_text_uses_canonical_gateway_name_without_remote_default() -> None:
-    source = PLASMACTL.read_text(encoding="utf-8")
+    # Canonical integration-host operator wording is owned by the integration
+    # backend. The top-level plasmactl script only owns deployment-profile routing.
+    source = PLASMACTL_INTEGRATION.read_text(encoding="utf-8")
 
     assert '"Plasma Web REST Gateway"' in source
     assert "default Plasma Web REST Gateway" not in source

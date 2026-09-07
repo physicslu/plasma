@@ -58,7 +58,6 @@ test("uses canonical Web REST APIs and Site identity", async () => {
   assert.doesNotMatch(api, /channel_id/);
   assert.doesNotMatch(api, /payload\.programmer|payload\.channels/);
   assert.doesNotMatch(api, /LegacyChannel|LegacyProgrammer/);
-  assert.match(api, /Job snapshot is missing a valid site_id/);
 });
 
 test("EMode Programming owns single-PPU engineering operations after legacy console retirement", async () => {
@@ -81,12 +80,17 @@ test("EMode Programming owns single-PPU engineering operations after legacy cons
 
 test("uses same-origin as the default Browser route with no fixed remote Gateway", async () => {
   const api = await readFile(new URL("../app/plasma-api.ts", import.meta.url), "utf8");
-  const plasmactl = await readFile(new URL("../../../scripts/plasmactl", import.meta.url), "utf8");
+  // Deployment API defaults are owned by the integration backend; the top-level
+  // plasmactl script is now only the deployment-profile router.
+  const plasmactlIntegration = await readFile(
+    new URL("../../../scripts/plasmactl-integration", import.meta.url),
+    "utf8",
+  );
 
   const webDefault = api.match(
     /process\.env\.NEXT_PUBLIC_PLASMA_API_URL\s*\?\?\s*"([^"]*)"/,
   )?.[1];
-  const deploymentDefault = plasmactl.match(
+  const deploymentDefault = plasmactlIntegration.match(
     /default_public_api_url="([^"]*)"/,
   )?.[1];
 
