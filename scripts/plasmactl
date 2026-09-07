@@ -98,7 +98,7 @@ case "$command" in
       install_services
     fi
     ;;
-  deploy|update-and-restart)
+  deploy)
     profile="$(profile_for_optional_arg "${1:-}")" || wrapper_die "unknown deployment profile: ${1:-}"
     [[ "${1:-}" == "$profile" ]] && shift || true
     if [[ "$profile" == "swpc-z2like" ]]; then
@@ -108,6 +108,19 @@ case "$command" in
       load_integration_backend
       deploy
     fi
+    ;;
+  update-and-restart)
+    case "${1:-}" in
+      ""|integration)
+        [[ "${1:-}" == "integration" ]] && shift || true
+        (($# == 0)) || wrapper_die "update-and-restart is an integration-only alias"
+        load_integration_backend
+        deploy
+        ;;
+      *)
+        wrapper_die "update-and-restart is an integration-only alias; use 'plasmactl deploy PROFILE'"
+        ;;
+    esac
     ;;
   status)
     profile="$(profile_for_optional_arg "${1:-}")" || wrapper_die "unknown deployment profile: ${1:-}"
