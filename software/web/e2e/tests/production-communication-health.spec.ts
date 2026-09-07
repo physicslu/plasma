@@ -170,7 +170,7 @@ test("provider HTTP failure keeps PPU online, reports Programming unavailable, a
 
   await expect(communicationHealth(page)).toContainText("Gateway ONLINE · PPU ONLINE · PROGRAMMING UNAVAILABLE");
   const notice = page.getByRole("status");
-  await expect(notice).toContainText(/Programming.*unavailable/i);
+  await expect(notice).toContainText(/Programming.*(?:unavailable|不可用)/i);
   await expect(notice).not.toContainText(/Mock Provider|non-JSON|Engineering provider unavailable/i);
   expect(sessionRequests).toBe(0);
 });
