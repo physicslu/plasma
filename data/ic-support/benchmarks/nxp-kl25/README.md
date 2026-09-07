@@ -28,11 +28,27 @@ locked manufacturer bytes
   -> deterministic canonicalization / relationship derivation
 ```
 
-## Current foundation status
+## Retained source lock
 
-The source documents have been acquired on the SWPC, but their exact bytes are intentionally not guessed by repository automation. `capture_source_lock.py` must be run against the local PDF directory to generate the real SHA-256/byte-length source lock.
+The exact SWPC-downloaded PDF identities are retained in `source-lock.json`:
 
-Until that source lock and deterministic evidence units are retained, all of the following remain denied:
+```text
+nxp_kl25_ds_rev5
+sha256 e42271b7f612ac1b0812001e62bef10d217be4a61dbee5bb0a1e5c4076209a3b
+bytes  1280088
+
+nxp_kl25_rm_rev3
+sha256 7911a7d9f8192fa317960feabc9377d0fd81a9b90d31f8070cae9612cb237241
+bytes  6637765
+```
+
+The retained RM artifact was independently sanity-checked on SWPC as PDF 1.6 with 807 pages. A prior 10-byte failed download was rejected and is not part of the source lock.
+
+`capture_source_lock.py` now fails closed for implausibly small artifacts and files without a `%PDF-` header.
+
+## Current admission status
+
+Source identity is locked. Deterministic evidence-unit discovery has not yet been retained, so all of the following remain denied:
 
 - Evidence Pack admission
 - semantic extraction admission
@@ -41,9 +57,7 @@ Until that source lock and deterministic evidence units are retained, all of the
 - production admission
 - destructive security operation admission
 
-## SWPC integrity capture
-
-After this branch is available on SWPC:
+## Reproduce SWPC integrity capture
 
 ```bash
 python3 data/ic-support/benchmarks/nxp-kl25/capture_source_lock.py \
