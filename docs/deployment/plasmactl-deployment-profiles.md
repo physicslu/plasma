@@ -4,16 +4,17 @@
 
 **Current deployment control-plane contract.**
 
-`plasmactl` is the operator entry point for Plasma deployment/runtime lifecycle commands. A deployment **profile** selects a host role and its backend; it does not collapse development-host and appliance-style ownership into one implementation.
+`plasmactl` is the operator entry point for Plasma deployment/runtime lifecycle commands. A deployment **profile** selects a host role and its backend; it does not collapse development-host, Control Station, and appliance-style ownership into one implementation.
 
-Initial profiles:
+Current profiles:
 
 | Profile | Purpose | Service ownership | Release model | Hardware claim |
 |---|---|---|---|---|
 | `integration` | SWPC development/integration host | user systemd | repository/runtime environment | none |
+| `local-control-station` | Linux reference Control Station: Console/BFF + Manager | user systemd | immutable user-local release | none |
 | `swpc-z2like` | x86_64 PS-only PPU surrogate | system systemd | immutable `/opt/plasma/releases/<release-id>` | PS-surrogate software only |
 
-Future `z2-ps` / `z2-full` profiles require their own implementation and qualification. They are not aliases of `swpc-z2like`.
+Future `z2-ps` / `z2-full` profiles require their own implementation and qualification. They are not aliases of `swpc-z2like`. The shorthand `z2` remains unavailable until the full real-Z2 boundary is qualified.
 
 ## First-principles ownership
 
@@ -31,12 +32,16 @@ Therefore:
 plasmactl
 ├── integration
 │   └── scripts/plasmactl-integration
+├── local-control-station
+│   └── scripts/plasmactl-local-control-station
 └── swpc-z2like
     └── scripts/plasmactl-swpc-z2like
         └── scripts/swpc-z2like-ppu-install.sh
 ```
 
-The hardened SWPC installer remains the host-mutating implementation. `plasmactl-swpc-z2like` adds lifecycle orchestration, evidence/status checks and activation rollback; it does not duplicate the installer internals.
+The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
+
+The hardened SWPC installer remains the host-mutating implementation for the PPU-surrogate role. `plasmactl-swpc-z2like` adds lifecycle orchestration, evidence/status checks and activation rollback; it does not duplicate the installer internals.
 
 ## Backward compatibility
 
@@ -72,6 +77,78 @@ logs
 ```
 
 There is deliberately no implicit fallback from an unknown profile to `integration`.
+
+## Local Control Station operator flow
+
+The Linux reference profile is documented in detail at `docs/deployment/local-control-station.md`.
+
+### First install
+
+```bash
+./scripts/plasmactl install local-control-station \
+  --ppu-alias swpc-ppu \
+  --ppu-endpoint http://127.0.0.1:18081
+```
+
+The PPU endpoint is mandatory on first install and is deployment configuration, not Browser-owned state. HTTP and HTTPS Gateway roots are accepted; credentials, query strings, fragments and nested paths are rejected.
+
+Default local bindings:
+
+```text
+Console/BFF  127.0.0.1:18190
+Manager      127.0.0.1:18280
+```
+
+The profile is loopback-only and creates no public listener or firewall rule.
+
+It builds an immutable user-local release under:
+
+```text
+~/.local/share/plasma/local-control-station/releases/<git-sha-prefix>
+```
+
+and points:
+
+```text
+~/.local/share/plasma/local-control-station/current
+```
+
+at the active release.
+
+### Deploy a committed source revision
+
+```bash
+./scripts/plasmactl deploy local-control-station
+```
+
+Like `swpc-z2like`, this profile activates the repository's current **clean committed HEAD** and does not mutate Git history or fetch/merge source. Source acquisition and runtime activation remain separate responsibilities.
+
+Deployment updates the local Manager target, switches the immutable release, restarts only:
+
+```text
+plasma-local-manager.service
+plasma-control-station.service
+```
+
+and verifies the local Console + Manager runtime. A failed activation restores the previous release, profile configuration, Manager configuration, evidence and user units.
+
+Target PPU availability is probed but is deliberately not part of Control Station deployment qualification:
+
+```text
+Control Station readiness != PPU readiness != Programming readiness
+```
+
+### Verification
+
+```bash
+./scripts/plasmactl verify local-control-station
+```
+
+This verifies the local runtime/evidence contract, managed-mode BFF wiring, local Manager liveness and local Console health. It does not qualify PPU execution, Z2, PL, Sites, or real IC programming.
+
+### Cross-platform boundary
+
+`local-control-station` is currently the **Linux user-systemd reference deployment**. macOS and Windows are expected to package the same Control Station product/runtime contract through platform-native installation/service mechanisms rather than duplicate Programming or Manager functionality.
 
 ## SWPC Z2-like operator flow
 
@@ -224,4 +301,4 @@ The existing command remains unchanged:
 plasmactl verify fleet
 ```
 
-It validates Manager/Fleet observation. It is not a substitute for `verify swpc-z2like`, and neither is a substitute for real Z2/PL/Site/IC acceptance.
+It validates Manager/Fleet observation. It is not a substitute for `verify local-control-station` or `verify swpc-z2like`, and none of these is a substitute for real Z2/PL/Site/IC acceptance.
