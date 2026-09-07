@@ -8,6 +8,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 CONTRACT = HERE / "source-acquisition-contract.json"
+MIN_PDF_BYTES = 1024
 
 
 def sha256_file(path: Path) -> str:
@@ -16,6 +17,18 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def validate_pdf_artifact(path: Path) -> None:
+    if not path.is_file():
+        raise SystemExit(f"missing required source: {path}")
+    size = path.stat().st_size
+    if size < MIN_PDF_BYTES:
+        raise SystemExit(f"source is implausibly small for a PDF ({size} bytes): {path}")
+    with path.open("rb") as f:
+        header = f.read(5)
+    if header != b"%PDF-":
+        raise SystemExit(f"source does not have a PDF header: {path}")
 
 
 def main() -> int:
@@ -28,8 +41,7 @@ def main() -> int:
     locked_sources = []
     for source in contract["sources"]:
         path = args.source_dir / source["local_filename"]
-        if not path.is_file():
-            raise SystemExit(f"missing required source: {path}")
+        validate_pdf_artifact(path)
         locked_sources.append({
             "source_id": source["source_id"],
             "authority": source["authority"],
@@ -37,7 +49,7 @@ def main() -> int:
             "document_number": source["document_number"],
             "revision": source["revision"],
             "requested_url": source["official_url"],
-            "final_url": source["official_url"],
+            "final_url": source.get("final_url", source["official_url"]),
             "local_filename": source["local_filename"],
             "integrity": {
                 "algorithm": "sha256",
