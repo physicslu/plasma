@@ -21,6 +21,7 @@ def test_public_preview_host_is_allowed_without_restoring_direct_gateway_ownersh
     direct_gateway_ownership_paths = (
         "packaging/windows/run-console.ps1",
         "scripts/plasmactl",
+        "scripts/plasmactl-integration",
         "software/web/app/layout.tsx",
         "software/web/app/plasma-api.ts",
         "software/web/next.config.ts",
@@ -48,7 +49,7 @@ def test_web_default_and_storage_migration_are_same_origin_owned() -> None:
 
 def test_swpc_local_gateway_and_mock_path_remain_available_behind_same_origin() -> None:
     vite = _source("software/web/vite.config.ts")
-    deployment = _source("scripts/plasmactl")
+    deployment = _source("scripts/plasmactl-integration")
     assert 'process.env.PLASMA_GATEWAY_PROXY_URL ?? "http://127.0.0.1:18080"' in vite
     assert "target: localGatewayProxyTarget" in vite
     assert 'engineering_mock_args=" --engineering-mock --engineering-mock-root $engineering_mock_root"' in deployment
