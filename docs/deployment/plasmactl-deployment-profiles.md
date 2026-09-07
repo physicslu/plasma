@@ -36,7 +36,7 @@ plasmactl
         └── scripts/swpc-z2like-ppu-install.sh
 ```
 
-The hardened SWPC installer remains the host-mutating implementation. `plasmactl-swpc-z2like` adds lifecycle orchestration, evidence/status checks and upgrade rollback; it does not duplicate the installer internals.
+The hardened SWPC installer remains the host-mutating implementation. `plasmactl-swpc-z2like` adds lifecycle orchestration, evidence/status checks and activation rollback; it does not duplicate the installer internals.
 
 ## Backward compatibility
 
@@ -84,11 +84,11 @@ sudo ./scripts/plasmactl install swpc-z2like
 Defaults:
 
 ```text
-PPU ID            swpc-z2like-01
-Facility          lab
+PPU ID             swpc-z2like-01
+Facility           lab
 Restricted ingress 127.0.0.1:18081
-Plasma Python     reuse qualified evidence, or auto-select exactly one
-                  /opt/plasma/python/*/bin/python3
+Plasma Python      reuse qualified evidence, or auto-select exactly one
+                   /opt/plasma/python/*/bin/python3
 ```
 
 Operator overrides are explicit:
@@ -103,6 +103,10 @@ sudo ./scripts/plasmactl install swpc-z2like \
 
 If zero or multiple Plasma-owned Python runtimes are available and no already-qualified evidence resolves the interpreter, installation fails closed rather than guessing.
 
+A first install is accepted only when no prior SWPC Z2-like install evidence or appliance-owned `/opt/plasma/current`, `/etc/plasma/ppu.yaml`, system units, or restricted Nginx configuration already exists. This prevents a missing evidence file from being interpreted as permission to overwrite an unknown installation.
+
+If first-install activation fails after that clean boundary is proven, the profile stops/removes only artifacts created inside that prechecked boundary and removes the unqualified target release. Persistent state/log directories are not treated as qualification evidence and are not used to claim installation success.
+
 ### Deploy an updated committed source revision
 
 ```bash
@@ -113,15 +117,23 @@ Unlike `deploy integration`, the privileged SWPC profile does **not** fetch or m
 
 This prevents a root deployment process from silently acquiring Git credentials or changing repository history.
 
+Before any mutation, deployment requires the install evidence, `/opt/plasma/current`, PPU configuration, system units, and restricted Nginx ownership to agree. An evidence/current-release mismatch fails closed.
+
 Deployment behavior:
 
 ```text
 validate existing Plasma-owned installation
         |
         v
+prove evidence <-> /opt/plasma/current ownership consistency
+        |
+        v
 compare current Git SHA with install evidence
         |
         +-- same SHA -> verify only / idempotent no-op
+        |
+        v
+remove only an inactive, unqualified target from a prior failed retry
         |
         v
 snapshot active symlink + owned config/unit/evidence
@@ -140,12 +152,13 @@ verify readiness + restricted boundary + local PS loopback
         |
         +-- PASS -> keep new activation
         |
-        +-- FAIL -> restore previous activation/config/evidence and restart it
+        +-- FAIL -> restore previous activation/config/evidence,
+                    remove unqualified target release, restart old activation
 ```
 
 The backend never implicitly stops integration-host **user** systemd services. Port/service ownership conflicts remain fail-closed; the operator must resolve a conflicting integration runtime explicitly.
 
-A failed deployment may leave an unreferenced immutable release directory for forensic inspection. The active `/opt/plasma/current` and install evidence are rolled back to the previous qualified activation when rollback succeeds.
+A failed upgrade is designed to leave the previous qualified release active and to remove the failed target release after rollback, so retrying the same clean committed SHA does not collide with an unqualified immutable-release directory. If rollback itself is incomplete, the command returns a critical failure and does not claim qualification.
 
 ## Verification
 
@@ -156,7 +169,8 @@ A failed deployment may leave an unreferenced immutable release directory for fo
 This is a local, read-only qualification check of the already installed surrogate. It verifies:
 
 - install evidence contract;
-- Plasma-owned immutable activation and system units;
+- install evidence and active immutable release identity agree;
+- Plasma-owned PPU configuration, system units and restricted Nginx ownership;
 - `plasma-server.service` and `plasma-web.service` active;
 - direct local Gateway readiness on `127.0.0.1:18080`;
 - restricted ingress readiness on `127.0.0.1:18081`;
