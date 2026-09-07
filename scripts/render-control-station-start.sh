@@ -62,15 +62,18 @@ trap 'exit 0' INT TERM
 
 mkdir -p "${state_root}"
 manager_config="${state_root}/manager.yaml"
-registry_state="${state_root}/manager-ppu-registry.json"
 observation_db="${state_root}/manager-observations.sqlite3"
 
-python - "${manager_config}" "${manager_port}" "${observation_db}" "${registry_state}" "${ppu_alias}" "${ppu_endpoint}" <<'PY'
+# The public lab registry is deliberately immutable. Omitting
+# manager.registry_state_path keeps add/remove/lifecycle mutation disabled and
+# prevents an unauthenticated public Console/BFF caller from turning the fixed
+# SWPC lab target into an arbitrary Manager-side HTTP(S) request target.
+python - "${manager_config}" "${manager_port}" "${observation_db}" "${ppu_alias}" "${ppu_endpoint}" <<'PY'
 import sys
 from pathlib import Path
 import yaml
 
-path, port, observation_db, registry_state, alias, endpoint = sys.argv[1:]
+path, port, observation_db, alias, endpoint = sys.argv[1:]
 payload = {
     "manager": {
         "host": "127.0.0.1",
@@ -78,14 +81,13 @@ payload = {
         "request_timeout_s": 10.0,
         "poll_interval_s": 2.0,
         "observation_db_path": observation_db,
-        "registry_state_path": registry_state,
     },
     "ppus": [{"alias": alias, "endpoint": endpoint}],
 }
 Path(path).write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 PY
 
-printf '[render-control-station] Starting Plasma Manager on 127.0.0.1:%s for %s -> %s\n' \
+printf '[render-control-station] Starting immutable-registry Plasma Manager on 127.0.0.1:%s for %s -> %s\n' \
   "${manager_port}" "${ppu_alias}" "${ppu_endpoint}"
 python -m plasma_manager.server --config "${manager_config}" &
 manager_pid=$!
