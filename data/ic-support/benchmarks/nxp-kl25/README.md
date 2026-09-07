@@ -29,11 +29,12 @@ locked manufacturer bytes
   -> deterministic per-unit Applicability Binding
   -> deterministic Evidence Pack / TargetEvidenceBundle   [ADMITTED]
   -> pre-AI input manifest / model-context assembly       [ADMITTED]
+  -> model-free semantic runner / Ollama transport CI     [ADMITTED]
   -> AI manufacturer-near semantic extraction             [not admitted]
   -> deterministic canonicalization                       [not admitted]
 ```
 
-AI does not own exact commercial identity, manufacturer-document membership, target applicability, applicability exclusions, Evidence Unit dependency closure, or deterministic pack membership.
+AI does not own exact commercial identity, manufacturer-document membership, target applicability, applicability exclusions, Evidence Unit dependency closure, deterministic pack membership, or admission state.
 
 ## Current retained source lock
 
@@ -144,7 +145,7 @@ The retained artifact did not contain manufacturer text and did not execute sema
 
 ## Pre-AI CI strategy
 
-Normal repository CI is intentionally **model-free and network-free** for this stage. It uses synthetic page fixtures to test every deterministic and orchestration path that can be proven without real model inference:
+Normal repository CI is intentionally **model-free and network-free** for deterministic evidence preparation. It uses synthetic page fixtures to test every deterministic path that can be proven without real model inference:
 
 ```text
 contract validation
@@ -158,14 +159,64 @@ contract validation
   -> model-context assembly
   -> retained-provenance validation
   -> fail-closed mutation tests
-  -> STOP before model inference
 ```
-
-The permanent CI therefore does not require Ollama, oMLX, model weights, an API key, NXP website availability, or semantic inference.
 
 The one-shot live-source workflow used during Gate 3 is removed after retaining the proof so routine CI is not coupled to external website availability.
 
-When a real KL25 model runner is introduced in the next gate, its transport/orchestration behavior should also be covered by deterministic mocked CI (success, timeout, malformed JSON, schema rejection and runner errors). Actual model-weight inference and semantic-quality scoring remain separate live/model benchmarks.
+## Gate 4 model-free semantic runner CI
+
+Gate 4 admits the **runner/transport test boundary**, not semantic extraction itself. `semantic-extraction-contract.json` defines a manufacturer-near output protocol for exact target `MKL25Z128VLK4`.
+
+The model-facing contract requires exactly one result for each of the eight primary Evidence Units. Each result is explicitly either:
+
+```text
+FACTS   -> one or more manufacturer-near facts with exact evidence citations
+UNKNOWN -> empty facts list; no inference from missing evidence
+```
+
+Allowed fact kinds are intentionally bounded to:
+
+- `REGISTER`
+- `REGISTER_FIELD`
+- `COMMAND`
+- `SEQUENCE_STEP`
+- `STATUS`
+- `INTERFACE`
+- `SECURITY_RULE`
+- `CONSTRAINT`
+
+Every fact citation must resolve to an exact `(source_id, physical PDF page)` already present in that primary Evidence Pack. Missing units, duplicate units, unknown fact kinds, malformed JSON, unsupported fields, and out-of-pack citations fail closed. This validator does not try to decide whether a natural-language statement is technically correct; semantic correctness remains a model-quality/review problem.
+
+`semantic_runner.py` validates the pre-AI manifest before invoking any transport, assembles the manufacturer-only context, records prompt/provenance identity, and normalizes failures without emitting partial admitted semantics. CI covers success, explicit `UNKNOWN`, pre-AI tampering, timeout, connection failure, protocol failure, malformed model output, schema failure, unsupported facts, citation failure, and unexpected runner exceptions.
+
+`ollama_transport.py` is the real native `/api/chat` transport used by the supported local-AI topology. Repository CI tests its request payload and error handling with patched local I/O only: no external network, model weights, credentials, or API key are required.
+
+`run_ollama_semantic.py` wires the actual Gate 3 workspace shape to the semantic runner and Ollama adapter:
+
+```text
+packs/ + evidence/ + target-bundle.json + pre-ai-input.json
+  -> workspace self/provenance validation
+  -> semantic runner
+  -> Ollama native adapter
+  -> strict semantic output validation
+  -> semantic-run.json + raw-response.txt
+```
+
+This executable path is tested end-to-end with synthetic manufacturer evidence and a fake Ollama response. Workspace tampering and unexpected pack files are rejected before HTTP is invoked. Invalid model output may be retained locally for diagnosis but remains rejected by the semantic contract.
+
+Gate 4 admission is therefore:
+
+```text
+mock_runner_ci                  = true
+semantic_extraction             = false
+model_quality                   = false
+canonical_dataset               = false
+hil                             = false
+production                      = false
+destructive_security_operation  = false
+```
+
+The intended live model remains `qwen3.8:27b-mlx`, but Gate 4 does not execute model weights and makes no semantic-quality claim.
 
 ## Gate 3 fail-closed requirements
 
@@ -195,14 +246,18 @@ Admitted for this benchmark evidence pipeline:
 - deterministic Applicability Binding;
 - deterministic Evidence Pack;
 - exact-target `TargetEvidenceBundle`;
-- pre-AI CI through deterministic model-context assembly.
+- pre-AI CI through deterministic model-context assembly;
+- model-free semantic runner contract and fail-closed orchestration CI;
+- real Ollama transport code under mocked/patched CI;
+- executable Gate 3 workspace-to-run-artifact wiring under mocked CI.
 
 The following remain explicitly denied:
 
-- semantic extraction admission;
+- real semantic extraction admission;
+- model semantic-quality admission;
 - canonical dataset admission;
 - HIL admission;
 - production admission;
 - destructive security operation admission.
 
-Evidence Pack / pre-AI admission proves deterministic evidence packaging and pre-inference input integrity. It does **not** prove that any LLM extracts the correct semantics, that OpenOCD can program the device, or that hardware erase/program/security operations are safe.
+Gate 4 proves that the non-model execution path is deterministic, bounded, and fail-closed under the tested conditions. It does **not** prove that `qwen3.8:27b-mlx` extracts correct KL25 semantics, that OpenOCD can program the device, or that hardware erase/program/security operations are safe.

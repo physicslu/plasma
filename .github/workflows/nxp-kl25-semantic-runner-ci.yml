@@ -1,0 +1,46 @@
+name: NXP KL25 semantic runner CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "data/ic-support/benchmarks/nxp-kl25/**"
+      - ".github/workflows/nxp-kl25-semantic-runner-ci.yml"
+  pull_request:
+    paths:
+      - "data/ic-support/benchmarks/nxp-kl25/**"
+      - ".github/workflows/nxp-kl25-semantic-runner-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-mock-semantic-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Gate 4 semantic runner modules
+        run: |
+          python -m py_compile \
+            data/ic-support/benchmarks/nxp-kl25/semantic_extraction.py \
+            data/ic-support/benchmarks/nxp-kl25/semantic_runner.py \
+            data/ic-support/benchmarks/nxp-kl25/ollama_transport.py \
+            data/ic-support/benchmarks/nxp-kl25/run_ollama_semantic.py
+      - name: Revalidate pre-AI boundary
+        run: python data/ic-support/benchmarks/nxp-kl25/test_pre_ai_ci.py
+      - name: Validate semantic runner failure matrix
+        run: python data/ic-support/benchmarks/nxp-kl25/test_semantic_runner.py
+      - name: Validate real Ollama transport code without model weights
+        run: python data/ic-support/benchmarks/nxp-kl25/test_ollama_transport.py
+      - name: Validate Gate 3 workspace through executable Ollama semantic path
+        run: python data/ic-support/benchmarks/nxp-kl25/test_ollama_semantic_run.py

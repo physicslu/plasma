@@ -1,0 +1,56 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "kl25_semantic_extraction_contract",
+  "contract_id": "nxp-kl25-semantic-extraction-v0",
+  "target": "MKL25Z128VLK4",
+  "input": {
+    "artifact_type": "pre_ai_input_manifest",
+    "require_pre_ai_manifest_validation_before_transport": true,
+    "require_all_bound_primary_evidence_units": true,
+    "manufacturer_evidence_only": true,
+    "canonical_ground_truth_allowed": false,
+    "production_profile_allowed": false
+  },
+  "output": {
+    "one_result_per_primary_evidence_unit": true,
+    "allowed_states": [
+      "FACTS",
+      "UNKNOWN"
+    ],
+    "unknown_requires_empty_facts": true,
+    "facts_require_evidence": true,
+    "evidence_must_resolve_within_primary_pack": true,
+    "allowed_fact_kinds": [
+      "REGISTER",
+      "REGISTER_FIELD",
+      "COMMAND",
+      "SEQUENCE_STEP",
+      "STATUS",
+      "INTERFACE",
+      "SECURITY_RULE",
+      "CONSTRAINT"
+    ],
+    "ai_may_emit_commercial_identity_equivalence": false,
+    "ai_may_emit_applicability_binding": false,
+    "ai_may_emit_cross_target_relationships": false,
+    "ai_may_emit_canonical_relationships": false,
+    "ai_may_admit_destructive_security_operations": false
+  },
+  "runner": {
+    "transport_is_injected": true,
+    "repository_ci_uses_mock_transport": true,
+    "repository_ci_requires_external_network": false,
+    "repository_ci_requires_model_weights": false,
+    "repository_ci_requires_api_key": false,
+    "error_classes_are_fail_closed": true
+  },
+  "admission": {
+    "mock_runner_ci": true,
+    "semantic_extraction": false,
+    "model_quality": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}
