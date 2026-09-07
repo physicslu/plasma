@@ -1,0 +1,96 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "kl25_live_model_qualification_contract",
+  "contract_id": "nxp-kl25-live-model-qualification-v0",
+  "target": "MKL25Z128VLK4",
+  "required_input": {
+    "bundle_digest": "628aa2c7664cdf9778a11e56a8da0a9cf8816aaec704baf893bfae5a9fba0244",
+    "pre_ai_manifest_digest": "b26621b12d5b6f6fc924cbf59f00649767b3b2f9900fd7c5c560ee45cca80e07",
+    "semantic_contract_id": "nxp-kl25-semantic-extraction-v0"
+  },
+  "live_runtime": {
+    "transport": "ollama_native_chat",
+    "model_id": "qwen3.8:27b-mlx",
+    "runtime_label": "kl25-live-model-qualification",
+    "loopback_only": true,
+    "require_ollama_version": true,
+    "require_model_digest": true,
+    "allowed_done_reasons": [
+      "stop"
+    ],
+    "generation": {
+      "num_ctx": 32768,
+      "max_tokens": 4096,
+      "temperature": 0.0,
+      "seed": 0,
+      "timeout_seconds": 1800.0
+    }
+  },
+  "semantic_screening": {
+    "require_facts_state_for_all_units": true,
+    "minimum_facts_per_unit": 1,
+    "require_primary_unit_page_citation": true,
+    "forbidden_terms": [
+      "STM32",
+      "FLASH_CR",
+      "FLASH_KEYR",
+      "KEYR",
+      "OPTWRE",
+      "WRPRTERR"
+    ],
+    "required_term_groups": {
+      "nxp-kl25-ftfa-register-model-v0": [
+        ["FTFA"],
+        ["FSTAT"],
+        ["FCCOB"]
+      ],
+      "nxp-kl25-ftfa-command-sequencing-v0": [
+        ["FCCOB"],
+        ["CCIF"],
+        ["ACCERR", "FPVIOL"]
+      ],
+      "nxp-kl25-program-longword-v0": [
+        ["Program Longword"],
+        ["FCCOB"]
+      ],
+      "nxp-kl25-erase-sector-v0": [
+        ["Erase Flash Sector", "Erase Sector"]
+      ],
+      "nxp-kl25-erase-all-blocks-v0": [
+        ["Erase All Blocks"],
+        ["protect", "protection"]
+      ],
+      "nxp-kl25-flash-security-v0": [
+        ["FSEC"],
+        ["SEC", "MEEN", "KEYEN"]
+      ],
+      "nxp-kl25-debug-security-interaction-v0": [
+        ["SWD"],
+        ["secure", "security"],
+        ["mass erase"]
+      ],
+      "nxp-kl25-swd-mdm-ap-v0": [
+        ["SWD"],
+        ["MDM-AP", "MDM AP"],
+        ["mass erase", "status"]
+      ]
+    }
+  },
+  "review": {
+    "review_basis": "manufacturer_evidence",
+    "require_exact_unit_verdicts": true,
+    "allowed_unit_verdicts": ["PASS", "FAIL"],
+    "reviewed_verdict_required_for_qualification": true,
+    "screening_pass_is_not_semantic_correctness": true
+  },
+  "admission": {
+    "live_model_qualification_harness": true,
+    "live_model_run_retained": false,
+    "semantic_extraction": false,
+    "model_quality": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}
