@@ -24,6 +24,17 @@ class KL25DiscoveryContractTest(unittest.TestCase):
         for term in ["FTFA", "FCCOB", "Program Longword", "Erase Flash Sector", "FSTAT", "FSEC", "MDM-AP"]:
             self.assertIn(term, joined)
 
+    def test_device_identity_rejects_generic_family_headers(self):
+        contract = json.loads((HERE / "discovery-contract.json").read_text(encoding="utf-8"))
+        identity_terms = contract["categories"]["DEVICE_IDENTITY"]
+        policy = contract["category_policies"]["DEVICE_IDENTITY"]
+        self.assertIn("MKL25Z128VLK4", identity_terms)
+        self.assertIn("MKL25Z128", identity_terms)
+        for generic in ["Kinetis KL25", "KL25 Sub-Family"]:
+            self.assertNotIn(generic, identity_terms)
+            self.assertIn(generic, policy["forbidden_generic_family_headers"])
+        self.assertTrue(contract["cross_vendor_guards"]["generic_family_header_is_not_device_identity_evidence"])
+
     def test_stm32_register_model_is_only_a_forbidden_assumption(self):
         contract = json.loads((HERE / "discovery-contract.json").read_text(encoding="utf-8"))
         forbidden = contract["cross_vendor_guards"]["forbidden_stm32_assumptions"]
