@@ -40,7 +40,21 @@ def test_swpc_surrogate_requires_clean_source_and_isolated_final_python() -> Non
     assert "repository must be clean for qualification staging" in text
     assert 'sys.version_info < (3, 11)' in text
     assert 'sys.version_info.releaselevel != "final"' in text
+    assert "sys.prefix == sys.base_prefix" in text
+    assert "base or externally-managed interpreters are not accepted" in text
+    assert "PyYAML>=6.0 pre-provisioned" in text
+    assert "-m pip install" not in text
     assert "--plasma-python must be Plasma-owned under /opt/plasma/python/<version>/bin/python3" in text
+
+
+def test_swpc_surrogate_retries_readiness_before_failing_install() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert 'deadline = time.monotonic() + 10.0' in text
+    assert 'timeout=min(1.0, max(0.1, remaining))' in text
+    assert 'time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))' in text
+    assert 'PPU readiness failed after 10s' in text
+    assert '"$plasma_python" - <<\'PY\'' in text
+    assert "python3 - <<'PY'" not in text
 
 
 def test_swpc_surrogate_fails_closed_on_existing_runtime_ports() -> None:

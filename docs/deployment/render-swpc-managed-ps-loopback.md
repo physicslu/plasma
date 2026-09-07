@@ -108,27 +108,46 @@ git fetch origin main
 
 For qualification, use a clean checkout at the intended exact source SHA.
 
-The SWPC Plasma interpreter must already exist under the product-owned path, for example:
+The SWPC Plasma interpreter must already exist under the product-owned path as an isolated virtual environment, for example:
 
 ```text
-/opt/plasma/python/3.11.16/bin/python3
+/opt/plasma/python/3.12.13/bin/python3
 ```
 
-Do not silently substitute `/usr/bin/python3` or the repository development venv as the deployed service interpreter.
+Do not pass `/usr/bin/python3`, a raw uv-managed base interpreter, a PEP 668 externally-managed interpreter, or the repository development venv. The installer deliberately does not mutate the deployed interpreter with `pip install`; dependencies must be pre-provisioned before installation.
+
+One supported preparation flow is:
+
+```bash
+sudo mkdir -p /opt/plasma/python
+sudo uv python install 3.12 --install-dir /opt/plasma/python
+sudo uv venv \
+  --python /opt/plasma/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3 \
+  /opt/plasma/python/3.12.13
+sudo uv pip install \
+  --python /opt/plasma/python/3.12.13/bin/python3 \
+  'PyYAML>=6.0'
+```
+
+Use the actual installed CPython path/version rather than assuming `3.12.13` on another host.
 
 Verify:
 
 ```bash
 /opt/plasma/python/<version>/bin/python3 --version
 /opt/plasma/python/<version>/bin/python3 - <<'PY'
-import platform, sys
+import platform, sys, yaml
 print(sys.version)
 print(sys.version_info.releaselevel)
 print(platform.machine())
+print(sys.prefix)
+print(sys.base_prefix)
+print(yaml.__version__)
+assert sys.prefix != sys.base_prefix
 PY
 ```
 
-The interpreter must be a final Python >= 3.11. The expected SWPC machine architecture is x86_64; that result is recorded as a surrogate difference rather than rewritten as ARMv7.
+The interpreter must be a final Python >= 3.11, must be an isolated virtual environment, and must already provide PyYAML >= 6.0. The expected SWPC machine architecture is x86_64; that result is recorded as a surrogate difference rather than rewritten as ARMv7.
 
 ## 5. Install the SWPC Z2-like PS-only surrogate
 
@@ -141,7 +160,7 @@ sudo bash scripts/swpc-z2like-ppu-install.sh \
   --facility-id lab
 ```
 
-The installer refuses a dirty Git source tree, builds/validates the source-tree-independent PPU runtime, creates an immutable release directory, installs PS-only configuration and systemd services, activates `/opt/plasma/current`, verifies local Gateway readiness, and writes:
+The installer refuses a dirty Git source tree, rejects a base/externally-managed interpreter, verifies the pre-provisioned runtime dependencies, builds/validates the source-tree-independent PPU runtime, creates an immutable release directory, installs PS-only configuration and systemd services, activates `/opt/plasma/current`, waits up to 10 seconds for local Gateway readiness with bounded retries, and writes:
 
 ```text
 /opt/plasma/install/last-swpc-z2like-install.json
