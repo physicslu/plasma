@@ -49,6 +49,27 @@ class KL25DiscoveryContractTest(unittest.TestCase):
         self.assertEqual(contract["preprocessing"]["arguments"], ["-layout", "-enc", "UTF-8"])
         self.assertEqual(contract["preprocessing"]["page_boundary"], "form_feed")
 
+    def test_reviewed_candidate_boundary_is_still_fail_closed(self):
+        boundary = json.loads((HERE / "reviewed-candidate-boundary.json").read_text(encoding="utf-8"))
+        self.assertEqual(boundary["status"], "reviewed_candidate_boundary_not_evidence_pack")
+        roles = {item["role"]: item for item in boundary["boundaries"]}
+        self.assertEqual(roles["flash_programming_core_candidate"]["pdf_pages"], [419, 456])
+        self.assertEqual(roles["debug_security_recovery_candidate"]["pdf_pages"], [149, 157])
+        self.assertEqual(
+            boundary["exclusion_policy"]["isolated_rm_keyword_hits_outside_reviewed_clusters"],
+            "DO_NOT_ADMIT_BY_KEYWORD_ALONE",
+        )
+        for key in [
+            "evidence_unit_catalog_admission",
+            "evidence_pack_admission",
+            "semantic_extraction_admission",
+            "canonical_dataset_admission",
+            "hil_admission",
+            "production_admission",
+            "destructive_security_operation_admission",
+        ]:
+            self.assertFalse(boundary["trust_boundary"][key])
+
 
 if __name__ == "__main__":
     unittest.main()
