@@ -22,7 +22,8 @@ usage() {
 Usage: bash scripts/ic-support-kl25-live.sh <command> [argument]
 
 Commands:
-  status               Validate the SWPC pre-AI workspace and loopback Ollama/model identity.
+  status               Validate pre-AI, frozen runtime envelope, and loopback Ollama/model identity.
+  context-audit        Measure deterministic cross-pack context compaction without model inference.
   build                Rebuild the deterministic Gate-3 pre-AI workspace from locked PDFs.
   run                  Execute one new frozen live qualification run in a unique run directory.
   diagnose [run-dir]   Diagnose one retained run without modifying its raw response.
@@ -66,6 +67,23 @@ from pathlib import Path
 
 value = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 print(value["live_runtime"]["model_id"])
+PY
+}
+
+print_contract_runtime() {
+  python3 - "$bench_dir/live-model-qualification-contract.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+value = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+runtime = value["live_runtime"]
+generation = runtime["generation"]
+context = runtime["context_protocol"]
+print(f"[kl25-live] qualification_contract: {value['contract_id']}")
+print(f"[kl25-live] context_strategy: {context['strategy']}")
+print(f"[kl25-live] num_ctx: {generation['num_ctx']}")
+print(f"[kl25-live] max_tokens: {generation['max_tokens']}")
 PY
 }
 
@@ -144,7 +162,15 @@ run_status() {
   validate_loopback_url
   [[ -d "$pre_ai_dir" ]] || fail "pre-AI workspace missing: $pre_ai_dir"
   validate_pre_ai_workspace
+  print_contract_runtime
   validate_ollama_identity
+}
+
+run_context_audit() {
+  require_command python3
+  [[ -d "$pre_ai_dir" ]] || fail "pre-AI workspace missing: $pre_ai_dir"
+  validate_pre_ai_workspace
+  python3 "$bench_dir/audit_semantic_context.py" --input-dir "$pre_ai_dir"
 }
 
 run_build() {
@@ -288,11 +314,27 @@ if semantic_run_path.is_file():
     print("semantic_error_class =", error.get("class"))
     print("semantic_error_type =", error.get("type"))
     print("semantic_error_message =", error.get("message"))
+    context = run.get("context") if isinstance(run.get("context"), dict) else {}
+    print("context_strategy =", context.get("strategy"))
+    print("context_page_occurrences =", context.get("page_occurrences"))
+    print("context_unique_physical_pages =", context.get("unique_physical_pages"))
+    print("context_duplicates_removed =", context.get("duplicate_occurrences_removed"))
+    print("context_bytes =", context.get("context_bytes"))
+    print("legacy_context_bytes =", context.get("legacy_context_bytes"))
+    print("prompt_bytes =", run.get("prompt", {}).get("byte_length"))
     metadata = run.get("transport_metadata") if isinstance(run.get("transport_metadata"), dict) else {}
     print("provider_model =", metadata.get("response_model"))
     print("provider_done =", metadata.get("done"))
     print("provider_done_reason =", metadata.get("done_reason"))
     print("provider_usage =", metadata.get("usage"))
+
+provenance_path = run_dir / "live-run-provenance.json"
+if provenance_path.is_file():
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    execution = provenance.get("execution") if isinstance(provenance.get("execution"), dict) else {}
+    generation = execution.get("generation") if isinstance(execution.get("generation"), dict) else {}
+    print("requested_num_ctx =", generation.get("num_ctx"))
+    print("requested_max_tokens =", generation.get("max_tokens"))
 
 if first_text is not None and pre_ai_dir.is_dir():
     sys.path.insert(0, str(bench_dir))
@@ -323,6 +365,9 @@ main() {
   case "$command" in
     status)
       run_status
+      ;;
+    context-audit)
+      run_context_audit
       ;;
     build)
       run_build
