@@ -1,0 +1,67 @@
+{
+  "schema_version": "0.1.0",
+  "boundary_id": "nxp-kl25-reviewed-candidate-boundary-v0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "target": "MKL25Z128VLK4",
+  "status": "reviewed_candidate_boundary_not_evidence_pack",
+  "boundaries": [
+    {
+      "source_id": "nxp_kl25_rm_rev3",
+      "role": "flash_programming_core_candidate",
+      "pdf_pages": [419, 456],
+      "rationale": "Dense contiguous concentration of FTFA/FCCOB command-engine, FSTAT status, program/erase commands, flash configuration and security terms.",
+      "candidate_categories": [
+        "FLASH_COMMAND_ENGINE",
+        "PROGRAMMING_SEQUENCE",
+        "COMMAND_STATUS",
+        "MEMORY_GEOMETRY",
+        "CONFIGURATION",
+        "SECURITY"
+      ],
+      "disposition": "MUST_REVIEW_FOR_EVIDENCE_UNITS"
+    },
+    {
+      "source_id": "nxp_kl25_rm_rev3",
+      "role": "debug_security_recovery_candidate",
+      "pdf_pages": [149, 157],
+      "rationale": "Dense contiguous concentration of SWD/debug-port/MDM-AP plus security-state and mass-erase terms.",
+      "candidate_categories": [
+        "DEBUG_PROGRAMMING_INTERFACE",
+        "SECURITY",
+        "PROGRAMMING_SEQUENCE"
+      ],
+      "disposition": "MUST_REVIEW_FOR_EVIDENCE_UNITS"
+    },
+    {
+      "source_id": "nxp_kl25_ds_rev5",
+      "role": "datasheet_programming_context_candidates",
+      "pdf_pages": [1, 52],
+      "rationale": "Datasheet candidate hits cover target identity, ordering/package context, memory geometry, SWD, FTFA/FOPT and summarized program/erase capability; page-level inclusion must still be reviewed individually.",
+      "candidate_categories": [
+        "DEVICE_IDENTITY",
+        "ORDERING",
+        "MEMORY_GEOMETRY",
+        "DEBUG_PROGRAMMING_INTERFACE",
+        "FLASH_COMMAND_ENGINE",
+        "PROGRAMMING_SEQUENCE",
+        "CONFIGURATION"
+      ],
+      "disposition": "REVIEW_INDIVIDUAL_CANDIDATE_PAGES"
+    }
+  ],
+  "exclusion_policy": {
+    "isolated_rm_keyword_hits_outside_reviewed_clusters": "DO_NOT_ADMIT_BY_KEYWORD_ALONE",
+    "table_of_contents_overview_cross_reference_hits": "DO_NOT_ADMIT_BY_KEYWORD_ALONE",
+    "generic_family_header_hits": "EXCLUDE_AS_IDENTITY_EVIDENCE"
+  },
+  "trust_boundary": {
+    "reviewed_candidate_boundary_complete": true,
+    "evidence_unit_catalog_admission": false,
+    "evidence_pack_admission": false,
+    "semantic_extraction_admission": false,
+    "canonical_dataset_admission": false,
+    "hil_admission": false,
+    "production_admission": false,
+    "destructive_security_operation_admission": false
+  }
+}
