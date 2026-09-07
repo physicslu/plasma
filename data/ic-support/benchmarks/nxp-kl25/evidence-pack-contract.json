@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "kl25_evidence_pack_contract",
+  "contract_id": "nxp-kl25-evidence-pack-v0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "definition_set_id": "nxp-kl25-reviewed-evidence-unit-definitions-v0",
+  "binding_id": "nxp-kl25-applicability-binding-v0",
+  "target": "MKL25Z128VLK4",
+  "pack_model": {
+    "one_primary_unit_per_pack": true,
+    "dependency_closure": "TRANSITIVE_DETERMINISTIC",
+    "page_materialization": "PHYSICAL_PDF_PAGE_ONE_BASED",
+    "deduplicate_pages_within_pack": true,
+    "manufacturer_text_committed_to_git": false,
+    "scope_bridge_must_be_bound": true,
+    "applicability_exclusions_must_be_reviewed": true,
+    "all_unit_bindings_must_be_bound": true
+  },
+  "unit_dependencies": {
+    "nxp-kl25-ftfa-register-model-v0": [],
+    "nxp-kl25-ftfa-command-sequencing-v0": [
+      "nxp-kl25-ftfa-register-model-v0"
+    ],
+    "nxp-kl25-program-longword-v0": [
+      "nxp-kl25-ftfa-command-sequencing-v0"
+    ],
+    "nxp-kl25-erase-sector-v0": [
+      "nxp-kl25-ftfa-command-sequencing-v0"
+    ],
+    "nxp-kl25-erase-all-blocks-v0": [
+      "nxp-kl25-ftfa-command-sequencing-v0"
+    ],
+    "nxp-kl25-flash-security-v0": [
+      "nxp-kl25-ftfa-command-sequencing-v0"
+    ],
+    "nxp-kl25-debug-security-interaction-v0": [
+      "nxp-kl25-swd-mdm-ap-v0",
+      "nxp-kl25-flash-security-v0"
+    ],
+    "nxp-kl25-swd-mdm-ap-v0": []
+  },
+  "pre_ai_ci": {
+    "repository_ci_must_not_require_model_inference": true,
+    "repository_ci_must_test_pack_construction": true,
+    "repository_ci_must_test_dependency_closure": true,
+    "repository_ci_must_test_target_bundle": true,
+    "repository_ci_must_test_content_digest_validation": true,
+    "repository_ci_must_test_context_assembly": true,
+    "live_source_validation_is_separate": true
+  },
+  "admission": {
+    "evidence_pack": true,
+    "pre_ai_ci": true,
+    "semantic_extraction": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}

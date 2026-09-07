@@ -1,0 +1,78 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "kl25_retained_evidence_pack_build",
+  "retention_id": "nxp-kl25-evidence-pack-live-retention-v0",
+  "target": "MKL25Z128VLK4",
+  "live_source_validation": {
+    "workflow_run_id": 34111376564,
+    "artifact_id": 10014477883,
+    "artifact_digest": "sha256:91253796f393b66bf660bb608669b0e0094e99b010d5081a5064d40dff02366d",
+    "generation_head": "0eb876d7699f55edcbf493c86c2ce6d593ffb94e",
+    "manufacturer_text_retained": false,
+    "semantic_extraction_executed": false
+  },
+  "source_lock": {
+    "source_lock_id": "nxp-kl25-source-lock-v0",
+    "source_id": "nxp_kl25_rm_rev3",
+    "algorithm": "sha256",
+    "digest": "7911a7d9f8192fa317960feabc9377d0fd81a9b90d31f8070cae9612cb237241",
+    "byte_length": 6637765
+  },
+  "definition_set": {
+    "definition_set_id": "nxp-kl25-reviewed-evidence-unit-definitions-v0",
+    "digest": "4628dae6b4a0bdad07eff76032df82c1f7f0720d6164abb87f81e4bec502e693"
+  },
+  "applicability_binding": {
+    "binding_id": "nxp-kl25-applicability-binding-v0",
+    "digest": "0dff77930a179e67de5bc004940d08b7583c574c175c50534914a4475cee3efe"
+  },
+  "evidence_pack_contract": {
+    "contract_id": "nxp-kl25-evidence-pack-v0",
+    "digest": "6d5e004a5fac4881cb19f99e921f9afb63f23dcc5aa90b329a7651cda5dcea2c"
+  },
+  "builder": {
+    "name": "build_evidence_pack.py",
+    "version": "0.1.0",
+    "sha256": "b4e49286c3bab6d8cd4a6d873e272ecefa31106bdcd1aede86459849420ab611"
+  },
+  "target_bundle": {
+    "bundle_id": "mkl25z128vlk4-target-evidence-bundle-v0",
+    "bundle_digest": "628aa2c7664cdf9778a11e56a8da0a9cf8816aaec704baf893bfae5a9fba0244",
+    "pack_count": 8,
+    "pack_digests": {
+      "nxp-kl25-debug-security-interaction-v0-pack-v0": "fd051690e1eb318db9adc6c7c08138ff2e01962f3f3c7da5f611b7c5ee8f34b8",
+      "nxp-kl25-erase-all-blocks-v0-pack-v0": "823b7ca34fc11d66b2e6542663f00f1389e18ab539a0cfe91e2f23b048886b84",
+      "nxp-kl25-erase-sector-v0-pack-v0": "b3e4cc7649adcd6f291b8377b19c506e40ee90fbced6f4786021dc642ed4f6da",
+      "nxp-kl25-flash-security-v0-pack-v0": "29a06a5eb54bb619e15f50430054664ba871b5662297d8f2c1bb9804297484be",
+      "nxp-kl25-ftfa-command-sequencing-v0-pack-v0": "15441aa97608f4be8c8f02ace562345e94ac035f635d9e1a3b3c22b65e05cbf4",
+      "nxp-kl25-ftfa-register-model-v0-pack-v0": "08c115c87a89375cc12b828709a1fcef661bdcc090debf5d64b39fb7d39282a9",
+      "nxp-kl25-program-longword-v0-pack-v0": "51ab8f591422434504641f8369df3a421e69fd50bc295ad4f10aece7dd8938de",
+      "nxp-kl25-swd-mdm-ap-v0-pack-v0": "33432e9c3e28b33f18e8beffcc856b7474c50210fbd67d2145e132f7ecc1c613"
+    }
+  },
+  "pre_ai": {
+    "manifest_digest": "b26621b12d5b6f6fc924cbf59f00649767b3b2f9900fd7c5c560ee45cca80e07",
+    "evidence_sha256": {
+      "nxp-kl25-debug-security-interaction-v0-pack-v0": "49cc8af725ae80c3a8cbb1d2648c77e7e3cafa12ad8bbe542537a0f35b1ccfb8",
+      "nxp-kl25-erase-all-blocks-v0-pack-v0": "513df24fe465fe750e3d5976b960694a20ed1c6cb350254d72056f36d05f16d2",
+      "nxp-kl25-erase-sector-v0-pack-v0": "e6cf936c2506a24ef0071003c44c8e4bf59b6d4ef8700e5547fafb87461b7b12",
+      "nxp-kl25-flash-security-v0-pack-v0": "b7ef27f0aa0094a0c86f38e761fac9706150e8701f9229568fbc15911b831bba",
+      "nxp-kl25-ftfa-command-sequencing-v0-pack-v0": "85eaccffc424ec76388a0b3300d90ba391ade2253fceef06a63954e0138c26ae",
+      "nxp-kl25-ftfa-register-model-v0-pack-v0": "3259bae209bac5747229c6de45b971f6e0e4d82bbc0a2e435f409b9d925e3337",
+      "nxp-kl25-program-longword-v0-pack-v0": "b2e3d2a78250bfbc35dceaa84c1d0a1fb3d234572306c480483cafaf4670d4d4",
+      "nxp-kl25-swd-mdm-ap-v0-pack-v0": "6bf2d15f7169cf960efdf7efcc4c197273d8ca91edf221c104709c674897880a"
+    },
+    "model_context_sha256": "c7e5cea60011c752c40874084849917ed594c769fe834210869fc5c7550a563f",
+    "repository_ci_validates_through_context_assembly": true,
+    "model_inference_required_in_repository_ci": false
+  },
+  "admission": {
+    "evidence_pack": true,
+    "pre_ai_ci": true,
+    "semantic_extraction": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}
