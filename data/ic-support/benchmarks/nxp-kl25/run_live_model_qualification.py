@@ -12,6 +12,7 @@ import build_evidence_pack as builder
 import ollama_live_runtime
 import qualify_semantic_run as qualification
 import run_ollama_semantic
+import semantic_runner
 
 HERE = Path(__file__).resolve().parent
 
@@ -159,7 +160,14 @@ def main() -> int:
             f"model_digest={provenance['ollama_runtime_identity']['model_digest']}"
         )
         return 0 if report["status"] == "READY_FOR_REVIEW" else 1
-    except (LiveQualificationExecutionError, qualification.LiveModelQualificationError, OSError, ValueError) as exc:
+    except (
+        LiveQualificationExecutionError,
+        qualification.LiveModelQualificationError,
+        run_ollama_semantic.SemanticWorkspaceError,
+        semantic_runner.SemanticTransportError,
+        OSError,
+        ValueError,
+    ) as exc:
         print(f"KL25 live model qualification FAIL: {exc}", file=sys.stderr)
         return 1
 
