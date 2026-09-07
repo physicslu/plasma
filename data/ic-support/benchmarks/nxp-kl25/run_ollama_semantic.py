@@ -10,6 +10,7 @@ from typing import Any
 
 import build_evidence_pack as builder
 import ollama_transport
+import semantic_context
 import semantic_runner as runner
 
 HERE = Path(__file__).resolve().parent
@@ -110,6 +111,7 @@ def execute_workspace(
     temperature: float,
     seed: int | None,
     timeout_seconds: float,
+    context_strategy: str = semantic_context.LEGACY_CONTEXT_STRATEGY,
 ) -> dict[str, Any]:
     manifest, packs, evidence_text, contract = load_pre_ai_workspace(input_dir)
     captured_raw: dict[str, str] = {"text": ""}
@@ -138,6 +140,7 @@ def execute_workspace(
             "seed": seed,
             "timeout_seconds": timeout_seconds,
         },
+        context_strategy=context_strategy,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "semantic-run.json").write_text(
@@ -160,6 +163,11 @@ def main() -> int:
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--timeout-seconds", type=float, default=1800.0)
+    parser.add_argument(
+        "--context-strategy",
+        choices=[semantic_context.LEGACY_CONTEXT_STRATEGY, semantic_context.COMPACT_CONTEXT_STRATEGY],
+        default=semantic_context.LEGACY_CONTEXT_STRATEGY,
+    )
     args = parser.parse_args()
     try:
         record = execute_workspace(
@@ -173,6 +181,7 @@ def main() -> int:
             temperature=args.temperature,
             seed=args.seed,
             timeout_seconds=args.timeout_seconds,
+            context_strategy=args.context_strategy,
         )
     except (SemanticWorkspaceError, OSError, ValueError) as exc:
         print(f"KL25 semantic runner FAIL: {exc}", file=sys.stderr)
