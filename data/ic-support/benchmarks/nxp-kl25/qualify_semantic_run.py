@@ -34,7 +34,7 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def _without_digest(value: dict[str, Any], key: str) -> dict[str, Any]:
-    return {item_key: item_value for item_key, item_value in value.items() if item_key != key}
+    return {k: v for k, v in value.items() if k != key}
 
 
 def _pack_by_primary(packs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -51,9 +51,7 @@ def _pack_by_primary(packs: dict[str, dict[str, Any]]) -> dict[str, dict[str, An
 def _primary_refs(pack: dict[str, Any]) -> set[tuple[str, int]]:
     primary = pack.get("primary_unit_id")
     for unit in pack.get("included_units", []):
-        if not isinstance(unit, dict):
-            continue
-        if unit.get("unit_id") != primary or unit.get("origin") != "PRIMARY":
+        if not isinstance(unit, dict) or unit.get("unit_id") != primary or unit.get("origin") != "PRIMARY":
             continue
         source_id = unit.get("source_id")
         page_range = unit.get("pdf_page_range")
@@ -61,7 +59,7 @@ def _primary_refs(pack: dict[str, Any]) -> set[tuple[str, int]]:
         require(
             isinstance(page_range, list)
             and len(page_range) == 2
-            and all(isinstance(value, int) and not isinstance(value, bool) for value in page_range),
+            and all(isinstance(v, int) and not isinstance(v, bool) for v in page_range),
             f"{primary}: primary page range malformed",
         )
         start, end = page_range
@@ -70,13 +68,9 @@ def _primary_refs(pack: dict[str, Any]) -> set[tuple[str, int]]:
     raise LiveModelQualificationError(f"{primary}: PRIMARY included unit not found")
 
 
-def _normalized(value: str) -> str:
-    return " ".join(value.casefold().split())
-
-
 def _contains_term(text: str, term: str) -> bool:
-    haystack = _normalized(text)
-    needle = _normalized(term)
+    haystack = " ".join(text.casefold().split())
+    needle = " ".join(term.casefold().split())
     if not needle:
         return False
     if re.fullmatch(r"[a-z0-9_-]+", needle):
@@ -108,7 +102,6 @@ def validate_reviewed_verdict(
         errors.append("reviewed verdict semantic_run_digest mismatch")
     if verdict.get("review_basis") != "manufacturer_evidence":
         errors.append("review_basis must be manufacturer_evidence")
-
     items = verdict.get("unit_verdicts")
     if not isinstance(items, list):
         return False, errors + ["unit_verdicts must be an array"]
@@ -117,13 +110,12 @@ def validate_reviewed_verdict(
     for index, item in enumerate(items):
         if not isinstance(item, dict):
             errors.append(f"unit_verdicts[{index}] must be an object")
+            all_pass = False
             continue
         unit_id = item.get("primary_unit_id")
-        if unit_id not in expected_units:
-            errors.append(f"unsupported reviewed unit: {unit_id}")
-            continue
-        if unit_id in observed:
-            errors.append(f"duplicate reviewed unit: {unit_id}")
+        if unit_id not in expected_units or unit_id in observed:
+            errors.append(f"unsupported or duplicate reviewed unit: {unit_id}")
+            all_pass = False
             continue
         observed.add(unit_id)
         state = item.get("verdict")
@@ -132,11 +124,11 @@ def validate_reviewed_verdict(
             all_pass = False
         elif state != "PASS":
             all_pass = False
-        rationale = item.get("rationale")
-        if not isinstance(rationale, str) or not rationale.strip():
+        if not isinstance(item.get("rationale"), str) or not item["rationale"].strip():
             errors.append(f"{unit_id}: non-empty review rationale required")
     if observed != expected_units:
         errors.append(f"reviewed verdict must cover all primary units; missing={sorted(expected_units - observed)}")
+        all_pass = False
     expected_overall = "PASS" if all_pass and not errors else "FAIL"
     if verdict.get("overall_verdict") != expected_overall:
         errors.append(f"overall_verdict must be {expected_overall}")
@@ -163,7 +155,6 @@ def assess_live_run(
     required = contract.get("required_input", {})
     live_runtime = contract.get("live_runtime", {})
     generation = live_runtime.get("generation", {})
-
     check(contract.get("artifact_type") == "kl25_live_model_qualification_contract", "qualification contract artifact mismatch")
     check(semantic_run.get("artifact_type") == "kl25_semantic_extraction_run", "semantic run artifact mismatch")
     check(semantic_run.get("status") == "success", "semantic run status must be success")
@@ -171,23 +162,21 @@ def assess_live_run(
     check(semantic_run.get("bundle_digest") == required.get("bundle_digest"), "bundle digest mismatch")
     check(semantic_run.get("pre_ai_manifest_digest") == required.get("pre_ai_manifest_digest"), "pre-AI manifest digest mismatch")
     check(semantic_run.get("semantic_contract_id") == required.get("semantic_contract_id"), "semantic contract id mismatch")
-
     runtime = semantic_run.get("runtime", {})
     check(runtime.get("transport") == live_runtime.get("transport"), "transport mismatch")
     check(runtime.get("model_id") == live_runtime.get("model_id"), "model id mismatch")
     check(runtime.get("runtime_label") == live_runtime.get("runtime_label"), "runtime label mismatch")
     check(semantic_run.get("transport_invoked") is True, "transport must be invoked")
-    prompt = semantic_run.get("prompt", {})
-    check(isinstance(prompt.get("sha256"), str) and HEX64.fullmatch(prompt.get("sha256", "")) is not None, "prompt digest missing")
+    prompt_sha = semantic_run.get("prompt", {}).get("sha256")
+    check(isinstance(prompt_sha, str) and HEX64.fullmatch(prompt_sha) is not None, "prompt digest missing")
     check(semantic_run.get("raw_response_sha256") == builder.sha256_text(raw_response), "raw response digest mismatch")
-
-    transport_metadata = semantic_run.get("transport_metadata", {})
-    check(transport_metadata.get("response_model") == live_runtime.get("model_id"), "provider response model mismatch")
-    check(transport_metadata.get("done") is True, "provider done must be true")
-    done_reason = transport_metadata.get("done_reason")
+    metadata = semantic_run.get("transport_metadata", {})
+    check(metadata.get("response_model") == live_runtime.get("model_id"), "provider response model mismatch")
+    check(metadata.get("done") is True, "provider done must be true")
+    done_reason = metadata.get("done_reason")
     if done_reason is not None:
         check(done_reason in live_runtime.get("allowed_done_reasons", []), "provider done_reason not allowed")
-    usage = transport_metadata.get("usage", {})
+    usage = metadata.get("usage", {})
     for name in ("input_tokens", "generation_tokens"):
         value = usage.get(name)
         check(isinstance(value, int) and not isinstance(value, bool) and value > 0, f"{name} must be a positive integer")
@@ -203,9 +192,9 @@ def assess_live_run(
     identity = provenance.get("ollama_runtime_identity", {})
     model_digest = identity.get("model_digest")
     check(isinstance(model_digest, str) and MODEL_DIGEST.fullmatch(model_digest) is not None, "Ollama model digest missing or malformed")
-    version = identity.get("ollama_version")
-    check(isinstance(version, str) and bool(version.strip()), "Ollama version missing")
+    check(isinstance(identity.get("ollama_version"), str) and bool(identity.get("ollama_version", "").strip()), "Ollama version missing")
     execution = provenance.get("execution", {})
+    check(execution.get("transport") == live_runtime.get("transport"), "provenance transport mismatch")
     check(execution.get("model_id") == live_runtime.get("model_id"), "provenance model id mismatch")
     check(execution.get("runtime_label") == live_runtime.get("runtime_label"), "provenance runtime label mismatch")
     for name, expected in generation.items():
@@ -244,19 +233,14 @@ def assess_live_run(
             if _contains_term(text, forbidden):
                 screening_errors.append(f"{unit_id}: forbidden cross-vendor term present: {forbidden}")
         for group in screening.get("required_term_groups", {}).get(unit_id, []):
-            if not isinstance(group, list) or not group:
-                screening_errors.append(f"{unit_id}: malformed required term group")
-                continue
-            if not any(_contains_term(text, candidate) for candidate in group):
+            if not isinstance(group, list) or not group or not any(_contains_term(text, term) for term in group):
                 screening_errors.append(f"{unit_id}: missing required concept group: {group}")
         if screening.get("require_primary_unit_page_citation") is True:
             primary_refs = _primary_refs(pack_by_primary[unit_id])
             has_primary_ref = any(
                 (ref.get("source_id"), ref.get("pdf_page_number")) in primary_refs
-                for fact in facts
-                if isinstance(fact, dict)
-                for ref in fact.get("evidence", [])
-                if isinstance(ref, dict)
+                for fact in facts if isinstance(fact, dict)
+                for ref in fact.get("evidence", []) if isinstance(ref, dict)
             )
             if not has_primary_ref:
                 screening_errors.append(f"{unit_id}: no citation to primary Evidence Unit pages")
@@ -291,20 +275,17 @@ def assess_live_run(
         "model_id": live_runtime.get("model_id"),
         "model_digest": identity.get("model_digest"),
         "status": status,
-        "integrity": {
-            "status": "PASS" if not integrity_errors else "FAIL",
-            "errors": integrity_errors,
-        },
+        "integrity": {"status": "PASS" if not integrity_errors else "FAIL", "errors": integrity_errors},
         "semantic_screening": {
             "status": "PASS" if not screening_errors else "FAIL",
             "errors": screening_errors,
-            "note": "Concept screening is a deterministic defect filter, not proof of semantic correctness."
+            "note": "Concept screening is a deterministic defect filter, not proof of semantic correctness.",
         },
         "review": {
-            "required": true if False else True,
+            "required": True,
             "status": "PASS" if reviewed_verdict is not None and review_pass else "FAIL" if reviewed_verdict is not None else "PENDING",
             "errors": review_errors,
-            "basis_required": "manufacturer_evidence"
+            "basis_required": "manufacturer_evidence",
         },
         "trust_boundary": {
             "live_run_integrity_is_not_semantic_correctness": True,
@@ -315,8 +296,8 @@ def assess_live_run(
             "canonical_dataset_admission": False,
             "hil_admission": False,
             "production_admission": False,
-            "destructive_security_operation_admission": False
-        }
+            "destructive_security_operation_admission": False,
+        },
     }
     report["report_digest"] = builder.canonical_sha256(report)
     return report
