@@ -246,9 +246,9 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
         report, _ = self.assess(reviewed_verdict=verdict)
         self.assertEqual(report["status"], "REJECTED_REVIEW")
 
-    def test_contract_keeps_actual_model_admissions_false(self):
+    def test_contract_admits_only_the_model_free_harness(self):
         admission = self.contract["admission"]
-        self.assertFalse(admission["live_model_qualification_harness"])
+        self.assertTrue(admission["live_model_qualification_harness"])
         self.assertFalse(admission["live_model_run_retained"])
         self.assertFalse(admission["semantic_extraction"])
         self.assertFalse(admission["model_quality"])
