@@ -6,7 +6,7 @@ export type BatchReadinessCode =
   | "image-required"
   | "image-invalid"
   | "invalid-read"
-  | "ppu-offline"
+  | "programming-unavailable"
   | "site-busy"
   | "running"
   | "cancelling";
@@ -40,7 +40,7 @@ const LABELS: Record<BatchReadinessCode, string> = {
   "image-required": "IMAGE REQUIRED",
   "image-invalid": "IMAGE INVALID",
   "invalid-read": "INVALID READ",
-  "ppu-offline": "PPU OFFLINE",
+  "programming-unavailable": "PROGRAMMING UNAVAILABLE",
   "site-busy": "SITE BUSY",
   running: "RUNNING",
   cancelling: "CANCELLING",
@@ -53,11 +53,16 @@ function result(code: BatchReadinessCode): BatchReadiness {
 /**
  * Single source of truth for Pmod/Emode batch dispatch readiness.
  * The status badge and Execute button must consume this same result.
+ *
+ * Provider availability is a Programming capability signal, not a PPU
+ * connectivity signal. Gateway/PPU reachability is reported independently by
+ * the communication-health model; a missing Programming provider must never be
+ * presented to the operator as "PPU OFFLINE".
  */
 export function evaluateBatchReadiness(input: BatchReadinessInput): BatchReadiness {
   if (input.batchCancelling) return result("cancelling");
   if (input.batchRunning) return result("running");
-  if (!input.providerOnline) return result("ppu-offline");
+  if (!input.providerOnline) return result("programming-unavailable");
   if (!input.targetValid) return result("no-target");
   if (input.selectedSiteCount <= 0) return result("no-site");
   if (input.selectedOperationCount <= 0) return result("no-op");
