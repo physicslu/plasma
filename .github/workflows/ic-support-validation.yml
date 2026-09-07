@@ -105,6 +105,10 @@ jobs:
           python data/ic-support/benchmarks/nxp-kl25/test_reviewed_evidence_units.py
           python data/ic-support/benchmarks/nxp-kl25/test_applicability.py
           python data/ic-support/benchmarks/nxp-kl25/test_applicability_binding.py
+      - name: Validate NXP KL25 deterministic Evidence Packs
+        run: python data/ic-support/benchmarks/nxp-kl25/test_evidence_pack.py
+      - name: Validate NXP KL25 pre-AI CI boundary
+        run: python data/ic-support/benchmarks/nxp-kl25/test_pre_ai_ci.py
       - name: Validate STM32F103C source lock
         run: python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
       - name: Compare STM32F103C benchmark
