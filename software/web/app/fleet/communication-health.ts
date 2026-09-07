@@ -41,7 +41,7 @@ export function summarizePPUHealth(
   }
   if (!catalogAvailable) {
     return providerUnavailable
-      ? { tone: "unavailable", label: "PPU UNAVAILABLE", ready: 0, total: 0 }
+      ? { tone: "online", label: "PPU ONLINE · PROGRAMMING UNAVAILABLE", ready: 0, total: 0 }
       : { tone: "loading", label: "PPU WAITING", ready: 0, total: 0 };
   }
   if (!total) return { tone: "idle", label: "PPU —", ready: 0, total: 0 };
