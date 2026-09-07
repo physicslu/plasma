@@ -1,16 +1,38 @@
 # SWPC Public Preview / Mock Environment
 
-## Purpose
+## Status
 
-`https://plasma.open4th.com` is the canonical public ingress for the Plasma SWPC Preview / Mock environment.
+**Historical.** This document records the retired role of `plasma.open4th.com` before the Local Control Station reference deployment was introduced.
 
-Its purpose is fast software feedback before a local Control Station or Z2 deployment is available. It is suitable for checking the latest Web UI, PMode / EMode flows, same-origin routing, Engineering Mock behavior, Programming Job presentation, Batch behavior, and other software-only integration paths supported by the SWPC runtime.
+The current public Mock / software-demo lane is:
 
-It is **not** a production Plasma Gateway Endpoint and it is **not** evidence of Z2, PS↔PL, FPGA, target-power, electrical, or real-IC acceptance.
+```text
+plasma-demo.open4th.com
+  -> Render
+  -> Integration / Mock runtime
+```
 
-## Routing contract
+The current intended SWPC hostname role, after Local Control Station runtime acceptance and explicit tunnel retargeting, is:
 
-The public hostname and the operator's private SWPC engineering ingress terminate at the same SWPC Web runtime:
+```text
+plasma.open4th.com
+  -> Cloudflare Tunnel
+  -> SWPC Local Control Station Console/BFF
+```
+
+The old Preview/Mock route remains historical evidence only. It must not be used as the current deployment contract.
+
+## Historical purpose
+
+`https://plasma.open4th.com` previously served as the canonical public ingress for the Plasma SWPC Preview / Mock environment.
+
+Its purpose was fast software feedback before a local Control Station or Z2 deployment was available. It was suitable for checking Web UI, PMode / EMode flows, same-origin routing, Engineering Mock behavior, Programming Job presentation, Batch behavior, and other software-only integration paths supported by the SWPC runtime.
+
+It was **not** a production Plasma Gateway Endpoint and was never evidence of Z2, PS↔PL, FPGA, target-power, electrical, or real-IC acceptance.
+
+## Historical routing contract
+
+The retired route was:
 
 ```text
 public Browser
@@ -18,68 +40,70 @@ public Browser
     v
 plasma.open4th.com
     |
-    +------------------------------+
-                                   v
-                          SWPC Vite / Vinext Web
-                                   |
-                          same-origin API routing
-                                   |
-                    +--------------+--------------+
-                    |                             |
-                    v                             v
-             local Plasma Gateway           Manager / BFF
-                    |
-                    v
-          Engineering Mock Provider
+    v
+SWPC Vite / Vinext Web
+    |
+    +--> local Plasma Gateway
+    |       |
+    |       v
+    |   Engineering Mock Provider
+    |
+    +--> optional Manager / BFF
 ```
 
-The private overlay-network hostname remains an engineering / operations / fallback ingress. It is intentionally not documented here as a product hostname.
+This topology is no longer the intended role for `plasma.open4th.com`.
 
-## Ownership boundary
+## Current replacement
 
-Allowed:
-
-- `plasma.open4th.com` as a Vite `allowedHosts` frontend ingress alias;
-- Browser requests using the current origin;
-- SWPC-local Vite proxying to the local Plasma Gateway;
-- Engineering Mock Provider behind the same-origin Web path;
-- Manager/BFF routing when the integration host is configured for it.
-
-Retired and forbidden:
-
-- `plasma.open4th.com` as a hard-coded Browser API Base;
-- `PLASMA_PUBLIC_API_URL=https://plasma.open4th.com...` as current topology ownership;
-- Browser code learning or selecting a Plasma Gateway Endpoint through this hostname;
-- treating Preview / Mock PASS as Real-Host or Real-PPU acceptance.
-
-The architectural invariant remains:
+Mock/demo responsibility moved to the independent Render lane:
 
 ```text
-standalone SWPC Preview / Mock:
-Browser -> same origin -> local Vite proxy -> local Plasma Gateway -> Mock / local execution
-
-formal Control Station:
-Browser -> same-origin Console/BFF -> Manager -> selected PPU Plasma Gateway
+plasma-demo.open4th.com
+    |
+    v
+Render Integration / Mock
 ```
 
-The public hostname is frontend ingress. A **Plasma Gateway Endpoint** is the network location of one PPU's northbound service. A Linux **Default Gateway** is a routing next hop. These concepts are intentionally distinct.
-
-## Expected routes
-
-The public Preview should expose the same current product Web routes as the SWPC Web runtime:
+SWPC is being repositioned as the Linux reference host for the Local Control Station role:
 
 ```text
-/             -> Control Station product entry
-/fleet        -> PMode
-/engineering  -> EMode
-/ppu          -> compatibility redirect to /engineering
+plasma.open4th.com
+    |
+    v
+SWPC Local Control Station
+    |
+    +--> Console/BFF
+    |
+    v
+Manager
+    |
+    v
+configured PPU Plasma Gateway endpoint
 ```
 
-The public hostname changes ingress only. It must not introduce a second frontend implementation or a second Plasma Gateway API contract.
+The actual Cloudflare tunnel must not be retargeted until the Local Control Station profile has been merged and its SWPC runtime has passed local acceptance.
 
-## Validation boundary
+## Preserved invariants
 
-A useful Preview acceptance proves that the deployed SWPC revision can be reached through the public hostname and that supported same-origin Web / Mock paths operate. It does not prove:
+The architectural rules from the retired Preview remain useful:
+
+- `plasma.open4th.com` is never a Plasma Gateway Endpoint or Browser API Base;
+- Browser traffic uses same-origin Control Station routing;
+- PPU endpoint ownership belongs to Manager/deployment configuration, not Browser-selected state;
+- Mock PASS is never real PPU, Z2, PL, Site, electrical, or real-IC evidence;
+- changing ingress must not create a second frontend implementation or a second Plasma Gateway API contract.
+
+The three concepts remain distinct:
+
+```text
+Control Station hostname   browser/operator ingress
+Plasma Gateway Endpoint    one PPU's northbound service root
+Linux Default Gateway      Layer-3 network next hop
+```
+
+## Historical validation boundary
+
+A successful old SWPC Preview acceptance proved only software ingress and supported Mock paths. It did not prove:
 
 - Windows or macOS installer behavior on a physical operator machine;
 - network reachability to a real PPU Plasma Gateway Endpoint;
@@ -90,4 +114,4 @@ A useful Preview acceptance proves that the deployed SWPC revision can be reache
 - physical programming interfaces;
 - real IC erase / program / verify / read behavior.
 
-Those remain separate acceptance layers.
+Those remain separate acceptance layers under the current architecture as well.
