@@ -107,6 +107,25 @@ def test_unknown_profile_fails_closed() -> None:
     assert "unknown deployment profile" in result.stderr
 
 
+def test_update_and_restart_remains_integration_only(tmp_path: Path) -> None:
+    log = tmp_path / "backend.log"
+    fake = tmp_path / "fake-backend.sh"
+    fake.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -Eeuo pipefail\n"
+        f"printf '%s\\n' \"$*\" >> {log!s}\n",
+        encoding="utf-8",
+    )
+    result = run(
+        "update-and-restart",
+        "swpc-z2like",
+        env={"PLASMA_SWPC_Z2LIKE_BACKEND": str(fake)},
+    )
+    assert result.returncode != 0
+    assert "integration-only alias" in result.stderr
+    assert not log.exists()
+
+
 def test_swpc_backend_keeps_system_profile_separate_from_integration_user_services() -> None:
     source = SWPC_Z2LIKE.read_text(encoding="utf-8")
     assert "/opt/plasma/install/last-swpc-z2like-install.json" in source
