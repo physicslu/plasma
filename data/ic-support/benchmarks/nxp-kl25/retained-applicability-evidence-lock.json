@@ -1,0 +1,142 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "retained_applicability_evidence_lock",
+  "evidence_lock_id": "nxp-kl25-retained-applicability-evidence-lock-v0",
+  "applicability_id": "nxp-kl25-applicability-foundation-v1",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "target": "MKL25Z128VLK4",
+  "generation": {
+    "candidate_file_sha256": "7f2e67a212abbb256e5cc227b407fd24c2be4669488336671050d8b3af58e142",
+    "github_actions_run_id": 34104291763,
+    "github_actions_artifact_id": 10011731376,
+    "github_actions_artifact_digest": "sha256:357b261d0be0753e44f8a5392e5b1bcc1baff3d055dea22384184eacf6513ae1",
+    "generation_head": "8b66623d8e268957af9519d50b6e097d163b800e",
+    "preprocessing": "pdftotext -layout -enc UTF-8"
+  },
+  "claims": {
+    "TARGET_EXACT_IDENTITY": {
+      "candidate_count": 7,
+      "selected_evidence": [
+        {
+          "source_id": "nxp_kl25_ds_rev5",
+          "pdf_page_number": 2,
+          "page_text_sha256": "58adca50c0994ca32441f9c0ada8339486d30cb1ac5b8e7e5dafd1ba915c7ce5"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 44,
+          "page_text_sha256": "5c4cbed633f96d73a50d7aaca4d60617ddeb7e01e47c3c6b7800194cfd3bce9e"
+        }
+      ]
+    },
+    "TARGET_DEVICE_EXPRESSION": {
+      "candidate_count": 0,
+      "selected_evidence": []
+    },
+    "RM_TARGET_MEMBERSHIP": {
+      "candidate_count": 6,
+      "selected_evidence": [
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 44,
+          "page_text_sha256": "5c4cbed633f96d73a50d7aaca4d60617ddeb7e01e47c3c6b7800194cfd3bce9e"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 73,
+          "page_text_sha256": "b2066a87d79261d9b8399ab383728a31eeff976ea01908850667c5d8fe4d3e46"
+        }
+      ]
+    },
+    "KL25_FAMILY_SCOPE": {
+      "candidate_count": 2,
+      "selected_evidence": [
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 38,
+          "page_text_sha256": "fef2023dc824d27657d37114797efbf777f18f837350e206dfb41e8da4b31ef3"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 44,
+          "page_text_sha256": "5c4cbed633f96d73a50d7aaca4d60617ddeb7e01e47c3c6b7800194cfd3bce9e"
+        }
+      ]
+    },
+    "FTFA_MODULE_PRESENCE": {
+      "candidate_count": 34,
+      "selected_evidence": [
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 74,
+          "page_text_sha256": "1442b99f381d955443c7ac7a9f7129ffc8338bff4cf207bfbfad626dd68fe105"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 419,
+          "page_text_sha256": "03d5af8d9c95ead13deccecc96d7bfbd0a06e9f30a191dc4713224d874633608"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 452,
+          "page_text_sha256": "6f1a1b1e9223c3925b70fe853fea75d2a72491462b27e61b79fb22cedcde0088"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 453,
+          "page_text_sha256": "a077fe4a6a9f58b459a8d550461c9a93f82ef6ea6265c4748306074b53205831"
+        }
+      ]
+    },
+    "SWD_DEBUG_PRESENCE": {
+      "candidate_count": 12,
+      "selected_evidence": [
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 40,
+          "page_text_sha256": "09c46148037f11fd5e7de050a63f2a5e89121c1e1d02ac7e6f88451972383fa6"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 151,
+          "page_text_sha256": "fe51fcb8db0239897eb65ba26e111e1fc81052b45a99300b7d3940e75cb06615"
+        }
+      ]
+    },
+    "MDM_AP_PRESENCE": {
+      "candidate_count": 5,
+      "selected_evidence": [
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 152,
+          "page_text_sha256": "670a56d513b634b9335387ff782980e14daf1abaebcdc991829ce64745594907"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 153,
+          "page_text_sha256": "64430677d1ddf729d4c2b20c45f756e092fce55911f963b82d977b2f4f92034a"
+        }
+      ]
+    },
+    "FLASH_SECURITY_MODEL": {
+      "candidate_count": 13,
+      "selected_evidence": [
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 149,
+          "page_text_sha256": "329275ffc2475731a5bed1c6d1fee0ea1dbe58791f90849a88030d52df45358f"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 453,
+          "page_text_sha256": "a077fe4a6a9f58b459a8d550461c9a93f82ef6ea6265c4748306074b53205831"
+        },
+        {
+          "source_id": "nxp_kl25_rm_rev3",
+          "pdf_page_number": 454,
+          "page_text_sha256": "38deb2b99898f2d313cdf66c00249ce1136dcd63813d96a3ec193777322ba028"
+        }
+      ]
+    }
+  }
+}
