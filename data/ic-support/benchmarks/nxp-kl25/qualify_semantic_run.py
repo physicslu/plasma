@@ -192,13 +192,20 @@ def assess_live_run(
     identity = provenance.get("ollama_runtime_identity", {})
     model_digest = identity.get("model_digest")
     check(isinstance(model_digest, str) and MODEL_DIGEST.fullmatch(model_digest) is not None, "Ollama model digest missing or malformed")
+    check(identity.get("model_id") == live_runtime.get("model_id"), "Ollama identity model id mismatch")
+    check(identity.get("ollama_url_policy") == "loopback_only", "Ollama identity endpoint policy mismatch")
     check(isinstance(identity.get("ollama_version"), str) and bool(identity.get("ollama_version", "").strip()), "Ollama version missing")
     execution = provenance.get("execution", {})
     check(execution.get("transport") == live_runtime.get("transport"), "provenance transport mismatch")
     check(execution.get("model_id") == live_runtime.get("model_id"), "provenance model id mismatch")
     check(execution.get("runtime_label") == live_runtime.get("runtime_label"), "provenance runtime label mismatch")
+    check(execution.get("ollama_endpoint_policy") == "loopback_only", "provenance endpoint policy mismatch")
     for name, expected in generation.items():
         check(execution.get("generation", {}).get(name) == expected, f"generation setting mismatch: {name}")
+    fingerprints = provenance.get("code_fingerprints")
+    check(isinstance(fingerprints, dict) and bool(fingerprints), "code fingerprints missing")
+    if isinstance(fingerprints, dict):
+        check(all(isinstance(value, str) and HEX64.fullmatch(value) is not None for value in fingerprints.values()), "code fingerprint malformed")
 
     pack_by_primary = _pack_by_primary(packs)
     expected_units = set(pack_by_primary)
@@ -244,6 +251,16 @@ def assess_live_run(
             )
             if not has_primary_ref:
                 screening_errors.append(f"{unit_id}: no citation to primary Evidence Unit pages")
+
+    # A live success must preserve one content truth: parsed semantic response == raw model JSON.
+    # Keep this as an integrity check when the semantic screening itself otherwise passes.
+    if not screening_errors:
+        try:
+            parsed_raw = json.loads(raw_response)
+        except json.JSONDecodeError:
+            integrity_errors.append("raw response cannot be reparsed as JSON")
+        else:
+            check(parsed_raw == semantic_run.get("response"), "raw response and parsed semantic response differ")
 
     review_pass = False
     review_errors: list[str] = []
