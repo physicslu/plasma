@@ -1,0 +1,504 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
+installer="${PLASMA_SWPC_Z2LIKE_INSTALLER:-$repo_root/scripts/swpc-z2like-ppu-install.sh}"
+evidence="${PLASMA_SWPC_Z2LIKE_EVIDENCE:-/opt/plasma/install/last-swpc-z2like-install.json}"
+python_root="${PLASMA_SWPC_Z2LIKE_PYTHON_ROOT:-/opt/plasma/python}"
+plasma_python_override="${PLASMA_SWPC_Z2LIKE_PYTHON:-}"
+ppu_id="${PLASMA_SWPC_Z2LIKE_PPU_ID:-swpc-z2like-01}"
+facility_id="${PLASMA_SWPC_Z2LIKE_FACILITY_ID:-lab}"
+proxy_port="${PLASMA_SWPC_Z2LIKE_PROXY_PORT:-18081}"
+nginx_conf="${PLASMA_SWPC_Z2LIKE_NGINX_CONF:-/etc/nginx/conf.d/plasma-swpc-z2like-ppu.conf}"
+nginx_marker="# Managed by Plasma SWPC Z2-like lab installer"
+server_unit="/etc/systemd/system/plasma-server.service"
+gateway_unit="/etc/systemd/system/plasma-web.service"
+ppu_config="/etc/plasma/ppu.yaml"
+current_link="/opt/plasma/current"
+release_root="/opt/plasma/releases"
+
+say() {
+  printf '[plasmactl swpc-z2like] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl swpc-z2like] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+require_root() {
+  (( EUID == 0 )) || die "install/deploy requires root; run: sudo ./scripts/plasmactl $1 swpc-z2like"
+}
+
+validate_identity() {
+  [[ "$ppu_id" =~ ^[A-Za-z0-9._:-]+$ ]] || die "invalid PPU id: $ppu_id"
+  [[ "$facility_id" =~ ^[A-Za-z0-9._:-]+$ ]] || die "invalid Facility id: $facility_id"
+  [[ "$proxy_port" =~ ^[0-9]+$ ]] || die "invalid restricted proxy port: $proxy_port"
+  (( proxy_port >= 1 && proxy_port <= 65535 && proxy_port != 9900 && proxy_port != 18080 )) || \
+    die "restricted proxy port conflicts with reserved runtime ports: $proxy_port"
+}
+
+json_field() {
+  local path="$1" field="$2"
+  python3 - "$path" "$field" <<'PY'
+import json
+import sys
+
+path, field = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+value = payload.get(field)
+if value is None:
+    raise SystemExit(1)
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif isinstance(value, (dict, list)):
+    print(json.dumps(value, separators=(",", ":"), sort_keys=True))
+else:
+    print(value)
+PY
+}
+
+release_dir_for_sha() {
+  local sha="$1" version
+  version="$(python3 - "$repo_root/release/product.json" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle)["product_version"])
+PY
+)"
+  printf '%s/%s-%s\n' "$release_root" "$version" "${sha:0:12}"
+}
+
+resolve_plasma_python() {
+  local candidate evidence_python=""
+  local -a candidates=()
+
+  if [[ -n "$plasma_python_override" ]]; then
+    [[ -x "$plasma_python_override" ]] || die "configured Plasma Python is not executable: $plasma_python_override"
+    printf '%s\n' "$plasma_python_override"
+    return 0
+  fi
+
+  if [[ -f "$evidence" ]]; then
+    evidence_python="$(json_field "$evidence" plasma_python 2>/dev/null || true)"
+    if [[ -n "$evidence_python" && -x "$evidence_python" ]]; then
+      printf '%s\n' "$evidence_python"
+      return 0
+    fi
+  fi
+
+  shopt -s nullglob
+  for candidate in "$python_root"/*/bin/python3; do
+    [[ -x "$candidate" ]] && candidates+=("$candidate")
+  done
+  shopt -u nullglob
+
+  case "${#candidates[@]}" in
+    1) printf '%s\n' "${candidates[0]}" ;;
+    0) die "no Plasma-owned Python found under $python_root/*/bin/python3" ;;
+    *)
+      printf '[plasmactl swpc-z2like] candidate Plasma runtimes:\n' >&2
+      printf '  %s\n' "${candidates[@]}" >&2
+      die "multiple Plasma runtimes found; set PLASMA_SWPC_Z2LIKE_PYTHON explicitly"
+      ;;
+  esac
+}
+
+require_clean_source() {
+  [[ -d "$repo_root/.git" ]] || die "repository metadata is missing: $repo_root"
+  local changes
+  changes="$(git -C "$repo_root" status --porcelain --untracked-files=normal)"
+  [[ -z "$changes" ]] || {
+    printf '%s\n' "$changes" >&2
+    die "repository must be clean before SWPC Z2-like qualification deployment"
+  }
+}
+
+validate_install_evidence() {
+  [[ -f "$evidence" ]] || die "SWPC Z2-like install evidence is missing: $evidence"
+  python3 - "$evidence" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+expected = {
+    "schema_version": 1,
+    "role": "ppu-surrogate",
+    "platform": "linux",
+    "z2_equivalent": False,
+    "hardware_boundary": "closed",
+    "configured_site_count": 0,
+    "max_supported_sites": 8,
+}
+for field, value in expected.items():
+    if payload.get(field) != value:
+        raise SystemExit(f"invalid SWPC Z2-like evidence field {field}: {payload.get(field)!r}")
+if not payload.get("release_id") or not payload.get("git_sha") or not payload.get("plasma_python"):
+    raise SystemExit("SWPC Z2-like evidence is missing release identity/runtime fields")
+PY
+}
+
+require_managed_installation() {
+  validate_install_evidence
+  [[ -L "$current_link" ]] || die "current release symlink is missing: $current_link"
+  [[ -f "$ppu_config" ]] || die "PPU configuration is missing: $ppu_config"
+  [[ -f "$server_unit" && -f "$gateway_unit" ]] || die "system PPU units are missing"
+  grep -Fq 'User=plasma' "$server_unit" || die "plasma-server.service is not owned by the Plasma system runtime"
+  grep -Fq '/opt/plasma/current/runtime/ppu/ppu.pyz' "$server_unit" || die "plasma-server.service does not target the managed immutable runtime"
+  grep -Fq 'User=plasma' "$gateway_unit" || die "plasma-web.service is not owned by the Plasma system runtime"
+  grep -Fq '/opt/plasma/current/runtime/ppu/ppu.pyz' "$gateway_unit" || die "plasma-web.service does not target the managed immutable runtime"
+  [[ -f "$nginx_conf" ]] || die "restricted Nginx ingress is missing: $nginx_conf"
+  grep -Fxq "$nginx_marker" "$nginx_conf" || die "restricted Nginx ingress is not Plasma-owned"
+
+  local expected_current observed_current
+  expected_current="$release_root/$(json_field "$evidence" release_id)"
+  observed_current="$(readlink -f "$current_link")"
+  [[ "$observed_current" == "$expected_current" ]] || \
+    die "install evidence/current release mismatch: evidence=$expected_current current=$observed_current"
+}
+
+require_clean_first_install_boundary() {
+  local artifact
+  for artifact in "$current_link" "$ppu_config" "$server_unit" "$gateway_unit" "$nginx_conf"; do
+    [[ ! -e "$artifact" && ! -L "$artifact" ]] || \
+      die "first install found unmanaged/pre-existing appliance artifact without install evidence: $artifact"
+  done
+}
+
+safe_remove_unqualified_release() {
+  local target="$1" active=""
+  [[ "$target" == "$release_root/"* && "$target" != "$release_root/" ]] || \
+    die "refusing unsafe release cleanup path: $target"
+  if [[ -L "$current_link" ]]; then
+    active="$(readlink -f "$current_link")"
+    [[ "$target" != "$active" ]] || die "refusing to remove active release: $target"
+  fi
+  if [[ -e "$target" ]]; then
+    say "removing unqualified inactive release: $target"
+    rm -rf --one-file-system "$target"
+  fi
+}
+
+verify_ready_json() {
+  python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+if payload.get("ok") is not True or payload.get("execution") != "ready":
+    raise SystemExit(f"unexpected readiness payload: {payload!r}")
+'
+}
+
+verify_loopback_json() {
+  python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+loopback = payload.get("loopback") or {}
+if payload.get("ok") is not True:
+    raise SystemExit(f"loopback did not return ok=true: {payload!r}")
+if loopback.get("endpoint") != "ps" or loopback.get("source") != "ps":
+    raise SystemExit(f"loopback did not terminate at PS: {loopback!r}")
+if loopback.get("tx_crc32") != "d202ef8d" or loopback.get("rx_crc32") != "d202ef8d":
+    raise SystemExit(f"loopback CRC mismatch: {loopback!r}")
+if payload.get("payload_base64") != "AA==":
+    raise SystemExit("loopback payload mismatch")
+'
+}
+
+verify_profile() {
+  require_command python3
+  require_command curl
+  require_command systemctl
+  validate_identity
+  require_managed_installation
+
+  systemctl is-active --quiet plasma-server.service || die "plasma-server.service is not active"
+  systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
+
+  local ready restricted_ready blocked_status loopback test_id
+  ready="$(curl --fail --silent --show-error --max-time 3 http://127.0.0.1:18080/api/health/ready)"
+  verify_ready_json <<<"$ready"
+  restricted_ready="$(curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:$proxy_port/api/health/ready")"
+  verify_ready_json <<<"$restricted_ready"
+
+  blocked_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 \
+    "http://127.0.0.1:$proxy_port/api/settings/sites")"
+  [[ "$blocked_status" == "404" ]] || die "restricted ingress unexpectedly exposed /api/settings/sites: HTTP $blocked_status"
+
+  test_id="plasmactl-swpc-z2like-$PPID-$(date +%s)"
+  loopback="$(curl --fail --silent --show-error --max-time 8 \
+    -H 'Accept: application/json' \
+    -H 'Content-Type: application/json' \
+    -H "Idempotency-Key: $test_id" \
+    --data "{\"endpoint\":\"ps\",\"test_id\":\"$test_id\",\"sequence\":1,\"pattern\":\"zero\",\"seed\":\"\",\"payload_length\":1,\"payload_base64\":\"AA==\",\"tx_crc32\":\"d202ef8d\",\"timeout_ms\":5000}" \
+    "http://127.0.0.1:$proxy_port/api/engineering/diagnostics/loopback")"
+  verify_loopback_json <<<"$loopback"
+
+  say "PASS: local PS-only surrogate is ready and restricted ingress remains closed"
+  say "qualification boundary: x86_64 SWPC PS surrogate only; no Z2/ARMv7/PL/FPGA/Site/IC claim"
+}
+
+status_profile() {
+  require_command python3
+  validate_identity
+  printf 'Profile:       swpc-z2like\n'
+  if [[ ! -f "$evidence" ]]; then
+    printf 'Installation:  not-installed\n'
+    return 1
+  fi
+  validate_install_evidence
+  python3 - "$evidence" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+for label, field in (
+    ("Release ID", "release_id"),
+    ("Git SHA", "git_sha"),
+    ("Architecture", "architecture"),
+    ("Plasma Python", "plasma_python"),
+    ("Gateway bind", "gateway_bind"),
+    ("Restricted", "restricted_ingress"),
+    ("Sites", "configured_site_count"),
+    ("Max Sites", "max_supported_sites"),
+):
+    print(f"{label + ':':14} {payload.get(field, 'unknown')}")
+print("Z2 equivalent:  NO")
+print("Hardware:       CLOSED")
+PY
+  printf 'Current:       %s\n' "$(readlink -f "$current_link" 2>/dev/null || echo missing)"
+  if command -v systemctl >/dev/null 2>&1; then
+    printf 'Server svc:    %s\n' "$(systemctl is-active plasma-server.service 2>/dev/null || true)"
+    printf 'Gateway svc:   %s\n' "$(systemctl is-active plasma-web.service 2>/dev/null || true)"
+  fi
+}
+
+run_installer() {
+  local plasma_python="$1"
+  bash "$installer" \
+    --plasma-python "$plasma_python" \
+    --ppu-id "$ppu_id" \
+    --facility-id "$facility_id" \
+    --proxy-port "$proxy_port"
+}
+
+cleanup_failed_first_install() {
+  local target_release="$1"
+  say "first install failed; removing only artifacts created inside the clean SWPC Z2-like boundary"
+  set +e
+  systemctl stop plasma-web.service plasma-server.service >/dev/null 2>&1
+  if [[ -L "$current_link" && "$(readlink -f "$current_link" 2>/dev/null)" == "$target_release" ]]; then
+    rm -f "$current_link"
+  fi
+  [[ -f "$nginx_conf" ]] && grep -Fxq "$nginx_marker" "$nginx_conf" && rm -f "$nginx_conf"
+  rm -f "$server_unit" "$gateway_unit" "$ppu_config" "$evidence"
+  if [[ "$target_release" == "$release_root/"* && "$target_release" != "$release_root/" ]]; then
+    rm -rf --one-file-system "$target_release"
+  fi
+  systemctl daemon-reload >/dev/null 2>&1
+  if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx >/dev/null 2>&1
+  fi
+  set -e
+}
+
+install_profile() {
+  require_root install
+  require_command git
+  require_command python3
+  validate_identity
+  require_clean_source
+  [[ ! -f "$evidence" ]] || die "SWPC Z2-like is already installed; use 'plasmactl deploy swpc-z2like'"
+  require_clean_first_install_boundary
+
+  local plasma_python current_sha target_release install_complete=0
+  plasma_python="$(resolve_plasma_python)"
+  current_sha="$(git -C "$repo_root" rev-parse HEAD)"
+  target_release="$(release_dir_for_sha "$current_sha")"
+  if [[ -e "$target_release" ]]; then
+    say "stale unqualified target exists from a prior failed attempt; cleaning before first install"
+    safe_remove_unqualified_release "$target_release"
+  fi
+
+  on_install_exit() {
+    local rc=$?
+    trap - EXIT
+    if (( rc != 0 && ! install_complete )); then
+      cleanup_failed_first_install "$target_release"
+    fi
+    exit "$rc"
+  }
+  trap on_install_exit EXIT
+
+  say "installing current committed source as SWPC Z2-like PS surrogate"
+  say "Plasma Python: $plasma_python"
+  run_installer "$plasma_python"
+  verify_profile
+  install_complete=1
+  trap - EXIT
+}
+
+restore_file() {
+  local snapshot="$1" destination="$2"
+  rm -f "$destination"
+  cp -a "$snapshot" "$destination"
+}
+
+deploy_profile() {
+  require_root deploy
+  require_command git
+  require_command python3
+  require_command systemctl
+  require_command nginx
+  validate_identity
+  require_clean_source
+
+  if [[ ! -f "$evidence" ]]; then
+    say "no existing SWPC Z2-like installation; deploy is performing first install"
+    install_profile
+    return 0
+  fi
+
+  require_managed_installation
+  local current_sha installed_sha plasma_python previous_current target_release snapshot rollback_required=0
+  current_sha="$(git -C "$repo_root" rev-parse HEAD)"
+  installed_sha="$(json_field "$evidence" git_sha)"
+  if [[ "$current_sha" == "$installed_sha" ]]; then
+    say "release already matches current source SHA; deployment is an idempotent no-op"
+    verify_profile
+    return 0
+  fi
+
+  plasma_python="$(resolve_plasma_python)"
+  previous_current="$(readlink -f "$current_link")"
+  [[ -d "$previous_current" ]] || die "current release target is invalid: $previous_current"
+  target_release="$(release_dir_for_sha "$current_sha")"
+  [[ "$target_release" != "$previous_current" ]] || die "new source unexpectedly resolves to active release: $target_release"
+  if [[ -e "$target_release" ]]; then
+    say "stale unqualified target exists from a prior failed activation; cleaning before retry"
+    safe_remove_unqualified_release "$target_release"
+  fi
+
+  snapshot="$(mktemp -d /tmp/plasma-swpc-z2like-deploy.XXXXXX)"
+  cp -a "$server_unit" "$snapshot/plasma-server.service"
+  cp -a "$gateway_unit" "$snapshot/plasma-web.service"
+  cp -a "$ppu_config" "$snapshot/ppu.yaml"
+  cp -a "$nginx_conf" "$snapshot/nginx.conf"
+  cp -a "$evidence" "$snapshot/install.json"
+  rollback_required=1
+
+  rollback() {
+    local rollback_failed=0
+    say "deployment failed; restoring previous qualified SWPC Z2-like activation"
+    set +e
+    systemctl stop plasma-web.service plasma-server.service >/dev/null 2>&1
+    ln -sfn "$previous_current" /opt/plasma/current.rollback
+    mv -Tf /opt/plasma/current.rollback "$current_link" || rollback_failed=1
+    restore_file "$snapshot/plasma-server.service" "$server_unit" || rollback_failed=1
+    restore_file "$snapshot/plasma-web.service" "$gateway_unit" || rollback_failed=1
+    restore_file "$snapshot/ppu.yaml" "$ppu_config" || rollback_failed=1
+    restore_file "$snapshot/nginx.conf" "$nginx_conf" || rollback_failed=1
+    restore_file "$snapshot/install.json" "$evidence" || rollback_failed=1
+    if [[ "$target_release" == "$release_root/"* && "$target_release" != "$release_root/" && "$target_release" != "$previous_current" ]]; then
+      rm -rf --one-file-system "$target_release" || rollback_failed=1
+    else
+      rollback_failed=1
+    fi
+    systemctl daemon-reload || rollback_failed=1
+    nginx -t || rollback_failed=1
+    systemctl reload nginx || rollback_failed=1
+    systemctl start plasma-server.service plasma-web.service || rollback_failed=1
+    set -e
+    if (( rollback_failed )); then
+      printf '[plasmactl swpc-z2like] CRITICAL: rollback was incomplete; inspect system services and /opt/plasma/current manually\n' >&2
+      return 1
+    fi
+    say "rollback restored: $previous_current"
+    return 0
+  }
+
+  on_exit() {
+    local rc=$?
+    trap - EXIT
+    if (( rc != 0 && rollback_required )); then
+      if ! rollback; then
+        rc=2
+      fi
+    fi
+    rm -rf "$snapshot"
+    exit "$rc"
+  }
+  trap on_exit EXIT
+
+  say "upgrading SWPC Z2-like surrogate: ${installed_sha:0:12} -> ${current_sha:0:12}"
+  say "stopping only Plasma-owned system PPU services; integration-host user services are never stopped implicitly"
+  systemctl stop plasma-web.service plasma-server.service
+
+  # Existing restricted Nginx owns the profile port. Remove only the installer-owned
+  # config during activation so the hardened installer can repeat its port preflight.
+  rm -f "$nginx_conf"
+  nginx -t
+  systemctl reload nginx
+
+  run_installer "$plasma_python"
+  verify_profile
+  rollback_required=0
+  trap - EXIT
+  rm -rf "$snapshot"
+  say "deployment activation complete: $(json_field "$evidence" release_id)"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: plasmactl-swpc-z2like COMMAND [options]
+
+Commands:
+  install    First provision of the x86_64 SWPC Z2-like PS surrogate
+  deploy     Activate current clean committed source; rollback to previous activation on failure
+  verify     Read-only local PS-surrogate readiness/restricted-ingress/PS-loopback verification
+  status     Show installed release identity and system-service state
+
+Options:
+  --plasma-python PATH   Override Plasma-owned runtime (otherwise reuse evidence or auto-select one unique runtime)
+  --ppu-id ID            PPU identity (default: swpc-z2like-01)
+  --facility-id ID       Facility identity (default: lab)
+  --proxy-port PORT      Restricted Nginx ingress (default: 18081)
+
+This profile is an x86_64 PS surrogate. It never constitutes ARMv7/Z2, PL, FPGA,
+Site electrical, real-IC programming, or production-readiness evidence.
+EOF
+}
+
+if [[ "${PLASMACTL_SWPC_Z2LIKE_LIB_ONLY:-0}" == "1" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+
+command="${1:-help}"
+shift || true
+while (($#)); do
+  case "$1" in
+    --plasma-python) plasma_python_override="${2:-}"; shift 2 ;;
+    --ppu-id) ppu_id="${2:-}"; shift 2 ;;
+    --facility-id) facility_id="${2:-}"; shift 2 ;;
+    --proxy-port) proxy_port="${2:-}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "unknown option: $1" ;;
+  esac
+done
+
+case "$command" in
+  install) install_profile ;;
+  deploy) deploy_profile ;;
+  verify) verify_profile ;;
+  status) status_profile ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; die "unknown command: $command" ;;
+esac
