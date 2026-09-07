@@ -92,6 +92,8 @@ def build_candidate_inputs(
     summary: dict[str, Any],
     evidence_id: str,
     catalog_rows: list[dict[str, str]],
+    supported_base_devices: frozenset[str] = SUPPORTED_BASE_DEVICES,
+    expected_candidate_count: int = 9,
 ) -> list[dict[str, Any]]:
     """Normalize retained Phase 4.3B evidence into policy inputs."""
 
@@ -110,8 +112,8 @@ def build_candidate_inputs(
         evidence = result.get("evidence")
         if not isinstance(base_device, str) or not isinstance(evidence, dict):
             raise AdmissionError("retained STM32F2 result lacks base/evidence")
-        if base_device not in SUPPORTED_BASE_DEVICES:
-            raise AdmissionError(f"{base_device}: outside bounded Phase 4.3C policy")
+        if base_device not in supported_base_devices:
+            raise AdmissionError(f"{base_device}: outside bounded STM32F2 policy")
         if result.get("acquisition_status") != "success":
             raise AdmissionError(f"{base_device}: retained acquisition was not successful")
         observed_bases.append(base_device)
@@ -149,16 +151,25 @@ def build_candidate_inputs(
                 }
             )
 
-    if set(observed_bases) != SUPPORTED_BASE_DEVICES or len(observed_bases) != len(
-        SUPPORTED_BASE_DEVICES
+    if set(observed_bases) != supported_base_devices or len(observed_bases) != len(
+        supported_base_devices
     ):
         raise AdmissionError("retained STM32F2 Base Device scope drifted")
-    if len(candidates) != 9:
-        raise AdmissionError(f"Phase 4.3C requires exactly 9 retained candidates, got {len(candidates)}")
+    if len(candidates) != expected_candidate_count:
+        raise AdmissionError(
+            f"bounded STM32F2 policy requires exactly {expected_candidate_count} "
+            f"retained candidates, got {len(candidates)}"
+        )
     return candidates
 
 
-def build_canonical_row(candidate: dict[str, Any], fields: list[str]) -> dict[str, str]:
+def build_canonical_row(
+    candidate: dict[str, Any],
+    fields: list[str],
+    *,
+    supported_base_devices: frozenset[str] = SUPPORTED_BASE_DEVICES,
+    flash_by_code: dict[str, str] = FLASH_BY_CODE,
+) -> dict[str, str]:
     """Apply the bounded STM32F2 metadata and mapping policy to one candidate."""
 
     icpn = candidate.get("icpn")
@@ -188,12 +199,12 @@ def build_canonical_row(candidate: dict[str, Any], fields: list[str]) -> dict[st
         raise CandidateReject(f"unsupported STM32F2 option suffix: {option_suffix}")
 
     pin_code, flash_code = base_match.groups()
-    flash_size = FLASH_BY_CODE.get(flash_code)
+    flash_size = flash_by_code.get(flash_code)
     if flash_size is None:
         raise CandidateManualReview(f"unsupported STM32F2 flash-size code: {flash_code}")
     package, pin_count = _package_and_pins(pin_code, package_code)
-    if base_device not in SUPPORTED_BASE_DEVICES:
-        raise CandidateReject(f"{base_device}: outside bounded Phase 4.3C policy")
+    if base_device not in supported_base_devices:
+        raise CandidateReject(f"{base_device}: outside bounded STM32F2 policy")
 
     target_configs = mapping.get("target_configs")
     if mapping.get("status") != "unique" or not isinstance(target_configs, list) or len(
