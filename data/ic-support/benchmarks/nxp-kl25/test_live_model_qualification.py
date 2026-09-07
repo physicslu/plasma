@@ -47,6 +47,24 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
             }
         return result
 
+    def build_context(self):
+        return {
+            "schema_version": "0.1.0",
+            "strategy": "cross_pack_physical_page_dedup_v1",
+            "gate3_artifacts_mutated": False,
+            "dedup_identity": ["source_id", "pdf_page_number", "page_text_sha256"],
+            "page_occurrences": 127,
+            "unique_physical_pages": 33,
+            "duplicate_occurrences_removed": 94,
+            "page_occurrence_redundancy_pct": 74.02,
+            "legacy_context_sha256": "a" * 64,
+            "legacy_context_bytes": 413754,
+            "context_sha256": "b" * 64,
+            "context_bytes": 107285,
+            "context_byte_reduction_pct": 74.07,
+            "per_pack": [],
+        }
+
     def build_semantic_run(self, packs):
         results = []
         for unit_id, (start, _, statement) in UNIT_FIXTURES.items():
@@ -81,8 +99,11 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
                 "transport": "ollama_native_chat",
                 "runtime_label": "kl25-live-model-qualification",
                 "model_id": "qwen3.8:27b-mlx",
+                "output_format": "json_schema",
+                "output_schema_sha256": "c" * 64,
             },
-            "prompt": {"sha256": "b" * 64, "byte_length": 1000},
+            "context": self.build_context(),
+            "prompt": {"sha256": "b" * 64, "byte_length": 112561},
             "trust_boundary": {
                 "semantic_extraction_admission": False,
                 "model_quality_admission": False,
@@ -93,7 +114,7 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
                 "response_model": "qwen3.8:27b-mlx",
                 "done": True,
                 "done_reason": "stop",
-                "usage": {"input_tokens": 12000, "generation_tokens": 900},
+                "usage": {"input_tokens": 23000, "generation_tokens": 5000},
                 "timing": {"wall_time_ms": 1000.0},
             },
             "transport_invoked": True,
@@ -102,8 +123,10 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
         return run, raw
 
     def build_provenance(self, run, raw):
+        context_protocol = self.contract["live_runtime"]["context_protocol"]
+        run_context = run["context"]
         provenance = {
-            "schema_version": "0.1.0",
+            "schema_version": "0.3.0",
             "artifact_type": "kl25_live_model_run_provenance",
             "target": "MKL25Z128VLK4",
             "bundle_digest": run["bundle_digest"],
@@ -112,7 +135,7 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
             "raw_response_sha256": builder.sha256_text(raw),
             "ollama_runtime_identity": {
                 "ollama_url_policy": "loopback_only",
-                "ollama_version": "0.12.0",
+                "ollama_version": "0.33.3",
                 "model_id": "qwen3.8:27b-mlx",
                 "model_digest": "sha256:" + "a" * 64,
             },
@@ -121,6 +144,16 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
                 "model_id": "qwen3.8:27b-mlx",
                 "runtime_label": "kl25-live-model-qualification",
                 "ollama_endpoint_policy": "loopback_only",
+                "context": {
+                    **copy.deepcopy(context_protocol),
+                    "context_sha256": run_context["context_sha256"],
+                    "context_bytes": run_context["context_bytes"],
+                    "legacy_context_bytes": run_context["legacy_context_bytes"],
+                    "page_occurrences": run_context["page_occurrences"],
+                    "unique_physical_pages": run_context["unique_physical_pages"],
+                    "duplicate_occurrences_removed": run_context["duplicate_occurrences_removed"],
+                    "context_byte_reduction_pct": run_context["context_byte_reduction_pct"],
+                },
                 "generation": copy.deepcopy(self.contract["live_runtime"]["generation"]),
             },
             "code_fingerprints": {"qualify_semantic_run.py": "f" * 64},
@@ -168,6 +201,35 @@ class KL25LiveModelQualificationTest(unittest.TestCase):
             mutate_provenance=lambda provenance: provenance["ollama_runtime_identity"].__setitem__("model_digest", "bad")
         )
         self.assertEqual(report["status"], "REJECTED_INTEGRITY")
+
+    def test_context_strategy_and_provenance_binding_are_integrity_requirements(self):
+        report, _ = self.assess(
+            mutate_run=lambda run: run["context"].__setitem__("strategy", "pack_materialized_v0")
+        )
+        self.assertEqual(report["status"], "REJECTED_INTEGRITY")
+        self.assertTrue(any("context strategy" in item for item in report["integrity"]["errors"]))
+
+        report, _ = self.assess(
+            mutate_provenance=lambda provenance: provenance["execution"]["context"].__setitem__("context_sha256", "0" * 64)
+        )
+        self.assertEqual(report["status"], "REJECTED_INTEGRITY")
+        self.assertTrue(any("provenance semantic context" in item for item in report["integrity"]["errors"]))
+
+    def test_provider_token_envelope_must_fit_requested_num_ctx(self):
+        def overflow_input(run):
+            run["transport_metadata"]["usage"]["input_tokens"] = 70000
+
+        report, _ = self.assess(mutate_run=overflow_input)
+        self.assertEqual(report["status"], "REJECTED_INTEGRITY")
+        self.assertTrue(any("input_tokens must be below" in item for item in report["integrity"]["errors"]))
+
+        def overflow_total(run):
+            run["transport_metadata"]["usage"]["input_tokens"] = 62000
+            run["transport_metadata"]["usage"]["generation_tokens"] = 5000
+
+        report, _ = self.assess(mutate_run=overflow_total)
+        self.assertEqual(report["status"], "REJECTED_INTEGRITY")
+        self.assertTrue(any("must fit requested num_ctx" in item for item in report["integrity"]["errors"]))
 
     def test_unknown_or_stm32_projection_fails_screening(self):
         def unknown(run):
