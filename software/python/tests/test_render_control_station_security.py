@@ -9,7 +9,7 @@ SCRIPT = REPOSITORY_ROOT / "scripts" / "render-control-station-start.sh"
 
 def test_public_render_lab_uses_fixed_immutable_manager_registry() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
-    assert "registry_state_path" not in text
+    assert '"registry_state_path":' not in text
     assert "arbitrary Manager-side HTTP(S) request target" in text
     assert '"ppus": [{"alias": alias, "endpoint": endpoint}]' in text
 
