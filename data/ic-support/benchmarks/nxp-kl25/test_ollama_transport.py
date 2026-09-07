@@ -34,6 +34,12 @@ class KL25OllamaTransportTest(unittest.TestCase):
             "temperature": 0.0,
             "seed": 7,
             "timeout_seconds": 30.0,
+            "format_schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["schema_version"],
+                "properties": {"schema_version": {"type": "string"}},
+            },
         }
         options.update(overrides.pop("options", {}))
         return ollama_transport.ollama_native_chat_transport(
@@ -44,7 +50,7 @@ class KL25OllamaTransportTest(unittest.TestCase):
             **overrides,
         )
 
-    def test_native_chat_request_has_bounded_non_streaming_controls(self):
+    def test_native_chat_request_has_bounded_non_streaming_structured_controls(self):
         captured = {}
         outer = {
             "model": "qwen3.8:27b-mlx",
@@ -73,6 +79,12 @@ class KL25OllamaTransportTest(unittest.TestCase):
         self.assertFalse(payload["truncate"])
         self.assertFalse(payload["shift"])
         self.assertEqual(payload["messages"], [{"role": "user", "content": "manufacturer evidence prompt"}])
+        self.assertEqual(payload["format"], {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["schema_version"],
+            "properties": {"schema_version": {"type": "string"}},
+        })
         self.assertEqual(payload["options"]["num_ctx"], 32768)
         self.assertEqual(payload["options"]["num_predict"], 2048)
         self.assertEqual(payload["options"]["temperature"], 0.0)
@@ -81,6 +93,12 @@ class KL25OllamaTransportTest(unittest.TestCase):
         self.assertEqual(result["response_model"], "qwen3.8:27b-mlx")
         self.assertEqual(result["usage"]["input_tokens"], 100)
         self.assertEqual(result["usage"]["generation_tokens"], 20)
+
+    def test_structured_output_schema_is_required_before_http(self):
+        with mock.patch("urllib.request.urlopen") as mocked:
+            with self.assertRaises(runner.SemanticTransportProtocolError):
+                self.invoke(options={"format_schema": None})
+            mocked.assert_not_called()
 
     def test_timeout_is_normalized(self):
         with mock.patch("urllib.request.urlopen", side_effect=TimeoutError("mock timeout")):
