@@ -17,11 +17,6 @@ HEADING_PATTERNS = [
     re.compile(r"^\s*[A-Z][A-Z0-9 /()&\-]{5,100}$"),
 ]
 
-MATCH_MODES = {
-    "TARGET_EXACT_IDENTITY": "whole_token",
-    "TARGET_DEVICE_EXPRESSION": "whole_token",
-}
-
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -71,6 +66,14 @@ def matched_terms(page: str, terms: list[str], mode: str) -> list[str]:
     return [term for term in terms if term.lower() in lower]
 
 
+def page_allowed(claim: dict, source_id: str, page_number: int) -> bool:
+    page_ranges = claim.get("page_ranges")
+    if not page_ranges:
+        return True
+    ranges = page_ranges.get(source_id, [])
+    return any(start <= page_number <= end for start, end in ranges)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Discover deterministic KL25 applicability evidence candidates")
     parser.add_argument("--source-dir", type=Path, required=True)
@@ -94,18 +97,21 @@ def main() -> int:
 
     claims: dict[str, dict] = {}
     for claim_id, claim in contract["candidate_claims"].items():
-        mode = MATCH_MODES.get(claim_id, "literal")
+        mode = claim.get("match_mode", "literal")
         evidence = []
         for source_id in claim["source_ids"]:
             source = source_by_id[source_id]
             for page_index, page in enumerate(pages_by_source[source_id]):
+                page_number = page_index + 1
+                if not page_allowed(claim, source_id, page_number):
+                    continue
                 matched = matched_terms(page, claim["terms"], mode)
                 if not matched:
                     continue
                 evidence.append({
                     "source_id": source_id,
                     "document_role": source["document_role"],
-                    "pdf_page_number": page_index + 1,
+                    "pdf_page_number": page_number,
                     "matched_terms": matched,
                     "match_mode": mode,
                     "heading_candidates": headings(page),
@@ -114,18 +120,21 @@ def main() -> int:
                 })
         claims[claim_id] = {
             "purpose": claim["purpose"],
+            "optional": bool(claim.get("optional", False)),
+            "absence_policy": claim.get("absence_policy"),
             "evidence": evidence,
             "candidate_count": len(evidence),
             "review_status": "PENDING"
         }
 
     output = {
-        "schema_version": "0.1.0",
+        "schema_version": "0.2.0",
         "artifact_type": "applicability_evidence_candidates",
         "applicability_id": contract["applicability_id"],
         "source_lock_id": lock["source_lock_id"],
         "target": contract["target"],
         "claims": claims,
+        "scope_bridge": contract["scope_bridge"],
         "unit_requirements": contract["unit_requirements"],
         "trust_boundary": {
             "candidate_evidence_complete": True,
@@ -143,7 +152,8 @@ def main() -> int:
     args.output.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {args.output}")
     for claim_id, item in claims.items():
-        print(f"{claim_id} {item['candidate_count']}")
+        suffix = " optional" if item["optional"] else ""
+        print(f"{claim_id} {item['candidate_count']}{suffix}")
     return 0
 
 
