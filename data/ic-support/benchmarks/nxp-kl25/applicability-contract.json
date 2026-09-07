@@ -1,0 +1,89 @@
+{
+  "schema_version": "0.1.0",
+  "applicability_id": "nxp-kl25-applicability-foundation-v0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "definition_set_id": "nxp-kl25-reviewed-evidence-unit-definitions-v0",
+  "target": "MKL25Z128VLK4",
+  "principle": "commercial target identity, manufacturer family scope, module presence, and unit scope are distinct claims",
+  "candidate_claims": {
+    "TARGET_EXACT_IDENTITY": {
+      "source_ids": ["nxp_kl25_ds_rev5"],
+      "terms": ["MKL25Z128VLK4"],
+      "purpose": "prove the requested commercial target is present in manufacturer evidence"
+    },
+    "TARGET_DEVICE_EXPRESSION": {
+      "source_ids": ["nxp_kl25_ds_rev5"],
+      "terms": ["MKL25Z128"],
+      "purpose": "bridge the exact commercial part to the manufacturer device expression without fuzzy matching"
+    },
+    "KL25_FAMILY_SCOPE": {
+      "source_ids": ["nxp_kl25_ds_rev5", "nxp_kl25_rm_rev3"],
+      "terms": ["Kinetis KL25", "KL25 Sub-Family"],
+      "purpose": "establish family/document scope; these terms are not commercial identity evidence"
+    },
+    "FTFA_MODULE_PRESENCE": {
+      "source_ids": ["nxp_kl25_ds_rev5", "nxp_kl25_rm_rev3"],
+      "terms": ["FTFA", "Flash Memory Module"],
+      "purpose": "establish the NXP flash module used by the reviewed programming units"
+    },
+    "SWD_DEBUG_PRESENCE": {
+      "source_ids": ["nxp_kl25_ds_rev5", "nxp_kl25_rm_rev3"],
+      "terms": ["Serial Wire Debug", "SWD"],
+      "purpose": "establish debug/programming interface presence"
+    },
+    "MDM_AP_PRESENCE": {
+      "source_ids": ["nxp_kl25_rm_rev3"],
+      "terms": ["MDM-AP"],
+      "purpose": "establish the debug/security access-port model described by the reviewed unit"
+    },
+    "FLASH_SECURITY_MODEL": {
+      "source_ids": ["nxp_kl25_rm_rev3"],
+      "terms": ["FSEC", "security state"],
+      "purpose": "establish the manufacturer security model used by the reviewed security units"
+    }
+  },
+  "scope_bridge": {
+    "required_claims": [
+      "TARGET_EXACT_IDENTITY",
+      "TARGET_DEVICE_EXPRESSION",
+      "KL25_FAMILY_SCOPE"
+    ],
+    "generic_family_header_may_establish_family_scope": true,
+    "generic_family_header_may_establish_commercial_identity": false,
+    "fuzzy_target_matching_allowed": false,
+    "substring_identity_equivalence_allowed": false
+  },
+  "unit_binding_policy": {
+    "required_before_binding": [
+      "scope_bridge_reviewed",
+      "module_or_interface_presence_reviewed",
+      "unit_section_within_applicable_manufacturer_document_reviewed",
+      "applicability_exclusions_reviewed"
+    ],
+    "absence_of_exclusion_is_not_assumed_from_keyword_search": true,
+    "shared_reference_manual_does_not_by_itself_prove_unit_applicability": true,
+    "unknown_fails_closed": true
+  },
+  "unit_requirements": {
+    "nxp-kl25-ftfa-register-model-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-ftfa-command-sequencing-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-program-longword-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-erase-sector-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-erase-all-blocks-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-flash-security-v0": ["FTFA_MODULE_PRESENCE", "FLASH_SECURITY_MODEL"],
+    "nxp-kl25-debug-security-interaction-v0": ["SWD_DEBUG_PRESENCE", "MDM_AP_PRESENCE", "FLASH_SECURITY_MODEL"],
+    "nxp-kl25-swd-mdm-ap-v0": ["SWD_DEBUG_PRESENCE", "MDM_AP_PRESENCE"]
+  },
+  "admission": {
+    "applicability_candidate_evidence": true,
+    "scope_bridge": false,
+    "evidence_unit_catalog": false,
+    "applicability_binding": false,
+    "evidence_pack": false,
+    "semantic_extraction": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}
