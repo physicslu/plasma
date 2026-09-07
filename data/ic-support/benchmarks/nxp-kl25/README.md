@@ -27,12 +27,13 @@ locked manufacturer bytes
   -> reviewed applicability claims
   -> deterministic target scope bridge
   -> deterministic per-unit Applicability Binding
-  -> Evidence Pack / TargetEvidenceBundle        [not yet admitted]
-  -> AI manufacturer-near semantic extraction    [not yet admitted]
-  -> deterministic canonicalization              [not yet admitted]
+  -> deterministic Evidence Pack / TargetEvidenceBundle   [Gate 3 under validation]
+  -> pre-AI input manifest / model-context assembly       [Gate 3 under validation]
+  -> AI manufacturer-near semantic extraction             [not admitted]
+  -> deterministic canonicalization                       [not admitted]
 ```
 
-AI does not own exact commercial identity, manufacturer-document membership, target applicability, applicability exclusions, or cross-unit binding.
+AI does not own exact commercial identity, manufacturer-document membership, target applicability, applicability exclusions, Evidence Unit dependency closure, or deterministic pack membership.
 
 ## Current retained source lock
 
@@ -74,7 +75,7 @@ The retained applicability run was regenerated from source-locked DS/RM bytes us
 
 The selected anchors are reviewed in `reviewed-applicability-claims.json` with `source_id`, physical PDF page and normalized-page SHA-256. That reviewed artifact also locks the evidence-lock file digest, so mutation of retained anchor metadata fails closed.
 
-The target scope bridge is now admitted:
+The target scope bridge is admitted:
 
 ```text
 exact MKL25Z128VLK4 identity
@@ -94,23 +95,100 @@ Module/interface claims for FTFA, SWD, MDM-AP and the Flash security model are r
 
 `derive_applicability_binding.py` therefore derives all eight reviewed units as `BOUND` for `MKL25Z128VLK4`. Missing prerequisites derive `UNKNOWN`; malformed or provenance-mismatched retained evidence is rejected.
 
+## Gate 3 Evidence Pack model
+
+`build_evidence_pack.py` defines one primary Evidence Pack for each admitted Evidence Unit and computes deterministic transitive dependency closure before materializing manufacturer text.
+
+Examples:
+
+```text
+Program Longword
+  -> FTFA command sequencing
+      -> FTFA register model
+
+Debug / Security interaction
+  -> SWD / MDM-AP
+  -> Flash Security
+      -> FTFA command sequencing
+          -> FTFA register model
+```
+
+This is intentionally stronger than copying only the primary operation pages. The objective is to provide the smallest context that still preserves the register/status/sequence/security dependencies required to interpret the primary Evidence Unit.
+
+Each pack identity is bound to:
+
+- exact source-lock fingerprint;
+- Evidence Unit definition-set digest;
+- Applicability Binding digest;
+- Evidence Pack contract digest;
+- builder SHA-256;
+- included unit set and dependency origin;
+- physical PDF page numbers;
+- normalized page-text SHA-256 values.
+
+The target bundle contains the eight pack digests for exact target `MKL25Z128VLK4`. Manufacturer text is materialized for execution but is not committed to Git as a retained artifact.
+
+## Pre-AI CI strategy
+
+Normal repository CI is intentionally **model-free and network-free** for this stage. It uses synthetic page fixtures to test every deterministic and orchestration path that can be proven without real model inference:
+
+```text
+contract validation
+  -> dependency graph validation
+  -> dependency closure
+  -> pack construction
+  -> page deduplication
+  -> page-content digest validation
+  -> TargetEvidenceBundle assembly
+  -> pre-AI input manifest
+  -> model-context assembly
+  -> fail-closed mutation tests
+  -> STOP before model inference
+```
+
+The permanent CI therefore must not require Ollama, oMLX, model weights, an API key, or a vendor website.
+
+A separate one-shot live-source validation is used during Gate 3 review to fetch the exact source-locked NXP Reference Manual, verify its byte length/SHA-256, run the pinned `pdftotext` transformation, build the real packs, and retain metadata/digests only. That temporary workflow is removed after the real-source evidence is retained so routine CI is not coupled to external website availability.
+
+When a real KL25 model runner is introduced in the next gate, its transport/orchestration behavior should also be covered by deterministic mocked CI (success, timeout, malformed JSON, schema rejection and runner errors). Actual model-weight inference and semantic-quality scoring remain separate live/model benchmarks.
+
+## Gate 3 fail-closed requirements
+
+Evidence Pack construction must reject or invalidate the build when any of these conditions occurs:
+
+- target scope bridge is not `BOUND`;
+- any required unit binding is `UNKNOWN`;
+- applicability exclusions are not reviewed;
+- catalog/binding/source-lock identities disagree;
+- dependency graph contains unknown nodes, self-dependencies or cycles;
+- a required physical PDF page is absent;
+- source bytes fail byte-length or SHA-256 verification;
+- materialized page content differs from the recorded page hash;
+- pack/bundle/evidence digests differ from the pre-AI manifest.
+
+No test may convert an unknown or malformed state into an inferred `BOUND` state.
+
 ## Current trust boundary
 
-Admitted for this benchmark evidence pipeline:
+Already admitted for this benchmark evidence pipeline:
 
-- source lock
-- deterministic preprocessing/discovery
-- reviewed Evidence Unit Catalog
-- reviewed target scope bridge
-- deterministic Applicability Binding
+- source lock;
+- deterministic preprocessing/discovery;
+- reviewed Evidence Unit Catalog;
+- reviewed target scope bridge;
+- deterministic Applicability Binding.
 
-The following remain denied:
+Gate 3 implementation exists on the review branch, but admission stays false until both permanent CI and real-source validation pass:
 
-- Evidence Pack admission
-- semantic extraction admission
-- canonical dataset admission
-- HIL admission
-- production admission
-- destructive security operation admission
+- Evidence Pack admission: `false`;
+- Pre-AI CI admission: `false`.
 
-Applicability binding is evidence governance. It is not proof of executable erase/program/unsecure behavior on real hardware.
+The following remain denied regardless of Gate 3 test results:
+
+- semantic extraction admission;
+- canonical dataset admission;
+- HIL admission;
+- production admission;
+- destructive security operation admission.
+
+Evidence Pack admission, when granted, proves deterministic evidence packaging and pre-inference input integrity. It does **not** prove that any LLM extracts the correct semantics, that OpenOCD can program the device, or that hardware erase/program/security operations are safe.
