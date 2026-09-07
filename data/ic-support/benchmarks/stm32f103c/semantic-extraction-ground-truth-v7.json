@@ -1,0 +1,71 @@
+{
+  "schema_version": "0.8.0",
+  "benchmark_id": "stm32f103c-semantic-extraction-v7",
+  "source_lock_id": "stm32f103c-source-lock-v0",
+  "status": "source_locked_device_identity_ontology_semantic_ground_truth",
+  "expected": {
+    "profile_relationships": {},
+    "targets": {
+      "STM32F103C8T6": {
+        "manufacturer_applicability_expression": "STM32F103x8",
+        "flash_size_bytes": 65536,
+        "page_size_bytes": 1024,
+        "page_count": 64,
+        "package_hardware": {
+          "package_family": "LQFP",
+          "pin_count": 48,
+          "debug_programming_interfaces": ["SWD", "JTAG"]
+        }
+      },
+      "STM32F103CBT6": {
+        "manufacturer_applicability_expression": "STM32F103xB",
+        "flash_size_bytes": 131072,
+        "page_size_bytes": 1024,
+        "page_count": 128,
+        "package_hardware": {
+          "package_family": "LQFP",
+          "pin_count": 48,
+          "debug_programming_interfaces": ["SWD", "JTAG"]
+        }
+      }
+    },
+    "programming_contract": {
+      "program_granularity_bytes": 2,
+      "unlock_keys": ["0x45670123", "0xCDEF89AB"],
+      "write_erase_requires_hsi": true
+    },
+    "option_contract": {
+      "region_start_text": "0x1FFF F800",
+      "region_size_bytes": 16,
+      "encoding_structure": {
+        "logical_value_width_bits": 8,
+        "stored_pair_width_bits": 16,
+        "companion_value_present": true,
+        "companion_relation": "bitwise_not"
+      }
+    },
+    "security_contract": {
+      "read_unprotect_is_destructive": true,
+      "write_protection_granularity_bytes": 4096
+    }
+  },
+  "comparison_rules": {
+    "$.semantic_facts.option_contract.region_start_text": "HEX_ADDRESS_EQUIVALENT",
+    "$.semantic_facts.targets.STM32F103C8T6.package_hardware.debug_programming_interfaces": "STRING_SET_EQUIVALENT",
+    "$.semantic_facts.targets.STM32F103CBT6.package_hardware.debug_programming_interfaces": "STRING_SET_EQUIVALENT"
+  },
+  "identity_ontology": {
+    "commercial_target_identity_source": "semantic_facts.targets object key",
+    "manufacturer_applicability_expression_source": "manufacturer evidence",
+    "commercial_identity_is_ai_extracted_leaf": false,
+    "fuzzy_identity_equivalence": false
+  },
+  "trust_boundary": {
+    "visible_to_generation": false,
+    "all_profile_relationships_visible_to_generation": false,
+    "citation_presence_is_not_semantic_entailment_proof": true,
+    "destructive_security_operation_admission": false,
+    "canonical_dataset_admission": false,
+    "production_admission": false
+  }
+}
