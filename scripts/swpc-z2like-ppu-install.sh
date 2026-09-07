@@ -82,9 +82,23 @@ print(".".join(map(str, sys.version_info[:3])), sys.version_info.releaselevel, p
 PY
 )
 "$plasma_python" - <<'PY'
+import re
 import sys
+
 if sys.version_info < (3, 11) or sys.version_info.releaselevel != "final":
     raise SystemExit("Plasma Python must be a final release >= 3.11")
+if sys.prefix == sys.base_prefix:
+    raise SystemExit(
+        "Plasma Python must be an isolated virtual environment; "
+        "base or externally-managed interpreters are not accepted"
+    )
+try:
+    import yaml
+except ModuleNotFoundError as exc:
+    raise SystemExit("Plasma Python must have PyYAML>=6.0 pre-provisioned") from exc
+match = re.match(r"^(\d+)\.(\d+)", yaml.__version__)
+if match is None or tuple(map(int, match.groups())) < (6, 0):
+    raise SystemExit(f"Plasma Python requires PyYAML>=6.0, found {yaml.__version__}")
 PY
 
 sha="$(git -C "$repo_root" rev-parse HEAD)"
@@ -103,8 +117,8 @@ log_root="/var/log/plasma"
 printf '[swpc-z2like] release_id=%s source_sha=%s python=%s machine=%s\n' \
   "$release_id" "$sha" "$py_version" "$py_machine"
 
-# Build with the same isolated interpreter that will execute the runtime.
-"$plasma_python" -m pip install --disable-pip-version-check 'PyYAML>=6.0'
+# The deployed interpreter is pre-provisioned and must not be mutated here.
+# Build and execute with the same isolated interpreter.
 tmp_runtime="$(mktemp -d /tmp/plasma-swpc-z2like-runtime.XXXXXX)"
 trap 'rm -rf "$tmp_runtime"' EXIT
 rm -rf "$tmp_runtime/runtime"
@@ -249,14 +263,31 @@ systemctl enable --now plasma-server.service plasma-web.service
 nginx -t
 systemctl reload nginx
 
-python3 - <<'PY'
-import json, urllib.request
+"$plasma_python" - <<'PY'
+import json
+import time
+import urllib.request
+
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-with opener.open("http://127.0.0.1:18080/api/health/ready", timeout=5) as response:
-    payload = json.load(response)
-if response.status != 200 or payload.get("ok") is not True or payload.get("execution") != "ready":
-    raise SystemExit(f"PPU readiness failed: {payload!r}")
-print(json.dumps(payload, sort_keys=True))
+deadline = time.monotonic() + 10.0
+last_error = "readiness was not attempted"
+while True:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise SystemExit(f"PPU readiness failed after 10s: {last_error}")
+    try:
+        with opener.open(
+            "http://127.0.0.1:18080/api/health/ready",
+            timeout=min(1.0, max(0.1, remaining)),
+        ) as response:
+            payload = json.load(response)
+        if response.status == 200 and payload.get("ok") is True and payload.get("execution") == "ready":
+            print(json.dumps(payload, sort_keys=True))
+            break
+        last_error = f"unexpected readiness response: status={response.status} payload={payload!r}"
+    except Exception as exc:
+        last_error = f"{type(exc).__name__}: {exc}"
+    time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))
 PY
 
 cat >/opt/plasma/install/last-swpc-z2like-install.json <<EOF
