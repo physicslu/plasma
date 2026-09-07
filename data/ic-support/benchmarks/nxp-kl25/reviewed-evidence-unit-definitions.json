@@ -5,7 +5,7 @@
   "reviewed_boundary_id": "nxp-kl25-reviewed-candidate-boundary-v0",
   "construction_id": "nxp-kl25-evidence-unit-construction-v0",
   "target": "MKL25Z128VLK4",
-  "status": "reviewed_definitions_not_admitted_catalog",
+  "status": "admitted_evidence_unit_catalog",
   "units": [
     {
       "unit_id": "nxp-kl25-ftfa-register-model-v0",
@@ -91,9 +91,9 @@
   },
   "trust_boundary": {
     "reviewed_unit_definitions_complete": true,
-    "evidence_unit_catalog_admission": false,
+    "evidence_unit_catalog_admission": true,
     "evidence_pack_admission": false,
-    "applicability_binding_admission": false,
+    "applicability_binding_admission": true,
     "semantic_extraction_admission": false,
     "canonical_dataset_admission": false,
     "hil_admission": false,
