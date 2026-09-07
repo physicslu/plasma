@@ -155,6 +155,8 @@ def assess_live_run(
     required = contract.get("required_input", {})
     live_runtime = contract.get("live_runtime", {})
     generation = live_runtime.get("generation", {})
+    context_protocol = live_runtime.get("context_protocol", {})
+
     check(contract.get("artifact_type") == "kl25_live_model_qualification_contract", "qualification contract artifact mismatch")
     check(semantic_run.get("artifact_type") == "kl25_semantic_extraction_run", "semantic run artifact mismatch")
     check(semantic_run.get("status") == "success", "semantic run status must be success")
@@ -162,14 +164,40 @@ def assess_live_run(
     check(semantic_run.get("bundle_digest") == required.get("bundle_digest"), "bundle digest mismatch")
     check(semantic_run.get("pre_ai_manifest_digest") == required.get("pre_ai_manifest_digest"), "pre-AI manifest digest mismatch")
     check(semantic_run.get("semantic_contract_id") == required.get("semantic_contract_id"), "semantic contract id mismatch")
+
     runtime = semantic_run.get("runtime", {})
     check(runtime.get("transport") == live_runtime.get("transport"), "transport mismatch")
     check(runtime.get("model_id") == live_runtime.get("model_id"), "model id mismatch")
     check(runtime.get("runtime_label") == live_runtime.get("runtime_label"), "runtime label mismatch")
     check(semantic_run.get("transport_invoked") is True, "transport must be invoked")
+
     prompt_sha = semantic_run.get("prompt", {}).get("sha256")
     check(isinstance(prompt_sha, str) and HEX64.fullmatch(prompt_sha) is not None, "prompt digest missing")
     check(semantic_run.get("raw_response_sha256") == builder.sha256_text(raw_response), "raw response digest mismatch")
+
+    run_context = semantic_run.get("context") if isinstance(semantic_run.get("context"), dict) else {}
+    check(run_context.get("strategy") == context_protocol.get("strategy"), "semantic context strategy mismatch")
+    check(run_context.get("gate3_artifacts_mutated") is False, "semantic context must not mutate Gate-3 artifacts")
+    context_sha = run_context.get("context_sha256")
+    check(isinstance(context_sha, str) and HEX64.fullmatch(context_sha) is not None, "semantic context digest missing")
+    context_bytes = run_context.get("context_bytes")
+    legacy_context_bytes = run_context.get("legacy_context_bytes")
+    page_occurrences = run_context.get("page_occurrences")
+    unique_pages = run_context.get("unique_physical_pages")
+    duplicates_removed = run_context.get("duplicate_occurrences_removed")
+    check(isinstance(context_bytes, int) and context_bytes > 0, "semantic context byte length missing")
+    check(isinstance(legacy_context_bytes, int) and legacy_context_bytes > 0, "legacy context byte length missing")
+    check(isinstance(page_occurrences, int) and page_occurrences > 0, "context page occurrence count missing")
+    check(isinstance(unique_pages, int) and unique_pages > 0, "context unique physical page count missing")
+    check(isinstance(duplicates_removed, int) and duplicates_removed >= 0, "context duplicate removal count missing")
+    if all(isinstance(value, int) for value in (page_occurrences, unique_pages, duplicates_removed)):
+        check(page_occurrences == unique_pages + duplicates_removed, "context duplicate accounting mismatch")
+    if isinstance(context_bytes, int) and isinstance(legacy_context_bytes, int):
+        check(context_bytes < legacy_context_bytes, "compact context must be smaller than legacy context")
+    if context_protocol.get("require_cross_pack_duplicate_removal") is True:
+        check(isinstance(duplicates_removed, int) and duplicates_removed > 0, "qualification requires cross-pack duplicate removal")
+    check(run_context.get("dedup_identity") == context_protocol.get("dedup_identity"), "context dedup identity mismatch")
+
     metadata = semantic_run.get("transport_metadata", {})
     check(metadata.get("response_model") == live_runtime.get("model_id"), "provider response model mismatch")
     check(metadata.get("done") is True, "provider done must be true")
@@ -181,6 +209,23 @@ def assess_live_run(
         value = usage.get(name)
         check(isinstance(value, int) and not isinstance(value, bool) and value > 0, f"{name} must be a positive integer")
 
+    input_tokens = usage.get("input_tokens")
+    generation_tokens = usage.get("generation_tokens")
+    num_ctx = generation.get("num_ctx")
+    if context_protocol.get("require_input_tokens_below_num_ctx") is True:
+        check(
+            isinstance(input_tokens, int) and isinstance(num_ctx, int) and input_tokens < num_ctx,
+            "provider input_tokens must be below requested num_ctx",
+        )
+    if context_protocol.get("require_total_tokens_within_num_ctx") is True:
+        check(
+            isinstance(input_tokens, int)
+            and isinstance(generation_tokens, int)
+            and isinstance(num_ctx, int)
+            and input_tokens + generation_tokens <= num_ctx,
+            "provider input_tokens + generation_tokens must fit requested num_ctx",
+        )
+
     check(provenance.get("artifact_type") == "kl25_live_model_run_provenance", "provenance artifact mismatch")
     check(provenance.get("target") == contract.get("target"), "provenance target mismatch")
     check(provenance.get("semantic_run_digest") == semantic_run_digest, "provenance semantic run digest mismatch")
@@ -189,12 +234,14 @@ def assess_live_run(
         provenance.get("provenance_digest") == builder.canonical_sha256(_without_digest(provenance, "provenance_digest")),
         "provenance self-digest mismatch",
     )
+
     identity = provenance.get("ollama_runtime_identity", {})
     model_digest = identity.get("model_digest")
     check(isinstance(model_digest, str) and MODEL_DIGEST.fullmatch(model_digest) is not None, "Ollama model digest missing or malformed")
     check(identity.get("model_id") == live_runtime.get("model_id"), "Ollama identity model id mismatch")
     check(identity.get("ollama_url_policy") == "loopback_only", "Ollama identity endpoint policy mismatch")
     check(isinstance(identity.get("ollama_version"), str) and bool(identity.get("ollama_version", "").strip()), "Ollama version missing")
+
     execution = provenance.get("execution", {})
     check(execution.get("transport") == live_runtime.get("transport"), "provenance transport mismatch")
     check(execution.get("model_id") == live_runtime.get("model_id"), "provenance model id mismatch")
@@ -202,6 +249,22 @@ def assess_live_run(
     check(execution.get("ollama_endpoint_policy") == "loopback_only", "provenance endpoint policy mismatch")
     for name, expected in generation.items():
         check(execution.get("generation", {}).get(name) == expected, f"generation setting mismatch: {name}")
+
+    execution_context = execution.get("context") if isinstance(execution.get("context"), dict) else {}
+    check(execution_context.get("strategy") == context_protocol.get("strategy"), "provenance context strategy mismatch")
+    check(execution_context.get("gate3_evidence_artifacts_immutable") is True, "provenance must bind immutable Gate-3 context source")
+    check(execution_context.get("dedup_identity") == context_protocol.get("dedup_identity"), "provenance context dedup identity mismatch")
+    for name in (
+        "context_sha256",
+        "context_bytes",
+        "legacy_context_bytes",
+        "page_occurrences",
+        "unique_physical_pages",
+        "duplicate_occurrences_removed",
+        "context_byte_reduction_pct",
+    ):
+        check(execution_context.get(name) == run_context.get(name), f"provenance semantic context mismatch: {name}")
+
     fingerprints = provenance.get("code_fingerprints")
     check(isinstance(fingerprints, dict) and bool(fingerprints), "code fingerprints missing")
     if isinstance(fingerprints, dict):
@@ -284,7 +347,7 @@ def assess_live_run(
         status = "REJECTED_REVIEW"
 
     report: dict[str, Any] = {
-        "schema_version": "0.1.0",
+        "schema_version": "0.2.0",
         "artifact_type": "kl25_live_model_qualification_report",
         "qualification_contract_id": contract.get("contract_id"),
         "target": contract.get("target"),
