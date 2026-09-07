@@ -1,0 +1,42 @@
+{
+  "schema_version": "0.1.0",
+  "construction_id": "nxp-kl25-evidence-unit-construction-v0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "reviewed_boundary_id": "nxp-kl25-reviewed-candidate-boundary-v0",
+  "target": "MKL25Z128VLK4",
+  "method": {
+    "source_scope": "reviewed_candidate_boundaries_only",
+    "text_source": "pdftotext_layout_utf8",
+    "section_detection": "document_heading_candidates_then_contiguous_grouping",
+    "page_hash_required": true,
+    "keyword_hits_are_navigation_only": true,
+    "manual_page_guessing_is_authoritative": false
+  },
+  "required_candidate_roles": [
+    "flash_programming_core_candidate",
+    "debug_security_recovery_candidate"
+  ],
+  "evidence_unit_requirements": {
+    "source_id_required": true,
+    "pdf_page_range_required": true,
+    "page_text_sha256_required": true,
+    "heading_evidence_required": true,
+    "manufacturer_native_terms_preserved": true,
+    "applicability_must_be_established_separately": true
+  },
+  "cross_vendor_guards": {
+    "forbidden_stm32_projection": ["KEYR", "FLASH_CR", "PER", "MER", "PG"],
+    "ftfa_fccob_fstat_are_manufacturer_near_terms": true,
+    "mdm_ap_security_recovery_is_not_flash_command_equivalence": true
+  },
+  "admission": {
+    "construction_candidate_catalog": true,
+    "evidence_unit_catalog": false,
+    "evidence_pack": false,
+    "semantic_extraction": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}
