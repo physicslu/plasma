@@ -96,9 +96,9 @@ const operationCodes: Record<Operation, string> = { erase: "E", program: "P", ve
 const copy = {
   "zh-TW": {
     title: "PMODE · FACTORY CONSOLE",
-    provider: "Mock PPU Provider",
-    loading: "正在連接 Mock Provider…",
-    offline: "Mock Provider 無法使用。請確認 Plasma Web REST Gateway 已啟用 Mock Provider。",
+    provider: "Programming Provider",
+    loading: "正在載入 Programming Provider…",
+    offline: "Programming 功能目前不可用。PPU 與 Gateway 連線狀態獨立判定。",
     gatewayUnreachable: "Plasma Web REST Gateway 無法連線。",
     productionSelection: "PRODUCTION SITE SELECTION",
     productionSelectionHint: "Tree 定義 Production Set；進入量產後仍可在 Live Site Status 決定下一個 Batch 的 PPU / Site membership。",
@@ -146,9 +146,9 @@ const copy = {
   },
   "en-US": {
     title: "PMODE · FACTORY CONSOLE",
-    provider: "Mock PPU Provider",
-    loading: "Connecting to Mock Provider…",
-    offline: "Mock Provider is unavailable. Enable the Mock Provider on the Plasma Web REST Gateway.",
+    provider: "Programming Provider",
+    loading: "Loading Programming Provider…",
+    offline: "Programming is currently unavailable. PPU and Gateway connectivity are reported independently.",
     gatewayUnreachable: "Plasma Web REST Gateway is unreachable.",
     productionSelection: "PRODUCTION SITE SELECTION",
     productionSelectionHint: "The tree defines the Production Set. Live Site Status independently defines the next Batch PPU / Site membership.",
@@ -445,9 +445,6 @@ export default function FactoryConsoleV2() {
     setBatchSnapshot(next);
     if (terminalServerBatchStates.has(next.state)) finalizeBatch(next);
     const snapshotMembership = selectionFromBatch(next);
-    // Server Batch Runtime is execution truth. It must not rewrite operator
-    // Batch Selection. These fallbacks only reconstruct browser context when a
-    // fresh tab reconnects to an already-active server Batch.
     setBatchSelection(current => selectionCounts(current).sites > 0 ? current : snapshotMembership);
     setProductionSet(current => selectionCounts(current).sites > 0 ? current : snapshotMembership);
     setDraftSelection(current => selectionCounts(current).sites > 0 ? current : snapshotMembership);
@@ -512,9 +509,7 @@ export default function FactoryConsoleV2() {
         appendLog(`[BAT] ${next.state.toUpperCase()} · ${next.batch_id}`, next.state === "error" ? "ERROR" : next.state === "cancelled" || next.state === "stopping" ? "WARN" : "INFO");
         previousState = next.state;
       }
-      if (terminalServerBatchStates.has(next.state)) {
-        return;
-      }
+      if (terminalServerBatchStates.has(next.state)) return;
       await delay(POLL_INTERVAL_MS);
     }
     endActivity();
@@ -608,7 +603,6 @@ export default function FactoryConsoleV2() {
     let stopped = false;
     void (async () => {
       try {
-        await ensureEngineeringSession(apiBase);
         const nextCatalog = await getEngineeringTargets(apiBase);
         if (stopped) return;
         setGatewayHealth("online");
@@ -648,11 +642,12 @@ export default function FactoryConsoleV2() {
         }
       } catch (error) {
         if (stopped) return;
-        const detail = error instanceof Error ? error.message : "Mock Provider unavailable";
-        setGatewayHealth(gatewayHealthFromError(error));
+        const detail = error instanceof Error ? error.message : "Programming provider unavailable";
+        const nextGatewayHealth = gatewayHealthFromError(error);
+        setGatewayHealth(nextGatewayHealth);
         setProviderError(detail);
         setCatalog(null);
-        appendLog(`[PROVIDER] unavailable · ${detail}`, "ERROR");
+        appendLog(`[PROGRAMMING] provider unavailable · ${detail}`, nextGatewayHealth === "online" ? "WARN" : "ERROR");
       }
     })();
     return () => {
@@ -661,7 +656,7 @@ export default function FactoryConsoleV2() {
       runtimeRecoveryGenerationRef.current += 1;
       endActivity();
     };
-  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, ensureEngineeringSession, loadSelectionRuntimes, pollServerBatch, setBatchSelection, workspaceHydrated]);
+  }, [apiBase, appendLog, applyBatchSnapshot, beginActivity, endActivity, loadSelectionRuntimes, pollServerBatch, setBatchSelection, workspaceHydrated]);
 
   const serverBatchState = batchSnapshot?.state ?? null;
   const serverBatchRunning = serverBatchState === "queued" || serverBatchState === "running" || serverBatchState === "stopping";
@@ -954,8 +949,11 @@ export default function FactoryConsoleV2() {
     setBatchCommandState("submitting");
     appendLog(`[BAT] SUBMIT · ${batchCounts.ppus} PPUs · ${batchCounts.sites} Sites · ${operations.map(operation => operation.toUpperCase()).join(" → ")} · Target ${targetDevice ? targetDevice.icpn ?? targetDevice.identifier : "MOCK"}`);
     try {
+      const batchSessionId = requiresImage && !sessionId
+        ? await ensureEngineeringSession(apiBase)
+        : sessionId;
       const accepted = await createServerBatch(apiBase, {
-        sessionId,
+        sessionId: batchSessionId,
         targets,
         operations,
         executionPolicy,
@@ -1007,6 +1005,8 @@ export default function FactoryConsoleV2() {
     return text[site.state];
   }
 
+  const programmingUnavailable = !catalog && gatewayHealth === "online" && Boolean(providerError);
+
   return (
     <main className="factoryConsoleV2">
       <section className="factoryConsoleShell">
@@ -1019,8 +1019,10 @@ export default function FactoryConsoleV2() {
 
         {!catalog && (
           <section className="factoryConsoleNotice" role="status">
-            <b>{gatewayHealth === "unreachable" ? text.gatewayUnreachable : providerError ? text.offline : text.loading}</b>
-            {providerError && <span>{providerError}</span>}
+            <b style={programmingUnavailable ? { color: "#475569" } : undefined}>
+              {gatewayHealth === "unreachable" ? text.gatewayUnreachable : providerError ? text.offline : text.loading}
+            </b>
+            {providerError && gatewayHealth === "unreachable" && <span>{providerError}</span>}
           </section>
         )}
 
@@ -1123,79 +1125,79 @@ export default function FactoryConsoleV2() {
             </OperatorPanel>
 
             <ProgrammingJobPanel
-    mode="production"
-    title={text.programmingJob}
-    collapsed={programmingJobCollapsed}
-    onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
-    expandLabel={text.showSelection}
-    collapseLabel={text.hideSelection}
-    apiBase={apiBase}
-    targetDevice={targetDevice}
-    onTargetChange={setTargetDevice}
-    targetDisabled={batchRunning}
-    targetLabel={text.targetIc}
-    imageLabel={text.image}
-    image={{
-      name: imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? "Mock Synthetic Image" : "Select programming image (.bin)…"),
-      title: imageAsset?.name,
-      source: imageAsset ? "user" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none",
-      hint: text.imageHint,
-      browseLabel: text.browse,
-      browseDisabled: batchRunning,
-      inputDisabled: batchRunning,
-      inputAriaLabel: "Production Programming Image file",
-      onFileChange: (file, event) => {
-        if (file && file.size > MAX_IMAGE_BYTES) {
-          setOperatorWarning(text.imageTooLarge);
-          setImageAsset(null);
-          event.currentTarget.value = "";
-          return;
-        }
-        setImageAsset(file);
-        if (file) appendLog(`[IMG] SELECTED · ${file.name} · ${file.size} bytes`);
-      },
-    }}
-    operationsLabel={text.operations}
-    operations={operationOrder.map(operation => ({
-      key: operation,
-      code: operationCodes[operation],
-      label: t(`operation.${operation}`),
-      checked: selectedOperations.includes(operation),
-      disabled: batchRunning,
-      onChange: () => toggleOperation(operation),
-    }))}
-    policyLabel={text.batchPolicy}
-    policy={{
-      repeatLabel: text.repeat,
-      repeatValue: repeatCount,
-      repeatDisabled: batchRunning,
-      repeatAriaLabel: "Repeat Count",
-      onRepeatChange: setRepeatCount,
-      retryLabel: text.retry,
-      retryValue: siteRetryLimit,
-      retryDisabled: batchRunning,
-      retryAriaLabel: "Site Retry Limit",
-      onRetryChange: setSiteRetryLimit,
-      stopLabel: text.stopPolicy,
-      stopValue: failedSiteThreshold,
-      stopDisabled: batchRunning || !batchCounts.sites,
-      stopAriaLabel: "Stop Policy",
-      stopOptions: [
-        { value: "", label: text.never },
-        ...Array.from({ length: batchCounts.sites }, (_, index) => index + 1).map(value => ({ value: String(value), label: `${value} Fail` })),
-      ],
-      onStopChange: setFailedSiteThreshold,
-    }}
-    startLabel={text.start}
-    startDisabled={!batchReadiness.ready || !policyValid}
-    onStart={executeBatch}
-    statusLabel={text.batchStatus}
-    statusValue={batchStatusLabel}
-    statusClassName={`state-${batchStatusState}`}
-    abortLabel={text.abort}
-    abortDisabled={!serverBatchRunning || serverBatchState === "stopping" || batchAborting}
-    onAbort={abortBatch}
-  />
+              mode="production"
+              title={text.programmingJob}
+              collapsed={programmingJobCollapsed}
+              onToggleCollapsed={() => setProgrammingJobCollapsed(current => !current)}
+              expandLabel={text.showSelection}
+              collapseLabel={text.hideSelection}
+              apiBase={apiBase}
+              targetDevice={targetDevice}
+              onTargetChange={setTargetDevice}
+              targetDisabled={batchRunning}
+              targetLabel={text.targetIc}
+              imageLabel={text.image}
+              image={{
+                name: imageAsset?.name ?? (requiresImage && syntheticMockImageAvailable ? "Mock Synthetic Image" : "Select programming image (.bin)…"),
+                title: imageAsset?.name,
+                source: imageAsset ? "user" : requiresImage && syntheticMockImageAvailable ? "mock_synthetic" : "none",
+                hint: text.imageHint,
+                browseLabel: text.browse,
+                browseDisabled: batchRunning,
+                inputDisabled: batchRunning,
+                inputAriaLabel: "Production Programming Image file",
+                onFileChange: (file, event) => {
+                  if (file && file.size > MAX_IMAGE_BYTES) {
+                    setOperatorWarning(text.imageTooLarge);
+                    setImageAsset(null);
+                    event.currentTarget.value = "";
+                    return;
+                  }
+                  setImageAsset(file);
+                  if (file) appendLog(`[IMG] SELECTED · ${file.name} · ${file.size} bytes`);
+                },
+              }}
+              operationsLabel={text.operations}
+              operations={operationOrder.map(operation => ({
+                key: operation,
+                code: operationCodes[operation],
+                label: t(`operation.${operation}`),
+                checked: selectedOperations.includes(operation),
+                disabled: batchRunning,
+                onChange: () => toggleOperation(operation),
+              }))}
+              policyLabel={text.batchPolicy}
+              policy={{
+                repeatLabel: text.repeat,
+                repeatValue: repeatCount,
+                repeatDisabled: batchRunning,
+                repeatAriaLabel: "Repeat Count",
+                onRepeatChange: setRepeatCount,
+                retryLabel: text.retry,
+                retryValue: siteRetryLimit,
+                retryDisabled: batchRunning,
+                retryAriaLabel: "Site Retry Limit",
+                onRetryChange: setSiteRetryLimit,
+                stopLabel: text.stopPolicy,
+                stopValue: failedSiteThreshold,
+                stopDisabled: batchRunning || !batchCounts.sites,
+                stopAriaLabel: "Stop Policy",
+                stopOptions: [
+                  { value: "", label: text.never },
+                  ...Array.from({ length: batchCounts.sites }, (_, index) => index + 1).map(value => ({ value: String(value), label: `${value} Fail` })),
+                ],
+                onStopChange: setFailedSiteThreshold,
+              }}
+              startLabel={text.start}
+              startDisabled={!batchReadiness.ready || !policyValid}
+              onStart={executeBatch}
+              statusLabel={text.batchStatus}
+              statusValue={batchStatusLabel}
+              statusClassName={`state-${batchStatusState}`}
+              abortLabel={text.abort}
+              abortDisabled={!serverBatchRunning || serverBatchState === "stopping" || batchAborting}
+              onAbort={abortBatch}
+            />
 
             {operatorWarning && <div className="factoryWarning" role="alert"><span>{operatorWarning}</span><button type="button" onClick={() => setOperatorWarning(null)}>×</button></div>}
 
