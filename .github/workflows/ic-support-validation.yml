@@ -102,6 +102,7 @@ jobs:
           python data/ic-support/benchmarks/nxp-kl25/test_foundation.py
           python data/ic-support/benchmarks/nxp-kl25/test_discovery.py
           python data/ic-support/benchmarks/nxp-kl25/test_evidence_unit_construction.py
+          python data/ic-support/benchmarks/nxp-kl25/test_reviewed_evidence_units.py
       - name: Validate STM32F103C source lock
         run: python data/ic-support/benchmarks/stm32f103c/validate_source_lock.py
       - name: Compare STM32F103C benchmark
