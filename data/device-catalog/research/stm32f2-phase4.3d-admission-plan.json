@@ -1,0 +1,458 @@
+{
+  "adapter_id": "stm32f2-phase4.3c",
+  "candidate_count": 9,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "18f361abcc0bd79687956f5e3ed651c46231de8311b1d35ebe844d705e75aa3e",
+        "rendered_dom_sha256": "2dffbdcdfe977ca78faef656334d5f915c44083e1ea6d7eae71e57fcd812bbdb",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205rb.html"
+      },
+      "base_device": "STM32F205RB",
+      "base_mapping": {
+        "existing_identifier": "STM32F205RBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F205RBT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F205RB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F205RBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F205RBT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F205",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205rb.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "18f361abcc0bd79687956f5e3ed651c46231de8311b1d35ebe844d705e75aa3e",
+        "rendered_dom_sha256": "2dffbdcdfe977ca78faef656334d5f915c44083e1ea6d7eae71e57fcd812bbdb",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205rb.html"
+      },
+      "base_device": "STM32F205RB",
+      "base_mapping": {
+        "existing_identifier": "STM32F205RBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F205RBT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F205RB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F205RBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F205RBT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F205",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205rb.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "18f361abcc0bd79687956f5e3ed651c46231de8311b1d35ebe844d705e75aa3e",
+        "rendered_dom_sha256": "2dffbdcdfe977ca78faef656334d5f915c44083e1ea6d7eae71e57fcd812bbdb",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205rb.html"
+      },
+      "base_device": "STM32F205RB",
+      "base_mapping": {
+        "existing_identifier": "STM32F205RBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F205RBT7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F205RB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F205RBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "128 KiB",
+        "icpn": "STM32F205RBT7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F205",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205rb.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "36ef20b031b7cbac0ddd394ce4b6a36b9f80693dc6b8f982ed907d8bbfa6f85f",
+        "rendered_dom_sha256": "63ad89c6843ad324efc34dd0c41480bbeb34e2876cd1237c4e86ab980f523cec",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207ic.html"
+      },
+      "base_device": "STM32F207IC",
+      "base_mapping": {
+        "existing_identifier": "STM32F207ICHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F207ICH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F207IC",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F207ICHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F207ICH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "176",
+        "series": "STM32F207",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207ic.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "36ef20b031b7cbac0ddd394ce4b6a36b9f80693dc6b8f982ed907d8bbfa6f85f",
+        "rendered_dom_sha256": "63ad89c6843ad324efc34dd0c41480bbeb34e2876cd1237c4e86ab980f523cec",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207ic.html"
+      },
+      "base_device": "STM32F207IC",
+      "base_mapping": {
+        "existing_identifier": "STM32F207ICTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F207ICT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F207IC",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F207ICTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "256 KiB",
+        "icpn": "STM32F207ICT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "176",
+        "series": "STM32F207",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f207ic.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "d79d328e27860975c9feb14f1731c80e14c622deeb664100cec63381827a16bb",
+        "rendered_dom_sha256": "cf076d33f756596842964385950d995dc9a4226895bdf7a6b10efee4a7a5a099",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215re.html"
+      },
+      "base_device": "STM32F215RE",
+      "base_mapping": {
+        "existing_identifier": "STM32F215RETx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F215RET6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F215RE",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F215RETx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F215RET6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F215",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215re.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "d79d328e27860975c9feb14f1731c80e14c622deeb664100cec63381827a16bb",
+        "rendered_dom_sha256": "cf076d33f756596842964385950d995dc9a4226895bdf7a6b10efee4a7a5a099",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215re.html"
+      },
+      "base_device": "STM32F215RE",
+      "base_mapping": {
+        "existing_identifier": "STM32F215RETx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F215RET6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F215RE",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F215RETx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F215RET6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "64",
+        "series": "STM32F215",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f215re.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "2c8ec477f1203b8a83d93214719e5429e71a17946b78707b2a44eef410a2feef",
+        "rendered_dom_sha256": "c860975baf862b18d422f18ececc1b592b736ba9c836a23b37fc516745bbd704",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ie.html"
+      },
+      "base_device": "STM32F217IE",
+      "base_mapping": {
+        "existing_identifier": "STM32F217IEHx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F217IEH6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F217IE",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F217IEHx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F217IEH6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "",
+        "package": "UFBGA",
+        "pin_count": "176",
+        "series": "STM32F217",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ie.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "evidence_section_sha256": "2c8ec477f1203b8a83d93214719e5429e71a17946b78707b2a44eef410a2feef",
+        "rendered_dom_sha256": "c860975baf862b18d422f18ececc1b592b736ba9c836a23b37fc516745bbd704",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ie.html"
+      },
+      "base_device": "STM32F217IE",
+      "base_mapping": {
+        "existing_identifier": "STM32F217IETx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f2x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32F217IET6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32F217IE",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32F217IETx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32F2",
+        "flash_size": "512 KiB",
+        "icpn": "STM32F217IET6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32f2x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "176",
+        "series": "STM32F217",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/en/microcontrollers-microprocessors/stm32f217ie.html#plasma-evidence=stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+        "source_type": "official_st_product_page_retained_browser_evidence",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_direct_st_retained_browser_exact_icpn"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 0,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 9,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f2-phase4.3b-official-st-discovery-2026-09-06-retained-20260906T151730Z-a17d9e4",
+  "fail_closed": true,
+  "family": "STM32F2",
+  "full_stm32f2_surface_covered": false,
+  "inputs": {
+    "canonical_dataset": "stm32f2-commercial-icpn.csv",
+    "canonical_input_sha256": "a57ec095b1af22963ef5415d7f3cbc1cd4a920dc6e06a9817dca4d029b714971",
+    "family_adapter": "stm32f2-phase4.3c",
+    "policy_baseline": "stm32f2-phase4.3c-policy-baseline.json",
+    "policy_baseline_sha256": "2f3380044dcf1165a56724dc80175d70cbeccdd9a1bc2872cb1e06c0d64d4e34",
+    "production_manifest": "icpn-v1-manifest.json",
+    "production_manifest_sha256": "1bcab39dbec4014bff2205d7efc2ddf4bb5558f6787e9dc5b45608a8066174b5",
+    "retained_evidence_baseline": "stm32f2-phase4.3b-discovery-baseline.json",
+    "retained_evidence_baseline_sha256": "ab9d3f604b8c1c75b685690d79a91fd9fbcb2787ef670af244203453e8bcc599",
+    "retained_evidence_directory": "stm32f2-phase4.3b-official-st-discovery-live-2026-09-06"
+  },
+  "issues": [],
+  "lifecycle_exclusions": [],
+  "phase": "4.3D",
+  "production_snapshot": {
+    "base_device_count": 157,
+    "exact_icpn_count": 459,
+    "family_exact_icpn_counts": {
+      "STM32F1": 75,
+      "STM32F4": 384
+    },
+    "stm32f2_exact_icpn_count": 0
+  },
+  "production_write_applied": false,
+  "programming_algorithm_equivalence_claimed": false,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "source_provenance": {
+    "evidence_manifest_sha256": "ef86cebe2ec07a3ea8be993099ee2883bb1be19f37008ce54a7aebb88a50211e",
+    "executed_git_sha": "a17d9e4d778bac9f2d5360f0f55fd396277db14f",
+    "repository": "physicslu/plasma",
+    "workflow_run_id": 34041745112
+  }
+}
