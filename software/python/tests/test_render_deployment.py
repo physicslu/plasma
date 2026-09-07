@@ -85,19 +85,54 @@ class StaticGatewayTests(unittest.TestCase):
 
 
 class RenderDeploymentContractTests(unittest.TestCase):
-    def test_render_blueprint_uses_one_free_python_web_service(self) -> None:
+    def _services(self) -> dict[str, dict[str, object]]:
         blueprint = yaml.safe_load((REPOSITORY_ROOT / "render.yaml").read_text())
-        self.assertEqual(len(blueprint["services"]), 1)
-        service = blueprint["services"][0]
-        self.assertEqual(service["type"], "web")
-        self.assertEqual(service["runtime"], "python")
-        self.assertEqual(service["plan"], "free")
-        self.assertEqual(service["buildCommand"], "bash scripts/render-build.sh")
-        self.assertEqual(service["startCommand"], "bash scripts/render-start.sh")
-        self.assertEqual(service["healthCheckPath"], "/api/health/ready")
-        environment = {item["key"]: str(item["value"]) for item in service["envVars"]}
-        self.assertEqual(environment["PLASMA_RENDER_ENGINEERING_MOCK"], "1")
-        self.assertEqual(environment["PLASMA_RENDER_FLASH_BYTES"], str(1024 * 1024))
+        return {service["name"]: service for service in blueprint["services"]}
+
+    def test_render_blueprint_preserves_public_demo_and_adds_control_station_lab(self) -> None:
+        services = self._services()
+        self.assertEqual(set(services), {"plasma-public-demo", "plasma-control-station-lab"})
+
+        public_demo = services["plasma-public-demo"]
+        self.assertEqual(public_demo["type"], "web")
+        self.assertEqual(public_demo["runtime"], "python")
+        self.assertEqual(public_demo["plan"], "free")
+        self.assertEqual(public_demo["buildCommand"], "bash scripts/render-build.sh")
+        self.assertEqual(public_demo["startCommand"], "bash scripts/render-start.sh")
+        self.assertEqual(public_demo["healthCheckPath"], "/api/health/ready")
+        public_environment = {item["key"]: str(item["value"]) for item in public_demo["envVars"]}
+        self.assertEqual(public_environment["PLASMA_RENDER_ENGINEERING_MOCK"], "1")
+        self.assertEqual(public_environment["PLASMA_RENDER_FLASH_BYTES"], str(1024 * 1024))
+
+        control_station = services["plasma-control-station-lab"]
+        self.assertEqual(control_station["type"], "web")
+        self.assertEqual(control_station["runtime"], "python")
+        self.assertEqual(control_station["plan"], "free")
+        self.assertEqual(control_station["buildCommand"], "bash scripts/render-build.sh")
+        self.assertEqual(control_station["startCommand"], "bash scripts/render-control-station-start.sh")
+        self.assertEqual(control_station["healthCheckPath"], "/")
+        control_environment = {item["key"]: item for item in control_station["envVars"]}
+        self.assertEqual(control_environment["PLASMA_RENDER_PPU_ALIAS"]["value"], "swpc-ppu")
+        self.assertIs(control_environment["PLASMA_RENDER_PPU_ENDPOINT"]["sync"], False)
+        self.assertNotIn("value", control_environment["PLASMA_RENDER_PPU_ENDPOINT"])
+
+    def test_control_station_lab_is_manager_only_and_requires_restricted_https_ppu_ingress(self) -> None:
+        script = (REPOSITORY_ROOT / "scripts/render-control-station-start.sh").read_text(encoding="utf-8")
+        self.assertIn("python -m plasma_manager.server", script)
+        self.assertIn('PLASMA_CONTROL_STATION_MODE="managed"', script)
+        self.assertIn('PLASMA_FLEET_UI_ENABLED="1"', script)
+        self.assertIn('PLASMA_MANAGER_API_URL="http://127.0.0.1:', script)
+        self.assertIn('parsed.scheme != "https"', script)
+        self.assertIn("must identify the restricted ingress root", script)
+        self.assertNotIn("python -m plasma_server.server", script)
+        self.assertNotIn("-m plasma_web.gateway", script)
+        self.assertNotIn("--engineering-mock", script)
+
+    def test_render_build_produces_public_demo_and_control_station_payloads(self) -> None:
+        script = (REPOSITORY_ROOT / "scripts/render-build.sh").read_text(encoding="utf-8")
+        self.assertIn("npm run build:render", script)
+        self.assertIn("npm run build:product", script)
+        self.assertIn("dist/standalone/server.js", script)
 
     def test_render_mock_ppu_is_loopback_only_and_has_eight_sites(self) -> None:
         config = load_config(REPOSITORY_ROOT / "software/python/config/render-demo.yaml")
