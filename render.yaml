@@ -17,3 +17,22 @@ services:
         value: "1"
       - key: PLASMA_RENDER_FLASH_BYTES
         value: "1048576"
+
+  - type: web
+    name: plasma-control-station-lab
+    runtime: python
+    plan: free
+    buildCommand: bash scripts/render-build.sh
+    startCommand: bash scripts/render-control-station-start.sh
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PLASMA_RENDER_PPU_ALIAS
+        value: swpc-ppu
+      - key: PLASMA_RENDER_PPU_ENDPOINT
+        sync: false
