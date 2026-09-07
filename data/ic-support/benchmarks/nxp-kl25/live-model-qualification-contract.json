@@ -1,7 +1,7 @@
 {
-  "schema_version": "0.2.0",
+  "schema_version": "0.3.0",
   "artifact_type": "kl25_live_model_qualification_contract",
-  "contract_id": "nxp-kl25-live-model-qualification-v1",
+  "contract_id": "nxp-kl25-live-model-qualification-v2",
   "target": "MKL25Z128VLK4",
   "required_input": {
     "bundle_digest": "628aa2c7664cdf9778a11e56a8da0a9cf8816aaec704baf893bfae5a9fba0244",
@@ -18,6 +18,18 @@
     "allowed_done_reasons": [
       "stop"
     ],
+    "context_protocol": {
+      "strategy": "cross_pack_physical_page_dedup_v1",
+      "gate3_evidence_artifacts_immutable": true,
+      "dedup_identity": [
+        "source_id",
+        "pdf_page_number",
+        "page_text_sha256"
+      ],
+      "require_cross_pack_duplicate_removal": true,
+      "require_input_tokens_below_num_ctx": true,
+      "require_total_tokens_within_num_ctx": true
+    },
     "output_protocol": {
       "format": "json_schema",
       "structured_output_required": true,
@@ -25,8 +37,8 @@
       "reasoning_content_forbidden": true
     },
     "generation": {
-      "num_ctx": 32768,
-      "max_tokens": 4096,
+      "num_ctx": 65536,
+      "max_tokens": 8192,
       "temperature": 0.0,
       "seed": 0,
       "timeout_seconds": 1800.0
