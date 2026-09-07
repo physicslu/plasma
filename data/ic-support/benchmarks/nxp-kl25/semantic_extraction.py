@@ -57,6 +57,82 @@ def _allowed_page_refs(pack: dict[str, Any]) -> set[tuple[str, int]]:
     return refs
 
 
+def build_output_json_schema(
+    contract: dict[str, Any],
+    *,
+    packs: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Build the deterministic provider-facing JSON Schema for semantic output.
+
+    The provider schema intentionally enforces representation shape while the
+    existing deterministic parser remains authoritative for per-unit citation
+    membership, FACTS/UNKNOWN semantics, exact unit coverage, and provenance.
+    Keeping those checks in the parser avoids treating provider-side structured
+    decoding as a semantic trust boundary.
+    """
+
+    require(contract.get("schema_version") == SEMANTIC_SCHEMA_VERSION, "semantic contract schema mismatch")
+    target = contract.get("target")
+    require(isinstance(target, str) and target != "", "semantic contract target missing")
+    pack_by_primary = _pack_by_primary(packs)
+    allowed_kinds = contract.get("output", {}).get("allowed_fact_kinds")
+    require(isinstance(allowed_kinds, list) and all(isinstance(item, str) for item in allowed_kinds), "allowed fact kinds malformed")
+    require(bool(allowed_kinds), "allowed fact kinds missing")
+
+    source_ids = sorted({source_id for pack in pack_by_primary.values() for source_id, _ in _allowed_page_refs(pack)})
+    primary_unit_ids = sorted(pack_by_primary)
+
+    evidence_ref_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["source_id", "pdf_page_number"],
+        "properties": {
+            "source_id": {"type": "string", "enum": source_ids},
+            "pdf_page_number": {"type": "integer", "minimum": 1},
+        },
+    }
+    fact_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["fact_id", "kind", "statement", "evidence"],
+        "properties": {
+            "fact_id": {"type": "string", "minLength": 1, "maxLength": 128},
+            "kind": {"type": "string", "enum": list(allowed_kinds)},
+            "statement": {"type": "string", "minLength": 1, "maxLength": 4000},
+            "evidence": {
+                "type": "array",
+                "minItems": 1,
+                "items": evidence_ref_schema,
+            },
+        },
+    }
+    unit_result_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["primary_unit_id", "state", "facts"],
+        "properties": {
+            "primary_unit_id": {"type": "string", "enum": primary_unit_ids},
+            "state": {"type": "string", "enum": ["FACTS", "UNKNOWN"]},
+            "facts": {"type": "array", "items": fact_schema},
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["schema_version", "target", "unit_results"],
+        "properties": {
+            "schema_version": {"type": "string", "enum": [SEMANTIC_SCHEMA_VERSION]},
+            "target": {"type": "string", "enum": [target]},
+            "unit_results": {
+                "type": "array",
+                "minItems": len(primary_unit_ids),
+                "maxItems": len(primary_unit_ids),
+                "items": unit_result_schema,
+            },
+        },
+    }
+
+
 def render_prompt(
     manufacturer_context: str,
     *,
@@ -80,7 +156,7 @@ def render_prompt(
             f"- {primary_unit_id} | pack={pack.get('pack_id')} | allowed_evidence=[{rendered_refs}]"
         )
 
-    instructions = f"""PLASMA NXP KL25 MANUFACTURER-NEAR SEMANTIC EXTRACTION\n\nTARGET: {target}\n\nReturn exactly one JSON object. Do not use Markdown fences or prose outside JSON.\nThe JSON root must contain exactly: schema_version, target, unit_results.\nschema_version must be {SEMANTIC_SCHEMA_VERSION!r}; target must be {target!r}.\n\nFor every primary Evidence Unit below, return exactly one unit_results entry with exactly:\n  primary_unit_id, state, facts\nstate must be FACTS or UNKNOWN. If evidence is insufficient, use UNKNOWN with facts=[].\nNever guess, synthesize missing identity levels, or convert absence of evidence into a fact.\n\nEvery FACTS entry must contain at least one fact. Each fact must contain exactly:\n  fact_id, kind, statement, evidence\nkind must be one of: {', '.join(allowed_kinds)}.\nevidence must contain one or more exact source_id/pdf_page_number references allowed for that unit's pack.\nDo not emit commercial identity equivalence, applicability bindings, cross-target relationships, canonical relationships, production admission, or destructive-security admission.\nPreserve NXP-native concepts such as FTFA, FCCOB, FSTAT, SWD and MDM-AP when supported by manufacturer evidence.\n\nPRIMARY EVIDENCE UNITS AND ALLOWED CITATIONS:\n{chr(10).join(unit_lines)}\n\nMANUFACTURER EVIDENCE CONTEXT FOLLOWS:\n{manufacturer_context}"""
+    instructions = f"""PLASMA NXP KL25 MANUFACTURER-NEAR SEMANTIC EXTRACTION\n\nTARGET: {target}\n\nReturn exactly one final JSON object. Do not emit analysis, reasoning, <think> tags, Markdown fences, or prose outside JSON.\nThe JSON root must contain exactly: schema_version, target, unit_results.\nschema_version must be {SEMANTIC_SCHEMA_VERSION!r}; target must be {target!r}.\n\nFor every primary Evidence Unit below, return exactly one unit_results entry with exactly:\n  primary_unit_id, state, facts\nstate must be FACTS or UNKNOWN. If evidence is insufficient, use UNKNOWN with facts=[].\nNever guess, synthesize missing identity levels, or convert absence of evidence into a fact.\n\nEvery FACTS entry must contain at least one fact. Each fact must contain exactly:\n  fact_id, kind, statement, evidence\nkind must be one of: {', '.join(allowed_kinds)}.\nevidence must be a JSON array of objects with exactly source_id and pdf_page_number, for example:\n  [{{\"source_id\":\"nxp_kl25_rm_rev3\",\"pdf_page_number\":150}}]\nNever encode an evidence citation as a string such as \"nxp_kl25_rm_rev3:p150\".\nEvery evidence object must reference a source/page allowed for that unit's pack.\nDo not emit commercial identity equivalence, applicability bindings, cross-target relationships, canonical relationships, production admission, or destructive-security admission.\nPreserve NXP-native concepts such as FTFA, FCCOB, FSTAT, SWD and MDM-AP when supported by manufacturer evidence.\n\nPRIMARY EVIDENCE UNITS AND ALLOWED CITATIONS:\n{chr(10).join(unit_lines)}\n\nMANUFACTURER EVIDENCE CONTEXT FOLLOWS:\n{manufacturer_context}"""
     prompt_meta = {
         "schema_version": SEMANTIC_SCHEMA_VERSION,
         "target": target,
