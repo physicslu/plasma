@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1.1",
+  "schema_version": "0.1.0",
   "discovery_id": "nxp-kl25-deterministic-evidence-discovery-v0",
   "source_lock_id": "nxp-kl25-source-lock-v0",
   "target": "MKL25Z128VLK4",
@@ -8,6 +8,12 @@
     "arguments": ["-layout", "-enc", "UTF-8"],
     "page_boundary": "form_feed",
     "normalization": ["normalize_crlf_to_lf", "strip_trailing_space", "preserve_case"]
+  },
+  "category_policies": {
+    "DEVICE_IDENTITY": {
+      "requires_discriminating_device_expression": true,
+      "forbidden_generic_family_headers": ["Kinetis KL25", "KL25 Sub-Family"]
+    }
   },
   "categories": {
     "DEVICE_IDENTITY": ["MKL25Z128VLK4", "MKL25Z128"],
@@ -21,19 +27,13 @@
     "CONFIGURATION": ["flash configuration field", "backdoor comparison key", "FOPT"],
     "UNKNOWN": []
   },
-  "category_policies": {
-    "DEVICE_IDENTITY": {
-      "discriminating_terms_only": true,
-      "forbidden_generic_family_headers": ["Kinetis KL25", "KL25 Sub-Family"],
-      "reason": "family names repeated in document headers are navigation context, not commercial target identity evidence"
-    }
-  },
   "cross_vendor_guards": {
     "forbidden_stm32_assumptions": ["KEYR", "FLASH_CR", "PER", "MER", "PG"],
     "vendor_native_terms_are_preserved": true,
     "candidate_hits_are_not_admitted_evidence": true,
     "manual_page_guessing_is_not_authoritative": true,
-    "generic_family_header_is_not_device_identity_evidence": true
+    "generic_family_header_is_not_device_identity_evidence": true,
+    "heading_aware_construction_required_before_evidence_unit_admission": true
   },
   "admission": {
     "candidate_catalog": true,
