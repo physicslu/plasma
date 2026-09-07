@@ -276,7 +276,6 @@ export default function ProgrammingWorkspaceV2() {
   const siteSelectionTarget = useRef<string | null>(selectedSiteIdsState !== null ? initialSelectionKey : null);
   const pendingRestore = useRef<PendingRestore | null>(null);
   const restartSessionRequested = useRef(false);
-
   const serverBatchActive = batchSnapshot?.state === "queued"
     || batchSnapshot?.state === "running"
     || batchSnapshot?.state === "stopping";
@@ -324,6 +323,7 @@ export default function ProgrammingWorkspaceV2() {
   const noOperationWarning = locale === "zh-TW"
     ? "未選擇任何操作。請至少選擇 Erase、Program、Verify 或 Read 其中一項。"
     : "No operation selected. Select at least one of Erase, Program, Verify, or Read.";
+  const programmingUnavailableLabel = locale === "zh-TW" ? "燒錄功能目前不可用" : "Programming unavailable";
   const dismissWarning = locale === "zh-TW" ? "關閉警告" : "Dismiss warning";
   const syntheticImageLabel = "Mock Synthetic Image";
   const syntheticImageHint = locale === "zh-TW"
@@ -571,8 +571,17 @@ export default function ProgrammingWorkspaceV2() {
         resetTargetRuntime(true);
         setCatalog(null);
         setCatalogError(message);
-        setConnection("offline");
-        appendLog(`[ENGINEERING] Provider unavailable · ${message}`, true);
+        let ppuReachable = false;
+        try {
+          await getGatewayLiveness(apiBase, configuredGatewayPolicy.current.ppu_request_timeout_ms);
+          ppuReachable = true;
+        } catch {
+          ppuReachable = false;
+        }
+        if (cancelled) return;
+        setConnection(ppuReachable ? "online" : "offline");
+        if (ppuReachable) appendLog("[PPU] ONLINE · Programming unavailable", false, "PPU");
+        appendLog(`[ENGINEERING] Programming unavailable · ${message}`, true);
       }
     })();
     return () => {
@@ -1092,7 +1101,7 @@ export default function ProgrammingWorkspaceV2() {
           </div>
         </div>
 
-        {catalogError && <div className="engineeringBoundaryNote warning"><b>{t("engineeringProgramming.providerOffline")}</b><span>{catalogError}</span></div>}
+        {catalogError && <div className="engineeringBoundaryNote warning"><b>{programmingUnavailableLabel}</b><span>{catalogError}</span></div>}
 
         <section className="productionProgrammingCard liveSiteStatus overviewCard" aria-label="Engineering Site status">
           <header>
