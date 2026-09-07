@@ -1,0 +1,588 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
+python_project="$repo_root/software/python"
+web_dir="$repo_root/software/web"
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+config_dir="$config_home/plasma/local-control-station"
+config_file="${PLASMA_LOCAL_CONTROL_STATION_CONFIG:-$config_dir/profile.env}"
+manager_config="$config_dir/manager.yaml"
+state_dir="$state_home/plasma/local-control-station"
+evidence="$state_dir/install.json"
+release_root="$data_home/plasma/local-control-station/releases"
+current_link="$data_home/plasma/local-control-station/current"
+unit_dir="$config_home/systemd/user"
+manager_unit="$unit_dir/plasma-local-manager.service"
+console_unit="$unit_dir/plasma-control-station.service"
+unit_marker="# Managed by Plasma local-control-station profile"
+
+# Environment overrides win over persisted profile configuration.
+env_python="${PLASMA_LOCAL_CONTROL_STATION_PYTHON-}"
+env_ppu_alias="${PLASMA_LOCAL_CONTROL_STATION_PPU_ALIAS-}"
+env_ppu_endpoint="${PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT-}"
+env_console_port="${PLASMA_LOCAL_CONTROL_STATION_CONSOLE_PORT-}"
+env_manager_port="${PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT-}"
+if [[ -f "$config_file" ]]; then
+  # shellcheck source=/dev/null
+  source "$config_file"
+fi
+[[ -n "$env_python" ]] && PLASMA_LOCAL_CONTROL_STATION_PYTHON="$env_python"
+[[ -n "$env_ppu_alias" ]] && PLASMA_LOCAL_CONTROL_STATION_PPU_ALIAS="$env_ppu_alias"
+[[ -n "$env_ppu_endpoint" ]] && PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT="$env_ppu_endpoint"
+[[ -n "$env_console_port" ]] && PLASMA_LOCAL_CONTROL_STATION_CONSOLE_PORT="$env_console_port"
+[[ -n "$env_manager_port" ]] && PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT="$env_manager_port"
+
+base_python="${PLASMA_LOCAL_CONTROL_STATION_PYTHON:-}"
+ppu_alias="${PLASMA_LOCAL_CONTROL_STATION_PPU_ALIAS:-local-ppu}"
+ppu_endpoint="${PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT:-}"
+console_host="127.0.0.1"
+console_port="${PLASMA_LOCAL_CONTROL_STATION_CONSOLE_PORT:-18190}"
+manager_host="127.0.0.1"
+manager_port="${PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT:-18280}"
+
+say() {
+  printf '[plasmactl local-control-station] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl local-control-station] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+require_linux_user_runtime() {
+  [[ "$(uname -s)" == "Linux" ]] || \
+    die "local-control-station plasmactl reference deployment currently supports Linux user-systemd only; macOS/Windows require their platform package"
+  require_command systemctl
+  systemctl --user show-environment >/dev/null 2>&1 || \
+    die "systemd user manager is unavailable for this login"
+}
+
+validate_port() {
+  local value="$1" label="$2"
+  [[ "$value" =~ ^[0-9]+$ ]] || die "$label must be an integer: $value"
+  (( value >= 1 && value <= 65535 )) || die "$label is outside 1..65535: $value"
+}
+
+validate_endpoint() {
+  [[ -n "$ppu_endpoint" ]] || die "PPU endpoint is required; use --ppu-endpoint URL"
+  python3 - "$ppu_endpoint" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+value = sys.argv[1].strip()
+parsed = urlsplit(value)
+if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.hostname is None:
+    raise SystemExit("PPU endpoint must be an absolute HTTP(S) URL")
+if parsed.username is not None or parsed.password is not None:
+    raise SystemExit("PPU endpoint must not embed credentials")
+if parsed.query or parsed.fragment:
+    raise SystemExit("PPU endpoint must not contain query or fragment")
+if parsed.path not in {"", "/"}:
+    raise SystemExit("PPU endpoint must identify the Plasma Gateway root")
+PY
+}
+
+validate_settings() {
+  [[ "${#ppu_alias}" -le 128 && "$ppu_alias" =~ ^[A-Za-z0-9._:-]+$ ]] || \
+    die "PPU alias must use 1-128 characters from A-Z/a-z/0-9/._:-"
+  validate_port "$console_port" "Console port"
+  validate_port "$manager_port" "Manager port"
+  (( console_port != manager_port )) || die "Console and Manager ports must be different"
+  validate_endpoint
+}
+
+python_is_supported() {
+  "$1" - <<'PY' >/dev/null 2>&1
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+PY
+}
+
+resolve_base_python() {
+  local candidate
+  local -a candidates=()
+  if [[ -n "$base_python" ]]; then
+    [[ -x "$base_python" ]] || die "configured Python is not executable: $base_python"
+    python_is_supported "$base_python" || die "local Control Station requires Python >= 3.11: $base_python"
+    return 0
+  fi
+
+  shopt -s nullglob
+  for candidate in /opt/plasma/python/*/bin/python3; do
+    [[ -x "$candidate" ]] && python_is_supported "$candidate" && candidates+=("$candidate")
+  done
+  shopt -u nullglob
+  if (( ${#candidates[@]} == 1 )); then
+    base_python="${candidates[0]}"
+    return 0
+  fi
+  if (( ${#candidates[@]} > 1 )); then
+    printf '[plasmactl local-control-station] candidate Plasma Python runtimes:\n' >&2
+    printf '  %s\n' "${candidates[@]}" >&2
+    die "multiple Plasma Python runtimes found; use --python PATH"
+  fi
+
+  require_command python3
+  python_is_supported "$(command -v python3)" || \
+    die "system python3 is older than 3.11 and no qualified /opt/plasma/python runtime was found"
+  base_python="$(command -v python3)"
+}
+
+require_clean_source() {
+  [[ -d "$repo_root/.git" ]] || die "repository metadata is missing: $repo_root"
+  [[ -d "$python_project" && -d "$web_dir" ]] || die "repository layout is incomplete: $repo_root"
+  local changes
+  changes="$(git -C "$repo_root" status --porcelain --untracked-files=normal)"
+  [[ -z "$changes" ]] || {
+    printf '%s\n' "$changes" >&2
+    die "repository must be clean before local Control Station activation"
+  }
+}
+
+current_sha() {
+  git -C "$repo_root" rev-parse HEAD
+}
+
+release_dir_for_sha() {
+  local sha="$1"
+  printf '%s/%s\n' "$release_root" "${sha:0:12}"
+}
+
+validate_release() {
+  local release="$1" sha="$2"
+  [[ -f "$release/release.json" ]] || return 1
+  [[ -x "$release/venv/bin/python" ]] || return 1
+  [[ -f "$release/web/server.js" ]] || return 1
+  "$base_python" - "$release/release.json" "$sha" <<'PY'
+import json
+import sys
+path, expected = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+if payload.get("schema_version") != 1 or payload.get("git_sha") != expected:
+    raise SystemExit(1)
+PY
+}
+
+prepare_release() {
+  local sha="$1" release staging npm_bin node_bin
+  release="$(release_dir_for_sha "$sha")"
+  if [[ -e "$release" ]]; then
+    validate_release "$release" "$sha" || die "existing release is incomplete or belongs to another revision: $release"
+    printf '%s\n' "$release"
+    return 0
+  fi
+
+  require_command npm
+  require_command node
+  npm_bin="$(command -v npm)"
+  node_bin="$(command -v node)"
+  [[ "$($node_bin -p 'process.versions.node.split(`.`)[0]')" == "22" ]] || \
+    die "Control Station build requires Node.js 22"
+
+  mkdir -p "$release_root"
+  staging="$release.tmp-$PPID"
+  [[ ! -e "$staging" ]] || rm -rf --one-file-system "$staging"
+  mkdir -p "$staging"
+  cleanup_staging() {
+    local rc=$?
+    trap - RETURN
+    (( rc == 0 )) || rm -rf --one-file-system "$staging"
+    return "$rc"
+  }
+  trap cleanup_staging RETURN
+
+  say "building immutable local Control Station release ${sha:0:12}"
+  "$base_python" -m venv "$staging/venv"
+  "$staging/venv/bin/python" -m pip install --disable-pip-version-check "$python_project"
+  "$staging/venv/bin/python" -c 'import plasma_manager.server' >/dev/null
+  (cd "$web_dir" && "$npm_bin" run install:ci && "$npm_bin" run build:product)
+  mkdir -p "$staging/web"
+  cp -a "$web_dir/dist/standalone/." "$staging/web/"
+  [[ -f "$staging/web/server.js" ]] || die "Control Station standalone build did not produce server.js"
+  "$base_python" - "$staging/release.json" "$sha" <<'PY'
+import json
+import sys
+path, sha = sys.argv[1:]
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump({"schema_version": 1, "git_sha": sha}, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+PY
+  mv "$staging" "$release"
+  trap - RETURN
+  printf '%s\n' "$release"
+}
+
+write_profile_config() {
+  mkdir -p "$config_dir"
+  {
+    printf '# Plasma local Control Station reference deployment\n'
+    printf 'PLASMA_LOCAL_CONTROL_STATION_PYTHON=%q\n' "$base_python"
+    printf 'PLASMA_LOCAL_CONTROL_STATION_PPU_ALIAS=%q\n' "$ppu_alias"
+    printf 'PLASMA_LOCAL_CONTROL_STATION_PPU_ENDPOINT=%q\n' "$ppu_endpoint"
+    printf 'PLASMA_LOCAL_CONTROL_STATION_CONSOLE_PORT=%q\n' "$console_port"
+    printf 'PLASMA_LOCAL_CONTROL_STATION_MANAGER_PORT=%q\n' "$manager_port"
+  } >"$config_file"
+}
+
+write_manager_config() {
+  mkdir -p "$config_dir" "$state_dir"
+  "$base_python" - "$manager_config" "$manager_host" "$manager_port" \
+    "$state_dir/manager-observations.sqlite3" "$ppu_alias" "$ppu_endpoint" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path, host, port, observation_db, alias, endpoint = sys.argv[1:]
+q = json.dumps
+text = (
+    "manager:\n"
+    f"  host: {q(host)}\n"
+    f"  port: {int(port)}\n"
+    "  request_timeout_s: 10.0\n"
+    "  poll_interval_s: 2.0\n"
+    f"  observation_db_path: {q(observation_db)}\n"
+    "ppus:\n"
+    f"  - alias: {q(alias)}\n"
+    f"    endpoint: {q(endpoint)}\n"
+)
+Path(path).write_text(text, encoding="utf-8")
+PY
+}
+
+write_units() {
+  local node_bin
+  require_command node
+  node_bin="$(command -v node)"
+  mkdir -p "$unit_dir"
+  cat >"$manager_unit" <<EOF
+$unit_marker
+[Unit]
+Description=Plasma Local Control Station Manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=$state_dir
+Environment=PYTHONUNBUFFERED=1
+ExecStart=$current_link/venv/bin/python -m plasma_manager.server --config $manager_config
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+EOF
+
+  cat >"$console_unit" <<EOF
+$unit_marker
+[Unit]
+Description=Plasma Local Control Station Console/BFF
+After=network-online.target plasma-local-manager.service
+Wants=network-online.target plasma-local-manager.service
+
+[Service]
+Type=simple
+WorkingDirectory=$current_link/web
+Environment=HOST=$console_host
+Environment=PORT=$console_port
+Environment=PLASMA_FLEET_UI_ENABLED=1
+Environment=PLASMA_CONTROL_STATION_MODE=managed
+Environment=PLASMA_MANAGER_API_URL=http://$manager_host:$manager_port
+Environment=PLASMA_MANAGER_PPU_ALIAS=$ppu_alias
+ExecStart=$node_bin $current_link/web/server.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
+EOF
+}
+
+write_evidence() {
+  local sha="$1" release="$2"
+  mkdir -p "$state_dir"
+  "$base_python" - "$evidence" "$sha" "$(basename "$release")" "$base_python" \
+    "$ppu_alias" "$ppu_endpoint" "$console_port" "$manager_port" <<'PY'
+import json
+import platform
+import sys
+from pathlib import Path
+
+path, sha, release_id, python, alias, endpoint, console_port, manager_port = sys.argv[1:]
+payload = {
+    "schema_version": 1,
+    "role": "local-control-station",
+    "platform": "linux",
+    "architecture": platform.machine(),
+    "git_sha": sha,
+    "release_id": release_id,
+    "python": python,
+    "ppu_alias": alias,
+    "ppu_endpoint": endpoint,
+    "console_bind": f"127.0.0.1:{console_port}",
+    "manager_bind": f"127.0.0.1:{manager_port}",
+    "hardware_claim": "none",
+}
+Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+}
+
+json_field() {
+  "$base_python" - "$1" "$2" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    value = json.load(handle).get(sys.argv[2])
+if value is None:
+    raise SystemExit(1)
+print(value)
+PY
+}
+
+require_owned_installation() {
+  [[ -f "$evidence" ]] || die "local Control Station is not installed; run 'plasmactl install local-control-station --ppu-endpoint URL'"
+  [[ -L "$current_link" ]] || die "active release symlink is missing: $current_link"
+  [[ -f "$config_file" && -f "$manager_config" ]] || die "local Control Station configuration is incomplete"
+  [[ -f "$manager_unit" && -f "$console_unit" ]] || die "local Control Station user units are missing"
+  grep -Fxq "$unit_marker" "$manager_unit" || die "Manager unit is not owned by local-control-station profile"
+  grep -Fxq "$unit_marker" "$console_unit" || die "Console unit is not owned by local-control-station profile"
+  local expected observed
+  expected="$release_root/$(json_field "$evidence" release_id)"
+  observed="$(readlink -f "$current_link")"
+  [[ "$observed" == "$expected" ]] || die "install evidence/current release mismatch: evidence=$expected current=$observed"
+  validate_release "$observed" "$(json_field "$evidence" git_sha)" || die "active release failed integrity validation"
+}
+
+wait_for_http() {
+  local url="$1" label="$2" attempt
+  for attempt in {1..30}; do
+    if curl --fail --silent --show-error --max-time 2 "$url" >/dev/null 2>&1; then
+      say "$label healthy: $url"
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+probe_target() {
+  local url="${ppu_endpoint%/}/api/health/live" code
+  code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 3 "$url" 2>/dev/null || true)"
+  if [[ "$code" == "200" ]]; then
+    say "target PPU probe: ONLINE ($ppu_alias -> $ppu_endpoint)"
+  else
+    say "target PPU probe: unavailable/non-200 ($ppu_alias -> $ppu_endpoint, HTTP ${code:-000}); non-fatal for Control Station deployment qualification"
+  fi
+}
+
+verify_profile() {
+  require_linux_user_runtime
+  require_command curl
+  resolve_base_python
+  validate_settings
+  require_owned_installation
+  systemctl --user is-active --quiet plasma-local-manager.service || die "plasma-local-manager.service is not active"
+  systemctl --user is-active --quiet plasma-control-station.service || die "plasma-control-station.service is not active"
+  grep -Fq 'Environment=PLASMA_CONTROL_STATION_MODE=managed' "$console_unit" || die "Console unit is not in managed mode"
+  grep -Fq "Environment=PLASMA_MANAGER_API_URL=http://$manager_host:$manager_port" "$console_unit" || die "Console unit has the wrong Manager API URL"
+  grep -Fq "Environment=PLASMA_MANAGER_PPU_ALIAS=$ppu_alias" "$console_unit" || die "Console unit has the wrong fixed PPU alias"
+  wait_for_http "http://$manager_host:$manager_port/api/health/live" "Manager" || die "Manager liveness failed"
+  wait_for_http "http://$console_host:$console_port/" "Control Station Console" || die "Control Station Console health failed"
+  say "PASS: local Control Station Console + Manager are healthy on loopback"
+  say "qualification boundary: Control Station runtime only; PPU/PS/PL/Site/IC readiness is separate"
+  probe_target
+}
+
+status_profile() {
+  resolve_base_python
+  printf 'Profile:        local-control-station\n'
+  if [[ ! -f "$evidence" ]]; then
+    printf 'Installation:   not-installed\n'
+    return 1
+  fi
+  require_owned_installation
+  printf 'Git SHA:        %s\n' "$(json_field "$evidence" git_sha)"
+  printf 'Release:        %s\n' "$(readlink -f "$current_link")"
+  printf 'PPU alias:      %s\n' "$ppu_alias"
+  printf 'PPU endpoint:   %s\n' "$ppu_endpoint"
+  printf 'Console:        http://%s:%s\n' "$console_host" "$console_port"
+  printf 'Manager:        http://%s:%s\n' "$manager_host" "$manager_port"
+  printf 'Manager svc:    %s\n' "$(systemctl --user is-active plasma-local-manager.service 2>/dev/null || true)"
+  printf 'Console svc:    %s\n' "$(systemctl --user is-active plasma-control-station.service 2>/dev/null || true)"
+  probe_target
+}
+
+require_clean_first_install_boundary() {
+  local path
+  for path in "$current_link" "$evidence" "$manager_unit" "$console_unit"; do
+    [[ ! -e "$path" && ! -L "$path" ]] || die "first install found pre-existing local-control-station artifact: $path"
+  done
+}
+
+install_profile() {
+  require_linux_user_runtime
+  require_command git
+  require_command curl
+  resolve_base_python
+  validate_settings
+  require_clean_source
+  require_clean_first_install_boundary
+  local sha release
+  sha="$(current_sha)"
+  release="$(prepare_release "$sha")"
+  write_profile_config
+  write_manager_config
+  mkdir -p "$(dirname "$current_link")"
+  ln -sfn "$release" "$current_link"
+  write_units
+  write_evidence "$sha" "$release"
+  systemctl --user daemon-reload
+  systemctl --user enable plasma-local-manager.service plasma-control-station.service >/dev/null
+  say "installed Linux reference profile at ${sha:0:12}; services remain stopped until deploy/start activation"
+  say "Console is loopback-only by design: http://$console_host:$console_port"
+}
+
+backup_file_if_present() {
+  local source="$1" target="$2"
+  [[ -f "$source" ]] && cp -a "$source" "$target"
+}
+
+deploy_profile() {
+  require_linux_user_runtime
+  require_command git
+  require_command curl
+  resolve_base_python
+  validate_settings
+  require_clean_source
+  require_owned_installation
+
+  local sha release previous_release backup_dir
+  sha="$(current_sha)"
+  release="$(prepare_release "$sha")"
+  previous_release="$(readlink -f "$current_link")"
+  backup_dir="$(mktemp -d "$state_dir/deploy-backup.XXXXXX")"
+  backup_file_if_present "$config_file" "$backup_dir/profile.env"
+  backup_file_if_present "$manager_config" "$backup_dir/manager.yaml"
+  backup_file_if_present "$evidence" "$backup_dir/install.json"
+  backup_file_if_present "$manager_unit" "$backup_dir/manager.service"
+  backup_file_if_present "$console_unit" "$backup_dir/console.service"
+
+  rollback() {
+    local rc=$?
+    trap - ERR
+    say "activation failed; restoring previous local Control Station release/configuration"
+    set +e
+    ln -sfn "$previous_release" "$current_link"
+    [[ -f "$backup_dir/profile.env" ]] && cp -a "$backup_dir/profile.env" "$config_file"
+    [[ -f "$backup_dir/manager.yaml" ]] && cp -a "$backup_dir/manager.yaml" "$manager_config"
+    [[ -f "$backup_dir/install.json" ]] && cp -a "$backup_dir/install.json" "$evidence"
+    [[ -f "$backup_dir/manager.service" ]] && cp -a "$backup_dir/manager.service" "$manager_unit"
+    [[ -f "$backup_dir/console.service" ]] && cp -a "$backup_dir/console.service" "$console_unit"
+    systemctl --user daemon-reload
+    systemctl --user restart plasma-local-manager.service
+    systemctl --user restart plasma-control-station.service
+    rm -rf --one-file-system "$backup_dir"
+    set -e
+    exit "$rc"
+  }
+  trap rollback ERR
+
+  write_profile_config
+  write_manager_config
+  ln -sfn "$release" "$current_link"
+  write_units
+  write_evidence "$sha" "$release"
+  systemctl --user daemon-reload
+  systemctl --user enable plasma-local-manager.service plasma-control-station.service >/dev/null
+  systemctl --user restart plasma-local-manager.service
+  wait_for_http "http://$manager_host:$manager_port/api/health/live" "Manager"
+  systemctl --user restart plasma-control-station.service
+  wait_for_http "http://$console_host:$console_port/" "Control Station Console"
+  verify_profile
+  trap - ERR
+  rm -rf --one-file-system "$backup_dir"
+  say "deployment complete: ${sha:0:12}"
+}
+
+parse_options() {
+  while (($#)); do
+    case "$1" in
+      --python)
+        (($# >= 2)) || die "--python requires PATH"
+        base_python="$2"; shift 2 ;;
+      --ppu-alias)
+        (($# >= 2)) || die "--ppu-alias requires ALIAS"
+        ppu_alias="$2"; shift 2 ;;
+      --ppu-endpoint)
+        (($# >= 2)) || die "--ppu-endpoint requires URL"
+        ppu_endpoint="$2"; shift 2 ;;
+      --console-port)
+        (($# >= 2)) || die "--console-port requires PORT"
+        console_port="$2"; shift 2 ;;
+      --manager-port)
+        (($# >= 2)) || die "--manager-port requires PORT"
+        manager_port="$2"; shift 2 ;;
+      -h|--help)
+        usage; exit 0 ;;
+      *) die "unknown option: $1" ;;
+    esac
+  done
+}
+
+usage() {
+  cat <<'EOF'
+Usage: plasmactl-local-control-station COMMAND [OPTIONS]
+
+Linux reference deployment for the local Control Station role:
+  Console/BFF + Manager only. It does not start a local PPU Server/Gateway.
+
+Commands:
+  install   Build immutable runtime, write user-systemd units/config, do not start
+  deploy    Activate current clean committed source, restart and verify local runtime
+  verify    Verify Console + Manager only; target PPU reachability is reported separately
+  status    Show release, target configuration and user-service state
+
+Options:
+  --python PATH          Python >= 3.11 used to build the immutable runtime
+  --ppu-alias ALIAS      Fixed Manager/BFF target alias (default: local-ppu)
+  --ppu-endpoint URL     PPU Plasma Gateway root; HTTP or HTTPS, required on first install
+  --console-port PORT    Loopback Console port (default: 18190)
+  --manager-port PORT    Loopback Manager port (default: 18280)
+
+Examples:
+  plasmactl install local-control-station \
+    --ppu-alias swpc-ppu --ppu-endpoint http://127.0.0.1:18081
+  plasmactl deploy local-control-station
+  plasmactl verify local-control-station
+
+Boundary:
+  This profile is the Linux user-systemd reference deployment. macOS and Windows
+  use the same Control Station product/runtime contract but require platform-native
+  packaging. No PPU/PS/PL/Site/IC hardware qualification is implied.
+EOF
+}
+
+command="${1:-help}"
+shift || true
+parse_options "$@"
+case "$command" in
+  install) install_profile ;;
+  deploy) deploy_profile ;;
+  verify) verify_profile ;;
+  status) status_profile ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; die "unknown command: $command" ;;
+esac
