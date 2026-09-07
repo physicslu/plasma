@@ -70,7 +70,9 @@ Catalog admission means these are reviewed logical manufacturer-section units. I
 
 ## Reviewed applicability and deterministic binding
 
-The retained applicability run was regenerated from source-locked DS/RM bytes using `pdftotext -layout -enc UTF-8`. The selected anchors are retained in `retained-applicability-evidence-lock.json` and reviewed in `reviewed-applicability-claims.json` with `source_id`, physical PDF page and normalized-page SHA-256.
+The retained applicability run was regenerated from source-locked DS/RM bytes using `pdftotext -layout -enc UTF-8`. The one-shot GitHub Actions run and artifact identifiers, candidate-file digest, artifact digest, generation head, selected page hashes, and preprocessing command are retained in `retained-applicability-evidence-lock.json`; the one-shot workflow itself was removed after retention.
+
+The selected anchors are reviewed in `reviewed-applicability-claims.json` with `source_id`, physical PDF page and normalized-page SHA-256. That reviewed artifact also locks the evidence-lock file digest, so mutation of retained anchor metadata fails closed.
 
 The target scope bridge is now admitted:
 
