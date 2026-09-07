@@ -1,0 +1,119 @@
+{
+  "schema_version": "0.2.0",
+  "applicability_id": "nxp-kl25-applicability-foundation-v1",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "definition_set_id": "nxp-kl25-reviewed-evidence-unit-definitions-v0",
+  "target": "MKL25Z128VLK4",
+  "principle": "commercial target identity, manufacturer document membership, family scope, module presence, and unit scope are distinct claims",
+  "candidate_claims": {
+    "TARGET_EXACT_IDENTITY": {
+      "source_ids": ["nxp_kl25_ds_rev5", "nxp_kl25_rm_rev3"],
+      "terms": ["MKL25Z128VLK4"],
+      "match_mode": "whole_token",
+      "purpose": "prove the exact requested commercial target appears in manufacturer evidence"
+    },
+    "TARGET_DEVICE_EXPRESSION": {
+      "source_ids": ["nxp_kl25_ds_rev5", "nxp_kl25_rm_rev3"],
+      "terms": ["MKL25Z128"],
+      "match_mode": "whole_token",
+      "optional": true,
+      "absence_policy": "DO_NOT_INFER_OR_SYNTHESIZE",
+      "purpose": "observe a manufacturer device expression only if the locked documents actually use one; it is not a required bridge node"
+    },
+    "RM_TARGET_MEMBERSHIP": {
+      "source_ids": ["nxp_kl25_rm_rev3"],
+      "terms": ["MKL25Z128VLK4"],
+      "match_mode": "whole_token",
+      "purpose": "prove that the exact commercial target is explicitly represented inside the locked KL25 reference manual"
+    },
+    "KL25_FAMILY_SCOPE": {
+      "source_ids": ["nxp_kl25_rm_rev3"],
+      "terms": ["KL25 Sub-Family Introduction", "Orderable part numbers"],
+      "page_ranges": {
+        "nxp_kl25_rm_rev3": [[38, 44]]
+      },
+      "purpose": "establish KL25 family/document scope from explicit section anchors rather than repeated headers"
+    },
+    "FTFA_MODULE_PRESENCE": {
+      "source_ids": ["nxp_kl25_rm_rev3"],
+      "terms": ["FTFA", "Flash Memory Module"],
+      "page_ranges": {
+        "nxp_kl25_rm_rev3": [[72, 74], [419, 456]]
+      },
+      "purpose": "establish the NXP flash module from KL25 configuration and Flash Memory Module sections"
+    },
+    "SWD_DEBUG_PRESENCE": {
+      "source_ids": ["nxp_kl25_ds_rev5", "nxp_kl25_rm_rev3"],
+      "terms": ["Serial Wire Debug", "SWD"],
+      "page_ranges": {
+        "nxp_kl25_ds_rev5": [[20, 21]],
+        "nxp_kl25_rm_rev3": [[40, 51], [149, 157]]
+      },
+      "purpose": "establish debug/programming interface presence from debug-specific sections"
+    },
+    "MDM_AP_PRESENCE": {
+      "source_ids": ["nxp_kl25_rm_rev3"],
+      "terms": ["MDM-AP"],
+      "page_ranges": {
+        "nxp_kl25_rm_rev3": [[149, 157]]
+      },
+      "purpose": "establish the debug/security access-port model from the dedicated debug chapter"
+    },
+    "FLASH_SECURITY_MODEL": {
+      "source_ids": ["nxp_kl25_rm_rev3"],
+      "terms": ["FSEC", "security state"],
+      "page_ranges": {
+        "nxp_kl25_rm_rev3": [[149, 157], [423, 455]]
+      },
+      "purpose": "establish the manufacturer security model from dedicated security/register sections"
+    }
+  },
+  "scope_bridge": {
+    "required_claims": [
+      "TARGET_EXACT_IDENTITY",
+      "RM_TARGET_MEMBERSHIP",
+      "KL25_FAMILY_SCOPE"
+    ],
+    "optional_observation_claims": ["TARGET_DEVICE_EXPRESSION"],
+    "generic_family_header_alone_may_establish_family_scope": false,
+    "explicit_family_section_anchor_may_establish_family_scope": true,
+    "generic_family_header_may_establish_commercial_identity": false,
+    "fuzzy_target_matching_allowed": false,
+    "substring_identity_equivalence_allowed": false,
+    "missing_intermediate_device_expression_blocks_bridge": false
+  },
+  "unit_binding_policy": {
+    "required_before_binding": [
+      "scope_bridge_reviewed",
+      "module_or_interface_presence_reviewed",
+      "unit_section_within_applicable_manufacturer_document_reviewed",
+      "applicability_exclusions_reviewed"
+    ],
+    "absence_of_exclusion_is_not_assumed_from_keyword_search": true,
+    "shared_reference_manual_does_not_by_itself_prove_unit_applicability": true,
+    "document_wide_header_hits_are_not_applicability_evidence": true,
+    "unknown_fails_closed": true
+  },
+  "unit_requirements": {
+    "nxp-kl25-ftfa-register-model-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-ftfa-command-sequencing-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-program-longword-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-erase-sector-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-erase-all-blocks-v0": ["FTFA_MODULE_PRESENCE"],
+    "nxp-kl25-flash-security-v0": ["FTFA_MODULE_PRESENCE", "FLASH_SECURITY_MODEL"],
+    "nxp-kl25-debug-security-interaction-v0": ["SWD_DEBUG_PRESENCE", "MDM_AP_PRESENCE", "FLASH_SECURITY_MODEL"],
+    "nxp-kl25-swd-mdm-ap-v0": ["SWD_DEBUG_PRESENCE", "MDM_AP_PRESENCE"]
+  },
+  "admission": {
+    "applicability_candidate_evidence": true,
+    "scope_bridge": true,
+    "evidence_unit_catalog": true,
+    "applicability_binding": true,
+    "evidence_pack": false,
+    "semantic_extraction": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}

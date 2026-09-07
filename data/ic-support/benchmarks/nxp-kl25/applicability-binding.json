@@ -1,0 +1,91 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "deterministic_applicability_binding",
+  "binding_id": "nxp-kl25-applicability-binding-v0",
+  "applicability_id": "nxp-kl25-applicability-foundation-v1",
+  "reviewed_claims_id": "nxp-kl25-reviewed-applicability-claims-v0",
+  "definition_set_id": "nxp-kl25-reviewed-evidence-unit-definitions-v0",
+  "source_lock_id": "nxp-kl25-source-lock-v0",
+  "target": "MKL25Z128VLK4",
+  "scope_bridge": {
+    "status": "BOUND",
+    "required_claims": [
+      "TARGET_EXACT_IDENTITY",
+      "RM_TARGET_MEMBERSHIP",
+      "KL25_FAMILY_SCOPE"
+    ],
+    "missing_prerequisites": [],
+    "intermediate_device_expression_required": false,
+    "fuzzy_identity_matching_used": false
+  },
+  "applicability_exclusions_reviewed": true,
+  "unit_bindings": {
+    "nxp-kl25-ftfa-register-model-v0": {
+      "status": "BOUND",
+      "source_id": "nxp_kl25_rm_rev3",
+      "pdf_page_range": [422, 431],
+      "required_claims": ["FTFA_MODULE_PRESENCE"],
+      "missing_prerequisites": []
+    },
+    "nxp-kl25-ftfa-command-sequencing-v0": {
+      "status": "BOUND",
+      "source_id": "nxp_kl25_rm_rev3",
+      "pdf_page_range": [435, 439],
+      "required_claims": ["FTFA_MODULE_PRESENCE"],
+      "missing_prerequisites": []
+    },
+    "nxp-kl25-program-longword-v0": {
+      "status": "BOUND",
+      "source_id": "nxp_kl25_rm_rev3",
+      "pdf_page_range": [444, 445],
+      "required_claims": ["FTFA_MODULE_PRESENCE"],
+      "missing_prerequisites": []
+    },
+    "nxp-kl25-erase-sector-v0": {
+      "status": "BOUND",
+      "source_id": "nxp_kl25_rm_rev3",
+      "pdf_page_range": [446, 448],
+      "required_claims": ["FTFA_MODULE_PRESENCE"],
+      "missing_prerequisites": []
+    },
+    "nxp-kl25-erase-all-blocks-v0": {
+      "status": "BOUND",
+      "source_id": "nxp_kl25_rm_rev3",
+      "pdf_page_range": [451, 452],
+      "required_claims": ["FTFA_MODULE_PRESENCE"],
+      "missing_prerequisites": []
+    },
+    "nxp-kl25-flash-security-v0": {
+      "status": "BOUND",
+      "source_id": "nxp_kl25_rm_rev3",
+      "pdf_page_range": [454, 455],
+      "required_claims": ["FTFA_MODULE_PRESENCE", "FLASH_SECURITY_MODEL"],
+      "missing_prerequisites": []
+    },
+    "nxp-kl25-debug-security-interaction-v0": {
+      "status": "BOUND",
+      "source_id": "nxp_kl25_rm_rev3",
+      "pdf_page_range": [149, 150],
+      "required_claims": ["SWD_DEBUG_PRESENCE", "MDM_AP_PRESENCE", "FLASH_SECURITY_MODEL"],
+      "missing_prerequisites": []
+    },
+    "nxp-kl25-swd-mdm-ap-v0": {
+      "status": "BOUND",
+      "source_id": "nxp_kl25_rm_rev3",
+      "pdf_page_range": [151, 157],
+      "required_claims": ["SWD_DEBUG_PRESENCE", "MDM_AP_PRESENCE"],
+      "missing_prerequisites": []
+    }
+  },
+  "admission": {
+    "scope_bridge": true,
+    "evidence_unit_catalog": true,
+    "applicability_binding": true,
+    "evidence_pack": false,
+    "semantic_extraction": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}
