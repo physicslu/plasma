@@ -49,8 +49,8 @@
     "live_source_validation_is_separate": true
   },
   "admission": {
-    "evidence_pack": false,
-    "pre_ai_ci": false,
+    "evidence_pack": true,
+    "pre_ai_ci": true,
     "semantic_extraction": false,
     "canonical_dataset": false,
     "hil": false,
