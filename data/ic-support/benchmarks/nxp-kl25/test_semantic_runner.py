@@ -232,9 +232,9 @@ class KL25SemanticRunnerTest(unittest.TestCase):
         self.assertEqual(transport.kwargs["model_id"], "mock-model")
         self.assertEqual(transport.kwargs["runtime_label"], "repository-ci")
 
-    def test_gate4_contract_keeps_real_model_admissions_false(self):
+    def test_gate4_contract_admits_mock_runner_only(self):
         admission = self.contract["admission"]
-        self.assertFalse(admission["mock_runner_ci"])
+        self.assertTrue(admission["mock_runner_ci"])
         self.assertFalse(admission["semantic_extraction"])
         self.assertFalse(admission["model_quality"])
         self.assertFalse(admission["canonical_dataset"])
