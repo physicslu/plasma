@@ -45,7 +45,7 @@
     "error_classes_are_fail_closed": true
   },
   "admission": {
-    "mock_runner_ci": false,
+    "mock_runner_ci": true,
     "semantic_extraction": false,
     "model_quality": false,
     "canonical_dataset": false,
