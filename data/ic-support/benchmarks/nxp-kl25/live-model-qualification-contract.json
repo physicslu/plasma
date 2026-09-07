@@ -84,7 +84,7 @@
     "screening_pass_is_not_semantic_correctness": true
   },
   "admission": {
-    "live_model_qualification_harness": false,
+    "live_model_qualification_harness": true,
     "live_model_run_retained": false,
     "semantic_extraction": false,
     "model_quality": false,
