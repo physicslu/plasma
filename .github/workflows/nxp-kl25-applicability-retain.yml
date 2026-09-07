@@ -33,9 +33,21 @@ jobs:
             --output /tmp/nxp-kl25-applicability-v1.json
           python data/ic-support/benchmarks/nxp-kl25/summarize_applicability.py \
             /tmp/nxp-kl25-applicability-v1.json
+      - name: Extract bounded review pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nxp-kl25-review
+          pdftotext -layout -enc UTF-8 -f 1 -l 21 /tmp/nxp-kl25-source/KL25P80M48SF0.pdf /tmp/nxp-kl25-review/ds-pages-1-21.txt
+          pdftotext -layout -enc UTF-8 -f 38 -l 44 /tmp/nxp-kl25-source/KL25P80M48SF0RM.pdf /tmp/nxp-kl25-review/rm-pages-38-44.txt
+          pdftotext -layout -enc UTF-8 -f 72 -l 79 /tmp/nxp-kl25-source/KL25P80M48SF0RM.pdf /tmp/nxp-kl25-review/rm-pages-72-79.txt
+          pdftotext -layout -enc UTF-8 -f 149 -l 157 /tmp/nxp-kl25-source/KL25P80M48SF0RM.pdf /tmp/nxp-kl25-review/rm-pages-149-157.txt
+          pdftotext -layout -enc UTF-8 -f 419 -l 456 /tmp/nxp-kl25-source/KL25P80M48SF0RM.pdf /tmp/nxp-kl25-review/rm-pages-419-456.txt
       - uses: actions/upload-artifact@v4
         with:
           name: nxp-kl25-applicability-v1
-          path: /tmp/nxp-kl25-applicability-v1.json
+          path: |
+            /tmp/nxp-kl25-applicability-v1.json
+            /tmp/nxp-kl25-review/*.txt
           if-no-files-found: error
           retention-days: 1
