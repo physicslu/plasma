@@ -140,7 +140,10 @@ test("Reconnect preserves the selected PPU and falls back to Default only when i
 
   providerOnline = false;
   await connect.click();
-  await expect(page.getByText("temporary provider outage", { exact: true })).toBeVisible();
+  const availability = page.locator(".engineeringBoundaryNote.warning");
+  await expect(availability.locator("b")).toContainText(/燒錄功能目前不可用|Programming unavailable/i);
+  await expect(availability.locator(":scope > span")).toBeHidden();
+  await expect(log).toContainText("temporary provider outage");
 
   providerOnline = true;
   await connect.click();
