@@ -10,7 +10,7 @@ from typing import Any
 import ab_benchmark as harness
 import canonicalize_semantic_run_v9 as canonical_pipeline
 import ollama_semantic_extraction_run_v9 as ollama_runner
-import score_canonical_v8 as canonical_score
+import score_canonical_v9 as canonical_score
 import score_semantic_extraction_v9 as semantic_score
 import semantic_extraction_v9 as semantic
 
