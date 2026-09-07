@@ -33,6 +33,15 @@ class KL25EvidenceUnitConstructionTest(unittest.TestCase):
         self.assertTrue(guards["mdm_ap_security_recovery_is_not_flash_command_equivalence"])
         self.assertEqual(guards["forbidden_stm32_projection"], ["KEYR", "FLASH_CR", "PER", "MER", "PG"])
 
+    def test_review_dimensions_require_structure_and_applicability(self):
+        contract = json.loads((HERE / "evidence-unit-construction-contract.json").read_text(encoding="utf-8"))
+        dims = contract["expected_next_review_dimensions"]
+        for required in ["section_heading", "contiguous_page_span", "manufacturer_native_terms", "applicability_evidence"]:
+            self.assertIn(required, dims)
+        self.assertFalse(contract["method"]["manual_page_guessing_is_authoritative"])
+        self.assertTrue(contract["evidence_unit_requirements"]["heading_evidence_required"])
+        self.assertTrue(contract["evidence_unit_requirements"]["applicability_must_be_established_separately"])
+
 
 if __name__ == "__main__":
     unittest.main()
