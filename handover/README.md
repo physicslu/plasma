@@ -7,13 +7,14 @@ This directory contains numbered engineering handover documents intended to let 
 | ID | Date | Topic | Status | Recommended continuation |
 |---|---|---|---|---|
 | [H001](H001-plasma-ic-evidence-canonical-pipeline-2026-09-06.md) | 2026-09-06 | IC Evidence, semantic extraction, relationship derivation, and canonical specification pipeline | Current | Memory Geometry Relationship Derivation Foundation |
+| [H002](H002-render-swpc-managed-ps-qualification-2026-09-07.md) | 2026-09-07 | Render / Cloudflare / SWPC managed PS qualification and browser Programming routing defect | Current | Fix managed Programming / Engineering same-origin routing |
 
 ## Usage
 
 For a new session, ask the agent to read the relevant handover before proposing changes. Example:
 
 ```text
-Read repo handover H001 and continue from its recommended continuation point.
+Read repo handover H002 and continue.
 ```
 
 A handover records engineering state; it does not override `AGENTS.md`, checked-in executable code, or current repository state. If a handover conflicts with newer code, tests, or contracts, the newer repository state is authoritative.
