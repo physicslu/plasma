@@ -50,6 +50,9 @@ def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
     if not isinstance(sources, list):
         raise AdmissionError("Production manifest sources must be a list")
 
+    # Phase 4.3C is a historical, pre-admission boundary.  Validate every
+    # current source, but reconstruct that boundary from the non-STM32F2
+    # sources so later STM32F2 growth cannot rewrite the checked-in baseline.
     family_counts: dict[str, int] = {}
     base_devices: set[tuple[str, str]] = set()
     for source in sources:
@@ -68,8 +71,9 @@ def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
             raise AdmissionError(f"{family}: Production manifest row count drifted")
         if any(row.get("family") != family for row in rows):
             raise AdmissionError(f"{family}: canonical source contains a foreign family")
-        family_counts[family] = family_counts.get(family, 0) + len(rows)
-        base_devices.update((family, row.get("base_device", "")) for row in rows)
+        if family != FAMILY:
+            family_counts[family] = family_counts.get(family, 0) + len(rows)
+            base_devices.update((family, row.get("base_device", "")) for row in rows)
 
     exact_count = sum(family_counts.values())
     if family_counts != {"STM32F1": 75, "STM32F4": 384}:

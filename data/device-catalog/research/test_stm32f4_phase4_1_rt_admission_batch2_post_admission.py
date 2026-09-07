@@ -185,7 +185,10 @@ class STM32F4Phase41RTBatch2PostAdmissionTests(unittest.TestCase):
         self.assertEqual(f4["row_count"], len(rows))
         self.assertEqual(f4["sha256"], current_sha)
         self.assertEqual(f4["git_blob_sha"], current_blob)
-        self.assertEqual(sum(source["row_count"] for source in sources.values()), 75 + len(rows))
+        self.assertEqual(
+            sum(sources[family]["row_count"] for family in ("STM32F1", "STM32F4")),
+            75 + len(rows),
+        )
         self.assertTrue(NEW_BASES <= production_bases)
 
         inventory = build_inventory(catalog_path=CATALOG, canonical_path=CANONICAL)

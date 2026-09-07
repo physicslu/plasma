@@ -7,7 +7,8 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalog, get_default_device_catalog
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 459
+EXPECTED_PRODUCTION_CATALOG_SIZE = 468
+EXPECTED_STM32F2_CATALOG_SIZE = 9
 EXPECTED_STM32F4_CATALOG_SIZE = 384
 
 
@@ -90,7 +91,7 @@ def test_checked_in_production_catalog_contains_only_current_admitted_exact_icpn
     assert all(record.production_admitted for record in catalog.records)
     assert all(record.identifier_kind == "manufacturer_part_number" for record in catalog.records)
     assert all(record.icpn == record.identifier for record in catalog.records)
-    assert {record.family for record in catalog.records} == {"STM32F1", "STM32F4"}
+    assert {record.family for record in catalog.records} == {"STM32F1", "STM32F2", "STM32F4"}
 
 
 def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
@@ -229,13 +230,14 @@ def test_production_payload_separates_catalog_verification_from_physical_validat
 def test_production_metadata_reports_vendor_family_taxonomy() -> None:
     metadata = get_default_device_catalog().metadata
     assert metadata["catalog_size"] == EXPECTED_PRODUCTION_CATALOG_SIZE
-    assert metadata["source_count"] == 2
+    assert metadata["source_count"] == 3
     assert metadata["taxonomy"] == [
         {
             "vendor": "STMicroelectronics",
             "count": EXPECTED_PRODUCTION_CATALOG_SIZE,
             "families": [
                 {"family": "STM32F1", "count": 75},
+                {"family": "STM32F2", "count": EXPECTED_STM32F2_CATALOG_SIZE},
                 {"family": "STM32F4", "count": EXPECTED_STM32F4_CATALOG_SIZE},
             ],
         }

@@ -1,0 +1,33 @@
+{
+  "added_exact_icpns": [
+    "STM32F205RBT6",
+    "STM32F205RBT6TR",
+    "STM32F205RBT7",
+    "STM32F207ICH6",
+    "STM32F207ICT6",
+    "STM32F215RET6",
+    "STM32F215RET6TR",
+    "STM32F217IEH6",
+    "STM32F217IET6"
+  ],
+  "admission_plan_sha256": "b657e31ea214348e3153acc7a2514b11b48b88de4ca84f31237cf0574a36a8e8",
+  "canonical_csv_file_sha256": "935477152326adfa531b21cd1b87374e10b78c6deed19f11353a56f92f11ec26",
+  "canonical_csv_git_blob_sha": "27ba77774667c128b4ccb86c4bc335cfa78853cb",
+  "full_stm32f2_surface_covered": false,
+  "lifecycle_exclusions": [],
+  "phase": "4.3D",
+  "production_exact_icpns_after": 468,
+  "production_exact_icpns_before": 459,
+  "production_family_count_after": 3,
+  "production_family_count_before": 2,
+  "programming_algorithm_equivalence_claimed": false,
+  "proposal_artifact_id": 10000326131,
+  "proposal_artifact_zip_sha256": "871ca9719279278d3cad7563164324626951288605e165f664e7f63adc028a12",
+  "proposal_run_id": 34070625312,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "status": "published",
+  "stm32f2_base_devices_after": 4,
+  "stm32f2_rows_after": 9,
+  "stm32f2_rows_before": 0
+}

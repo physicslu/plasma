@@ -35,7 +35,11 @@ def main() -> int:
     assert hashlib.sha256(CANONICAL.read_bytes()).hexdigest() == production["stm32f4_catalog_sha256"]
     manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
     assert (
-        sum(source["row_count"] for source in manifest["sources"])
+        sum(
+            source["row_count"]
+            for source in manifest["sources"]
+            if source["family"] in {"STM32F1", "STM32F4"}
+        )
         == production["st_exact_icpns"]
     )
     with STM32F1_CANONICAL.open(encoding="utf-8") as handle:

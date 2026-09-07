@@ -104,7 +104,10 @@ class STM32F4Phase41RTPolicyTests(unittest.TestCase):
         self.assertEqual(sources["STM32F4"]["row_count"], len(rows))
         self.assertEqual(sources["STM32F4"]["sha256"], current_sha)
         self.assertEqual(sources["STM32F4"]["git_blob_sha"], current_blob)
-        self.assertEqual(sum(source["row_count"] for source in sources.values()), 75 + len(rows))
+        self.assertEqual(
+            sum(sources[family]["row_count"] for family in ("STM32F1", "STM32F4")),
+            75 + len(rows),
+        )
 
 
 if __name__ == "__main__":

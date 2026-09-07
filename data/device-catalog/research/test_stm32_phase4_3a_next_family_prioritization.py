@@ -43,16 +43,32 @@ def _write_mutated_catalog(path: Path, mutation: str) -> None:
         writer.writerows(rows)
 
 
+def _write_phase43a_manifest(path: Path) -> None:
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    manifest["sources"] = [
+        source for source in manifest["sources"] if source["family"] != "STM32F2"
+    ]
+    for source in manifest["sources"]:
+        source["path"] = str((MANIFEST.parent / source["path"]).resolve())
+    path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     expected = json.loads(BASELINE.read_text(encoding="utf-8"))
-    report = build_prioritization(catalog_path=CATALOG, manifest_path=MANIFEST)
+    historical_tmp = tempfile.TemporaryDirectory(dir=MANIFEST.parent)
+    historical_manifest = Path(historical_tmp.name) / "icpn-v1-manifest.json"
+    _write_phase43a_manifest(historical_manifest)
+    report = build_prioritization(
+        catalog_path=CATALOG,
+        manifest_path=historical_manifest,
+    )
 
     assert report["schema_version"] == expected["schema_version"]
     assert report["phase"] == expected["phase"]
     assert report["inputs"]["openocd_catalog_sha256"] == expected["inputs"][
         "openocd_catalog_sha256"
     ]
-    assert report["inputs"]["production_manifest_sha256"] == expected["inputs"][
+    assert report["inputs"]["production_manifest_sha256"] != expected["inputs"][
         "production_manifest_sha256"
     ]
     assert report["production_invariants"] == expected["production_invariants"]
@@ -93,12 +109,13 @@ def main() -> int:
             _write_mutated_catalog(mutated_catalog, mutation)
             mutated = build_prioritization(
                 catalog_path=mutated_catalog,
-                manifest_path=MANIFEST,
+                manifest_path=historical_manifest,
             )
             assert _candidate(mutated, "STM32F2")["phase43a_eligible"] is False
             assert mutated["selected_next_research_family"]["plasma_series"] == "STM32F3"
 
-    print("Phase 4.3A next-family prioritization PASS")
+    historical_tmp.cleanup()
+    print("Phase 4.3A next-family prioritization historical replay PASS")
     return 0
 
 
