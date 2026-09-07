@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import json
 import tempfile
 import unittest
@@ -8,7 +7,7 @@ from pathlib import Path
 
 import canonicalize_semantic_run_v9 as pipeline
 import retained_semantic_v9 as retained
-import score_canonical_v8 as canonical_score
+import score_canonical_v9 as canonical_score
 import score_semantic_extraction_v9 as semantic_score
 import semantic_extraction_v9 as semantic
 
