@@ -72,10 +72,11 @@ class KL25EvidencePackTest(unittest.TestCase):
             },
         )
         self.assertEqual(len(pack["page_refs"]), 17)
-        self.assertEqual(
-            {(ref["source_id"], ref["pdf_page_number"]) for ref in pack["page_refs"]},
-            {(ref["source_id"], ref["pdf_page_number"]) for ref in pack["page_refs"]},
-        )
+        page_keys = [
+            (ref["source_id"], ref["pdf_page_number"])
+            for ref in pack["page_refs"]
+        ]
+        self.assertEqual(len(page_keys), len(set(page_keys)))
 
     def test_debug_security_pack_closes_over_debug_and_flash_security_context(self):
         packs, _ = self.build()
