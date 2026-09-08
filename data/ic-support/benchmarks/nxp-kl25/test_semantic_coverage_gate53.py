@@ -76,6 +76,14 @@ def test_semantic_prompt_uses_generic_coverage_rule_not_per_unit_answer_keys() -
     assert "required_term_groups" not in source
 
 
+def test_semantic_prompt_requires_global_fact_id_uniqueness() -> None:
+    source = (HERE / "semantic_extraction.py").read_text(encoding="utf-8")
+    assert "fact_id must be globally unique across the entire response" in source
+    assert "do not restart fact numbering for each Evidence Unit" in source
+    # The deterministic parser remains authoritative and must still fail closed.
+    assert "duplicate fact_id" in source
+
+
 if __name__ == "__main__":
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
