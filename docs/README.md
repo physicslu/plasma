@@ -89,7 +89,8 @@
 ## Deployment
 
 - **Current** — [Deployment Index](deployment/README.md)
-- **Current** — [`plasmactl` Deployment Profiles](deployment/plasmactl-deployment-profiles.md)：定義統一 operator CLI、`integration`／`swpc-z2like` profile ownership、privileged activation rollback 與 qualification boundary。
+- **Current** — [`plasmactl` Deployment Profiles](deployment/plasmactl-deployment-profiles.md)：定義統一 operator CLI、`integration`／`local-control-station`／`swpc-z2like` profile ownership、activation rollback 與 qualification boundary。
+- **Current** — [Local Control Station Reference Deployment](deployment/local-control-station.md)：定義 Linux user-systemd 的 Console/BFF + Manager 本機參考部署、可設定 PPU Endpoint、loopback-only ingress、immutable release 與 rollback；macOS／Windows 保留相同產品契約但使用平台原生 packaging。
 - **Current** — [Product Deployment Foundation](deployment/product-deployment-foundation.md)：定義跨平台 Control Station（macOS／Linux／Windows）、Z2 PPU、SWPC integration host 的產品部署責任邊界，以及 immutable release 與跨平台 read-only readiness audit。
 - **Current** — [Product Release Format v1](deployment/product-release-format.md)：定義 product version、release manifest、角色／平台 artifact matrix、SHA-256 integrity、safe verification 與 clean-extraction acceptance。
 - **Current** — [Control Station Runtime Packaging](deployment/control-station-runtime-packaging.md)：定義 source-tree-independent Vinext standalone Console/BFF、Manager Python zipapp、runtime manifest 與 Control Station release payload。
@@ -101,7 +102,7 @@
 - **Reference** — [Control Station Runtime Acceptance Evidence](deployment/control-station-runtime-acceptance.md)：定義 macOS／Linux／Windows clean-runtime CI 的證據範圍與不可延伸宣稱的邊界。
 - **Current** — [macOS Control Station Installer Pilot](deployment/macos-control-station-installer-pilot.md)：定義 unsigned `.pkg`、per-user `launchd` LaunchAgents、absolute Node/Python runtime binding，以及 install/start/restart/stop-start/basic-uninstall acceptance；不代表 signing/notarization readiness。
 - **Current** — [Windows Control Station Installer Pilot](deployment/windows-control-station-installer-pilot.md)：定義 unsigned MSI、WinSW-backed Windows SCM services、`Program Files`／`ProgramData` 邊界，以及 install/start/restart/stop-start/basic-uninstall acceptance；不代表 signing 或真正 Windows operator-host readiness。
-- **Current** — [SWPC Public Preview / Mock Environment](deployment/swpc-public-preview.md)：定義 `plasma.open4th.com` 為 SWPC 公開 Preview／Mock frontend ingress；Browser 維持 same-origin routing，且該 hostname 不得重新成為 Plasma Gateway Endpoint／API base。
+- **Historical** — [SWPC Public Preview / Mock Environment](deployment/swpc-public-preview.md)：記錄 `plasma.open4th.com` 過去作為 SWPC Preview／Mock ingress 的退役角色；目前 Mock Demo 已移至 `plasma-demo.open4th.com`，SWPC hostname 保留給 Local Control Station 驗收後切換。
 - **Current** — [Web Runtime Hygiene](deployment/web-runtime-hygiene.md)
 - **Current** — [Manager BFF Runtime Wiring](deployment/manager-bff-runtime-wiring.md)
 - **Current** — [Render Free Public Mock Demo](deployment/render-free-public-demo.md)
