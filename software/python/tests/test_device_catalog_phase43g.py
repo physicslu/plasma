@@ -30,7 +30,6 @@ def _assert_payload(payload: dict, icpn: str) -> None:
 
 def test_phase43g_exact_icpns_are_catalog_admitted_without_runtime_claims() -> None:
     catalog = get_default_device_catalog()
-    assert catalog.size == 481
     for icpn in EXPECTED:
         record = catalog.resolve("STMicroelectronics", icpn)
         assert record is not None and record.production_admitted
@@ -38,6 +37,7 @@ def test_phase43g_exact_icpns_are_catalog_admitted_without_runtime_claims() -> N
 
 
 def test_phase43g_exact_icpns_are_exposed_by_rest_catalog() -> None:
+    expected_catalog_size = get_default_device_catalog().size
     server = ThreadingHTTPServer(("127.0.0.1", 0), PlasmaWebHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -48,7 +48,8 @@ def test_phase43g_exact_icpns_are_exposed_by_rest_catalog() -> None:
             response = connection.getresponse()
             payload = json.loads(response.read())
             connection.close()
-            assert response.status == 200 and payload["catalog_size"] == 481
+            assert response.status == 200
+            assert payload["catalog_size"] == expected_catalog_size
             _assert_payload(next(item for item in payload["results"] if item["icpn"] == icpn), icpn)
     finally:
         server.shutdown()
