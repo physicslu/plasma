@@ -203,7 +203,8 @@ def test_z2_ps_profile_delegates_without_aliasing_swpc_surrogate(tmp_path: Path)
     source = PLASMACTL.read_text(encoding="utf-8")
     assert "z2-ps" in source
     assert "Real PYNQ-Z2 ARMv7 PS-only" in source
-    assert "aliases swpc-z2like" not in source
+    assert "z2-ps) run_z2_ps_backend" in source
+    assert "z2-ps) run_swpc_z2like_backend" not in source
 
 
 def test_z2_ps_backend_keeps_pynq_python_and_hardware_boundary_closed() -> None:
