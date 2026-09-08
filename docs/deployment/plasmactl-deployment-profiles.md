@@ -4,7 +4,7 @@
 
 **Current deployment control-plane contract.**
 
-`plasmactl` is the operator entry point for Plasma deployment/runtime lifecycle commands. A deployment **profile** selects a host role and its backend; it does not collapse development-host, Control Station, and appliance-style ownership into one implementation.
+`plasmactl` is the operator entry point for Plasma deployment/runtime lifecycle commands. A deployment **profile** selects a host role and its backend; it does not collapse development-host, Control Station, surrogate-PPU, and real-appliance ownership into one implementation.
 
 Current profiles:
 
@@ -13,8 +13,9 @@ Current profiles:
 | `integration` | SWPC development/integration host | user systemd | repository/runtime environment | none |
 | `local-control-station` | Linux reference Control Station: Console/BFF + Manager | user systemd | immutable user-local release | none |
 | `swpc-z2like` | x86_64 PS-only PPU surrogate | system systemd | immutable `/opt/plasma/releases/<release-id>` | PS-surrogate software only |
+| `z2-ps` | Real PYNQ-Z2 ARMv7 PS-only PPU | system systemd | GitHub-built Python runtime + immutable PPU release | PS runtime/local diagnostic only |
 
-Future `z2-ps` / `z2-full` profiles require their own implementation and qualification. They are not aliases of `swpc-z2like`. The shorthand `z2` remains unavailable until the full real-Z2 boundary is qualified.
+`z2-full` remains future work and requires PS + PL + Site/Programming qualification. The shorthand `z2` remains unavailable until that full boundary is qualified. Neither is an alias of `swpc-z2like`.
 
 ## First-principles ownership
 
@@ -34,14 +35,18 @@ plasmactl
 │   └── scripts/plasmactl-integration
 ├── local-control-station
 │   └── scripts/plasmactl-local-control-station
-└── swpc-z2like
-    └── scripts/plasmactl-swpc-z2like
-        └── scripts/swpc-z2like-ppu-install.sh
+├── swpc-z2like
+│   └── scripts/plasmactl-swpc-z2like
+│       └── scripts/swpc-z2like-ppu-install.sh
+└── z2-ps
+    └── scripts/plasmactl-z2-ps
+        ├── scripts/z2-python-runtime.py
+        └── scripts/ppu-z2-installer.py
 ```
 
 The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
 
-The hardened SWPC installer remains the host-mutating implementation for the PPU-surrogate role. `plasmactl-swpc-z2like` adds lifecycle orchestration, evidence/status checks and activation rollback; it does not duplicate the installer internals.
+The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals.
 
 ## Backward compatibility
 
@@ -63,7 +68,7 @@ plasmactl status integration
 
 `update-and-restart` remains an alias of `deploy integration`.
 
-The following remain integration-only in this phase:
+The following remain integration-only:
 
 ```text
 update
@@ -148,7 +153,7 @@ This verifies the local runtime/evidence contract, managed-mode BFF wiring, loca
 
 ### Cross-platform boundary
 
-`local-control-station` is currently the **Linux user-systemd reference deployment**. macOS and Windows are expected to package the same Control Station product/runtime contract through platform-native installation/service mechanisms rather than duplicate Programming or Manager functionality.
+`local-control-station` is currently the **Linux user-systemd reference deployment**. macOS and Windows package the same Control Station product/runtime contract through platform-native installation/service mechanisms rather than duplicate Programming or Manager functionality.
 
 ## SWPC Z2-like operator flow
 
@@ -190,9 +195,7 @@ If first-install activation fails after that clean boundary is proven, the profi
 sudo ./scripts/plasmactl deploy swpc-z2like
 ```
 
-Unlike `deploy integration`, the privileged SWPC profile does **not** fetch or merge Git. It activates the repository's current **clean committed HEAD**. Source control update and privileged host activation are separate responsibilities.
-
-This prevents a root deployment process from silently acquiring Git credentials or changing repository history.
+The privileged SWPC profile does **not** fetch or merge Git. It activates the repository's current **clean committed HEAD**. Source control update and privileged host activation are separate responsibilities.
 
 Before any mutation, deployment requires the install evidence, `/opt/plasma/current`, PPU configuration, system units, and restricted Nginx ownership to agree. An evidence/current-release mismatch fails closed.
 
@@ -235,63 +238,160 @@ verify readiness + restricted boundary + local PS loopback
 
 The backend never implicitly stops integration-host **user** systemd services. Port/service ownership conflicts remain fail-closed; the operator must resolve a conflicting integration runtime explicitly.
 
-A failed upgrade is designed to leave the previous qualified release active and to remove the failed target release after rollback, so retrying the same clean committed SHA does not collide with an unqualified immutable-release directory. If rollback itself is incomplete, the command returns a critical failure and does not claim qualification.
-
-## Verification
+### Verification
 
 ```bash
 ./scripts/plasmactl verify swpc-z2like
 ```
 
-This is a local, read-only qualification check of the already installed surrogate. It verifies:
+This is a local, read-only qualification check of the already installed surrogate. It verifies install evidence/current identity, Plasma-owned config/system units/restricted ingress, active Server/Gateway, local/restricted health, negative-route isolation, and PS diagnostic loopback.
 
-- install evidence contract;
-- install evidence and active immutable release identity agree;
-- Plasma-owned PPU configuration, system units and restricted Nginx ownership;
-- `plasma-server.service` and `plasma-web.service` active;
-- direct local Gateway readiness on `127.0.0.1:18080`;
-- restricted ingress readiness on `127.0.0.1:18081`;
-- `/api/settings/sites` remains HTTP 404 on restricted ingress;
-- PS diagnostic loopback returns from the PS endpoint with matching CRC/payload.
+It does **not** prove the Render/Manager managed path.
 
-It does **not** prove the Render/Manager managed path. Managed Control Station -> BFF -> Manager -> SWPC acceptance remains the separate runtime-acceptance layer documented by the managed PS qualification flow.
-
-## Status
+### Status
 
 ```bash
 ./scripts/plasmactl status swpc-z2like
 ```
 
-Status reports installed evidence such as release ID, Git SHA, architecture, Plasma Python, private Gateway/restricted ingress, Site count, active release and system-service state.
+Status reports installed evidence and service state; it does not manufacture a PASS claim.
 
-Status does not manufacture a PASS claim. `verify` is the executable local acceptance command.
+## Real Z2 PS operator flow
 
-## Qualification boundary
+The full package and qualification contract is documented at `docs/deployment/z2-ps-installer.md`.
 
-`swpc-z2like` means:
+### GitHub release candidate
+
+`.github/workflows/z2-ps-release.yml` builds a source-tree-independent candidate kit containing:
+
+```text
+Plasma-owned CPython ARMv7 runtime
+canonical ppu/linux/armv7l release
+plasmactl router + z2-ps backend
+Z2 PPU installer
+hash/evidence metadata
+```
+
+The CPython build runs in an Ubuntu 22.04 ARMv7 userspace and uses a pinned official Python source archive SHA-256. This removes target-local compilation from the normal clean-Z2 deployment flow.
+
+CI validates the package and ARMv7 userspace behavior, but it is only **software/package qualification**. It cannot prove a physical PYNQ-Z2 runtime.
+
+### First install on clean PYNQ-Z2
+
+After transferring and extracting the GitHub artifact:
+
+```bash
+sudo bash scripts/plasmactl install z2-ps \
+  --python-artifact artifacts/plasma-python-3.12.13-linux-armv7l.tar.gz \
+  --python-sidecar artifacts/plasma-python-3.12.13-linux-armv7l.tar.gz.sha256 \
+  --release-artifact artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz \
+  --release-sidecar artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256 \
+  --gateway-host 192.168.2.99 \
+  --ppu-id z2-dev-01 \
+  --facility-id lab
+```
+
+The order is intentional:
+
+```text
+verify Python artifact
+  -> install /opt/plasma/python/<version>
+  -> execute/import-probe it on real ARMv7
+  -> verify PPU artifact
+  -> activate immutable PPU release
+  -> start system services
+  -> local health
+  -> local PS diagnostic loopback
+```
+
+The profile never replaces `/usr/bin/python3` or the PYNQ Python environment.
+
+### Deploy a later PPU release
+
+```bash
+sudo bash scripts/plasmactl deploy z2-ps \
+  --release-artifact artifacts/plasma-ppu-<new-release-id>-linux-armv7l.tar.gz \
+  --release-sidecar artifacts/plasma-ppu-<new-release-id>-linux-armv7l.tar.gz.sha256 \
+  --gateway-host 192.168.2.99 \
+  --ppu-id z2-dev-01 \
+  --facility-id lab
+```
+
+When no new Python artifact/path is provided, `deploy z2-ps` reuses `/opt/plasma/install/python-runtime.json` rather than guessing among interpreters.
+
+### Verification
+
+```bash
+bash scripts/plasmactl verify z2-ps
+```
+
+A PASS requires a real Linux ARMv7 runtime, active Plasma Server/Gateway, Gateway readiness and a local PS diagnostic loopback with `endpoint=ps` / `source=ps`.
+
+This qualifies only:
+
+```text
+Real PYNQ-Z2 / ARMv7 PS software runtime
+local Z2 Gateway -> Server -> PS diagnostic path
+```
+
+It does **not** qualify:
+
+```text
+PS <-> PL
+FPGA bitstream/execution
+Site electrical path
+target power
+real IC erase/program/verify
+8-Site hardware concurrency
+production programmer readiness
+```
+
+After local verification, the Control Station uses its existing Manager registry workflow:
+
+```text
+Add PPU
+-> alias + http://<Z2-IP>:18080
+-> Manager observation
+-> Validate & Enable
+-> Managed PS Loopback
+```
+
+Managed PS Loopback is a separate end-to-end acceptance layer and must be retained for the exact deployed identities.
+
+### Status
+
+```bash
+bash scripts/plasmactl status z2-ps
+```
+
+Status reports release ID, source SHA, isolated Plasma Python path, Gateway endpoint and system-service state. It is observational only; `verify z2-ps` is the executable local acceptance command.
+
+## Qualification boundaries
+
+### `swpc-z2like`
 
 ```text
 x86_64 SWPC
-  + Plasma Server
-  + Plasma Gateway
-  + PS diagnostic behavior
-  + production-like filesystem/service ownership
-  + restricted ingress
++ Plasma Server/Gateway
++ PS diagnostic behavior
++ production-like filesystem/service ownership
 ```
 
-It explicitly does **not** mean:
+This is not Real Z2 qualification.
+
+### `z2-ps`
 
 ```text
-PYNQ-Z2 / ARMv7 qualified
-PS <-> PL qualified
-FPGA bitstream qualified
-Site electrical path qualified
-real IC erase/program/verify qualified
-8-Site hardware concurrency qualified
-production programmer qualified
+Real PYNQ-Z2 / ARMv7
++ isolated Plasma Python
++ canonical PPU release
++ systemd Server/Gateway
++ local PS diagnostic behavior
 ```
 
-Mock must not be enabled to turn those missing boundaries green.
+This remains PS-only qualification.
+
+Mock must not be enabled to turn missing PL/Site/IC boundaries green.
 
 ## Relationship to `verify fleet`
 
@@ -301,4 +401,4 @@ The existing command remains unchanged:
 plasmactl verify fleet
 ```
 
-It validates Manager/Fleet observation. It is not a substitute for `verify local-control-station` or `verify swpc-z2like`, and none of these is a substitute for real Z2/PL/Site/IC acceptance.
+It validates Manager/Fleet observation. It is not a substitute for `verify local-control-station`, `verify swpc-z2like`, `verify z2-ps`, or Managed PS Loopback, and none of these is a substitute for PL/Site/real-IC acceptance.
