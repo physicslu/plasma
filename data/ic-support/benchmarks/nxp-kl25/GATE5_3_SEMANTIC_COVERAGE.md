@@ -70,8 +70,59 @@ This run did not reach semantic screening. The provider completed normally and e
 
 This is an output-contract guidance defect exposed by the broader Gate 5.3 extraction response, not evidence that the two target coverage omissions passed or failed. Semantic coverage remains unevaluated for this run.
 
+## Second real Gate 5.3 v3 run
+
+Run `20260908T052459Z` is retained unchanged. It reached the semantic screening boundary successfully:
+
+- qualification contract at inference time: `nxp-kl25-live-model-qualification-v3`
+- context strategy: `cross_pack_physical_page_dedup_v1`
+- page occurrences: 127
+- unique physical pages: 33
+- duplicate occurrences removed: 94
+- context bytes: 107386
+- prompt bytes: 113393
+- input tokens: 23362
+- generation tokens: 4498
+- requested context: 65536
+- requested max output tokens: 8192
+- provider done reason: `stop`
+- full JSON document: PASS
+- semantic contract: PASS
+- semantic status: success
+- integrity: PASS
+- qualification: `REJECTED_SCREENING`
+
+The only reported screening errors were `FCCOB` for the FTFA register-model unit and Program Longword unit. Inspection of the retained semantic facts showed that the required mechanism was in fact present:
+
+- FTFA register model emitted `FTFA_FCCOBn` and described the Flash Common Command Object register family.
+- Program Longword emitted `FCCOB0`, `FCCOB1-3`, and `FCCOB4-7` and described command code, address, and data placement.
+- The prior SWD omission was corrected in this run.
+
+Therefore these two remaining errors are deterministic vocabulary-normalization false negatives, not semantic coverage omissions.
+
+## Screening policy revision v3.1
+
+The qualification contract is revised to `nxp-kl25-live-model-qualification-v3.1` for deterministic requalification. This revision does not change the retained model output, context, generation envelope, or manufacturer evidence.
+
+Rather than introduce generic prefix/fuzzy matching, the screening vocabulary explicitly recognizes the manufacturer-defined indexed FCCOB register family:
+
+- `FCCOB`
+- generic `FCCOBn`
+- indexed `FCCOB0` through `FCCOB11`
+
+This allows `FTFA_FCCOBn`, `FCCOB0`, and indexed FCCOB references to satisfy the FCCOB concept through the existing punctuation-delimited exact-token matcher, while unrelated extensions such as `FCCOBX` remain rejected. `FSTATUS` also remains invalid for the `FSTAT` concept.
+
+This explicit-vocabulary approach is intentionally narrower than a general `concept + arbitrary suffix` rule and therefore preserves the fail-closed screening boundary.
+
 ## Acceptance boundary
 
-Gate 5.3 model-free CI must demonstrate that the four lexical false negatives are corrected while the two genuine coverage omissions (`Program Longword/FCCOB` and `SWD/MDM-AP/SWD`) remain failures for the retained statements. It must also retain global `fact_id` uniqueness as a deterministic parser invariant while making that invariant explicit to the model.
+Gate 5.3 model-free CI must demonstrate all of the following:
 
-A future real local-model run may reach `READY_FOR_REVIEW`; that status is not semantic correctness. Manufacturer-evidence review remains mandatory before `QUALIFIED`, and all canonical/HIL/production/security admissions remain denied.
+- prior lexical false negatives remain corrected;
+- the retained v2 genuine `Program Longword/FCCOB` and `SWD/MDM-AP/SWD` omissions remain omissions when the concept is actually absent;
+- the retained v3 forms `FTFA_FCCOBn` and indexed `FCCOB0..11` satisfy the FCCOB concept;
+- unrelated prefix extensions such as `FCCOBX` do not satisfy the concept;
+- global `fact_id` uniqueness remains a deterministic parser invariant;
+- no Gate-3 evidence or retained run artifact is modified.
+
+After CI is green, run `20260908T052459Z` must be requalified deterministically under contract v3.1 without invoking the local model. `READY_FOR_REVIEW`, if reached, is not semantic correctness. Manufacturer-evidence review remains mandatory before `QUALIFIED`, and all canonical/HIL/production/security admissions remain denied.
