@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "manufacturer": "STMicroelectronics",
+  "source_repository": "physicslu/plasma",
+  "executed_git_sha": "0ac86cbf8da4cfaad6e0201c278cc43cb4c52c75",
+  "execution_mode": "github_actions_headed_chromium",
+  "workflow_run_id": 34204938530,
+  "artifact_id": 10047381270,
+  "artifact_zip_sha256": "c40fcba4e35c3e193c9ca85e1433df352f42b91453d6b68c923fa2eafca4d9eb",
+  "evidence_id": "stm32f3-phase4.4b-official-st-discovery-2026-09-08-retained-20260908T083224Z-0ac86cbf",
+  "acquisition_transport": "chromium_rendered_dom",
+  "evidence_profile": "stm32f3_dual_surface_v1",
+  "headed": true,
+  "playwright_version": "1.62.0",
+  "chromium_version": "151.0.7922.34",
+  "target_count": 6,
+  "acquisition_success": 6,
+  "acquisition_failure": 0,
+  "exact_icpn_candidate_count": 10,
+  "excluded_non_active_part_number_count": 0,
+  "evaluator_result": "phase4_4b_dual_surface_discovery_clean",
+  "scale_ready": true,
+  "canonical_dataset_admission": false,
+  "production_admission_ready": false,
+  "acquisition_time_utc": {
+    "first": "2026-09-08T08:31:52Z",
+    "last": "2026-09-08T08:32:24Z"
+  },
+  "baseline_sha256": "bce53ea895b70a12b873259a81603716665496d60a649a6b867928b7d55ff90a",
+  "pilot_summary_sha256": "21bcf53d325d4258e929edcfa09ac9cacf73f06bfa6e248402c79168d72a77b9"
+}
