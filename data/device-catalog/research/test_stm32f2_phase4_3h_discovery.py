@@ -7,7 +7,9 @@ import json
 import tempfile
 from pathlib import Path
 
+from device_catalog_bounded_discovery import BoundedDiscoveryError, load_batch_spec
 from st_product_page_acquisition import AcquisitionError
+from stm32f2_bounded_discovery import DEFAULT_REGISTRY, load_spec
 from stm32f2_phase4_3b_discovery import TARGET_CONFIG, resolve_mapping
 from stm32f2_phase4_3h_discovery import (
     DEFAULT_CANONICAL,
@@ -86,7 +88,13 @@ def main() -> int:
     assert all(item["target_configs"] == [TARGET_CONFIG] for item in mappings)
     assert resolve_mapping("STM32F217VET6", catalog)["status"] == "unique"
 
+    # The generic registry must preserve both historical bounded batches without
+    # requiring another phase-specific implementation.
+    assert load_spec("4.3E").phase == "4.3E"
+    assert load_spec("4.3H").manifest_path == DEFAULT_MANIFEST
+
     manifest = json.loads(DEFAULT_MANIFEST.read_text(encoding="utf-8"))
+    registry = json.loads(DEFAULT_REGISTRY.read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory() as temporary_directory:
         wrong = copy.deepcopy(manifest)
         wrong["targets"][0]["base_device"] = "STM32F205RF"
@@ -117,6 +125,40 @@ def main() -> int:
             pass
         else:
             raise AssertionError("Production boundary drift must fail closed")
+
+        registry_drift = copy.deepcopy(registry)
+        registry_drift["batches"]["4.3H"]["expected_production_sha256"] = "0" * 64
+        registry_path = Path(temporary_directory) / "registry.json"
+        registry_path.write_text(json.dumps(registry_drift), encoding="utf-8")
+        spec = load_batch_spec(
+            registry_path=registry_path,
+            family="STM32F2",
+            phase="4.3H",
+            root=DEFAULT_REGISTRY.parent,
+        )
+        try:
+            from stm32f2_bounded_discovery import read_production_bases as generic_read_production_bases
+
+            generic_read_production_bases(DEFAULT_CANONICAL, spec=spec)
+        except AcquisitionError:
+            pass
+        else:
+            raise AssertionError("registry Production boundary drift must fail closed")
+
+        wrong_family = copy.deepcopy(registry)
+        wrong_family["family"] = "STM32F3"
+        registry_path.write_text(json.dumps(wrong_family), encoding="utf-8")
+        try:
+            load_batch_spec(
+                registry_path=registry_path,
+                family="STM32F2",
+                phase="4.3H",
+                root=DEFAULT_REGISTRY.parent,
+            )
+        except BoundedDiscoveryError:
+            pass
+        else:
+            raise AssertionError("registry family drift must fail closed")
 
     print("Phase 4.3H STM32F2 discovery contract PASS")
     return 0
