@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -34,16 +35,28 @@ def find_base(inventory: dict, base_device: str) -> dict:
 
 def test_current_production_metrics() -> None:
     module = load_module()
+    manifest, rows = module.load_production_catalog()
     inventory = module.build_inventory()
     metrics = inventory["metrics"]
 
-    assert metrics["exact_icpns"] == 481
-    assert metrics["families"] == 3
-    assert metrics["family_exact_icpns"] == {"STM32F1": 75, "STM32F2": 22, "STM32F4": 384}
-    assert metrics["base_devices"] == 165
-    assert metrics["deterministic_openocd_exact_icpns"] == 481
+    expected_family_counts = dict(sorted(Counter(row["family"] for row in rows).items()))
+    expected_base_devices = {
+        (row["manufacturer"], row["base_device"])
+        for row in rows
+    }
+    expected_exact_icpns = len(rows)
+
+    assert manifest["status"] == "production"
+    assert expected_exact_icpns == sum(source["row_count"] for source in manifest["sources"])
+    assert metrics["exact_icpns"] == expected_exact_icpns
+    assert metrics["families"] == len(expected_family_counts)
+    assert metrics["family_exact_icpns"] == expected_family_counts
+    assert metrics["base_devices"] == len(expected_base_devices)
+    assert metrics["deterministic_openocd_exact_icpns"] == expected_exact_icpns
     assert metrics["ic_support_bound_exact_icpns"] == 2
-    assert metrics["unresolved_programming_profile_exact_icpns"] == 479
+    assert metrics["unresolved_programming_profile_exact_icpns"] == (
+        expected_exact_icpns - metrics["ic_support_bound_exact_icpns"]
+    )
     assert metrics["evidence_backed_programming_profiles"] == 1
     assert metrics["native_ppu_runtime_ready_exact_icpns"] == 0
     assert inventory["programming_profile_ids"] == ["stm32f1-medium-density-flash-v0"]

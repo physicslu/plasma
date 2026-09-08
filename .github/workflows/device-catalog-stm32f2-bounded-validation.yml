@@ -9,12 +9,16 @@ on:
       - "data/device-catalog/research/stm32f2_bounded_*.py"
       - "data/device-catalog/research/stm32f2_admission_policy.py"
       - "data/device-catalog/research/stm32f2_phase4_3[ij]_*.py"
+      - "data/device-catalog/research/stm32f2-commercial-icpn.csv"
       - "data/device-catalog/research/stm32f2-bounded-*.json"
       - "data/device-catalog/research/stm32f2-bounded-*.md"
       - "data/device-catalog/research/stm32f2-phase4.3*-discovery-manifest.json"
       - "data/device-catalog/research/stm32f2-phase4.3*-discovery-baseline.json"
       - "data/device-catalog/research/stm32f2-phase4.3*-policy-baseline.json"
+      - "data/device-catalog/research/stm32f2-phase4.3*-admission-audit.json"
+      - "data/device-catalog/research/test_stm32f2_phase4_3j_admission.py"
       - "data/device-catalog/research/evidence/stm32f2-phase4.3*/**"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32f2-bounded-validation.yml"
   pull_request:
     paths:
@@ -22,12 +26,16 @@ on:
       - "data/device-catalog/research/stm32f2_bounded_*.py"
       - "data/device-catalog/research/stm32f2_admission_policy.py"
       - "data/device-catalog/research/stm32f2_phase4_3[ij]_*.py"
+      - "data/device-catalog/research/stm32f2-commercial-icpn.csv"
       - "data/device-catalog/research/stm32f2-bounded-*.json"
       - "data/device-catalog/research/stm32f2-bounded-*.md"
       - "data/device-catalog/research/stm32f2-phase4.3*-discovery-manifest.json"
       - "data/device-catalog/research/stm32f2-phase4.3*-discovery-baseline.json"
       - "data/device-catalog/research/stm32f2-phase4.3*-policy-baseline.json"
+      - "data/device-catalog/research/stm32f2-phase4.3*-admission-audit.json"
+      - "data/device-catalog/research/test_stm32f2_phase4_3j_admission.py"
       - "data/device-catalog/research/evidence/stm32f2-phase4.3*/**"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32f2-bounded-validation.yml"
 
 concurrency:
@@ -50,11 +58,11 @@ jobs:
       - name: Replay historical bounded transactions
         run: python data/device-catalog/research/test_stm32f2_bounded_historical_golden_replay.py
 
-      - name: Validate bounded policy and admission planning
+      - name: Validate bounded policy and historical admission replay
         run: |
           python data/device-catalog/research/stm32f2_phase4_3i_policy.py
-          python data/device-catalog/research/stm32f2_phase4_3j_admission.py --output /tmp/stm32f2-phase4.3j-admission-plan.json
           python data/device-catalog/research/test_stm32f2_bounded_policy_admission.py
+          python data/device-catalog/research/test_stm32f2_phase4_3j_admission.py
 
       - name: Validate shadow drift classification
         run: python data/device-catalog/research/test_stm32f2_bounded_shadow_compare.py

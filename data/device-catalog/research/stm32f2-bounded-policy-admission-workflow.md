@@ -1,7 +1,7 @@
 # STM32F2 bounded policy and admission workflow
 
 This document records the Phase 3 refactor that follows the bounded discovery,
-evidence and planning work.  The objective is to automate deterministic batch
+evidence and planning work. The objective is to automate deterministic batch
 mechanics without collapsing the governance boundaries between Discovery,
 Policy, Admission and runtime/physical programming support.
 
@@ -24,8 +24,8 @@ Policy, Admission and runtime/physical programming support.
 | manual-review/reject classification | yes | yes | generic admission framework + adapter |
 | Production write | forbidden | forbidden | governance boundary |
 
-The repeated mechanics now live in `stm32f2_bounded_policy.py`.  Per-batch
-choices live in `stm32f2-bounded-policy-batches.json`.
+The repeated mechanics live in `stm32f2_bounded_policy.py`. Per-batch choices
+live in `stm32f2-bounded-policy-batches.json`.
 
 ### Admission: historical Phase 4.3D vs 4.3G
 
@@ -40,8 +40,8 @@ choices live in `stm32f2-bounded-policy-batches.json`.
 | lifecycle exclusions | none | none | batch evidence/policy |
 | Production write | separate controlled publish | same | governance / publication transaction |
 
-`stm32f2_bounded_admission.py` therefore remains a read-only planner and does
-not duplicate the generic canonical writer.
+`stm32f2_bounded_admission.py` remains a read-only planner and does not
+duplicate the generic canonical writer.
 
 ## Phase 4.3I policy
 
@@ -64,10 +64,10 @@ The metadata contract extends the prior cumulative STM32F2 policy with:
 - `R/Y` = WLCSP, 66 balls/pins.
 
 The canonical `pin_count` field means the actual physical package pin or ball
-count.  It is not merely the logical ordering-code class.  ST's STM32F20x
+count. It is not merely the logical ordering-code class. ST's STM32F20x
 ordering table explicitly defines `R = 64 or 66 pins` and states that 66 pins
-is available on WLCSP only.  The retained ST product page identifies
-`STM32F205REY6TR` as WLCSP 66.  The STM32F21x ordering table defines `V = 100
+is available on WLCSP only. The retained ST product page identifies
+`STM32F205REY6TR` as WLCSP 66. The STM32F21x ordering table defines `V = 100
 pins`, and `F = 768 Kbytes` is defined by the STM32F20x ordering table.
 
 Policy references:
@@ -79,30 +79,46 @@ Policy references:
 The immutable policy baseline is
 `stm32f2-phase4.3i-policy-baseline.json`.
 
-## Phase 4.3J admission planning
+## Phase 4.3J admission and publication
 
-The bounded admission planner requires the checked-in Phase 4.3I policy
-baseline and the current 22-row STM32F2 canonical boundary.
+The bounded admission planner replays from the guarded 22-row historical
+STM32F2 canonical boundary and the closed Phase 4.3I policy baseline.
 
-The deterministic pre-publication result is:
+The deterministic admission result is:
 
 ```text
-candidate_count                        11
-admit                                  11
-already_present                         0
-manual_review_required                  0
-reject                                  0
-canonical_rows_before                  22
-canonical_rows_after_if_published      33
-Production exact ICPNs before         481
-Production exact ICPNs after          492
-Production write applied            false
+candidate_count                   11
+admit                             11
+already_present                    0
+manual_review_required             0
+reject                             0
+STM32F2 canonical rows        22 -> 33
+Production exact ICPNs       481 -> 492
+STM32F2 Base Devices           8 -> 12
+Production Base Devices      165 -> 169
 ```
 
-A clean plan is necessary but not sufficient for publication.  Publication
-must remain a separate controlled transaction that writes the canonical CSV,
-updates the Production manifest content bindings, records an immutable audit,
-and passes the normal Device Catalog / product runtime validation gates.
+The publication transaction is bound by:
+
+```text
+admission plan SHA-256
+1b8649c284210076d74fa4b418c5f40554f5d74e1b03062054685d70f34faba8
+
+published STM32F2 canonical SHA-256
+69a9e02be14237bd2c683bc63eed4bd132ba62c5e8c334ef0e85671f868003d0
+
+published STM32F2 canonical Git blob
+1bec0770179f3849c6cfbb66aea9ad9d63610f55
+```
+
+`stm32f2-phase4.3j-admission-audit.json` records the immutable publication
+accounting and proposal artifact identity. The Production manifest binds the
+33-row STM32F2 source by both Git blob and SHA-256 content digest.
+
+Post-admission regression reconstructs the historical 22-row canonical input,
+replays the 4.3J plan, verifies the exact plan digest, writes 22 -> 33 in a
+sandbox, requires the second write to be a no-op, and rejects unbound canonical
+drift. This preserves the historical fail-closed boundary after publication.
 
 ## Governance boundary
 
@@ -119,8 +135,8 @@ It does **not** prove or authorize:
 - native PPU support;
 - socket/electrical qualification;
 - real-target programming success;
-- runtime programming enablement merely because the catalog row exists.
+- physical programming support merely because the catalog row is selectable.
 
 Normal future STM32F2 batches should extend the JSON registry and reuse the
-bounded engines.  New phase-specific large policy/admission implementations
+bounded engines. New phase-specific large policy/admission implementations
 should be treated as an exception requiring a demonstrated new semantic rule.

@@ -64,7 +64,12 @@ def build_admission_plan(
     production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,
 ) -> dict[str, Any]:
     spec = load_admission_spec(phase, registry_path=registry_path)
-    policy_plan = build_policy_plan(phase=spec.phase, registry_path=registry_path)
+    policy_plan = build_policy_plan(
+        phase=spec.phase,
+        registry_path=registry_path,
+        canonical_path=canonical_path,
+        production_manifest_path=production_manifest_path,
+    )
     if not policy_plan_is_clean(policy_plan, spec=spec):
         raise AdmissionError(f"{spec.phase}: policy plan is not clean")
     policy_baseline = read_json(spec.policy_baseline_path)

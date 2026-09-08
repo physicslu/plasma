@@ -46,6 +46,16 @@ EXPECTED_43I = {
 
 
 class STM32F2BoundedPolicyAdmissionTests(unittest.TestCase):
+    def _phase_4_3j_historical_canonical(self, path: Path) -> None:
+        with DEFAULT_CANONICAL.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            rows = [row for row in reader if row["icpn"] not in EXPECTED_43I]
+        self.assertEqual(len(rows), 22)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+
     def test_historical_policy_replay_matches_checked_in_baselines(self) -> None:
         for phase in ("4.3C", "4.3F"):
             with self.subTest(phase=phase):
@@ -102,26 +112,29 @@ class STM32F2BoundedPolicyAdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(AdmissionError, "historical canonical"):
                 build_policy_plan(phase="4.3I", canonical_path=path)
 
-    def test_phase_4_3j_admission_plan_is_clean_and_read_only(self) -> None:
-        spec = load_admission_spec("4.3J")
-        plan = build_admission_plan(phase="4.3J")
-        self.assertTrue(admission_plan_is_clean(plan, spec=spec))
-        self.assertEqual(plan["candidate_count"], 11)
-        self.assertEqual(plan["canonical_rows_before"], 22)
-        self.assertEqual(
-            plan["decision_counts"],
-            {"admit": 11, "already_present": 0, "manual_review_required": 0, "reject": 0},
-        )
-        self.assertEqual({item["icpn"] for item in plan["candidates"]}, EXPECTED_43I)
-        self.assertFalse(plan["production_write_applied"])
-        self.assertFalse(plan["programming_algorithm_equivalence_claimed"])
-        self.assertFalse(plan["runtime_programming_support_claimed"])
-
-    def test_generic_writer_is_exact_and_idempotent_in_sandbox(self) -> None:
-        plan = build_admission_plan(phase="4.3J")
+    def test_phase_4_3j_admission_plan_replays_from_historical_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             canonical = Path(tmp) / DEFAULT_CANONICAL.name
-            canonical.write_bytes(DEFAULT_CANONICAL.read_bytes())
+            self._phase_4_3j_historical_canonical(canonical)
+            spec = load_admission_spec("4.3J")
+            plan = build_admission_plan(phase="4.3J", canonical_path=canonical)
+            self.assertTrue(admission_plan_is_clean(plan, spec=spec))
+            self.assertEqual(plan["candidate_count"], 11)
+            self.assertEqual(plan["canonical_rows_before"], 22)
+            self.assertEqual(
+                plan["decision_counts"],
+                {"admit": 11, "already_present": 0, "manual_review_required": 0, "reject": 0},
+            )
+            self.assertEqual({item["icpn"] for item in plan["candidates"]}, EXPECTED_43I)
+            self.assertFalse(plan["production_write_applied"])
+            self.assertFalse(plan["programming_algorithm_equivalence_claimed"])
+            self.assertFalse(plan["runtime_programming_support_claimed"])
+
+    def test_generic_writer_is_exact_and_idempotent_in_sandbox(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            canonical = Path(tmp) / DEFAULT_CANONICAL.name
+            self._phase_4_3j_historical_canonical(canonical)
+            plan = build_admission_plan(phase="4.3J", canonical_path=canonical)
             first = write_canonical_dataset(plan=plan, canonical_path=canonical)
             second = write_canonical_dataset(plan=plan, canonical_path=canonical)
             self.assertEqual(first["status"], "written")
@@ -137,10 +150,10 @@ class STM32F2BoundedPolicyAdmissionTests(unittest.TestCase):
             }, {"STM32F205RE", "STM32F207IF", "STM32F215VE", "STM32F217VE"})
 
     def test_generic_writer_rejects_unbound_canonical_drift(self) -> None:
-        plan = build_admission_plan(phase="4.3J")
         with tempfile.TemporaryDirectory() as tmp:
             canonical = Path(tmp) / DEFAULT_CANONICAL.name
-            canonical.write_bytes(DEFAULT_CANONICAL.read_bytes())
+            self._phase_4_3j_historical_canonical(canonical)
+            plan = build_admission_plan(phase="4.3J", canonical_path=canonical)
             with canonical.open("a", encoding="utf-8") as handle:
                 handle.write("unexpected\n")
             with self.assertRaisesRegex(AdmissionError, "changed after admission planning"):
