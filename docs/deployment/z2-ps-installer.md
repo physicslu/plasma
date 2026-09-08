@@ -1,38 +1,68 @@
-# PYNQ-Z2 PS Installer and Managed Loopback Acceptance
+# PYNQ-Z2 PS Release Kit and Managed Loopback Acceptance
 
-Status: **PS-only installer implementation; each new deployment candidate requires real Z2 qualification**
+Status: **PS-only release-kit implementation; every deployment candidate still requires real Z2 qualification**
 
 ## Purpose
 
-`scripts/ppu-z2-installer.py` is the host-mutating product adapter for the PPU/Z2 role. It consumes the canonical `ppu/linux/armv7l` Common Release Format artifact and activates only the PS software node:
+The Z2 PS deployment path turns a clean PYNQ-Z2 image into a Plasma PPU PS node without compiling Plasma or CPython on the board.
+
+The product flow is:
 
 ```text
-verified PPU release
-  -> immutable /opt/plasma/releases/<release-id>
-  -> /opt/plasma/current
-  -> plasma-server.service
-  -> plasma-web.service
-  -> /api/health/ready
+GitHub Actions
+  -> build qualified ARMv7 Plasma Python candidate
+  -> build canonical ppu/linux/armv7l release
+  -> assemble source-tree-independent Z2 PS kit
+  -> Actions artifact
+
+Clean PYNQ-Z2
+  -> verify/install Plasma-owned Python below /opt/plasma/python
+  -> verify/install immutable PPU release
+  -> systemd Server + Gateway
+  -> local readiness + PS diagnostic loopback
+  -> Control Station Add PPU / Validate & Enable
+  -> Managed PS Loopback acceptance
 ```
 
-The installer does not load an FPGA bitstream, access PL, enable physical Sites, change target power, or program a real IC.
+The PS profile does **not** load an FPGA bitstream, access PL, enable physical Sites, change target power, or program a real IC.
+
+## Why the kit exists
+
+A clean Z2 is a runtime target, not a build server. Rebuilding CPython on the board is slow and makes deployment depend on target-local build state. The release candidate therefore moves deterministic build work into GitHub CI and keeps the Z2 responsibility to install, execute, and provide hardware/runtime evidence.
+
+```text
+GitHub CI = build / software validation / package transport
+Real Z2   = install / runtime validation / hardware qualification
+```
+
+A CI PASS must never be reported as a Real Z2 PASS.
 
 ## Release identity
 
-Release Identity v2 is mandatory for deployment candidates:
+PPU Release Identity v2 remains mandatory:
 
 ```text
 product_version = 0.1.1
-full git_sha    = <40-character source SHA>
+full git_sha    = <40-character Plasma source SHA>
 release_id      = 0.1.1-<first-12-git-sha>
-artifact_sha256 = <exact archive digest>
+artifact_sha256 = <exact PPU archive digest>
 ```
 
-The Common Release Format archive, Actions transport envelope, copied installer script and installed immutable directory all carry the same release identity. The installed evidence retains the full source SHA.
+The Plasma Python artifact has a separate runtime identity:
+
+```text
+role            = plasma-python-runtime
+platform        = linux
+architecture    = armv7l
+python_version  = 3.12.13
+source_ref      = pinned python.org source archive + SHA-256
+```
+
+These identities are intentionally separate: upgrading Plasma application code must not silently replace the PYNQ System Python or conflate CPython provenance with Plasma source provenance.
 
 ## Runtime ownership
 
-ADR-0001 is mandatory. PYNQ owns System Python; Plasma owns a separate runtime.
+ADR-0001 remains mandatory. PYNQ owns System Python; Plasma owns a separate runtime.
 
 Observed development baseline:
 
@@ -46,36 +76,85 @@ PYNQ              3.1.1
 Ethernet          192.168.2.99/24
 ```
 
-Plasma requires a final ARMv7 Python >=3.11 below:
+Plasma runtime lives only below:
 
 ```text
-/opt/plasma/python/
+/opt/plasma/python/<version>/
 ```
 
-The bootstrap itself remains Python-3.10-compatible so the stock PYNQ image can verify/start installation, but generated services bind the explicitly qualified Plasma interpreter. The installer never replaces `/usr/bin/python3` or the PYNQ venv.
+The bootstrap scripts remain Python-3.10-compatible so the stock PYNQ image can verify and start installation. Plasma Server and Plasma Gateway use the isolated Plasma interpreter, never `/usr/bin/python3` or the PYNQ venv.
 
-## Installer kit
+## GitHub-built release candidate kit
 
-The `PPU release artifact` workflow transports an identity-qualified kit:
+Workflow:
 
 ```text
-Actions artifact:
-plasma-ppu-linux-armv7l-<release-id>
-
-contents:
-plasma-ppu-<release-id>-linux-armv7l.tar.gz
-plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256
-plasma-ppu-z2-installer-<release-id>.py
-plasma-ppu-z2-installer-<release-id>.py.sha256
+.github/workflows/z2-ps-release.yml
 ```
 
-The installer script remains a bootstrap component rather than Common Release Format payload. Detached hashes prove exact bytes, not publisher authenticity.
+It builds CPython from the pinned official source archive inside an Ubuntu 22.04 ARMv7 userspace under QEMU, validates the resulting runtime, then assembles the PPU release and deployment tooling.
 
-## Verification before mutation
+GitHub Actions artifact:
 
-The bootstrap validates:
+```text
+plasma-z2-ps-kit-<release-id>
+```
 
-1. detached release archive SHA-256;
+Transport payload:
+
+```text
+plasma-z2-ps-kit-<release-id>.tar.gz
+plasma-z2-ps-kit-<release-id>.tar.gz.sha256
+```
+
+After extraction:
+
+```text
+plasma-z2-ps-kit-<release-id>/
+├── SHA256SUMS
+├── scripts/
+│   ├── plasmactl
+│   ├── plasmactl-z2-ps
+│   ├── ppu-z2-installer.py
+│   └── z2-python-runtime.py
+├── artifacts/
+│   ├── plasma-python-3.12.13-linux-armv7l.tar.gz
+│   ├── plasma-python-3.12.13-linux-armv7l.tar.gz.sha256
+│   ├── plasma-ppu-<release-id>-linux-armv7l.tar.gz
+│   └── plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256
+└── docs/
+    └── README.md
+```
+
+The Z2 does not need Git, npm, Node.js, Vite, a Plasma source checkout, a compiler, or a local CPython build to consume this kit.
+
+## Plasma Python artifact safety
+
+`scripts/z2-python-runtime.py` validates:
+
+1. detached archive SHA-256;
+2. canonical archive root and safe extraction paths;
+3. regular files/directories only — links and special files are rejected;
+4. exact internal `SHA256SUMS` file set and digests;
+5. Linux/ARMv7 runtime manifest;
+6. final Python >=3.11;
+7. successful target execution with `ssl` and `sqlite3` imports;
+8. ownership boundary declaring that System Python and PYNQ Python are not replaced.
+
+Installation writes:
+
+```text
+/opt/plasma/python/<version>/
+/opt/plasma/install/python-runtime.json
+```
+
+The installer does not mutate `/usr/bin/python3`.
+
+## PPU release verification before mutation
+
+`scripts/ppu-z2-installer.py` validates:
+
+1. detached PPU archive SHA-256;
 2. safe `tar.gz` structure under `plasma-release/`;
 3. no unsafe/non-regular archive members or extraction-limit breach;
 4. exact internal `SHA256SUMS` file set and digests;
@@ -85,23 +164,18 @@ The bootstrap validates:
 8. production Device Catalog presence;
 9. explicit Plasma-owned ARMv7 final Python >=3.11.
 
-Example read-only verification:
-
-```bash
-python3 plasma-ppu-z2-installer-0.1.1-abcdef123456.py verify \
-  --release-artifact plasma-ppu-0.1.1-abcdef123456-linux-armv7l.tar.gz \
-  --sidecar plasma-ppu-0.1.1-abcdef123456-linux-armv7l.tar.gz.sha256
-```
-
 ## Filesystem and service boundary
 
 ```text
 /opt/plasma/
 ├── python/
+│   └── <python-version>/
 ├── releases/
 │   └── <release-id>/
 ├── current -> releases/<release-id>/
-└── install/last-install.json
+└── install/
+    ├── python-runtime.json
+    └── last-install.json
 
 /etc/plasma/ppu.yaml
 /var/lib/plasma/
@@ -110,7 +184,7 @@ python3 plasma-ppu-z2-installer-0.1.1-abcdef123456.py verify \
 /etc/systemd/system/plasma-web.service
 ```
 
-A dedicated `plasma` system user owns mutable state/logs. Immutable release content and service units remain system-owned.
+A dedicated `plasma` system user owns mutable state/logs. Immutable release content and systemd units remain system-owned.
 
 ## PS-only topology contract
 
@@ -123,7 +197,7 @@ server:
 sites: []
 ```
 
-This means:
+Therefore:
 
 ```text
 max_supported_sites = 8   capacity ceiling
@@ -132,35 +206,59 @@ enabled_site_count   = 0
 sites                = []
 ```
 
-This is a valid fail-closed PS-only state. It is **not** a claim that the eventual appliance has no Sites, and it does not create a canonical `Site 0`. When physical Sites exist their IDs remain one-based.
-
-Manager must therefore accept a trusted PPU identity/topology observation with `site_count=0` when `/api/status.sites=[]` is consistent. Fabricating eight Sites merely to satisfy fleet admission would overclaim hardware topology and is prohibited.
+This is a valid fail-closed PS-only state. It is not a claim that the eventual appliance has no Sites, and it never creates `SITE 0`. Physical Site identity remains one-based.
 
 ## Network binding
 
 Qualification requires an explicit non-loopback unicast IPv4 address for `--gateway-host`; wildcard `0.0.0.0` is rejected.
 
-The Plasma Server remains `127.0.0.1:9900`. Plasma Gateway binds the explicit Z2 address on `18080` and connects locally to Server. Installer-local health uses a proxy-free client.
+The Plasma Server remains:
 
-## Installation
+```text
+127.0.0.1:9900
+```
 
-Example:
+The Plasma Gateway binds the explicit Z2 address on port `18080` and connects locally to Server.
+
+## Installation on a clean Z2
+
+Assume the extracted kit directory is the current directory and the Z2 address is `192.168.2.99`.
+
+First identify the exact artifact names:
 
 ```bash
-sudo python3 plasma-ppu-z2-installer-0.1.1-abcdef123456.py install \
-  --release-artifact plasma-ppu-0.1.1-abcdef123456-linux-armv7l.tar.gz \
-  --sidecar plasma-ppu-0.1.1-abcdef123456-linux-armv7l.tar.gz.sha256 \
-  --plasma-python /opt/plasma/python/<version>/bin/python3 \
+ls artifacts/
+```
+
+Then install using the kit-local `plasmactl` router:
+
+```bash
+sudo bash scripts/plasmactl install z2-ps \
+  --python-artifact artifacts/plasma-python-3.12.13-linux-armv7l.tar.gz \
+  --python-sidecar artifacts/plasma-python-3.12.13-linux-armv7l.tar.gz.sha256 \
+  --release-artifact artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz \
+  --release-sidecar artifacts/plasma-ppu-<release-id>-linux-armv7l.tar.gz.sha256 \
   --gateway-host 192.168.2.99 \
   --ppu-id z2-dev-01 \
   --facility-id lab
 ```
 
-The `sudo python3` process is bootstrap only. Runtime services bind the explicit Plasma Python path.
+The first install verifies and installs the isolated Python runtime before invoking the existing PPU installer. An already installed Z2 uses `deploy` for a new Plasma release:
+
+```bash
+sudo bash scripts/plasmactl deploy z2-ps \
+  --release-artifact artifacts/plasma-ppu-<new-release-id>-linux-armv7l.tar.gz \
+  --release-sidecar artifacts/plasma-ppu-<new-release-id>-linux-armv7l.tar.gz.sha256 \
+  --gateway-host 192.168.2.99 \
+  --ppu-id z2-dev-01 \
+  --facility-id lab
+```
+
+When `--python-artifact` and `--plasma-python` are omitted during deploy, the profile reuses `/opt/plasma/install/python-runtime.json`.
 
 ## Activation and rollback
 
-Installation is side-by-side and source-identity-aware:
+PPU activation remains side-by-side and source-identity-aware:
 
 ```text
 verify everything
@@ -173,33 +271,61 @@ verify everything
   -> direct/no-proxy readiness
 ```
 
-Activation failure rolls back the active link and managed service/configuration state. Incomplete rollback is reported explicitly; a failed immutable candidate may remain for evidence but is not active.
+PPU activation failure restores the previous release/configuration/service state. Python runtime installation is separate and fail-closed; a Python runtime must execute successfully on the real ARMv7 target before PPU activation begins.
 
-## Evidence levels
+## Local Z2 verification
 
-`/opt/plasma/install/last-install.json` supports only the exact claims it records, including exact release/source identity, isolated Python, systemd activation and Z2-local Gateway readiness.
+```bash
+bash scripts/plasmactl verify z2-ps
+bash scripts/plasmactl status z2-ps
+```
 
-Managed PS Loopback is separate end-to-end evidence:
+`verify z2-ps` requires:
 
 ```text
-Mac Control Station
+real Linux ARMv7 host
+plasma-server.service active
+plasma-web.service active
+/api/health/ready PASS
+local POST /api/engineering/diagnostics/loopback executes at endpoint=ps/source=ps
+closed hardware boundary retained in install evidence
+```
+
+A PASS here means:
+
+```text
+Real Z2 ARMv7 PS runtime + local PS diagnostic path qualified
+```
+
+It does **not** yet prove the Control Station managed route.
+
+## Control Station enrollment and Managed PS Loopback
+
+After local Z2 verification:
+
+```text
+Control Station EMode
+  -> Add PPU
+  -> alias + http://<Z2-IP>:18080
+  -> Pending
+  -> Manager trusted observation
+  -> Validate & Enable
+  -> Managed PS Loopback
+```
+
+The end-to-end acceptance path is:
+
+```text
+Control Station
   -> same-origin Manager BFF
-  -> Manager selected alias z2
+  -> Manager selected Z2 alias
   -> Z2 Plasma Gateway :18080
   -> Z2 Plasma Server :9900
   -> PS diagnostic handler
   -> return
 ```
 
-Canonical acceptance:
-
-```bash
-python3 scripts/runtime_acceptance/run.py ps-loopback \
-  --base-url http://127.0.0.1:18000/api/manager/ppu \
-  --environment managed-z2-ps
-```
-
-Only after this passes for the exact deployed Control Station and PPU source identities may the record state **Managed PS Loopback PASS**.
+Only after this passes for the exact deployed Control Station and PPU source identities may retained evidence state **Managed PS Loopback PASS**.
 
 ## PYNQ regression requirement
 
@@ -207,4 +333,15 @@ After installation, re-check PYNQ-owned Python/PYNQ. Plasma installation must no
 
 ## Explicit non-claims
 
-This phase does not qualify PS↔PL, FPGA execution/loading, PMOD/Site electrical behavior, target power, real IC programming, 8-Site hardware concurrency, publisher signing/authenticity, or a bundled Plasma Python runtime.
+This phase does not qualify:
+
+```text
+PS <-> PL
+FPGA execution/loading
+PMOD/Site electrical behavior
+target power
+real IC programming
+8-Site hardware concurrency
+publisher signing/authenticity
+production programmer readiness
+```
