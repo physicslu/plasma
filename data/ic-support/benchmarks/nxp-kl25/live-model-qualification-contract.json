@@ -1,7 +1,7 @@
 {
   "schema_version": "0.3.0",
   "artifact_type": "kl25_live_model_qualification_contract",
-  "contract_id": "nxp-kl25-live-model-qualification-v3",
+  "contract_id": "nxp-kl25-live-model-qualification-v3.1",
   "target": "MKL25Z128VLK4",
   "required_input": {
     "bundle_digest": "628aa2c7664cdf9778a11e56a8da0a9cf8816aaec704baf893bfae5a9fba0244",
@@ -60,16 +60,16 @@
       "nxp-kl25-ftfa-register-model-v0": [
         ["FTFA"],
         ["FSTAT"],
-        ["FCCOB"]
+        ["FCCOB", "FCCOBn", "FCCOB0", "FCCOB1", "FCCOB2", "FCCOB3", "FCCOB4", "FCCOB5", "FCCOB6", "FCCOB7", "FCCOB8", "FCCOB9", "FCCOB10", "FCCOB11"]
       ],
       "nxp-kl25-ftfa-command-sequencing-v0": [
-        ["FCCOB"],
+        ["FCCOB", "FCCOBn", "FCCOB0", "FCCOB1", "FCCOB2", "FCCOB3", "FCCOB4", "FCCOB5", "FCCOB6", "FCCOB7", "FCCOB8", "FCCOB9", "FCCOB10", "FCCOB11"],
         ["CCIF"],
         ["ACCERR", "FPVIOL"]
       ],
       "nxp-kl25-program-longword-v0": [
         ["Program Longword"],
-        ["FCCOB"]
+        ["FCCOB", "FCCOBn", "FCCOB0", "FCCOB1", "FCCOB2", "FCCOB3", "FCCOB4", "FCCOB5", "FCCOB6", "FCCOB7", "FCCOB8", "FCCOB9", "FCCOB10", "FCCOB11"]
       ],
       "nxp-kl25-erase-sector-v0": [
         ["Erase Flash Sector", "Erase Sector"]
