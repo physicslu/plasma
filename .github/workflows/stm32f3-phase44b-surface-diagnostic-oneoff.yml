@@ -1,0 +1,92 @@
+name: STM32F3 Phase 4.4B surface diagnostic one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f3-phase44b-discovery
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+      - name: Diagnose STM32F301C6 rendered evidence surface
+        run: |
+          xvfb-run -a python - <<'PY'
+          import json
+          import time
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          from st_product_page_acquisition import QualitySectionParser, normalize_text
+
+          url = 'https://www.st.com/en/microcontrollers-microprocessors/stm32f301c6.html'
+          out = Path('/tmp/stm32f3-phase4.4b-surface-diagnostic')
+          out.mkdir(parents=True, exist_ok=True)
+          failed_requests = []
+          response_statuses = []
+
+          def metrics(page, label):
+              html = page.content()
+              text = page.locator('body').inner_text(timeout=10000)
+              parser = QualitySectionParser()
+              parser.feed(html)
+              parser.close()
+              section = normalize_text(' '.join(parser.section_parts))
+              payload = {
+                  'label': label,
+                  'url': page.url,
+                  'html_bytes': len(html.encode('utf-8')),
+                  'quality_heading_text_count': text.count('Quality and Reliability'),
+                  'part_number_text_count': text.count('Part Number'),
+                  'marketing_status_text_count': text.count('Marketing Status'),
+                  'quality_seen_by_parser': parser.quality_seen,
+                  'parser_section_chars': len(section),
+                  'parser_section_has_part_number': 'Part Number' in section,
+                  'parser_section_has_marketing_status': 'Marketing Status' in section,
+                  'challenge_markers': [m for m in ('verify you are human','access denied','captcha','request rejected') if m in text.lower()],
+              }
+              print('DIAGNOSTIC ' + json.dumps(payload, sort_keys=True))
+              return html, payload
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=False, args=['--disable-http2'])
+              context = browser.new_context()
+              page = context.new_page()
+              page.on('requestfailed', lambda req: failed_requests.append({'url': req.url, 'failure': req.failure}))
+              page.on('response', lambda res: response_statuses.append({'url': res.url, 'status': res.status}) if 'st.com' in res.url else None)
+              response = page.goto(url, wait_until='domcontentloaded', timeout=90000)
+              print('NAVIGATION ' + json.dumps({'final_url': page.url, 'status': response.status if response else None, 'browser_version': browser.version}, sort_keys=True))
+              checkpoints = [(0, 't0'), (5, 't5'), (15, 't20'), (30, 't50'), (40, 't90')]
+              last_html = ''
+              all_metrics = []
+              for delay, label in checkpoints:
+                  if delay:
+                      time.sleep(delay)
+                  last_html, payload = metrics(page, label)
+                  all_metrics.append(payload)
+              Path(out / 'rendered-dom.html').write_text(last_html, encoding='utf-8')
+              Path(out / 'metrics.json').write_text(json.dumps(all_metrics, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+              Path(out / 'failed-requests.json').write_text(json.dumps(failed_requests, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+              # Keep only status/url, no headers/cookies.
+              Path(out / 'st-response-statuses.json').write_text(json.dumps(response_statuses, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+              browser.close()
+          PY
+        env:
+          PYTHONPATH: data/device-catalog/research
+      - name: Upload diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32f3-phase4.4b-surface-diagnostic-20260908
+          path: /tmp/stm32f3-phase4.4b-surface-diagnostic
+          retention-days: 2
