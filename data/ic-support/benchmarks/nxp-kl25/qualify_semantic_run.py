@@ -69,13 +69,26 @@ def _primary_refs(pack: dict[str, Any]) -> set[tuple[str, int]]:
 
 
 def _contains_term(text: str, term: str) -> bool:
+    """Deterministically match a concept without fuzzy semantics.
+
+    Preserve exact bounded matching for compound terms such as ``MDM-AP`` and
+    ``FLASH_CR``. A single alphanumeric concept may also match one component of
+    a punctuation-delimited identifier, so ``FTFA_FSTAT`` satisfies both
+    ``FTFA`` and ``FSTAT``. No stemming, embeddings, or semantic similarity are
+    used here.
+    """
     haystack = " ".join(text.casefold().split())
     needle = " ".join(term.casefold().split())
     if not needle:
         return False
     if re.fullmatch(r"[a-z0-9_-]+", needle):
-        return re.search(rf"(?<![a-z0-9_-]){re.escape(needle)}(?![a-z0-9_-])", haystack) is not None
-    return needle in haystack
+        if re.search(rf"(?<![a-z0-9_-]){re.escape(needle)}(?![a-z0-9_-])", haystack) is not None:
+            return True
+    elif needle in haystack:
+        return True
+    if re.fullmatch(r"[a-z0-9]+", needle):
+        return needle in re.findall(r"[a-z0-9]+", haystack)
+    return False
 
 
 def _unit_text(unit_result: dict[str, Any]) -> str:
