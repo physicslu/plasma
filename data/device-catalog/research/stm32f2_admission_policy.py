@@ -1,8 +1,9 @@
 """Bounded STM32F2 commercial identity and canonical-row policy.
 
-The policy is intentionally limited to the four Base Devices retained by
-Phase 4.3B.  It defines metadata semantics for those evidence-backed exact
-ICPNs without authorizing a canonical or Production write.
+The base policy defines stable STM32F2 commercial-identity semantics while
+bounded batch policy decides which Base Devices and metadata-code extensions
+are authorized for a particular evidence-backed batch.  No helper in this
+module authorizes canonical or Production writes.
 """
 
 from __future__ import annotations
@@ -75,11 +76,17 @@ def _require_sha256(value: object, label: str) -> str:
     return value
 
 
-def _package_and_pins(pin_code: str, package_code: str) -> tuple[str, str]:
-    package = PACKAGE_BY_CODE.get(package_code)
+def _package_and_pins(
+    pin_code: str,
+    package_code: str,
+    *,
+    package_by_code: dict[str, str] = PACKAGE_BY_CODE,
+    pins_by_combination: dict[tuple[str, str], str] = PINS_BY_COMBINATION,
+) -> tuple[str, str]:
+    package = package_by_code.get(package_code)
     if package is None:
         raise CandidateReject(f"unsupported STM32F2 package code: {package_code}")
-    pins = PINS_BY_COMBINATION.get((pin_code, package_code))
+    pins = pins_by_combination.get((pin_code, package_code))
     if pins is None:
         raise CandidateManualReview(
             f"unsupported STM32F2 pin/package combination: {pin_code}/{package_code}"
@@ -95,7 +102,7 @@ def build_candidate_inputs(
     supported_base_devices: frozenset[str] = SUPPORTED_BASE_DEVICES,
     expected_candidate_count: int = 9,
 ) -> list[dict[str, Any]]:
-    """Normalize retained Phase 4.3B evidence into policy inputs."""
+    """Normalize retained bounded evidence into deterministic policy inputs."""
 
     if not evidence_id:
         raise AdmissionError("STM32F2 retained evidence requires evidence_id")
@@ -169,8 +176,13 @@ def build_canonical_row(
     *,
     supported_base_devices: frozenset[str] = SUPPORTED_BASE_DEVICES,
     flash_by_code: dict[str, str] = FLASH_BY_CODE,
+    package_by_code: dict[str, str] = PACKAGE_BY_CODE,
+    pins_by_combination: dict[tuple[str, str], str] = PINS_BY_COMBINATION,
+    temperature_by_code: dict[str, str] = TEMPERATURE_BY_CODE,
+    option_suffixes: frozenset[str] = OPTION_SUFFIXES,
+    target_config: str = TARGET_CONFIG,
 ) -> dict[str, str]:
-    """Apply the bounded STM32F2 metadata and mapping policy to one candidate."""
+    """Apply bounded STM32F2 metadata and mapping policy to one candidate."""
 
     icpn = candidate.get("icpn")
     base_device = candidate.get("base_device")
@@ -193,16 +205,21 @@ def build_canonical_row(
     if len(suffix) < 2:
         raise CandidateReject(f"ICPN lacks package/temperature codes: {icpn}")
     package_code, temperature_code, option_suffix = suffix[0], suffix[1], suffix[2:]
-    if temperature_code not in TEMPERATURE_BY_CODE:
+    if temperature_code not in temperature_by_code:
         raise CandidateReject(f"unsupported STM32F2 temperature code: {temperature_code}")
-    if option_suffix not in OPTION_SUFFIXES:
+    if option_suffix not in option_suffixes:
         raise CandidateReject(f"unsupported STM32F2 option suffix: {option_suffix}")
 
     pin_code, flash_code = base_match.groups()
     flash_size = flash_by_code.get(flash_code)
     if flash_size is None:
         raise CandidateManualReview(f"unsupported STM32F2 flash-size code: {flash_code}")
-    package, pin_count = _package_and_pins(pin_code, package_code)
+    package, pin_count = _package_and_pins(
+        pin_code,
+        package_code,
+        package_by_code=package_by_code,
+        pins_by_combination=pins_by_combination,
+    )
     if base_device not in supported_base_devices:
         raise CandidateReject(f"{base_device}: outside bounded STM32F2 policy")
 
@@ -213,7 +230,7 @@ def build_canonical_row(
         raise CandidateManualReview(
             f"ICPN lacks one unique OpenOCD ordering-pattern mapping: {icpn}"
         )
-    if target_configs[0] != TARGET_CONFIG:
+    if target_configs[0] != target_config:
         raise CandidateManualReview(f"unexpected STM32F2 OpenOCD target mapping: {icpn}")
     if mapping.get("identifier_kind") != "ordering_pattern":
         raise CandidateManualReview(f"unexpected STM32F2 identifier kind: {icpn}")
@@ -243,7 +260,7 @@ def build_canonical_row(
         "package": package,
         "pin_count": pin_count,
         "flash_size": flash_size,
-        "temperature_grade": TEMPERATURE_BY_CODE[temperature_code],
+        "temperature_grade": temperature_by_code[temperature_code],
         "option_suffix": option_suffix,
         "cmsis_device_name": "",
         "existing_identifier": existing_identifier,
