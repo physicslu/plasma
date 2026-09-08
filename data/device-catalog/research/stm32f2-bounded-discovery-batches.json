@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "family": "STM32F2",
+  "batches": {
+    "4.3E": {
+      "scope": "second bounded read-only official-ST STM32F2 discovery",
+      "manifest": "stm32f2-phase4.3e-discovery-manifest.json",
+      "baseline": "stm32f2-phase4.3e-discovery-baseline.json",
+      "evidence_dir": "evidence/stm32f2-phase4.3e-official-st-discovery-live-2026-09-07",
+      "expected_production_bases": [
+        "STM32F205RB",
+        "STM32F207IC",
+        "STM32F215RE",
+        "STM32F217IE"
+      ],
+      "expected_production_sha256": "dab17b2892497a32e555e57c5349da4ebe6f37136d90c0cab87a4df08a8fe0c9"
+    },
+    "4.3H": {
+      "scope": "third bounded read-only official-ST STM32F2 discovery",
+      "manifest": "stm32f2-phase4.3h-discovery-manifest.json",
+      "baseline": "stm32f2-phase4.3h-discovery-baseline.json",
+      "evidence_dir": "evidence/stm32f2-phase4.3h-official-st-discovery-live-2026-09-07",
+      "expected_production_bases": [
+        "STM32F205RB",
+        "STM32F205RC",
+        "STM32F207IC",
+        "STM32F207IE",
+        "STM32F215RE",
+        "STM32F215RG",
+        "STM32F217IE",
+        "STM32F217IG"
+      ],
+      "expected_production_sha256": "1706ab65dccb112a7ff907d82cf07c5ef6a46110097746aaeb5f3f9aed17c5cb"
+    }
+  }
+}
