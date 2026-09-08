@@ -1,0 +1,62 @@
+name: STM32F2 Phase 4.3H live shadow one-off
+
+on:
+  push:
+    branches:
+      - agent/stm32f2-4.3h-live-shadow-20260908
+    paths:
+      - ".github/workflows/stm32f2-4.3h-live-shadow-oneoff.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  live-shadow:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install research browser dependency
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run headed Chromium Phase 4.3H live shadow
+        id: shadow
+        shell: bash
+        run: |
+          set +e
+          xvfb-run -a python data/device-catalog/research/stm32f2_bounded_shadow.py acquire \
+            --phase 4.3H \
+            --output /tmp/stm32f2-phase4.3h-live-shadow.json \
+            --report /tmp/stm32f2-phase4.3h-shadow-report.json \
+            --timeout 90 \
+            --delay 2
+          status=$?
+          set -e
+          echo "$status" | tee /tmp/stm32f2-phase4.3h-shadow-exit-code.txt
+          echo "shadow_exit_code=$status" >> "$GITHUB_OUTPUT"
+          cat /tmp/stm32f2-phase4.3h-shadow-report.json || true
+          if [ "$status" -eq 1 ]; then
+            exit 1
+          fi
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+
+      - name: Upload live shadow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32f2-phase4.3h-live-shadow-20260908
+          path: |
+            /tmp/stm32f2-phase4.3h-live-shadow.json
+            /tmp/stm32f2-phase4.3h-shadow-report.json
+            /tmp/stm32f2-phase4.3h-shadow-exit-code.txt
+          if-no-files-found: warn
+          retention-days: 7
