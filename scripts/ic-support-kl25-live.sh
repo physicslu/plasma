@@ -356,7 +356,14 @@ if report_path.is_file():
     report = json.loads(report_path.read_text(encoding="utf-8"))
     print("qualification_status =", report.get("status"))
     integrity = report.get("integrity") if isinstance(report.get("integrity"), dict) else {}
+    screening = report.get("semantic_screening") if isinstance(report.get("semantic_screening"), dict) else {}
+    review = report.get("review") if isinstance(report.get("review"), dict) else {}
+    print("integrity_status =", integrity.get("status"))
     print("integrity_errors =", integrity.get("errors"))
+    print("semantic_screening_status =", screening.get("status"))
+    print("semantic_screening_errors =", screening.get("errors"))
+    print("review_status =", review.get("status"))
+    print("review_errors =", review.get("errors"))
 PY
 }
 
