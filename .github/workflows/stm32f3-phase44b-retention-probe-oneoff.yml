@@ -16,38 +16,31 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build retention transaction bindings
+      - name: Build retained package manifest
+        env:
+          PYTHONPATH: data/device-catalog/research
         run: |
           python - <<'PY'
-          import csv
-          import hashlib
           import json
           from pathlib import Path
+          from device_catalog_evidence_framework import build_manifest, sha256
 
-          root = Path('.')
-          research = root / 'data/device-catalog/research'
-          production = root / 'data/device-catalog/production'
+          research = Path('data/device-catalog/research')
           evidence = research / 'evidence/stm32f3-phase4.4b-official-st-discovery-live-2026-09-08'
-
-          def sha(path):
-              return hashlib.sha256(path.read_bytes()).hexdigest()
-
-          manifest = json.loads((production / 'icpn-v1-manifest.json').read_text())
+          evidence_id = 'stm32f3-phase4.4b-official-st-discovery-2026-09-08-retained-20260908T083224Z-0ac86cbf'
+          retained = ['README.md', 'pilot-summary.json', 'provenance.json']
+          manifest = build_manifest(evidence, evidence_id=evidence_id, retained_files=retained)
           payload = {
-              'openocd_catalog_sha256': sha(research / 'openocd-parts-canonical.csv'),
-              'discovery_manifest_sha256': sha(research / 'stm32f3-phase4.4b-discovery-manifest.json'),
-              'production_manifest_sha256': sha(production / 'icpn-v1-manifest.json'),
-              'pilot_summary_sha256': sha(evidence / 'pilot-summary.json'),
-              'production_exact_icpn_count': sum(item['row_count'] for item in manifest['sources']),
-              'family_exact_icpn_counts': {item['family']: item['row_count'] for item in manifest['sources']},
+              'manifest': manifest,
+              'baseline_sha256': sha256(research / 'stm32f3-phase4.4b-discovery-baseline.json'),
           }
           print(json.dumps(payload, indent=2, sort_keys=True))
-          Path('/tmp/stm32f3-phase4.4b-retention-bindings.json').write_text(
+          Path('/tmp/stm32f3-phase4.4b-retention-final.json').write_text(
               json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8'
           )
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: stm32f3-phase4.4b-retention-bindings
-          path: /tmp/stm32f3-phase4.4b-retention-bindings.json
+          name: stm32f3-phase4.4b-retention-final
+          path: /tmp/stm32f3-phase4.4b-retention-final.json
           retention-days: 2
