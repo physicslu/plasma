@@ -8,7 +8,7 @@ from http.server import ThreadingHTTPServer
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 481
+EXPECTED_PRODUCTION_CATALOG_SIZE = 492
 EXPECTED_STM32F4_CATALOG_SIZE = 384
 LIFECYCLE_ONLY_ICPNS = {
     "STM32F429BET6",
