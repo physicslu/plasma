@@ -1,0 +1,54 @@
+name: STM32F2 bounded validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/research/device_catalog_bounded_*.py"
+      - "data/device-catalog/research/stm32f2_bounded_*.py"
+      - "data/device-catalog/research/stm32f2-bounded-*.json"
+      - "data/device-catalog/research/stm32f2-bounded-*.md"
+      - "data/device-catalog/research/stm32f2-phase4.3*-discovery-manifest.json"
+      - "data/device-catalog/research/stm32f2-phase4.3*-discovery-baseline.json"
+      - "data/device-catalog/research/evidence/stm32f2-phase4.3*/**"
+      - ".github/workflows/device-catalog-stm32f2-bounded-validation.yml"
+  pull_request:
+    paths:
+      - "data/device-catalog/research/device_catalog_bounded_*.py"
+      - "data/device-catalog/research/stm32f2_bounded_*.py"
+      - "data/device-catalog/research/stm32f2-bounded-*.json"
+      - "data/device-catalog/research/stm32f2-bounded-*.md"
+      - "data/device-catalog/research/stm32f2-phase4.3*-discovery-manifest.json"
+      - "data/device-catalog/research/stm32f2-phase4.3*-discovery-baseline.json"
+      - "data/device-catalog/research/evidence/stm32f2-phase4.3*/**"
+      - ".github/workflows/device-catalog-stm32f2-bounded-validation.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-stm32f2-bounded:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Replay historical bounded transactions
+        run: python data/device-catalog/research/test_stm32f2_bounded_historical_golden_replay.py
+
+      - name: Validate shadow drift classification
+        run: python data/device-catalog/research/test_stm32f2_bounded_shadow_compare.py
+
+      - name: Exercise offline shadow CLI
+        run: |
+          python data/device-catalog/research/stm32f2_bounded_shadow.py compare \
+            --phase 4.3H \
+            --live-summary data/device-catalog/research/evidence/stm32f2-phase4.3h-official-st-discovery-live-2026-09-07/pilot-summary.json
