@@ -36,6 +36,20 @@ EXPECTED = [
     ("STM32F215", "STM32F215VE"),
     ("STM32F217", "STM32F217VE"),
 ]
+CURRENT_PRODUCTION_BASES = {
+    "STM32F205RB",
+    "STM32F205RC",
+    "STM32F205RE",
+    "STM32F207IC",
+    "STM32F207IE",
+    "STM32F207IF",
+    "STM32F215RE",
+    "STM32F215RG",
+    "STM32F215VE",
+    "STM32F217IE",
+    "STM32F217IG",
+    "STM32F217VE",
+}
 SYNTHETIC = {
     "STM32F205RE": ["STM32F205RET6", "STM32F205REY6"],
     "STM32F207IF": ["STM32F207IFH6", "STM32F207IFT6"],
@@ -80,16 +94,24 @@ def _assert_next_batch_planning() -> None:
     )
     assert plan["family"] == "STM32F2"
     assert plan["phase"] == phase
-    assert plan["inputs"]["production_exact_icpn_count"] == 22
-    assert plan["inputs"]["production_base_device_count"] == 8
-    assert (
-        plan["registry_entry"]["expected_production_sha256"]
-        == "1706ab65dccb112a7ff907d82cf07c5ef6a46110097746aaeb5f3f9aed17c5cb"
-    )
-    assert [
+    assert plan["inputs"]["production_exact_icpn_count"] == 33
+    assert plan["inputs"]["production_base_device_count"] == 12
+    assert set(plan["registry_entry"]["expected_production_bases"]) == CURRENT_PRODUCTION_BASES
+    production_sha = plan["registry_entry"]["expected_production_sha256"]
+    assert len(production_sha) == 64
+    int(production_sha, 16)
+    assert production_sha != "1706ab65dccb112a7ff907d82cf07c5ef6a46110097746aaeb5f3f9aed17c5cb"
+
+    next_targets = [
         (target["subfamily"], target["base_device"])
         for target in plan["manifest"]["targets"]
-    ] == EXPECTED
+    ]
+    assert [subfamily for subfamily, _base in next_targets] == [
+        "STM32F205", "STM32F207", "STM32F215", "STM32F217"
+    ]
+    assert len({base for _subfamily, base in next_targets}) == 4
+    assert all(base not in CURRENT_PRODUCTION_BASES for _subfamily, base in next_targets)
+    assert next_targets != EXPECTED
     assert (
         plan["manifest"]["pilot_id"]
         == "stm32f2-phase4.3z-official-st-discovery-2026-09-08"
@@ -162,7 +184,7 @@ def _assert_next_batch_planning() -> None:
             registry_path=registry_path,
         )
         mutated = copy.deepcopy(clean_plan)
-        mutated["manifest"]["targets"][0]["base_device"] = "STM32F205RF"
+        mutated["manifest"]["targets"][0]["base_device"] = "STM32F205ZZ"
         plan_path = root / "mutated-plan.json"
         plan_path.write_text(json.dumps(mutated), encoding="utf-8")
         try:
