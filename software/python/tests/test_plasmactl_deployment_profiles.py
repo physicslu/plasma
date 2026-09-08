@@ -11,6 +11,7 @@ PLASMACTL = REPO_ROOT / "scripts" / "plasmactl"
 INTEGRATION = REPO_ROOT / "scripts" / "plasmactl-integration"
 LOCAL_CONTROL_STATION = REPO_ROOT / "scripts" / "plasmactl-local-control-station"
 SWPC_Z2LIKE = REPO_ROOT / "scripts" / "plasmactl-swpc-z2like"
+Z2_PS = REPO_ROOT / "scripts" / "plasmactl-z2-ps"
 
 
 def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -27,7 +28,7 @@ def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedPr
 
 
 def test_profile_scripts_are_valid_bash() -> None:
-    for path in (PLASMACTL, INTEGRATION, LOCAL_CONTROL_STATION, SWPC_Z2LIKE):
+    for path in (PLASMACTL, INTEGRATION, LOCAL_CONTROL_STATION, SWPC_Z2LIKE, Z2_PS):
         result = subprocess.run(
             ["bash", "-n", str(path)],
             cwd=REPO_ROOT,
@@ -179,17 +180,56 @@ def test_swpc_z2like_profile_delegates_to_backend_without_browser_selected_targe
     assert "target_url" not in source
 
 
+def test_z2_ps_profile_delegates_without_aliasing_swpc_surrogate(tmp_path: Path) -> None:
+    log = tmp_path / "z2-backend.log"
+    fake = tmp_path / "fake-z2-backend.sh"
+    fake.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -Eeuo pipefail\n"
+        f"printf '%s\\n' \"$*\" >> {log!s}\n",
+        encoding="utf-8",
+    )
+    env = {"PLASMA_Z2_PS_BACKEND": str(fake)}
+    cases = (
+        (("install", "z2-ps", "--gateway-host", "192.168.2.99"), "install --gateway-host 192.168.2.99"),
+        (("deploy", "z2-ps", "--gateway-host", "192.168.2.99"), "deploy --gateway-host 192.168.2.99"),
+        (("verify", "z2-ps"), "verify"),
+        (("status", "z2-ps"), "status"),
+    )
+    for args, _ in cases:
+        result = run(*args, env=env)
+        assert result.returncode == 0, result.stderr
+    assert log.read_text(encoding="utf-8").splitlines() == [expected for _, expected in cases]
+    source = PLASMACTL.read_text(encoding="utf-8")
+    assert "z2-ps" in source
+    assert "Real PYNQ-Z2 ARMv7 PS-only" in source
+    assert "z2-ps) run_z2_ps_backend" in source
+    assert "z2-ps) run_swpc_z2like_backend" not in source
+
+
+def test_z2_ps_backend_keeps_pynq_python_and_hardware_boundary_closed() -> None:
+    source = Z2_PS.read_text(encoding="utf-8")
+    assert "--python-artifact" in source
+    assert "$product_root/python" in source
+    assert "/usr/bin/python3" not in source
+    assert "PS-only" in source
+    assert "PL/FPGA/Site/power/real-IC readiness is separate" in source
+    assert "/api/engineering/diagnostics/loopback" in source
+    assert 'loopback.get("endpoint") != "ps"' in source
+    assert 'loopback.get("source") != "ps"' in source
+
+
 def test_unknown_profile_fails_closed() -> None:
     result = run("deploy", "future-hardware")
     assert result.returncode != 0
     assert "unknown deployment profile" in result.stderr
 
 
-def test_real_z2_profiles_remain_reserved_not_aliases() -> None:
+def test_unqualified_real_z2_profiles_remain_reserved_not_aliases() -> None:
     source = PLASMACTL.read_text(encoding="utf-8")
-    assert "z2-ps and z2-full remain reserved" in source
-    assert "`z2` is intentionally not accepted yet" in source
-    for profile in ("z2", "z2-ps", "z2-full"):
+    assert "z2-full remains reserved" in source
+    assert "`z2` is" in source and "intentionally not accepted" in source
+    for profile in ("z2", "z2-full"):
         result = run("deploy", profile)
         assert result.returncode != 0
         assert "unknown deployment profile" in result.stderr

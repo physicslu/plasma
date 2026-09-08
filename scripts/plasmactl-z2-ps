@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+python_runtime_tool="${PLASMA_Z2_PYTHON_RUNTIME_TOOL:-$script_dir/z2-python-runtime.py}"
+ppu_installer="${PLASMA_Z2_PPU_INSTALLER:-$script_dir/ppu-z2-installer.py}"
+product_root="${PLASMA_Z2_PRODUCT_ROOT:-/opt/plasma}"
+install_root="$product_root/install"
+install_evidence="$install_root/last-install.json"
+python_evidence="$install_root/python-runtime.json"
+
+say() {
+  printf '[plasmactl z2-ps] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl z2-ps] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_file() {
+  [[ -f "$1" ]] || die "$2 is missing: $1"
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+require_root() {
+  (( EUID == 0 )) || die "z2-ps install/deploy requires root privileges"
+}
+
+json_field() {
+  local file="$1" path="$2"
+  python3 - "$file" "$path" <<'PY'
+import json
+import sys
+
+path, dotted = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    value = json.load(handle)
+for part in dotted.split("."):
+    if not isinstance(value, dict) or part not in value:
+        raise SystemExit(1)
+    value = value[part]
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif value is None:
+    print("null")
+else:
+    print(value)
+PY
+}
+
+python_from_evidence() {
+  [[ -f "$python_evidence" ]] || return 1
+  json_field "$python_evidence" python_path
+}
+
+usage() {
+  cat <<'EOF'
+Usage: plasmactl-z2-ps COMMAND [OPTIONS]
+
+Commands:
+  install   First installation on a clean PYNQ-Z2 PS target
+  deploy    Activate a new verified PPU release on an already installed Z2
+  verify    Read-only local Z2 PS runtime + PS diagnostic verification
+  status    Installed release/runtime/service summary
+
+Install/deploy options:
+  --release-artifact PATH   Canonical plasma-ppu-*-linux-armv7l.tar.gz
+  --release-sidecar PATH    Detached SHA-256 sidecar (defaults to <artifact>.sha256)
+  --python-artifact PATH    Optional prebuilt Plasma ARMv7 Python runtime artifact
+  --python-sidecar PATH     Detached Python runtime SHA-256 sidecar
+  --plasma-python PATH      Existing qualified Plasma Python under /opt/plasma/python
+  --gateway-host IPv4       Explicit non-loopback Z2 IPv4 address
+  --ppu-id ID               PPU identity (default z2-dev-01)
+  --facility-id ID          Facility identity (default lab)
+  --display-name NAME       Human display name (default Plasma Z2 PS)
+
+A first install requires either --python-artifact or --plasma-python. Deploy reuses
+/opt/plasma/install/python-runtime.json when neither is supplied.
+
+Qualification boundary:
+  z2-ps proves only the real Z2 ARMv7 PS software runtime and local PS diagnostic
+  path. It does not qualify PS<->PL, FPGA execution/loading, Site electrical I/O,
+  target power, real IC programming, or eight-Site hardware concurrency.
+EOF
+}
+
+parse_activation_args() {
+  release_artifact=""
+  release_sidecar=""
+  python_artifact=""
+  python_sidecar=""
+  plasma_python=""
+  gateway_host=""
+  ppu_id="z2-dev-01"
+  facility_id="lab"
+  display_name="Plasma Z2 PS"
+
+  while (($#)); do
+    case "$1" in
+      --release-artifact) (($# >= 2)) || die "--release-artifact requires a value"; release_artifact="$2"; shift 2 ;;
+      --release-sidecar|--sidecar) (($# >= 2)) || die "$1 requires a value"; release_sidecar="$2"; shift 2 ;;
+      --python-artifact) (($# >= 2)) || die "--python-artifact requires a value"; python_artifact="$2"; shift 2 ;;
+      --python-sidecar) (($# >= 2)) || die "--python-sidecar requires a value"; python_sidecar="$2"; shift 2 ;;
+      --plasma-python) (($# >= 2)) || die "--plasma-python requires a value"; plasma_python="$2"; shift 2 ;;
+      --gateway-host) (($# >= 2)) || die "--gateway-host requires a value"; gateway_host="$2"; shift 2 ;;
+      --ppu-id) (($# >= 2)) || die "--ppu-id requires a value"; ppu_id="$2"; shift 2 ;;
+      --facility-id) (($# >= 2)) || die "--facility-id requires a value"; facility_id="$2"; shift 2 ;;
+      --display-name) (($# >= 2)) || die "--display-name requires a value"; display_name="$2"; shift 2 ;;
+      -h|--help) usage; exit 0 ;;
+      *) die "unknown option: $1" ;;
+    esac
+  done
+
+  [[ -n "$release_artifact" ]] || die "--release-artifact is required"
+  [[ -n "$gateway_host" ]] || die "--gateway-host is required"
+  require_file "$release_artifact" "PPU release artifact"
+  if [[ -n "$release_sidecar" ]]; then
+    require_file "$release_sidecar" "PPU release sidecar"
+  fi
+  if [[ -n "$python_artifact" ]]; then
+    require_file "$python_runtime_tool" "Z2 Python runtime tool"
+    require_file "$python_artifact" "Plasma Python runtime artifact"
+    if [[ -n "$python_sidecar" ]]; then
+      require_file "$python_sidecar" "Plasma Python runtime sidecar"
+    fi
+  fi
+  require_file "$ppu_installer" "Z2 PPU installer"
+}
+
+install_or_reuse_python() {
+  if [[ -n "$python_artifact" ]]; then
+    local -a args=(install "$python_artifact" --product-root "$product_root")
+    [[ -n "$python_sidecar" ]] && args+=(--sidecar "$python_sidecar")
+    say "installing verified Plasma-owned ARMv7 Python runtime"
+    python3 "$python_runtime_tool" "${args[@]}"
+    plasma_python="$(python_from_evidence)" || die "Python runtime installation did not create evidence"
+  elif [[ -z "$plasma_python" ]]; then
+    plasma_python="$(python_from_evidence)" || \
+      die "no qualified Plasma Python evidence; provide --python-artifact or --plasma-python"
+  fi
+  [[ "$plasma_python" == "$product_root"/python/*/bin/python3* ]] || \
+    die "Plasma Python must remain below $product_root/python: $plasma_python"
+  [[ -x "$plasma_python" ]] || die "Plasma Python is not executable: $plasma_python"
+}
+
+activate_release() {
+  require_root
+  require_command python3
+  install_or_reuse_python
+  local -a args=(
+    install
+    --release-artifact "$release_artifact"
+    --plasma-python "$plasma_python"
+    --gateway-host "$gateway_host"
+    --ppu-id "$ppu_id"
+    --facility-id "$facility_id"
+    --display-name "$display_name"
+    --product-root "$product_root"
+  )
+  [[ -n "$release_sidecar" ]] && args+=(--sidecar "$release_sidecar")
+  say "activating verified Z2 PS-only PPU release"
+  python3 "$ppu_installer" "${args[@]}"
+}
+
+local_health_url() {
+  local gateway_host
+  gateway_host="$(json_field "$install_evidence" gateway_host)" || return 1
+  printf 'http://%s:18080\n' "$gateway_host"
+}
+
+verify_runtime() {
+  require_command python3
+  require_command systemctl
+  require_command curl
+  require_file "$install_evidence" "Z2 PS install evidence"
+
+  python3 - "$install_evidence" <<'PY'
+import json
+import platform
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    evidence = json.load(handle)
+if evidence.get("result") != "PASS":
+    raise SystemExit("last install evidence is not PASS")
+if evidence.get("evidence_level") != "z2-ps-installer-local-health":
+    raise SystemExit("unexpected Z2 evidence level")
+expected = {
+    "loads_fpga": False,
+    "accesses_pl": False,
+    "changes_target_power": False,
+    "programs_real_ic": False,
+}
+if evidence.get("hardware_boundary") != expected:
+    raise SystemExit("Z2 PS hardware boundary is not closed")
+machine = platform.machine().lower()
+if machine not in {"armv7", "armv7l"}:
+    raise SystemExit(f"runtime host is not ARMv7: {machine}")
+PY
+
+  systemctl is-active --quiet plasma-server.service || die "plasma-server.service is not active"
+  systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
+
+  local base readiness loopback
+  base="$(local_health_url)" || die "install evidence is missing gateway_host"
+  readiness="$(curl --noproxy '*' --fail --silent --show-error --max-time 5 "$base/api/health/ready")" || \
+    die "Z2 Gateway readiness failed: $base/api/health/ready"
+  loopback="$(curl --noproxy '*' --fail --silent --show-error --max-time 5 \
+    -H 'Content-Type: application/json' \
+    --data '{"endpoint":"ps","payload":"504c41534d412d5a322d5053"}' \
+    "$base/api/engineering/diagnostics/loopback")" || die "Z2 local PS loopback request failed"
+
+  python3 - "$readiness" "$loopback" <<'PY'
+import json
+import sys
+
+ready = json.loads(sys.argv[1])
+loopback = json.loads(sys.argv[2])
+if ready.get("gateway") != "ready" or ready.get("execution") != "ready":
+    raise SystemExit(f"unexpected readiness: {ready!r}")
+if loopback.get("endpoint") != "ps" or loopback.get("source") != "ps":
+    raise SystemExit(f"loopback did not execute at PS endpoint: {loopback!r}")
+PY
+
+  say "PASS: real Z2 ARMv7 PS runtime + local PS diagnostic loopback"
+  say "qualification boundary: PS-only; PL/FPGA/Site/power/real-IC readiness is separate"
+}
+
+show_status() {
+  require_file "$install_evidence" "Z2 PS install evidence"
+  local release_id git_sha gateway_host python_path server_state web_state
+  release_id="$(json_field "$install_evidence" release_id)"
+  git_sha="$(json_field "$install_evidence" git_sha)"
+  gateway_host="$(json_field "$install_evidence" gateway_host)"
+  python_path="$(json_field "$install_evidence" plasma_python.path)"
+  server_state="$(systemctl is-active plasma-server.service 2>/dev/null || true)"
+  web_state="$(systemctl is-active plasma-web.service 2>/dev/null || true)"
+  printf 'Profile:       z2-ps\n'
+  printf 'Release:       %s\n' "$release_id"
+  printf 'Git SHA:       %s\n' "$git_sha"
+  printf 'Plasma Python: %s\n' "$python_path"
+  printf 'Gateway:       http://%s:18080\n' "$gateway_host"
+  printf 'Server svc:    %s\n' "${server_state:-unknown}"
+  printf 'Gateway svc:   %s\n' "${web_state:-unknown}"
+  printf 'Hardware:      PS-only; PL/Site/real-IC not qualified by this profile\n'
+}
+
+command="${1:-help}"
+shift || true
+case "$command" in
+  install)
+    [[ ! -e "$install_evidence" ]] || die "z2-ps is already installed; use 'plasmactl deploy z2-ps'"
+    parse_activation_args "$@"
+    activate_release
+    verify_runtime
+    ;;
+  deploy)
+    [[ -f "$install_evidence" ]] || die "z2-ps is not installed; use 'plasmactl install z2-ps' first"
+    parse_activation_args "$@"
+    activate_release
+    verify_runtime
+    ;;
+  verify)
+    (($# == 0)) || die "verify accepts no profile options"
+    verify_runtime
+    ;;
+  status)
+    (($# == 0)) || die "status accepts no profile options"
+    show_status
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage >&2
+    die "unknown command: $command"
+    ;;
+esac

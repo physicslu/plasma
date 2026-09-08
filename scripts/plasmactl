@@ -6,6 +6,7 @@ repo_root="$(cd "$(dirname "$wrapper_path")/.." && pwd)"
 integration_backend="${PLASMACTL_INTEGRATION_BACKEND:-$repo_root/scripts/plasmactl-integration}"
 local_control_station_backend="${PLASMA_LOCAL_CONTROL_STATION_BACKEND:-$repo_root/scripts/plasmactl-local-control-station}"
 swpc_z2like_backend="${PLASMA_SWPC_Z2LIKE_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like}"
+z2_ps_backend="${PLASMA_Z2_PS_BACKEND:-$repo_root/scripts/plasmactl-z2-ps}"
 # Compatibility marker for repository documentation/contracts. The integration
 # backend owns migration behavior; the operator entrypoint publishes its schema.
 current_config_version=6
@@ -47,11 +48,17 @@ run_swpc_z2like_backend() {
   bash "$swpc_z2like_backend" "$@"
 }
 
+run_z2_ps_backend() {
+  require_backend "$z2_ps_backend" "z2-ps"
+  bash "$z2_ps_backend" "$@"
+}
+
 profile_for_optional_arg() {
   case "${1:-}" in
     ""|integration) printf '%s\n' integration ;;
     local-control-station) printf '%s\n' local-control-station ;;
     swpc-z2like) printf '%s\n' swpc-z2like ;;
+    z2-ps) printf '%s\n' z2-ps ;;
     *) return 1 ;;
   esac
 }
@@ -64,6 +71,7 @@ Deployment profiles:
   integration             SWPC development/integration host; user systemd, Vite, optional Manager/Mock
   local-control-station   Linux reference Control Station; Console/BFF + Manager only, user systemd
   swpc-z2like             x86_64 PS-only PPU surrogate; root/system systemd, immutable release, restricted ingress
+  z2-ps                   Real PYNQ-Z2 ARMv7 PS-only PPU runtime; no PL/Site/IC claim
 
 Profile-aware commands:
   install [integration]              Legacy integration-host install (default; backward compatible)
@@ -81,18 +89,26 @@ Profile-aware commands:
   plasmactl verify swpc-z2like       Read-only local surrogate readiness/restricted-ingress/PS-loopback checks
   plasmactl status swpc-z2like       Installed release identity and system-service state
 
+  sudo plasmactl install z2-ps --release-artifact PATH --gateway-host IPv4 \
+    [--python-artifact PATH | --plasma-python PATH] [--ppu-id ID] [--facility-id ID]
+  sudo plasmactl deploy z2-ps --release-artifact PATH --gateway-host IPv4 [same identity/runtime options]
+  plasmactl verify z2-ps             Real Z2 ARMv7 PS runtime + local PS diagnostic loopback only
+  plasmactl status z2-ps             Installed release, Plasma Python and system-service state
+
 Integration-only commands retained unchanged:
   update | test | restart | web-restart | start | stop | ports | logs [TARGET]
   update-and-restart                  Alias of `deploy integration`
 
 Future hardware profiles:
-  z2-ps and z2-full remain reserved for real PYNQ-Z2 qualification. They are not
-  aliases of swpc-z2like, and `z2` is intentionally not accepted yet.
+  z2-full remains reserved for PS + PL + Site/Programming qualification. `z2` is
+  intentionally not accepted until z2-full is qualified; neither aliases swpc-z2like.
 
 Safety boundary:
   `local-control-station` proves only the local Console/BFF + Manager runtime.
-  `swpc-z2like` is not Z2/ARMv7 qualification and proves no PL, FPGA, Site electrical,
-  real-IC programming, eight-site hardware concurrency, or production readiness.
+  `swpc-z2like` is not Z2/ARMv7 qualification.
+  `z2-ps` proves only real-Z2 ARMv7 PS software/runtime and local PS diagnostics;
+  none of these profiles alone proves PL, FPGA, Site electrical, real-IC programming,
+  eight-site hardware concurrency, or production programmer readiness.
 EOF
 }
 
@@ -111,6 +127,7 @@ case "$command" in
     case "$profile" in
       local-control-station) run_local_control_station_backend install "$@" ;;
       swpc-z2like) run_swpc_z2like_backend install "$@" ;;
+      z2-ps) run_z2_ps_backend install "$@" ;;
       integration)
         (($# == 0)) || wrapper_die "integration install does not accept profile options"
         load_integration_backend
@@ -124,6 +141,7 @@ case "$command" in
     case "$profile" in
       local-control-station) run_local_control_station_backend deploy "$@" ;;
       swpc-z2like) run_swpc_z2like_backend deploy "$@" ;;
+      z2-ps) run_z2_ps_backend deploy "$@" ;;
       integration)
         (($# == 0)) || wrapper_die "integration deploy does not accept profile options"
         load_integration_backend
@@ -151,6 +169,7 @@ case "$command" in
     case "$profile" in
       local-control-station) run_local_control_station_backend status ;;
       swpc-z2like) run_swpc_z2like_backend status ;;
+      z2-ps) run_z2_ps_backend status ;;
       integration)
         load_integration_backend
         show_status
@@ -166,6 +185,10 @@ case "$command" in
       swpc-z2like)
         shift
         run_swpc_z2like_backend verify "$@"
+        ;;
+      z2-ps)
+        shift
+        run_z2_ps_backend verify "$@"
         ;;
       integration)
         shift
