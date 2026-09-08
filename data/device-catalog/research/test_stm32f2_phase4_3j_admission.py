@@ -28,9 +28,13 @@ from stm32f2_bounded_policy import DEFAULT_CANONICAL  # noqa: E402
 
 AUDIT_PATH = HERE / "stm32f2-phase4.3j-admission-audit.json"
 MANIFEST_PATH = HERE.parent / "production" / "icpn-v1-manifest.json"
+PRESTATE_MANIFEST_PATH = HERE / "stm32f2-phase4.3j-production-manifest-prestate.json"
+F1_CANONICAL = HERE / "stm32f1-commercial-icpn.csv"
+F4_CANONICAL = HERE / "stm32f4-commercial-icpn.csv"
 EXPECTED_PLAN_SHA256 = "1b8649c284210076d74fa4b418c5f40554f5d74e1b03062054685d70f34faba8"
 EXPECTED_CANONICAL_SHA256 = "69a9e02be14237bd2c683bc63eed4bd132ba62c5e8c334ef0e85671f868003d0"
 EXPECTED_CANONICAL_BLOB = "1bec0770179f3849c6cfbb66aea9ad9d63610f55"
+EXPECTED_PRESTATE_F2_SHA256 = "9746ba2d13d36f0c60d1a6997fde23b2d97fe2aae34b27297885a41343655621"
 EXPECTED = {
     "STM32F205RET6",
     "STM32F205RET6TR",
@@ -60,9 +64,28 @@ class STM32F2Phase43JAdmissionTests(unittest.TestCase):
             writer = csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
+        self.assertEqual(file_sha256(path), EXPECTED_PRESTATE_F2_SHA256)
 
-    def _historical_plan(self, canonical: Path) -> dict:
-        plan = build_admission_plan(phase="4.3J", canonical_path=canonical)
+    def _historical_transaction_paths(self, root: Path) -> tuple[Path, Path]:
+        research = root / "research"
+        production = root / "production"
+        research.mkdir(parents=True)
+        production.mkdir(parents=True)
+
+        canonical = research / DEFAULT_CANONICAL.name
+        self._historical_canonical(canonical)
+        (research / F1_CANONICAL.name).write_bytes(F1_CANONICAL.read_bytes())
+        (research / F4_CANONICAL.name).write_bytes(F4_CANONICAL.read_bytes())
+        manifest = production / "icpn-v1-manifest.json"
+        manifest.write_bytes(PRESTATE_MANIFEST_PATH.read_bytes())
+        return canonical, manifest
+
+    def _historical_plan(self, canonical: Path, manifest: Path) -> dict:
+        plan = build_admission_plan(
+            phase="4.3J",
+            canonical_path=canonical,
+            production_manifest_path=manifest,
+        )
         spec = load_admission_spec("4.3J")
         self.assertTrue(admission_plan_is_clean(plan, spec=spec))
         payload = json.dumps(plan, indent=2, sort_keys=True) + "\n"
@@ -98,9 +121,8 @@ class STM32F2Phase43JAdmissionTests(unittest.TestCase):
 
     def test_historical_plan_replay_and_writer_are_exact_and_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            canonical = Path(tmp) / DEFAULT_CANONICAL.name
-            self._historical_canonical(canonical)
-            plan = self._historical_plan(canonical)
+            canonical, manifest = self._historical_transaction_paths(Path(tmp))
+            plan = self._historical_plan(canonical, manifest)
             self.assertEqual({item["icpn"] for item in plan["candidates"]}, EXPECTED)
             first = write_canonical_dataset(plan=plan, canonical_path=canonical)
             second = write_canonical_dataset(plan=plan, canonical_path=canonical)
@@ -113,9 +135,8 @@ class STM32F2Phase43JAdmissionTests(unittest.TestCase):
 
     def test_writer_rejects_unbound_historical_canonical_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            canonical = Path(tmp) / DEFAULT_CANONICAL.name
-            self._historical_canonical(canonical)
-            plan = self._historical_plan(canonical)
+            canonical, manifest = self._historical_transaction_paths(Path(tmp))
+            plan = self._historical_plan(canonical, manifest)
             with canonical.open("a", encoding="utf-8") as handle:
                 handle.write("unexpected\n")
             with self.assertRaisesRegex(AdmissionError, "changed after admission planning"):
