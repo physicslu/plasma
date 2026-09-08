@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "family": "STM32F2",
+  "batches": {
+    "4.3C": {
+      "discovery_phase": "4.3B",
+      "admission_phase": "4.3D",
+      "adapter_id": "stm32f2-phase4.3c",
+      "policy_baseline": "stm32f2-phase4.3c-policy-baseline.json",
+      "expected_candidate_count": 9,
+      "expected_canonical_icpn_count_before": 0,
+      "historical_production_base_devices": [],
+      "expected_production_exact_icpn_count": 459,
+      "expected_production_base_device_count": 157,
+      "expected_production_family_counts": {
+        "STM32F1": 75,
+        "STM32F4": 384
+      },
+      "metadata_contract": {
+        "flash_by_code": {
+          "B": "128 KiB",
+          "C": "256 KiB",
+          "E": "512 KiB"
+        },
+        "temperature_by_code": {
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "package_by_code": {
+          "H": "UFBGA",
+          "T": "LQFP"
+        },
+        "pins_by_combination": {
+          "I/H": "176",
+          "I/T": "176",
+          "R/T": "64"
+        },
+        "allowed_option_suffixes": ["", "TR"],
+        "openocd_target_config": "tcl/target/stm32f2x.cfg"
+      },
+      "summary_extra": {
+        "base_main": "5fdaa608692e82088f3e67ff5b85c7569338ebcc"
+      }
+    },
+    "4.3F": {
+      "discovery_phase": "4.3E",
+      "admission_phase": "4.3G",
+      "adapter_id": "stm32f2-phase4.3f",
+      "policy_baseline": "stm32f2-phase4.3f-policy-baseline.json",
+      "expected_candidate_count": 13,
+      "expected_canonical_icpn_count_before": 9,
+      "historical_production_base_devices": [
+        "STM32F205RB",
+        "STM32F207IC",
+        "STM32F215RE",
+        "STM32F217IE"
+      ],
+      "expected_production_exact_icpn_count": 468,
+      "expected_production_base_device_count": 161,
+      "expected_production_family_counts": {
+        "STM32F1": 75,
+        "STM32F2": 9,
+        "STM32F4": 384
+      },
+      "metadata_contract": {
+        "flash_by_code": {
+          "B": "128 KiB",
+          "C": "256 KiB",
+          "E": "512 KiB",
+          "G": "1024 KiB"
+        },
+        "temperature_by_code": {
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "package_by_code": {
+          "H": "UFBGA",
+          "T": "LQFP"
+        },
+        "pins_by_combination": {
+          "I/H": "176",
+          "I/T": "176",
+          "R/T": "64"
+        },
+        "allowed_option_suffixes": ["", "TR"],
+        "openocd_target_config": "tcl/target/stm32f2x.cfg"
+      }
+    },
+    "4.3I": {
+      "discovery_phase": "4.3H",
+      "admission_phase": "4.3J",
+      "adapter_id": "stm32f2-phase4.3i",
+      "policy_baseline": "stm32f2-phase4.3i-policy-baseline.json",
+      "expected_candidate_count": 11,
+      "expected_canonical_icpn_count_before": 22,
+      "historical_production_base_devices": [
+        "STM32F205RB",
+        "STM32F205RC",
+        "STM32F207IC",
+        "STM32F207IE",
+        "STM32F215RE",
+        "STM32F215RG",
+        "STM32F217IE",
+        "STM32F217IG"
+      ],
+      "expected_production_exact_icpn_count": 481,
+      "expected_production_base_device_count": 165,
+      "expected_production_family_counts": {
+        "STM32F1": 75,
+        "STM32F2": 22,
+        "STM32F4": 384
+      },
+      "metadata_contract": {
+        "flash_by_code": {
+          "B": "128 KiB",
+          "C": "256 KiB",
+          "E": "512 KiB",
+          "F": "768 KiB",
+          "G": "1024 KiB"
+        },
+        "temperature_by_code": {
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "package_by_code": {
+          "H": "UFBGA",
+          "T": "LQFP",
+          "Y": "WLCSP"
+        },
+        "pins_by_combination": {
+          "I/H": "176",
+          "I/T": "176",
+          "R/T": "64",
+          "R/Y": "66",
+          "V/T": "100"
+        },
+        "allowed_option_suffixes": ["", "TR"],
+        "openocd_target_config": "tcl/target/stm32f2x.cfg"
+      },
+      "policy_evidence": {
+        "stm32f20x_ordering_information": "https://www.st.com/resource/en/datasheet/stm32f205rc.pdf",
+        "stm32f21x_ordering_information": "https://www.st.com/resource/en/datasheet/stm32f217ve.pdf",
+        "stm32f205re_quality_and_reliability": "https://www.st.com/en/microcontrollers-microprocessors/stm32f205re.html",
+        "semantic_decisions": {
+          "pin_count": "actual package pin or ball count",
+          "R/T": "64",
+          "R/Y": "66",
+          "V/T": "100",
+          "F_flash": "768 KiB",
+          "Y_package": "WLCSP"
+        }
+      }
+    }
+  }
+}
