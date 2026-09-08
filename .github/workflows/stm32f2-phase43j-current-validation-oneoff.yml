@@ -16,39 +16,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Add post-admission validation step and remove this workflow
+      - name: Append post-admission validation step and remove this workflow
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('.github/workflows/device-catalog-current-validation.yml')
-          text = path.read_text(encoding='utf-8')
-          needle = '''      - name: Validate Phase 4.3H STM32F2 third bounded discovery
-                  run: |
-                    python data/device-catalog/research/test_stm32f2_phase4_3h_discovery.py
-                    python data/device-catalog/research/validate_stm32f2_phase4_3h_retained_evidence.py
-                    python data/device-catalog/research/test_stm32f2_phase4_3h_retained_evidence.py
-          '''
-          # The triple-quoted literal above is indented by Python source indentation.
-          needle = '\n'.join(line[10:] if line.startswith('          ') else line for line in needle.splitlines()) + '\n'
-          addition = '''
-      - name: Validate Phase 4.3I-J STM32F2 policy and post-admission closure
-        run: |
-          python data/device-catalog/research/stm32f2_phase4_3i_policy.py
-          python data/device-catalog/research/test_stm32f2_phase4_3j_admission.py
-          PYTHONPATH=software/python python software/python/tests/test_device_catalog.py
-          '''
-          addition = '\n'.join(line[10:] if line.startswith('          ') else line for line in addition.splitlines()) + '\n'
-          if 'Validate Phase 4.3I-J STM32F2 policy and post-admission closure' in text:
-              raise SystemExit('Phase 4.3I-J validation step already exists')
-          if needle not in text:
-              raise SystemExit('Phase 4.3H validation anchor not found exactly')
-          path.write_text(text.replace(needle, needle + addition), encoding='utf-8')
-          PY
+          file=.github/workflows/device-catalog-current-validation.yml
+          ! grep -q 'Validate Phase 4.3I-J STM32F2 policy and post-admission closure' "$file"
+          tail -n 6 "$file" | grep -q 'Validate Phase 4.3H STM32F2 third bounded discovery'
+          printf '\n      - name: Validate Phase 4.3I-J STM32F2 policy and post-admission closure\n        run: |\n          python data/device-catalog/research/stm32f2_phase4_3i_policy.py\n          python data/device-catalog/research/test_stm32f2_phase4_3j_admission.py\n          PYTHONPATH=software/python python software/python/tests/test_device_catalog.py\n' >> "$file"
           git rm .github/workflows/stm32f2-phase43j-current-validation-oneoff.yml
           git config user.name 'plasma-ci'
           git config user.email 'plasma-ci@users.noreply.github.com'
-          git add .github/workflows/device-catalog-current-validation.yml
+          git add "$file"
           git commit -m 'ci: validate STM32F2 Phase 4.3J post-admission closure'
           git push origin HEAD:agent/device-catalog-stm32f2-phase43j-publish
