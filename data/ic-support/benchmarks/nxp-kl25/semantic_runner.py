@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 import build_evidence_pack as builder
+import semantic_context
 import semantic_extraction as semantic
 
 RUN_SCHEMA_VERSION = "0.1.0"
@@ -69,6 +70,7 @@ def execute_semantic_run(
     model_id: str,
     runtime_label: str,
     request_options: dict[str, Any] | None = None,
+    context_strategy: str = semantic_context.LEGACY_CONTEXT_STRATEGY,
 ) -> dict[str, Any]:
     record: dict[str, Any] = {
         "schema_version": RUN_SCHEMA_VERSION,
@@ -120,11 +122,23 @@ def execute_semantic_run(
             packs=packs,
             evidence_text=evidence_text,
         )
-        manufacturer_context = builder.assemble_model_context(
-            pre_ai_manifest,
-            packs=packs,
-            evidence_text=evidence_text,
-        )
+        if context_strategy == semantic_context.LEGACY_CONTEXT_STRATEGY:
+            manufacturer_context = builder.assemble_model_context(
+                pre_ai_manifest,
+                packs=packs,
+                evidence_text=evidence_text,
+            )
+            context_meta = semantic_context.describe_legacy_context(manufacturer_context)
+        elif context_strategy == semantic_context.COMPACT_CONTEXT_STRATEGY:
+            manufacturer_context, context_meta = semantic_context.assemble_compact_model_context(
+                pre_ai_manifest,
+                packs=packs,
+                evidence_text=evidence_text,
+            )
+        else:
+            raise semantic_context.SemanticContextError(f"unsupported semantic context strategy: {context_strategy}")
+        record["context"] = context_meta
+
         output_schema = semantic.build_output_json_schema(contract, packs=packs)
         record["runtime"]["output_format"] = "json_schema"
         record["runtime"]["output_schema_sha256"] = builder.canonical_sha256(output_schema)

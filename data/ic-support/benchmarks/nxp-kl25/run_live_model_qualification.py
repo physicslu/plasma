@@ -12,6 +12,7 @@ import build_evidence_pack as builder
 import ollama_live_runtime
 import qualify_semantic_run as qualification
 import run_ollama_semantic
+import semantic_context
 import semantic_runner
 
 HERE = Path(__file__).resolve().parent
@@ -44,6 +45,7 @@ def _code_fingerprints() -> dict[str, str]:
         "run_ollama_semantic.py",
         "ollama_live_runtime.py",
         "ollama_transport.py",
+        "semantic_context.py",
         "semantic_runner.py",
         "semantic_extraction.py",
         "qualify_semantic_run.py",
@@ -61,7 +63,17 @@ def execute_live_qualification(
     required = contract["required_input"]
     runtime = contract["live_runtime"]
     generation = runtime["generation"]
+    context_protocol = runtime.get("context_protocol", {})
     output_protocol = runtime.get("output_protocol", {})
+
+    require(
+        context_protocol.get("strategy") == semantic_context.COMPACT_CONTEXT_STRATEGY,
+        "qualification context protocol must use cross-pack physical-page deduplication",
+    )
+    require(
+        context_protocol.get("gate3_evidence_artifacts_immutable") is True,
+        "qualification context protocol must keep Gate-3 evidence artifacts immutable",
+    )
     require(output_protocol.get("format") == "json_schema", "qualification output protocol must use json_schema")
     require(output_protocol.get("structured_output_required") is True, "structured output must be required")
 
@@ -92,13 +104,15 @@ def execute_live_qualification(
         temperature=generation["temperature"],
         seed=generation["seed"],
         timeout_seconds=generation["timeout_seconds"],
+        context_strategy=context_protocol["strategy"],
     )
 
     raw_path = output_dir / "raw-response.txt"
     raw_response = raw_path.read_text(encoding="utf-8")
     semantic_runtime = record.get("runtime", {})
+    semantic_context_meta = record.get("context") if isinstance(record.get("context"), dict) else {}
     provenance: dict[str, Any] = {
-        "schema_version": "0.2.0",
+        "schema_version": "0.3.0",
         "artifact_type": "kl25_live_model_run_provenance",
         "target": contract["target"],
         "bundle_digest": record.get("bundle_digest"),
@@ -111,6 +125,16 @@ def execute_live_qualification(
             "model_id": runtime["model_id"],
             "runtime_label": runtime["runtime_label"],
             "ollama_endpoint_policy": "loopback_only",
+            "context": {
+                **dict(context_protocol),
+                "context_sha256": semantic_context_meta.get("context_sha256"),
+                "context_bytes": semantic_context_meta.get("context_bytes"),
+                "legacy_context_bytes": semantic_context_meta.get("legacy_context_bytes"),
+                "page_occurrences": semantic_context_meta.get("page_occurrences"),
+                "unique_physical_pages": semantic_context_meta.get("unique_physical_pages"),
+                "duplicate_occurrences_removed": semantic_context_meta.get("duplicate_occurrences_removed"),
+                "context_byte_reduction_pct": semantic_context_meta.get("context_byte_reduction_pct"),
+            },
             "output_protocol": {
                 **dict(output_protocol),
                 "output_schema_sha256": semantic_runtime.get("output_schema_sha256"),

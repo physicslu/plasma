@@ -47,6 +47,24 @@ class KL25RunLiveModelQualificationTest(unittest.TestCase):
             }
         return result
 
+    def context_record(self):
+        return {
+            "schema_version": "0.1.0",
+            "strategy": "cross_pack_physical_page_dedup_v1",
+            "gate3_artifacts_mutated": False,
+            "dedup_identity": ["source_id", "pdf_page_number", "page_text_sha256"],
+            "page_occurrences": 127,
+            "unique_physical_pages": 33,
+            "duplicate_occurrences_removed": 94,
+            "page_occurrence_redundancy_pct": 74.02,
+            "legacy_context_sha256": "a" * 64,
+            "legacy_context_bytes": 413754,
+            "context_sha256": "b" * 64,
+            "context_bytes": 107285,
+            "context_byte_reduction_pct": 74.07,
+            "per_pack": [],
+        }
+
     def semantic_record(self, raw_text):
         response = json.loads(raw_text)
         return {
@@ -60,15 +78,18 @@ class KL25RunLiveModelQualificationTest(unittest.TestCase):
                 "transport": "ollama_native_chat",
                 "runtime_label": "kl25-live-model-qualification",
                 "model_id": "qwen3.8:27b-mlx",
+                "output_format": "json_schema",
+                "output_schema_sha256": "d" * 64,
             },
-            "prompt": {"sha256": "c" * 64, "byte_length": 5000},
+            "context": self.context_record(),
+            "prompt": {"sha256": "c" * 64, "byte_length": 112561},
             "status": "success",
             "response": response,
             "transport_metadata": {
                 "response_model": "qwen3.8:27b-mlx",
                 "done": True,
                 "done_reason": "stop",
-                "usage": {"input_tokens": 10000, "generation_tokens": 1000},
+                "usage": {"input_tokens": 23000, "generation_tokens": 5000},
                 "timing": {"wall_time_ms": 1234.0},
             },
             "transport_invoked": True,
@@ -112,11 +133,12 @@ class KL25RunLiveModelQualificationTest(unittest.TestCase):
             def fake_execute_workspace(**kwargs):
                 self.assertEqual(kwargs["model_id"], "qwen3.8:27b-mlx")
                 self.assertEqual(kwargs["runtime_label"], "kl25-live-model-qualification")
-                self.assertEqual(kwargs["num_ctx"], 32768)
-                self.assertEqual(kwargs["max_tokens"], 4096)
+                self.assertEqual(kwargs["num_ctx"], 65536)
+                self.assertEqual(kwargs["max_tokens"], 8192)
                 self.assertEqual(kwargs["temperature"], 0.0)
                 self.assertEqual(kwargs["seed"], 0)
                 self.assertEqual(kwargs["timeout_seconds"], 1800.0)
+                self.assertEqual(kwargs["context_strategy"], "cross_pack_physical_page_dedup_v1")
                 output_dir.mkdir(parents=True, exist_ok=True)
                 (output_dir / "raw-response.txt").write_text(raw, encoding="utf-8")
                 (output_dir / "semantic-run.json").write_text(json.dumps(record), encoding="utf-8")
@@ -124,7 +146,7 @@ class KL25RunLiveModelQualificationTest(unittest.TestCase):
 
             identity = {
                 "ollama_url_policy": "loopback_only",
-                "ollama_version": "0.12.0",
+                "ollama_version": "0.33.3",
                 "model_id": "qwen3.8:27b-mlx",
                 "model_digest": "sha256:" + "d" * 64,
             }
@@ -140,6 +162,9 @@ class KL25RunLiveModelQualificationTest(unittest.TestCase):
             self.assertEqual(retained["status"], "success")
             self.assertEqual(report["status"], "READY_FOR_REVIEW")
             self.assertEqual(provenance["ollama_runtime_identity"]["model_digest"], "sha256:" + "d" * 64)
+            self.assertEqual(provenance["execution"]["generation"]["num_ctx"], 65536)
+            self.assertEqual(provenance["execution"]["generation"]["max_tokens"], 8192)
+            self.assertEqual(provenance["execution"]["context"]["unique_physical_pages"], 33)
             self.assertFalse(provenance["execution"]["host"]["hostname_retained"])
             self.assertTrue((output_dir / "live-run-provenance.json").is_file())
             self.assertTrue((output_dir / "qualification-report.json").is_file())

@@ -35,13 +35,17 @@ jobs:
         run: |
           python -m py_compile \
             data/ic-support/benchmarks/nxp-kl25/semantic_extraction.py \
+            data/ic-support/benchmarks/nxp-kl25/semantic_context.py \
             data/ic-support/benchmarks/nxp-kl25/semantic_runner.py \
             data/ic-support/benchmarks/nxp-kl25/ollama_transport.py \
             data/ic-support/benchmarks/nxp-kl25/run_ollama_semantic.py \
+            data/ic-support/benchmarks/nxp-kl25/audit_semantic_context.py \
             data/ic-support/benchmarks/nxp-kl25/ollama_live_runtime.py \
             data/ic-support/benchmarks/nxp-kl25/qualify_semantic_run.py \
             data/ic-support/benchmarks/nxp-kl25/run_live_model_qualification.py \
-            data/ic-support/benchmarks/nxp-kl25/test_output_contract_hardening.py
+            data/ic-support/benchmarks/nxp-kl25/test_output_contract_hardening.py \
+            data/ic-support/benchmarks/nxp-kl25/test_context_compaction.py \
+            data/ic-support/benchmarks/nxp-kl25/test_semantic_coverage_gate53.py
       - name: Validate KL25 operator helper syntax
         run: |
           bash -n scripts/ic-support-kl25-live.sh
@@ -52,6 +56,10 @@ jobs:
         run: python data/ic-support/benchmarks/nxp-kl25/test_semantic_runner.py
       - name: Validate structured output hardening regressions
         run: python data/ic-support/benchmarks/nxp-kl25/test_output_contract_hardening.py
+      - name: Validate deterministic context compaction and 64K envelope wiring
+        run: python data/ic-support/benchmarks/nxp-kl25/test_context_compaction.py
+      - name: Validate Gate 5.3 semantic coverage screening robustness
+        run: python data/ic-support/benchmarks/nxp-kl25/test_semantic_coverage_gate53.py
       - name: Validate real Ollama transport code without model weights
         run: python data/ic-support/benchmarks/nxp-kl25/test_ollama_transport.py
       - name: Validate Gate 3 workspace through executable Ollama semantic path
