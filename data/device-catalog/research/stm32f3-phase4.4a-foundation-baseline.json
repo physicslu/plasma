@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "phase": "4.4A",
+  "family": "STM32F3",
+  "source_row_count": 90,
+  "subfamily_counts": {
+    "STM32F301": 8,
+    "STM32F302": 22,
+    "STM32F303": 24,
+    "STM32F373": 12,
+    "STM32F3x4": 12,
+    "STM32F3x8": 12
+  },
+  "target_config": "tcl/target/stm32f3x.cfg",
+  "initial_targets": [
+    {
+      "subfamily": "STM32F301",
+      "base_device": "STM32F301C6"
+    },
+    {
+      "subfamily": "STM32F302",
+      "base_device": "STM32F302C6"
+    },
+    {
+      "subfamily": "STM32F303",
+      "base_device": "STM32F303C6"
+    },
+    {
+      "subfamily": "STM32F373",
+      "base_device": "STM32F373C8"
+    },
+    {
+      "subfamily": "STM32F3x4",
+      "base_device": "STM32F334C4"
+    },
+    {
+      "subfamily": "STM32F3x8",
+      "base_device": "STM32F318C8"
+    }
+  ],
+  "claims": {
+    "manufacturer_evidence_retained": false,
+    "exact_commercial_icpn_asserted": false,
+    "canonical_dataset_admission": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  }
+}
