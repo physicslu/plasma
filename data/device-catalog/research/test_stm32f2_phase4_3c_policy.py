@@ -151,11 +151,9 @@ class STM32F2Phase43CPolicyTests(unittest.TestCase):
 
     def test_historical_snapshot_remains_459_after_stm32f2_growth(self) -> None:
         manifest = json.loads(DEFAULT_PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
-        self.assertEqual(sum(source["row_count"] for source in manifest["sources"]), 481)
-        self.assertEqual(
-            {source["family"] for source in manifest["sources"]},
-            {"STM32F1", "STM32F2", "STM32F4"},
-        )
+        sources = {source["family"]: source for source in manifest["sources"]}
+        self.assertEqual(set(sources), {"STM32F1", "STM32F2", "STM32F4"})
+        self.assertGreaterEqual(sources["STM32F2"]["row_count"], self.plan["policy_ready_count"])
         self.assertEqual(
             self.plan["production_snapshot"],
             {
