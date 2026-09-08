@@ -1,0 +1,53 @@
+name: STM32F3 Phase 4.4B retention probe one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f3-phase44b-discovery
+
+permissions:
+  contents: read
+
+jobs:
+  retention-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build retention transaction bindings
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path('.')
+          research = root / 'data/device-catalog/research'
+          production = root / 'data/device-catalog/production'
+          evidence = research / 'evidence/stm32f3-phase4.4b-official-st-discovery-live-2026-09-08'
+
+          def sha(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          manifest = json.loads((production / 'icpn-v1-manifest.json').read_text())
+          payload = {
+              'openocd_catalog_sha256': sha(research / 'openocd-parts-canonical.csv'),
+              'discovery_manifest_sha256': sha(research / 'stm32f3-phase4.4b-discovery-manifest.json'),
+              'production_manifest_sha256': sha(production / 'icpn-v1-manifest.json'),
+              'pilot_summary_sha256': sha(evidence / 'pilot-summary.json'),
+              'production_exact_icpn_count': sum(item['row_count'] for item in manifest['sources']),
+              'family_exact_icpn_counts': {item['family']: item['row_count'] for item in manifest['sources']},
+          }
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          Path('/tmp/stm32f3-phase4.4b-retention-bindings.json').write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32f3-phase4.4b-retention-bindings
+          path: /tmp/stm32f3-phase4.4b-retention-bindings.json
+          retention-days: 2
