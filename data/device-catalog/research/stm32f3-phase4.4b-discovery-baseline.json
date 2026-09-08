@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "phase": "4.4B",
+  "pilot_id": "stm32f3-phase4.4b-official-st-discovery-2026-09-08",
+  "executed_git_sha": "0ac86cbf8da4cfaad6e0201c278cc43cb4c52c75",
+  "acquisition_context": {
+    "execution_mode": "github_actions_headed_chromium",
+    "workflow_run_id": 34204938530,
+    "artifact_id": 10047381270,
+    "artifact_zip_sha256": "c40fcba4e35c3e193c9ca85e1433df352f42b91453d6b68c923fa2eafca4d9eb"
+  },
+  "inputs": {
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "discovery_manifest_sha256": "652476cbbb26a585de73a8d9c2cc130d221b3805dee3682e823c4299f811d59f",
+    "production_manifest_sha256_at_discovery": "40f8d3928aad3a43d017a377ec2a9e41a610fa7bd232942c3e938d8628af6b3"
+  },
+  "production_snapshot": {
+    "exact_icpn_count": 492,
+    "family_exact_icpn_counts": {
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F4": 384
+    },
+    "stm32f3_exact_icpn_count": 0
+  },
+  "result": {
+    "attempted": 6,
+    "acquisition_success": 6,
+    "acquisition_failure": 0,
+    "active_exact_icpn_candidates": 10,
+    "excluded_non_active_part_numbers": 0,
+    "canonical_mapping": {
+      "unique": 6,
+      "ambiguous": 0,
+      "unmapped": 0
+    },
+    "manual_intervention_required": 0
+  },
+  "evidence_profile": "stm32f3_dual_surface_v1",
+  "targets": [
+    {
+      "subfamily": "STM32F301",
+      "base_device": "STM32F301C6",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f301c6.html",
+      "retrieved_at_utc": "2026-09-08T08:31:52Z",
+      "rendered_dom_sha256": "4669b072ea343128d84f0364c5b7ee72f5f10a4e6c12b85bb628856d6242cfec",
+      "evidence_section_sha256": "9520c74f23f2f6e068e3d152c5691620760729631950230f26adc58ccc68640d",
+      "active_exact_icpns": [
+        "STM32F301C6T6",
+        "STM32F301C6T6TR",
+        "STM32F301C6T7"
+      ],
+      "excluded_non_active_part_numbers": []
+    },
+    {
+      "subfamily": "STM32F302",
+      "base_device": "STM32F302C6",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f302c6.html",
+      "retrieved_at_utc": "2026-09-08T08:31:59Z",
+      "rendered_dom_sha256": "d06109e7bf25dd720796558c220494b7cda4196361bf37dca8b60c1a6ea5c63d",
+      "evidence_section_sha256": "f5452b879f59acbb6818df97aa8ffdb889c6087e3c071671288fc1417578c1ab",
+      "active_exact_icpns": [
+        "STM32F302C6T6"
+      ],
+      "excluded_non_active_part_numbers": []
+    },
+    {
+      "subfamily": "STM32F303",
+      "base_device": "STM32F303C6",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f303c6.html",
+      "retrieved_at_utc": "2026-09-08T08:32:05Z",
+      "rendered_dom_sha256": "b0203ee404a22d891aa4b5204fd813e72ae44ef194e212a0ff007195999f2acf",
+      "evidence_section_sha256": "e9bdb78181651fe7913530a27dd0bef8c1fbeaf3c183e284b6bc9902270d0cde",
+      "active_exact_icpns": [
+        "STM32F303C6T6"
+      ],
+      "excluded_non_active_part_numbers": []
+    },
+    {
+      "subfamily": "STM32F373",
+      "base_device": "STM32F373C8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f373c8.html",
+      "retrieved_at_utc": "2026-09-08T08:32:11Z",
+      "rendered_dom_sha256": "84096005ea9cd60b677f1a24da568a25b3fff29bf6e1866548fc8970a1245ab6",
+      "evidence_section_sha256": "2ad78790ed46b8727c22e51a4adf4e4f229c0cbbd7ac76bac620ce799059fe26",
+      "active_exact_icpns": [
+        "STM32F373C8T6",
+        "STM32F373C8T6TR"
+      ],
+      "excluded_non_active_part_numbers": []
+    },
+    {
+      "subfamily": "STM32F3x4",
+      "base_device": "STM32F334C4",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f334c4.html",
+      "retrieved_at_utc": "2026-09-08T08:32:17Z",
+      "rendered_dom_sha256": "c2d9e044b7b0ce24c9eec82898edc0686087e20f492758d86d49145654412113",
+      "evidence_section_sha256": "c239d88fd01d3cd4de9872f058acfc6602a3f1638dce4008fcfd3134c79cfaca",
+      "active_exact_icpns": [
+        "STM32F334C4T6"
+      ],
+      "excluded_non_active_part_numbers": []
+    },
+    {
+      "subfamily": "STM32F3x8",
+      "base_device": "STM32F318C8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f318c8.html",
+      "retrieved_at_utc": "2026-09-08T08:32:24Z",
+      "rendered_dom_sha256": "bb9550e137fb9baf43a27637bcb29edeb6e10eb7bb7f549170c1e2810f11b2fa",
+      "evidence_section_sha256": "7439542577e9e02b080cc6ba2690a7034b75b50f3d0362a58369d56f24c25606",
+      "active_exact_icpns": [
+        "STM32F318C8T6",
+        "STM32F318C8Y6TR"
+      ],
+      "excluded_non_active_part_numbers": []
+    }
+  ],
+  "claims": {
+    "production_write_authorized": false,
+    "production_admission_ready": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false,
+    "full_stm32f3_surface_discovered": false
+  }
+}
