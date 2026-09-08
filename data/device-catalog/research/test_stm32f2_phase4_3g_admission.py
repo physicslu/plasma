@@ -17,6 +17,7 @@ from stm32f2_admission_policy import CANONICAL_FIELDS  # noqa: E402
 from stm32f2_phase4_3g_admission import DEFAULT_CANONICAL, admission_plan_is_clean  # noqa: E402
 
 PLAN_PATH = HERE / "stm32f2-phase4.3g-admission-plan.json"
+PHASE43D_PLAN_PATH = HERE / "stm32f2-phase4.3d-admission-plan.json"
 AUDIT_PATH = HERE / "stm32f2-phase4.3g-admission-audit.json"
 MANIFEST_PATH = HERE.parent / "production" / "icpn-v1-manifest.json"
 EXPECTED_PLAN_SHA256 = "343350cc187254e63d7bd58f05f600bb822cf0f5df6279f506e093cae1179b65"
@@ -32,17 +33,25 @@ class STM32F2Phase43GAdmissionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.plan = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
+        cls.phase43d_plan = json.loads(PHASE43D_PLAN_PATH.read_text(encoding="utf-8"))
+        cls.phase43d_icpns = {item["icpn"] for item in cls.phase43d_plan["candidates"]}
         cls.audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+        if len(cls.phase43d_icpns) != 9:
+            raise AssertionError("Phase 4.3D historical input must contain exactly 9 ICPNs")
 
-    def _historical_canonical(self, path: Path) -> None:
-        with DEFAULT_CANONICAL.open(newline="", encoding="utf-8") as handle:
-            reader = csv.DictReader(handle)
-            rows = [row for row in reader if row["icpn"] not in EXPECTED]
-        self.assertEqual(len(rows), 9)
+    @staticmethod
+    def _write_rows(path: Path, rows: list[dict[str, str]]) -> None:
         with path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
+
+    def _historical_canonical(self, path: Path) -> None:
+        with DEFAULT_CANONICAL.open(newline="", encoding="utf-8") as handle:
+            rows = [row for row in csv.DictReader(handle) if row["icpn"] in self.phase43d_icpns]
+        self.assertEqual({row["icpn"] for row in rows}, self.phase43d_icpns)
+        self.assertEqual(len(rows), 9)
+        self._write_rows(path, rows)
 
     def test_bound_plan_is_exact_clean_and_read_only(self) -> None:
         self.assertEqual(file_sha256(PLAN_PATH), EXPECTED_PLAN_SHA256)
@@ -53,17 +62,25 @@ class STM32F2Phase43GAdmissionTests(unittest.TestCase):
         self.assertFalse(self.plan["programming_algorithm_equivalence_claimed"])
         self.assertFalse(self.plan["runtime_programming_support_claimed"])
 
-    def test_published_canonical_manifest_and_audit_are_bound(self) -> None:
+    def test_historical_publication_and_current_manifest_are_both_bound(self) -> None:
         with DEFAULT_CANONICAL.open(newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))
-        self.assertEqual(len(rows), 22)
-        self.assertTrue(EXPECTED.issubset({row["icpn"] for row in rows}))
-        self.assertEqual(len({row["base_device"] for row in rows}), 8)
+        exact_icpns = {row["icpn"] for row in rows}
+        historical_icpns = self.phase43d_icpns | EXPECTED
+        historical_rows = [row for row in rows if row["icpn"] in historical_icpns]
+
+        self.assertTrue(historical_icpns.issubset(exact_icpns))
+        self.assertEqual(len(historical_rows), 22)
+        self.assertEqual(len({row["base_device"] for row in historical_rows}), 8)
+        with tempfile.TemporaryDirectory() as tmp:
+            historical = Path(tmp) / DEFAULT_CANONICAL.name
+            self._write_rows(historical, historical_rows)
+            self.assertEqual(file_sha256(historical), self.audit["canonical_csv_file_sha256"])
+
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
         source = next(item for item in manifest["sources"] if item["family"] == "STM32F2")
-        self.assertEqual(source["row_count"], 22)
+        self.assertEqual(source["row_count"], len(rows))
         self.assertEqual(source["sha256"], file_sha256(DEFAULT_CANONICAL))
-        self.assertEqual(source["sha256"], self.audit["canonical_csv_file_sha256"])
         self.assertEqual(self.audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
         self.assertEqual(self.audit["production_exact_icpns_after"], 481)
         self.assertEqual(self.audit["production_family_count_after"], 3)
