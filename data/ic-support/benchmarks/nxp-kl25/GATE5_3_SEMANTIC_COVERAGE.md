@@ -114,9 +114,24 @@ This allows `FTFA_FCCOBn`, `FCCOB0`, and indexed FCCOB references to satisfy the
 
 This explicit-vocabulary approach is intentionally narrower than a general `concept + arbitrary suffix` rule and therefore preserves the fail-closed screening boundary.
 
+## Deterministic retained-run requalification
+
+After the v3.1 screening revision and model-free CI passed, the unchanged retained semantic run `20260908T052459Z` was requalified without invoking Ollama. The original run directory and its original `qualification-report.json` remain unchanged; the derived report is stored separately under the benchmark requalification area.
+
+Result:
+
+```text
+qualification_contract = nxp-kl25-live-model-qualification-v3.1
+semantic_run            = 20260908T052459Z
+model_inference         = not invoked
+qualification           = READY_FOR_REVIEW
+```
+
+`READY_FOR_REVIEW` means deterministic integrity and semantic screening no longer reject this retained output under the corrected v3.1 policy. It is not semantic correctness and does not admit the model or extracted facts.
+
 ## Acceptance boundary
 
-Gate 5.3 model-free CI must demonstrate all of the following:
+Gate 5.3 model-free CI demonstrates all of the following:
 
 - prior lexical false negatives remain corrected;
 - the retained v2 genuine `Program Longword/FCCOB` and `SWD/MDM-AP/SWD` omissions remain omissions when the concept is actually absent;
@@ -125,4 +140,4 @@ Gate 5.3 model-free CI must demonstrate all of the following:
 - global `fact_id` uniqueness remains a deterministic parser invariant;
 - no Gate-3 evidence or retained run artifact is modified.
 
-After CI is green, run `20260908T052459Z` must be requalified deterministically under contract v3.1 without invoking the local model. `READY_FOR_REVIEW`, if reached, is not semantic correctness. Manufacturer-evidence review remains mandatory before `QUALIFIED`, and all canonical/HIL/production/security admissions remain denied.
+Gate 5.3 deterministic screening acceptance is therefore complete at `READY_FOR_REVIEW`. Manufacturer-evidence review remains mandatory before `QUALIFIED`, and all semantic-extraction/model-quality/canonical/HIL/production/security admissions remain denied.
