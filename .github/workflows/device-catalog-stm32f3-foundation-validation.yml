@@ -1,4 +1,4 @@
-name: STM32F3 foundation validation
+name: STM32F3 validation
 
 on:
   push:
@@ -10,6 +10,15 @@ on:
       - "data/device-catalog/research/stm32f3-phase4.4a-foundation-baseline.json"
       - "data/device-catalog/research/test_stm32f3_phase4_4a_foundation.py"
       - "data/device-catalog/research/device-catalog-phase4.4a-stm32f3-foundation.md"
+      - "data/device-catalog/research/stm32f3-phase4.4b-discovery-manifest.json"
+      - "data/device-catalog/research/stm32f3_phase4_4b_discovery.py"
+      - "data/device-catalog/research/stm32f3_dual_surface_evidence.py"
+      - "data/device-catalog/research/stm32f3_browser_acquisition.py"
+      - "data/device-catalog/research/run_stm32f3_phase4_4b_browser_discovery.py"
+      - "data/device-catalog/research/test_stm32f3_phase4_4b_discovery.py"
+      - "data/device-catalog/research/test_stm32f3_dual_surface_evidence.py"
+      - "data/device-catalog/research/st_browser_acquisition.py"
+      - "data/device-catalog/research/test_st_browser_acquisition.py"
       - ".github/workflows/device-catalog-stm32f3-foundation-validation.yml"
   pull_request:
     paths:
@@ -18,6 +27,15 @@ on:
       - "data/device-catalog/research/stm32f3-phase4.4a-foundation-baseline.json"
       - "data/device-catalog/research/test_stm32f3_phase4_4a_foundation.py"
       - "data/device-catalog/research/device-catalog-phase4.4a-stm32f3-foundation.md"
+      - "data/device-catalog/research/stm32f3-phase4.4b-discovery-manifest.json"
+      - "data/device-catalog/research/stm32f3_phase4_4b_discovery.py"
+      - "data/device-catalog/research/stm32f3_dual_surface_evidence.py"
+      - "data/device-catalog/research/stm32f3_browser_acquisition.py"
+      - "data/device-catalog/research/run_stm32f3_phase4_4b_browser_discovery.py"
+      - "data/device-catalog/research/test_stm32f3_phase4_4b_discovery.py"
+      - "data/device-catalog/research/test_stm32f3_dual_surface_evidence.py"
+      - "data/device-catalog/research/st_browser_acquisition.py"
+      - "data/device-catalog/research/test_st_browser_acquisition.py"
       - ".github/workflows/device-catalog-stm32f3-foundation-validation.yml"
 
 concurrency:
@@ -28,7 +46,7 @@ permissions:
   contents: read
 
 jobs:
-  validate-stm32f3-foundation:
+  validate-stm32f3:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,3 +55,9 @@ jobs:
           python-version: "3.12"
       - name: Validate Phase 4.4A STM32F3 source surface and deterministic targets
         run: python data/device-catalog/research/test_stm32f3_phase4_4a_foundation.py
+      - name: Validate Phase 4.4B bounded discovery contract
+        run: python data/device-catalog/research/test_stm32f3_phase4_4b_discovery.py
+      - name: Validate STM32F3 dual-surface identity/lifecycle evidence
+        run: python data/device-catalog/research/test_stm32f3_dual_surface_evidence.py
+      - name: Regress generic ST browser evidence semantics
+        run: python data/device-catalog/research/test_st_browser_acquisition.py
