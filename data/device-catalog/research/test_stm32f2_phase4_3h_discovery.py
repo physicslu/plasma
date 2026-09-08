@@ -4,12 +4,19 @@ from __future__ import annotations
 import copy
 import csv
 import json
+import shutil
 import tempfile
 from pathlib import Path
 
 from device_catalog_bounded_discovery import BoundedDiscoveryError, load_batch_spec
+from device_catalog_bounded_planning import BoundedPlanningError
 from st_product_page_acquisition import AcquisitionError
-from stm32f2_bounded_discovery import DEFAULT_REGISTRY, load_spec
+from stm32f2_bounded_discovery import (
+    DEFAULT_REGISTRY,
+    build_next_batch_plan,
+    load_spec,
+    materialize_next_batch_plan,
+)
 from stm32f2_phase4_3b_discovery import TARGET_CONFIG, resolve_mapping
 from stm32f2_phase4_3h_discovery import (
     DEFAULT_CANONICAL,
@@ -62,6 +69,151 @@ def _evidence_builder(**kwargs: object) -> dict[str, object]:
         "excluded_non_active_part_numbers": [],
         "exact_icpns": list(SYNTHETIC[base]),
     }
+
+
+def _assert_next_batch_planning() -> None:
+    phase = "4.3Z"
+    acquisition_date = "2026-09-08"
+    plan = build_next_batch_plan(
+        phase=phase,
+        acquisition_date=acquisition_date,
+    )
+    assert plan["family"] == "STM32F2"
+    assert plan["phase"] == phase
+    assert plan["inputs"]["production_exact_icpn_count"] == 22
+    assert plan["inputs"]["production_base_device_count"] == 8
+    assert (
+        plan["registry_entry"]["expected_production_sha256"]
+        == "1706ab65dccb112a7ff907d82cf07c5ef6a46110097746aaeb5f3f9aed17c5cb"
+    )
+    assert [
+        (target["subfamily"], target["base_device"])
+        for target in plan["manifest"]["targets"]
+    ] == EXPECTED
+    assert (
+        plan["manifest"]["pilot_id"]
+        == "stm32f2-phase4.3z-official-st-discovery-2026-09-08"
+    )
+    assert (
+        plan["registry_entry"]["manifest"]
+        == "stm32f2-phase4.3z-discovery-manifest.json"
+    )
+    assert (
+        plan["registry_entry"]["baseline"]
+        == "stm32f2-phase4.3z-discovery-baseline.json"
+    )
+    assert plan["registry_entry"]["evidence_dir"].endswith(
+        "stm32f2-phase4.3z-official-st-discovery-live-2026-09-08"
+    )
+
+    try:
+        build_next_batch_plan(phase="4.3H", acquisition_date=acquisition_date)
+    except BoundedPlanningError:
+        pass
+    else:
+        raise AssertionError("planner must refuse an already registered phase")
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        root = Path(temporary_directory)
+        registry_path = root / DEFAULT_REGISTRY.name
+        shutil.copyfile(DEFAULT_REGISTRY, registry_path)
+
+        materializable = build_next_batch_plan(
+            phase=phase,
+            acquisition_date=acquisition_date,
+            registry_path=registry_path,
+        )
+        plan_path = root / "next-batch-plan.json"
+        plan_path.write_text(
+            json.dumps(materializable, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        report = materialize_next_batch_plan(
+            plan_path=plan_path,
+            registry_path=registry_path,
+            root=root,
+        )
+        assert report["status"] == "materialized"
+        assert report["canonical_dataset_admission"] is False
+
+        registry_after = json.loads(registry_path.read_text(encoding="utf-8"))
+        assert registry_after["batches"][phase] == materializable["registry_entry"]
+        manifest_path = root / materializable["registry_entry"]["manifest"]
+        assert json.loads(manifest_path.read_text(encoding="utf-8")) == materializable["manifest"]
+
+        try:
+            materialize_next_batch_plan(
+                plan_path=plan_path,
+                registry_path=registry_path,
+                root=root,
+            )
+        except BoundedPlanningError:
+            pass
+        else:
+            raise AssertionError("materializer must refuse an already registered phase")
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        root = Path(temporary_directory)
+        registry_path = root / DEFAULT_REGISTRY.name
+        shutil.copyfile(DEFAULT_REGISTRY, registry_path)
+        clean_plan = build_next_batch_plan(
+            phase=phase,
+            acquisition_date=acquisition_date,
+            registry_path=registry_path,
+        )
+        mutated = copy.deepcopy(clean_plan)
+        mutated["manifest"]["targets"][0]["base_device"] = "STM32F205RF"
+        plan_path = root / "mutated-plan.json"
+        plan_path.write_text(json.dumps(mutated), encoding="utf-8")
+        try:
+            materialize_next_batch_plan(
+                plan_path=plan_path,
+                registry_path=registry_path,
+                root=root,
+            )
+        except BoundedPlanningError:
+            pass
+        else:
+            raise AssertionError("materializer must fail closed on plan target drift")
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        root = Path(temporary_directory)
+        registry_path = root / DEFAULT_REGISTRY.name
+        canonical_path = root / DEFAULT_CANONICAL.name
+        shutil.copyfile(DEFAULT_REGISTRY, registry_path)
+        shutil.copyfile(DEFAULT_CANONICAL, canonical_path)
+
+        stale_plan = build_next_batch_plan(
+            phase=phase,
+            acquisition_date=acquisition_date,
+            registry_path=registry_path,
+            canonical_path=canonical_path,
+        )
+        plan_path = root / "stale-plan.json"
+        plan_path.write_text(json.dumps(stale_plan), encoding="utf-8")
+
+        with canonical_path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            fields = reader.fieldnames
+            rows = list(reader)
+        assert fields is not None
+        rows[0]["icpn"] = "STM32F205RBT8"
+        with canonical_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+
+        try:
+            materialize_next_batch_plan(
+                plan_path=plan_path,
+                registry_path=registry_path,
+                canonical_path=canonical_path,
+                root=root,
+            )
+        except BoundedPlanningError:
+            pass
+        else:
+            raise AssertionError("stale Production-bound plan must fail closed")
 
 
 def main() -> int:
@@ -159,6 +311,8 @@ def main() -> int:
             pass
         else:
             raise AssertionError("registry family drift must fail closed")
+
+    _assert_next_batch_planning()
 
     print("Phase 4.3H STM32F2 discovery contract PASS")
     return 0
