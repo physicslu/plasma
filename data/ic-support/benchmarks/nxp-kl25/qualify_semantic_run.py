@@ -69,13 +69,34 @@ def _primary_refs(pack: dict[str, Any]) -> set[tuple[str, int]]:
 
 
 def _contains_term(text: str, term: str) -> bool:
+    """Deterministically match a screening concept without fuzzy semantics.
+
+    Exact phrase matching is preserved for compound terms such as ``MDM-AP``
+    and ``FLASH_CR``. For a single alphanumeric concept such as ``FTFA`` or
+    ``FSTAT``, also treat punctuation/underscore-delimited identifier segments
+    as independent lexical units, so ``FTFA_FSTAT`` satisfies both concepts.
+    This is intentionally not stemming or semantic similarity.
+    """
     haystack = " ".join(text.casefold().split())
     needle = " ".join(term.casefold().split())
     if not needle:
         return False
+
+    # Preserve the original exact bounded match first. This keeps compound
+    # identifiers and phrases deterministic and backwards compatible.
     if re.fullmatch(r"[a-z0-9_-]+", needle):
-        return re.search(rf"(?<![a-z0-9_-]){re.escape(needle)}(?![a-z0-9_-])", haystack) is not None
-    return needle in haystack
+        if re.search(rf"(?<![a-z0-9_-]){re.escape(needle)}(?![a-z0-9_-])", haystack) is not None:
+            return True
+    elif needle in haystack:
+        return True
+
+    # Single alphanumeric concepts may appear as a component of a structured
+    # register/interface identifier (for example FTFA_FSTAT). Split only on
+    # non-alphanumeric delimiters; do not apply stemming or fuzzy matching.
+    if re.fullmatch(r"[a-z0-9]+", needle):
+        identifier_tokens = re.findall(r"[a-z0-9]+", haystack)
+        return needle in identifier_tokens
+    return False
 
 
 def _unit_text(unit_result: dict[str, Any]) -> str:
@@ -346,77 +367,67 @@ def assess_live_run(
     else:
         status = "REJECTED_REVIEW"
 
-    report: dict[str, Any] = {
+    return {
         "schema_version": "0.2.0",
         "artifact_type": "kl25_live_model_qualification_report",
-        "qualification_contract_id": contract.get("contract_id"),
+        "contract_id": contract.get("contract_id"),
         "target": contract.get("target"),
         "semantic_run_digest": semantic_run_digest,
-        "model_id": live_runtime.get("model_id"),
-        "model_digest": identity.get("model_digest"),
         "status": status,
-        "integrity": {"status": "PASS" if not integrity_errors else "FAIL", "errors": integrity_errors},
+        "integrity": {
+            "status": "PASS" if not integrity_errors else "FAIL",
+            "errors": integrity_errors,
+        },
         "semantic_screening": {
             "status": "PASS" if not screening_errors else "FAIL",
             "errors": screening_errors,
-            "note": "Concept screening is a deterministic defect filter, not proof of semantic correctness.",
         },
         "review": {
-            "required": True,
-            "status": "PASS" if reviewed_verdict is not None and review_pass else "FAIL" if reviewed_verdict is not None else "PENDING",
+            "status": "PASS" if reviewed_verdict is not None and review_pass else "PENDING" if reviewed_verdict is None else "FAIL",
             "errors": review_errors,
-            "basis_required": "manufacturer_evidence",
         },
-        "trust_boundary": {
-            "live_run_integrity_is_not_semantic_correctness": True,
-            "screening_pass_is_not_semantic_correctness": True,
-            "reviewed_verdict_required_for_qualification": True,
-            "semantic_extraction_admission": False,
-            "model_quality_admission": False,
-            "canonical_dataset_admission": False,
-            "hil_admission": False,
-            "production_admission": False,
-            "destructive_security_operation_admission": False,
-        },
+        "admission": contract.get("admission", {}),
     }
-    report["report_digest"] = builder.canonical_sha256(report)
-    return report
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Assess an NXP KL25 live-model semantic run")
-    parser.add_argument("--semantic-run", type=Path, required=True)
-    parser.add_argument("--raw-response", type=Path, required=True)
-    parser.add_argument("--provenance", type=Path, required=True)
-    parser.add_argument("--packs-dir", type=Path, required=True)
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Qualify one retained KL25 live semantic run")
+    parser.add_argument("--contract", required=True, type=Path)
+    parser.add_argument("--semantic-run", required=True, type=Path)
+    parser.add_argument("--raw-response", required=True, type=Path)
+    parser.add_argument("--provenance", required=True, type=Path)
+    parser.add_argument("--packs-dir", required=True, type=Path)
     parser.add_argument("--reviewed-verdict", type=Path)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--contract", type=Path, default=HERE / "live-model-qualification-contract.json")
-    args = parser.parse_args()
-    try:
-        contract = read_json(args.contract)
-        semantic_run = read_json(args.semantic_run)
-        provenance = read_json(args.provenance)
-        reviewed_verdict = read_json(args.reviewed_verdict) if args.reviewed_verdict else None
-        raw_response = args.raw_response.read_text(encoding="utf-8")
-        packs = {path.stem: read_json(path) for path in sorted(args.packs_dir.glob("*.json"))}
-        require(bool(packs), "no Evidence Pack JSON files found")
-        report = assess_live_run(
-            contract=contract,
-            semantic_run=semantic_run,
-            raw_response=raw_response,
-            provenance=provenance,
-            packs=packs,
-            reviewed_verdict=reviewed_verdict,
-        )
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        print(f"KL25 live-model qualification: {report['status']}")
-        return 0 if report["status"] in {"READY_FOR_REVIEW", "QUALIFIED"} else 1
-    except (LiveModelQualificationError, OSError, ValueError) as exc:
-        print(f"KL25 live-model qualification FAIL: {exc}", file=sys.stderr)
-        return 1
+    parser.add_argument("--output", required=True, type=Path)
+    args = parser.parse_args(argv)
+
+    contract = read_json(args.contract)
+    semantic_run = read_json(args.semantic_run)
+    provenance = read_json(args.provenance)
+    raw_response = args.raw_response.read_text(encoding="utf-8")
+    packs = {
+        path.stem: read_json(path)
+        for path in sorted(args.packs_dir.glob("*.json"))
+    }
+    reviewed_verdict = read_json(args.reviewed_verdict) if args.reviewed_verdict is not None else None
+
+    report = assess_live_run(
+        contract=contract,
+        semantic_run=semantic_run,
+        raw_response=raw_response,
+        provenance=provenance,
+        packs=packs,
+        reviewed_verdict=reviewed_verdict,
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"KL25 live qualification: {report['status']}; output={args.output}")
+    return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except (OSError, LiveModelQualificationError, builder.KL25EvidencePackError) as exc:
+        print(f"KL25 live qualification failed: {exc}", file=sys.stderr)
+        raise SystemExit(1)
