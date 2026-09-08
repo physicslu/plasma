@@ -1,9 +1,7 @@
 name: STM32F3 Phase 4.4B live discovery one-off
 
 on:
-  push:
-    branches:
-      - agent/device-catalog-stm32f3-phase44b-discovery
+  workflow_dispatch:
 
 permissions:
   contents: read
