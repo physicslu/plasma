@@ -76,7 +76,7 @@
       ],
       "nxp-kl25-erase-all-blocks-v0": [
         ["Erase All Blocks"],
-        ["protect", "protection"]
+        ["protect", "protected", "protection", "unprotected"]
       ],
       "nxp-kl25-flash-security-v0": [
         ["FSEC"],
