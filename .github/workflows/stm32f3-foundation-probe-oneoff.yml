@@ -1,0 +1,53 @@
+name: STM32F3 foundation probe one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f3-foundation
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe guarded STM32F3 catalog surface
+        run: |
+          python - <<'PY'
+          import csv, json
+          from collections import Counter
+          from pathlib import Path
+
+          path = Path('data/device-catalog/research/openocd-parts-canonical.csv')
+          with path.open(newline='', encoding='utf-8') as handle:
+              rows = list(csv.DictReader(handle))
+          f3 = [r for r in rows if r.get('vendor') == 'STMicroelectronics' and r.get('plasma_series') == 'STM32F3']
+          payload = {
+              'row_count': len(f3),
+              'subfamilies': dict(sorted(Counter(r.get('subfamily','') for r in f3).items())),
+              'identifier_kinds': dict(sorted(Counter(r.get('identifier_kind','') for r in f3).items())),
+              'target_configs': dict(sorted(Counter(r.get('target_config','') for r in f3).items())),
+              'openocd_distributions': dict(sorted(Counter(r.get('openocd_distribution','') for r in f3).items())),
+              'mapping_statuses': dict(sorted(Counter(r.get('mapping_status','') for r in f3).items())),
+              'validation_statuses': dict(sorted(Counter(r.get('validation_status','') for r in f3).items())),
+              'rows': [
+                  {k: r.get(k,'') for k in ('subfamily','part_number','identifier_kind','target_config')}
+                  for r in sorted(f3, key=lambda x: (x.get('subfamily',''), x.get('part_number','')))
+              ],
+          }
+          Path('/tmp/stm32f3-foundation-probe.json').write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(payload, indent=2))
+          assert payload['row_count'] == 90
+          assert len(payload['subfamilies']) == 6
+          assert payload['target_configs'] == {'tcl/target/stm32f3x.cfg': 90}
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32f3-foundation-probe
+          path: /tmp/stm32f3-foundation-probe.json
+          retention-days: 2
