@@ -64,6 +64,54 @@ python data/device-catalog/research/stm32f2_bounded_evidence.py \
 
 Discovery evidence remains separate from policy and canonical admission.
 
+## 5. Historical golden replay
+
+The offline regression gate reconstructs the historical Production boundaries for
+Phase 4.3E and Phase 4.3H from the current canonical dataset, re-runs the generic
+planner against those boundaries, and requires the resulting registry state and
+target identities to match the retained historical transactions.
+
+```bash
+python data/device-catalog/research/test_stm32f2_bounded_historical_golden_replay.py
+```
+
+This test uses only repository data. It does not access ST web pages and does not
+write Production.
+
+## 6. Live shadow comparison
+
+A live shadow run reuses an already registered phase and writes only temporary output.
+It compares current ST rendered-DOM results with retained evidence and classifies the
+result as:
+
+- `clean`: target identity and active/lifecycle data match retained evidence;
+- `source_drift`: the bounded software contract remains valid, but ST active or
+  lifecycle data changed;
+- `software_regression`: target identity, authority claims, acquisition contract, or
+  OpenOCD mapping invariants changed.
+
+Example headed Chromium run:
+
+```bash
+python data/device-catalog/research/stm32f2_bounded_shadow.py acquire \
+  --phase 4.3H \
+  --output /tmp/stm32f2-phase4.3h-live-shadow.json \
+  --report /tmp/stm32f2-phase4.3h-shadow-report.json
+```
+
+The live shadow command refuses to write its output under the retained `evidence/`
+tree. Exit status is `0` for clean, `2` for source drift, and `1` for software or
+acquisition regression. Because ST web availability is an external dependency, live
+shadow acquisition is not a normal merge gate.
+
+An already captured summary can be compared offline:
+
+```bash
+python data/device-catalog/research/stm32f2_bounded_shadow.py compare \
+  --phase 4.3H \
+  --live-summary /tmp/stm32f2-phase4.3h-live-shadow.json
+```
+
 ## Governance boundary
 
 Normal discovery automation may determine *what to inspect next* and may materialize
