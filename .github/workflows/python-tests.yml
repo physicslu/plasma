@@ -17,6 +17,7 @@ on:
       - "scripts/tests/**"
       - "!scripts/tests/test-public-doc-sanitization.sh"
       - "!scripts/tests/test-documentation-integrity.py"
+      - "!scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/codex-cloud-*.sh"
       - ".github/workflows/python-tests.yml"
   pull_request:
@@ -35,6 +36,7 @@ on:
       - "scripts/tests/**"
       - "!scripts/tests/test-public-doc-sanitization.sh"
       - "!scripts/tests/test-documentation-integrity.py"
+      - "!scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/codex-cloud-*.sh"
       - ".github/workflows/python-tests.yml"
 
