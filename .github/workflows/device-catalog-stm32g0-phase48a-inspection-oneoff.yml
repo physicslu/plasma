@@ -1,0 +1,48 @@
+name: STM32G0 Phase 4.8A source inspection one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32g0-phase48a-foundation
+    paths:
+      - .github/workflows/device-catalog-stm32g0-phase48a-inspection-oneoff.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Inspect STM32G0 and STM32G4 OpenOCD source surfaces
+        run: |
+          python - <<'PY'
+          import csv, json
+          from collections import Counter, defaultdict
+          from pathlib import Path
+          p=Path('data/device-catalog/research/openocd-parts-canonical.csv')
+          rows=list(csv.DictReader(p.open(newline='', encoding='utf-8')))
+          for family in ('STM32G0','STM32G4'):
+              fr=[r for r in rows if r.get('plasma_series') == family]
+              by_sub=Counter(r.get('subfamily','') for r in fr)
+              result={
+                  'family': family,
+                  'row_count': len(fr),
+                  'subfamily_count': len(by_sub),
+                  'subfamilies': dict(sorted(by_sub.items())),
+                  'identifier_kinds': dict(sorted(Counter(r.get('identifier_kind','') for r in fr).items())),
+                  'target_configs': sorted({r.get('target_config','') for r in fr}),
+                  'distributions': dict(sorted(Counter(r.get('openocd_distribution','') for r in fr).items())),
+                  'mapping_statuses': dict(sorted(Counter(r.get('mapping_status','') for r in fr).items())),
+                  'validation_statuses': dict(sorted(Counter(r.get('validation_status','') for r in fr).items())),
+                  'sample_rows': [
+                      {k:r.get(k,'') for k in ('part_number','subfamily','identifier_kind','target_config','mapping_status','validation_status')}
+                      for r in fr[:20]
+                  ],
+              }
+              print(json.dumps(result, indent=2, sort_keys=True))
+          PY
