@@ -9,11 +9,11 @@
     },
     {
       "path": "pilot-summary.json",
-      "sha256": "fa8ccc8e9d07c1bcdce0ec4bc556dbbe342f9641fc5ee82198a53fdda5a6e9eb"
+      "sha256": "3077cc04ecba5dc19f0d74bf570b659fc7ba803d7356cc194cf0604e96dc6687"
     },
     {
       "path": "provenance.json",
-      "sha256": "38afb23e6b46b70bf0430161c3afc5379d39ad134b5800a12a7b50ac0df8de22"
+      "sha256": "204f4c893e14795d1302fcedf3e9ff7d8dc8406b608f4b52afbe58af74cae515"
     }
   ]
 }
