@@ -96,11 +96,12 @@ class SiteExecutionRouter:
         if self.resolver is None:
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
-                "non-Mock Site has no promoted runtime capability resolver",
+                "non-Mock Site has no promoted runtime capability resolver; no IC Support resolver is auto-loaded",
                 context={
                     "site_id": self.site.id,
                     "site_interface": self.site.interface,
                     "runtime_capability_state": "not_configured",
+                    "ic_support_state": "not_configured",
                 },
             )
         support = self.resolver.resolve_exact(request.target)
@@ -113,6 +114,7 @@ class SiteExecutionRouter:
                     "site_interface": self.site.interface,
                     "target": request.target,
                     "runtime_capability_state": "unresolved",
+                    "ic_support_state": "unresolved",
                 },
             )
 
