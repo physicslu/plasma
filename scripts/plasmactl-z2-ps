@@ -225,7 +225,7 @@ import sys
 
 ready = json.loads(sys.argv[1])
 response = json.loads(sys.argv[2])
-if ready.get("gateway") != "ready" or ready.get("execution") != "ready":
+if ready.get("gateway") != "alive" or ready.get("execution") != "ready":
     raise SystemExit(f"unexpected readiness: {ready!r}")
 if response.get("ok") is not True:
     raise SystemExit(f"loopback response did not report ok=true: {response!r}")
