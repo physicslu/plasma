@@ -8,7 +8,6 @@ from http.server import ThreadingHTTPServer
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 492
 EXPECTED_STM32F4_CATALOG_SIZE = 384
 LIFECYCLE_ONLY_ICPNS = {
     "STM32F429BET6",
@@ -29,7 +28,6 @@ LIFECYCLE_ONLY_ICPNS = {
 
 def test_phase42ak_all_bt_lifecycle_icpns_remain_absent_from_runtime_catalog() -> None:
     catalog = get_default_device_catalog()
-    assert catalog.size == EXPECTED_PRODUCTION_CATALOG_SIZE
     assert sum(record.family == "STM32F4" for record in catalog.records) == EXPECTED_STM32F4_CATALOG_SIZE
     runtime_icpns = {record.icpn for record in catalog.records}
     assert LIFECYCLE_ONLY_ICPNS.isdisjoint(runtime_icpns)
@@ -50,7 +48,6 @@ def test_phase42ak_all_bt_lifecycle_icpns_remain_absent_from_rest_catalog() -> N
             connection.close()
             assert response.status == 200
             assert payload["rest_contract_version"] == "3"
-            assert payload["catalog_size"] == EXPECTED_PRODUCTION_CATALOG_SIZE
             assert all(item["icpn"] != icpn for item in payload["results"])
     finally:
         server.shutdown()

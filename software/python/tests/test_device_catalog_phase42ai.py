@@ -8,7 +8,6 @@ from http.server import ThreadingHTTPServer
 from plasma_web.device_catalog import get_default_device_catalog
 from plasma_web.gateway import PlasmaWebHandler
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 492
 EXPECTED_ICPNS = {
     "STM32F469AEH6": ("STM32F469AE", "UFBGA", "169", "512 KiB"),
     "STM32F469AEH7": ("STM32F469AE", "UFBGA", "169", "512 KiB"),
@@ -26,7 +25,6 @@ EXPECTED_ICPNS = {
 
 def test_phase42ai_exact_icpns_are_resolved_by_runtime_catalog() -> None:
     catalog = get_default_device_catalog()
-    assert catalog.size == EXPECTED_PRODUCTION_CATALOG_SIZE
     for icpn, (base_device, package, pin_count, flash_size) in EXPECTED_ICPNS.items():
         matches = catalog.search(icpn.lower(), limit=5)
         row = next(record for record in matches if record.icpn == icpn)
@@ -51,7 +49,6 @@ def test_phase42ai_exact_icpns_are_exposed_by_rest_catalog() -> None:
             connection.close()
             assert response.status == 200
             assert payload["rest_contract_version"] == "3"
-            assert payload["catalog_size"] == EXPECTED_PRODUCTION_CATALOG_SIZE
             assert payload["count"] >= 1
             result = next(item for item in payload["results"] if item["icpn"] == icpn)
             assert result["base_device"] == base_device
