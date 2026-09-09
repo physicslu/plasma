@@ -35,6 +35,12 @@ on:
       - "data/device-catalog/research/test_stm32f7_phase4_6c_policy.py"
       - "data/device-catalog/research/test_stm32f7_phase4_6c_policy_plan.py"
       - "data/device-catalog/research/device-catalog-phase4.6c-stm32f7-policy.md"
+      - "data/device-catalog/research/stm32f7_admission_policy.py"
+      - "data/device-catalog/research/stm32f7_phase4_6d_admission.py"
+      - "data/device-catalog/research/stm32f7-phase4.6d-admission-plan.json"
+      - "data/device-catalog/research/test_stm32f7_phase4_6d_admission.py"
+      - "data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py"
+      - "data/device-catalog/research/device-catalog-phase4.6d-stm32f7-admission.md"
       - ".github/workflows/device-catalog-stm32f7-validation.yml"
   pull_request:
     paths:
@@ -68,6 +74,12 @@ on:
       - "data/device-catalog/research/test_stm32f7_phase4_6c_policy.py"
       - "data/device-catalog/research/test_stm32f7_phase4_6c_policy_plan.py"
       - "data/device-catalog/research/device-catalog-phase4.6c-stm32f7-policy.md"
+      - "data/device-catalog/research/stm32f7_admission_policy.py"
+      - "data/device-catalog/research/stm32f7_phase4_6d_admission.py"
+      - "data/device-catalog/research/stm32f7-phase4.6d-admission-plan.json"
+      - "data/device-catalog/research/test_stm32f7_phase4_6d_admission.py"
+      - "data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py"
+      - "data/device-catalog/research/device-catalog-phase4.6d-stm32f7-admission.md"
       - ".github/workflows/device-catalog-stm32f7-validation.yml"
 
 concurrency:
@@ -99,3 +111,7 @@ jobs:
         run: python data/device-catalog/research/test_stm32f7_phase4_6c_policy_plan.py
       - name: Replay exact Phase 4.6C policy baseline
         run: python data/device-catalog/research/stm32f7_phase4_6c_policy.py
+      - name: Validate Phase 4.6D admission mapping and negative controls
+        run: python data/device-catalog/research/test_stm32f7_phase4_6d_admission.py
+      - name: Replay frozen Phase 4.6D admission plan
+        run: python data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py
