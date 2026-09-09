@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "phase": "4.6A",
+  "family": "STM32F7",
+  "source_row_count": 123,
+  "subfamily_counts": {
+    "STM32F722": 10,
+    "STM32F723": 12,
+    "STM32F730": 4,
+    "STM32F732": 5,
+    "STM32F733": 6,
+    "STM32F745": 10,
+    "STM32F746": 16,
+    "STM32F750": 3,
+    "STM32F756": 8,
+    "STM32F765": 14,
+    "STM32F767": 14,
+    "STM32F768": 1,
+    "STM32F769": 8,
+    "STM32F777": 7,
+    "STM32F778": 1,
+    "STM32F779": 4
+  },
+  "target_config": "tcl/target/stm32f7x.cfg",
+  "initial_targets": [
+    {"subfamily": "STM32F722", "base_device": "STM32F722IC"},
+    {"subfamily": "STM32F723", "base_device": "STM32F723IC"},
+    {"subfamily": "STM32F730", "base_device": "STM32F730I8"},
+    {"subfamily": "STM32F732", "base_device": "STM32F732IE"},
+    {"subfamily": "STM32F733", "base_device": "STM32F733IE"},
+    {"subfamily": "STM32F745", "base_device": "STM32F745IE"},
+    {"subfamily": "STM32F746", "base_device": "STM32F746BE"},
+    {"subfamily": "STM32F750", "base_device": "STM32F750N8"},
+    {"subfamily": "STM32F756", "base_device": "STM32F756BG"},
+    {"subfamily": "STM32F765", "base_device": "STM32F765BG"},
+    {"subfamily": "STM32F767", "base_device": "STM32F767BG"},
+    {"subfamily": "STM32F768", "base_device": "STM32F768AI"},
+    {"subfamily": "STM32F769", "base_device": "STM32F769AG"},
+    {"subfamily": "STM32F777", "base_device": "STM32F777BI"},
+    {"subfamily": "STM32F778", "base_device": "STM32F778AI"},
+    {"subfamily": "STM32F779", "base_device": "STM32F779AI"}
+  ],
+  "claims": {
+    "manufacturer_evidence_retained": false,
+    "exact_commercial_icpn_asserted": false,
+    "canonical_dataset_admission": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  }
+}
