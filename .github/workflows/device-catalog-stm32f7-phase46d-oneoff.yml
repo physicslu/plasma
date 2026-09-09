@@ -1,0 +1,47 @@
+name: STM32F7 Phase 4.6D admission-plan one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f7-phase46d-admission
+    paths:
+      - .github/workflows/device-catalog-stm32f7-phase46d-oneoff.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-admission-plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay closed Phase 4.6C policy
+        run: |
+          python data/device-catalog/research/test_stm32f7_phase4_6c_policy.py
+          python data/device-catalog/research/test_stm32f7_phase4_6c_policy_plan.py
+          python data/device-catalog/research/stm32f7_phase4_6c_policy.py
+      - name: Build Phase 4.6D read-only admission plan
+        run: |
+          python data/device-catalog/research/stm32f7_phase4_6d_admission.py \
+            --output /tmp/stm32f7-phase4.6d-admission-plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          plan = json.loads(Path('/tmp/stm32f7-phase4.6d-admission-plan.json').read_text())
+          print(json.dumps({
+              'candidate_count': plan['candidate_count'],
+              'decision_counts': plan['decision_counts'],
+              'required_target_config': plan['required_target_config'],
+              'canonical_rows_before': plan['canonical_rows_before'],
+              'canonical_dataset_admission': plan['canonical_dataset_admission'],
+              'lifecycle_exclusions_preserved': plan['lifecycle_exclusions_preserved'],
+              'source_unavailable_exclusions_preserved': plan['source_unavailable_exclusions_preserved'],
+              'production_snapshot': plan['production_snapshot'],
+              'canonical_write_applied': plan['canonical_write_applied'],
+              'production_write_applied': plan['production_write_applied'],
+          }, indent=2, sort_keys=True))
+          PY
