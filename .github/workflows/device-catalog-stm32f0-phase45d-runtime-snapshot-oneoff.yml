@@ -1,0 +1,85 @@
+name: STM32F0 Phase 4.5D runtime snapshot one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f0-phase45d-publication
+    paths:
+      - ".github/workflows/device-catalog-stm32f0-phase45d-runtime-snapshot-oneoff.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update-runtime-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32f0-phase45d-publication
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Advance current runtime catalog expectations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          release = Path('software/python/tests/test_device_catalog.py')
+          text = release.read_text(encoding='utf-8')
+          replacements = {
+              'EXPECTED_PRODUCTION_CATALOG_SIZE = 502\nEXPECTED_STM32F2_CATALOG_SIZE = 33\n':
+                  'EXPECTED_PRODUCTION_CATALOG_SIZE = 544\nEXPECTED_STM32F0_CATALOG_SIZE = 42\nEXPECTED_STM32F2_CATALOG_SIZE = 33\n',
+              '{"STM32F1", "STM32F2", "STM32F3", "STM32F4"}':
+                  '{"STM32F0", "STM32F1", "STM32F2", "STM32F3", "STM32F4"}',
+              'assert metadata["source_count"] == 4':
+                  'assert metadata["source_count"] == 5',
+              '                {"family": "STM32F1", "count": 75},\n':
+                  '                {"family": "STM32F0", "count": EXPECTED_STM32F0_CATALOG_SIZE},\n'
+                  '                {"family": "STM32F1", "count": 75},\n',
+          }
+          for old, new in replacements.items():
+              assert text.count(old) == 1, old
+              text = text.replace(old, new, 1)
+          release.write_text(text, encoding='utf-8')
+
+          gateway = Path('software/python/tests/test_device_catalog_web_gateway.py')
+          text = gateway.read_text(encoding='utf-8')
+          assert text.count('EXPECTED_PRODUCTION_CATALOG_SIZE = 502') == 1
+          gateway.write_text(
+              text.replace('EXPECTED_PRODUCTION_CATALOG_SIZE = 502', 'EXPECTED_PRODUCTION_CATALOG_SIZE = 544', 1),
+              encoding='utf-8',
+          )
+
+          remaining = []
+          for path in Path('software/python/tests').glob('test_device_catalog*.py'):
+              if 'EXPECTED_PRODUCTION_CATALOG_SIZE = 502' in path.read_text(encoding='utf-8'):
+                  remaining.append(str(path))
+          assert not remaining, remaining
+          print('CURRENT_RELEASE_SIZE=544')
+          print('STM32F0_RELEASE_SIZE=42')
+          PY
+          git diff --check
+
+      - name: Validate runtime loader snapshot
+        run: |
+          PYTHONPATH=software/python python - <<'PY'
+          from plasma_web.device_catalog import get_default_device_catalog
+          catalog = get_default_device_catalog()
+          assert catalog.size == 544
+          assert catalog.source_count == 5
+          assert {record.family for record in catalog.records} == {
+              'STM32F0', 'STM32F1', 'STM32F2', 'STM32F3', 'STM32F4'
+          }
+          assert len([record for record in catalog.records if record.family == 'STM32F0']) == 42
+          print('RUNTIME_SNAPSHOT=CLEAN')
+          PY
+
+      - name: Commit runtime snapshot
+        run: |
+          git config user.name "plasma-ci"
+          git config user.email "plasma-ci@users.noreply.github.com"
+          git add software/python/tests/test_device_catalog.py software/python/tests/test_device_catalog_web_gateway.py
+          git diff --cached --check
+          git commit -m "test: advance Production runtime snapshot to 544"
+          git push origin HEAD:agent/device-catalog-stm32f0-phase45d-publication
