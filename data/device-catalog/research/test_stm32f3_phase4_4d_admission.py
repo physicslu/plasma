@@ -80,12 +80,15 @@ class STM32F3Phase44DAdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(AdmissionError, "changed after admission planning"):
                 write_canonical_dataset(plan=plan, canonical_path=canonical)
 
-    def test_planner_rejects_nonempty_prestate(self) -> None:
+    def test_planner_rejects_valid_but_nonempty_prestate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             canonical = Path(tmp) / "stm32f3-commercial-icpn.csv"
             write_empty_canonical(canonical)
-            with canonical.open("a", encoding="utf-8") as handle:
-                handle.write(",".join(["x"] * len(CANONICAL_FIELDS)) + "\n")
+            clean_plan = build_admission_plan(canonical_path=canonical)
+            valid_row = clean_plan["candidates"][0]["proposed_canonical_row"]
+            with canonical.open("a", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator="\n")
+                writer.writerow(valid_row)
             with self.assertRaisesRegex(AdmissionError, "zero-row STM32F3 canonical prestate"):
                 build_admission_plan(canonical_path=canonical)
 
