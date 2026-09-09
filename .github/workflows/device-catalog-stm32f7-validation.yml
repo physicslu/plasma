@@ -1,0 +1,43 @@
+name: STM32F7 validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/research/device_catalog_bounded_discovery.py"
+      - "data/device-catalog/research/st_product_page_acquisition.py"
+      - "data/device-catalog/research/stm32f7_foundation.py"
+      - "data/device-catalog/research/stm32f7-phase4.6a-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py"
+      - "data/device-catalog/research/device-catalog-phase4.6a-stm32f7-foundation.md"
+      - ".github/workflows/device-catalog-stm32f7-validation.yml"
+  pull_request:
+    paths:
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/research/device_catalog_bounded_discovery.py"
+      - "data/device-catalog/research/st_product_page_acquisition.py"
+      - "data/device-catalog/research/stm32f7_foundation.py"
+      - "data/device-catalog/research/stm32f7-phase4.6a-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py"
+      - "data/device-catalog/research/device-catalog-phase4.6a-stm32f7-foundation.md"
+      - ".github/workflows/device-catalog-stm32f7-validation.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-stm32f7:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Phase 4.6A STM32F7 source surface and deterministic targets
+        run: python data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py
