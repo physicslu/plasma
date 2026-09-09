@@ -206,13 +206,17 @@ PY
   systemctl is-active --quiet plasma-server.service || die "plasma-server.service is not active"
   systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
 
-  local base readiness loopback
+  local base readiness loopback test_id loopback_request
   base="$(local_health_url)" || die "install evidence is missing gateway_host"
   readiness="$(curl --noproxy '*' --fail --silent --show-error --max-time 5 "$base/api/health/ready")" || \
     die "Z2 Gateway readiness failed: $base/api/health/ready"
+  test_id="z2-local-verify-$$"
+  loopback_request="{\"endpoint\":\"ps\",\"test_id\":\"$test_id\",\"sequence\":1,\"pattern\":\"zero\",\"seed\":\"\",\"payload_length\":1,\"payload_base64\":\"AA==\",\"tx_crc32\":\"d202ef8d\",\"timeout_ms\":5000}"
   loopback="$(curl --noproxy '*' --fail --silent --show-error --max-time 5 \
+    -H 'Accept: application/json' \
     -H 'Content-Type: application/json' \
-    --data '{"endpoint":"ps","payload":"504c41534d412d5a322d5053"}' \
+    -H "Idempotency-Key: $test_id" \
+    --data "$loopback_request" \
     "$base/api/engineering/diagnostics/loopback")" || die "Z2 local PS loopback request failed"
 
   python3 - "$readiness" "$loopback" <<'PY'
@@ -220,11 +224,20 @@ import json
 import sys
 
 ready = json.loads(sys.argv[1])
-loopback = json.loads(sys.argv[2])
+response = json.loads(sys.argv[2])
 if ready.get("gateway") != "ready" or ready.get("execution") != "ready":
     raise SystemExit(f"unexpected readiness: {ready!r}")
+if response.get("ok") is not True:
+    raise SystemExit(f"loopback response did not report ok=true: {response!r}")
+loopback = response.get("loopback")
+if not isinstance(loopback, dict):
+    raise SystemExit(f"loopback response is missing nested loopback evidence: {response!r}")
 if loopback.get("endpoint") != "ps" or loopback.get("source") != "ps":
-    raise SystemExit(f"loopback did not execute at PS endpoint: {loopback!r}")
+    raise SystemExit(f"loopback did not execute at PS endpoint: {response!r}")
+if loopback.get("tx_crc32") != "d202ef8d" or loopback.get("rx_crc32") != "d202ef8d":
+    raise SystemExit(f"loopback CRC evidence is invalid: {response!r}")
+if response.get("payload_base64") != "AA==":
+    raise SystemExit(f"loopback payload echo is invalid: {response!r}")
 PY
 
   say "PASS: real Z2 ARMv7 PS runtime + local PS diagnostic loopback"
