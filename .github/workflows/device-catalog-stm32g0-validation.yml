@@ -9,10 +9,12 @@ on:
       - "data/device-catalog/research/stm32g0-phase4.8a-foundation-baseline.json"
       - "data/device-catalog/research/stm32g0-phase4.8b-*.json"
       - "data/device-catalog/research/stm32g0-phase4.8c-*.json"
+      - "data/device-catalog/research/stm32g0-phase4.8d-*.json"
       - "data/device-catalog/research/evidence/stm32g0-phase4.8b-*/**"
       - "data/device-catalog/research/device-catalog-phase4.8a-stm32g0-foundation.md"
       - "data/device-catalog/research/device-catalog-phase4.8b-stm32g0-discovery.md"
       - "data/device-catalog/research/device-catalog-phase4.8c-stm32g0-policy.md"
+      - "data/device-catalog/research/device-catalog-phase4.8d-stm32g0-admission.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - ".github/workflows/device-catalog-stm32g0-validation.yml"
   pull_request:
@@ -21,10 +23,12 @@ on:
       - "data/device-catalog/research/stm32g0-phase4.8a-foundation-baseline.json"
       - "data/device-catalog/research/stm32g0-phase4.8b-*.json"
       - "data/device-catalog/research/stm32g0-phase4.8c-*.json"
+      - "data/device-catalog/research/stm32g0-phase4.8d-*.json"
       - "data/device-catalog/research/evidence/stm32g0-phase4.8b-*/**"
       - "data/device-catalog/research/device-catalog-phase4.8a-stm32g0-foundation.md"
       - "data/device-catalog/research/device-catalog-phase4.8b-stm32g0-discovery.md"
       - "data/device-catalog/research/device-catalog-phase4.8c-stm32g0-policy.md"
+      - "data/device-catalog/research/device-catalog-phase4.8d-stm32g0-admission.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - ".github/workflows/device-catalog-stm32g0-validation.yml"
 
@@ -60,3 +64,7 @@ jobs:
         run: python data/device-catalog/research/test_stm32g0_phase4_8c_policy_plan.py
       - name: Replay Phase 4.8C deterministic metadata baseline
         run: python data/device-catalog/research/stm32g0_phase4_8c_policy.py
+      - name: Validate Phase 4.8D capability / canonical admission boundary
+        run: python data/device-catalog/research/test_stm32g0_phase4_8d_admission.py
+      - name: Validate frozen Phase 4.8D admission plan
+        run: python data/device-catalog/research/validate_stm32g0_phase4_8d_admission_plan.py
