@@ -41,6 +41,10 @@ on:
       - "data/device-catalog/research/test_stm32f7_phase4_6d_admission.py"
       - "data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py"
       - "data/device-catalog/research/device-catalog-phase4.6d-stm32f7-admission.md"
+      - "data/device-catalog/research/stm32f7-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32f7-phase4.6e-publication-audit.json"
+      - "data/device-catalog/research/test_stm32f7_phase4_6e_publication.py"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32f7-validation.yml"
   pull_request:
     paths:
@@ -80,6 +84,10 @@ on:
       - "data/device-catalog/research/test_stm32f7_phase4_6d_admission.py"
       - "data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py"
       - "data/device-catalog/research/device-catalog-phase4.6d-stm32f7-admission.md"
+      - "data/device-catalog/research/stm32f7-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32f7-phase4.6e-publication-audit.json"
+      - "data/device-catalog/research/test_stm32f7_phase4_6e_publication.py"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32f7-validation.yml"
 
 concurrency:
@@ -115,3 +123,5 @@ jobs:
         run: python data/device-catalog/research/test_stm32f7_phase4_6d_admission.py
       - name: Replay frozen Phase 4.6D admission plan
         run: python data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py
+      - name: Validate Phase 4.6E post-publication closure
+        run: python data/device-catalog/research/test_stm32f7_phase4_6e_publication.py
