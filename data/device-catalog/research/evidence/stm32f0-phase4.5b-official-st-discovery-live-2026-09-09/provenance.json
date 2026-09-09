@@ -8,7 +8,7 @@
   "acquisition_transport": "chromium_rendered_dom",
   "artifact_id": 10090443968,
   "artifact_zip_sha256": "a3c02afd6a1295a612d25e35031d8623da86c0ea76777acaab4caaaab51cb1aa",
-  "baseline_sha256": "d0987137c0c9336d3a36c9108409e73a9cd403bc82c9133b41337bcaeb32e57f",
+  "baseline_sha256": "2052ed71d159bd345fa9a718422558843ce0513c3e0f3ccfe6765f1edc79eadf",
   "canonical_dataset_admission": false,
   "chromium_version": "151.0.7922.34",
   "evaluator_result": "phase4_5b_commercial_identity_clean",
