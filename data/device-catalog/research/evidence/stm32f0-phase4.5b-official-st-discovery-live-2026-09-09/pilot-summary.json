@@ -60,6 +60,10 @@
     "STM32F098CCU6TR"
   ],
   "family": "STM32F0",
+  "lifecycle": {
+    "excluded_non_active_part_numbers": 0,
+    "marketing_status_for_all_exact_icpns": "Active Product is in volume production."
+  },
   "phase": "4.5B",
   "pilot_id": "stm32f0-phase4.5b-official-st-discovery-2026-09-09",
   "schema_version": 1
