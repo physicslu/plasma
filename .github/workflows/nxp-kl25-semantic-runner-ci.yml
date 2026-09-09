@@ -73,3 +73,5 @@ jobs:
         run: python data/ic-support/benchmarks/nxp-kl25/test_live_model_qualification.py
       - name: Validate frozen live-model execution wiring without model weights
         run: python data/ic-support/benchmarks/nxp-kl25/test_run_live_model_qualification.py
+      - name: Validate Gate 5.5 bounded extraction without network or model weights
+        run: python data/ic-support/benchmarks/nxp-kl25/test_bounded_extraction.py
