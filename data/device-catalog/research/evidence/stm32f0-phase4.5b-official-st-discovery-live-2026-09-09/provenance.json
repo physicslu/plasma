@@ -22,7 +22,7 @@
   "headed": true,
   "live_artifact_summary_sha256": "e96c9f09f4f57d2797cd9e3928664dcd67c72f3887eae3795df66aa1e75cbb76",
   "manufacturer": "STMicroelectronics",
-  "pilot_summary_sha256": "fa8ccc8e9d07c1bcdce0ec4bc556dbbe342f9641fc5ee82198a53fdda5a6e9eb",
+  "pilot_summary_sha256": "3077cc04ecba5dc19f0d74bf570b659fc7ba803d7356cc194cf0604e96dc6687",
   "playwright_version": "1.62.0",
   "production_admission_ready": false,
   "retained_pilot_summary_kind": "normalized_decision_projection",
