@@ -127,21 +127,50 @@ Each pack identity is bound to:
 
 The target bundle contains the eight pack digests for exact target `MKL25Z128VLK4`. Manufacturer text is materialized for execution but is not committed to Git as a retained artifact.
 
-## Retained Gate 3 live-source proof
+## Retained live-source proofs
 
-After offline CI passed, the admitted contract was rerun against the exact source-locked NXP Reference Manual. The live run verified the RM byte length/SHA-256, executed the pinned PDF-to-text transform, built all eight real packs, assembled the target bundle and pre-AI context, and retained metadata only.
-
-Final retained provenance is in `retained-evidence-pack-build.json`:
+The original Gate 3 proof is historical and remains immutable in
+`retained-evidence-pack-build.json`. It is bound to the exact archived v0
+Evidence Unit definitions and applicability binding that produced the semantic
+runs preceding Gate 5.6:
 
 ```text
 workflow run     34111376564
 artifact id      10014477883
 generation head  0eb876d7699f55edcbf493c86c2ce6d593ffb94e
 bundle digest    628aa2c7664cdf9778a11e56a8da0a9cf8816aaec704baf893bfae5a9fba0244
+manifest digest  b26621b12d5b6f6fc924cbf59f00649767b3b2f9900fd7c5c560ee45cca80e07
 pack count       8
 ```
 
-The retained artifact did not contain manufacturer text and did not execute semantic extraction. Repository regression validates that this retained proof remains bound to the current source-lock, definition set, applicability binding, Evidence Pack contract and builder SHA.
+Gate 5.6 corrected the Program Longword logical evidence boundary from physical
+PDF pages 444–445 to 444–446 after manufacturer review established that Table
+27-36 continues onto p446 before the Erase Flash Sector section begins. The
+corrected real-source proof is retained separately in
+`retained-evidence-pack-build-v1.json`:
+
+```text
+workflow run       34312404077
+artifact id        10088834705
+generation head    95e631424a42f4a5a22da555eed9f68dda2a4a8f
+boundary release   nxp-kl25-evidence-boundary-release-v1
+definition digest  c9c2ed86a0aa5ccdcc1861a0153d0b79cc94f57a568faa5432d9f0389bb4132f
+binding digest     1e88d2bb1cfdae65e6456bca3407d2419a7b2bd391729fd2feae1917ac4be038
+bundle digest      ffe9bfaa8a6ed47c8edd6d952fe1ca2cc114513c2a1f0832892ab9484e7322bf
+manifest digest    03155ede421cddb7c2ab64e079ef43b1124a7c78cbedf1e7a08c60c29796bb6e
+model-context SHA  8ebeab88b4a1e6c540c8af2d4d1941bdb02f0d31389f92a1d4bc0366103cfaaa
+pack count         8
+```
+
+The Gate 5.6 source validation verified the locked RM byte length/SHA-256/PDF
+identity, ran the unchanged Evidence Pack builder, admitted p446 for the Program
+Longword primary unit, continued to exclude p447, and retained metadata only.
+It did not retain manufacturer text and did not execute semantic extraction.
+
+Repository regression validates both generations independently: v0 remains bound
+to its archived historical inputs, while v1 remains bound to the corrected active
+definitions and deterministically regenerated applicability binding. Gate 5.6 is
+not a retroactive repair of any retained semantic run.
 
 ## Pre-AI CI strategy
 
@@ -161,7 +190,9 @@ contract validation
   -> fail-closed mutation tests
 ```
 
-The one-shot live-source workflow used during Gate 3 is removed after retaining the proof so routine CI is not coupled to external website availability.
+One-shot live-source workflows are used only to create a retained evidence proof
+for a reviewed release. They are removed after the metadata proof is committed so
+routine CI is not coupled to external website availability.
 
 ## Gate 4 model-free semantic runner CI
 
