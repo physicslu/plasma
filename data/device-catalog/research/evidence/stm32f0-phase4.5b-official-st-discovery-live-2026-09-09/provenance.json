@@ -1,0 +1,46 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 13,
+  "acquisition_time_utc": {
+    "first": "2026-09-09T05:41:10Z",
+    "last": "2026-09-09T05:59:00Z"
+  },
+  "acquisition_transport": "chromium_rendered_dom",
+  "artifact_id": 10090443968,
+  "artifact_zip_sha256": "a3c02afd6a1295a612d25e35031d8623da86c0ea76777acaab4caaaab51cb1aa",
+  "baseline_sha256": "d0987137c0c9336d3a36c9108409e73a9cd403bc82c9133b41337bcaeb32e57f",
+  "canonical_dataset_admission": false,
+  "chromium_version": "151.0.7922.34",
+  "evaluator_result": "phase4_5b_commercial_identity_clean",
+  "evidence_id": "stm32f0-phase4.5b-official-st-discovery-2026-09-09-retained-20260909T055900Z-1fcdf869",
+  "evidence_profile": "stm32f0_dual_surface_v1",
+  "exact_icpn_candidate_count": 42,
+  "excluded_non_active_part_number_count": 0,
+  "executed_git_sha": "1fcdf8696bc4d334f6e5f092efc8200b65fc443e",
+  "execution_mode": "github_actions_headed_chromium",
+  "github_checkout_sha": "95276ea5af83819351c7f9f4a2f32db0638842b9",
+  "headed": true,
+  "manufacturer": "STMicroelectronics",
+  "pilot_summary_sha256": "e96c9f09f4f57d2797cd9e3928664dcd67c72f3887eae3795df66aa1e75cbb76",
+  "playwright_version": "1.62.0",
+  "production_admission_ready": false,
+  "routing_gates_commercial_identity": false,
+  "scale_ready": true,
+  "schema_version": 1,
+  "source_bindings": {
+    "discovery_manifest_git_blob_sha": "446969fb89f4bd6b8bd421eb0e4b2506d14c8a36",
+    "openocd_catalog_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+    "production_exact_icpn_count": 502,
+    "production_family_counts": {
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384
+    },
+    "production_manifest_git_blob_sha": "6fb6d103027fc3c7a949f0d4aa2d9c10828cc103",
+    "stm32f0_production_prestate_count": 0
+  },
+  "source_repository": "physicslu/plasma",
+  "target_count": 13,
+  "workflow_run_id": 34315839031
+}
