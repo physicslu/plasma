@@ -21,8 +21,38 @@ Canonical Site ID 從 **1** 開始，不存在 `SITE 0`。目前 prototype 預�
 - `pl/`：Zynq Programmable Logic 的 RTL、constraints、模擬、verification 與 Vivado 建置資產。
 - `software/python/`：Plasma PPU control plane、Protocol v3.3 TCP Server、CLI、Plasma Gateway、Plasma Manager 與測試。
 - `software/web/`：React + TypeScript Plasma Control Station Web，包括 PMode 與 EMode。
+- `data/device-catalog/`：ICPN commercial identity、canonical metadata 與 selectable Production catalog。
+- `data/ic-support/`：AI-assisted manufacturer-evidence / programming-method research artifacts；不是 production runtime authority。
 - `scripts/plasmactl`：integration host 的更新、測試、systemd reconciliation、重啟與服務管理入口。
 - `docs/`：architecture、development 與 deployment 文件。
+
+## Current engineering workstreams
+
+Plasma 目前將工程活動明確分成三條獨立 workstream：
+
+| Workstream | 回答的問題 | 主要 authority |
+|---|---|---|
+| **SW/PPU** | Plasma 產品現在實際能執行什麼？ | software/PS/PL/runtime/package/release |
+| **ICPN** | User 可以選哪些 exact commercial IC？ | commercial identity / canonical catalog |
+| **AI IC Support** | 從 manufacturer evidence 可以研究出什麼燒錄知識／方法？ | evidence / semantic extraction / candidate programming method |
+
+另有 **REPO** domain 專門處理 documentation、terminology、security 與 CI boundary governance。
+
+核心邊界：
+
+```text
+ICPN admitted
+    != AI programming method researched
+    != OpenOCD supported
+    != PPU implemented
+    != Socket available
+    != electrical / HIL qualified
+```
+
+因此 ICPN 數量是 selectable inventory；OpenOCD、PPU、Socket、electrical、HIL/physical programming 是每顆 IC 的 capability / qualification status，不是 catalog admission 的同義詞。
+
+Canonical workstream ownership contract：[`WORKSTREAMS.md`](WORKSTREAMS.md)。
+Machine-readable CI ownership registry：`.github/ci-workstreams.json`。
 
 ## Current software path
 
@@ -81,6 +111,7 @@ Programming Asset 可擴充 Image、Key、Option、Serial Number、Calibration�
 
 ## 文件入口
 
+- Workstream ownership：[`WORKSTREAMS.md`](WORKSTREAMS.md)
 - 全部文件與狀態索引：[`docs/README.md`](docs/README.md)
 - Operator 操作指南：[`docs/operator/plasma-console-guide.md`](docs/operator/plasma-console-guide.md)
 - Domain / naming / identity：[`docs/architecture/domain-naming-migration.md`](docs/architecture/domain-naming-migration.md)
