@@ -1,4 +1,4 @@
-name: STM32F7 Phase 4.6B diagnostic one-off
+name: STM32F7 Phase 4.6B live discovery one-off
 
 on:
   push:
@@ -11,9 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  diagnostic:
+  live-discovery:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,83 +30,49 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install 'playwright==1.62.0'
           python -m playwright install --with-deps chromium
-      - name: Diagnose one official-ST STM32F722IC target
+      - name: Run bounded 16-target STM32F7 official-ST discovery
         env:
           PYTHONPATH: data/device-catalog/research
         run: |
-          mkdir -p /tmp/stm32f7-phase4.6b-diagnostic
-          xvfb-run -a python - <<'PY'
+          mkdir -p /tmp/stm32f7-phase4.6b-live/evidence
+          set +e
+          xvfb-run -a python data/device-catalog/research/run_stm32f7_phase4_6b_browser_discovery.py \
+            --output /tmp/stm32f7-phase4.6b-live/live-summary.json \
+            --evidence-dir /tmp/stm32f7-phase4.6b-live/evidence \
+            --timeout 90 \
+            --delay 2
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > /tmp/stm32f7-phase4.6b-live/exit-code.txt
+          python - <<'PY'
           import json
           import os
-          import time
           from pathlib import Path
 
-          from stm32f7_browser_acquisition import STM32F7BrowserAcquirer
-          from stm32f7_dual_surface_evidence import (
-              EVIDENCE_SURFACE,
-              PARSER_PROFILE,
-              build_dual_surface_browser_evidence_record,
+          root = Path('/tmp/stm32f7-phase4.6b-live')
+          metadata = {
+              'github_sha': os.environ.get('GITHUB_SHA'),
+              'github_run_id': os.environ.get('GITHUB_RUN_ID'),
+              'github_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'github_workflow': os.environ.get('GITHUB_WORKFLOW'),
+              'diagnostic_run_id': '34325478619',
+              'diagnostic_artifact_id': '10093586727',
+              'diagnostic_artifact_zip_sha256': '05258ee448dbfbb2033ab67e1ccd7b2b14b9370ad979f21617891ed82327ff4a',
+          }
+          (root / 'execution-metadata.json').write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
           )
-          from stm32f7_phase4_6b_discovery import source_url_for_base
-
-          base = 'STM32F722IC'
-          source_url = source_url_for_base(base)
-          with STM32F7BrowserAcquirer(
-              base_by_url={source_url: base},
-              headless=False,
-          ) as acquirer:
-              body, final_url, etag, last_modified = acquirer.fetch(source_url, 90.0)
-              evidence = build_dual_surface_browser_evidence_record(
-                  body=body,
-                  source_url=source_url,
-                  final_url=final_url,
-                  base_device=base,
-                  retrieved_at_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-                  http_etag=etag,
-                  http_last_modified=last_modified,
-              )
-              exact = evidence.get('exact_icpns')
-              excluded = evidence.get('excluded_non_active_part_numbers')
-              assert isinstance(exact, list) and exact, exact
-              assert all(isinstance(value, str) and value.startswith(base) for value in exact), exact
-              assert isinstance(excluded, list), excluded
-              assert evidence.get('parser_profile') == PARSER_PROFILE, evidence.get('parser_profile')
-              assert evidence.get('evidence_surface') == EVIDENCE_SURFACE, evidence.get('evidence_surface')
-
-              result = {
-                  'schema_version': 1,
-                  'phase': '4.6B-diagnostic',
-                  'base_device': base,
-                  'source_url': source_url,
-                  'final_url': final_url,
-                  'exact_icpns': exact,
-                  'excluded_non_active_part_numbers': excluded,
-                  'parser_profile': PARSER_PROFILE,
-                  'evidence_surface': EVIDENCE_SURFACE,
-                  'browser_version': acquirer.browser_version,
-                  'github_sha': os.environ.get('GITHUB_SHA'),
-                  'github_run_id': os.environ.get('GITHUB_RUN_ID'),
-                  'claims': {
-                      'bounded_16_target_discovery_complete': False,
-                      'canonical_dataset_admission': False,
-                      'production_write_authorized': False,
-                      'runtime_support_claimed': False,
-                  },
-              }
-
-          root = Path('/tmp/stm32f7-phase4.6b-diagnostic')
-          (root / 'diagnostic-summary.json').write_text(
-              json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8'
-          )
-          (root / 'STM32F722IC.json').write_text(
-              json.dumps(evidence, indent=2, sort_keys=True) + '\n', encoding='utf-8'
-          )
-          print(json.dumps(result, indent=2, sort_keys=True))
           PY
-      - name: Upload diagnostic evidence
+      - name: Upload live discovery evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stm32f7-phase4.6b-diagnostic-stm32f722ic-20260909
-          path: /tmp/stm32f7-phase4.6b-diagnostic
+          name: stm32f7-phase4.6b-live-discovery-20260909
+          path: /tmp/stm32f7-phase4.6b-live
           if-no-files-found: error
+      - name: Enforce commercial identity acquisition result
+        if: always()
+        run: |
+          test -f /tmp/stm32f7-phase4.6b-live/exit-code.txt
+          test "$(cat /tmp/stm32f7-phase4.6b-live/exit-code.txt)" = "0"
