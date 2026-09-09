@@ -1,0 +1,132 @@
+{
+  "aggregate": {
+    "acquisition_failure": 0,
+    "acquisition_success": 14,
+    "active_candidate_targets": 9,
+    "active_exact_icpn_candidates": 19,
+    "attempted": 16,
+    "bounded_discovery_clean": true,
+    "commercial_identity_clean": false,
+    "commercial_identity_unresolved_targets": 2,
+    "commercial_identity_verified_targets": 14,
+    "dispositioned_targets": 16,
+    "excluded_non_active_part_numbers": 11,
+    "identity_manual_intervention_required": 0,
+    "lifecycle_excluded_targets": 5,
+    "openocd_routing": {
+      "ambiguous": 0,
+      "gates_commercial_identity": false,
+      "not_applicable": 7,
+      "unique": 9,
+      "unmapped": 0
+    },
+    "routing_followup_required": 0,
+    "source_unavailable_exclusions": 2
+  },
+  "claims": {
+    "canonical_dataset_admission": false,
+    "production_admission_ready": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  },
+  "exact_icpns": [
+    "STM32F722ICK6",
+    "STM32F722ICT6",
+    "STM32F723ICK6",
+    "STM32F723ICT6",
+    "STM32F730I8K6",
+    "STM32F730I8K6TR",
+    "STM32F732IEK6",
+    "STM32F732IET6",
+    "STM32F733IEK6",
+    "STM32F733IET6",
+    "STM32F745IEK6",
+    "STM32F745IEK6TR",
+    "STM32F745IEK7",
+    "STM32F745IEK7TR",
+    "STM32F745IET6",
+    "STM32F745IET7",
+    "STM32F750N8H6",
+    "STM32F778AIY6TR",
+    "STM32F779AIY6TR"
+  ],
+  "family": "STM32F7",
+  "lifecycle": {
+    "excluded_non_active_part_numbers": [
+      {
+        "base_device": "STM32F730I8",
+        "icpn": "STM32F730I8K7",
+        "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+      },
+      {
+        "base_device": "STM32F732IE",
+        "icpn": "STM32F732IEK7",
+        "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+      },
+      {
+        "base_device": "STM32F732IE",
+        "icpn": "STM32F732IET7",
+        "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+      },
+      {
+        "base_device": "STM32F733IE",
+        "icpn": "STM32F733IEK7",
+        "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+      },
+      {
+        "base_device": "STM32F733IE",
+        "icpn": "STM32F733IET7",
+        "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+      },
+      {
+        "base_device": "STM32F746BE",
+        "icpn": "STM32F746BET6",
+        "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+      },
+      {
+        "base_device": "STM32F750N8",
+        "icpn": "STM32F750N8H7",
+        "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+      },
+      {
+        "base_device": "STM32F756BG",
+        "icpn": "STM32F756BGT6",
+        "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+      },
+      {
+        "base_device": "STM32F765BG",
+        "icpn": "STM32F765BGT6",
+        "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+      },
+      {
+        "base_device": "STM32F767BG",
+        "icpn": "STM32F767BGT6",
+        "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+      },
+      {
+        "base_device": "STM32F777BI",
+        "icpn": "STM32F777BIT6",
+        "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+      }
+    ],
+    "marketing_status_for_all_exact_icpns": "Active Product is in volume production."
+  },
+  "phase": "4.6B",
+  "pilot_id": "stm32f7-phase4.6b-official-st-discovery-2026-09-09",
+  "schema_version": 1,
+  "source_unavailable_exclusions": [
+    {
+      "base_device": "STM32F768AI",
+      "reason": "canonical_product_page_http_404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f768ai.html",
+      "subfamily": "STM32F768"
+    },
+    {
+      "base_device": "STM32F769AG",
+      "reason": "canonical_product_page_http_404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f769ag.html",
+      "subfamily": "STM32F769"
+    }
+  ]
+}

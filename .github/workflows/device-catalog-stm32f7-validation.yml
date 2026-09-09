@@ -7,21 +7,53 @@ on:
     paths:
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/research/device_catalog_bounded_discovery.py"
+      - "data/device-catalog/research/device_catalog_evidence_framework.py"
       - "data/device-catalog/research/st_product_page_acquisition.py"
+      - "data/device-catalog/research/st_browser_acquisition.py"
+      - "data/device-catalog/research/st_dual_surface_evidence.py"
+      - "data/device-catalog/research/st_dual_surface_browser_acquisition.py"
       - "data/device-catalog/research/stm32f7_foundation.py"
       - "data/device-catalog/research/stm32f7-phase4.6a-foundation-baseline.json"
       - "data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py"
       - "data/device-catalog/research/device-catalog-phase4.6a-stm32f7-foundation.md"
+      - "data/device-catalog/research/stm32f7_dual_surface_evidence.py"
+      - "data/device-catalog/research/stm32f7_browser_acquisition.py"
+      - "data/device-catalog/research/stm32f7-phase4.6b-discovery-manifest.json"
+      - "data/device-catalog/research/stm32f7_phase4_6b_discovery.py"
+      - "data/device-catalog/research/run_stm32f7_phase4_6b_browser_discovery.py"
+      - "data/device-catalog/research/test_stm32f7_dual_surface_evidence.py"
+      - "data/device-catalog/research/test_stm32f7_phase4_6b_discovery.py"
+      - "data/device-catalog/research/retain_stm32f7_phase4_6b_artifact.py"
+      - "data/device-catalog/research/stm32f7-phase4.6b-discovery-baseline.json"
+      - "data/device-catalog/research/validate_stm32f7_phase4_6b_retained_evidence.py"
+      - "data/device-catalog/research/evidence/stm32f7-phase4.6b-official-st-discovery-live-2026-09-09/**"
+      - "data/device-catalog/research/device-catalog-phase4.6b-stm32f7-discovery.md"
       - ".github/workflows/device-catalog-stm32f7-validation.yml"
   pull_request:
     paths:
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/research/device_catalog_bounded_discovery.py"
+      - "data/device-catalog/research/device_catalog_evidence_framework.py"
       - "data/device-catalog/research/st_product_page_acquisition.py"
+      - "data/device-catalog/research/st_browser_acquisition.py"
+      - "data/device-catalog/research/st_dual_surface_evidence.py"
+      - "data/device-catalog/research/st_dual_surface_browser_acquisition.py"
       - "data/device-catalog/research/stm32f7_foundation.py"
       - "data/device-catalog/research/stm32f7-phase4.6a-foundation-baseline.json"
       - "data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py"
       - "data/device-catalog/research/device-catalog-phase4.6a-stm32f7-foundation.md"
+      - "data/device-catalog/research/stm32f7_dual_surface_evidence.py"
+      - "data/device-catalog/research/stm32f7_browser_acquisition.py"
+      - "data/device-catalog/research/stm32f7-phase4.6b-discovery-manifest.json"
+      - "data/device-catalog/research/stm32f7_phase4_6b_discovery.py"
+      - "data/device-catalog/research/run_stm32f7_phase4_6b_browser_discovery.py"
+      - "data/device-catalog/research/test_stm32f7_dual_surface_evidence.py"
+      - "data/device-catalog/research/test_stm32f7_phase4_6b_discovery.py"
+      - "data/device-catalog/research/retain_stm32f7_phase4_6b_artifact.py"
+      - "data/device-catalog/research/stm32f7-phase4.6b-discovery-baseline.json"
+      - "data/device-catalog/research/validate_stm32f7_phase4_6b_retained_evidence.py"
+      - "data/device-catalog/research/evidence/stm32f7-phase4.6b-official-st-discovery-live-2026-09-09/**"
+      - "data/device-catalog/research/device-catalog-phase4.6b-stm32f7-discovery.md"
       - ".github/workflows/device-catalog-stm32f7-validation.yml"
 
 concurrency:
@@ -41,3 +73,9 @@ jobs:
           python-version: "3.12"
       - name: Validate Phase 4.6A STM32F7 source surface and deterministic targets
         run: python data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py
+      - name: Validate STM32F7 dual-surface identity/lifecycle evidence
+        run: python data/device-catalog/research/test_stm32f7_dual_surface_evidence.py
+      - name: Validate Phase 4.6B bounded discovery and identity/capability separation
+        run: python data/device-catalog/research/test_stm32f7_phase4_6b_discovery.py
+      - name: Validate retained Phase 4.6B evidence and semantic replay
+        run: python data/device-catalog/research/validate_stm32f7_phase4_6b_retained_evidence.py
