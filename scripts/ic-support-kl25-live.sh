@@ -15,32 +15,43 @@ source_dir="$bench_root/source"
 pre_ai_dir="$bench_root/pre-ai"
 runs_dir="$bench_root/runs"
 legacy_run_dir="$bench_root/qwen-live"
+bounded_pre_ai_dir="$bench_root/pre-ai-boundary-v1"
+bounded_runs_dir="$bench_root/bounded-runs"
 ollama_url="${PLASMA_OLLAMA_URL:-http://127.0.0.1:11434}"
 
 usage() {
   cat <<'EOF'
 Usage: bash scripts/ic-support-kl25-live.sh <command> [argument]
 
-Commands:
-  status               Validate pre-AI, frozen runtime envelope, and loopback Ollama/model identity.
-  context-audit        Measure deterministic cross-pack context compaction without model inference.
-  build                Rebuild the deterministic Gate-3 pre-AI workspace from locked PDFs.
-  run                  Execute one new frozen live qualification run in a unique run directory.
-  diagnose [run-dir]   Diagnose one retained run without modifying its raw response.
-  help                 Show this help.
+Historical monolithic commands:
+  status                       Validate historical pre-AI, v4.1 envelope, and loopback model identity.
+  context-audit                Measure deterministic monolithic context compaction without inference.
+  build                        Rebuild the historical command's pre-AI path from current locked inputs.
+  run                          Execute one monolithic v4.1 live qualification run.
+  diagnose [run-dir]           Diagnose one retained monolithic run read-only.
+
+Gate 5.7 bounded commands:
+  bounded-build                Build corrected Gate 5.6 pre-AI workspace into a separate directory.
+  bounded-status               Validate Gate 5.6 workspace, Gate 5.7 contract, and loopback model identity.
+  bounded-run                  Execute one Gate 5.7 sequential 8-unit bounded experiment; no retries.
+  bounded-diagnose [run-dir]   Diagnose one retained bounded experiment read-only.
+
+  help                         Show this help.
 
 Default SWPC benchmark layout:
   /storage/projects/plasma-benchmark/nxp-kl25/source
   /storage/projects/plasma-benchmark/nxp-kl25/pre-ai
   /storage/projects/plasma-benchmark/nxp-kl25/runs/<UTC-run-id>
+  /storage/projects/plasma-benchmark/nxp-kl25/pre-ai-boundary-v1
+  /storage/projects/plasma-benchmark/nxp-kl25/bounded-runs/<UTC-run-id>
 
 Environment overrides:
   PLASMA_KL25_BENCH_ROOT   Benchmark root directory.
   PLASMA_OLLAMA_URL        Loopback Ollama URL; default http://127.0.0.1:11434.
 
-The supported topology keeps source/evidence/run artifacts on SWPC. The SWPC
-loopback Ollama endpoint may be backed by the established SSH reverse tunnel to
-the Mac model host. Direct LAN Ollama URLs are not accepted by the qualification harness.
+Source/evidence/run artifacts stay on SWPC. The loopback Ollama endpoint may be
+backed by the established SSH reverse tunnel to the Mac model host. Direct LAN
+Ollama URLs are rejected. No helper command performs an automatic model retry.
 EOF
 }
 
@@ -59,15 +70,22 @@ validate_loopback_url() {
   ollama_url="${ollama_url%/}"
 }
 
-contract_model() {
-  python3 - "$bench_dir/live-model-qualification-contract.json" <<'PY'
+model_from_contract() {
+  python3 - "$1" <<'PY'
 import json
 import sys
 from pathlib import Path
-
 value = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 print(value["live_runtime"]["model_id"])
 PY
+}
+
+contract_model() {
+  model_from_contract "$bench_dir/live-model-qualification-contract.json"
+}
+
+bounded_contract_model() {
+  model_from_contract "$bench_dir/live-bounded-qualification-contract.json"
 }
 
 print_contract_runtime() {
@@ -75,7 +93,6 @@ print_contract_runtime() {
 import json
 import sys
 from pathlib import Path
-
 value = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 runtime = value["live_runtime"]
 generation = runtime["generation"]
@@ -87,22 +104,37 @@ print(f"[kl25-live] max_tokens: {generation['max_tokens']}")
 PY
 }
 
+print_bounded_contract_runtime() {
+  python3 - "$bench_dir/live-bounded-qualification-contract.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+value = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+runtime = value["live_runtime"]
+generation = runtime["generation"]
+required = value["required_input"]
+print(f"[kl25-live] bounded_qualification_contract: {value['contract_id']}")
+print(f"[kl25-live] evidence_boundary_release: {required['evidence_boundary_release_id']}")
+print(f"[kl25-live] execution_mode: {runtime['execution_mode']}")
+print(f"[kl25-live] primary_unit_count: {runtime['primary_unit_count']}")
+print(f"[kl25-live] automatic_retries: {runtime['automatic_retries']}")
+print(f"[kl25-live] num_ctx_per_unit: {generation['num_ctx']}")
+print(f"[kl25-live] max_tokens_per_unit: {generation['max_tokens']}")
+PY
+}
+
 validate_pre_ai_workspace() {
   python3 - "$bench_dir" "$pre_ai_dir" <<'PY'
 import json
 import sys
 from pathlib import Path
-
 bench_dir = Path(sys.argv[1])
 pre_ai_dir = Path(sys.argv[2])
 sys.path.insert(0, str(bench_dir))
-
 import run_ollama_semantic
-
 manifest, packs, _, _ = run_ollama_semantic.load_pre_ai_workspace(pre_ai_dir)
 contract = json.loads((bench_dir / "live-model-qualification-contract.json").read_text(encoding="utf-8"))
 required = contract["required_input"]
-
 checks = {
     "target": manifest.get("target") == contract.get("target"),
     "bundle_digest": manifest.get("bundle_digest") == required.get("bundle_digest"),
@@ -112,7 +144,6 @@ checks = {
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
     raise SystemExit("pre-AI qualification binding mismatch: " + ", ".join(failed))
-
 print("[kl25-live] pre-AI workspace: PASS")
 print(f"[kl25-live] target: {manifest['target']}")
 print(f"[kl25-live] bundle_digest: {manifest['bundle_digest']}")
@@ -121,19 +152,54 @@ print(f"[kl25-live] pack_count: {len(packs)}")
 PY
 }
 
-validate_ollama_identity() {
-  local model version_json tags_json
-  model="$(contract_model)"
+validate_bounded_pre_ai_workspace() {
+  python3 - "$bench_dir" "$bounded_pre_ai_dir" <<'PY'
+import json
+import sys
+from pathlib import Path
+bench_dir = Path(sys.argv[1])
+pre_ai_dir = Path(sys.argv[2])
+sys.path.insert(0, str(bench_dir))
+import bounded_extraction
+import build_evidence_pack
+import qualify_bounded_run
+import run_ollama_semantic
+manifest, packs, _, semantic_contract = run_ollama_semantic.load_pre_ai_workspace(pre_ai_dir)
+contract = json.loads((bench_dir / "live-bounded-qualification-contract.json").read_text(encoding="utf-8"))
+qualify_bounded_run.validate_contract(contract)
+required = contract["required_input"]
+rules = bounded_extraction.policy()
+checks = {
+    "target": manifest.get("target") == contract.get("target"),
+    "bundle_digest": manifest.get("bundle_digest") == required.get("bundle_digest"),
+    "pre_ai_manifest_digest": manifest.get("manifest_digest") == required.get("pre_ai_manifest_digest"),
+    "semantic_contract": semantic_contract.get("contract_id") == required.get("semantic_contract_id"),
+    "bounded_contract": rules.get("contract_id") == required.get("bounded_contract_id"),
+    "bounded_contract_digest": build_evidence_pack.canonical_sha256(rules) == required.get("bounded_contract_digest"),
+    "evidence_release": rules.get("evidence_boundary_release_id") == required.get("evidence_boundary_release_id"),
+    "pack_count": len(packs) == 8,
+}
+failed = [name for name, ok in checks.items() if not ok]
+if failed:
+    raise SystemExit("bounded pre-AI qualification binding mismatch: " + ", ".join(failed))
+print("[kl25-live] bounded pre-AI workspace: PASS")
+print(f"[kl25-live] target: {manifest['target']}")
+print(f"[kl25-live] bundle_digest: {manifest['bundle_digest']}")
+print(f"[kl25-live] manifest_digest: {manifest['manifest_digest']}")
+print(f"[kl25-live] pack_count: {len(packs)}")
+PY
+}
+
+validate_ollama_identity_for_model() {
+  local model="$1" version_json tags_json
   version_json="$(curl --silent --show-error --fail --max-time 5 "$ollama_url/api/version")" || \
     fail "Ollama version endpoint is unavailable at $ollama_url; check the reverse tunnel"
   tags_json="$(curl --silent --show-error --fail --max-time 10 "$ollama_url/api/tags")" || \
     fail "Ollama tags endpoint is unavailable at $ollama_url; check the reverse tunnel"
-
   python3 - "$model" "$version_json" "$tags_json" <<'PY'
 import json
 import re
 import sys
-
 model_id, version_raw, tags_raw = sys.argv[1:]
 version = json.loads(version_raw)
 tags = json.loads(tags_raw)
@@ -143,7 +209,7 @@ if not isinstance(ollama_version, str) or not ollama_version.strip():
 models = tags.get("models")
 if not isinstance(models, list):
     raise SystemExit("Ollama /api/tags models is not an array")
-matches = [item for item in models if isinstance(item, dict) and item.get("name") == model_id]
+matches = [item for item in models if isinstance(item, dict) and (item.get("name") == model_id or item.get("model") == model_id)]
 if len(matches) != 1:
     raise SystemExit(f"expected exactly one installed model named {model_id}; found {len(matches)}")
 digest = matches[0].get("digest")
@@ -156,6 +222,14 @@ print(f"[kl25-live] model_digest: {digest}")
 PY
 }
 
+validate_ollama_identity() {
+  validate_ollama_identity_for_model "$(contract_model)"
+}
+
+validate_bounded_ollama_identity() {
+  validate_ollama_identity_for_model "$(bounded_contract_model)"
+}
+
 run_status() {
   require_command python3
   require_command curl
@@ -164,6 +238,16 @@ run_status() {
   validate_pre_ai_workspace
   print_contract_runtime
   validate_ollama_identity
+}
+
+run_bounded_status() {
+  require_command python3
+  require_command curl
+  validate_loopback_url
+  [[ -d "$bounded_pre_ai_dir" ]] || fail "bounded pre-AI workspace missing: $bounded_pre_ai_dir; run bounded-build first"
+  validate_bounded_pre_ai_workspace
+  print_bounded_contract_runtime
+  validate_bounded_ollama_identity
 }
 
 run_context_audit() {
@@ -179,16 +263,13 @@ run_build() {
   [[ -d "$source_dir" ]] || fail "source directory missing: $source_dir"
   [[ -f "$source_dir/KL25P80M48SF0.pdf" ]] || fail "locked KL25 data sheet missing"
   [[ -f "$source_dir/KL25P80M48SF0RM.pdf" ]] || fail "locked KL25 reference manual missing"
-
   mkdir -p "$bench_root"
   local tmp_dir="$bench_root/.pre-ai.tmp.$$"
   rm -rf "$tmp_dir"
   trap 'rm -rf "$tmp_dir"' EXIT
-
   python3 "$bench_dir/build_evidence_pack.py" \
     --source-dir "$source_dir" \
     --output-dir "$tmp_dir"
-
   rm -rf "$pre_ai_dir"
   mv "$tmp_dir" "$pre_ai_dir"
   trap - EXIT
@@ -196,10 +277,29 @@ run_build() {
   validate_pre_ai_workspace
 }
 
+run_bounded_build() {
+  require_command python3
+  require_command pdftotext
+  [[ -d "$source_dir" ]] || fail "source directory missing: $source_dir"
+  [[ -f "$source_dir/KL25P80M48SF0.pdf" ]] || fail "locked KL25 data sheet missing"
+  [[ -f "$source_dir/KL25P80M48SF0RM.pdf" ]] || fail "locked KL25 reference manual missing"
+  mkdir -p "$bench_root"
+  local tmp_dir="$bench_root/.pre-ai-boundary-v1.tmp.$$"
+  rm -rf "$tmp_dir"
+  trap 'rm -rf "$tmp_dir"' EXIT
+  python3 "$bench_dir/build_evidence_pack.py" \
+    --source-dir "$source_dir" \
+    --output-dir "$tmp_dir"
+  rm -rf "$bounded_pre_ai_dir"
+  mv "$tmp_dir" "$bounded_pre_ai_dir"
+  trap - EXIT
+  printf '[kl25-live] bounded pre-AI workspace rebuilt atomically: %s\n' "$bounded_pre_ai_dir"
+  validate_bounded_pre_ai_workspace
+}
+
 run_live() {
   run_status
   mkdir -p "$runs_dir"
-
   local run_id run_dir rc
   run_id="$(date -u +%Y%m%dT%H%M%SZ)"
   run_dir="$runs_dir/$run_id"
@@ -208,7 +308,6 @@ run_live() {
     run_dir="$runs_dir/$run_id"
   fi
   mkdir "$run_dir"
-
   printf '[kl25-live] run_dir: %s\n' "$run_dir"
   set +e
   python3 "$bench_dir/run_live_model_qualification.py" \
@@ -217,7 +316,6 @@ run_live() {
     --ollama-url "$ollama_url"
   rc=$?
   set -e
-
   ln -sfn "$run_id" "$runs_dir/latest"
   printf '[kl25-live] retained run: %s\n' "$run_dir"
   if (( rc != 0 )); then
@@ -227,14 +325,41 @@ run_live() {
   return "$rc"
 }
 
+run_bounded_live() {
+  run_bounded_status
+  mkdir -p "$bounded_runs_dir"
+  local run_id run_dir rc
+  run_id="$(date -u +%Y%m%dT%H%M%SZ)"
+  run_dir="$bounded_runs_dir/$run_id"
+  if [[ -e "$run_dir" ]]; then
+    run_id="$run_id-$$"
+    run_dir="$bounded_runs_dir/$run_id"
+  fi
+  printf '[kl25-live] bounded_run_dir: %s\n' "$run_dir"
+  set +e
+  python3 "$bench_dir/run_live_bounded_qualification.py" \
+    --input-dir "$bounded_pre_ai_dir" \
+    --output-dir "$run_dir" \
+    --ollama-url "$ollama_url"
+  rc=$?
+  set -e
+  if [[ -d "$run_dir" ]]; then
+    ln -sfn "$run_id" "$bounded_runs_dir/latest"
+    printf '[kl25-live] retained bounded run: %s\n' "$run_dir"
+    if (( rc != 0 )); then
+      printf '[kl25-live] bounded qualification did not reach READY_FOR_REVIEW; retained child artifacts are immutable evidence.\n' >&2
+      printf '[kl25-live] diagnose with: bash scripts/ic-support-kl25-live.sh bounded-diagnose %q\n' "$run_dir" >&2
+    fi
+  else
+    printf '[kl25-live] bounded preflight failed before artifact creation.\n' >&2
+  fi
+  return "$rc"
+}
+
 resolve_diagnostic_dir() {
   local requested="${1:-}"
   if [[ -n "$requested" ]]; then
-    if [[ -f "$requested" ]]; then
-      dirname "$requested"
-    else
-      printf '%s\n' "$requested"
-    fi
+    if [[ -f "$requested" ]]; then dirname "$requested"; else printf '%s\n' "$requested"; fi
     return
   fi
   if [[ -L "$runs_dir/latest" || -d "$runs_dir/latest" ]]; then
@@ -248,23 +373,33 @@ resolve_diagnostic_dir() {
   fail "no retained run found; pass an explicit run directory"
 }
 
+resolve_bounded_diagnostic_dir() {
+  local requested="${1:-}"
+  if [[ -n "$requested" ]]; then
+    if [[ -f "$requested" ]]; then dirname "$requested"; else printf '%s\n' "$requested"; fi
+    return
+  fi
+  if [[ -L "$bounded_runs_dir/latest" || -d "$bounded_runs_dir/latest" ]]; then
+    printf '%s\n' "$bounded_runs_dir/latest"
+    return
+  fi
+  fail "no retained bounded run found; pass an explicit run directory"
+}
+
 run_diagnose() {
   require_command python3
   local run_dir
   run_dir="$(resolve_diagnostic_dir "${1:-}")"
   [[ -f "$run_dir/raw-response.txt" ]] || fail "raw-response.txt missing under $run_dir"
-
   python3 - "$bench_dir" "$pre_ai_dir" "$run_dir" <<'PY'
 import json
 import sys
 from pathlib import Path
-
 bench_dir = Path(sys.argv[1])
 pre_ai_dir = Path(sys.argv[2])
 run_dir = Path(sys.argv[3]).resolve()
 raw_path = run_dir / "raw-response.txt"
 raw = raw_path.read_text(encoding="utf-8")
-
 print("===== KL25 LIVE RUN DIAGNOSIS =====")
 print("run_dir    =", run_dir)
 print("raw_bytes  =", len(raw.encode("utf-8")))
@@ -273,7 +408,6 @@ print("starts_{   =", raw.lstrip().startswith("{"))
 print("ends_}     =", raw.rstrip().endswith("}"))
 print("has_fence  =", "```" in raw)
 print("has_think_marker =", "<think>" in raw or "</think>" in raw)
-
 try:
     json.loads(raw)
 except json.JSONDecodeError as exc:
@@ -284,7 +418,6 @@ except json.JSONDecodeError as exc:
     print("json_pos    =", exc.pos)
 else:
     print("FULL_JSON   = PASS")
-
 stripped = raw.lstrip()
 leading = len(raw) - len(stripped)
 decoder = json.JSONDecoder()
@@ -303,9 +436,7 @@ else:
     print("trailing_chars =", len(trailing))
     print("trailing_nonwhitespace =", bool(trailing.strip()))
     print("trailing_has_think_marker =", "<think>" in trailing or "</think>" in trailing)
-    if trailing.strip():
-        print("trailing_preview =", repr(trailing[:240]))
-
+    if trailing.strip(): print("trailing_preview =", repr(trailing[:240]))
 semantic_run_path = run_dir / "semantic-run.json"
 if semantic_run_path.is_file():
     run = json.loads(semantic_run_path.read_text(encoding="utf-8"))
@@ -327,7 +458,6 @@ if semantic_run_path.is_file():
     print("provider_done =", metadata.get("done"))
     print("provider_done_reason =", metadata.get("done_reason"))
     print("provider_usage =", metadata.get("usage"))
-
 provenance_path = run_dir / "live-run-provenance.json"
 if provenance_path.is_file():
     provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
@@ -335,12 +465,10 @@ if provenance_path.is_file():
     generation = execution.get("generation") if isinstance(execution.get("generation"), dict) else {}
     print("requested_num_ctx =", generation.get("num_ctx"))
     print("requested_max_tokens =", generation.get("max_tokens"))
-
 if first_text is not None and pre_ai_dir.is_dir():
     sys.path.insert(0, str(bench_dir))
     import run_ollama_semantic
     import semantic_extraction
-
     try:
         _, packs, _, contract = run_ollama_semantic.load_pre_ai_workspace(pre_ai_dir)
         semantic_extraction.parse_model_result(first_text, contract=contract, packs=packs)
@@ -350,7 +478,6 @@ if first_text is not None and pre_ai_dir.is_dir():
         print("first_document_semantic_error =", str(exc))
     else:
         print("FIRST_DOCUMENT_SEMANTIC_CONTRACT = PASS")
-
 report_path = run_dir / "qualification-report.json"
 if report_path.is_file():
     report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -367,31 +494,66 @@ if report_path.is_file():
 PY
 }
 
+run_bounded_diagnose() {
+  require_command python3
+  local run_dir
+  run_dir="$(resolve_bounded_diagnostic_dir "${1:-}")"
+  [[ -f "$run_dir/aggregate-report.json" ]] || fail "aggregate-report.json missing under $run_dir"
+  python3 - "$run_dir" <<'PY'
+import json
+import sys
+from pathlib import Path
+run_dir = Path(sys.argv[1]).resolve()
+def read(name):
+    path = run_dir / name
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+aggregate = read("aggregate-report.json") or {}
+report = read("qualification-report.json") or {}
+provenance = read("live-bounded-provenance.json") or {}
+print("===== KL25 LIVE BOUNDED DIAGNOSIS =====")
+print("run_dir =", run_dir)
+print("aggregate_status =", aggregate.get("status"))
+print("aggregate_errors =", aggregate.get("errors"))
+print("qualification_status =", report.get("status"))
+print("integrity =", report.get("integrity"))
+print("semantic_screening =", report.get("semantic_screening"))
+identity = provenance.get("ollama_runtime_identity") if isinstance(provenance.get("ollama_runtime_identity"), dict) else {}
+print("model =", identity.get("model_id"))
+print("model_digest =", identity.get("model_digest"))
+unit_files = sorted(run_dir.glob("unit-*/unit-run.json"))
+print("child_count =", len(unit_files))
+for path in unit_files:
+    child = json.loads(path.read_text(encoding="utf-8"))
+    binding = child.get("binding") if isinstance(child.get("binding"), dict) else {}
+    metadata = child.get("transport_metadata") if isinstance(child.get("transport_metadata"), dict) else {}
+    error = child.get("error") if isinstance(child.get("error"), dict) else {}
+    raw = child.get("raw_response") if isinstance(child.get("raw_response"), str) else ""
+    print("---")
+    print("unit =", binding.get("primary_unit_id"))
+    print("status =", child.get("status"))
+    print("error_class =", error.get("class"))
+    print("error_type =", error.get("type"))
+    print("error_message =", error.get("message"))
+    print("done_reason =", metadata.get("done_reason"))
+    print("usage =", metadata.get("usage"))
+    print("raw_bytes =", len(raw.encode("utf-8")))
+PY
+}
+
 main() {
   local command="${1:-help}"
   case "$command" in
-    status)
-      run_status
-      ;;
-    context-audit)
-      run_context_audit
-      ;;
-    build)
-      run_build
-      ;;
-    run)
-      run_live
-      ;;
-    diagnose)
-      run_diagnose "${2:-}"
-      ;;
-    help|-h|--help)
-      usage
-      ;;
-    *)
-      usage >&2
-      fail "Unknown command: $command"
-      ;;
+    status) run_status ;;
+    context-audit) run_context_audit ;;
+    build) run_build ;;
+    run) run_live ;;
+    diagnose) run_diagnose "${2:-}" ;;
+    bounded-build) run_bounded_build ;;
+    bounded-status) run_bounded_status ;;
+    bounded-run) run_bounded_live ;;
+    bounded-diagnose) run_bounded_diagnose "${2:-}" ;;
+    help|-h|--help) usage ;;
+    *) usage >&2; fail "Unknown command: $command" ;;
   esac
 }
 
