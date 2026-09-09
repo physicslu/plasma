@@ -280,4 +280,4 @@ data/device-catalog/production/icpn-v1-manifest.json
 - [IC Support Coverage Normalization](ic-support-coverage-normalization.md)
 - [IC Support Runtime Resolver Foundation](ic-support-runtime-resolver.md)
 - [Product Deployment Foundation](../deployment/product-deployment-foundation.md)
-- [Product Release Format v1](../deployment/product-release-format-v1.md)
+- [Product Release Format v1](../deployment/product-release-format.md)
