@@ -1,0 +1,151 @@
+name: STM32F7 Phase 4.6E publication proposal one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f7-phase46e-publication
+    paths:
+      - .github/workflows/device-catalog-stm32f7-phase46e-publication-oneoff.yml
+
+permissions:
+  contents: read
+
+jobs:
+  propose-publication:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay frozen Phase 4.6D admission contract
+        run: |
+          python data/device-catalog/research/test_stm32f7_phase4_6d_admission.py
+          python data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py
+      - name: Build deterministic publication proposal
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          root = Path('.')
+          research = root / 'data/device-catalog/research'
+          production = root / 'data/device-catalog/production'
+          plan_path = research / 'stm32f7-phase4.6d-admission-plan.json'
+          manifest_path = production / 'icpn-v1-manifest.json'
+          canonical_path = Path('/tmp/stm32f7-commercial-icpn.csv')
+          proposal_manifest_path = Path('/tmp/icpn-v1-manifest.proposed.json')
+          proposal_path = Path('/tmp/stm32f7-phase4.6e-publication-proposal.json')
+
+          expected_plan_sha = '1e13d87d9d4e445efb5dbb43b79bad1bf3b5b916126095fb5a55c58580691a7e'
+          plan_bytes = plan_path.read_bytes()
+          plan_sha = hashlib.sha256(plan_bytes).hexdigest()
+          assert plan_sha == expected_plan_sha, (plan_sha, expected_plan_sha)
+          plan = json.loads(plan_bytes)
+          assert plan['candidate_count'] == 19
+          assert plan['decision_counts'] == {
+              'admit': 19,
+              'already_present': 0,
+              'manual_review_required': 0,
+              'reject': 0,
+          }
+          assert plan['canonical_write_applied'] is False
+          assert plan['production_write_applied'] is False
+
+          rows = [item['proposed_canonical_row'] for item in plan['candidates'] if item['decision'] == 'admit']
+          rows.sort(key=lambda row: row['icpn'])
+          assert len(rows) == 19
+          fields = list(rows[0].keys())
+          expected_fields = [
+              'manufacturer','icpn','family','series','base_device','package','pin_count','flash_size',
+              'temperature_grade','option_suffix','cmsis_device_name','existing_identifier',
+              'existing_identifier_kind','mapping_status','openocd_target_config','source_type',
+              'source_reference','source_authority','verification_status'
+          ]
+          # Preserve canonical policy order, not JSON key sort order.
+          fields = expected_fields
+          assert all(set(row) == set(fields) for row in rows)
+          with canonical_path.open('w', newline='', encoding='utf-8') as handle:
+              writer = csv.DictWriter(handle, fieldnames=fields, lineterminator='\n')
+              writer.writeheader()
+              writer.writerows(rows)
+
+          canonical_bytes = canonical_path.read_bytes()
+          canonical_sha = hashlib.sha256(canonical_bytes).hexdigest()
+          canonical_blob = subprocess.check_output(['git', 'hash-object', str(canonical_path)], text=True).strip()
+
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          assert all(item.get('family') != 'STM32F7' for item in manifest['sources'])
+          current_exact = sum(int(item['row_count']) for item in manifest['sources'])
+          assert current_exact == 544, current_exact
+
+          current_icpns = set()
+          current_bases = set()
+          for source in manifest['sources']:
+              source_path = (production / source['path']).resolve()
+              with source_path.open(newline='', encoding='utf-8') as handle:
+                  source_rows = list(csv.DictReader(handle))
+              assert len(source_rows) == int(source['row_count'])
+              current_icpns.update(row['icpn'] for row in source_rows)
+              current_bases.update(row['base_device'] for row in source_rows)
+          assert len(current_icpns) == 544
+          assert len(current_bases) == 188
+
+          proposed_icpns = {row['icpn'] for row in rows}
+          proposed_bases = {row['base_device'] for row in rows}
+          assert len(proposed_icpns) == 19
+          assert len(proposed_bases) == 9
+          assert current_icpns.isdisjoint(proposed_icpns)
+          assert current_bases.isdisjoint(proposed_bases)
+
+          proposed_manifest = json.loads(json.dumps(manifest))
+          proposed_manifest['sources'].append({
+              'manufacturer': 'STMicroelectronics',
+              'family': 'STM32F7',
+              'path': '../research/stm32f7-commercial-icpn.csv',
+              'row_count': 19,
+              'git_blob_sha': canonical_blob,
+              'sha256': canonical_sha,
+          })
+          proposal_manifest_path.write_text(json.dumps(proposed_manifest, indent=2) + '\n', encoding='utf-8')
+          manifest_sha = hashlib.sha256(proposal_manifest_path.read_bytes()).hexdigest()
+
+          exact_after = len(current_icpns | proposed_icpns)
+          bases_after = len(current_bases | proposed_bases)
+          family_after = len(proposed_manifest['sources'])
+          assert exact_after == 563, exact_after
+          assert bases_after == 197, bases_after
+          assert family_after == 6, family_after
+
+          proposal = {
+              'phase': '4.6E',
+              'status': 'proposal_only',
+              'admission_plan_sha256': plan_sha,
+              'canonical_csv_file_sha256': canonical_sha,
+              'canonical_csv_git_blob_sha': canonical_blob,
+              'proposed_manifest_sha256': manifest_sha,
+              'stm32f7_rows_before': 0,
+              'stm32f7_rows_after': 19,
+              'stm32f7_base_devices_after': 9,
+              'production_exact_icpns_before': 544,
+              'production_exact_icpns_after': exact_after,
+              'production_base_devices_before': 188,
+              'production_base_devices_after': bases_after,
+              'production_family_count_before': 5,
+              'production_family_count_after': family_after,
+              'added_exact_icpns': sorted(proposed_icpns),
+              'canonical_write_applied': False,
+              'production_write_applied': False,
+              'programming_algorithm_equivalence_claimed': False,
+              'physical_target_qualification_claimed': False,
+              'runtime_programming_support_claimed': False,
+              'full_stm32f7_surface_covered': False,
+          }
+          proposal_path.write_text(json.dumps(proposal, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          proposal['publication_proposal_sha256'] = hashlib.sha256(proposal_path.read_bytes()).hexdigest()
+          print(json.dumps(proposal, indent=2, sort_keys=True))
+          PY
