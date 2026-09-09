@@ -14,6 +14,10 @@ def read(name: str) -> str:
     return (WORKFLOWS / name).read_text(encoding="utf-8")
 
 
+def read_repo(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
 def require(text: str, needle: str, *, owner: str) -> None:
     if needle not in text:
         raise SystemExit(f"{owner}: required CI boundary token missing: {needle}")
@@ -122,9 +126,7 @@ def main() -> int:
     forbid(ppu_release, '"data/device-catalog/production/**"', owner="SW/PPU PPU release")
     forbid(z2_release, '"data/device-catalog/production/**"', owner="SW/PPU Z2 release")
 
-    # REPO governance tests are not SW/PPU source tests. Because python-tests
-    # still owns the broad scripts/tests/** software-helper surface, explicitly
-    # exclude this repository-boundary guard on both push and pull_request.
+    # REPO governance tests are not SW/PPU source tests.
     require_count(
         python_tests,
         '"!scripts/tests/test-ci-domain-boundaries.py"',
@@ -132,8 +134,7 @@ def main() -> int:
         owner="SW/PPU Python/PL",
     )
 
-    # Preserve positive ownership so trigger cleanup cannot be satisfied by
-    # accidentally deleting the workflows' real source boundaries.
+    # Preserve positive SW/PPU ownership.
     require(python_tests, '"software/python/**"', owner="SW/PPU Python/PL")
     require(python_tests, '"pl/rtl/**"', owner="SW/PPU Python/PL")
     require(ppu_release, '"scripts/ppu-release.py"', owner="SW/PPU PPU release")
@@ -141,9 +142,7 @@ def main() -> int:
     require(z2_release, '"scripts/z2-python-runtime.py"', owner="SW/PPU Z2 release")
     require(z2_release, '"software/python/plasma_server/**"', owner="SW/PPU Z2 release")
 
-    # AI IC Support is a manufacturer-evidence / programming-method research
-    # domain. It may bind a precise benchmark catalog input, but it must not own
-    # software runtime, OpenOCD execution or execution-admission validation.
+    # AI IC Support is manufacturer-evidence / programming-method research.
     require(ai_support, "name: AI IC Support research validation", owner="AI IC Support")
     require(ai_support, '"data/ic-support/**"', owner="AI IC Support")
     require(
@@ -172,6 +171,30 @@ def main() -> int:
     )
     for token in forbidden_ai_tokens:
         forbid(ai_support, token, owner="AI IC Support")
+
+    # Lock the code-level promotion boundary as well as CI trigger ownership.
+    # SW/PPU runtime may only consume a caller-selected, runtime-owned capability
+    # source. Research under data/ic-support/ cannot be an implicit default.
+    runtime_resolver = read_repo("software/python/plasma_core/ic_support.py")
+    site_manager = read_repo("software/python/plasma_server/site_manager.py")
+    for token in (
+        "data/ic-support",
+        "PLASMA_IC_SUPPORT_ROOT",
+        "IC_SUPPORT_RELATIVE_ROOT",
+        "def default_ic_support_root",
+        "def get_default_ic_support_resolver",
+    ):
+        forbid(runtime_resolver, token, owner="SW/PPU runtime capability")
+    forbid(
+        site_manager,
+        "get_default_ic_support_resolver",
+        owner="SW/PPU SiteManager capability injection",
+    )
+    require(
+        site_manager,
+        "self.ic_support_resolver = ic_support_resolver",
+        owner="SW/PPU SiteManager capability injection",
+    )
 
     print("CI workstream/domain-boundary contract PASS")
     return 0

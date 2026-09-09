@@ -210,13 +210,29 @@ A catalog ICPN can therefore be valid and selectable while a capability is `unsu
 
 CI must preserve that separation. Missing backend support is not a reason to hide a valid commercial ICPN from the catalog.
 
-## 8. Transitional code-level coupling
+## 8. Runtime capability promotion boundary
 
-There is a legacy pilot bridge in current software where `software/python/plasma_core/ic_support.py` can read `data/ic-support/`, and `SiteManager` can instantiate that resolver for non-mock sites.
+The former code-level bridge from SW/PPU runtime directly into `data/ic-support/` is closed.
 
-This is a **code-level coupling to be separated deliberately**; it does not change the authority of `data/ic-support/` from research into software runtime ownership.
+Current executable rules are:
 
-Do not solve this by broad CI fan-out. A follow-up architecture change should give runtime capability data an explicit promoted/runtime-owned source or remove the pilot resolver from the production execution path. Until then, changes in the research workstream must not be described as software support qualification.
+```text
+AI IC Support research (`data/ic-support/`)
+        X  no implicit runtime read
+        |
+        v only through future explicit promotion
+SW/PPU-owned runtime capability source
+        -> explicit resolver injection
+        -> route/plan/runtime gates
+```
+
+`software/python/plasma_core/ic_support.py` has no repository-relative AI-research default and no environment fallback to `data/ic-support/`. `SiteManager` does not automatically construct a research-backed resolver for non-Mock Sites.
+
+Because no Production-promoted runtime capability package exists today, the default non-Mock runtime state is intentionally fail-closed. A Job requiring target capability cannot enter the registry, acquire the PPU execution lease, reach a SiteWorker queue or access hardware unless an explicit SW/PPU-owned resolver is supplied and later runtime gates also pass.
+
+Software plan/router/executor tests use a SW-owned synthetic capability fixture. Passing those tests validates software mechanics only; it does not promote AI research output or create a hardware-support claim.
+
+A future research-to-runtime promotion mechanism must be an explicit reviewed transaction with its own SW/PPU validation and, where appropriate, PPU/HIL qualification.
 
 ## 9. Trigger ownership rules
 
@@ -256,8 +272,8 @@ A CI topology PR should prove its own boundary:
 - no software/runtime test is deleted merely to obtain a green result;
 - no historical evidence is rewritten to present-day numbers;
 - documentation integrity remains green;
-- a later data-only catalog PR should demonstrate that Python/PL, PPU and Z2 no longer fan out;
-- a later AI IC Support research-only PR should demonstrate that software/runtime gates no longer fan out.
+- data-only catalog work must not fan out into Python/PL, PPU and Z2;
+- AI IC Support research-only work must not fan out into software/runtime qualification.
 
 ## 12. Historical evidence boundary
 
@@ -273,11 +289,12 @@ data/device-catalog/production/icpn-v1-manifest.json
 
 ## 13. Related documents
 
+- [Plasma Engineering Workstreams](../../WORKSTREAMS.md)
 - [Documentation Maintenance](../development/documentation-maintenance.md)
 - [Operator Acceptance Test Matrix](../development/operator-acceptance-test-matrix.md)
 - [Mock Continuous Delivery](../development/mock-cd.md)
 - [Runtime Acceptance](../testing/runtime-acceptance.md)
 - [IC Support Coverage Normalization](ic-support-coverage-normalization.md)
-- [IC Support Runtime Resolver Foundation](ic-support-runtime-resolver.md)
+- [Runtime Capability Resolver and Execution Binding](ic-support-runtime-resolver.md)
 - [Product Deployment Foundation](../deployment/product-deployment-foundation.md)
 - [Product Release Format v1](../deployment/product-release-format.md)

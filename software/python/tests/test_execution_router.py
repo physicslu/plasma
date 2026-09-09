@@ -7,7 +7,6 @@ from pathlib import Path
 from plasma_core.config import PlasmaConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.models import JobRequest
 from plasma_interfaces.base import BaseInterface, ProgressCallback
 from plasma_server.execution_router import (
@@ -20,6 +19,7 @@ from plasma_server.execution_router import (
     normalize_openocd_target_config,
 )
 from plasma_server.site_manager import SiteManager
+from tests.runtime_capability_fixture import build_test_resolver
 
 
 class StubInterface(BaseInterface):
@@ -61,7 +61,7 @@ class StubInterface(BaseInterface):
 
 class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.resolver = get_default_ic_support_resolver()
+        self.resolver = build_test_resolver()
         self.interface = StubInterface()
 
     def test_openocd_target_normalization_accepts_catalog_and_runtime_forms(self) -> None:
@@ -212,6 +212,50 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
         self.assertEqual(caught.exception.code, ErrorCode.INVALID_ARGUMENT)
+
+    async def test_site_manager_non_mock_does_not_auto_load_research_capability(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            config = PlasmaConfig(
+                server=ServerConfig(
+                    host="127.0.0.1",
+                    port=0,
+                    output_root=root_path / "output",
+                    log_root=root_path / "logs",
+                    max_supported_sites=1,
+                    max_concurrent_jobs=1,
+                ),
+                sites=[
+                    SiteConfig(
+                        id=1,
+                        enabled=True,
+                        interface="openocd",
+                        openocd={
+                            "interface_cfg": "interface/cmsis-dap.cfg",
+                            "target_cfg": "target/stm32f1x.cfg",
+                        },
+                    )
+                ],
+            )
+            manager = SiteManager(config, interface_factory=lambda _site: self.interface)
+            self.assertIsNone(manager.ic_support_resolver)
+            await manager.start()
+            try:
+                with self.assertRaises(PlasmaError) as caught:
+                    manager.enqueue(
+                        JobRequest(
+                            site_id=1,
+                            operation=Operation.ERASE,
+                            target="STM32F103C8T6",
+                            job_id="no-promoted-capability",
+                        )
+                    )
+                self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
+                self.assertIn("no IC Support resolver", caught.exception.message)
+                self.assertEqual(manager.registry.all(), [])
+                self.assertFalse(manager.execution_lease_snapshot()["busy"])
+            finally:
+                await manager.shutdown()
 
     async def test_site_manager_unresolved_target_fails_before_registry_or_execution_lease(self) -> None:
         with tempfile.TemporaryDirectory() as root:

@@ -17,6 +17,8 @@ from plasma_interfaces.openocd_plan import (
 )
 
 
+# Retained wire/log key for compatibility. Its value is now a SW/PPU-owned
+# runtime capability route; it is not direct AI IC Support research state.
 RESOLVED_IC_SUPPORT_METADATA_KEY = "resolved_ic_support"
 MOCK_ROUTE = "mock_workflow"
 OPENOCD_ROUTE = "openocd"
@@ -28,10 +30,9 @@ class SiteExecutionRouter:
     """Resolve one Job route, compile backend plans, then gate real execution.
 
     Mock is a workflow simulator and does not create hardware-support evidence.
-    Non-Mock routing must resolve an exact ICPN and backend identity before the
-    Job can be considered for queue admission. Phase 3.7 adds deterministic
-    OpenOCD dry-run plan compilation while keeping real hardware execution
-    closed until an executor is independently proven runtime-ready.
+    Non-Mock routing requires an explicitly supplied SW/PPU runtime capability
+    resolver before a Job can be considered for queue admission. AI IC Support
+    research data is not a runtime source.
     """
 
     def __init__(
@@ -65,23 +66,15 @@ class SiteExecutionRouter:
         if not isinstance(route, dict):
             raise PlasmaError(
                 ErrorCode.INTERNAL_ERROR,
-                "request does not contain a server-resolved IC Support route",
+                "request does not contain a server-resolved runtime capability route",
                 context={"job_id": request.job_id, "site_id": request.site_id},
             )
         return route
 
-    def _decorate(
-        self,
-        request: JobRequest,
-        *,
-        route: dict[str, Any],
-    ) -> JobRequest:
+    def _decorate(self, request: JobRequest, *, route: dict[str, Any]) -> JobRequest:
         return replace(
             request,
-            metadata={
-                **request.metadata,
-                RESOLVED_IC_SUPPORT_METADATA_KEY: route,
-            },
+            metadata={**request.metadata, RESOLVED_IC_SUPPORT_METADATA_KEY: route},
         )
 
     def _resolve_mock(self, request: JobRequest) -> JobRequest:
@@ -103,18 +96,24 @@ class SiteExecutionRouter:
         if self.resolver is None:
             raise PlasmaError(
                 ErrorCode.CONFIG_INVALID,
-                "non-Mock Site has no IC Support resolver",
-                context={"site_id": self.site.id, "site_interface": self.site.interface},
+                "non-Mock Site has no promoted runtime capability resolver; no IC Support resolver is auto-loaded",
+                context={
+                    "site_id": self.site.id,
+                    "site_interface": self.site.interface,
+                    "runtime_capability_state": "not_configured",
+                    "ic_support_state": "not_configured",
+                },
             )
         support = self.resolver.resolve_exact(request.target)
         if support is None:
             raise PlasmaError(
                 ErrorCode.OPERATION_UNSUPPORTED,
-                f"no evidence-backed IC Support binding for target {request.target!r}",
+                f"no promoted runtime capability binding for target {request.target!r}",
                 context={
                     "site_id": self.site.id,
                     "site_interface": self.site.interface,
                     "target": request.target,
+                    "runtime_capability_state": "unresolved",
                     "ic_support_state": "unresolved",
                 },
             )

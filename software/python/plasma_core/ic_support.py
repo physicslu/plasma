@@ -3,15 +3,11 @@ from __future__ import annotations
 import argparse
 import copy
 import json
-import os
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 
-IC_SUPPORT_ROOT_ENV = "PLASMA_IC_SUPPORT_ROOT"
-IC_SUPPORT_RELATIVE_ROOT = Path("data/ic-support")
 EXPECTED_PROFILE_KINDS = (
     "programming",
     "memory_geometry",
@@ -37,18 +33,7 @@ EXPECTED_CATALOG_FIELDS = (
 
 
 class ICSupportIntegrityError(RuntimeError):
-    """Checked-in IC Support data is incomplete, contradictory, or malformed."""
-
-
-def _repository_root() -> Path:
-    return Path(__file__).resolve().parents[3]
-
-
-def default_ic_support_root() -> Path:
-    configured = os.environ.get(IC_SUPPORT_ROOT_ENV)
-    if configured:
-        return Path(configured).expanduser().resolve()
-    return (_repository_root() / IC_SUPPORT_RELATIVE_ROOT).resolve()
+    """Explicitly supplied runtime capability data is incomplete or contradictory."""
 
 
 def _require(condition: bool, message: str) -> None:
@@ -60,7 +45,7 @@ def _load_object(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise ICSupportIntegrityError(f"cannot read IC Support JSON: {path}") from exc
+        raise ICSupportIntegrityError(f"cannot read runtime capability JSON: {path}") from exc
     _require(isinstance(payload, dict), f"{path}: top-level JSON must be an object")
     return payload
 
@@ -111,6 +96,13 @@ class ResolvedProfile:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedICSupport:
+    """Runtime-consumable capability record supplied by an explicit SW-owned source.
+
+    The historical class name is retained for compatibility while the runtime
+    promotion boundary is established. An instance is not automatically trusted
+    merely because equivalent AI research data exists elsewhere in the repository.
+    """
+
     icpn: str
     binding_set_id: str
     binding_status: str
@@ -166,11 +158,11 @@ class ResolvedICSupport:
 
 
 class ICSupportResolver:
-    """Resolve exact ICPNs into reusable technical profiles.
+    """Resolve exact ICPNs from an explicitly supplied runtime capability set.
 
-    The resolver owns knowledge resolution only. It deliberately does not claim
-    that an OpenOCD command template or Plasma Native PPU driver is implemented
-    merely because a Programming Profile exists.
+    This loader has deliberately **no repository default** and no environment
+    fallback to another workstream. A future promotion step may materialize a
+    SW-owned capability package and explicitly pass its root to this loader.
     """
 
     def __init__(self, records: dict[str, ResolvedICSupport], *, root: Path) -> None:
@@ -187,11 +179,12 @@ class ICSupportResolver:
 
     @classmethod
     def from_root(cls, root: Path) -> "ICSupportResolver":
+        """Load a caller-selected capability package; caller owns its provenance."""
         resolved_root = root.expanduser().resolve()
         profiles_root = resolved_root / "profiles"
         bindings_root = resolved_root / "bindings"
-        _require(profiles_root.is_dir(), f"IC Support profiles directory not found: {profiles_root}")
-        _require(bindings_root.is_dir(), f"IC Support bindings directory not found: {bindings_root}")
+        _require(profiles_root.is_dir(), f"runtime capability profiles directory not found: {profiles_root}")
+        _require(bindings_root.is_dir(), f"runtime capability bindings directory not found: {bindings_root}")
 
         profiles: dict[str, ResolvedProfile] = {}
         for dirname, expected_kind in PROFILE_DIRECTORY_KIND.items():
@@ -204,9 +197,9 @@ class ICSupportResolver:
                     path=path,
                     expected_kind=expected_kind,
                 )
-                _require(profile.profile_id not in profiles, f"duplicate IC Support profile_id: {profile.profile_id}")
+                _require(profile.profile_id not in profiles, f"duplicate runtime capability profile_id: {profile.profile_id}")
                 profiles[profile.profile_id] = profile
-        _require(profiles, f"no IC Support profiles found under {profiles_root}")
+        _require(profiles, f"no runtime capability profiles found under {profiles_root}")
 
         records: dict[str, ResolvedICSupport] = {}
         for path in sorted(bindings_root.glob("*.json")):
@@ -227,7 +220,7 @@ class ICSupportResolver:
                 _require(isinstance(icpn, str) and icpn.strip(), f"{path}: binding ICPN is required")
                 canonical_icpn = icpn.strip()
                 key = canonical_icpn.casefold()
-                _require(key not in records, f"duplicate IC Support binding for exact ICPN: {canonical_icpn}")
+                _require(key not in records, f"duplicate runtime capability binding for exact ICPN: {canonical_icpn}")
                 _require(isinstance(expected_catalog, dict), f"{canonical_icpn}: expected_catalog is required")
                 for field in EXPECTED_CATALOG_FIELDS:
                     value = expected_catalog.get(field)
@@ -250,7 +243,7 @@ class ICSupportResolver:
                 for kind in EXPECTED_PROFILE_KINDS:
                     profile_id = profile_refs[kind]
                     _require(isinstance(profile_id, str) and profile_id, f"{canonical_icpn}: {kind} profile_id is required")
-                    _require(profile_id in profiles, f"{canonical_icpn}: dangling IC Support profile {profile_id!r}")
+                    _require(profile_id in profiles, f"{canonical_icpn}: dangling runtime capability profile {profile_id!r}")
                     profile = profiles[profile_id]
                     _require(
                         profile.kind == kind,
@@ -267,7 +260,7 @@ class ICSupportResolver:
                     revision_overrides=tuple(normalized_overrides),
                 )
 
-        _require(records, f"no IC Support exact-ICPN bindings found under {bindings_root}")
+        _require(records, f"no runtime capability exact-ICPN bindings found under {bindings_root}")
         return cls(records, root=resolved_root)
 
     def resolve_exact(self, icpn: str) -> ResolvedICSupport | None:
@@ -278,7 +271,7 @@ class ICSupportResolver:
     def require_exact(self, icpn: str) -> ResolvedICSupport:
         resolved = self.resolve_exact(icpn)
         if resolved is None:
-            raise KeyError(f"no evidence-backed IC Support binding for exact ICPN: {icpn}")
+            raise KeyError(f"no promoted runtime capability binding for exact ICPN: {icpn}")
         return resolved
 
     def summary(self) -> dict[str, Any]:
@@ -294,21 +287,20 @@ class ICSupportResolver:
         }
 
 
-@lru_cache(maxsize=4)
-def _resolver_for_root(root: str) -> ICSupportResolver:
-    return ICSupportResolver.from_root(Path(root))
-
-
-def get_default_ic_support_resolver() -> ICSupportResolver:
-    return _resolver_for_root(str(default_ic_support_root()))
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Resolve evidence-backed Plasma IC Support")
+    parser = argparse.ArgumentParser(
+        description="Inspect an explicitly supplied Plasma runtime capability package"
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        required=True,
+        help="SW-owned runtime capability root; no repository/research default exists",
+    )
     parser.add_argument("--summary", action="store_true", help="print resolver summary JSON")
     parser.add_argument("--icpn", help="resolve one exact ICPN")
     args = parser.parse_args()
-    resolver = get_default_ic_support_resolver()
+    resolver = ICSupportResolver.from_root(args.root)
     if args.icpn:
         resolved = resolver.resolve_exact(args.icpn)
         payload: dict[str, Any] = (
@@ -326,5 +318,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except ICSupportIntegrityError as exc:
-        print(f"IC Support runtime resolver FAIL: {exc}")
+        print(f"runtime capability resolver FAIL: {exc}")
         raise SystemExit(1)
