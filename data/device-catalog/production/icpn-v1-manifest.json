@@ -7,6 +7,14 @@
   "sources": [
     {
       "manufacturer": "STMicroelectronics",
+      "family": "STM32F0",
+      "path": "../research/stm32f0-commercial-icpn.csv",
+      "row_count": 42,
+      "git_blob_sha": "ad9a5b0e643dcbee3118dff9f9863c637d66e3d6",
+      "sha256": "c5e138eced2389cf99948536308142a2488bdaefa619130b9b50b6fc52cd80c9"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
       "family": "STM32F1",
       "path": "../research/stm32f1-commercial-icpn.csv",
       "row_count": 75,
