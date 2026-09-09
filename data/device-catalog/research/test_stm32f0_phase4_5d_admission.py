@@ -1,129 +1,118 @@
 #!/usr/bin/env python3
-"""Regression tests for STM32F0 Phase 4.5D admission planning."""
+"""Post-publication regressions for STM32F0 Phase 4.5D admission."""
 
 from __future__ import annotations
 
-import copy
+import csv
+import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from device_catalog_admission_framework import CandidateManualReview
-from stm32f0_admission_policy import CANONICAL_FIELDS, build_canonical_row
-from stm32f0_phase4_5d_admission import (
-    EXPECTED_CANDIDATE_COUNT,
-    EXPECTED_PRODUCTION_BASE_DEVICE_COUNT,
-    EXPECTED_PRODUCTION_EXACT_COUNT,
-    admission_plan_is_clean,
-    build_admission_plan,
-)
+from device_catalog_admission_framework import AdmissionError, file_sha256, write_canonical_dataset
+from stm32f0_admission_policy import CANONICAL_FIELDS
+from stm32f0_phase4_5d_admission import admission_plan_is_clean, build_admission_plan
+
+HERE = Path(__file__).resolve().parent
+CURRENT_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
+PRESTATE_MANIFEST = HERE / "stm32f0-phase4.5d-production-manifest-prestate.json"
+AUDIT_PATH = HERE / "stm32f0-phase4.5d-admission-audit.json"
+CURRENT_CANONICAL = HERE / "stm32f0-commercial-icpn.csv"
+
+EXPECTED_PLAN_SHA256 = "37eebcd8e8a537b28916934a4d4651aea3f1d1f7d449cb6586a1f641a884c5f1"
+EXPECTED_CANONICAL_SHA256 = "c5e138eced2389cf99948536308142a2488bdaefa619130b9b50b6fc52cd80c9"
+EXPECTED_CANONICAL_BLOB = "ad9a5b0e643dcbee3118dff9f9863c637d66e3d6"
 
 
-def valid_candidate() -> dict[str, object]:
-    return {
-        "manufacturer": "STMicroelectronics",
-        "base_device": "STM32F078CB",
-        "icpn": "STM32F078CBY6TR",
-        "authoritative_evidence": {
-            "evidence_id": "test-evidence",
-            "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f078cb.html",
-            "rendered_dom_sha256": "a" * 64,
-            "evidence_section_sha256": "b" * 64,
-            "evidence_profile": "stm32f0_dual_surface_v1",
-        },
-        "base_mapping": {
-            "status": "unique",
-            "match_count": 1,
-            "identifier_kind": "ordering_pattern",
-            "existing_identifier": "STM32F078CBYx",
-            "target_configs": ["tcl/target/stm32f0x.cfg"],
-        },
-    }
+def write_empty_canonical(path: Path) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator="\n").writeheader()
 
 
 class STM32F0Phase45DAdmissionTests(unittest.TestCase):
-    def test_canonical_row_combines_metadata_and_capability(self) -> None:
-        row = build_canonical_row(valid_candidate(), list(CANONICAL_FIELDS))
-        self.assertEqual(row["icpn"], "STM32F078CBY6TR")
-        self.assertEqual(row["package"], "WLCSP")
-        self.assertEqual(row["pin_count"], "49")
-        self.assertEqual(row["flash_size"], "128 KiB")
-        self.assertEqual(row["existing_identifier"], "STM32F078CBYx")
-        self.assertEqual(row["existing_identifier_kind"], "ordering_pattern")
-        self.assertEqual(row["mapping_status"], "deterministic_ordering_pattern")
-        self.assertEqual(row["openocd_target_config"], "tcl/target/stm32f0x.cfg")
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
 
-    def test_missing_mapping_blocks_admission_not_metadata(self) -> None:
-        candidate = valid_candidate()
-        candidate.pop("base_mapping")
-        with self.assertRaises(CandidateManualReview):
-            build_canonical_row(candidate, list(CANONICAL_FIELDS))
-
-    def test_ambiguous_mapping_requires_manual_review(self) -> None:
-        candidate = copy.deepcopy(valid_candidate())
-        candidate["base_mapping"]["status"] = "ambiguous"
-        candidate["base_mapping"]["match_count"] = 2
-        with self.assertRaises(CandidateManualReview):
-            build_canonical_row(candidate, list(CANONICAL_FIELDS))
-
-    def test_wrong_target_config_requires_manual_review(self) -> None:
-        candidate = copy.deepcopy(valid_candidate())
-        candidate["base_mapping"]["target_configs"] = ["tcl/target/stm32f3x.cfg"]
-        with self.assertRaises(CandidateManualReview):
-            build_canonical_row(candidate, list(CANONICAL_FIELDS))
-
-    def test_non_ordering_pattern_mapping_requires_manual_review(self) -> None:
-        candidate = copy.deepcopy(valid_candidate())
-        candidate["base_mapping"]["identifier_kind"] = "cmsis_device_name"
-        with self.assertRaises(CandidateManualReview):
-            build_canonical_row(candidate, list(CANONICAL_FIELDS))
-
-    def test_current_catalog_builds_clean_42_candidate_plan(self) -> None:
-        plan = build_admission_plan()
+    def _historical_plan(self, canonical: Path) -> dict:
+        self.assertFalse(canonical.exists())
+        plan = build_admission_plan(
+            canonical_path=canonical,
+            production_manifest_path=PRESTATE_MANIFEST,
+        )
         self.assertTrue(admission_plan_is_clean(plan))
-        self.assertEqual(plan["candidate_count"], EXPECTED_CANDIDATE_COUNT)
-        self.assertEqual(plan["decision_counts"], {
-            "admit": 42,
-            "already_present": 0,
-            "manual_review_required": 0,
-            "reject": 0,
-        })
-        self.assertEqual(plan["canonical_rows_before"], 0)
-        self.assertTrue(plan["metadata_policy_clean"])
-        self.assertTrue(plan["capability_mapping_gate_applied"])
-        self.assertEqual(plan["required_target_config"], "tcl/target/stm32f0x.cfg")
+        payload = json.dumps(plan, indent=2, sort_keys=True) + "\n"
+        self.assertEqual(hashlib.sha256(payload.encode()).hexdigest(), EXPECTED_PLAN_SHA256)
+        return plan
 
-        for item in plan["candidates"]:
-            row = item["proposed_canonical_row"]
-            self.assertEqual(item["decision"], "admit")
-            self.assertIsNotNone(row)
-            self.assertEqual(row["family"], "STM32F0")
-            self.assertEqual(row["openocd_target_config"], "tcl/target/stm32f0x.cfg")
-            self.assertEqual(row["existing_identifier_kind"], "ordering_pattern")
-            self.assertEqual(row["mapping_status"], "deterministic_ordering_pattern")
+    def test_published_canonical_manifest_and_audit_are_bound(self) -> None:
+        with CURRENT_CANONICAL.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), 42)
+        self.assertEqual(len({row["icpn"] for row in rows}), 42)
+        self.assertEqual(len({row["base_device"] for row in rows}), 13)
+        self.assertEqual(file_sha256(CURRENT_CANONICAL), EXPECTED_CANONICAL_SHA256)
+        self.assertTrue(all(row["family"] == "STM32F0" for row in rows))
+        self.assertTrue(
+            all(row["openocd_target_config"] == "tcl/target/stm32f0x.cfg" for row in rows)
+        )
 
-    def test_admission_plan_remains_read_only(self) -> None:
-        plan = build_admission_plan()
-        self.assertEqual(plan["production_snapshot"]["exact_icpn_count"], EXPECTED_PRODUCTION_EXACT_COUNT)
-        self.assertEqual(plan["production_snapshot"]["base_device_count"], EXPECTED_PRODUCTION_BASE_DEVICE_COUNT)
-        self.assertEqual(plan["production_snapshot"]["stm32f0_exact_icpn_count"], 0)
-        self.assertFalse(plan["canonical_write_applied"])
-        self.assertFalse(plan["production_write_applied"])
-        self.assertFalse(plan["programming_algorithm_equivalence_claimed"])
-        self.assertFalse(plan["physical_target_qualification_claimed"])
-        self.assertFalse(plan["runtime_programming_support_claimed"])
-        self.assertFalse(plan["full_stm32f0_surface_covered"])
-        self.assertTrue(plan["fail_closed"])
+        manifest = json.loads(CURRENT_MANIFEST.read_text(encoding="utf-8"))
+        source = next(item for item in manifest["sources"] if item["family"] == "STM32F0")
+        self.assertEqual(source["row_count"], 42)
+        self.assertEqual(source["sha256"], EXPECTED_CANONICAL_SHA256)
+        self.assertEqual(source["git_blob_sha"], EXPECTED_CANONICAL_BLOB)
+        self.assertEqual(len(manifest["sources"]), 5)
 
-    def test_nonempty_canonical_prestate_is_refused(self) -> None:
+        self.assertEqual(self.audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
+        self.assertEqual(self.audit["canonical_csv_file_sha256"], EXPECTED_CANONICAL_SHA256)
+        self.assertEqual(self.audit["canonical_csv_git_blob_sha"], EXPECTED_CANONICAL_BLOB)
+        self.assertEqual(set(self.audit["added_exact_icpns"]), {row["icpn"] for row in rows})
+        self.assertEqual(self.audit["stm32f0_rows_before"], 0)
+        self.assertEqual(self.audit["stm32f0_rows_after"], 42)
+        self.assertEqual(self.audit["stm32f0_base_devices_after"], 13)
+        self.assertEqual(self.audit["production_exact_icpns_before"], 502)
+        self.assertEqual(self.audit["production_exact_icpns_after"], 544)
+        self.assertEqual(self.audit["production_base_devices_before"], 175)
+        self.assertEqual(self.audit["production_base_devices_after"], 188)
+        self.assertEqual(self.audit["production_family_count_before"], 4)
+        self.assertEqual(self.audit["production_family_count_after"], 5)
+        self.assertEqual(self.audit["status"], "published")
+        self.assertFalse(self.audit["programming_algorithm_equivalence_claimed"])
+        self.assertFalse(self.audit["physical_target_qualification_claimed"])
+        self.assertFalse(self.audit["runtime_programming_support_claimed"])
+        self.assertFalse(self.audit["full_stm32f0_surface_covered"])
+
+    def test_historical_plan_replays_exactly_and_writer_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "stm32f0-commercial-icpn.csv"
-            path.write_text(
-                ",".join(CANONICAL_FIELDS) + "\n" + ",".join(["x"] * len(CANONICAL_FIELDS)) + "\n",
-                encoding="utf-8",
-            )
-            with self.assertRaises(Exception):
-                build_admission_plan(canonical_path=path)
+            canonical = Path(tmp) / "stm32f0-commercial-icpn.csv"
+            plan = self._historical_plan(canonical)
+            self.assertEqual(plan["candidate_count"], 42)
+            self.assertEqual(plan["production_snapshot"]["exact_icpn_count"], 502)
+            self.assertEqual(plan["production_snapshot"]["base_device_count"], 175)
+            self.assertEqual(plan["canonical_rows_before"], 0)
+
+            write_empty_canonical(canonical)
+            first = write_canonical_dataset(plan=plan, canonical_path=canonical)
+            second = write_canonical_dataset(plan=plan, canonical_path=canonical)
+            self.assertEqual(first["status"], "written")
+            self.assertEqual(first["rows_after"], 42)
+            self.assertEqual(second["status"], "no_op")
+            self.assertEqual(file_sha256(canonical), EXPECTED_CANONICAL_SHA256)
+
+    def test_current_published_canonical_cannot_be_re_admitted(self) -> None:
+        with self.assertRaisesRegex(AdmissionError, "zero-row STM32F0 canonical prestate"):
+            build_admission_plan()
+
+    def test_published_metadata_contract_is_preserved(self) -> None:
+        with CURRENT_CANONICAL.open(newline="", encoding="utf-8") as handle:
+            rows = {row["icpn"]: row for row in csv.DictReader(handle)}
+        self.assertEqual(rows["STM32F078CBY6TR"]["package"], "WLCSP")
+        self.assertEqual(rows["STM32F078CBY6TR"]["pin_count"], "49")
+        self.assertEqual(rows["STM32F098CCT7"]["flash_size"], "256 KiB")
+        self.assertEqual(rows["STM32F071C8U7"]["temperature_grade"], "-40 to 105 C")
+        self.assertEqual(rows["STM32F030C6T6"]["openocd_target_config"], "tcl/target/stm32f0x.cfg")
 
 
 if __name__ == "__main__":
