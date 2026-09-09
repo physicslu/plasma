@@ -1,0 +1,83 @@
+name: STM32F3 Phase 4.4D runtime snapshot update one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f3-phase44d-publication
+    paths:
+      - .github/workflows/stm32f3-phase44d-runtime-snapshot-update-oneoff.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-runtime-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32f3-phase44d-publication
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Decouple historical tests and advance current release snapshot
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('software/python/tests')
+          phase_files = sorted(root.glob('test_device_catalog_phase42*.py'))
+          targets = []
+          for path in phase_files:
+              text = path.read_text(encoding='utf-8')
+              if 'EXPECTED_PRODUCTION_CATALOG_SIZE = 492' in text:
+                  targets.append(path)
+          assert len(targets) == 12, [str(path) for path in targets]
+
+          for path in targets:
+              lines = path.read_text(encoding='utf-8').splitlines(keepends=True)
+              filtered = [line for line in lines if 'EXPECTED_PRODUCTION_CATALOG_SIZE' not in line]
+              new = ''.join(filtered)
+              assert 'EXPECTED_PRODUCTION_CATALOG_SIZE' not in new
+              path.write_text(new, encoding='utf-8')
+
+          release = root / 'test_device_catalog.py'
+          text = release.read_text(encoding='utf-8')
+          replacements = {
+              'EXPECTED_PRODUCTION_CATALOG_SIZE = 492\n': 'EXPECTED_PRODUCTION_CATALOG_SIZE = 502\n',
+              'EXPECTED_STM32F2_CATALOG_SIZE = 33\n': 'EXPECTED_STM32F2_CATALOG_SIZE = 33\nEXPECTED_STM32F3_CATALOG_SIZE = 10\n',
+              '{"STM32F1", "STM32F2", "STM32F4"}': '{"STM32F1", "STM32F2", "STM32F3", "STM32F4"}',
+              'assert metadata["source_count"] == 3': 'assert metadata["source_count"] == 4',
+              '                {"family": "STM32F2", "count": EXPECTED_STM32F2_CATALOG_SIZE},\n                {"family": "STM32F4", "count": EXPECTED_STM32F4_CATALOG_SIZE},': '                {"family": "STM32F2", "count": EXPECTED_STM32F2_CATALOG_SIZE},\n                {"family": "STM32F3", "count": EXPECTED_STM32F3_CATALOG_SIZE},\n                {"family": "STM32F4", "count": EXPECTED_STM32F4_CATALOG_SIZE},',
+          }
+          for old, new in replacements.items():
+              assert old in text, old
+              text = text.replace(old, new, 1)
+          release.write_text(text, encoding='utf-8')
+
+          gateway = root / 'test_device_catalog_web_gateway.py'
+          text = gateway.read_text(encoding='utf-8')
+          assert text.count('EXPECTED_PRODUCTION_CATALOG_SIZE = 492') == 1
+          text = text.replace(
+              'EXPECTED_PRODUCTION_CATALOG_SIZE = 492',
+              'EXPECTED_PRODUCTION_CATALOG_SIZE = 502',
+              1,
+          )
+          gateway.write_text(text, encoding='utf-8')
+
+          remaining = []
+          for path in root.glob('test_device_catalog*.py'):
+              if 'EXPECTED_PRODUCTION_CATALOG_SIZE = 492' in path.read_text(encoding='utf-8'):
+                  remaining.append(str(path))
+          assert not remaining, remaining
+          print('HISTORICAL_PHASE_FILES_DECOUPLED=12')
+          print('CURRENT_RELEASE_SIZE=502')
+          PY
+          git diff --check
+      - name: Commit deterministic runtime snapshot update
+        run: |
+          git config user.name "plasma-ci"
+          git config user.email "plasma-ci@users.noreply.github.com"
+          git add software/python/tests
+          git commit -m "test: advance Production runtime snapshot to 502"
+          git push origin HEAD:agent/device-catalog-stm32f3-phase44d-publication
