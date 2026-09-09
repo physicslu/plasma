@@ -4,6 +4,13 @@
 Commercial identity/lifecycle authority comes from retained ST evidence.
 OpenOCD routing is recorded as an orthogonal observation and never gates the
 existence/selectability of a legitimate commercial ICPN.
+
+Phase 4.6B is a discovery gate, not an admission gate. A deterministic target
+may therefore resolve to Active exact ICPNs, to manufacturer-verified
+non-Active identities (for example NRND/Proposal), or to an unavailable
+canonical ST product page. The latter two are fail-closed exclusions, not
+acquisition failures. Only transport/parser/identity ambiguity requires manual
+intervention.
 """
 
 from __future__ import annotations
@@ -33,6 +40,7 @@ DEFAULT_MANIFEST = HERE / "stm32f7-phase4.6b-discovery-manifest.json"
 DEFAULT_OUTPUT = Path("/tmp/stm32f7-phase4.6b-live-summary.json")
 MAX_TARGETS = len(EXPECTED_SUBFAMILIES)
 MIN_DELAY_SECONDS = 1.0
+CANONICAL_PAGE_404 = "browser navigation returned HTTP 404"
 
 
 @dataclass(frozen=True)
@@ -143,12 +151,29 @@ def resolve_mapping(
 
 
 def _overall_routing_status(mappings: list[dict[str, Any]]) -> str:
+    if not mappings:
+        return "not_applicable"
     statuses = Counter(str(item.get("status")) for item in mappings)
     if statuses == Counter({"unique": len(mappings)}):
         return "unique"
     if statuses["ambiguous"]:
         return "ambiguous"
     return "unmapped"
+
+
+def _excluded_icpns(excluded: list[object], base_device: str) -> list[str]:
+    identities: list[str] = []
+    for item in excluded:
+        if not isinstance(item, dict):
+            raise AcquisitionError(f"{base_device}: lifecycle exclusion must be an object")
+        icpn = item.get("icpn")
+        status = item.get("marketing_status")
+        if not isinstance(icpn, str) or not icpn.startswith(base_device):
+            raise AcquisitionError(f"{base_device}: invalid lifecycle-excluded ICPN")
+        if not isinstance(status, str) or not status.strip():
+            raise AcquisitionError(f"{base_device}: lifecycle exclusion lacks Marketing Status")
+        identities.append(icpn)
+    return identities
 
 
 def run_discovery(
@@ -162,9 +187,12 @@ def run_discovery(
 ) -> dict[str, object]:
     results: list[dict[str, object]] = []
     routing_counts: Counter[str] = Counter()
+    disposition_counts: Counter[str] = Counter()
     active_candidates = 0
     excluded_candidates = 0
     acquisition_success = 0
+    acquisition_failure = 0
+    verified_identity_targets = 0
 
     for target in targets:
         result: dict[str, object] = {
@@ -198,13 +226,14 @@ def run_discovery(
                 raise AcquisitionError(
                     f"{target.base_device}: excluded lifecycle rows must be a list"
                 )
-            if not raw_icpns:
-                raise AcquisitionError(
-                    f"{target.base_device}: official ST page has no Active exact ICPN"
-                )
+            excluded_ids = _excluded_icpns(excluded, target.base_device)
             if any(not value.startswith(target.base_device) for value in raw_icpns):
                 raise AcquisitionError(
                     f"{target.base_device}: evidence contains a foreign exact ICPN"
+                )
+            if not raw_icpns and not excluded_ids:
+                raise AcquisitionError(
+                    f"{target.base_device}: manufacturer page produced no exact identity disposition"
                 )
 
             mappings = [
@@ -212,9 +241,19 @@ def run_discovery(
                 for value in raw_icpns
             ]
             overall = _overall_routing_status(mappings)
+            if raw_icpns:
+                disposition = "active_candidates"
+                identity_status = "verified_active"
+                routing_counts[overall] += 1
+            else:
+                disposition = "lifecycle_excluded"
+                identity_status = "verified_non_active_only"
+                routing_counts["not_applicable"] += 1
+
             result.update(
                 acquisition_status="success",
-                commercial_identity_status="verified_active",
+                disposition=disposition,
+                commercial_identity_status=identity_status,
                 evidence=evidence,
                 routing_observations=mappings,
                 openocd_routing={
@@ -231,42 +270,82 @@ def run_discovery(
                 },
             )
             acquisition_success += 1
+            verified_identity_targets += 1
             active_candidates += len(raw_icpns)
-            excluded_candidates += len(excluded)
-            routing_counts[overall] += 1
+            excluded_candidates += len(excluded_ids)
+            disposition_counts[disposition] += 1
         except (AcquisitionError, OSError) as exc:
-            result.update(
-                acquisition_status="failure",
-                commercial_identity_status="unverified",
-                error_type=type(exc).__name__,
-                error=str(exc),
-            )
+            if isinstance(exc, AcquisitionError) and str(exc) == CANONICAL_PAGE_404:
+                result.update(
+                    acquisition_status="source_unavailable",
+                    disposition="source_unavailable_excluded",
+                    commercial_identity_status="unverified",
+                    source_unavailable_status="http_404",
+                    manual_intervention_required=False,
+                    error_type=type(exc).__name__,
+                    error=str(exc),
+                )
+                disposition_counts["source_unavailable_excluded"] += 1
+                routing_counts["not_applicable"] += 1
+            else:
+                result.update(
+                    acquisition_status="failure",
+                    disposition="manual_review",
+                    commercial_identity_status="unverified",
+                    manual_intervention_required=True,
+                    error_type=type(exc).__name__,
+                    error=str(exc),
+                )
+                acquisition_failure += 1
+                disposition_counts["manual_review"] += 1
         results.append(result)
 
-    acquisition_failure = len(targets) - acquisition_success
+    source_unavailable = disposition_counts["source_unavailable_excluded"]
+    manual_review = disposition_counts["manual_review"]
+    dispositioned = (
+        disposition_counts["active_candidates"]
+        + disposition_counts["lifecycle_excluded"]
+        + source_unavailable
+    )
     commercial_identity_clean = (
         len(targets) == MAX_TARGETS
-        and acquisition_success == MAX_TARGETS
+        and verified_identity_targets == MAX_TARGETS
+        and source_unavailable == 0
+        and manual_review == 0
+    )
+    bounded_discovery_clean = (
+        len(targets) == MAX_TARGETS
+        and dispositioned == MAX_TARGETS
+        and manual_review == 0
         and acquisition_failure == 0
         and active_candidates > 0
     )
+
     summary: dict[str, object] = {
         "schema_version": 1,
         "phase": PHASE,
         "family": FAMILY,
         "pilot_id": pilot_id,
-        "scope": "bounded read-only official-ST STM32F7 commercial identity discovery",
+        "scope": "bounded read-only official-ST STM32F7 commercial identity/lifecycle discovery",
         "attempted": len(targets),
         "acquisition_success": acquisition_success,
         "acquisition_failure": acquisition_failure,
+        "active_candidate_targets": disposition_counts["active_candidates"],
+        "lifecycle_excluded_targets": disposition_counts["lifecycle_excluded"],
+        "source_unavailable_exclusions": source_unavailable,
+        "dispositioned_targets": dispositioned,
+        "commercial_identity_verified_targets": verified_identity_targets,
+        "commercial_identity_unresolved_targets": source_unavailable,
         "active_exact_icpn_candidates": active_candidates,
         "excluded_non_active_part_numbers": excluded_candidates,
         "commercial_identity_clean": commercial_identity_clean,
-        "identity_manual_intervention_required": acquisition_failure,
+        "bounded_discovery_clean": bounded_discovery_clean,
+        "identity_manual_intervention_required": manual_review,
         "openocd_routing": {
             "unique": routing_counts["unique"],
             "ambiguous": routing_counts["ambiguous"],
             "unmapped": routing_counts["unmapped"],
+            "not_applicable": routing_counts["not_applicable"],
             "gates_commercial_identity": False,
         },
         "routing_followup_required": routing_counts["ambiguous"] + routing_counts["unmapped"],
@@ -284,15 +363,15 @@ def run_discovery(
 
 
 def discovery_is_clean(summary: dict[str, object]) -> bool:
-    """Commercial-identity clean gate; routing state is intentionally orthogonal."""
+    """Bounded discovery clean gate; routing and lifecycle exclusions are orthogonal."""
 
     claims = summary.get("claims")
     routing = summary.get("openocd_routing")
     return (
         summary.get("attempted") == MAX_TARGETS
-        and summary.get("acquisition_success") == MAX_TARGETS
+        and summary.get("dispositioned_targets") == MAX_TARGETS
         and summary.get("acquisition_failure") == 0
-        and summary.get("commercial_identity_clean") is True
+        and summary.get("bounded_discovery_clean") is True
         and summary.get("identity_manual_intervention_required") == 0
         and isinstance(summary.get("active_exact_icpn_candidates"), int)
         and int(summary["active_exact_icpn_candidates"]) > 0
