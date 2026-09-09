@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 from stm32f7_phase4_6d_admission import admission_plan_is_clean, build_admission_plan
@@ -34,7 +35,9 @@ def main() -> int:
         if sha256(PLAN_PATH) != EXPECTED_PLAN_SHA256:
             raise RuntimeError("frozen Phase 4.6D admission-plan byte digest mismatch")
         frozen = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
-        replay = build_admission_plan()
+        with tempfile.TemporaryDirectory() as td:
+            historical_canonical = Path(td) / "stm32f7-commercial-icpn.csv"
+            replay = build_admission_plan(canonical_path=historical_canonical)
         if not admission_plan_is_clean(replay):
             raise RuntimeError("replayed Phase 4.6D admission plan is not clean")
         if replay != frozen:
