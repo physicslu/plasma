@@ -100,7 +100,7 @@ class ResolvedICSupport:
 
     The historical class name is retained for compatibility while the runtime
     promotion boundary is established. An instance is not automatically trusted
-    merely because equivalent research data exists under data/ic-support/.
+    merely because equivalent AI research data exists elsewhere in the repository.
     """
 
     icpn: str
@@ -161,8 +161,7 @@ class ICSupportResolver:
     """Resolve exact ICPNs from an explicitly supplied runtime capability set.
 
     This loader has deliberately **no repository default** and no environment
-    fallback. `data/ic-support/` is the AI IC Support research workstream and is
-    not a production runtime source. A future promotion step may materialize a
+    fallback to another workstream. A future promotion step may materialize a
     SW-owned capability package and explicitly pass its root to this loader.
     """
 
