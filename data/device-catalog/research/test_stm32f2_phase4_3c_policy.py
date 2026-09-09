@@ -154,11 +154,12 @@ class STM32F2Phase43CPolicyTests(unittest.TestCase):
         sources = {source["family"]: source for source in manifest["sources"]}
         self.assertEqual(
             set(sources),
-            {"STM32F0", "STM32F1", "STM32F2", "STM32F3", "STM32F4"},
+            {"STM32F0", "STM32F1", "STM32F2", "STM32F3", "STM32F4", "STM32F7"},
         )
         self.assertEqual(sources["STM32F0"]["row_count"], 42)
         self.assertGreaterEqual(sources["STM32F2"]["row_count"], self.plan["policy_ready_count"])
         self.assertEqual(sources["STM32F3"]["row_count"], 10)
+        self.assertEqual(sources["STM32F7"]["row_count"], 19)
         self.assertEqual(
             self.plan["production_snapshot"],
             {
