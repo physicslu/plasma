@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "phase": "4.5A",
+  "family": "STM32F0",
+  "source_row_count": 111,
+  "subfamily_counts": {
+    "STM32F030": 7,
+    "STM32F031": 10,
+    "STM32F038": 5,
+    "STM32F042": 13,
+    "STM32F048": 3,
+    "STM32F051": 17,
+    "STM32F058": 4,
+    "STM32F070": 4,
+    "STM32F071": 10,
+    "STM32F072": 13,
+    "STM32F078": 7,
+    "STM32F091": 11,
+    "STM32F098": 7
+  },
+  "target_config": "tcl/target/stm32f0x.cfg",
+  "initial_targets": [
+    {"subfamily": "STM32F030", "base_device": "STM32F030C6"},
+    {"subfamily": "STM32F031", "base_device": "STM32F031C4"},
+    {"subfamily": "STM32F038", "base_device": "STM32F038C6"},
+    {"subfamily": "STM32F042", "base_device": "STM32F042C4"},
+    {"subfamily": "STM32F048", "base_device": "STM32F048C6"},
+    {"subfamily": "STM32F051", "base_device": "STM32F051C4"},
+    {"subfamily": "STM32F058", "base_device": "STM32F058C8"},
+    {"subfamily": "STM32F070", "base_device": "STM32F070C6"},
+    {"subfamily": "STM32F071", "base_device": "STM32F071C8"},
+    {"subfamily": "STM32F072", "base_device": "STM32F072C8"},
+    {"subfamily": "STM32F078", "base_device": "STM32F078CB"},
+    {"subfamily": "STM32F091", "base_device": "STM32F091CB"},
+    {"subfamily": "STM32F098", "base_device": "STM32F098CC"}
+  ],
+  "claims": {
+    "manufacturer_evidence_retained": false,
+    "exact_commercial_icpn_asserted": false,
+    "canonical_dataset_admission": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  }
+}
