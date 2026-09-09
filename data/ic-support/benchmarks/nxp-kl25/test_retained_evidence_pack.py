@@ -27,11 +27,15 @@ class KL25RetainedEvidencePackTest(unittest.TestCase):
         cls.builder = load_builder()
         cls.retained = json.loads((HERE / "retained-evidence-pack-build.json").read_text(encoding="utf-8"))
         cls.contract = json.loads((HERE / "evidence-pack-contract.json").read_text(encoding="utf-8"))
-        cls.definitions = json.loads((HERE / "reviewed-evidence-unit-definitions.json").read_text(encoding="utf-8"))
-        cls.binding = json.loads((HERE / "applicability-binding.json").read_text(encoding="utf-8"))
+        # Gate 5.6 changes the active Program Longword boundary. The original
+        # Gate 3 retained proof must remain bound to the exact v0 inputs that
+        # produced it rather than being silently reinterpreted against the
+        # corrected active catalog.
+        cls.definitions = json.loads((HERE / "reviewed-evidence-unit-definitions-v0.json").read_text(encoding="utf-8"))
+        cls.binding = json.loads((HERE / "applicability-binding-v0.json").read_text(encoding="utf-8"))
         cls.source_lock = json.loads((HERE / "source-lock.json").read_text(encoding="utf-8"))
 
-    def test_retained_live_provenance_is_bound_to_current_deterministic_inputs(self):
+    def test_retained_live_provenance_is_bound_to_historical_v0_deterministic_inputs(self):
         retained = self.retained
         self.assertEqual(retained["target"], "MKL25Z128VLK4")
         self.assertEqual(
