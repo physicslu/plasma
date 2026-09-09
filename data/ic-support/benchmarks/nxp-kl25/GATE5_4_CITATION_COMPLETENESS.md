@@ -6,7 +6,7 @@ Target: `MKL25Z128VLK4`
 
 Gate 5.4 addresses the remaining provenance-quality defect observed after the retained Gate 5.3 semantic run passed manufacturer-evidence truth review.
 
-The retained run remains immutable:
+The retained Gate 5.3 run remains immutable:
 
 ```text
 /storage/projects/plasma-benchmark/nxp-kl25/runs/20260908T052459Z
@@ -22,23 +22,14 @@ citation_pass           = 3
 citation_needs_repair   = 5
 ```
 
-Six facts were semantically supported by the full deterministic Evidence Pack but had incomplete fact-local citations:
-
-- `nxp-kl25-debug-security-interaction-v0-1`
-- `nxp-kl25-ftfa-command-sequencing-v0-4`
-- `nxp-kl25-ftfa-register-model-v0-2`
-- `nxp-kl25-program-longword-v0-1`
-- `nxp-kl25-swd-mdm-ap-v0-2`
-- `nxp-kl25-swd-mdm-ap-v0-3`
-
-This is not classified as a semantic contradiction. The evidence showed a narrower failure mode: a compound fact could be correct when checked against the full Evidence Pack while its own citation list did not cover every material clause.
+Six facts were semantically supported by the full deterministic Evidence Pack but had incomplete fact-local citations. This is not classified as a semantic contradiction. The narrower defect is that a compound fact can be correct against the full Evidence Pack while its own citation list fails to support every material clause.
 
 ## First-principles distinction
 
 Gate 5.4 keeps two independent questions separate:
 
 ```text
-semantic truth       = is the complete claim supported somewhere in the bounded manufacturer Evidence Pack?
+semantic truth        = is the complete claim supported somewhere in the bounded manufacturer Evidence Pack?
 citation completeness = do this fact's own cited pages support every material clause in that claim?
 ```
 
@@ -52,77 +43,122 @@ A semantic PASS does not erase a citation defect.
 contract_id = nxp-kl25-semantic-extraction-v1
 ```
 
-The output contract now requires a citation-completeness policy with these properties:
+The output contract requires:
 
-- facts should be atomic;
-- every material clause requires complete evidence;
-- a multi-page claim must cite every manufacturer page needed for complete support;
-- materially disjoint clauses should be split into separate facts;
-- irrelevant citation padding is forbidden.
+- atomic facts where practical;
+- every material clause to have complete evidence;
+- multi-page claims to cite every necessary manufacturer page;
+- materially disjoint clauses to be split when possible;
+- irrelevant citation padding to remain forbidden.
 
-The semantic prompt gives one generic locality example only: if one page establishes a register address and another establishes a field meaning, a statement claiming both must cite both pages or be split into atomic facts with local citations.
-
-No KL25 per-unit answer key or expected page list is injected into the model prompt.
+The prompt includes only a generic locality example and does not expose KL25 per-unit answer keys.
 
 ## Deterministic trust boundary
 
-The deterministic parser continues to enforce:
+The deterministic parser enforces representation, exact primary-unit coverage, global fact-id uniqueness, fact kinds, non-empty evidence arrays, duplicate-ref rejection, and Evidence Pack membership.
 
-- one structured semantic response;
-- exact primary-unit coverage;
-- globally unique `fact_id` values;
-- allowed fact kinds;
-- non-empty evidence arrays;
-- no duplicate evidence refs inside a fact;
-- every citation must belong to that unit's admitted Evidence Pack.
-
-It deliberately does **not** claim to infer whether a natural-language clause is completely supported by a particular page. That would require semantic interpretation and would turn deterministic code into a hidden fuzzy reviewer.
-
-Manufacturer-evidence review therefore remains mandatory for citation completeness.
+It deliberately does **not** infer whether natural-language content is fully supported by the cited pages. Manufacturer-evidence review remains mandatory for semantic and citation completeness.
 
 ## Qualification contract v4
 
-The live qualification contract is revised to:
+Gate 5.4 originally used:
 
 ```text
 contract_id          = nxp-kl25-live-model-qualification-v4
 semantic_contract_id = nxp-kl25-semantic-extraction-v1
+num_ctx               = 65536
+max_tokens            = 8192
 ```
 
-The review policy now explicitly records that semantic truth and citation quality are independent, and that complete fact citations are required for review acceptance.
+The first Gate 5.4 live run is retained immutably at:
 
-Gate 5.4 does not alter:
+```text
+/storage/projects/plasma-benchmark/nxp-kl25/runs/20260909T010751Z
+```
+
+Observed provider telemetry:
+
+```text
+semantic_status      = error
+qualification_status = REJECTED_INTEGRITY
+input_tokens         = 23565
+generation_tokens    = 8192
+done_reason          = length
+raw_json_complete    = false
+```
+
+The failure occurred exactly at the configured generation ceiling. The 64K context envelope was not exhausted:
+
+```text
+23565 + 8192 = 31757 < 65536
+```
+
+Therefore this retained run is classified as output-envelope negative evidence, not as a citation-completeness result. It must not be repaired or overwritten.
+
+## Gate 5.4A corrective amendment
+
+Gate 5.4A is a narrow, explicitly approved corrective amendment. It changes only the live output ceiling:
+
+```text
+contract_id          = nxp-kl25-live-model-qualification-v4.1
+semantic_contract_id = nxp-kl25-semantic-extraction-v1
+num_ctx               = 65536
+max_tokens            = 16384
+```
+
+Frozen across v4 → v4.1:
 
 - Gate-3 Evidence Packs;
 - target-bundle digest;
 - pre-AI manifest digest;
 - source lock;
 - applicability binding;
+- semantic extraction contract and prompt;
 - compact-context strategy;
-- local model identity;
-- 64K context / 8192 output envelope;
-- retained prior runs.
+- local model identity and digest;
+- temperature, seed, and timeout;
+- screening vocabulary;
+- review policy;
+- all retained prior runs.
+
+The correction is driven by observed telemetry rather than speculative prompt tuning. With the observed input size, the revised worst-case envelope is:
+
+```text
+23565 + 16384 = 39949 < 65536
+headroom             = 25587
+```
+
+Exactly one corrective live run is allowed after model-free CI passes. If it again ends with `done_reason=length`, stop and re-evaluate output granularity instead of automatically increasing the limit again.
 
 ## Model-free CI
 
-Repository CI validates the Gate 5.4 policy without model weights or external inference.
+Repository CI validates the citation contract and the frozen v4.1 runtime envelope without model weights or external inference. Tests verify:
 
-Synthetic tests prove that:
+- semantic contract remains `nxp-kl25-semantic-extraction-v1`;
+- qualification contract is `nxp-kl25-live-model-qualification-v4.1`;
+- `num_ctx` remains `65536`;
+- `max_tokens` is exactly `16384`;
+- atomic-fact and complete-citation requirements remain active;
+- provider schema supports multi-page citations and split atomic facts;
+- missing citation policy fails closed;
+- live execution wiring propagates the frozen 16K output envelope into retained provenance.
 
-- the versioned contracts enable all Gate 5.4 citation policies;
-- the rendered model prompt contains the atomic-fact and complete-citation requirements;
-- the structured output schema supports a compound fact citing multiple pages;
-- the schema also supports splitting that compound statement into atomic facts with local citations;
-- deleting the Gate 5.4 citation policy fails closed before provider schema use;
-- the parser does not pretend that citation membership alone proves semantic completeness.
+## Corrective live acceptance
 
-## Live acceptance
+After model-free CI passes, run exactly one new `qwen3.8:27b-mlx` inference under the existing SWPC-to-Mac loopback/reverse-tunnel topology.
 
-After model-free CI passes, exactly one new `qwen3.8:27b-mlx` live semantic run is allowed under the established SWPC-to-Mac reverse-tunnel topology.
+First-stage acceptance:
 
-The new run is a new experiment because the semantic extraction contract and prompt changed. It must be retained separately and must not overwrite `20260908T052459Z`.
+```text
+FULL_JSON                         = PASS
+semantic_status                   = success
+provider_done_reason              = stop
+integrity                         = PASS
+semantic_screening                = PASS
+qualification_status              = READY_FOR_REVIEW
+```
 
-The post-run manufacturer review acceptance target is:
+Then manufacturer review requires:
 
 ```text
 semantic_pass             = 8
@@ -131,21 +167,10 @@ citation_pass             = 8
 citation_needs_repair     = 0
 ```
 
-If any semantic fact fails, investigate the fact; do not tune the prompt to force PASS.
-
-If semantic truth passes but citation completeness still fails, retain the run as negative provenance evidence and diagnose the remaining locality defect. Do not repair the model response in place.
-
 Only after both semantic truth and citation completeness pass may an authoritative `kl25_reviewed_semantic_verdict` be issued for that exact semantic-run digest and deterministic requalification proceed toward `QUALIFIED`.
 
 ## Admission boundary
 
-Gate 5.4 does not admit:
+Gate 5.4 / 5.4A does not admit semantic extraction quality globally, model quality globally, canonical dataset content, HIL, production programming, or destructive security operations.
 
-- semantic extraction quality globally;
-- model quality globally;
-- canonical dataset content;
-- HIL;
-- production programming;
-- destructive security operations.
-
-A future `QUALIFIED` result is scoped to the exact retained KL25 live-model run and its reviewed manufacturer evidence.
+A future `QUALIFIED` result remains scoped to the exact retained KL25 live-model run and its reviewed manufacturer evidence.
