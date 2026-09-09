@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Gate 5.5 experimental mock-only unit extraction and deterministic aggregation.
+"""Gate 5.5 bounded unit extraction and deterministic aggregation core.
 
-No provider client or live CLI is wired here. All eight original packs are
-validated before constructing isolated requests; no subset manifest is invented.
+The default execution profile remains the Gate 5.5 mock-only contract. This
+module contains no provider client and no live CLI. A separately gated caller
+may supply an explicit execution profile; request provenance then binds that
+external execution contract without changing the Gate 5.5 base policy.
 """
 from __future__ import annotations
 
@@ -18,6 +20,7 @@ import semantic_runner
 
 HERE = Path(__file__).resolve().parent
 POLICY_PATH = HERE / "bounded-extraction-contract.json"
+HEX = set("0123456789abcdef")
 
 
 class BoundedExtractionError(ValueError):
@@ -31,7 +34,7 @@ def require(condition: bool, message: str) -> None:
 
 def policy() -> dict[str, Any]:
     value = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-    require(value["execution_mode"] == "mock_only", "live execution is not enabled")
+    require(value["execution_mode"] == "mock_only", "Gate 5.5 base policy must remain mock_only")
     require(value["generation"] == {
         "num_ctx": 65536, "max_tokens": 8192, "temperature": 0.0,
         "seed": 0, "timeout_seconds": 1800.0,
@@ -46,19 +49,51 @@ def _digest_without(value: dict[str, Any], key: str) -> str:
     return builder.canonical_sha256({k: v for k, v in value.items() if k != key})
 
 
+def _execution_profile(value: dict[str, Any] | None) -> dict[str, Any]:
+    rules = policy()
+    if value is None:
+        digest = builder.canonical_sha256(rules)
+        return {
+            "contract_id": rules["contract_id"],
+            "contract_digest": digest,
+            "execution_mode": "mock_only",
+            "transport": "mock",
+            "runtime_label": "gate55-model-free",
+            "generation": copy.deepcopy(rules["generation"]),
+            "automatic_retries": 0,
+            "primary_unit_count": rules["primary_unit_count"],
+        }
+
+    require(isinstance(value, dict), "execution profile must be an object")
+    profile = copy.deepcopy(value)
+    for key in ("contract_id", "contract_digest", "execution_mode", "transport", "runtime_label"):
+        require(isinstance(profile.get(key), str) and bool(profile[key].strip()), f"execution profile {key} required")
+    digest = profile["contract_digest"].lower()
+    require(len(digest) == 64 and all(c in HEX for c in digest), "execution contract digest malformed")
+    profile["contract_digest"] = digest
+    require(profile.get("generation") == rules["generation"], "execution generation must equal bounded base envelope")
+    require(profile.get("automatic_retries") == 0, "execution profile retries are forbidden")
+    require(profile.get("primary_unit_count") == rules["primary_unit_count"], "execution profile unit count mismatch")
+    require(profile.get("execution_mode") != "mock_only", "external execution profile must not impersonate Gate 5.5 mock mode")
+    return profile
+
+
 def prepare_requests(
     *, contract: dict[str, Any], pre_ai_manifest: dict[str, Any],
     packs: dict[str, dict[str, Any]], evidence_text: dict[str, str],
     model_id: str, model_digest: str,
+    execution_profile: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Validate the complete input, then render exactly one original pack per request."""
+    """Validate the complete input, then render exactly one admitted pack per request."""
     rules = policy()
+    execution = _execution_profile(execution_profile)
     require(contract.get("contract_id") == rules["semantic_contract_id"], "semantic contract mismatch")
     require(contract.get("schema_version") == semantic.SEMANTIC_SCHEMA_VERSION, "semantic schema mismatch")
     require(contract.get("target") == pre_ai_manifest.get("target") == rules["target"], "target mismatch")
     require(isinstance(model_id, str) and bool(model_id.strip()), "model identity required")
     require(isinstance(model_digest, str) and len(model_digest) == 64
-            and all(c in "0123456789abcdef" for c in model_digest), "model digest required")
+            and all(c in HEX for c in model_digest.lower()), "model digest required")
+    model_digest = model_digest.lower()
     require(all(contract.get("admission", {}).get(k) is False for k in rules["admission"]),
             "semantic admissions must remain denied")
     builder.validate_pre_ai_manifest(
@@ -68,13 +103,12 @@ def prepare_requests(
     )
     primary = semantic._pack_by_primary(packs)
     require(len(primary) == rules["primary_unit_count"], "expected exactly eight primary packs")
-    # Verify pack content, not merely equality of stored digest labels.
     for pack_id, pack in packs.items():
         require(pack.get("pack_id") == pack_id, "pack identity mismatch")
         require(pack.get("target") == rules["target"], "pack target mismatch")
         require(pack.get("pack_digest") == _digest_without(pack, "pack_digest"), "pack content digest mismatch")
-    # Validates framing, page hashes, duplicate physical pages and cross-pack conflicts.
-    # The assembled global context is discarded and is never sent to the transport.
+    # Validate framing/page hashes/cross-pack conflicts. The global context is
+    # discarded; every transport call receives only one admitted pack.
     semantic_context.assemble_compact_model_context(pre_ai_manifest, packs=packs, evidence_text=evidence_text)
 
     code_fingerprints = {name: builder.sha256_file(HERE / name) for name in (
@@ -88,7 +122,6 @@ def prepare_requests(
         schema = semantic.build_output_json_schema(contract, packs=one_pack)
         refs = sorted(semantic._allowed_page_refs(pack))
         evidence_schema = schema["properties"]["unit_results"]["items"]["properties"]["facts"]["items"]["properties"]["evidence"]
-        # Pair-wise alternatives avoid allowing an invalid cross-product of source/page values.
         evidence_schema["items"] = {"anyOf": [
             {"type": "object", "additionalProperties": False,
              "required": ["source_id", "pdf_page_number"],
@@ -103,7 +136,7 @@ def prepare_requests(
             + evidence_text[pack_id]
         )
         prompt, _ = semantic.render_prompt(context, contract=contract, packs=one_pack)
-        options = {**rules["generation"], "format_schema": schema}
+        options = {**execution["generation"], "format_schema": schema}
         binding = {
             "target": rules["target"], "primary_unit_id": unit_id, "pack_id": pack_id,
             "pack_digest": pack["pack_digest"],
@@ -111,15 +144,18 @@ def prepare_requests(
             "pre_ai_manifest_digest": pre_ai_manifest["manifest_digest"],
             "semantic_contract_digest": builder.canonical_sha256(contract),
             "bounded_contract_digest": builder.canonical_sha256(rules),
+            "execution_contract_id": execution["contract_id"],
+            "execution_contract_digest": execution["contract_digest"],
+            "execution_mode": execution["execution_mode"],
             "model_id": model_id, "model_digest": model_digest,
             "code_fingerprints": code_fingerprints,
-            "transport": "mock", "runtime_label": "gate55-model-free",
+            "transport": execution["transport"], "runtime_label": execution["runtime_label"],
             "context_sha256": builder.sha256_text(context),
             "context_bytes": len(context.encode("utf-8")),
             "evidence_sha256": builder.sha256_text(evidence_text[pack_id]),
             "prompt_sha256": builder.sha256_text(prompt),
             "output_schema_sha256": builder.canonical_sha256(schema),
-            "generation": copy.deepcopy(rules["generation"]),
+            "generation": copy.deepcopy(execution["generation"]),
         }
         binding["request_digest"] = builder.canonical_sha256(binding)
         requests.append({"binding": binding, "prompt": prompt, "options": options})
@@ -145,7 +181,6 @@ def _validate_completion(metadata: Any, binding: dict[str, Any]) -> None:
 
 
 def _parse(raw_text: str, *, contract: dict[str, Any], packs: dict[str, Any]) -> dict[str, Any]:
-    # json.loads normally silently accepts duplicate keys; do not normalize them.
     def unique_pairs(pairs):
         result = {}
         for key, value in pairs:
@@ -165,6 +200,7 @@ def aggregate_results(
     children: list[dict[str, Any]], *, contract: dict[str, Any],
     pre_ai_manifest: dict[str, Any], packs: dict[str, dict[str, Any]],
     evidence_text: dict[str, str], model_id: str, model_digest: str,
+    execution_profile: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Revalidate retained children against independently regenerated requests.
 
@@ -173,12 +209,16 @@ def aggregate_results(
     """
     requests = prepare_requests(contract=contract, pre_ai_manifest=pre_ai_manifest,
                                 packs=packs, evidence_text=evidence_text,
-                                model_id=model_id, model_digest=model_digest)
+                                model_id=model_id, model_digest=model_digest,
+                                execution_profile=execution_profile)
     expected = {r["binding"]["primary_unit_id"]: r["binding"] for r in requests}
     rules = policy()
+    execution = _execution_profile(execution_profile)
     result: dict[str, Any] = {
         "schema_version": "0.1.0", "artifact_type": "kl25_bounded_aggregate",
         "bounded_contract_id": rules["contract_id"],
+        "execution_contract_id": execution["contract_id"],
+        "execution_mode": execution["execution_mode"],
         "target": rules["target"], "bundle_digest": pre_ai_manifest["bundle_digest"],
         "pre_ai_manifest_digest": pre_ai_manifest["manifest_digest"],
         "status": "REJECTED_INTEGRITY", "errors": [],
@@ -225,7 +265,6 @@ def aggregate_results(
         combined = {"schema_version": semantic.SEMANTIC_SCHEMA_VERSION, "target": rules["target"],
                     "unit_results": sorted(units, key=lambda u: u["primary_unit_id"])}
         try:
-            # Full-set parser also enforces global fact-ID uniqueness.
             parsed = semantic.parse_model_result(json.dumps(combined), contract=contract, packs=packs)
             result["response"] = parsed
             result["status"] = "INTEGRITY_PASS"
@@ -246,20 +285,24 @@ def execute_bounded_run(
     *, contract: dict[str, Any], pre_ai_manifest: dict[str, Any],
     packs: dict[str, dict[str, Any]], evidence_text: dict[str, str],
     transport: semantic_runner.TransportCallable, model_id: str, model_digest: str,
-    output_dir: Path,
+    output_dir: Path, execution_profile: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Execute one injected mock call per unit; retain artifacts in a NEW directory.
+    """Execute exactly one injected call per unit and retain a new artifact tree.
 
-    The callback is a trusted test dependency, never selected from configuration.
-    No built-in model client, URL, automatic retry or live entry point exists.
+    No built-in provider client, URL selection, retry, semantic repair, or live
+    entry point exists here. The caller owns transport selection and must supply
+    a separately governed execution profile for any non-mock execution.
     """
     inputs = copy.deepcopy({"contract": contract, "pre_ai_manifest": pre_ai_manifest,
                             "packs": packs, "evidence_text": evidence_text,
-                            "model_id": model_id, "model_digest": model_digest})
-    requests = prepare_requests(**inputs)  # Complete validation before any call or write.
+                            "model_id": model_id, "model_digest": model_digest,
+                            "execution_profile": execution_profile})
+    requests = prepare_requests(**inputs)
     output_dir.mkdir(parents=True, exist_ok=False)
     _write_json(output_dir / "request-manifest.json",
-                {"requests": [r["binding"] for r in requests]})
+                {"execution_contract_id": requests[0]["binding"]["execution_contract_id"],
+                 "execution_mode": requests[0]["binding"]["execution_mode"],
+                 "requests": [r["binding"] for r in requests]})
     children = []
     for index, request in enumerate(requests):
         binding = copy.deepcopy(request["binding"])
@@ -282,21 +325,18 @@ def execute_bounded_run(
             require(isinstance(raw, str), "raw response missing")
             child["raw_response"] = raw
             require(bool(raw.strip()), "raw response empty")
-            # Parse first so truncated JSON remains the primary diagnostic,
-            # while retaining provider length/stop metadata in either case.
             pack_id = binding["pack_id"]
             parsed = _parse(raw, contract=inputs["contract"], packs={pack_id: inputs["packs"][pack_id]})
             _validate_completion(child["transport_metadata"], binding)
             child["response"] = parsed
             child["status"] = "success"
-        except Exception as exc:  # A failed child is retained, never repaired or retried.
+        except Exception as exc:  # failed children are retained, never repaired/retried
             child["error"] = {"class": (semantic_runner._error_class(exc)
                                        if not isinstance(exc, BoundedExtractionError)
                                        else "bounded_integrity_error"),
                               "type": type(exc).__name__, "message": str(exc)}
         child["raw_response_sha256"] = builder.sha256_text(child["raw_response"])
         child["record_digest"] = builder.canonical_sha256(child)
-        # Persist each completed child before proceeding; file names are not model-controlled.
         unit_dir = output_dir / f"unit-{index + 1:02d}"
         unit_dir.mkdir()
         with (unit_dir / "raw-response.txt").open("x", encoding="utf-8", newline="") as stream:
