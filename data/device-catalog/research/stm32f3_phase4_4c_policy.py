@@ -48,7 +48,8 @@ DISCOVERY_PHASE = "4.4B"
 ADMISSION_PHASE = "4.4D"
 ADAPTER_ID = "stm32f3-phase4.4c"
 DEFAULT_POLICY_BASELINE = HERE / "stm32f3-phase4.4c-policy-baseline.json"
-DEFAULT_PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.json"
+DEFAULT_PRODUCTION_MANIFEST = HERE / "stm32f3-phase4.4d-production-manifest-prestate.json"
+DEFAULT_PRODUCTION_MANIFEST_BINDING_NAME = "icpn-v1-manifest.json"
 EXPECTED_CANDIDATE_COUNT = 10
 EXPECTED_PRODUCTION_EXACT_COUNT = 492
 EXPECTED_PRODUCTION_BASE_DEVICE_COUNT = 169
@@ -145,6 +146,7 @@ def build_policy_plan(
     *,
     catalog_path: Path = DEFAULT_CATALOG,
     production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,
+    production_manifest_binding_name: str | None = DEFAULT_PRODUCTION_MANIFEST_BINDING_NAME,
 ) -> dict[str, Any]:
     retained = validate_retained_evidence()
     if (
@@ -196,7 +198,9 @@ def build_policy_plan(
             "mapping_catalog_sha256": file_sha256(catalog_path),
             "canonical_dataset": "stm32f3-commercial-icpn.csv",
             "canonical_dataset_absent_before_policy": True,
-            "production_manifest": production_manifest_path.name,
+            "production_manifest": (
+                production_manifest_binding_name or production_manifest_path.name
+            ),
             "production_manifest_sha256": file_sha256(production_manifest_path),
         },
         row_builder=build_canonical_row,
@@ -286,8 +290,16 @@ def policy_summary(plan: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def validate_policy(baseline_path: Path = DEFAULT_POLICY_BASELINE) -> tuple[dict[str, Any], dict[str, Any]]:
-    plan = build_policy_plan()
+def validate_policy(
+    baseline_path: Path = DEFAULT_POLICY_BASELINE,
+    *,
+    production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,
+    production_manifest_binding_name: str | None = DEFAULT_PRODUCTION_MANIFEST_BINDING_NAME,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    plan = build_policy_plan(
+        production_manifest_path=production_manifest_path,
+        production_manifest_binding_name=production_manifest_binding_name,
+    )
     if not policy_plan_is_clean(plan):
         raise STM32F3PolicyError("Phase 4.4C policy plan is not clean")
     summary = policy_summary(plan)

@@ -43,11 +43,15 @@ def _write_mutated_catalog(path: Path, mutation: str) -> None:
         writer.writerows(rows)
 
 
-def _write_phase43a_manifest(path: Path) -> None:
+def _write_phase43a_manifest(path: Path, expected: dict) -> None:
+    """Reconstruct only the Production family set visible to historical Phase 4.3A."""
+
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    historical_series = set(expected["production_invariants"]["production_series"])
     manifest["sources"] = [
-        source for source in manifest["sources"] if source["family"] != "STM32F2"
+        source for source in manifest["sources"] if source["family"] in historical_series
     ]
+    assert {source["family"] for source in manifest["sources"]} == historical_series
     for source in manifest["sources"]:
         source["path"] = str((MANIFEST.parent / source["path"]).resolve())
     path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -57,7 +61,7 @@ def main() -> int:
     expected = json.loads(BASELINE.read_text(encoding="utf-8"))
     historical_tmp = tempfile.TemporaryDirectory(dir=MANIFEST.parent)
     historical_manifest = Path(historical_tmp.name) / "icpn-v1-manifest.json"
-    _write_phase43a_manifest(historical_manifest)
+    _write_phase43a_manifest(historical_manifest, expected)
     report = build_prioritization(
         catalog_path=CATALOG,
         manifest_path=historical_manifest,
@@ -68,6 +72,9 @@ def main() -> int:
     assert report["inputs"]["openocd_catalog_sha256"] == expected["inputs"][
         "openocd_catalog_sha256"
     ]
+    # The temporary replay manifest uses absolute source paths, so its byte hash
+    # intentionally differs from the originally retained manifest while the
+    # reconstructed historical Production invariants must remain exact.
     assert report["inputs"]["production_manifest_sha256"] != expected["inputs"][
         "production_manifest_sha256"
     ]

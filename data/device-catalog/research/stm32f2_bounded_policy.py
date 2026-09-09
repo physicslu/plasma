@@ -277,8 +277,12 @@ def _production_snapshot(
         if family == FAMILY:
             saw_stm32f2 = True
             selected_rows = historical_stm32f2_rows
-        else:
+        elif family in spec.expected_production_family_counts:
             selected_rows = current_rows
+        else:
+            # A family admitted after this historical policy phase is outside
+            # the reconstructed boundary and must not mutate historical replay.
+            continue
         if selected_rows:
             family_counts[family] = len(selected_rows)
             base_devices.update((family, row.get("base_device", "")) for row in selected_rows)

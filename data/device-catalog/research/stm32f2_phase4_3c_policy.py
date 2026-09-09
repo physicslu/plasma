@@ -42,6 +42,7 @@ DEFAULT_PRODUCTION_MANIFEST = HERE.parent / "production" / "icpn-v1-manifest.jso
 DEFAULT_POLICY_BASELINE = HERE / "stm32f2-phase4.3c-policy-baseline.json"
 PHASE = "4.3C"
 ADAPTER_ID = "stm32f2-phase4.3c"
+HISTORICAL_PRODUCTION_FAMILY_COUNTS = {"STM32F1": 75, "STM32F4": 384}
 
 
 def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
@@ -50,9 +51,10 @@ def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
     if not isinstance(sources, list):
         raise AdmissionError("Production manifest sources must be a list")
 
-    # Phase 4.3C is a historical, pre-admission boundary.  Validate every
-    # current source, but reconstruct that boundary from the non-STM32F2
-    # sources so later STM32F2 growth cannot rewrite the checked-in baseline.
+    # Phase 4.3C is a historical, pre-STM32F2 boundary. Validate every current
+    # source for structural integrity, but include only the family set that was
+    # in Production when this policy decision was made. Families admitted later
+    # must not rewrite the historical policy baseline.
     family_counts: dict[str, int] = {}
     base_devices: set[tuple[str, str]] = set()
     for source in sources:
@@ -71,12 +73,12 @@ def _production_snapshot(manifest_path: Path) -> dict[str, Any]:
             raise AdmissionError(f"{family}: Production manifest row count drifted")
         if any(row.get("family") != family for row in rows):
             raise AdmissionError(f"{family}: canonical source contains a foreign family")
-        if family != FAMILY:
+        if family in HISTORICAL_PRODUCTION_FAMILY_COUNTS:
             family_counts[family] = family_counts.get(family, 0) + len(rows)
             base_devices.update((family, row.get("base_device", "")) for row in rows)
 
     exact_count = sum(family_counts.values())
-    if family_counts != {"STM32F1": 75, "STM32F4": 384}:
+    if family_counts != HISTORICAL_PRODUCTION_FAMILY_COUNTS:
         raise AdmissionError(f"unexpected Production family counts: {family_counts}")
     if exact_count != 459 or len(base_devices) != 157:
         raise AdmissionError("Phase 4.3C Production snapshot drifted")

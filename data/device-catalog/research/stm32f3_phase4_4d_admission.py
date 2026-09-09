@@ -26,6 +26,7 @@ from stm32f3_phase4_4c_policy import (
     ADAPTER_ID,
     DEFAULT_POLICY_BASELINE,
     DEFAULT_PRODUCTION_MANIFEST,
+    DEFAULT_PRODUCTION_MANIFEST_BINDING_NAME,
     EXPECTED_CANDIDATE_COUNT,
     EXPECTED_PRODUCTION_BASE_DEVICE_COUNT,
     EXPECTED_PRODUCTION_EXACT_COUNT,
@@ -67,8 +68,12 @@ def build_admission_plan(
     *,
     canonical_path: Path | None = DEFAULT_CANONICAL,
     production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,
+    production_manifest_binding_name: str | None = DEFAULT_PRODUCTION_MANIFEST_BINDING_NAME,
 ) -> dict[str, Any]:
-    policy_plan, _ = validate_policy()
+    policy_plan, _ = validate_policy(
+        production_manifest_path=production_manifest_path,
+        production_manifest_binding_name=production_manifest_binding_name,
+    )
     if not policy_plan_is_clean(policy_plan):
         raise STM32F3AdmissionError("Phase 4.4C policy is not clean")
 
@@ -105,7 +110,9 @@ def build_admission_plan(
             "mapping_catalog_sha256": policy_plan["inputs"]["mapping_catalog_sha256"],
             "canonical_dataset": DEFAULT_CANONICAL.name,
             "canonical_dataset_absent_before_admission": absent,
-            "production_manifest": production_manifest_path.name,
+            "production_manifest": (
+                production_manifest_binding_name or production_manifest_path.name
+            ),
             "production_manifest_sha256": file_sha256(production_manifest_path),
         },
         row_builder=build_canonical_row,

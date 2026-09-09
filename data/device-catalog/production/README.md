@@ -12,8 +12,9 @@ Current v1 admitted scope:
 | --- | --- | ---: | --- |
 | STMicroelectronics | STM32F1 | 75 | `../research/stm32f1-commercial-icpn.csv` |
 | STMicroelectronics | STM32F2 | 33 | `../research/stm32f2-commercial-icpn.csv` |
+| STMicroelectronics | STM32F3 | 10 | `../research/stm32f3-commercial-icpn.csv` |
 | STMicroelectronics | STM32F4 | 384 | `../research/stm32f4-commercial-icpn.csv` |
-| **Total** |  | **492** |  |
+| **Total** |  | **502** |  |
 
 Only rows that have completed the evidence → admission → canonical lifecycle may be referenced by the production manifest. OpenOCD research candidates, CMSIS device names, ordering patterns, family aliases, inferred commercial numbers, and unadmitted rows are excluded from the runtime selection surface.
 
@@ -83,13 +84,13 @@ A running process keeps the successfully validated catalog loaded for its lifeti
 Phase 3.2 is complete only when all of the following are true:
 
 - runtime default contains exactly the manifest-admitted exact ICPNs;
-- current v1 aggregate is 492 = 75 STM32F1 + 33 STM32F2 + 384 STM32F4;
+- current v1 aggregate is 502 = 75 STM32F1 + 33 STM32F2 + 10 STM32F3 + 384 STM32F4;
 - research-only candidate identifiers cannot be selected through the product API;
 - production source integrity failures stop catalog loading;
 - `/api/devices/search` exposes package/memory/mapping/provenance and catalog revision data;
 - both PMode and EMode consume the same shared admitted-ICPN picker;
 - server-side Job/Batch target resolution rejects identities outside the production catalog;
 - ICPN/OpenOCD evidence remains explicitly separate from PPU/Socket physical validation;
-- all historical F1/F2/F4 admission regressions and product Python/Web CI remain green.
+- all historical F1/F2/F3/F4 admission regressions and product Python/Web CI remain green.
 
 Deployment, service restart, FPGA/Z2 work, and real-IC programming are outside Phase 3.2 and require their own approval gates.
