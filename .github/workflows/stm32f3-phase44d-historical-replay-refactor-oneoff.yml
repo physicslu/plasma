@@ -1,0 +1,63 @@
+name: STM32F3 Phase 4.4D historical replay refactor one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f3-phase44d-publication
+    paths:
+      - .github/workflows/stm32f3-phase44d-historical-replay-refactor-oneoff.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32f3-phase44d-publication
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Parameterize policy and admission historical manifest bindings
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('data/device-catalog/research/stm32f3_phase4_4c_policy.py')
+          text = p.read_text(encoding='utf-8')
+          old = '''def build_policy_plan(\n    *,\n    catalog_path: Path = DEFAULT_CATALOG,\n    production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,\n) -> dict[str, Any]:'''
+          new = '''def build_policy_plan(\n    *,\n    catalog_path: Path = DEFAULT_CATALOG,\n    production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,\n    production_manifest_binding_name: str | None = None,\n) -> dict[str, Any]:'''
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          old = '''            "production_manifest": production_manifest_path.name,\n            "production_manifest_sha256": file_sha256(production_manifest_path),'''
+          new = '''            "production_manifest": (\n                production_manifest_binding_name or production_manifest_path.name\n            ),\n            "production_manifest_sha256": file_sha256(production_manifest_path),'''
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          old = '''def validate_policy(baseline_path: Path = DEFAULT_POLICY_BASELINE) -> tuple[dict[str, Any], dict[str, Any]]:\n    plan = build_policy_plan()'''
+          new = '''def validate_policy(\n    baseline_path: Path = DEFAULT_POLICY_BASELINE,\n    *,\n    production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,\n    production_manifest_binding_name: str | None = None,\n) -> tuple[dict[str, Any], dict[str, Any]]:\n    plan = build_policy_plan(\n        production_manifest_path=production_manifest_path,\n        production_manifest_binding_name=production_manifest_binding_name,\n    )'''
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          p.write_text(text, encoding='utf-8')
+
+          p = Path('data/device-catalog/research/stm32f3_phase4_4d_admission.py')
+          text = p.read_text(encoding='utf-8')
+          old = '''def build_admission_plan(\n    *,\n    canonical_path: Path | None = DEFAULT_CANONICAL,\n    production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,\n) -> dict[str, Any]:\n    policy_plan, _ = validate_policy()'''
+          new = '''def build_admission_plan(\n    *,\n    canonical_path: Path | None = DEFAULT_CANONICAL,\n    production_manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST,\n    production_manifest_binding_name: str | None = None,\n) -> dict[str, Any]:\n    policy_plan, _ = validate_policy(\n        production_manifest_path=production_manifest_path,\n        production_manifest_binding_name=production_manifest_binding_name,\n    )'''
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          old = '''            "production_manifest": production_manifest_path.name,\n            "production_manifest_sha256": file_sha256(production_manifest_path),'''
+          new = '''            "production_manifest": (\n                production_manifest_binding_name or production_manifest_path.name\n            ),\n            "production_manifest_sha256": file_sha256(production_manifest_path),'''
+          assert text.count(old) == 1
+          text = text.replace(old, new, 1)
+          p.write_text(text, encoding='utf-8')
+          PY
+          git diff --check
+      - name: Commit historical replay API
+        run: |
+          git config user.name "plasma-ci"
+          git config user.email "plasma-ci@users.noreply.github.com"
+          git add data/device-catalog/research/stm32f3_phase4_4c_policy.py data/device-catalog/research/stm32f3_phase4_4d_admission.py
+          git commit -m "device-catalog: preserve STM32F3 historical admission replay"
+          git push origin HEAD:agent/device-catalog-stm32f3-phase44d-publication
