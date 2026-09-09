@@ -149,11 +149,12 @@ class STM32F2Phase43CPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "schema"):
             build_canonical_row(candidate, list(CANONICAL_FIELDS[:-1]))
 
-    def test_historical_snapshot_remains_459_after_stm32f2_growth(self) -> None:
+    def test_historical_snapshot_ignores_later_family_growth(self) -> None:
         manifest = json.loads(DEFAULT_PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
         sources = {source["family"]: source for source in manifest["sources"]}
-        self.assertEqual(set(sources), {"STM32F1", "STM32F2", "STM32F4"})
+        self.assertEqual(set(sources), {"STM32F1", "STM32F2", "STM32F3", "STM32F4"})
         self.assertGreaterEqual(sources["STM32F2"]["row_count"], self.plan["policy_ready_count"])
+        self.assertEqual(sources["STM32F3"]["row_count"], 10)
         self.assertEqual(
             self.plan["production_snapshot"],
             {
