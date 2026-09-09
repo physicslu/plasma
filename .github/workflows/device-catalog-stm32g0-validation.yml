@@ -1,0 +1,40 @@
+name: STM32G0 validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/research/stm32g0_foundation.py"
+      - "data/device-catalog/research/stm32g0-phase4.8a-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py"
+      - "data/device-catalog/research/device-catalog-phase4.8a-stm32g0-foundation.md"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32g0-validation.yml"
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32g0_foundation.py"
+      - "data/device-catalog/research/stm32g0-phase4.8a-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py"
+      - "data/device-catalog/research/device-catalog-phase4.8a-stm32g0-foundation.md"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32g0-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stm32g0-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-stm32g0:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Phase 4.8A STM32G0 source surface and deterministic targets
+        run: python data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py
