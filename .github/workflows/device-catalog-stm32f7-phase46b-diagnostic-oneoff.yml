@@ -1,0 +1,112 @@
+name: STM32F7 Phase 4.6B diagnostic one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f7-phase46b-discovery
+    paths:
+      - .github/workflows/device-catalog-stm32f7-phase46b-diagnostic-oneoff.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate offline Phase 4.6A and 4.6B contracts
+        env:
+          PYTHONPATH: data/device-catalog/research
+        run: |
+          python data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py
+          python data/device-catalog/research/test_stm32f7_phase4_6b_discovery.py
+      - name: Install pinned Playwright and Chromium
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'playwright==1.62.0'
+          python -m playwright install --with-deps chromium
+      - name: Diagnose one official-ST STM32F722IC target
+        env:
+          PYTHONPATH: data/device-catalog/research
+        run: |
+          mkdir -p /tmp/stm32f7-phase4.6b-diagnostic
+          xvfb-run -a python - <<'PY'
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+          from stm32f7_browser_acquisition import STM32F7BrowserAcquirer
+          from stm32f7_dual_surface_evidence import (
+              EVIDENCE_SURFACE,
+              PARSER_PROFILE,
+              build_dual_surface_browser_evidence_record,
+          )
+          from stm32f7_phase4_6b_discovery import source_url_for_base
+
+          base = 'STM32F722IC'
+          source_url = source_url_for_base(base)
+          with STM32F7BrowserAcquirer(
+              base_by_url={source_url: base},
+              headless=False,
+          ) as acquirer:
+              body, final_url, etag, last_modified = acquirer.fetch(source_url, 90.0)
+              evidence = build_dual_surface_browser_evidence_record(
+                  body=body,
+                  source_url=source_url,
+                  final_url=final_url,
+                  base_device=base,
+                  retrieved_at_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+                  http_etag=etag,
+                  http_last_modified=last_modified,
+              )
+              exact = evidence.get('exact_icpns')
+              excluded = evidence.get('excluded_non_active_part_numbers')
+              assert isinstance(exact, list) and exact, exact
+              assert all(isinstance(value, str) and value.startswith(base) for value in exact), exact
+              assert isinstance(excluded, list), excluded
+              assert evidence.get('parser_profile') == PARSER_PROFILE, evidence.get('parser_profile')
+              assert evidence.get('evidence_surface') == EVIDENCE_SURFACE, evidence.get('evidence_surface')
+
+              result = {
+                  'schema_version': 1,
+                  'phase': '4.6B-diagnostic',
+                  'base_device': base,
+                  'source_url': source_url,
+                  'final_url': final_url,
+                  'exact_icpns': exact,
+                  'excluded_non_active_part_numbers': excluded,
+                  'parser_profile': PARSER_PROFILE,
+                  'evidence_surface': EVIDENCE_SURFACE,
+                  'browser_version': acquirer.browser_version,
+                  'github_sha': os.environ.get('GITHUB_SHA'),
+                  'github_run_id': os.environ.get('GITHUB_RUN_ID'),
+                  'claims': {
+                      'bounded_16_target_discovery_complete': False,
+                      'canonical_dataset_admission': False,
+                      'production_write_authorized': False,
+                      'runtime_support_claimed': False,
+                  },
+              }
+
+          root = Path('/tmp/stm32f7-phase4.6b-diagnostic')
+          (root / 'diagnostic-summary.json').write_text(
+              json.dumps(result, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          (root / 'STM32F722IC.json').write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(result, indent=2, sort_keys=True))
+          PY
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32f7-phase4.6b-diagnostic-stm32f722ic-20260909
+          path: /tmp/stm32f7-phase4.6b-diagnostic
+          if-no-files-found: error
