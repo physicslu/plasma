@@ -8,9 +8,11 @@ on:
       - "data/device-catalog/research/stm32g0_*.py"
       - "data/device-catalog/research/stm32g0-phase4.8a-foundation-baseline.json"
       - "data/device-catalog/research/stm32g0-phase4.8b-*.json"
+      - "data/device-catalog/research/stm32g0-phase4.8c-*.json"
       - "data/device-catalog/research/evidence/stm32g0-phase4.8b-*/**"
       - "data/device-catalog/research/device-catalog-phase4.8a-stm32g0-foundation.md"
       - "data/device-catalog/research/device-catalog-phase4.8b-stm32g0-discovery.md"
+      - "data/device-catalog/research/device-catalog-phase4.8c-stm32g0-policy.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - ".github/workflows/device-catalog-stm32g0-validation.yml"
   pull_request:
@@ -18,9 +20,11 @@ on:
       - "data/device-catalog/research/stm32g0_*.py"
       - "data/device-catalog/research/stm32g0-phase4.8a-foundation-baseline.json"
       - "data/device-catalog/research/stm32g0-phase4.8b-*.json"
+      - "data/device-catalog/research/stm32g0-phase4.8c-*.json"
       - "data/device-catalog/research/evidence/stm32g0-phase4.8b-*/**"
       - "data/device-catalog/research/device-catalog-phase4.8a-stm32g0-foundation.md"
       - "data/device-catalog/research/device-catalog-phase4.8b-stm32g0-discovery.md"
+      - "data/device-catalog/research/device-catalog-phase4.8c-stm32g0-policy.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - ".github/workflows/device-catalog-stm32g0-validation.yml"
 
@@ -50,3 +54,9 @@ jobs:
         run: python data/device-catalog/research/test_stm32g0_phase4_8b_live_evidence_contract.py
       - name: Validate retained Phase 4.8B evidence and semantic replay
         run: python data/device-catalog/research/validate_stm32g0_phase4_8b_retained_evidence.py
+      - name: Validate Phase 4.8C manufacturer-backed metadata policy
+        run: python data/device-catalog/research/test_stm32g0_phase4_8c_policy.py
+      - name: Validate Phase 4.8C frozen policy plan and Production boundary
+        run: python data/device-catalog/research/test_stm32g0_phase4_8c_policy_plan.py
+      - name: Replay Phase 4.8C deterministic metadata baseline
+        run: python data/device-catalog/research/stm32g0_phase4_8c_policy.py
