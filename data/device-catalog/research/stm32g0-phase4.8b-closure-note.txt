@@ -1,0 +1,1 @@
+STM32G0 Phase 4.8B closure candidate: official-ST identity/lifecycle discovery only; 12 targets, 49 Active exact ICPNs, 3 Proposal exclusions, 11 unique routing target groups, 1 routing-followup target group. No Production or runtime-support claim.
