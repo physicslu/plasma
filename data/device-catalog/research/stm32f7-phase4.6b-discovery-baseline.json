@@ -1,0 +1,395 @@
+{
+  "aggregate": {
+    "acquisition_failure": 0,
+    "acquisition_success": 14,
+    "active_candidate_targets": 9,
+    "active_exact_icpn_candidates": 19,
+    "attempted": 16,
+    "bounded_discovery_clean": true,
+    "commercial_identity_clean": false,
+    "commercial_identity_unresolved_targets": 2,
+    "commercial_identity_verified_targets": 14,
+    "dispositioned_targets": 16,
+    "excluded_non_active_part_numbers": 11,
+    "identity_manual_intervention_required": 0,
+    "lifecycle_excluded_targets": 5,
+    "openocd_routing": {
+      "ambiguous": 0,
+      "gates_commercial_identity": false,
+      "not_applicable": 7,
+      "unique": 9,
+      "unmapped": 0
+    },
+    "routing_followup_required": 0,
+    "source_unavailable_exclusions": 2
+  },
+  "browser": {
+    "browser_version": "151.0.7922.34",
+    "evidence_profile": "stm32f7_dual_surface_v1",
+    "headless": false,
+    "playwright_version": "1.62.0"
+  },
+  "claims": {
+    "canonical_dataset_admission": false,
+    "production_admission_ready": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  },
+  "discovery_execution": {
+    "artifact_id": 10094200419,
+    "artifact_zip_sha256": "998670e0d8fc6331d60a080dccd48f0dbeb2e967a0169af4e177d9e60f30bf3f",
+    "github_checkout_sha": "776ebeafe2156a6cfdea5340dc2c8921e45725ed",
+    "head_git_sha": "776ebeafe2156a6cfdea5340dc2c8921e45725ed",
+    "pre_policy_fix_artifact_id": "10093847910",
+    "pre_policy_fix_run_id": "34325627558",
+    "workflow_run_id": 34326658883
+  },
+  "family": "STM32F7",
+  "phase": "4.6B",
+  "pilot_id": "stm32f7-phase4.6b-official-st-discovery-2026-09-09",
+  "schema_version": 1,
+  "source_bindings": {
+    "discovery_manifest_git_blob_sha": "706613e1894b88261d1769f14631655e76bce27c",
+    "openocd_catalog_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+    "production_exact_icpn_count": 544,
+    "production_family_counts": {
+      "STM32F0": 42,
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384
+    },
+    "production_manifest_git_blob_sha": "8c9bf60bcbae81c145f647deabbcaf3af63c35e6",
+    "stm32f7_production_prestate_count": 0
+  },
+  "targets": [
+    {
+      "base_device": "STM32F722IC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "a178a0081ae49384dc7c79ca7b9327071517dccae6ef086fa1e3e57bf94a62af",
+      "exact_icpns": [
+        "STM32F722ICK6",
+        "STM32F722ICT6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "953b449cfa7a436a6010e4ecda81d2b117022be476ea866fd740f42563cf000d",
+      "retrieved_at_utc": "2026-09-09T07:59:46Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f722ic.html",
+      "subfamily": "STM32F722"
+    },
+    {
+      "base_device": "STM32F723IC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "4b60869094fc2a79f61117dc77dfb6442fa71c7481172aaedb6a4a2008455c55",
+      "exact_icpns": [
+        "STM32F723ICK6",
+        "STM32F723ICT6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "3c5a681e457d3c0a12d83f3e220804facba1975bc8085040236385ae6fd54ee8",
+      "retrieved_at_utc": "2026-09-09T07:59:51Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f723ic.html",
+      "subfamily": "STM32F723"
+    },
+    {
+      "base_device": "STM32F730I8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "b91f8277025726c50bd352555ab8edf110d73fe3035323a1480a86325ee5be6b",
+      "exact_icpns": [
+        "STM32F730I8K6",
+        "STM32F730I8K6TR"
+      ],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F730I8K7",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "408232745321590151653a6241a3d151ff42d29c227cce5593ecabcbe32b732d",
+      "retrieved_at_utc": "2026-09-09T07:59:57Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f730i8.html",
+      "subfamily": "STM32F730"
+    },
+    {
+      "base_device": "STM32F732IE",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "816159dfa191df8af270f01770126ce0eefeb5b34fb5d59191c6e64e9b928d78",
+      "exact_icpns": [
+        "STM32F732IEK6",
+        "STM32F732IET6"
+      ],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F732IEK7",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        },
+        {
+          "icpn": "STM32F732IET7",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "ed3862085ac2b5adf710edee40a778b9fd6eb0cf1ca55b26124037f67f95fa8d",
+      "retrieved_at_utc": "2026-09-09T08:00:03Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f732ie.html",
+      "subfamily": "STM32F732"
+    },
+    {
+      "base_device": "STM32F733IE",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "5e3fa76fd7afad26c8b1a8415439a47a0fd827037e9e924595f751c96a65bc92",
+      "exact_icpns": [
+        "STM32F733IEK6",
+        "STM32F733IET6"
+      ],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F733IEK7",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        },
+        {
+          "icpn": "STM32F733IET7",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "abde1acf9f6188f7090dc81f572e85a00deb24db460b1cd767557b81697b84d7",
+      "retrieved_at_utc": "2026-09-09T08:00:10Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f733ie.html",
+      "subfamily": "STM32F733"
+    },
+    {
+      "base_device": "STM32F745IE",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "407454a09efd660b0efce8701a42487cff157c068736e034f7c2144d80746efa",
+      "exact_icpns": [
+        "STM32F745IEK6",
+        "STM32F745IEK6TR",
+        "STM32F745IEK7",
+        "STM32F745IEK7TR",
+        "STM32F745IET6",
+        "STM32F745IET7"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "bf8db630646fb3790ea68c513ce19e6634957a2408fd262b9d76a134a68cab39",
+      "retrieved_at_utc": "2026-09-09T08:00:16Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f745ie.html",
+      "subfamily": "STM32F745"
+    },
+    {
+      "base_device": "STM32F746BE",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence_section_sha256": "c5b3809d7661eb7a5bbb045b67faf0a168b282e37b840179e457ef5e52240032",
+      "exact_icpns": [],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F746BET6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "not_applicable",
+      "historical_openocd_target_configs": [],
+      "rendered_dom_sha256": "5b79439f6513dd14b43698608131918a7e54e5c4fbcd234637c7575d87125ec0",
+      "retrieved_at_utc": "2026-09-09T08:00:24Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f746be.html",
+      "subfamily": "STM32F746"
+    },
+    {
+      "base_device": "STM32F750N8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "9738f1298ed8ec1f0d8ff8a44a3e4d5cd76704d6e438a0ccd46a22cf16e3b732",
+      "exact_icpns": [
+        "STM32F750N8H6"
+      ],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F750N8H7",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "74cb94837078e68ef8ab84440ecc4a3663b3bc905ad7385bde4ffbdcdba3c819",
+      "retrieved_at_utc": "2026-09-09T08:00:30Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f750n8.html",
+      "subfamily": "STM32F750"
+    },
+    {
+      "base_device": "STM32F756BG",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence_section_sha256": "c56b60aa22ceee8e24479583e2dc50f317b1149d1cb3aa8cb5bc71b39996b8db",
+      "exact_icpns": [],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F756BGT6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "not_applicable",
+      "historical_openocd_target_configs": [],
+      "rendered_dom_sha256": "3879158de8768d09a307c91825d6ac94b9b59c79b7ca9e5773bc8cc9e5c0cb3c",
+      "retrieved_at_utc": "2026-09-09T08:00:36Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f756bg.html",
+      "subfamily": "STM32F756"
+    },
+    {
+      "base_device": "STM32F765BG",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence_section_sha256": "c4fb563c177be46744eb4f75dce1c36c82048591357aa70002f9fa768e1dbef8",
+      "exact_icpns": [],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F765BGT6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "not_applicable",
+      "historical_openocd_target_configs": [],
+      "rendered_dom_sha256": "3214e40168fc1539d669852aeee06b33e6c0a044dc905e39e1aa76aad63f9264",
+      "retrieved_at_utc": "2026-09-09T08:00:42Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f765bg.html",
+      "subfamily": "STM32F765"
+    },
+    {
+      "base_device": "STM32F767BG",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence_section_sha256": "2833b61d0fa11217f4743bd208e1589b49af5d54d829885a3dbc48802be047eb",
+      "exact_icpns": [],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F767BGT6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "not_applicable",
+      "historical_openocd_target_configs": [],
+      "rendered_dom_sha256": "be4e99c64fac9c4d23de6d5c906f6e8cdedf0ccf82b34a12ab47715f8de2c31a",
+      "retrieved_at_utc": "2026-09-09T08:02:18Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f767bg.html",
+      "subfamily": "STM32F767"
+    },
+    {
+      "base_device": "STM32F768AI",
+      "commercial_identity_status": "unverified",
+      "disposition": "source_unavailable_excluded",
+      "routing_gates_commercial_identity": false,
+      "source_unavailable_status": "http_404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f768ai.html",
+      "subfamily": "STM32F768"
+    },
+    {
+      "base_device": "STM32F769AG",
+      "commercial_identity_status": "unverified",
+      "disposition": "source_unavailable_excluded",
+      "routing_gates_commercial_identity": false,
+      "source_unavailable_status": "http_404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f769ag.html",
+      "subfamily": "STM32F769"
+    },
+    {
+      "base_device": "STM32F777BI",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence_section_sha256": "bc19aa0582bcfd02afac9b9ce1b1dc1156906891b20cbe717bbe7dd9c06fe055",
+      "exact_icpns": [],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32F777BIT6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "not_applicable",
+      "historical_openocd_target_configs": [],
+      "rendered_dom_sha256": "f257c43939a2409ba223098fdc2e42b06e2a9266065e7776aa8b3a7ff3fd547d",
+      "retrieved_at_utc": "2026-09-09T08:04:04Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f777bi.html",
+      "subfamily": "STM32F777"
+    },
+    {
+      "base_device": "STM32F778AI",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "8175eff98fa68ecd1432b130b40c3a9d4220fd9c6d5760a35ec336c6432fd668",
+      "exact_icpns": [
+        "STM32F778AIY6TR"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "a62f9d4b3ca029086e607624308a5e4db887ad4f503a31fc339adf418becf210",
+      "retrieved_at_utc": "2026-09-09T08:04:10Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f778ai.html",
+      "subfamily": "STM32F778"
+    },
+    {
+      "base_device": "STM32F779AI",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "7770bb941b4c9356277c89eee95a20d2ed1abf3157cf6c91107341463c2e9c32",
+      "exact_icpns": [
+        "STM32F779AIY6TR"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32f7x.cfg"
+      ],
+      "rendered_dom_sha256": "1dde551c0ba8f16a4f52f25686798065e6fd24e1c3926f7ca968b8cf42067bbe",
+      "retrieved_at_utc": "2026-09-09T08:04:15Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f779ai.html",
+      "subfamily": "STM32F779"
+    }
+  ]
+}
