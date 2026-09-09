@@ -38,9 +38,11 @@ support, or physical programming qualification.
 - historical OpenOCD routing: 13 unique / 0 ambiguous / 0 unmapped
 - routing gates commercial identity: false
 
-The exact per-target ICPN lists, lifecycle records, rendered-DOM hashes and
-evidence-section hashes are retained in `pilot-summary.json` and pinned by the
-Phase 4.5B discovery baseline.
+The exact per-target ICPN lists, lifecycle status, rendered-DOM hashes and
+evidence-section hashes are retained in a normalized `pilot-summary.json`
+decision projection and pinned by the Phase 4.5B discovery baseline. The
+original live artifact is independently bound by its ZIP digest and full
+live-summary SHA-256.
 
 ## Claims intentionally not made
 
