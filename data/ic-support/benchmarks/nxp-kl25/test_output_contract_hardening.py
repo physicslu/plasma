@@ -25,6 +25,13 @@ class KL25OutputContractHardeningTest(unittest.TestCase):
             "target": "MKL25Z128VLK4",
             "output": {
                 "allowed_fact_kinds": ["REGISTER", "CONSTRAINT"],
+                "citation_completeness": {
+                    "facts_should_be_atomic": True,
+                    "every_material_clause_requires_complete_evidence": True,
+                    "multi_page_claim_requires_all_supporting_pages": True,
+                    "split_disjoint_evidence_claims": True,
+                    "irrelevant_padding_citations_forbidden": True,
+                },
             },
             "admission": {
                 "semantic_extraction": False,
