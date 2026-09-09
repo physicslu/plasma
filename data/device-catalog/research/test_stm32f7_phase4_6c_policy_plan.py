@@ -95,11 +95,23 @@ class STM32F7Phase46CPolicyPlanTests(unittest.TestCase):
             "git_blob_sha": "0" * 40,
             "sha256": "0" * 64,
         })
-        with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "prestate.json"
-            path.write_text(json.dumps(mutated), encoding="utf-8")
+        # Keep the temporary manifest beside the frozen manifest so its relative
+        # ../research/*.csv source paths preserve the real Production semantics.
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=".json",
+            prefix="stm32f7-phase4.6c-mutated-prestate-",
+            dir=DEFAULT_PRODUCTION_MANIFEST.parent,
+            delete=False,
+        ) as handle:
+            json.dump(mutated, handle)
+            path = Path(handle.name)
+        try:
             with self.assertRaises(STM32F7PolicyError):
                 production_snapshot(path)
+        finally:
+            path.unlink(missing_ok=True)
 
     def test_baseline_drift_fails_closed(self) -> None:
         baseline = read_json(DEFAULT_POLICY_BASELINE)
