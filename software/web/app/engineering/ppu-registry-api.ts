@@ -19,6 +19,13 @@ export type ManagerRegistryPayload = {
   ppus: ManagerRegistryEntry[];
 };
 
+export type ManagedPpuSelectionPayload = {
+  ok: true;
+  managed: true;
+  configured: true;
+  ppu_alias: string;
+};
+
 export type PPUNetworkMode = "dhcp" | "static";
 
 export type PPUNetworkSettings = {
@@ -183,6 +190,13 @@ export function getManagerRegistry(): Promise<ManagerRegistryPayload> {
 
 export function getManagerFleet(): Promise<FleetWebPayload> {
   return jsonRequest<FleetWebPayload>("/api/fleet");
+}
+
+export function selectManagerPpuForManagedOperations(alias: string): Promise<ManagedPpuSelectionPayload> {
+  return jsonRequest<ManagedPpuSelectionPayload>("/api/manager/ppu", {
+    method: "POST",
+    body: JSON.stringify({ ppu_alias: alias }),
+  });
 }
 
 export function addManagerPpu(alias: string, endpoint: string): Promise<RegistryMutationPayload> {
