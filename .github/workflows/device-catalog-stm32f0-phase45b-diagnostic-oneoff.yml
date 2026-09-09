@@ -25,6 +25,8 @@ jobs:
           python -m pip install 'playwright==1.62.0'
           python -m playwright install --with-deps chromium
       - name: Diagnose STM32F030C6 ST source surfaces
+        env:
+          PYTHONPATH: data/device-catalog/research
         run: |
           xvfb-run -a python - <<'PY'
           import json
