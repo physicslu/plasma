@@ -1,0 +1,55 @@
+name: STM32F3 Phase 4.4D admission probe one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f3-phase44d-admission-plan
+
+permissions:
+  contents: read
+
+jobs:
+  admission-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Phase 4.4D admission regressions
+        run: python data/device-catalog/research/test_stm32f3_phase4_4d_admission.py
+      - name: Generate plan and exercise generic writer twice
+        env:
+          PYTHONPATH: data/device-catalog/research
+        run: |
+          rm -f data/device-catalog/research/stm32f3-commercial-icpn.csv
+          python data/device-catalog/research/stm32f3_phase4_4d_admission.py \
+            --output /tmp/stm32f3-phase4.4d-admission-plan.json
+          python - <<'PY'
+          import csv, hashlib, json
+          from pathlib import Path
+          from device_catalog_admission_framework import write_canonical_dataset
+          from stm32f3_admission_policy import CANONICAL_FIELDS
+
+          plan_path = Path('/tmp/stm32f3-phase4.4d-admission-plan.json')
+          canonical = Path('/tmp/stm32f3-commercial-icpn.csv')
+          plan = json.loads(plan_path.read_text(encoding='utf-8'))
+          with canonical.open('w', newline='', encoding='utf-8') as handle:
+              csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator='\n').writeheader()
+          first = write_canonical_dataset(plan=plan, canonical_path=canonical)
+          second = write_canonical_dataset(plan=plan, canonical_path=canonical)
+          print('PLAN_SHA256=' + hashlib.sha256(plan_path.read_bytes()).hexdigest())
+          print('CANONICAL_SHA256=' + hashlib.sha256(canonical.read_bytes()).hexdigest())
+          print('FIRST=' + json.dumps(first, sort_keys=True))
+          print('SECOND=' + json.dumps(second, sort_keys=True))
+          print('CANONICAL_BEGIN')
+          print(canonical.read_text(encoding='utf-8'), end='')
+          print('CANONICAL_END')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32f3-phase4.4d-admission-probe
+          path: |
+            /tmp/stm32f3-phase4.4d-admission-plan.json
+            /tmp/stm32f3-commercial-icpn.csv
+          retention-days: 2
