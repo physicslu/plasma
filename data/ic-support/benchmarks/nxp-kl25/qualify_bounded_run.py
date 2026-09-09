@@ -12,6 +12,8 @@ import qualify_semantic_run as semantic_qualification
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 MODEL_DIGEST = re.compile(r"^(?:sha256:)?([0-9a-f]{64})$", re.IGNORECASE)
+GATE57_CONTRACT_ID = "nxp-kl25-live-bounded-qualification-v1"
+GATE57A_CONTRACT_ID = "nxp-kl25-live-bounded-qualification-v1.1"
 
 
 class LiveBoundedQualificationError(RuntimeError):
@@ -43,17 +45,23 @@ def execution_profile_from_contract(contract: dict[str, Any]) -> dict[str, Any]:
         "automatic_retries": runtime.get("automatic_retries"),
         "primary_unit_count": runtime.get("primary_unit_count"),
     }
-    # Reuse the provider-neutral bounded validator. It also proves that Gate 5.7
-    # kept the Gate 5.5 generation envelope and zero-retry policy unchanged.
+    if runtime.get("semantic_scope") is not None:
+        profile["semantic_scope"] = copy.deepcopy(runtime.get("semantic_scope"))
     return bounded._execution_profile(profile)
 
 
 def validate_contract(contract: dict[str, Any]) -> None:
     require(contract.get("artifact_type") == "kl25_live_bounded_qualification_contract",
             "live bounded contract artifact mismatch")
-    require(contract.get("contract_id") == "nxp-kl25-live-bounded-qualification-v1",
+    contract_id = contract.get("contract_id")
+    require(contract_id in {GATE57_CONTRACT_ID, GATE57A_CONTRACT_ID},
             "live bounded contract id mismatch")
     require(contract.get("target") == "MKL25Z128VLK4", "live bounded target mismatch")
+    if contract_id == GATE57_CONTRACT_ID:
+        require(contract.get("schema_version") == "0.1.0", "Gate 5.7 contract schema mismatch")
+    else:
+        require(contract.get("schema_version") == "0.2.0", "Gate 5.7A contract schema mismatch")
+
     required = contract.get("required_input")
     require(isinstance(required, dict), "required_input missing")
     rules = bounded.policy()
@@ -64,27 +72,39 @@ def validate_contract(contract: dict[str, Any]) -> None:
             "semantic contract id mismatch")
     require(required.get("evidence_boundary_release_id") == rules["evidence_boundary_release_id"],
             "evidence boundary release mismatch")
+
     runtime = contract.get("live_runtime")
     require(isinstance(runtime, dict), "live_runtime missing")
-    require(runtime.get("execution_mode") == "live_bounded_sequential", "execution mode mismatch")
+    if contract_id == GATE57_CONTRACT_ID:
+        require(runtime.get("execution_mode") == "live_bounded_sequential", "Gate 5.7 execution mode mismatch")
+        require(runtime.get("runtime_label") == "kl25-live-bounded-qualification", "Gate 5.7 runtime label mismatch")
+        require(runtime.get("semantic_scope") is None, "Gate 5.7 v1 must not gain primary-scoped policy")
+    else:
+        require(runtime.get("execution_mode") == "live_bounded_primary_scoped_sequential",
+                "Gate 5.7A execution mode mismatch")
+        require(runtime.get("runtime_label") == "kl25-live-bounded-primary-scoped-qualification",
+                "Gate 5.7A runtime label mismatch")
+        require(runtime.get("semantic_scope") == bounded.PRIMARY_SCOPE_POLICY,
+                "Gate 5.7A primary-scoped policy mismatch")
     require(runtime.get("transport") == "ollama_native_chat", "live bounded transport mismatch")
     require(runtime.get("model_id") == "qwen3.8:27b-mlx", "live bounded model mismatch")
     require(runtime.get("loopback_only") is True, "live bounded runtime must remain loopback-only")
     require(runtime.get("allowed_done_reasons") == ["stop"], "done-reason policy drift")
     execution_profile_from_contract(contract)
+
     admissions = contract.get("admission")
     require(isinstance(admissions, dict), "live bounded admission missing")
     require(admissions.get("live_bounded_qualification_harness") is True,
             "live bounded harness admission must be true")
     for key in ("live_bounded_run_retained", "semantic_extraction", "model_quality",
                 "canonical_dataset", "hil", "production", "destructive_security_operation"):
-        require(admissions.get(key) is False, f"Gate 5.7 admission must remain false: {key}")
+        require(admissions.get(key) is False, f"live bounded admission must remain false: {key}")
     review = contract.get("review")
     require(isinstance(review, dict), "review policy missing")
     require(review.get("manufacturer_review_required") is True, "manufacturer review must be required")
-    require(review.get("gate57_can_issue_qualified") is False, "Gate 5.7 must not issue QUALIFIED")
+    require(review.get("gate57_can_issue_qualified") is False, "Gate 5.7 family must not issue QUALIFIED")
     require(review.get("next_status_after_screening_pass") == "READY_FOR_REVIEW",
-            "Gate 5.7 success status must be READY_FOR_REVIEW")
+            "live bounded success status must be READY_FOR_REVIEW")
 
 
 def _screen_response(
@@ -186,6 +206,13 @@ def assess_bounded_live_run(
     check(all(v is False for v in aggregate.get("admission", {}).values()),
           "bounded aggregate admissions must remain denied")
     check(len(children) == runtime.get("primary_unit_count"), "bounded child count mismatch")
+    semantic_scope = runtime.get("semantic_scope")
+    if semantic_scope is None:
+        check(aggregate.get("semantic_scope") is None, "Gate 5.7 aggregate unexpectedly carries primary scope")
+    else:
+        check(aggregate.get("semantic_scope") == semantic_scope, "aggregate primary semantic scope mismatch")
+        check(aggregate.get("semantic_scope_digest") == builder.canonical_sha256(semantic_scope),
+              "aggregate primary semantic scope digest mismatch")
 
     identity = provenance.get("ollama_runtime_identity") if isinstance(provenance, dict) else None
     identity = identity if isinstance(identity, dict) else {}
@@ -234,6 +261,7 @@ def assess_bounded_live_run(
         expected = runtime.get(key)
         check(execution.get(key) == expected, f"provenance execution mismatch: {key}")
     check(execution.get("generation") == runtime.get("generation"), "provenance generation mismatch")
+    check(execution.get("semantic_scope") == runtime.get("semantic_scope"), "provenance semantic scope mismatch")
     check(execution.get("ollama_endpoint_policy") == "loopback_only", "provenance endpoint policy mismatch")
     fingerprints = provenance.get("code_fingerprints")
     check(isinstance(fingerprints, dict) and bool(fingerprints), "code fingerprints missing")
@@ -304,6 +332,7 @@ def assess_bounded_live_run(
         },
         "trust_boundary": {
             "bounded_integrity_is_not_semantic_correctness": True,
+            "primary_citation_presence_is_not_semantic_support": True,
             "screening_pass_is_not_semantic_correctness": True,
             "semantic_extraction_admission": False,
             "model_quality_admission": False,
