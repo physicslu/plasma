@@ -34,6 +34,14 @@ def test_z2_ps_verify_request_matches_current_loopback_contract() -> None:
     assert '-H "Idempotency-Key: $test_id"' in source
 
 
+def test_z2_ps_verify_matches_current_readiness_contract() -> None:
+    source = Z2_PS.read_text(encoding="utf-8")
+
+    assert 'ready.get("gateway") != "alive"' in source
+    assert 'ready.get("execution") != "ready"' in source
+    assert 'ready.get("gateway") != "ready"' not in source
+
+
 def test_z2_ps_verify_reads_nested_loopback_evidence() -> None:
     source = Z2_PS.read_text(encoding="utf-8")
 
