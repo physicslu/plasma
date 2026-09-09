@@ -43,11 +43,15 @@ jobs:
             data/ic-support/benchmarks/nxp-kl25/ollama_live_runtime.py \
             data/ic-support/benchmarks/nxp-kl25/qualify_semantic_run.py \
             data/ic-support/benchmarks/nxp-kl25/run_live_model_qualification.py \
+            data/ic-support/benchmarks/nxp-kl25/bounded_extraction.py \
+            data/ic-support/benchmarks/nxp-kl25/qualify_bounded_run.py \
+            data/ic-support/benchmarks/nxp-kl25/run_live_bounded_qualification.py \
             data/ic-support/benchmarks/nxp-kl25/test_output_contract_hardening.py \
             data/ic-support/benchmarks/nxp-kl25/test_context_compaction.py \
             data/ic-support/benchmarks/nxp-kl25/test_semantic_coverage_gate53.py \
             data/ic-support/benchmarks/nxp-kl25/test_citation_completeness_gate54.py \
-            data/ic-support/benchmarks/nxp-kl25/test_evidence_boundary_gate56.py
+            data/ic-support/benchmarks/nxp-kl25/test_evidence_boundary_gate56.py \
+            data/ic-support/benchmarks/nxp-kl25/test_live_bounded_qualification.py
       - name: Validate KL25 operator helper syntax
         run: |
           bash -n scripts/ic-support-kl25-live.sh
@@ -78,3 +82,5 @@ jobs:
         run: python data/ic-support/benchmarks/nxp-kl25/test_bounded_extraction.py
       - name: Validate Gate 5.6 Program Longword evidence boundary release
         run: python data/ic-support/benchmarks/nxp-kl25/test_evidence_boundary_gate56.py
+      - name: Validate Gate 5.7 live bounded qualification without network or model weights
+        run: python data/ic-support/benchmarks/nxp-kl25/test_live_bounded_qualification.py
