@@ -1,6 +1,11 @@
 name: STM32F0 Phase 4.5A inventory one-off
 
 on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f0-phase45a-foundation
+    paths:
+      - .github/workflows/device-catalog-stm32f0-phase45a-inventory-oneoff.yml
   workflow_dispatch:
 
 permissions:
