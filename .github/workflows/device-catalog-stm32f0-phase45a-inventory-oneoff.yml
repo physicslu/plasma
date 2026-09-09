@@ -6,6 +6,11 @@ on:
       - agent/device-catalog-stm32f0-phase45a-foundation
     paths:
       - .github/workflows/device-catalog-stm32f0-phase45a-inventory-oneoff.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/device-catalog-stm32f0-phase45a-inventory-oneoff.yml
   workflow_dispatch:
 
 permissions:
