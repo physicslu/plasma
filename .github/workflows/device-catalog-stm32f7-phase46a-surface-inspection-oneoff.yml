@@ -1,0 +1,55 @@
+name: STM32F7 Phase 4.6A source inspection one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f7-phase46a-foundation
+    paths:
+      - ".github/workflows/device-catalog-stm32f7-phase46a-surface-inspection-oneoff.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Inspect guarded STM32F7 source rows
+        run: |
+          python - <<'PY'
+          import csv
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          path = Path('data/device-catalog/research/openocd-parts-canonical.csv')
+          with path.open(newline='', encoding='utf-8') as handle:
+              rows = [
+                  row for row in csv.DictReader(handle)
+                  if row.get('vendor') == 'STMicroelectronics'
+                  and row.get('plasma_series') == 'STM32F7'
+              ]
+          counts = Counter(row.get('subfamily', '') for row in rows)
+          print('ROW_COUNT=' + str(len(rows)))
+          print('SUBFAMILY_COUNTS=' + json.dumps(dict(sorted(counts.items())), sort_keys=True))
+          print('TARGET_CONFIGS=' + json.dumps(sorted({row.get('target_config','') for row in rows})))
+          print('IDENTIFIER_KINDS=' + json.dumps(sorted({row.get('identifier_kind','') for row in rows})))
+          print('DISTRIBUTIONS=' + json.dumps(sorted({row.get('openocd_distribution','') for row in rows})))
+          print('MAPPING_STATUS=' + json.dumps(sorted({row.get('mapping_status','') for row in rows})))
+          print('VALIDATION_STATUS=' + json.dumps(sorted({row.get('validation_status','') for row in rows})))
+          print('ROWS_BEGIN')
+          for row in sorted(rows, key=lambda item: (item.get('subfamily',''), item.get('part_number',''))):
+              print(json.dumps({
+                  'subfamily': row.get('subfamily',''),
+                  'part_number': row.get('part_number',''),
+                  'identifier_kind': row.get('identifier_kind',''),
+                  'target_config': row.get('target_config',''),
+                  'mapping_status': row.get('mapping_status',''),
+                  'validation_status': row.get('validation_status',''),
+              }, sort_keys=True))
+          print('ROWS_END')
+          PY
