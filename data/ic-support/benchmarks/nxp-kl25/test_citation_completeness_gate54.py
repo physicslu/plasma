@@ -25,14 +25,8 @@ class Gate54CitationCompletenessTest(unittest.TestCase):
                 "pack_id": "synthetic-pack-v0",
                 "primary_unit_id": "synthetic-unit-v0",
                 "page_refs": [
-                    {
-                        "source_id": "nxp_kl25_rm_rev3",
-                        "pdf_page_number": 10,
-                    },
-                    {
-                        "source_id": "nxp_kl25_rm_rev3",
-                        "pdf_page_number": 11,
-                    },
+                    {"source_id": "nxp_kl25_rm_rev3", "pdf_page_number": 10},
+                    {"source_id": "nxp_kl25_rm_rev3", "pdf_page_number": 11},
                 ],
             }
         }
@@ -51,12 +45,15 @@ class Gate54CitationCompletenessTest(unittest.TestCase):
 
         self.assertEqual(
             self.qualification_contract["contract_id"],
-            "nxp-kl25-live-model-qualification-v4",
+            "nxp-kl25-live-model-qualification-v4.1",
         )
         self.assertEqual(
             self.qualification_contract["required_input"]["semantic_contract_id"],
             "nxp-kl25-semantic-extraction-v1",
         )
+        generation = self.qualification_contract["live_runtime"]["generation"]
+        self.assertEqual(generation["num_ctx"], 65536)
+        self.assertEqual(generation["max_tokens"], 16384)
         review = self.qualification_contract["review"]
         self.assertTrue(review["semantic_truth_and_citation_quality_are_independent"])
         self.assertTrue(review["require_complete_fact_citations_for_review_pass"])
@@ -107,14 +104,8 @@ class Gate54CitationCompletenessTest(unittest.TestCase):
                             "kind": "REGISTER_FIELD",
                             "statement": "Synthetic address and field meaning are jointly stated.",
                             "evidence": [
-                                {
-                                    "source_id": "nxp_kl25_rm_rev3",
-                                    "pdf_page_number": 10,
-                                },
-                                {
-                                    "source_id": "nxp_kl25_rm_rev3",
-                                    "pdf_page_number": 11,
-                                },
+                                {"source_id": "nxp_kl25_rm_rev3", "pdf_page_number": 10},
+                                {"source_id": "nxp_kl25_rm_rev3", "pdf_page_number": 11},
                             ],
                         }
                     ],
@@ -142,10 +133,7 @@ class Gate54CitationCompletenessTest(unittest.TestCase):
                             "kind": "REGISTER",
                             "statement": "Synthetic register address is established.",
                             "evidence": [
-                                {
-                                    "source_id": "nxp_kl25_rm_rev3",
-                                    "pdf_page_number": 10,
-                                }
+                                {"source_id": "nxp_kl25_rm_rev3", "pdf_page_number": 10}
                             ],
                         },
                         {
@@ -153,10 +141,7 @@ class Gate54CitationCompletenessTest(unittest.TestCase):
                             "kind": "REGISTER_FIELD",
                             "statement": "Synthetic field meaning is established.",
                             "evidence": [
-                                {
-                                    "source_id": "nxp_kl25_rm_rev3",
-                                    "pdf_page_number": 11,
-                                }
+                                {"source_id": "nxp_kl25_rm_rev3", "pdf_page_number": 11}
                             ],
                         },
                     ],
@@ -184,10 +169,7 @@ class Gate54CitationCompletenessTest(unittest.TestCase):
                             "kind": "CONSTRAINT",
                             "statement": "Synthetic compound statement whose semantic support cannot be proven by syntax alone.",
                             "evidence": [
-                                {
-                                    "source_id": "nxp_kl25_rm_rev3",
-                                    "pdf_page_number": 10,
-                                }
+                                {"source_id": "nxp_kl25_rm_rev3", "pdf_page_number": 10}
                             ],
                         }
                     ],
@@ -200,8 +182,6 @@ class Gate54CitationCompletenessTest(unittest.TestCase):
             packs=copy.deepcopy(self.packs),
         )
         self.assertEqual(parsed, value)
-        # Gate 5.4 deliberately does not add fuzzy or inferred citation repair.
-        # Natural-language completeness remains a manufacturer-evidence review duty.
 
     def test_missing_gate54_policy_is_rejected_before_transport_schema_use(self):
         contract = copy.deepcopy(self.semantic_contract)
