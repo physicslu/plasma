@@ -103,11 +103,17 @@ class STM32F3Phase44DAdmissionTests(unittest.TestCase):
         self.assertEqual(source["git_blob_sha"], EXPECTED_CANONICAL_BLOB)
 
         exact_count, base_count, family_counts = production_snapshot(CURRENT_MANIFEST)
-        self.assertEqual(exact_count, 502)
-        self.assertEqual(base_count, 175)
+        self.assertEqual(exact_count, 544)
+        self.assertEqual(base_count, 188)
         self.assertEqual(
             family_counts,
-            {"STM32F1": 75, "STM32F2": 33, "STM32F3": 10, "STM32F4": 384},
+            {
+                "STM32F0": 42,
+                "STM32F1": 75,
+                "STM32F2": 33,
+                "STM32F3": 10,
+                "STM32F4": 384,
+            },
         )
 
         self.assertEqual(self.audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
