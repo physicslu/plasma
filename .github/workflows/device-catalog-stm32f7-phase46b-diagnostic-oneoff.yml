@@ -1,4 +1,4 @@
-name: STM32F7 Phase 4.6B live discovery one-off
+name: STM32F7 Phase 4.6B disposition-aware live discovery one-off
 
 on:
   push:
@@ -24,6 +24,7 @@ jobs:
           PYTHONPATH: data/device-catalog/research
         run: |
           python data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py
+          python data/device-catalog/research/test_stm32f7_dual_surface_evidence.py
           python data/device-catalog/research/test_stm32f7_phase4_6b_discovery.py
       - name: Install pinned Playwright and Chromium
         run: |
@@ -58,20 +59,30 @@ jobs:
               'diagnostic_run_id': '34325478619',
               'diagnostic_artifact_id': '10093586727',
               'diagnostic_artifact_zip_sha256': '05258ee448dbfbb2033ab67e1ccd7b2b14b9370ad979f21617891ed82327ff4a',
+              'pre_policy_fix_run_id': '34325627558',
+              'pre_policy_fix_artifact_id': '10093847910',
+              'pre_policy_fix_artifact_zip_sha256': '98c512a69cc9a4385b3c9e36880489fd46c44d4de6f50b173dfb74d220809b64',
+              'pre_policy_fix_result': {
+                  'attempted': 16,
+                  'acquisition_success': 9,
+                  'acquisition_failure': 7,
+                  'active_exact_icpn_candidates': 19,
+                  'excluded_non_active_part_numbers_seen_before_reclassification': 6,
+              },
           }
           (root / 'execution-metadata.json').write_text(
               json.dumps(metadata, indent=2, sort_keys=True) + '\n',
               encoding='utf-8',
           )
           PY
-      - name: Upload live discovery evidence
+      - name: Upload disposition-aware live discovery evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stm32f7-phase4.6b-live-discovery-20260909
+          name: stm32f7-phase4.6b-disposition-aware-live-20260909
           path: /tmp/stm32f7-phase4.6b-live
           if-no-files-found: error
-      - name: Enforce commercial identity acquisition result
+      - name: Enforce bounded discovery result
         if: always()
         run: |
           test -f /tmp/stm32f7-phase4.6b-live/exit-code.txt
