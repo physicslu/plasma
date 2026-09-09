@@ -1,0 +1,410 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_success": 6,
+  "acquisition_transport": "chromium_rendered_dom",
+  "active_exact_icpn_candidates": 10,
+  "attempted": 6,
+  "browser": {
+    "browser_version": "151.0.7922.34",
+    "evidence_profile": "stm32f3_dual_surface_v1",
+    "headless": false,
+    "playwright_version": "1.62.0"
+  },
+  "canonical_mapping": {
+    "ambiguous": 0,
+    "unique": 6,
+    "unmapped": 0
+  },
+  "claims": {
+    "canonical_dataset_admission": false,
+    "production_admission_ready": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  },
+  "excluded_non_active_part_numbers": 0,
+  "family": "STM32F3",
+  "manual_intervention_required": 0,
+  "phase": "4.4B",
+  "pilot_id": "stm32f3-phase4.4b-official-st-discovery-2026-09-08",
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F301C6",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F301C6Tx",
+          "icpn": "STM32F301C6T6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F301C6Tx",
+          "icpn": "STM32F301C6T6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F301C6Tx",
+          "icpn": "STM32F301C6T7",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 3,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f3x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F301C6",
+        "evidence_section_sha256": "9520c74f23f2f6e068e3d152c5691620760729631950230f26adc58ccc68640d",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32F301C6T6",
+          "STM32F301C6T6TR",
+          "STM32F301C6T7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f301c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32f3_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F301C6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F301C6T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F301C6T7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "4669b072ea343128d84f0364c5b7ee72f5f10a4e6c12b85bb628856d6242cfec",
+        "retrieved_at_utc": "2026-09-08T08:31:52Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f301c6.html"
+      },
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F301 OpenOCD source surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f301c6.html",
+      "subfamily": "STM32F301"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F302C6",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F302C6Tx",
+          "icpn": "STM32F302C6T6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f3x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F302C6",
+        "evidence_section_sha256": "f5452b879f59acbb6818df97aa8ffdb889c6087e3c071671288fc1417578c1ab",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32F302C6T6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f302c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32f3_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F302C6T6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "d06109e7bf25dd720796558c220494b7cda4196361bf37dca8b60c1a6ea5c63d",
+        "retrieved_at_utc": "2026-09-08T08:31:59Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f302c6.html"
+      },
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F302 OpenOCD source surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f302c6.html",
+      "subfamily": "STM32F302"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F303C6",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F303C6Tx",
+          "icpn": "STM32F303C6T6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f3x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F303C6",
+        "evidence_section_sha256": "e9bdb78181651fe7913530a27dd0bef8c1fbeaf3c183e284b6bc9902270d0cde",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32F303C6T6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f303c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32f3_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F303C6T6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b0203ee404a22d891aa4b5204fd813e72ae44ef194e212a0ff007195999f2acf",
+        "retrieved_at_utc": "2026-09-08T08:32:05Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f303c6.html"
+      },
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F303 OpenOCD source surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f303c6.html",
+      "subfamily": "STM32F303"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F373C8",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F373C8Tx",
+          "icpn": "STM32F373C8T6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F373C8Tx",
+          "icpn": "STM32F373C8T6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f3x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F373C8",
+        "evidence_section_sha256": "2ad78790ed46b8727c22e51a4adf4e4f229c0cbbd7ac76bac620ce799059fe26",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32F373C8T6",
+          "STM32F373C8T6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f373c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32f3_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F373C8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F373C8T6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "84096005ea9cd60b677f1a24da568a25b3fff29bf6e1866548fc8970a1245ab6",
+        "retrieved_at_utc": "2026-09-08T08:32:11Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f373c8.html"
+      },
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F373 OpenOCD source surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f373c8.html",
+      "subfamily": "STM32F373"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F334C4",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F334C4Tx",
+          "icpn": "STM32F334C4T6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f3x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F334C4",
+        "evidence_section_sha256": "c239d88fd01d3cd4de9872f058acfc6602a3f1638dce4008fcfd3134c79cfaca",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32F334C4T6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f334c4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32f3_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F334C4T6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "c2d9e044b7b0ce24c9eec82898edc0686087e20f492758d86d49145654412113",
+        "retrieved_at_utc": "2026-09-08T08:32:17Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f334c4.html"
+      },
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F3x4 OpenOCD source surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f334c4.html",
+      "subfamily": "STM32F3x4"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32F318C8",
+      "candidate_mappings": [
+        {
+          "existing_identifier": "STM32F318C8Tx",
+          "icpn": "STM32F318C8T6",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        },
+        {
+          "existing_identifier": "STM32F318C8Yx",
+          "icpn": "STM32F318C8Y6TR",
+          "identifier_kind": "ordering_pattern",
+          "match_count": 1,
+          "status": "unique",
+          "target_configs": [
+            "tcl/target/stm32f3x.cfg"
+          ]
+        }
+      ],
+      "canonical_mapping": {
+        "candidate_count": 2,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32f3x.cfg"
+        ]
+      },
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32F318C8",
+        "evidence_section_sha256": "7439542577e9e02b080cc6ba2690a7034b75b50f3d0362a58369d56f24c25606",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32F318C8T6",
+          "STM32F318C8Y6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f318c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32f3_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32F318C8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32F318C8Y6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "bb9550e137fb9baf43a27637bcb29edeb6e10eb7bb7f549170c1e2810f11b2fa",
+        "retrieved_at_utc": "2026-09-08T08:32:24Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f318c8.html"
+      },
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F3x8 OpenOCD source surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f318c8.html",
+      "subfamily": "STM32F3x8"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "bounded read-only official-ST STM32F3 discovery"
+}
