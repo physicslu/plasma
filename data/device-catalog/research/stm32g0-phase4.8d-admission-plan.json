@@ -1,0 +1,2306 @@
+{
+  "adapter_id": "stm32g0-phase4.8d-admission",
+  "candidate_count": 47,
+  "candidates": [
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "8b8bd2f7a90c5b81fe16922b5609a16f999e97fd44ef88e914b3e7d1b355f99e",
+        "rendered_dom_sha256": "f6efe7bacd63d6c381a6a5b19f73e177d703fe1a62819e5f4589acd746a548de",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g030c6.html"
+      },
+      "base_device": "STM32G030C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G030C6Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G030C6T6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G030C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G030C6Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G030C6T6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G030",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g030c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "8b8bd2f7a90c5b81fe16922b5609a16f999e97fd44ef88e914b3e7d1b355f99e",
+        "rendered_dom_sha256": "f6efe7bacd63d6c381a6a5b19f73e177d703fe1a62819e5f4589acd746a548de",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g030c6.html"
+      },
+      "base_device": "STM32G030C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G030C6Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G030C6T6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G030C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G030C6Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G030C6T6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G030",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g030c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "66f014e77654c6ed0e63ce7ee04e23f83fd12a266ef2507efbdc6494b87ea3d6",
+        "rendered_dom_sha256": "89fcf296298a77a604aeda2031fb5609b9abd64ef623683f7887e69cf011afa6",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g031c4.html"
+      },
+      "base_device": "STM32G031C4",
+      "base_mapping": {
+        "existing_identifier": "STM32G031C4Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G031C4T6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G031C4",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G031C4Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "16 KiB",
+        "icpn": "STM32G031C4T6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G031",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g031c4.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "66f014e77654c6ed0e63ce7ee04e23f83fd12a266ef2507efbdc6494b87ea3d6",
+        "rendered_dom_sha256": "89fcf296298a77a604aeda2031fb5609b9abd64ef623683f7887e69cf011afa6",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g031c4.html"
+      },
+      "base_device": "STM32G031C4",
+      "base_mapping": {
+        "existing_identifier": "STM32G031C4Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G031C4U6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G031C4",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G031C4Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "16 KiB",
+        "icpn": "STM32G031C4U6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G031",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g031c4.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "83bd7da6dfc722315617c1e5ea928f25fe28a0be97c6193ee9c54a65463e8265",
+        "rendered_dom_sha256": "2180963821de4c18f7ecae8bfebf1dbf0914486c610cc7edc7a97ed10d1f44fe",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g041c6.html"
+      },
+      "base_device": "STM32G041C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G041C6Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G041C6T6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G041C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G041C6Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G041C6T6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G041",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g041c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "5c627a079cc3235366e8e0f34d302526c8feeada7215fe2480c086cbfe51d113",
+        "rendered_dom_sha256": "46d1246eac10ba89d19b3d84d8074425109a694ef546678cab2abdb101a718d0",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g050c6.html"
+      },
+      "base_device": "STM32G050C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G050C6Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G050C6T6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G050C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G050C6Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G050C6T6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G050",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g050c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "54afa14fe4e8296bacf1c102d80f51163f098e86d6213f424978baa7048fa024",
+        "rendered_dom_sha256": "bf6c38df5bd15847a3a2a61785c1818243bb5e3852986a76d12a36316f493f47",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g051c6.html"
+      },
+      "base_device": "STM32G051C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G051C6Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G051C6T6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G051C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G051C6Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G051C6T6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G051",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g051c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "54afa14fe4e8296bacf1c102d80f51163f098e86d6213f424978baa7048fa024",
+        "rendered_dom_sha256": "bf6c38df5bd15847a3a2a61785c1818243bb5e3852986a76d12a36316f493f47",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g051c6.html"
+      },
+      "base_device": "STM32G051C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G051C6Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G051C6U6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G051C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G051C6Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G051C6U6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G051",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g051c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "54afa14fe4e8296bacf1c102d80f51163f098e86d6213f424978baa7048fa024",
+        "rendered_dom_sha256": "bf6c38df5bd15847a3a2a61785c1818243bb5e3852986a76d12a36316f493f47",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g051c6.html"
+      },
+      "base_device": "STM32G051C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G051C6Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G051C6U6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G051C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G051C6Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G051C6U6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G051",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g051c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "54afa14fe4e8296bacf1c102d80f51163f098e86d6213f424978baa7048fa024",
+        "rendered_dom_sha256": "bf6c38df5bd15847a3a2a61785c1818243bb5e3852986a76d12a36316f493f47",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g051c6.html"
+      },
+      "base_device": "STM32G051C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G051C6Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G051C6U7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G051C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G051C6Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G051C6U7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G051",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g051c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "54afa14fe4e8296bacf1c102d80f51163f098e86d6213f424978baa7048fa024",
+        "rendered_dom_sha256": "bf6c38df5bd15847a3a2a61785c1818243bb5e3852986a76d12a36316f493f47",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g051c6.html"
+      },
+      "base_device": "STM32G051C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G051C6Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G051C6U7TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G051C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G051C6Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G051C6U7TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G051",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g051c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "0dd21f698e157e0dd6a2ca3fc2a6ad1d461fe23e7a13f4082a311dbcde8c1be0",
+        "rendered_dom_sha256": "07b9e34ad6fa3e116e3c713fb00ac8224aba7ac3f2e205cf334da9aa7d22d9d2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g061c6.html"
+      },
+      "base_device": "STM32G061C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G061C6Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G061C6T6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G061C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G061C6Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G061C6T6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G061",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g061c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "0dd21f698e157e0dd6a2ca3fc2a6ad1d461fe23e7a13f4082a311dbcde8c1be0",
+        "rendered_dom_sha256": "07b9e34ad6fa3e116e3c713fb00ac8224aba7ac3f2e205cf334da9aa7d22d9d2",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g061c6.html"
+      },
+      "base_device": "STM32G061C6",
+      "base_mapping": {
+        "existing_identifier": "STM32G061C6Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G061C6U6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G061C6",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G061C6Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "32 KiB",
+        "icpn": "STM32G061C6U6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G061",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g061c6.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "ab0f9524d47575a78ced08ba134487497d80b949aa5c704fc2b0562198f72988",
+        "rendered_dom_sha256": "19c763306ed3805ce17a624f7c013e190f872e6375071040661476802cf0e9a0",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g070cb.html"
+      },
+      "base_device": "STM32G070CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G070CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G070CBT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G070CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G070CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G070CBT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G070",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g070cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "ab0f9524d47575a78ced08ba134487497d80b949aa5c704fc2b0562198f72988",
+        "rendered_dom_sha256": "19c763306ed3805ce17a624f7c013e190f872e6375071040661476802cf0e9a0",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g070cb.html"
+      },
+      "base_device": "STM32G070CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G070CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G070CBT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G070CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G070CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G070CBT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G070",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g070cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8T3",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8T3",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8T3TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8T3TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8T6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8T6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8T6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8T6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8T7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8T7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Tx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8T7TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Tx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8T7TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8U3",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8U3",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8U3TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8U3TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8U6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8U6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8U7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8U7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "4bb537b49b1d85871fb3e83471a3c4b59c43230d416366300bd202150741e00d",
+        "rendered_dom_sha256": "ed383ec82100d7f603ebc746c977e2d30dd16a9565cd9f775596e98ba4cffc5f",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g071c8.html"
+      },
+      "base_device": "STM32G071C8",
+      "base_mapping": {
+        "existing_identifier": "STM32G071C8Ux",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G071C8U7TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G071C8",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G071C8Ux",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "64 KiB",
+        "icpn": "STM32G071C8U7TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G071",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g071c8.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "402907c53cbb6e6820a83ffc1cea395ae8d33bebdffcca00efa35ed019e26e0d",
+        "rendered_dom_sha256": "65f9efe0669aa98de96bb8cd8a4b9054bd9d8179c22328a46e74383cb8cd9f58",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g081cb.html"
+      },
+      "base_device": "STM32G081CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G081CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G081CBT3",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G081CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G081CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G081CBT3",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G081",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g081cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "402907c53cbb6e6820a83ffc1cea395ae8d33bebdffcca00efa35ed019e26e0d",
+        "rendered_dom_sha256": "65f9efe0669aa98de96bb8cd8a4b9054bd9d8179c22328a46e74383cb8cd9f58",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g081cb.html"
+      },
+      "base_device": "STM32G081CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G081CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G081CBT3TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G081CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G081CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G081CBT3TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G081",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g081cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "402907c53cbb6e6820a83ffc1cea395ae8d33bebdffcca00efa35ed019e26e0d",
+        "rendered_dom_sha256": "65f9efe0669aa98de96bb8cd8a4b9054bd9d8179c22328a46e74383cb8cd9f58",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g081cb.html"
+      },
+      "base_device": "STM32G081CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G081CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G081CBT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G081CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G081CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G081CBT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G081",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g081cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "402907c53cbb6e6820a83ffc1cea395ae8d33bebdffcca00efa35ed019e26e0d",
+        "rendered_dom_sha256": "65f9efe0669aa98de96bb8cd8a4b9054bd9d8179c22328a46e74383cb8cd9f58",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g081cb.html"
+      },
+      "base_device": "STM32G081CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G081CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G081CBT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G081CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G081CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G081CBT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G081",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g081cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "402907c53cbb6e6820a83ffc1cea395ae8d33bebdffcca00efa35ed019e26e0d",
+        "rendered_dom_sha256": "65f9efe0669aa98de96bb8cd8a4b9054bd9d8179c22328a46e74383cb8cd9f58",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g081cb.html"
+      },
+      "base_device": "STM32G081CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G081CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G081CBU3",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G081CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G081CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G081CBU3",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G081",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g081cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "402907c53cbb6e6820a83ffc1cea395ae8d33bebdffcca00efa35ed019e26e0d",
+        "rendered_dom_sha256": "65f9efe0669aa98de96bb8cd8a4b9054bd9d8179c22328a46e74383cb8cd9f58",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g081cb.html"
+      },
+      "base_device": "STM32G081CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G081CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G081CBU3TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G081CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G081CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G081CBU3TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G081",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g081cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "402907c53cbb6e6820a83ffc1cea395ae8d33bebdffcca00efa35ed019e26e0d",
+        "rendered_dom_sha256": "65f9efe0669aa98de96bb8cd8a4b9054bd9d8179c22328a46e74383cb8cd9f58",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g081cb.html"
+      },
+      "base_device": "STM32G081CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G081CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G081CBU6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G081CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G081CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G081CBU6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G081",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g081cb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "f484a0066d551952662bd75ebbffd532b1f43c9f01853709d9ed23e3d594062d",
+        "rendered_dom_sha256": "47fca67196adbcf90b6792e06b6098578c5e9a33a7ea283824e32315933d6d65",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b0ce.html"
+      },
+      "base_device": "STM32G0B0CE",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B0CETx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B0CET6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B0CE",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B0CETx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "512 KiB",
+        "icpn": "STM32G0B0CET6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G0B0",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b0ce.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "f484a0066d551952662bd75ebbffd532b1f43c9f01853709d9ed23e3d594062d",
+        "rendered_dom_sha256": "47fca67196adbcf90b6792e06b6098578c5e9a33a7ea283824e32315933d6d65",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b0ce.html"
+      },
+      "base_device": "STM32G0B0CE",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B0CETx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B0CET6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B0CE",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B0CETx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "512 KiB",
+        "icpn": "STM32G0B0CET6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G0B0",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b0ce.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBT3",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBT3",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBT3TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBT3TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBT6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBT6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBTx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBT6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBTx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBT6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "LQFP",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBU3",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBU3",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBU3TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBU3TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 125 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBU6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBU6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBU6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBU6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBU7",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBU7",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "1aec891cd1819d0746cdfc51f241a68f9f993a37464d76d525a241f92a6d43e4",
+        "rendered_dom_sha256": "f753822ecf759014278eb73fe81e0d38f0b370e146f4cb8d26a7e84b11eb31a8",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1cb.html"
+      },
+      "base_device": "STM32G0B1CB",
+      "base_mapping": {
+        "existing_identifier": "STM32G0B1CBUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0B1CBU7TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0B1CB",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0B1CBUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "128 KiB",
+        "icpn": "STM32G0B1CBU7TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G0B1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0b1kb.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 105 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "457466773fc685efb1a27e6b6d26f898b57c2de966f28aa9048c58576b52e5e2",
+        "rendered_dom_sha256": "1de05e9f7cf21b6bdd9effc57b2c7225c9ecf288c716f9179819f7204932739d",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0c1cc.html"
+      },
+      "base_device": "STM32G0C1CC",
+      "base_mapping": {
+        "existing_identifier": "STM32G0C1CCUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0C1CCU6",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0C1CC",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0C1CCUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "256 KiB",
+        "icpn": "STM32G0C1CCU6",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G0C1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0c1cc.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    },
+    {
+      "authoritative_evidence": {
+        "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "evidence_profile": "stm32g0_dual_surface_v1",
+        "evidence_section_sha256": "457466773fc685efb1a27e6b6d26f898b57c2de966f28aa9048c58576b52e5e2",
+        "rendered_dom_sha256": "1de05e9f7cf21b6bdd9effc57b2c7225c9ecf288c716f9179819f7204932739d",
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g0c1cc.html"
+      },
+      "base_device": "STM32G0C1CC",
+      "base_mapping": {
+        "existing_identifier": "STM32G0C1CCUx",
+        "identifier_kind": "ordering_pattern",
+        "match_count": 1,
+        "status": "unique",
+        "target_configs": [
+          "tcl/target/stm32g0x.cfg"
+        ]
+      },
+      "canonical_conflict": false,
+      "canonical_duplicate_count": 0,
+      "decision": "admit",
+      "icpn": "STM32G0C1CCU6TR",
+      "issues": [],
+      "manufacturer": "STMicroelectronics",
+      "proposed_canonical_row": {
+        "base_device": "STM32G0C1CC",
+        "cmsis_device_name": "",
+        "existing_identifier": "STM32G0C1CCUx",
+        "existing_identifier_kind": "ordering_pattern",
+        "family": "STM32G0",
+        "flash_size": "256 KiB",
+        "icpn": "STM32G0C1CCU6TR",
+        "manufacturer": "STMicroelectronics",
+        "mapping_status": "deterministic_ordering_pattern",
+        "openocd_target_config": "tcl/target/stm32g0x.cfg",
+        "option_suffix": "TR",
+        "package": "UFQFPN",
+        "pin_count": "48",
+        "series": "STM32G0C1",
+        "source_authority": "STMicroelectronics official",
+        "source_reference": "https://www.st.com/resource/en/datasheet/stm32g0c1cc.pdf#identity=stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+        "source_type": "official_st_ordering_information_plus_retained_phase4_8b_identity",
+        "temperature_grade": "-40 to 85 C",
+        "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+      }
+    }
+  ],
+  "canonical_dataset_admission": "planned",
+  "canonical_rows_before": 0,
+  "canonical_write_applied": false,
+  "capability_admittable_count": 47,
+  "capability_mapping_gate_applied": true,
+  "capability_unresolved": [
+    {
+      "base_device": "STM32G0B1CB",
+      "capability_status": "openocd_ordering_pattern_unresolved",
+      "icpn": "STM32G0B1CBT6N",
+      "identity_status": "manufacturer_verified_active",
+      "manufacturer": "STMicroelectronics",
+      "mapping": {
+        "existing_identifiers": [],
+        "match_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "policy_action": "exclude_from_canonical_admission_until_positive_capability_evidence"
+    },
+    {
+      "base_device": "STM32G0B1CB",
+      "capability_status": "openocd_ordering_pattern_unresolved",
+      "icpn": "STM32G0B1CBU6N",
+      "identity_status": "manufacturer_verified_active",
+      "manufacturer": "STMicroelectronics",
+      "mapping": {
+        "existing_identifiers": [],
+        "match_count": 0,
+        "status": "unmapped",
+        "target_configs": []
+      },
+      "policy_action": "exclude_from_canonical_admission_until_positive_capability_evidence"
+    }
+  ],
+  "capability_unresolved_count": 2,
+  "capability_unresolved_is_identity_rejection": false,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 47,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "discovery_phase": "4.8B",
+  "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+  "fail_closed": true,
+  "family": "STM32G0",
+  "full_stm32g0_surface_covered": false,
+  "inputs": {
+    "canonical_dataset": "stm32g0-commercial-icpn.csv",
+    "canonical_dataset_absent_before_admission": true,
+    "canonical_input_sha256": "a57ec095b1af22963ef5415d7f3cbc1cd4a920dc6e06a9817dca4d029b714971",
+    "family_adapter": "stm32g0-phase4.8d-admission",
+    "mapping_catalog": "openocd-parts-canonical.csv",
+    "mapping_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "metadata_adapter": "stm32g0-phase4.8c-metadata",
+    "policy_baseline": "stm32g0-phase4.8c-policy-baseline.json",
+    "policy_baseline_sha256": "953df55b097ad58c93738e2aeecc7c762cb464f882493bf622fefbb61fc3a787",
+    "policy_phase": "4.8C",
+    "production_manifest": "stm32g0-phase4.8c-production-manifest-prestate.json",
+    "production_manifest_sha256": "4b05b3e3e7cb8e9b8cc426f9358d758f04d5bc4944b23e44ee0cad1d3bea1cd3",
+    "retained_discovery_baseline": "stm32g0-phase4.8b-discovery-baseline.json",
+    "retained_discovery_baseline_sha256": "ef059c3226b506aa0ff739abf8c6bf3e0f525ceaefb571693458dad6b706f10a",
+    "retained_evidence_directory": "stm32g0-phase4.8b-official-st-discovery-live-2026-09-09"
+  },
+  "issues": [],
+  "manufacturer_verified_identity_count": 49,
+  "metadata_adapter_id": "stm32g0-phase4.8c-metadata",
+  "metadata_policy_clean": true,
+  "n_product_version_capability_equivalence_claimed": false,
+  "phase": "4.8D",
+  "physical_target_qualification_claimed": false,
+  "policy_phase": "4.8C",
+  "production_snapshot": {
+    "base_device_count": 197,
+    "exact_icpn_count": 563,
+    "family_exact_icpn_counts": {
+      "STM32F0": 42,
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384,
+      "STM32F7": 19
+    },
+    "stm32g0_exact_icpn_count": 0
+  },
+  "production_write_applied": false,
+  "programming_algorithm_equivalence_claimed": false,
+  "required_target_config": "tcl/target/stm32g0x.cfg",
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "source_provenance": {
+    "acquisition_failure": 0,
+    "acquisition_success": 12,
+    "acquisition_time_utc": {
+      "first": "2026-09-09T15:22:04Z",
+      "last": "2026-09-09T15:31:14Z"
+    },
+    "acquisition_transport": "chromium_rendered_dom",
+    "artifact_id": 10111790513,
+    "artifact_zip_sha256": "2d261efb10ec0840208337edf8a3d2ebd1d0dc3aeb5effd78af735dd30dac36f",
+    "baseline_sha256": "ef059c3226b506aa0ff739abf8c6bf3e0f525ceaefb571693458dad6b706f10a",
+    "bounded_discovery_clean": true,
+    "canonical_dataset_admission": false,
+    "chromium_version": "151.0.7922.34",
+    "commercial_identity_clean": true,
+    "evidence_profile": "stm32g0_dual_surface_v1",
+    "exact_icpn_candidate_count": 49,
+    "excluded_non_active_part_number_count": 3,
+    "executed_git_sha": "233e9300bfac96f868e4d4c372246a3e02ff541b",
+    "headed": true,
+    "live_artifact_summary_sha256": "9b7cd31d1b0b37cb2960f34edef980159133028c0df9916909be8a0833eaf50d",
+    "manufacturer": "STMicroelectronics",
+    "playwright_version": "1.62.0",
+    "production_admission_ready": false,
+    "routing_gates_commercial_identity": false,
+    "schema_version": 1,
+    "source_bindings": {
+      "discovery_manifest_git_blob_sha": "a2836b04f91631e0f0454cf503d76d2a11de2643",
+      "openocd_catalog_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+      "production_exact_icpn_count": 563,
+      "production_family_counts": {
+        "STM32F0": 42,
+        "STM32F1": 75,
+        "STM32F2": 33,
+        "STM32F3": 10,
+        "STM32F4": 384,
+        "STM32F7": 19
+      },
+      "production_manifest_git_blob_sha": "3f8ab8b9b90edc399ad2d0a798115fffe3ba9063",
+      "stm32g0_production_prestate_count": 0
+    },
+    "source_repository": "physicslu/plasma",
+    "source_unavailable_exclusion_count": 0,
+    "target_count": 12,
+    "workflow_run_id": 34369661142
+  }
+}
