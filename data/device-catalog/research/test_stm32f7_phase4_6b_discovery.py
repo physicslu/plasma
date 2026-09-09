@@ -10,6 +10,7 @@ from unittest.mock import patch
 from st_product_page_acquisition import AcquisitionError
 from stm32f7_foundation import DEFAULT_CATALOG, deterministic_initial_targets, read_catalog
 from stm32f7_phase4_6b_discovery import (
+    CANONICAL_PAGE_404,
     DEFAULT_MANIFEST,
     MAX_TARGETS,
     discovery_is_clean,
@@ -48,7 +49,7 @@ class STM32F7Phase46BDiscoveryTests(unittest.TestCase):
         for target in self.targets:
             self.assertEqual(target.source_url, source_url_for_base(target.base_device))
 
-    def test_clean_identity_discovery_is_not_gated_by_unmapped_openocd(self) -> None:
+    def test_clean_active_discovery_is_not_gated_by_unmapped_openocd(self) -> None:
         with patch(
             "stm32f7_phase4_6b_discovery.resolve_mapping",
             return_value={"status": "unmapped", "match_count": 0, "target_configs": []},
@@ -61,13 +62,80 @@ class STM32F7Phase46BDiscoveryTests(unittest.TestCase):
                 evidence_builder=self.evidence_builder,
             )
         self.assertTrue(summary["commercial_identity_clean"])
-        self.assertEqual(summary["acquisition_success"], MAX_TARGETS)
+        self.assertTrue(summary["bounded_discovery_clean"])
+        self.assertEqual(summary["active_candidate_targets"], MAX_TARGETS)
         self.assertEqual(summary["openocd_routing"]["unmapped"], MAX_TARGETS)
         self.assertEqual(summary["routing_followup_required"], MAX_TARGETS)
         self.assertFalse(summary["openocd_routing"]["gates_commercial_identity"])
         self.assertTrue(discovery_is_clean(summary))
 
-    def test_acquisition_failure_blocks_identity_clean_gate(self) -> None:
+    def test_lifecycle_only_target_is_excluded_not_failed(self) -> None:
+        lifecycle_base = self.targets[0].base_device
+
+        def builder(**kwargs):
+            base = kwargs["base_device"]
+            if base == lifecycle_base:
+                return {
+                    "base_device": base,
+                    "exact_icpns": [],
+                    "excluded_non_active_part_numbers": [
+                        {
+                            "icpn": f"{base}T6",
+                            "marketing_status": "NRND Not recommended for New Design.",
+                        }
+                    ],
+                }
+            return self.evidence_builder(**kwargs)
+
+        summary = run_discovery(
+            pilot_id=self.pilot_id,
+            targets=self.targets,
+            catalog_rows=self.catalog,
+            fetcher=self.fetcher,
+            evidence_builder=builder,
+        )
+        self.assertEqual(summary["acquisition_failure"], 0)
+        self.assertEqual(summary["acquisition_success"], MAX_TARGETS)
+        self.assertEqual(summary["lifecycle_excluded_targets"], 1)
+        self.assertEqual(summary["active_candidate_targets"], MAX_TARGETS - 1)
+        self.assertEqual(summary["excluded_non_active_part_numbers"], 1)
+        self.assertTrue(summary["commercial_identity_clean"])
+        self.assertTrue(summary["bounded_discovery_clean"])
+        self.assertTrue(discovery_is_clean(summary))
+        result = next(item for item in summary["results"] if item["base_device"] == lifecycle_base)
+        self.assertEqual(result["disposition"], "lifecycle_excluded")
+        self.assertEqual(result["commercial_identity_status"], "verified_non_active_only")
+        self.assertEqual(result["openocd_routing"]["status"], "not_applicable")
+
+    def test_canonical_404_is_fail_closed_exclusion_not_manual_review(self) -> None:
+        unavailable_url = self.targets[0].source_url
+
+        def fetcher(source_url: str, timeout_seconds: float):
+            del timeout_seconds
+            if source_url == unavailable_url:
+                raise AcquisitionError(CANONICAL_PAGE_404)
+            return b"<html></html>", source_url, None, None
+
+        summary = run_discovery(
+            pilot_id=self.pilot_id,
+            targets=self.targets,
+            catalog_rows=self.catalog,
+            fetcher=fetcher,
+            evidence_builder=self.evidence_builder,
+        )
+        self.assertEqual(summary["acquisition_failure"], 0)
+        self.assertEqual(summary["acquisition_success"], MAX_TARGETS - 1)
+        self.assertEqual(summary["source_unavailable_exclusions"], 1)
+        self.assertEqual(summary["commercial_identity_unresolved_targets"], 1)
+        self.assertFalse(summary["commercial_identity_clean"])
+        self.assertTrue(summary["bounded_discovery_clean"])
+        self.assertEqual(summary["identity_manual_intervention_required"], 0)
+        self.assertTrue(discovery_is_clean(summary))
+        result = next(item for item in summary["results"] if item["source_url"] == unavailable_url)
+        self.assertEqual(result["disposition"], "source_unavailable_excluded")
+        self.assertFalse(result["manual_intervention_required"])
+
+    def test_non_404_acquisition_failure_requires_manual_review(self) -> None:
         failed_url = self.targets[0].source_url
 
         def fetcher(source_url: str, timeout_seconds: float):
@@ -83,20 +151,17 @@ class STM32F7Phase46BDiscoveryTests(unittest.TestCase):
             fetcher=fetcher,
             evidence_builder=self.evidence_builder,
         )
-        self.assertFalse(summary["commercial_identity_clean"])
         self.assertEqual(summary["acquisition_failure"], 1)
         self.assertEqual(summary["identity_manual_intervention_required"], 1)
+        self.assertFalse(summary["bounded_discovery_clean"])
         self.assertFalse(discovery_is_clean(summary))
 
-    def test_no_active_exact_icpn_blocks_target(self) -> None:
+    def test_empty_identity_disposition_requires_manual_review(self) -> None:
         def builder(**kwargs):
-            base = kwargs["base_device"]
             return {
-                "base_device": base,
+                "base_device": kwargs["base_device"],
                 "exact_icpns": [],
-                "excluded_non_active_part_numbers": [
-                    {"icpn": f"{base}T6", "marketing_status": "NRND"}
-                ],
+                "excluded_non_active_part_numbers": [],
             }
 
         summary = run_discovery(
@@ -106,8 +171,8 @@ class STM32F7Phase46BDiscoveryTests(unittest.TestCase):
             fetcher=self.fetcher,
             evidence_builder=builder,
         )
-        self.assertEqual(summary["acquisition_success"], 0)
         self.assertEqual(summary["acquisition_failure"], MAX_TARGETS)
+        self.assertEqual(summary["identity_manual_intervention_required"], MAX_TARGETS)
         self.assertFalse(discovery_is_clean(summary))
 
     def test_foreign_exact_icpn_blocks_target(self) -> None:
@@ -125,7 +190,7 @@ class STM32F7Phase46BDiscoveryTests(unittest.TestCase):
             fetcher=self.fetcher,
             evidence_builder=builder,
         )
-        self.assertLess(summary["acquisition_success"], MAX_TARGETS)
+        self.assertGreater(summary["identity_manual_intervention_required"], 0)
         self.assertFalse(discovery_is_clean(summary))
 
     def test_manifest_target_drift_fails_closed(self) -> None:
@@ -147,7 +212,7 @@ class STM32F7Phase46BDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(AcquisitionError, "source URL slug mismatch"):
                 read_manifest(path, self.catalog)
 
-    def test_claims_remain_false_even_when_identity_is_clean(self) -> None:
+    def test_claims_remain_false_when_discovery_is_clean(self) -> None:
         summary = run_discovery(
             pilot_id=self.pilot_id,
             targets=self.targets,
