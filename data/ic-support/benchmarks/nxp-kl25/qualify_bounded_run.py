@@ -146,6 +146,7 @@ def assess_bounded_live_run(
 ) -> dict[str, Any]:
     integrity_errors: list[str] = []
     screening_errors: list[str] = []
+    screening_executed = False
 
     def check(condition: bool, message: str) -> None:
         if not condition:
@@ -256,6 +257,7 @@ def assess_bounded_live_run(
         check(provenance_children == expected_child_rows, "provenance child digest set mismatch")
 
     if not integrity_errors:
+        screening_executed = True
         screening_errors = _screen_response(
             aggregate.get("response"), screening=contract.get("semantic_screening", {}), packs=packs
         )
@@ -267,8 +269,18 @@ def assess_bounded_live_run(
     else:
         status = "READY_FOR_REVIEW"
 
+    if not screening_executed:
+        screening_status = "NOT_REACHED"
+        screening_note = "Deterministic screening was not executed because bounded integrity failed."
+    elif screening_errors:
+        screening_status = "FAIL"
+        screening_note = "Deterministic screening is a defect filter, not proof of semantic correctness."
+    else:
+        screening_status = "PASS"
+        screening_note = "Deterministic screening is a defect filter, not proof of semantic correctness."
+
     report: dict[str, Any] = {
-        "schema_version": "0.1.0",
+        "schema_version": "0.1.1",
         "artifact_type": "kl25_live_bounded_qualification_report",
         "qualification_contract_id": contract.get("contract_id"),
         "target": contract.get("target"),
@@ -280,9 +292,9 @@ def assess_bounded_live_run(
         "status": status,
         "integrity": {"status": "PASS" if not integrity_errors else "FAIL", "errors": integrity_errors},
         "semantic_screening": {
-            "status": "PASS" if not screening_errors else "FAIL",
+            "status": screening_status,
             "errors": screening_errors,
-            "note": "Deterministic screening is a defect filter, not proof of semantic correctness.",
+            "note": screening_note,
         },
         "review": {
             "required": True,
