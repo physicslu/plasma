@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "**/*.md"
+      - ".github/ci-workstreams.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
@@ -19,6 +20,7 @@ on:
   pull_request:
     paths:
       - "**/*.md"
+      - ".github/ci-workstreams.json"
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
@@ -103,6 +105,7 @@ jobs:
               ".github/workflows/repository-contracts.yml",
           }
           ci_boundary_exact = {
+              ".github/ci-workstreams.json",
               "scripts/tests/test-ci-domain-boundaries.py",
               ".github/workflows/python-tests.yml",
               ".github/workflows/ic-support-validation.yml",
