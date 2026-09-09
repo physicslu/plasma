@@ -8,20 +8,40 @@ on:
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/research/device_catalog_bounded_discovery.py"
       - "data/device-catalog/research/st_product_page_acquisition.py"
+      - "data/device-catalog/research/st_browser_acquisition.py"
+      - "data/device-catalog/research/st_dual_surface_evidence.py"
+      - "data/device-catalog/research/st_dual_surface_browser_acquisition.py"
       - "data/device-catalog/research/stm32f0_foundation.py"
       - "data/device-catalog/research/stm32f0-phase4.5a-foundation-baseline.json"
       - "data/device-catalog/research/test_stm32f0_phase4_5a_foundation.py"
       - "data/device-catalog/research/device-catalog-phase4.5a-stm32f0-foundation.md"
+      - "data/device-catalog/research/stm32f0_dual_surface_evidence.py"
+      - "data/device-catalog/research/stm32f0_browser_acquisition.py"
+      - "data/device-catalog/research/stm32f0-phase4.5b-discovery-manifest.json"
+      - "data/device-catalog/research/stm32f0_phase4_5b_discovery.py"
+      - "data/device-catalog/research/run_stm32f0_phase4_5b_browser_discovery.py"
+      - "data/device-catalog/research/test_stm32f0_dual_surface_evidence.py"
+      - "data/device-catalog/research/test_stm32f0_phase4_5b_discovery.py"
       - ".github/workflows/device-catalog-stm32f0-validation.yml"
   pull_request:
     paths:
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/research/device_catalog_bounded_discovery.py"
       - "data/device-catalog/research/st_product_page_acquisition.py"
+      - "data/device-catalog/research/st_browser_acquisition.py"
+      - "data/device-catalog/research/st_dual_surface_evidence.py"
+      - "data/device-catalog/research/st_dual_surface_browser_acquisition.py"
       - "data/device-catalog/research/stm32f0_foundation.py"
       - "data/device-catalog/research/stm32f0-phase4.5a-foundation-baseline.json"
       - "data/device-catalog/research/test_stm32f0_phase4_5a_foundation.py"
       - "data/device-catalog/research/device-catalog-phase4.5a-stm32f0-foundation.md"
+      - "data/device-catalog/research/stm32f0_dual_surface_evidence.py"
+      - "data/device-catalog/research/stm32f0_browser_acquisition.py"
+      - "data/device-catalog/research/stm32f0-phase4.5b-discovery-manifest.json"
+      - "data/device-catalog/research/stm32f0_phase4_5b_discovery.py"
+      - "data/device-catalog/research/run_stm32f0_phase4_5b_browser_discovery.py"
+      - "data/device-catalog/research/test_stm32f0_dual_surface_evidence.py"
+      - "data/device-catalog/research/test_stm32f0_phase4_5b_discovery.py"
       - ".github/workflows/device-catalog-stm32f0-validation.yml"
 
 concurrency:
@@ -41,3 +61,7 @@ jobs:
           python-version: "3.12"
       - name: Validate Phase 4.5A STM32F0 source surface and deterministic targets
         run: python data/device-catalog/research/test_stm32f0_phase4_5a_foundation.py
+      - name: Validate STM32F0 dual-surface identity/lifecycle evidence
+        run: python data/device-catalog/research/test_stm32f0_dual_surface_evidence.py
+      - name: Validate Phase 4.5B bounded discovery and identity/capability separation
+        run: python data/device-catalog/research/test_stm32f0_phase4_5b_discovery.py
