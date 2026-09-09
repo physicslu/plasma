@@ -19,6 +19,15 @@ def require(text: str, needle: str, *, owner: str) -> None:
         raise SystemExit(f"{owner}: required CI boundary token missing: {needle}")
 
 
+def require_count(text: str, needle: str, count: int, *, owner: str) -> None:
+    actual = text.count(needle)
+    if actual != count:
+        raise SystemExit(
+            f"{owner}: required CI boundary token count drift: {needle}; "
+            f"expected {count}, got {actual}"
+        )
+
+
 def forbid(text: str, needle: str, *, owner: str) -> None:
     if needle in text:
         raise SystemExit(f"{owner}: forbidden cross-domain CI coupling present: {needle}")
@@ -112,6 +121,16 @@ def main() -> int:
         forbid(python_tests, token, owner="SW/PPU Python/PL")
     forbid(ppu_release, '"data/device-catalog/production/**"', owner="SW/PPU PPU release")
     forbid(z2_release, '"data/device-catalog/production/**"', owner="SW/PPU Z2 release")
+
+    # REPO governance tests are not SW/PPU source tests. Because python-tests
+    # still owns the broad scripts/tests/** software-helper surface, explicitly
+    # exclude this repository-boundary guard on both push and pull_request.
+    require_count(
+        python_tests,
+        '"!scripts/tests/test-ci-domain-boundaries.py"',
+        2,
+        owner="SW/PPU Python/PL",
+    )
 
     # Preserve positive ownership so trigger cleanup cannot be satisfied by
     # accidentally deleting the workflows' real source boundaries.
