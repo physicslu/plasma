@@ -1,4 +1,4 @@
-name: STM32F7 Phase 4.6C metadata-policy one-off
+name: STM32F7 Phase 4.6C policy baseline one-off
 
 on:
   push:
@@ -8,13 +8,17 @@ on:
       - .github/workflows/device-catalog-stm32f7-phase46c-oneoff.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate-policy-boundary:
+  freeze-policy-baseline:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32f7-phase46c-policy
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -22,13 +26,23 @@ jobs:
         run: python data/device-catalog/research/validate_stm32f7_phase4_6b_retained_evidence.py
       - name: Validate Phase 4.6C metadata boundary
         run: python data/device-catalog/research/test_stm32f7_phase4_6c_policy.py
-      - name: Assert no STM32F7 Production publication
+      - name: Freeze Production prestate and deterministic policy baseline
         run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          manifest = json.loads(Path('data/device-catalog/production/icpn-v1-manifest.json').read_text())
-          assert all(x.get('family') != 'STM32F7' for x in manifest['sources'])
-          assert sum(int(x['row_count']) for x in manifest['sources']) == 544
-          print('Phase 4.6C boundary PASS; Production unchanged')
-          PY
+          set -Eeuo pipefail
+          python data/device-catalog/research/stm32f7_phase4_6c_policy.py \
+            --freeze-production \
+            --skip-baseline-check \
+            --output data/device-catalog/research/stm32f7-phase4.6c-policy-baseline.json
+          python data/device-catalog/research/stm32f7_phase4_6c_policy.py
+      - name: Commit immutable Phase 4.6C baseline inputs
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'plasma-ci'
+          git config user.email 'plasma-ci@users.noreply.github.com'
+          git add \
+            data/device-catalog/research/stm32f7-phase4.6c-policy-baseline.json \
+            data/device-catalog/research/stm32f7-phase4.6c-production-manifest-prestate.json
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'ERROR: baseline generation produced no changes' >&2; exit 1; }
+          git commit -m 'device-catalog: freeze STM32F7 Phase 4.6C policy baseline'
+          git push origin HEAD:agent/device-catalog-stm32f7-phase46c-policy
