@@ -1,0 +1,45 @@
+name: STM32F2 historical family boundary fix one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f3-phase44d-publication
+    paths:
+      - .github/workflows/stm32f2-historical-family-boundary-fix-oneoff.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32f3-phase44d-publication
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ignore future families when reconstructing a historical policy boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('data/device-catalog/research/stm32f2_bounded_policy.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''        if family == FAMILY:\n            saw_stm32f2 = True\n            selected_rows = historical_stm32f2_rows\n        else:\n            selected_rows = current_rows\n        if selected_rows:\n            family_counts[family] = len(selected_rows)\n            base_devices.update((family, row.get("base_device", "")) for row in selected_rows)\n'''
+          new = '''        if family == FAMILY:\n            saw_stm32f2 = True\n            selected_rows = historical_stm32f2_rows\n        elif family in spec.expected_production_family_counts:\n            selected_rows = current_rows\n        else:\n            # A family admitted after this historical policy phase is outside\n            # the reconstructed boundary and must not mutate historical replay.\n            continue\n        if selected_rows:\n            family_counts[family] = len(selected_rows)\n            base_devices.update((family, row.get("base_device", "")) for row in selected_rows)\n'''
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          git diff --check
+          python data/device-catalog/research/stm32f2_phase4_3i_policy.py
+          python data/device-catalog/research/test_stm32f2_bounded_policy_admission.py
+          python data/device-catalog/research/test_stm32f2_phase4_3j_admission.py
+      - name: Commit historical family-boundary fix
+        run: |
+          git config user.name "plasma-ci"
+          git config user.email "plasma-ci@users.noreply.github.com"
+          git add data/device-catalog/research/stm32f2_bounded_policy.py
+          git commit -m "device-catalog: isolate historical policy family boundary"
+          git push origin HEAD:agent/device-catalog-stm32f3-phase44d-publication
