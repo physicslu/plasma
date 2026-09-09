@@ -18,31 +18,41 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Inspect STM32G0 and STM32G4 OpenOCD source surfaces
+      - name: Select deterministic STM32G0 ordering representatives
         run: |
           python - <<'PY'
-          import csv, json
+          import csv, json, re
           from collections import Counter, defaultdict
           from pathlib import Path
           p=Path('data/device-catalog/research/openocd-parts-canonical.csv')
           rows=list(csv.DictReader(p.open(newline='', encoding='utf-8')))
-          for family in ('STM32G0','STM32G4'):
-              fr=[r for r in rows if r.get('plasma_series') == family]
-              by_sub=Counter(r.get('subfamily','') for r in fr)
-              result={
-                  'family': family,
-                  'row_count': len(fr),
-                  'subfamily_count': len(by_sub),
-                  'subfamilies': dict(sorted(by_sub.items())),
-                  'identifier_kinds': dict(sorted(Counter(r.get('identifier_kind','') for r in fr).items())),
-                  'target_configs': sorted({r.get('target_config','') for r in fr}),
-                  'distributions': dict(sorted(Counter(r.get('openocd_distribution','') for r in fr).items())),
-                  'mapping_statuses': dict(sorted(Counter(r.get('mapping_status','') for r in fr).items())),
-                  'validation_statuses': dict(sorted(Counter(r.get('validation_status','') for r in fr).items())),
-                  'sample_rows': [
-                      {k:r.get(k,'') for k in ('part_number','subfamily','identifier_kind','target_config','mapping_status','validation_status')}
-                      for r in fr[:20]
-                  ],
-              }
-              print(json.dumps(result, indent=2, sort_keys=True))
+          fr=[r for r in rows if r.get('plasma_series') == 'STM32G0']
+          grouped=defaultdict(list)
+          for r in fr:
+              grouped[r.get('subfamily','')].append(r)
+          selections=[]
+          details={}
+          for sub in sorted(grouped):
+              ordering=sorted(r['part_number'] for r in grouped[sub] if r.get('identifier_kind') == 'ordering_pattern')
+              cmsis=sorted(r['part_number'] for r in grouped[sub] if r.get('identifier_kind') == 'cmsis_device_name')
+              if not ordering:
+                  raise SystemExit(f'{sub}: no ordering_pattern representative')
+              pattern=ordering[0]
+              # OpenOCD ordering patterns use a terminal package/temperature wildcard x.
+              # Strip the final package+wildcard pair only to produce the bounded ST base-device target.
+              m=re.fullmatch(r'(STM32G0[A-Z0-9]+?)[A-Z]x', pattern)
+              if not m:
+                  raise SystemExit(f'{sub}: cannot derive base device from {pattern}')
+              base=m.group(1)
+              selections.append({'subfamily':sub,'base_device':base,'source_pattern':pattern})
+              details[sub]={'ordering_count':len(ordering),'cmsis_count':len(cmsis),'first_ordering_patterns':ordering[:5],'cmsis_names':cmsis}
+          print(json.dumps({
+              'family':'STM32G0',
+              'row_count':len(fr),
+              'ordering_count':sum(r.get('identifier_kind')=='ordering_pattern' for r in fr),
+              'cmsis_count':sum(r.get('identifier_kind')=='cmsis_device_name' for r in fr),
+              'target_configs':sorted({r.get('target_config','') for r in fr}),
+              'pilot_targets':selections,
+              'details':details,
+          }, indent=2, sort_keys=True))
           PY
