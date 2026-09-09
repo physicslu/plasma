@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "catalog_id": "plasma-icpn",
+  "catalog_version": "1.0.0",
+  "status": "production",
+  "selection_policy": "admitted_exact_manufacturer_part_number_only",
+  "sources": [
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F1",
+      "path": "../research/stm32f1-commercial-icpn.csv",
+      "row_count": 75,
+      "git_blob_sha": "b9f5e265fb5307c19b3a2a9f85f200711663e5ed",
+      "sha256": "18912f112f0a49eb194716c4211c7f28b73e67776029a0ee79e7af9f4fbae6a3"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F2",
+      "path": "../research/stm32f2-commercial-icpn.csv",
+      "row_count": 33,
+      "git_blob_sha": "1bec0770179f3849c6cfbb66aea9ad9d63610f55",
+      "sha256": "69a9e02be14237bd2c683bc63eed4bd132ba62c5e8c334ef0e85671f868003d0"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F3",
+      "path": "../research/stm32f3-commercial-icpn.csv",
+      "row_count": 10,
+      "git_blob_sha": "39f0d18c8e54ece6098090b24277bd365462106e",
+      "sha256": "c371b7a1c3b271afb9c8c823a4d12071be57da1aa11d138b59d39911489e1ee8"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32F4",
+      "path": "../research/stm32f4-commercial-icpn.csv",
+      "row_count": 384,
+      "git_blob_sha": "2f2a9edec7f7a9024a184ec363d5dd1b9d8c8863",
+      "sha256": "3ab4793d67f1b70e8c8f4c883bd9c24430f25b7a11a199ba32bb50fc48f39359"
+    }
+  ]
+}
