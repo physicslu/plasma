@@ -2,9 +2,9 @@
 """Deterministically retain a clean STM32F7 Phase 4.6B live artifact.
 
 Raw rendered-browser evidence remains in the immutable GitHub Actions artifact.
-This transformer validates that artifact and writes the compact repository
-projection: immutable baseline, normalized decision summary, provenance,
-README, and evidence manifest.
+The repository retains a compact decision projection, including Active exact
+ICPN candidates, manufacturer-verified lifecycle exclusions, and deterministic
+canonical-page-unavailable exclusions. No exclusion is promoted to admission.
 """
 
 from __future__ import annotations
@@ -82,18 +82,39 @@ def all_false_claims(value: object) -> bool:
 
 
 def _compact_timestamp(value: str) -> str:
-    require(re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value) is not None, "invalid acquisition timestamp")
+    require(
+        re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value) is not None,
+        "invalid acquisition timestamp",
+    )
     return value.replace("-", "").replace(":", "")
 
 
 def _validate_source_bindings() -> dict[str, object]:
-    require(git_blob_sha(DEFAULT_DISCOVERY_MANIFEST) == EXPECTED_DISCOVERY_MANIFEST_BLOB, "discovery manifest Git blob drifted")
-    require(git_blob_sha(DEFAULT_OPENOCD_CATALOG) == EXPECTED_OPENOCD_BLOB, "OpenOCD source Git blob drifted")
-    require(git_blob_sha(DEFAULT_PRODUCTION_MANIFEST) == EXPECTED_PRODUCTION_MANIFEST_BLOB, "Production manifest Git blob drifted")
+    require(
+        git_blob_sha(DEFAULT_DISCOVERY_MANIFEST) == EXPECTED_DISCOVERY_MANIFEST_BLOB,
+        "discovery manifest Git blob drifted",
+    )
+    require(
+        git_blob_sha(DEFAULT_OPENOCD_CATALOG) == EXPECTED_OPENOCD_BLOB,
+        "OpenOCD source Git blob drifted",
+    )
+    require(
+        git_blob_sha(DEFAULT_PRODUCTION_MANIFEST) == EXPECTED_PRODUCTION_MANIFEST_BLOB,
+        "Production manifest Git blob drifted",
+    )
     manifest = read_json(DEFAULT_PRODUCTION_MANIFEST)
-    counts = {str(item["family"]): int(item["row_count"]) for item in manifest.get("sources", [])}
-    require(counts == EXPECTED_PRODUCTION_FAMILY_COUNTS, f"Production family snapshot drifted: {counts}")
-    require(sum(counts.values()) == EXPECTED_PRODUCTION_EXACT_COUNT, "Production exact ICPN count drifted")
+    counts = {
+        str(item["family"]): int(item["row_count"])
+        for item in manifest.get("sources", [])
+    }
+    require(
+        counts == EXPECTED_PRODUCTION_FAMILY_COUNTS,
+        f"Production family snapshot drifted: {counts}",
+    )
+    require(
+        sum(counts.values()) == EXPECTED_PRODUCTION_EXACT_COUNT,
+        "Production exact ICPN count drifted",
+    )
     require(FAMILY not in counts, "STM32F7 must remain absent from Production during Phase 4.6B")
     return {
         "discovery_manifest_git_blob_sha": EXPECTED_DISCOVERY_MANIFEST_BLOB,
@@ -103,6 +124,19 @@ def _validate_source_bindings() -> dict[str, object]:
         "production_manifest_git_blob_sha": EXPECTED_PRODUCTION_MANIFEST_BLOB,
         "stm32f7_production_prestate_count": 0,
     }
+
+
+def _validate_exclusions(value: object, base: str) -> list[dict[str, str]]:
+    require(isinstance(value, list), f"{base}: lifecycle exclusions must be a list")
+    normalized: list[dict[str, str]] = []
+    for item in value:
+        require(isinstance(item, dict), f"{base}: lifecycle exclusion must be an object")
+        icpn = item.get("icpn")
+        status = item.get("marketing_status")
+        require(isinstance(icpn, str) and icpn.startswith(base), f"{base}: foreign lifecycle ICPN")
+        require(isinstance(status, str) and status.strip(), f"{base}: lifecycle status missing")
+        normalized.append({"icpn": icpn, "marketing_status": status})
+    return normalized
 
 
 def retain(
@@ -117,6 +151,7 @@ def retain(
 ) -> dict[str, object]:
     require(SHA256_RE.fullmatch(artifact_zip_sha256) is not None, "invalid artifact ZIP SHA-256")
     require(re.fullmatch(r"[0-9a-f]{40}", executed_git_sha) is not None, "invalid executed Git SHA")
+
     summary_path = artifact_root / "live-summary.json"
     metadata_path = artifact_root / "execution-metadata.json"
     exit_code_path = artifact_root / "exit-code.txt"
@@ -131,14 +166,17 @@ def retain(
     require(live.get("schema_version") == 1 and live.get("phase") == PHASE, "live phase/schema mismatch")
     require(live.get("family") == FAMILY, "live family mismatch")
     require(live.get("attempted") == MAX_TARGETS, "live target count mismatch")
-    require(live.get("acquisition_success") == MAX_TARGETS, "live acquisition success mismatch")
-    require(live.get("acquisition_failure") == 0, "live acquisition failure is nonzero")
-    require(live.get("commercial_identity_clean") is True, "live commercial identity gate is not clean")
-    require(live.get("identity_manual_intervention_required") == 0, "live identity manual intervention required")
+    require(live.get("dispositioned_targets") == MAX_TARGETS, "live target disposition count mismatch")
+    require(live.get("acquisition_failure") == 0, "live technical acquisition failure is nonzero")
+    require(live.get("bounded_discovery_clean") is True, "live bounded discovery gate is not clean")
+    require(live.get("identity_manual_intervention_required") == 0, "live manual intervention required")
     require(all_false_claims(live.get("claims")), "live claims must all remain false")
-    routing = live.get("openocd_routing")
-    require(isinstance(routing, dict) and routing.get("gates_commercial_identity") is False, "routing must not gate commercial identity")
 
+    routing = live.get("openocd_routing")
+    require(
+        isinstance(routing, dict) and routing.get("gates_commercial_identity") is False,
+        "routing must not gate commercial identity",
+    )
     browser = live.get("browser")
     require(isinstance(browser, dict), "live browser binding missing")
     require(browser.get("evidence_profile") == PROFILE, "live evidence profile mismatch")
@@ -157,28 +195,62 @@ def retain(
     require(isinstance(results, list) and len(results) == MAX_TARGETS, "live result count mismatch")
 
     retained_targets: list[dict[str, object]] = []
-    exact_icpns: list[str] = []
-    excluded_count = 0
+    active_icpns: list[str] = []
+    lifecycle_exclusions: list[dict[str, str]] = []
+    source_unavailable: list[dict[str, str]] = []
     timestamps: list[str] = []
+
     for manifest_target, result in zip(manifest_targets, results):
         require(isinstance(manifest_target, dict) and isinstance(result, dict), "target/result entry must be an object")
         base = manifest_target.get("base_device")
         subfamily = manifest_target.get("subfamily")
         source_url = manifest_target.get("source_url")
-        require(result.get("base_device") == base and result.get("subfamily") == subfamily, f"{base}: live target ordering mismatch")
-        require(result.get("source_url") == source_url, f"{base}: live source URL mismatch")
-        require(result.get("acquisition_status") == "success", f"{base}: acquisition was not successful")
-        require(result.get("commercial_identity_status") == "verified_active", f"{base}: commercial identity not verified active")
+        require(isinstance(base, str) and isinstance(subfamily, str) and isinstance(source_url, str), "invalid manifest target")
+        require(result.get("base_device") == base and result.get("subfamily") == subfamily, f"{base}: target ordering mismatch")
+        require(result.get("source_url") == source_url, f"{base}: source URL mismatch")
+        disposition = result.get("disposition")
+
+        if disposition == "source_unavailable_excluded":
+            require(result.get("acquisition_status") == "source_unavailable", f"{base}: invalid source-unavailable state")
+            require(result.get("source_unavailable_status") == "http_404", f"{base}: unsupported source-unavailable reason")
+            require(result.get("manual_intervention_required") is False, f"{base}: source exclusion cannot require manual review")
+            require(not (raw_evidence_dir / f"{base}.json").exists(), f"{base}: unexpected raw evidence for unavailable page")
+            retained_targets.append({
+                "base_device": base,
+                "commercial_identity_status": "unverified",
+                "disposition": disposition,
+                "routing_gates_commercial_identity": False,
+                "source_unavailable_status": "http_404",
+                "source_url": source_url,
+                "subfamily": subfamily,
+            })
+            source_unavailable.append({
+                "base_device": base,
+                "reason": "canonical_product_page_http_404",
+                "source_url": source_url,
+                "subfamily": subfamily,
+            })
+            continue
+
+        require(disposition in {"active_candidates", "lifecycle_excluded"}, f"{base}: unexpected disposition {disposition!r}")
+        require(result.get("acquisition_status") == "success", f"{base}: evidence acquisition was not successful")
         evidence = result.get("evidence")
         require(isinstance(evidence, dict), f"{base}: live evidence missing")
         raw_path = raw_evidence_dir / f"{base}.json"
         require(raw_path.is_file(), f"{base}: raw evidence file missing")
         require(read_json(raw_path) == evidence, f"{base}: raw evidence differs from live summary")
+
         exact = evidence.get("exact_icpns")
-        excluded = evidence.get("excluded_non_active_part_numbers")
-        require(isinstance(exact, list) and exact, f"{base}: exact ICPNs missing")
-        require(all(isinstance(value, str) and value.startswith(str(base)) for value in exact), f"{base}: foreign ICPN")
-        require(isinstance(excluded, list), f"{base}: lifecycle exclusion list missing")
+        require(isinstance(exact, list), f"{base}: exact ICPNs must be a list")
+        require(all(isinstance(value, str) and value.startswith(base) for value in exact), f"{base}: foreign Active ICPN")
+        excluded = _validate_exclusions(evidence.get("excluded_non_active_part_numbers"), base)
+        if disposition == "active_candidates":
+            require(bool(exact), f"{base}: Active disposition lacks Active exact ICPNs")
+            require(result.get("commercial_identity_status") == "verified_active", f"{base}: Active identity status mismatch")
+        else:
+            require(not exact and bool(excluded), f"{base}: lifecycle-only disposition is inconsistent")
+            require(result.get("commercial_identity_status") == "verified_non_active_only", f"{base}: lifecycle identity status mismatch")
+
         for digest_field in ("evidence_section_sha256", "rendered_dom_sha256"):
             digest = evidence.get(digest_field)
             require(isinstance(digest, str) and SHA256_RE.fullmatch(digest) is not None, f"{base}: invalid {digest_field}")
@@ -188,10 +260,14 @@ def retain(
         target_routing = result.get("openocd_routing")
         require(isinstance(target_routing, dict), f"{base}: routing observation missing")
         require(target_routing.get("gates_commercial_identity") is False, f"{base}: routing gate boundary mismatch")
+
         retained_targets.append({
             "base_device": base,
+            "commercial_identity_status": result.get("commercial_identity_status"),
+            "disposition": disposition,
             "evidence_section_sha256": evidence["evidence_section_sha256"],
             "exact_icpns": exact,
+            "excluded_non_active_part_numbers": excluded,
             "historical_openocd_routing_status": target_routing.get("status"),
             "historical_openocd_target_configs": target_routing.get("target_configs", []),
             "rendered_dom_sha256": evidence["rendered_dom_sha256"],
@@ -200,25 +276,37 @@ def retain(
             "source_url": source_url,
             "subfamily": subfamily,
         })
-        exact_icpns.extend(exact)
-        excluded_count += len(excluded)
+        active_icpns.extend(str(value) for value in exact)
+        lifecycle_exclusions.extend({"base_device": base, **item} for item in excluded)
 
-    require(len(set(exact_icpns)) == len(exact_icpns), "duplicate exact ICPN across retained targets")
-    require(len(exact_icpns) == int(live.get("active_exact_icpn_candidates", -1)), "aggregate exact ICPN count mismatch")
-    require(excluded_count == int(live.get("excluded_non_active_part_numbers", -1)), "aggregate lifecycle exclusion mismatch")
+    require(len(retained_targets) == MAX_TARGETS, "retained target count mismatch")
+    require(len(set(active_icpns)) == len(active_icpns), "duplicate Active exact ICPN across targets")
+    require(len(active_icpns) == int(live.get("active_exact_icpn_candidates", -1)), "aggregate Active ICPN count mismatch")
+    require(len(lifecycle_exclusions) == int(live.get("excluded_non_active_part_numbers", -1)), "aggregate lifecycle exclusion mismatch")
+    require(len(source_unavailable) == int(live.get("source_unavailable_exclusions", -1)), "aggregate source-unavailable count mismatch")
+    require(timestamps, "no retained manufacturer evidence timestamps")
+
     source_bindings = _validate_source_bindings()
+    aggregate_keys = (
+        "acquisition_failure",
+        "acquisition_success",
+        "active_candidate_targets",
+        "active_exact_icpn_candidates",
+        "attempted",
+        "bounded_discovery_clean",
+        "commercial_identity_clean",
+        "commercial_identity_unresolved_targets",
+        "commercial_identity_verified_targets",
+        "dispositioned_targets",
+        "excluded_non_active_part_numbers",
+        "identity_manual_intervention_required",
+        "lifecycle_excluded_targets",
+        "openocd_routing",
+        "routing_followup_required",
+        "source_unavailable_exclusions",
+    )
+    aggregate = {key: live[key] for key in aggregate_keys}
 
-    aggregate = {
-        "acquisition_failure": live["acquisition_failure"],
-        "acquisition_success": live["acquisition_success"],
-        "active_exact_icpn_candidates": live["active_exact_icpn_candidates"],
-        "attempted": live["attempted"],
-        "commercial_identity_clean": live["commercial_identity_clean"],
-        "excluded_non_active_part_numbers": live["excluded_non_active_part_numbers"],
-        "identity_manual_intervention_required": live["identity_manual_intervention_required"],
-        "openocd_routing": live["openocd_routing"],
-        "routing_followup_required": live["routing_followup_required"],
-    }
     baseline = {
         "aggregate": aggregate,
         "browser": browser,
@@ -228,6 +316,8 @@ def retain(
             "artifact_zip_sha256": artifact_zip_sha256,
             "github_checkout_sha": metadata["github_sha"],
             "head_git_sha": executed_git_sha,
+            "pre_policy_fix_artifact_id": metadata.get("pre_policy_fix_artifact_id"),
+            "pre_policy_fix_run_id": metadata.get("pre_policy_fix_run_id"),
             "workflow_run_id": workflow_run_id,
         },
         "family": FAMILY,
@@ -240,28 +330,18 @@ def retain(
     write_json(baseline_path, baseline)
 
     pilot_summary = {
-        "aggregate": {
-            key: aggregate[key]
-            for key in (
-                "acquisition_failure",
-                "acquisition_success",
-                "active_exact_icpn_candidates",
-                "attempted",
-                "commercial_identity_clean",
-                "excluded_non_active_part_numbers",
-                "identity_manual_intervention_required",
-            )
-        },
+        "aggregate": aggregate,
         "claims": live["claims"],
-        "exact_icpns": exact_icpns,
+        "exact_icpns": active_icpns,
         "family": FAMILY,
         "lifecycle": {
-            "excluded_non_active_part_numbers": excluded_count,
+            "excluded_non_active_part_numbers": lifecycle_exclusions,
             "marketing_status_for_all_exact_icpns": ACTIVE_STATUS,
         },
         "phase": PHASE,
         "pilot_id": live["pilot_id"],
         "schema_version": 1,
+        "source_unavailable_exclusions": source_unavailable,
     }
 
     first_time = min(timestamps)
@@ -285,13 +365,15 @@ def retain(
         "artifact_id": artifact_id,
         "artifact_zip_sha256": artifact_zip_sha256,
         "baseline_sha256": sha256(baseline_path),
+        "bounded_discovery_clean": True,
         "canonical_dataset_admission": False,
         "chromium_version": browser["browser_version"],
-        "evaluator_result": "phase4_6b_commercial_identity_clean",
+        "commercial_identity_clean": live["commercial_identity_clean"],
+        "evaluator_result": "phase4_6b_bounded_discovery_clean",
         "evidence_id": evidence_id,
         "evidence_profile": browser["evidence_profile"],
-        "exact_icpn_candidate_count": len(exact_icpns),
-        "excluded_non_active_part_number_count": excluded_count,
+        "exact_icpn_candidate_count": len(active_icpns),
+        "excluded_non_active_part_number_count": len(lifecycle_exclusions),
         "executed_git_sha": executed_git_sha,
         "execution_mode": "github_actions_headed_chromium",
         "github_checkout_sha": metadata["github_sha"],
@@ -300,20 +382,38 @@ def retain(
         "manufacturer": MANUFACTURER,
         "pilot_summary_sha256": sha256(pilot_path),
         "playwright_version": browser["playwright_version"],
+        "pre_policy_fix_artifact_id": metadata.get("pre_policy_fix_artifact_id"),
+        "pre_policy_fix_run_id": metadata.get("pre_policy_fix_run_id"),
         "production_admission_ready": False,
         "retained_pilot_summary_kind": "normalized_decision_projection",
         "routing_gates_commercial_identity": False,
-        "scale_ready": True,
         "schema_version": 1,
         "source_bindings": source_bindings,
         "source_repository": "physicslu/plasma",
+        "source_unavailable_exclusion_count": len(source_unavailable),
         "target_count": MAX_TARGETS,
         "workflow_run_id": workflow_run_id,
     }
     write_json(provenance_path, provenance)
 
-    readme = f"""# STM32F7 Phase 4.6B retained manufacturer evidence\n\nThis directory is the compact retained projection of the controlled official-ST\nGitHub Actions discovery run `{workflow_run_id}` executed from `{executed_git_sha}`.\n\nThe immutable Actions artifact `{artifact_id}` (ZIP SHA-256\n`{artifact_zip_sha256}`) retains the raw per-target dual-surface evidence. The\nrepository intentionally retains only the normalized decision projection and\nprovenance needed for deterministic offline replay.\n\n- target count: {MAX_TARGETS}\n- Active exact ICPN candidates: {len(exact_icpns)}\n- excluded non-Active part numbers: {excluded_count}\n- commercial identity clean: true\n- OpenOCD routing gates commercial identity: false\n- canonical admission: false\n- Production write authorization: false\n- runtime programming support claim: false\n\nEvidence ID: `{evidence_id}`\n"""
-    readme_path.write_text(readme, encoding="utf-8")
+    readme_path.write_text(
+        "# STM32F7 Phase 4.6B retained manufacturer evidence\n\n"
+        f"Controlled official-ST discovery run: `{workflow_run_id}` at `{executed_git_sha}`.\n\n"
+        f"The immutable Actions artifact `{artifact_id}` (ZIP SHA-256 `{artifact_zip_sha256}`) "
+        "retains raw per-target rendered-browser evidence. This directory retains only the "
+        "normalized decision projection and provenance.\n\n"
+        f"- deterministic targets: {MAX_TARGETS}\n"
+        f"- Active exact ICPN candidates: {len(active_icpns)}\n"
+        f"- lifecycle-excluded exact identities: {len(lifecycle_exclusions)}\n"
+        f"- canonical-page-unavailable targets: {len(source_unavailable)}\n"
+        "- manual-review targets: 0\n"
+        "- bounded discovery clean: true\n"
+        "- canonical admission: false\n"
+        "- Production write authorization: false\n"
+        "- runtime programming support claim: false\n\n"
+        f"Evidence ID: `{evidence_id}`\n",
+        encoding="utf-8",
+    )
 
     retained_manifest = {
         "schema_version": 1,
@@ -336,8 +436,9 @@ def retain(
         "manifest_sha256": sha256(manifest_path),
         "live_summary_sha256": sha256(summary_path),
         "target_count": MAX_TARGETS,
-        "active_exact_icpn_candidates": len(exact_icpns),
-        "excluded_non_active_part_numbers": excluded_count,
+        "active_exact_icpn_candidates": len(active_icpns),
+        "excluded_non_active_part_numbers": len(lifecycle_exclusions),
+        "source_unavailable_exclusions": len(source_unavailable),
     }
     print(json.dumps(report, indent=2, sort_keys=True))
     return report
