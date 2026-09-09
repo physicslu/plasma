@@ -1,4 +1,4 @@
-name: STM32F7 Phase 4.6B retained replay one-off
+name: STM32F7 Phase 4.6B disposition-aware retained replay one-off
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
         run: |
           python data/device-catalog/research/test_stm32f7_dual_surface_evidence.py
           python data/device-catalog/research/test_stm32f7_phase4_6b_discovery.py
-      - name: Replay retained Phase 4.6B evidence fail-closed
+      - name: Replay disposition-aware retained Phase 4.6B evidence fail-closed
         run: python data/device-catalog/research/validate_stm32f7_phase4_6b_retained_evidence.py
       - name: Assert Phase 4.6B did not publish STM32F7 to Production
         run: |
