@@ -42,6 +42,8 @@ jobs:
           python-version: '3.12'
       - name: Validate Phase 4.8A STM32G0 source surface and deterministic targets
         run: python data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py
+      - name: Validate STM32G0 dual-surface identity/lifecycle evidence
+        run: python data/device-catalog/research/test_stm32g0_dual_surface_evidence.py
       - name: Validate Phase 4.8B bounded discovery and identity/routing separation
         run: python data/device-catalog/research/test_stm32g0_phase4_8b_discovery.py
       - name: Validate retained Phase 4.8B evidence if present
