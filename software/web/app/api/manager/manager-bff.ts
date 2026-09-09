@@ -2,12 +2,21 @@ const DEFAULT_MANAGER_API_URL = "http://127.0.0.1:18180";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const MAX_MANAGED_REQUEST_BYTES = 24 * 1024 * 1024;
 const MANAGER_TIMEOUT_MS = 130_000;
+const MANAGER_SELECTION_TIMEOUT_MS = 5_000;
+const MANAGED_PPU_SELECTION_COOKIE = "plasma-manager-ppu-alias";
 const MANAGED_BINARY_GET_PATHS = [
   /^\/api\/jobs\/[^/]+\/files\/[^/]+$/,
   /^\/api\/engineering\/targets\/[^/]+\/[^/]+\/api\/jobs\/[^/]+\/files\/[^/]+$/,
 ];
 
 type RelayResponseContract = "passthrough" | "managed-ppu";
+
+type RegistrySelectionPayload = {
+  ppus?: Array<{
+    alias?: unknown;
+    lifecycle?: unknown;
+  }>;
+};
 
 function json(status: number, payload: object): Response {
   return Response.json(payload, {
@@ -46,8 +55,9 @@ export function managerApiBase(): string {
   return url.toString().replace(/\/$/, "");
 }
 
-function validPpuAlias(alias: string): boolean {
-  return Boolean(alias.trim() && alias.length <= 128 && !alias.includes("/") && !alias.includes("\\"));
+export function validPpuAlias(alias: string): boolean {
+  const normalized = alias.trim();
+  return Boolean(normalized && normalized.length <= 128 && !normalized.includes("/") && !normalized.includes("\\"));
 }
 
 export function managerPpuAlias(): string {
@@ -56,6 +66,65 @@ export function managerPpuAlias(): string {
     throw new Error("PLASMA_MANAGER_PPU_ALIAS must identify one enrolled PPU alias");
   }
   return alias;
+}
+
+function requestPpuAlias(request: Request): string | null {
+  const cookie = request.headers.get("Cookie") ?? "";
+  for (const field of cookie.split(";")) {
+    const [name, ...valueParts] = field.trim().split("=");
+    if (name !== MANAGED_PPU_SELECTION_COOKIE) continue;
+    try {
+      const alias = decodeURIComponent(valueParts.join("=")).trim();
+      return validPpuAlias(alias) ? alias : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function commissionedManagerPpuAliases(): Promise<string[]> {
+  const response = await fetch(`${managerApiBase()}/api/registry`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(MANAGER_SELECTION_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error("Manager registry is unavailable");
+  const payload = await response.json() as RegistrySelectionPayload;
+  const aliases = (Array.isArray(payload.ppus) ? payload.ppus : [])
+    .filter(entry => entry?.lifecycle === "commissioned")
+    .map(entry => typeof entry.alias === "string" ? entry.alias.trim() : "")
+    .filter(alias => validPpuAlias(alias));
+  return Array.from(new Set(aliases));
+}
+
+export async function managerPpuAliasIsCommissioned(alias: string): Promise<boolean> {
+  const normalized = alias.trim();
+  if (!validPpuAlias(normalized)) return false;
+  const aliases = await commissionedManagerPpuAliases();
+  return aliases.includes(normalized);
+}
+
+export async function resolveManagerPpuAlias(request: Request): Promise<string> {
+  const browserSelection = requestPpuAlias(request);
+  if (browserSelection) return browserSelection;
+
+  try {
+    return managerPpuAlias();
+  } catch {
+    // Legacy deployment selection is optional. A single commissioned Manager
+    // registry entry is an unambiguous bootstrap target.
+  }
+
+  const commissionedAliases = await commissionedManagerPpuAliases();
+  if (commissionedAliases.length === 1) return commissionedAliases[0];
+  throw new Error("Managed PPU selection is unavailable");
+}
+
+export function managerPpuSelectionCookie(alias: string): string {
+  const normalized = alias.trim();
+  if (!validPpuAlias(normalized)) throw new Error("PPU registry alias is invalid");
+  return `${MANAGED_PPU_SELECTION_COOKIE}=${encodeURIComponent(normalized)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000`;
 }
 
 function forwardedHeaders(request: Request): Headers {
@@ -188,7 +257,7 @@ export async function relayManagerPpuRequest(request: Request, targetPath: strin
 
   let ppuAlias: string;
   try {
-    ppuAlias = managerPpuAlias();
+    ppuAlias = await resolveManagerPpuAlias(request);
   } catch {
     return json(503, {
       ok: false,
