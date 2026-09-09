@@ -1,4 +1,4 @@
-name: STM32F7 Phase 4.6C permanent replay one-off
+name: STM32F7 Phase 4.6C permanent replay one-off rerun
 
 on:
   push:
