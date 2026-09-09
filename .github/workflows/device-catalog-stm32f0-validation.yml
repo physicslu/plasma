@@ -35,6 +35,10 @@ on:
       - "data/device-catalog/research/stm32f0_admission_policy.py"
       - "data/device-catalog/research/stm32f0_phase4_5d_admission.py"
       - "data/device-catalog/research/test_stm32f0_phase4_5d_admission.py"
+      - "data/device-catalog/research/stm32f0-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32f0-phase4.5d-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32f0-phase4.5d-admission-audit.json"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32f0-validation.yml"
   pull_request:
     paths:
@@ -68,6 +72,10 @@ on:
       - "data/device-catalog/research/stm32f0_admission_policy.py"
       - "data/device-catalog/research/stm32f0_phase4_5d_admission.py"
       - "data/device-catalog/research/test_stm32f0_phase4_5d_admission.py"
+      - "data/device-catalog/research/stm32f0-commercial-icpn.csv"
+      - "data/device-catalog/research/stm32f0-phase4.5d-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32f0-phase4.5d-admission-audit.json"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32f0-validation.yml"
 
 concurrency:
@@ -97,5 +105,5 @@ jobs:
         run: python data/device-catalog/research/validate_stm32f0_phase4_5b_retained_evidence.py
       - name: Validate Phase 4.5C metadata policy and immutable baseline
         run: python data/device-catalog/research/test_stm32f0_phase4_5c_policy.py
-      - name: Validate Phase 4.5D admission capability gate
+      - name: Validate Phase 4.5D post-publication regression
         run: python data/device-catalog/research/test_stm32f0_phase4_5d_admission.py
