@@ -1,4 +1,4 @@
-name: STM32F7 Phase 4.6B disposition-aware live discovery one-off
+name: STM32F7 Phase 4.6B retained-evidence one-off
 
 on:
   push:
@@ -8,82 +8,68 @@ on:
       - .github/workflows/device-catalog-stm32f7-phase46b-diagnostic-oneoff.yml
 
 permissions:
-  contents: read
+  contents: write
+  actions: read
 
 jobs:
-  live-discovery:
+  retain-evidence:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 10
+    env:
+      ARTIFACT_ID: '10094200419'
+      ARTIFACT_SHA256: '998670e0d8fc6331d60a080dccd48f0dbeb2e967a0169af4e177d9e60f30bf3f'
+      LIVE_RUN_ID: '34326658883'
+      LIVE_HEAD_SHA: '776ebeafe2156a6cfdea5340dc2c8921e45725ed'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32f7-phase46b-discovery
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate offline Phase 4.6A and 4.6B contracts
+      - name: Validate current Phase 4.6A and 4.6B offline contracts
         env:
           PYTHONPATH: data/device-catalog/research
         run: |
           python data/device-catalog/research/test_stm32f7_phase4_6a_foundation.py
           python data/device-catalog/research/test_stm32f7_dual_surface_evidence.py
           python data/device-catalog/research/test_stm32f7_phase4_6b_discovery.py
-      - name: Install pinned Playwright and Chromium
+      - name: Download exact immutable live artifact and verify ZIP digest
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install 'playwright==1.62.0'
-          python -m playwright install --with-deps chromium
-      - name: Run bounded 16-target STM32F7 official-ST discovery
+          set -Eeuo pipefail
+          mkdir -p /tmp/stm32f7-phase4.6b-artifact
+          curl --fail-with-body --location \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            --output /tmp/stm32f7-phase4.6b-artifact.zip
+          echo "${ARTIFACT_SHA256}  /tmp/stm32f7-phase4.6b-artifact.zip" | sha256sum --check --strict
+          unzip -q /tmp/stm32f7-phase4.6b-artifact.zip -d /tmp/stm32f7-phase4.6b-artifact
+      - name: Deterministically retain disposition-aware evidence
         env:
           PYTHONPATH: data/device-catalog/research
         run: |
-          mkdir -p /tmp/stm32f7-phase4.6b-live/evidence
-          set +e
-          xvfb-run -a python data/device-catalog/research/run_stm32f7_phase4_6b_browser_discovery.py \
-            --output /tmp/stm32f7-phase4.6b-live/live-summary.json \
-            --evidence-dir /tmp/stm32f7-phase4.6b-live/evidence \
-            --timeout 90 \
-            --delay 2
-          rc=$?
-          set -e
-          printf '%s\n' "$rc" > /tmp/stm32f7-phase4.6b-live/exit-code.txt
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          root = Path('/tmp/stm32f7-phase4.6b-live')
-          metadata = {
-              'github_sha': os.environ.get('GITHUB_SHA'),
-              'github_run_id': os.environ.get('GITHUB_RUN_ID'),
-              'github_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
-              'github_workflow': os.environ.get('GITHUB_WORKFLOW'),
-              'diagnostic_run_id': '34325478619',
-              'diagnostic_artifact_id': '10093586727',
-              'diagnostic_artifact_zip_sha256': '05258ee448dbfbb2033ab67e1ccd7b2b14b9370ad979f21617891ed82327ff4a',
-              'pre_policy_fix_run_id': '34325627558',
-              'pre_policy_fix_artifact_id': '10093847910',
-              'pre_policy_fix_artifact_zip_sha256': '98c512a69cc9a4385b3c9e36880489fd46c44d4de6f50b173dfb74d220809b64',
-              'pre_policy_fix_result': {
-                  'attempted': 16,
-                  'acquisition_success': 9,
-                  'acquisition_failure': 7,
-                  'active_exact_icpn_candidates': 19,
-                  'excluded_non_active_part_numbers_seen_before_reclassification': 6,
-              },
-          }
-          (root / 'execution-metadata.json').write_text(
-              json.dumps(metadata, indent=2, sort_keys=True) + '\n',
-              encoding='utf-8',
-          )
-          PY
-      - name: Upload disposition-aware live discovery evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: stm32f7-phase4.6b-disposition-aware-live-20260909
-          path: /tmp/stm32f7-phase4.6b-live
-          if-no-files-found: error
-      - name: Enforce bounded discovery result
-        if: always()
+          set -Eeuo pipefail
+          python data/device-catalog/research/retain_stm32f7_phase4_6b_artifact.py \
+            --artifact-root /tmp/stm32f7-phase4.6b-artifact \
+            --artifact-id "${ARTIFACT_ID}" \
+            --artifact-zip-sha256 "${ARTIFACT_SHA256}" \
+            --workflow-run-id "${LIVE_RUN_ID}" \
+            --executed-git-sha "${LIVE_HEAD_SHA}" \
+            | tee /tmp/stm32f7-phase4.6b-retention-report.json
+      - name: Commit only compact retained evidence
         run: |
-          test -f /tmp/stm32f7-phase4.6b-live/exit-code.txt
-          test "$(cat /tmp/stm32f7-phase4.6b-live/exit-code.txt)" = "0"
+          set -Eeuo pipefail
+          git config user.name 'plasma-ci'
+          git config user.email 'plasma-ci@users.noreply.github.com'
+          git add \
+            data/device-catalog/research/stm32f7-phase4.6b-discovery-baseline.json \
+            data/device-catalog/research/evidence/stm32f7-phase4.6b-official-st-discovery-live-2026-09-09
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'ERROR: retention produced no changes' >&2; exit 1; }
+          git commit -m 'device-catalog: retain STM32F7 Phase 4.6B evidence'
+          git push origin HEAD:agent/device-catalog-stm32f7-phase46b-discovery
