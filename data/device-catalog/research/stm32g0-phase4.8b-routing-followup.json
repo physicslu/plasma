@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "phase": "4.8B",
+  "family": "STM32G0",
+  "base_device": "STM32G0B1CB",
+  "status": "routing_followup_required",
+  "active_exact_icpns_not_matched_by_current_openocd_ordering_surface": [
+    "STM32G0B1CBT6N",
+    "STM32G0B1CBU6N"
+  ],
+  "commercial_identity_verified": true,
+  "routing_gates_commercial_identity": false,
+  "resolution_deferred_to_later_policy": true
+}
