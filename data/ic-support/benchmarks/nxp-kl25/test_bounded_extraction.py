@@ -77,9 +77,10 @@ class BoundedExtractionTests(unittest.TestCase):
             for source, page in pairs:
                 self.assertIn(f"=== BEGIN {source} PDF_PAGE {page} ", request["prompt"])
             if binding["primary_unit_id"] == "nxp-kl25-program-longword-v0":
-                self.assertNotIn("PDF_PAGE 446 ", request["prompt"])
-                self.assertNotIn(("nxp_kl25_rm_rev3", 446), pairs)
+                self.assertIn("PDF_PAGE 446 ", request["prompt"])
+                self.assertIn(("nxp_kl25_rm_rev3", 446), pairs)
                 self.assertIn("PDF_PAGE 445 ", request["prompt"])
+                self.assertNotIn(("nxp_kl25_rm_rev3", 447), pairs)
         self.assertEqual(self.inputs, before)
         self.assertEqual(self.calls, [])
 
@@ -88,7 +89,7 @@ class BoundedExtractionTests(unittest.TestCase):
         self.assertEqual(len(self.calls), 8)
         self.assertEqual(result["aggregate"]["status"], "INTEGRITY_PASS")
         self.assertEqual(result["aggregate"]["qualification_status"], "NOT_QUALIFIED")
-        self.assertTrue(result["aggregate"]["acceptance_blockers"])
+        self.assertEqual(result["aggregate"]["acceptance_blockers"], [])
         self.assertTrue(all(v is False for v in result["aggregate"]["admission"].values()))
         self.assertEqual(self.aggregate(list(reversed(result["children"]))), result["aggregate"])
         for index, child in enumerate(result["children"], 1):
@@ -140,19 +141,19 @@ class BoundedExtractionTests(unittest.TestCase):
         self.assertEqual(result["aggregate"]["status"], "REJECTED_INTEGRITY")
         self.assertNotIn("response", result["aggregate"])
 
-    def test_page446_is_still_rejected_for_program_longword(self):
+    def test_page447_is_still_rejected_for_program_longword(self):
         def transport(**kwargs):
             result = self.mock(**kwargs)
             raw = json.loads(result["raw_text"])
             unit = raw["unit_results"][0]
             if unit["primary_unit_id"] == "nxp-kl25-program-longword-v0":
-                unit["facts"][0]["evidence"][0]["pdf_page_number"] = 446
+                unit["facts"][0]["evidence"][0]["pdf_page_number"] = 447
                 result["raw_text"] = json.dumps(raw)
             return result
         result = self.execute(transport)
         child = next(c for c in result["children"] if c["status"] == "error")
         self.assertEqual(child["error"]["class"], "model_output_evidence_error")
-        self.assertIn("p446", child["error"]["message"])
+        self.assertIn("p447", child["error"]["message"])
         self.assertEqual(result["aggregate"]["status"], "REJECTED_INTEGRITY")
         self.assertNotIn("response", result["aggregate"])
 
@@ -298,6 +299,9 @@ class BoundedExtractionTests(unittest.TestCase):
         self.assertNotIn("import requests", source)
         self.assertNotIn("import subprocess", source)
         self.assertNotIn('if __name__ == "__main__"', source)
+        rules = bounded.policy()
+        self.assertEqual(rules["evidence_boundary_release_id"], "nxp-kl25-evidence-boundary-release-v1")
+        self.assertEqual(rules["known_acceptance_blockers"], [])
         result = self.execute()
         self.assertEqual(result["aggregate"]["status"], "INTEGRITY_PASS")
         self.assertTrue(all(c["options"]["max_tokens"] == 8192 for c in self.calls))

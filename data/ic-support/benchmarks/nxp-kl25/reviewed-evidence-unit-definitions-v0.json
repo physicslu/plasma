@@ -6,22 +6,6 @@
   "construction_id": "nxp-kl25-evidence-unit-construction-v0",
   "target": "MKL25Z128VLK4",
   "status": "admitted_evidence_unit_catalog",
-  "boundary_release": {
-    "release_id": "nxp-kl25-evidence-boundary-release-v1",
-    "supersedes_definition_digest": "4628dae6b4a0bdad07eff76032df82c1f7f0720d6164abb87f81e4bec502e693",
-    "review_status": "REVIEWED",
-    "corrections": [
-      {
-        "correction_id": "program-longword-table-27-36-continuation",
-        "unit_id": "nxp-kl25-program-longword-v0",
-        "source_id": "nxp_kl25_rm_rev3",
-        "previous_pdf_page_range": [444, 445],
-        "corrected_pdf_page_range": [444, 446],
-        "basis": "Reference Manual page 445 ends Table 27-36 with a continuation; physical PDF page 446 begins with the continued Program Longword verify-error/MGSTAT0 row before section 27.4.10.5 Erase Flash Sector Command.",
-        "scope_change": "BOUNDARY_ONLY_NO_UNIT_IDENTITY_CHANGE"
-      }
-    ]
-  },
   "units": [
     {
       "unit_id": "nxp-kl25-ftfa-register-model-v0",
@@ -45,7 +29,7 @@
       "unit_id": "nxp-kl25-program-longword-v0",
       "source_id": "nxp_kl25_rm_rev3",
       "section_scope": ["27.4.10.4 Program Longword Command"],
-      "pdf_page_range": [444, 446],
+      "pdf_page_range": [444, 445],
       "role": "PROGRAM_COMMAND",
       "manufacturer_native_terms": ["Program Longword", "FCCOB", "FSTAT", "CCIF"],
       "disposition": "REVIEWED_UNIT_DEFINITION"

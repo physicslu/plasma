@@ -1,0 +1,81 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "kl25_retained_evidence_pack_build",
+  "retention_id": "nxp-kl25-evidence-pack-live-retention-v1",
+  "evidence_boundary_release_id": "nxp-kl25-evidence-boundary-release-v1",
+  "target": "MKL25Z128VLK4",
+  "live_source_validation": {
+    "workflow_run_id": 34312404077,
+    "artifact_id": 10088834705,
+    "artifact_digest": "sha256:3e70c60cd728d41ed372bbad436fe5c5d677a80cd930b45dd21f76e0a704692a",
+    "generation_head": "95e631424a42f4a5a22da555eed9f68dda2a4a8f",
+    "manufacturer_text_retained": false,
+    "semantic_extraction_executed": false,
+    "program_longword_p446_validated": true,
+    "program_longword_p447_admitted": false
+  },
+  "source_lock": {
+    "source_lock_id": "nxp-kl25-source-lock-v0",
+    "source_id": "nxp_kl25_rm_rev3",
+    "algorithm": "sha256",
+    "digest": "7911a7d9f8192fa317960feabc9377d0fd81a9b90d31f8070cae9612cb237241",
+    "byte_length": 6637765
+  },
+  "definition_set": {
+    "definition_set_id": "nxp-kl25-reviewed-evidence-unit-definitions-v0",
+    "digest": "c9c2ed86a0aa5ccdcc1861a0153d0b79cc94f57a568faa5432d9f0389bb4132f"
+  },
+  "applicability_binding": {
+    "binding_id": "nxp-kl25-applicability-binding-v0",
+    "digest": "1e88d2bb1cfdae65e6456bca3407d2419a7b2bd391729fd2feae1917ac4be038"
+  },
+  "evidence_pack_contract": {
+    "contract_id": "nxp-kl25-evidence-pack-v0",
+    "digest": "6d5e004a5fac4881cb19f99e921f9afb63f23dcc5aa90b329a7651cda5dcea2c"
+  },
+  "builder": {
+    "name": "build_evidence_pack.py",
+    "version": "0.1.0",
+    "sha256": "b4e49286c3bab6d8cd4a6d873e272ecefa31106bdcd1aede86459849420ab611"
+  },
+  "target_bundle": {
+    "bundle_id": "mkl25z128vlk4-target-evidence-bundle-v0",
+    "bundle_digest": "ffe9bfaa8a6ed47c8edd6d952fe1ca2cc114513c2a1f0832892ab9484e7322bf",
+    "pack_count": 8,
+    "pack_digests": {
+      "nxp-kl25-debug-security-interaction-v0-pack-v0": "b0aba040fd055931a10906a7101524988ce54a459fa39abfd6e6813002e6311b",
+      "nxp-kl25-erase-all-blocks-v0-pack-v0": "c9ab1b6f908990c1a4fa9dc9deece108d04de3c64a0ce524308acded55901849",
+      "nxp-kl25-erase-sector-v0-pack-v0": "6239097cdcef2b923bd7e129dbaff1b3408ba655f0cdc37fbb5d5b74557312fb",
+      "nxp-kl25-flash-security-v0-pack-v0": "b2a529324546790e708e3ccdc07b79f2241363444e616d9bba35868816d94e96",
+      "nxp-kl25-ftfa-command-sequencing-v0-pack-v0": "99dd7b39aa0643abea614888156273a1eaf731a0a5c2304d1596dcfeb3fd94ca",
+      "nxp-kl25-ftfa-register-model-v0-pack-v0": "08e232fe22ceef5664951aefd4c5a9ad4ab2d3e70183e3c11de4e6fad76c4193",
+      "nxp-kl25-program-longword-v0-pack-v0": "d8972697fca92045158a6bcd4d868a46a13b100b96ef86ffc273781aceb53ffe",
+      "nxp-kl25-swd-mdm-ap-v0-pack-v0": "d132db9ff90f9a29dce62c3993739f5119290d2fa81b8ce0a98292c40789f6c6"
+    }
+  },
+  "pre_ai": {
+    "manifest_digest": "03155ede421cddb7c2ab64e079ef43b1124a7c78cbedf1e7a08c60c29796bb6e",
+    "evidence_sha256": {
+      "nxp-kl25-debug-security-interaction-v0-pack-v0": "49cc8af725ae80c3a8cbb1d2648c77e7e3cafa12ad8bbe542537a0f35b1ccfb8",
+      "nxp-kl25-erase-all-blocks-v0-pack-v0": "513df24fe465fe750e3d5976b960694a20ed1c6cb350254d72056f36d05f16d2",
+      "nxp-kl25-erase-sector-v0-pack-v0": "e6cf936c2506a24ef0071003c44c8e4bf59b6d4ef8700e5547fafb87461b7b12",
+      "nxp-kl25-flash-security-v0-pack-v0": "b7ef27f0aa0094a0c86f38e761fac9706150e8701f9229568fbc15911b831bba",
+      "nxp-kl25-ftfa-command-sequencing-v0-pack-v0": "85eaccffc424ec76388a0b3300d90ba391ade2253fceef06a63954e0138c26ae",
+      "nxp-kl25-ftfa-register-model-v0-pack-v0": "3259bae209bac5747229c6de45b971f6e0e4d82bbc0a2e435f409b9d925e3337",
+      "nxp-kl25-program-longword-v0-pack-v0": "40cc5b5f4974cea0135443f263e69e31b1595874d22e14b3af533254db5a00a9",
+      "nxp-kl25-swd-mdm-ap-v0-pack-v0": "6bf2d15f7169cf960efdf7efcc4c197273d8ca91edf221c104709c674897880a"
+    },
+    "model_context_sha256": "8ebeab88b4a1e6c540c8af2d4d1941bdb02f0d31389f92a1d4bc0366103cfaaa",
+    "repository_ci_validates_through_context_assembly": true,
+    "model_inference_required_in_repository_ci": false
+  },
+  "admission": {
+    "evidence_pack": true,
+    "pre_ai_ci": true,
+    "semantic_extraction": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}

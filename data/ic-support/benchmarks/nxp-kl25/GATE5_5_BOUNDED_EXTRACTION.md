@@ -1,8 +1,21 @@
 # NXP KL25 Gate 5.5: bounded extraction, model-free evaluation
 
-Gate 5.5 adds an experimental injected-mock execution path. It does not change
-the existing monolithic runner, v4.1 live qualification contract, provider wiring,
-frozen Evidence Packs or retained run artifacts. No live CLI is provided.
+Gate 5.5 adds an experimental injected-mock execution path. It does not replace
+the existing monolithic runner, v4.1 live qualification contract, or provider
+wiring. No live CLI is provided and no Local AI/model execution is admitted.
+
+## Repository status
+
+Gate 5.5 was merged with Gate 5.4/5.4A in PR #421. The merge commit on `main` is:
+
+```text
+d9651fc3c7d2386974f0e8c0688131b6a65c01c4
+```
+
+This corrects the earlier stacked-PR wording that described the Gate 5.4/5.4A
+foundation as unmerged. Gate 5.5 remains experimental and `mock_only` after the
+merge; merge status does not convert its integrity checks into semantic,
+canonical, HIL, production, or destructive-security admission.
 
 ## Retained failure evidence
 
@@ -21,23 +34,23 @@ Neither run exhausted the 65536-token context envelope.
 The second semantic-run error names
 `nxp-kl25-program-longword-v0.facts[9]`, fact
 `nxp-kl25-program-longword-v0-010`, citing `nxp_kl25_rm_rev3:p446`.
-The original Program Longword pack allows 422–431, 435–439 and 444–445.
-The retained response's only out-of-pack reference is page 446. The error
-prevents the runner from publishing any parsed response, so the qualification
-report's all-units-missing screening errors are consequential, not evidence
+The historical Program Longword pack allowed 422–431, 435–439 and 444–445.
+The retained response's only out-of-pack reference was page 446. The error
+prevented the runner from publishing a parsed response, so the qualification
+report's all-units-missing screening errors were consequential, not evidence
 that the raw response omitted all units.
 
 Manufacturer page 445 ends Table 27-36 with a continuation notice. Page 446
 contains the continued Program Longword verify-error/MGSTAT0 row before the
-Erase Flash Sector section. That page is visible in monolithic context through
-the Erase Sector pack but is outside the frozen Program Longword pack.
-The citation violates the contract even though this particular statement
-matches the manufacturer continuation. This does not establish semantic or
-citation correctness for the other facts.
+Erase Flash Sector section. That page was visible in monolithic context through
+the Erase Sector pack but was outside the historical Program Longword pack.
+The citation therefore violated the frozen contract even though this particular
+statement matched the manufacturer continuation. This does not establish
+semantic or citation correctness for the other facts.
 
 The experiment exposes output-budget coupling, cross-pack visibility and
 whole-response rejection. These observations justify evaluating unit isolation;
-they do not prove its live semantic quality or solve evidence-boundary omissions.
+they do not prove live semantic quality.
 
 ## Experimental contract and execution
 
@@ -49,8 +62,8 @@ sandbox arbitrary callback code or supply a provider client.
 
 `bounded_extraction.prepare_requests` validates the complete original pre-AI
 manifest and all pack/evidence/page digests before constructing requests.
-No fake subset pre-AI manifest is created. Each request carries the full original
-pack text, including its deterministic dependencies, and a one-unit schema.
+No fake subset pre-AI manifest is created. Each request carries the full admitted
+pack text, including deterministic dependencies, and a one-unit schema.
 Citation alternatives encode exact source/page pairs, not their cross-product.
 The existing deterministic parser remains authoritative.
 
@@ -71,7 +84,7 @@ units, mixed provenance, failed children, duplicate global fact IDs and raw
 mutation. Only whole-unit ordering changes. Statements, fact IDs and citations
 are not rewritten, deduplicated, supplemented or synthesized.
 
-The output is a new `kl25_bounded_aggregate` artifact, not a fabricated monolithic
+The output is a `kl25_bounded_aggregate` artifact, not a fabricated monolithic
 semantic run. `INTEGRITY_PASS` means structural aggregation passed; it is never
 `QUALIFIED` or proof of semantic correctness. All admissions remain false.
 Failed aggregates retain valid children as diagnostic artifacts without a
@@ -82,29 +95,44 @@ pages recur. Provider support for the pair-specific schema and live output sizes
 remain untested. The existing live qualification path is not wired to this
 experimental artifact.
 
-## Acceptance blocker: Program Longword continuation
+## Program Longword boundary blocker and Gate 5.6
 
-The frozen definition's 444–445 range excludes Table 27-36's continuation on 446.
-Unit isolation will continue to forbid citing that page for Program Longword.
-The versioned experiment contract exposes this as a blocker even when mock
-aggregation passes. No page range, source lock, applicability binding, Evidence
-Pack or retained response is changed here. A corrected evidence release requires
-a separately stated Gate 1 plan; subsequent semantic acceptance requires
-manufacturer review of the exact output and complete citations.
+The historical definition's 444–445 range excluded Table 27-36's continuation on
+physical PDF page 446. Gate 5.6 is the separately approved evidence-boundary
+release that corrects the active Program Longword range to 444–446 while keeping
+the source lock, unit identity, dependency graph, semantic admissions and prior
+retained artifacts unchanged.
+
+On the Gate 5.6 branch, `bounded-extraction-contract.json` records:
+
+```text
+evidence_boundary_release_id = nxp-kl25-evidence-boundary-release-v1
+known_acceptance_blockers     = []
+```
+
+and retains the former blocker in `resolved_acceptance_blockers`. Model-free
+regression now requires the isolated Program Longword request to admit p446 and
+continue to reject p447. This resolution is not retroactive: the retained
+20260909T022843Z run remains rejected against the historical pack that actually
+bounded that run.
 
 ## Model-free validation and approval boundaries
 
-Run the existing `nxp-kl25-semantic-runner-ci.yml` matrix and
-`python data/ic-support/benchmarks/nxp-kl25/test_bounded_extraction.py`.
-New tests use synthetic manufacturer text and injected transport only, with
-socket access blocked. They exercise isolated prompts/pair-specific schemas,
-pre-AI corruption, both retained failure classes, completion/usage failures,
-missing/duplicate units, provenance/raw tampering, global fact-ID collisions,
-UNKNOWN, output retention and deterministic aggregation without input mutation.
+The repository validation path includes:
+
+```text
+python data/ic-support/benchmarks/nxp-kl25/test_bounded_extraction.py
+python data/ic-support/benchmarks/nxp-kl25/test_evidence_boundary_gate56.py
+```
+
+Tests use synthetic manufacturer text and injected transport only, with network
+access blocked in the bounded-extraction tests. They exercise isolated prompts,
+pair-specific schemas, pre-AI corruption, retained failure classes,
+completion/usage failures, missing/duplicate units, provenance/raw tampering,
+global fact-ID collisions, UNKNOWN, output retention, deterministic aggregation,
+and the corrected Program Longword p446 boundary.
 
 Passing model-free CI at the exact revision must precede any future inference.
-This Gate 5.5 scope authorizes no model execution, live provider integration,
-evidence release, hardware, deployment or merging without Gate 2 approval.
-The unmerged Gate 5.4/5.4A foundation is a PR dependency; Gate 5.5 is reviewed
-as a stacked change against that foundation. Its CI pass does not authorize
-merging the foundation or this change into main.
+Gate 5.5/Gate 5.6 do not by themselves authorize model execution, live provider
+integration, HIL, hardware, deployment, canonical admission, production
+programming, or destructive security operations.

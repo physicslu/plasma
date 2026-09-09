@@ -71,12 +71,14 @@ class KL25EvidencePackTest(unittest.TestCase):
                 "nxp-kl25-program-longword-v0",
             },
         )
-        self.assertEqual(len(pack["page_refs"]), 17)
+        self.assertEqual(len(pack["page_refs"]), 18)
         page_keys = [
             (ref["source_id"], ref["pdf_page_number"])
             for ref in pack["page_refs"]
         ]
         self.assertEqual(len(page_keys), len(set(page_keys)))
+        self.assertIn(("nxp_kl25_rm_rev3", 446), page_keys)
+        self.assertNotIn(("nxp_kl25_rm_rev3", 447), page_keys)
 
     def test_debug_security_pack_closes_over_debug_and_flash_security_context(self):
         packs, _ = self.build()

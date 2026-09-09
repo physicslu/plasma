@@ -37,7 +37,7 @@
     "nxp-kl25-program-longword-v0": {
       "status": "BOUND",
       "source_id": "nxp_kl25_rm_rev3",
-      "pdf_page_range": [444, 446],
+      "pdf_page_range": [444, 445],
       "required_claims": ["FTFA_MODULE_PRESENCE"],
       "missing_prerequisites": []
     },
