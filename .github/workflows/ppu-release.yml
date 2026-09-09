@@ -27,7 +27,6 @@ on:
       - "docs/deployment/ppu-runtime-packaging.md"
       - "docs/deployment/z2-ps-installer.md"
       - "release/**"
-      - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
       - "software/python/plasma_core/**"
       - "software/python/plasma_interfaces/**"
