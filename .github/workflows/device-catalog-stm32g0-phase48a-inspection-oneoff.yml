@@ -1,4 +1,4 @@
-name: STM32G0 Phase 4.8A source inspection one-off
+name: STM32G0 Phase 4.8A foundation one-off
 
 on:
   push:
@@ -11,48 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
+  validate:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Select deterministic STM32G0 ordering representatives
-        run: |
-          python - <<'PY'
-          import csv, json, re
-          from collections import Counter, defaultdict
-          from pathlib import Path
-          p=Path('data/device-catalog/research/openocd-parts-canonical.csv')
-          rows=list(csv.DictReader(p.open(newline='', encoding='utf-8')))
-          fr=[r for r in rows if r.get('plasma_series') == 'STM32G0']
-          grouped=defaultdict(list)
-          for r in fr:
-              grouped[r.get('subfamily','')].append(r)
-          selections=[]
-          details={}
-          for sub in sorted(grouped):
-              ordering=sorted(r['part_number'] for r in grouped[sub] if r.get('identifier_kind') == 'ordering_pattern')
-              cmsis=sorted(r['part_number'] for r in grouped[sub] if r.get('identifier_kind') == 'cmsis_device_name')
-              if not ordering:
-                  raise SystemExit(f'{sub}: no ordering_pattern representative')
-              pattern=ordering[0]
-              # OpenOCD ordering patterns use a terminal package/temperature wildcard x.
-              # Strip the final package+wildcard pair only to produce the bounded ST base-device target.
-              m=re.fullmatch(r'(STM32G0[A-Z0-9]+?)[A-Z]x', pattern)
-              if not m:
-                  raise SystemExit(f'{sub}: cannot derive base device from {pattern}')
-              base=m.group(1)
-              selections.append({'subfamily':sub,'base_device':base,'source_pattern':pattern})
-              details[sub]={'ordering_count':len(ordering),'cmsis_count':len(cmsis),'first_ordering_patterns':ordering[:5],'cmsis_names':cmsis}
-          print(json.dumps({
-              'family':'STM32G0',
-              'row_count':len(fr),
-              'ordering_count':sum(r.get('identifier_kind')=='ordering_pattern' for r in fr),
-              'cmsis_count':sum(r.get('identifier_kind')=='cmsis_device_name' for r in fr),
-              'target_configs':sorted({r.get('target_config','') for r in fr}),
-              'pilot_targets':selections,
-              'details':details,
-          }, indent=2, sort_keys=True))
-          PY
+      - name: Validate STM32G0 Phase 4.8A foundation contract
+        run: python data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py
