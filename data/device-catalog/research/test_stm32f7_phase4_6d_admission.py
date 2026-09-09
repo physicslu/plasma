@@ -5,10 +5,9 @@ import copy
 import csv
 import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
-from device_catalog_admission_framework import AdmissionError
+from device_catalog_admission_framework import CandidateManualReview
 from stm32f7_admission_policy import CANONICAL_FIELDS, TARGET_CONFIG, build_canonical_row
 from stm32f7_phase4_6d_admission import (
     DEFAULT_CANONICAL,
@@ -19,6 +18,16 @@ from stm32f7_phase4_6d_admission import (
 
 
 class STM32F7Phase46DAdmissionTests(unittest.TestCase):
+    @staticmethod
+    def _candidate_input(item: dict) -> dict:
+        return {
+            "manufacturer": item["manufacturer"],
+            "base_device": item["base_device"],
+            "icpn": item["icpn"],
+            "authoritative_evidence": copy.deepcopy(item["authoritative_evidence"]),
+            "base_mapping": copy.deepcopy(item["base_mapping"]),
+        }
+
     def test_clean_plan_admits_exactly_19(self) -> None:
         plan = build_admission_plan()
         self.assertTrue(admission_plan_is_clean(plan))
@@ -45,7 +54,8 @@ class STM32F7Phase46DAdmissionTests(unittest.TestCase):
         admitted = [item for item in plan["candidates"] if item["decision"] == "admit"]
         self.assertEqual(len(admitted), 19)
         for item in admitted:
-            row = item["row"]
+            row = item["proposed_canonical_row"]
+            self.assertIsInstance(row, dict)
             self.assertEqual(row["openocd_target_config"], TARGET_CONFIG)
             self.assertEqual(row["existing_identifier_kind"], "ordering_pattern")
             self.assertEqual(row["mapping_status"], "deterministic_ordering_pattern")
@@ -76,7 +86,8 @@ class STM32F7Phase46DAdmissionTests(unittest.TestCase):
 
     def test_wrong_target_config_is_manual_review(self) -> None:
         plan = build_admission_plan()
-        candidate = copy.deepcopy(next(item for item in plan["candidates"] if item["decision"] == "admit")["input"])
+        item = next(item for item in plan["candidates"] if item["decision"] == "admit")
+        candidate = self._candidate_input(item)
         candidate["base_mapping"] = {
             "status": "unique",
             "match_count": 1,
@@ -84,13 +95,13 @@ class STM32F7Phase46DAdmissionTests(unittest.TestCase):
             "identifier_kind": "ordering_pattern",
             "existing_identifier": "STM32F722ICKx",
         }
-        from device_catalog_admission_framework import CandidateManualReview
         with self.assertRaises(CandidateManualReview):
             build_canonical_row(candidate, list(CANONICAL_FIELDS))
 
     def test_non_ordering_identifier_is_manual_review(self) -> None:
         plan = build_admission_plan()
-        candidate = copy.deepcopy(next(item for item in plan["candidates"] if item["decision"] == "admit")["input"])
+        item = next(item for item in plan["candidates"] if item["decision"] == "admit")
+        candidate = self._candidate_input(item)
         candidate["base_mapping"] = {
             "status": "unique",
             "match_count": 1,
@@ -98,15 +109,18 @@ class STM32F7Phase46DAdmissionTests(unittest.TestCase):
             "identifier_kind": "exact",
             "existing_identifier": candidate["icpn"],
         }
-        from device_catalog_admission_framework import CandidateManualReview
         with self.assertRaises(CandidateManualReview):
             build_canonical_row(candidate, list(CANONICAL_FIELDS))
 
     def test_nonzero_canonical_prestate_is_rejected(self) -> None:
         plan = build_admission_plan()
-        row = next(item["row"] for item in plan["candidates"] if item["decision"] == "admit")
+        row = next(
+            item["proposed_canonical_row"]
+            for item in plan["candidates"]
+            if item["decision"] == "admit"
+        )
         with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "stm32f7-commercial-icpn.csv"
+            path = __import__("pathlib").Path(td) / "stm32f7-commercial-icpn.csv"
             with path.open("w", newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(handle, fieldnames=list(CANONICAL_FIELDS))
                 writer.writeheader()
