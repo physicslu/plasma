@@ -49,9 +49,9 @@ def test_no_fuzzy_or_stemming_behavior() -> None:
     assert not qualify._contains_term("The controller uses FSTATUS.", "FSTAT")
 
 
-def test_gate53_contract_and_protection_vocabulary_are_explicit() -> None:
+def test_gate53_screening_vocabulary_survives_gate54_contract_versioning() -> None:
     contract = _contract()
-    assert contract["contract_id"] == "nxp-kl25-live-model-qualification-v3.1"
+    assert contract["contract_id"] == "nxp-kl25-live-model-qualification-v4"
     groups = contract["semantic_screening"]["required_term_groups"]
     protection = groups["nxp-kl25-erase-all-blocks-v0"][1]
     assert protection == ["protect", "protected", "protection", "unprotected"]
