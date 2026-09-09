@@ -15,7 +15,6 @@ on:
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
       - "release/**"
-      - "data/device-catalog/production/**"
       - "software/python/pyproject.toml"
       - "software/python/plasma_core/**"
       - "software/python/plasma_interfaces/**"

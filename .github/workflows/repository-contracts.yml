@@ -7,9 +7,14 @@ on:
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
+      - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
+      - ".github/workflows/python-tests.yml"
+      - ".github/workflows/ic-support-validation.yml"
+      - ".github/workflows/ppu-release.yml"
+      - ".github/workflows/z2-ps-release.yml"
       - ".github/workflows/repository-contracts.yml"
   pull_request:
     paths:
@@ -17,9 +22,14 @@ on:
       - "scripts/tests/test-public-doc-sanitization.sh"
       - "scripts/tests/test-documentation-integrity.py"
       - "scripts/tests/test-canonical-terminology-guard.py"
+      - "scripts/tests/test-ci-domain-boundaries.py"
       - "scripts/plasmactl"
       - "software/python/**"
       - "software/web/**"
+      - ".github/workflows/python-tests.yml"
+      - ".github/workflows/ic-support-validation.yml"
+      - ".github/workflows/ppu-release.yml"
+      - ".github/workflows/z2-ps-release.yml"
       - ".github/workflows/repository-contracts.yml"
 
 concurrency:
@@ -35,6 +45,7 @@ jobs:
     outputs:
       documentation: ${{ steps.route.outputs.documentation }}
       terminology: ${{ steps.route.outputs.terminology }}
+      ci_boundaries: ${{ steps.route.outputs.ci_boundaries }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -91,6 +102,14 @@ jobs:
               "scripts/tests/test-canonical-terminology-guard.py",
               ".github/workflows/repository-contracts.yml",
           }
+          ci_boundary_exact = {
+              "scripts/tests/test-ci-domain-boundaries.py",
+              ".github/workflows/python-tests.yml",
+              ".github/workflows/ic-support-validation.yml",
+              ".github/workflows/ppu-release.yml",
+              ".github/workflows/z2-ps-release.yml",
+              ".github/workflows/repository-contracts.yml",
+          }
 
           documentation = any(
               path.endswith(".md") or path in documentation_exact
@@ -102,13 +121,15 @@ jobs:
               or path in terminology_exact
               for path in changed
           )
+          ci_boundaries = any(path in ci_boundary_exact for path in changed)
 
           output = Path(os.environ["GITHUB_OUTPUT"])
           with output.open("a", encoding="utf-8") as stream:
               stream.write(f"documentation={'true' if documentation else 'false'}\n")
               stream.write(f"terminology={'true' if terminology else 'false'}\n")
+              stream.write(f"ci_boundaries={'true' if ci_boundaries else 'false'}\n")
 
-          if not documentation and not terminology:
+          if not documentation and not terminology and not ci_boundaries:
               raise SystemExit("repository-contract trigger matched but no contract owner was selected")
           PY
 
@@ -145,3 +166,16 @@ jobs:
         env:
           PLASMA_TERMINOLOGY_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python scripts/tests/test-canonical-terminology-guard.py
+
+  ci-domain-boundaries:
+    needs: route-contracts
+    if: needs.route-contracts.outputs.ci_boundaries == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Lock Device Catalog / AI research / software CI boundaries
+        run: python scripts/tests/test-ci-domain-boundaries.py

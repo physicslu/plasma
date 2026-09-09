@@ -4,159 +4,142 @@ Status: **Current repository validation and delivery contract**
 
 ## 1. Purpose
 
-Plasma CI/CD is organized by **risk boundary**, not by the number of YAML files.
+Plasma CI/CD is organized by **risk boundary and authority**, not by directory size or workflow count.
 
 The governing question is:
 
-> For this change, which executable contracts can realistically regress, and what is the cheapest gate that proves them?
+> For this change, which executable contract can realistically regress, and what is the cheapest gate that proves it?
 
-A workflow should run because it owns a dependency or risk surface. It should not run merely because a broad directory glob happens to contain the changed file.
+A workflow must run because it owns a real dependency. It must not run merely because a broad path glob happens to include an unrelated data file.
 
-The priority order is:
+Priority:
 
 ```text
 correctness
-  -> dependency ownership
+  -> authority / dependency ownership
   -> isolation of failure domains
-  -> recoverability / traceability
+  -> reproducibility / auditability
   -> feedback latency
   -> runner efficiency
 ```
 
-Runner savings are useful, but they must never be purchased by hiding a real dependency.
+## 2. Top-level validation domains
 
-GitHub Actions entrypoints are also treated as operator-facing infrastructure. Closely related gates may share one top-level workflow when their original event semantics and failure boundaries can remain explicit jobs. This reduces Actions-sidebar noise without weakening evidence.
-
-## 2. Validation topology
-
-The current repository topology is:
+The repository has several independent validation domains:
 
 ```text
-                         repository change
-                                |
-        +-----------------------+-----------------------+
-        |                       |                       |
-        v                       v                       v
- Repository contracts       Web validation        Python / PL source
-    |        |                  |                       |
-    |        +--> Terminology   +--> Web Fast           +--> Python / PL tests
-    +--> Documentation          |    lint/build/source
-                                |
-                                +--> Web E2E + visual
-                                |
-                                +--> runtime-affecting gates only
-                                      when their source dependencies change
+Repository / docs
+    -> repository-contracts
 
-                         cross-stack / delivery layers
-                                |
-          +---------------------+-----------------------+
-          |                     |                       |
-          v                     v                       v
-       Mock CD            Mock CD Browser      Control Station runtime
-    software stack        real browser +       Linux/macOS/Windows
-                          persistent stack      packaging acceptance
+Web / Control Station software
+    -> web source / browser / runtime / installer gates
 
-          |                     |                       |
-          +---------------------+-----------------------+
-                                |
-                                v
-                        installer / release gates
-                 Windows MSI / macOS PKG / Product / PPU
+Python / PL software
+    -> Python + PL source tests
+    -> software runtime acceptance
 
-                    Device support validation domain
-                                |
-                +---------------+---------------+
-                |                               |
-                v                               v
-     Device Catalog historical       Device Catalog current
-          regression gate                  regression gate
-                |                               |
-                +---------------+---------------+
-                                |
-                                v
-                  production Device Catalog inputs
-                                |
-                                v
-                      IC Support coverage
-                                |
-                     resolver / OpenOCD plan /
-                     software executor /
-                     execution-admission checks
+Device Catalog
+    -> historical catalog regression
+    -> current catalog regression
+    -> family-specific bounded discovery/policy/admission
+
+AI IC Support research
+    -> manufacturer evidence processing
+    -> Evidence Pack / applicability
+    -> AI extraction benchmarks
+    -> candidate programming-method research
+
+PPU / Z2 release
+    -> packaging
+    -> ARMv7 / QEMU acceptance
+    -> installer / network / release qualification
 ```
 
-A PASS in one layer does not imply PASS in a higher layer. In particular:
+These domains can reference one another's facts without sharing the same CI gate.
+
+A PASS in one domain does not imply a PASS in another:
 
 ```text
+Device Catalog admission
+    != OpenOCD programming support
+    != PPU implementation
+    != Socket support
+    != physical IC qualification
+
+AI IC Support research PASS
+    != software runtime support
+    != PPU implementation
+    != real-IC programming validation
+
 GitHub software CI PASS
     != SWPC deployment acceptance
-    != Z2 / FPGA acceptance
-    != real-IC programming validation
+    != Z2 / FPGA hardware acceptance
 ```
 
-## 3. Fast source gates
+## 3. Device Catalog authority
 
-### 3.1 Repository contracts: documentation and terminology
+`data/device-catalog/` owns commercial IC identity and user-selectable catalog admission.
 
-Top-level workflow:
+A Production ICPN means the exact commercial part is admitted to the selectable catalog with its canonical identity/metadata evidence. It does **not** mean every programming backend supports it.
+
+Primary workflows:
 
 ```text
-.github/workflows/repository-contracts.yml
+.github/workflows/device-catalog-validation.yml
+.github/workflows/device-catalog-current-validation.yml
+.github/workflows/device-catalog-stm32f2-bounded-validation.yml
+.github/workflows/device-catalog-stm32f3-foundation-validation.yml
 ```
 
-The dispatcher computes the changed-file set and routes it to distinct `documentation` and `terminology` jobs. The jobs remain separate failure domains even though they share one Actions entrypoint.
+Catalog changes may run targeted catalog-facing adapter tests when those tests are part of the catalog contract. They must not fan out into the complete Python/PL suite, PPU release, or Z2 release merely because the Production manifest gained rows.
 
-Documentation responsibility:
+The governing invariant is:
 
-- Markdown structure and local-link integrity;
-- documentation index coverage;
-- public-document sanitization;
-- selected executable documentation contracts;
-- canonical documentation facts that must track source values.
+> ICPN count is inventory/selectability. Backend capability is status.
 
-Terminology responsibility:
-
-- self-test the canonical terminology guard;
-- reject newly introduced retired domain vocabulary in Python/Web source and the terminology guard contract itself.
-
-Markdown-only changes should normally terminate at the documentation job unless a specific higher-level workflow actually consumes the Markdown as build/runtime input. A Markdown-only change must not pay the terminology job merely because both contracts share one top-level entrypoint.
-
-### 3.2 Web Fast
-
-Top-level workflow and job:
+Examples of orthogonal capability status include:
 
 ```text
-.github/workflows/web-tests.yml
-job: test
+OpenOCD mapping / execution support
+Plasma native programming support
+PPU qualification
+Socket availability
+Electrical qualification
+HIL / physical programming verification
 ```
 
-Primary responsibility:
+## 4. AI IC Support research authority
 
-- Web dependency installation;
-- lint;
-- build and source/SSR tests.
+`data/ic-support/` is an AI-assisted **research/pilot** domain for deriving evidence-backed programming knowledge and candidate programming methods from manufacturer documentation.
 
-This is the fast Web source gate. Its job remains separate from Playwright/browser installation.
-
-### 3.3 Web E2E and visual regression
-
-Top-level workflow and job:
+Primary deterministic workflow:
 
 ```text
-.github/workflows/web-tests.yml
-job: e2e
+.github/workflows/ic-support-validation.yml
 ```
 
-Primary responsibility:
+Networked manufacturer-source validation remains separately bounded, for example:
 
-- Playwright browser acceptance;
-- Chromium/browser runtime;
-- visual regression diagnostics and artifacts.
+```text
+.github/workflows/ic-evidence-live-validation.yml
+```
 
-Event semantics remain intentionally different from the fast job: E2E runs on pull requests, `main` pushes, and manual dispatch; the fast job runs on push/pull-request source changes and is skipped for manual E2E-only dispatch.
+AI IC Support research does not own:
 
-Browser tests are validation assets, not deployable runtime. A test-only E2E change must not automatically be treated as a Control Station or Mock CD runtime-source change unless that downstream workflow directly executes the changed test/helper/config.
+- commercial ICPN admission;
+- Plasma software runtime behavior;
+- OpenOCD execution implementation;
+- PPU implementation;
+- Socket support;
+- physical programming qualification.
 
-### 3.4 Python and PL source tests
+Therefore ordinary AI IC Support research changes must not trigger Python/PL runtime tests or release qualification.
+
+The research workflow may depend on a **precise retained reference input** when the benchmark itself binds that input. For example, the STM32F103C research pilot pins the STM32F1 commercial catalog. That precise data-to-data dependency is valid; it is not permission to trigger the workflow for every new ICPN in every family.
+
+Research output is not automatically promoted into runtime support. Promotion requires a separate capability/runtime contract.
+
+## 5. Python and PL source tests
 
 Workflow:
 
@@ -166,163 +149,89 @@ Workflow:
 
 Primary responsibility:
 
-- repository safety/configuration checks owned by the workflow;
-- Python package installation;
-- Python regression suite;
-- PL source tests.
+- Python source regressions;
+- PL source regressions;
+- software-owned repository/configuration checks executed by this workflow.
 
-Python documentation is handled by the documentation layer. Runtime workflows should distinguish Python runtime source from `software/python/tests/**` and `software/python/docs/**` when they do not execute those trees.
+Device Catalog data-only changes do not trigger this workflow. Catalog-specific Python adapter behavior is validated by the Device Catalog domain where required.
 
-## 4. Cross-stack runtime acceptance
+AI IC Support research data does not trigger this workflow merely because research artifacts exist in the same repository.
 
-### 4.1 Mock CD
+## 6. Runtime, installer and release gates
 
-Workflow:
+Software/release workflows validate executable or deployable artifacts, not catalog inventory counts.
 
-```text
-.github/workflows/mock-cd.yml
-```
-
-Mock CD validates an ephemeral Plasma software stack on a clean runner. It is broader than unit/source CI and narrower than real deployment/hardware acceptance.
-
-Its trigger boundary follows runtime source, not unrelated test/documentation trees.
-
-### 4.2 Mock CD Browser Runtime Acceptance
-
-Workflow:
-
-```text
-.github/workflows/mock-cd-browser.yml
-```
-
-This gate starts the real Mock CD software stack and executes the explicitly selected real-stack Playwright specifications.
-
-The trigger set is intentionally narrower than all of `software/web/e2e/**`: only the real-stack specs, their shared helper/config/package inputs, and runtime source they actually consume belong to this gate.
-
-### 4.3 Control Station runtime packaging acceptance
-
-Workflow:
+Examples:
 
 ```text
 .github/workflows/control-station-runtime.yml
-```
-
-Primary responsibility:
-
-- build the Control Station runtime;
-- validate clean extraction;
-- smoke Console/BFF/Manager behavior;
-- run on Linux, macOS and Windows.
-
-Web/Python test implementation is not itself a deployable Control Station artifact and should not trigger this gate unless it changes a directly consumed runtime/build contract.
-
-## 5. Installer and release gates
-
-Installer and release validation is not the same as application compatibility validation.
-
-Current delivery gates include:
-
-```text
+.github/workflows/ppu-release.yml
+.github/workflows/z2-ps-release.yml
+.github/workflows/product-release.yml
 .github/workflows/windows-control-station-installer.yml
 .github/workflows/macos-control-station-installer.yml
-.github/workflows/product-release.yml
-.github/workflows/ppu-release.yml
 ```
 
-Their responsibility is packaging/release behavior such as:
+PPU and Z2 gates own risks such as:
 
-- immutable release payloads;
-- clean extraction;
-- service/install lifecycle;
-- platform-specific installer behavior;
-- SHA-256/integrity verification;
-- PPU ARMv7/QEMU acceptance and network acceptance where owned by the PPU release workflow.
+- immutable release payload construction;
+- ARMv7 userspace execution;
+- QEMU qualification;
+- installer behavior;
+- PPU networking acceptance;
+- release artifact integrity.
 
-Ordinary React/UI or Markdown changes must not pay the cost of MSI/PKG/QEMU validation unless they modify a contract that those packaging pipelines consume.
+A Device Catalog row addition does not alter those artifacts by itself and therefore does not trigger those release gates.
 
-Release CI remains software evidence. A PPU release/QEMU PASS is not PYNQ-Z2 native hardware acceptance.
+Conversely, changes to PPU/Z2 software, packaging scripts, deployment contracts, or explicitly executed release tests must still trigger the appropriate heavy release validation.
 
-## 6. Device Catalog validation domains
+## 7. Capability status is separate from catalog admission
 
-Device Catalog validation is deliberately split into two complementary gates.
-
-### 6.1 Historical/full regression
-
-Workflow:
+The product model is:
 
 ```text
-.github/workflows/device-catalog-validation.yml
+Manufacturer identity evidence
+        |
+        v
+Device Catalog
+        |
+        +--> ICPN selectable = yes
+        |
+        v
+Capability / qualification state
+        +-- OpenOCD
+        +-- Plasma native / PPU
+        +-- Socket
+        +-- electrical
+        `-- physical/HIL
 ```
 
-This gate protects retained historical acquisition, evidence, policy and admission contracts. At the current repository state it covers the historical chain through STM32F4 Phase 4.1 batch3 plus the production manifest/runtime-view checks owned by that workflow.
+A catalog ICPN can therefore be valid and selectable while a capability is `unsupported`, `unqualified`, `unknown`, or `not tested`.
 
-The historical gate exists because a new admission must not silently invalidate earlier fail-closed policy or retained evidence.
+CI must preserve that separation. Missing backend support is not a reason to hide a valid commercial ICPN from the catalog.
 
-### 6.2 Current regression
+## 8. Transitional code-level coupling
 
-Workflow:
+There is a legacy pilot bridge in current software where `software/python/plasma_core/ic_support.py` can read `data/ic-support/`, and `SiteManager` can instantiate that resolver for non-mock sites.
 
-```text
-.github/workflows/device-catalog-current-validation.yml
-```
+This is a **code-level coupling to be separated deliberately**; it does not change the authority of `data/ic-support/` from research into software runtime ownership.
 
-This gate owns the current continuation surface:
+Do not solve this by broad CI fan-out. A follow-up architecture change should give runtime capability data an explicit promoted/runtime-owned source or remove the pilot resolver from the production execution path. Until then, changes in the research workstream must not be described as software support qualification.
 
-```text
-Phase 4.1 R/T batch4
-Phase 4.2A
-Phase 4.2B
-Phase 4.2D
-Phase 4.2E0
-Phase 4.2F
-Phase 4.2H
-Phase 4.2I
-Phase 4.2J
-```
+## 9. Trigger ownership rules
 
-The current gate shares one runner/setup boundary and executes each unique deterministic regression contract once.
+1. **Authority first.** Decide which domain owns the changed fact before choosing a workflow.
+2. **Executable dependency beats directory convention.** A path glob is evidence of dependency only when the workflow actually owns the risk.
+3. **ICPN inventory is not a release artifact.** Device Catalog additions do not trigger Python/PL, PPU, or Z2 release qualification by default.
+4. **AI research is not runtime.** `data/ic-support/**` research changes do not automatically trigger software runtime validation.
+5. **Capability is orthogonal to identity.** OpenOCD/PPU/Socket/HIL status does not gate catalog selectability unless a separate product policy explicitly says so.
+6. **Use precise cross-data dependencies.** A benchmark may trigger on one pinned catalog source it actually binds; do not replace that with a whole-family or whole-production glob.
+7. **Tests are not deployable runtime by default.** Release workflows follow only tests/helpers they execute directly.
+8. **Documentation is not runtime by default.** Markdown belongs to documentation integrity unless a release process consumes it.
+9. **Do not weaken a real dependency to save runners.** If a true code-level dependency exists, fix the architecture rather than hiding it with a path exclusion.
+10. **Historical evidence stays historical.** Current catalog growth must not rewrite old phase boundaries.
 
-Historical and Current are **not duplicates**. They cover different lifecycle ranges. Do not delete one merely because both react to Device Catalog work.
-
-Future trigger partitioning between these two gates requires an explicit dependency map for shared validators/helpers. Do not use filename-only negative globs to hide a shared dependency.
-
-## 7. Device Catalog -> IC Support cross-domain dependency
-
-Workflow:
-
-```text
-.github/workflows/ic-support-validation.yml
-```
-
-IC Support coverage is derived from production Device Catalog inputs. Therefore IC Support validation must run when its direct production inputs change:
-
-```text
-data/device-catalog/production/icpn-v1-manifest.json
-data/device-catalog/research/stm32f1-commercial-icpn.csv
-data/device-catalog/research/stm32f4-commercial-icpn.csv
-```
-
-This dependency prevents the production catalog from expanding while IC Support coverage snapshots remain stale.
-
-The same top-level workflow also owns the manual official-source-lock verification job. Manual dispatch runs the bounded source-integrity verification rather than the normal IC Support regression job; push/PR events keep their normal deterministic validation path.
-
-The current enforced production coverage is:
-
-```text
-Exact ICPNs:                           286
-STM32F1 exact ICPNs:                    75
-STM32F4 exact ICPNs:                   211
-Base Devices:                           91
-Deterministic OpenOCD-mapped ICPNs:    286
-Direct IC Support-bound ICPNs:           2
-Unresolved Programming Profile ICPNs:  284
-Evidence-backed Programming Profiles:    1
-Native PPU runtime-ready ICPNs:           0
-```
-
-These metrics are not interchangeable. `286 deterministic OpenOCD-mapped ICPNs` is routing/catalog evidence; it is not a claim of 286 Programming Profiles or 286 hardware-supported targets.
-
-## 8. Concurrency and superseded runs
+## 10. Concurrency and superseded runs
 
 PR-oriented workflows that can be superseded by a newer commit should use workflow-level concurrency such as:
 
@@ -338,41 +247,31 @@ The invariant is:
 
 Manual/live evidence workflows may intentionally use different concurrency semantics.
 
-## 9. Trigger ownership rules
+## 11. Required validation for CI topology changes
 
-Use these rules when changing workflow `paths`:
-
-1. **Executable dependency beats directory convention.** Read the job and identify what it actually imports, executes, packages or validates.
-2. **Documentation is not runtime by default.** Markdown belongs to Documentation integrity unless another workflow truly consumes it.
-3. **Tests are not deployable runtime by default.** A runtime workflow should follow only the tests it executes directly.
-4. **Shared helpers require explicit treatment.** Do not exclude a directory if a retained test imports a helper from it.
-5. **Production data is a runtime dependency when code reads it.** Device Catalog manifest/source changes legitimately cross into IC Support and release/runtime validation where consumed.
-6. **Do not use workflow count as the optimization metric.** One workflow with ten expensive matrix jobs can cost more than ten small workflows.
-7. **Do not weaken coverage during topology cleanup.** First change when/where validation runs; only deduplicate commands after proving identical invocations add no distinct fixture, state or failure domain.
-8. **Prefer fewer operator-facing entrypoints only when semantics stay explicit.** Sidebar cleanup is a usability benefit, not permission to merge unrelated evidence boundaries.
-
-## 10. Required validation for CI/CD changes
-
-A CI/CD topology PR should prove its own boundary before merge:
+A CI topology PR should prove its own boundary:
 
 - modified workflows self-trigger when practical;
-- every retained validation command still executes at least once in the intended gate;
-- no application/runtime test is removed merely to obtain a green result;
-- stale/failing assertions are investigated against the current executable contract rather than skipped;
-- documentation integrity is green when Current documentation changes;
-- historical evidence documents are not rewritten to present-day numbers.
+- retained validation commands remain owned somewhere appropriate;
+- no software/runtime test is deleted merely to obtain a green result;
+- no historical evidence is rewritten to present-day numbers;
+- documentation integrity remains green;
+- a later data-only catalog PR should demonstrate that Python/PL, PPU and Z2 no longer fan out;
+- a later AI IC Support research-only PR should demonstrate that software/runtime gates no longer fan out.
 
-For changes that intentionally prevent a workflow from triggering on an unrelated path, the strongest proof is a later PR containing only that unrelated path and showing the heavy workflow no longer fans out.
-
-## 11. Historical evidence boundary
+## 12. Historical evidence boundary
 
 `data/device-catalog/research/**` contains admission plans, baselines, retained evidence and audit records whose counts represent the repository state at those historical checkpoints.
 
-Do **not** rewrite those old numbers to match the current 286-ICPN catalog. They are evidence, not Current coverage documentation.
+Do **not** rewrite old numbers to match the current Production catalog. They are transaction evidence, not current coverage documentation.
 
-Current architecture/coverage documents must instead report present executable facts and clearly distinguish them from historical snapshots.
+The authoritative current catalog count belongs to:
 
-## 12. Related documents
+```text
+data/device-catalog/production/icpn-v1-manifest.json
+```
+
+## 13. Related documents
 
 - [Documentation Maintenance](../development/documentation-maintenance.md)
 - [Operator Acceptance Test Matrix](../development/operator-acceptance-test-matrix.md)

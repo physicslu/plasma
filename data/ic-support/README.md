@@ -1,29 +1,40 @@
-# Plasma IC Support — Phase A Pilot
+# Plasma AI IC Support — Research Pilot
 
-`data/ic-support/` owns the technical knowledge required to answer:
-
-> How does Plasma support this IC?
+`data/ic-support/` owns the AI-assisted research pipeline for deriving evidence-backed candidate programming knowledge and reusable programming methods from manufacturer documentation.
 
 It does **not** own commercial IC identity. Exact ICPN, manufacturer, family, package and current catalog admission remain owned by `data/device-catalog/`.
 
+It also does **not** own Plasma software runtime support. OpenOCD runtime integration, PPU implementation, Socket support, electrical qualification and physical programming qualification are separate capability domains.
+
 ## Phase A boundary
 
-This directory is a research/pilot contract. It does not change the Programming runtime, does not make a support claim, and cannot create PPU/Socket/real-IC validation evidence.
+This directory is a research/pilot contract. It does not change the Programming runtime, does not make a software-support claim, and cannot create PPU/Socket/real-IC validation evidence.
 
 ```text
-Device Catalog (Who is this IC?)
+Manufacturer evidence
         |
-        | exact ICPN
         v
-IC Support binding
+AI IC Support research
         |
-        +-- Programming Profile
-        +-- Memory Geometry Profile
-        +-- Package / Minimum Hardware Profile
-        +-- Option Profile
-        +-- Security Profile
-        `-- Revision Overrides
+        +-- Programming Profile candidate
+        +-- Memory Geometry Profile candidate
+        +-- Package / Minimum Hardware candidate
+        +-- Option Profile candidate
+        +-- Security Profile candidate
+        `-- Revision / applicability evidence
+
+Device Catalog -------------------------------> User-selectable ICPN
+        |                                             |
+        | identity / metadata                         v
+        |                                      Capability status
+        |                                      OpenOCD / PPU /
+        |                                      Socket / HIL
+        |
+        `---- may be referenced by research, but catalog admission
+              does not imply research or runtime support
 ```
+
+Research output is not automatically promoted into production software. A future runtime capability/driver promotion must have its own explicit contract, implementation and validation boundary.
 
 The Phase A target is `STM32F103C8T6` + `STM32F103CBT6`. The pair is deliberately chosen to test profile reuse: they share the programming behavior under test while their Flash geometries differ.
 
@@ -98,7 +109,7 @@ The candidate must report the exact source digests it consumed. A result generat
 
 The manufacturer-only Evidence Pack A/B experiment is deliberately separate from the formal blind benchmark. `evidence-pack-benchmark-v0.json` is now a runnable contract comparing full DS5319 + full PM0075 against deterministic DS5319 Evidence Pack + full PM0075 while keeping the existing formal three-source lock unchanged.
 
-Actual manufacturer-content-derived pack outputs are generated outside Git. `.github/workflows/ic-evidence-live-validation.yml` separately verifies the exact DS5319 source and semantic policy against the real PDF while retaining only metadata/digests as an artifact; ordinary deterministic IC Support CI remains independent of ST availability.
+Actual manufacturer-content-derived pack outputs are generated outside Git. `.github/workflows/ic-evidence-live-validation.yml` separately verifies the exact DS5319 source and semantic policy against the real PDF while retaining only metadata/digests as an artifact; ordinary deterministic AI IC Support research CI remains independent of ST availability.
 
 ## Validation
 
@@ -137,6 +148,7 @@ python data/ic-support/evidence/source_integrity.py verify
 
 - no AI/LLM semantic classifier or generic RAG implementation in the deterministic Evidence Pack path;
 - no AI authority to exclude evidence or create authoritative dependency edges;
+- no automatic promotion of research output into Plasma software runtime support;
 - no runtime `ResolvedICSupport` change from this workstream;
 - no changes to `SiteManager`, Handler or OpenOCD execution;
 - no PMode/EMode behavior change;

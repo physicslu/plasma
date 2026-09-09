@@ -5,8 +5,6 @@ on:
     paths:
       - ".gitignore"
       - ".clineignore"
-      - "data/device-catalog/production/**"
-      - "data/device-catalog/research/*-commercial-icpn.csv"
       - "software/python/**"
       - "!software/python/docs/**"
       - "pl/rtl/**"
@@ -25,8 +23,6 @@ on:
     paths:
       - ".gitignore"
       - ".clineignore"
-      - "data/device-catalog/production/**"
-      - "data/device-catalog/research/*-commercial-icpn.csv"
       - "software/python/**"
       - "!software/python/docs/**"
       - "pl/rtl/**"
