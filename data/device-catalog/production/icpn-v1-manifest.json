@@ -23,6 +23,14 @@
     },
     {
       "manufacturer": "STMicroelectronics",
+      "family": "STM32F3",
+      "path": "../research/stm32f3-commercial-icpn.csv",
+      "row_count": 10,
+      "git_blob_sha": "39f0d18c8e54ece6098090b24277bd365462106e",
+      "sha256": "c371b7a1c3b271afb9c8c823a4d12071be57da1aa11d138b59d39911489e1ee8"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
       "family": "STM32F4",
       "path": "../research/stm32f4-commercial-icpn.csv",
       "row_count": 384,
