@@ -63,7 +63,7 @@ class STM32F0Phase45DAdmissionTests(unittest.TestCase):
         self.assertEqual(source["row_count"], 42)
         self.assertEqual(source["sha256"], EXPECTED_CANONICAL_SHA256)
         self.assertEqual(source["git_blob_sha"], EXPECTED_CANONICAL_BLOB)
-        self.assertEqual(len(manifest["sources"]), 5)
+        self.assertEqual(len(manifest["sources"]), 6)
 
         self.assertEqual(self.audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
         self.assertEqual(self.audit["canonical_csv_file_sha256"], EXPECTED_CANONICAL_SHA256)
