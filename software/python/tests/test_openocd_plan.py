@@ -5,10 +5,10 @@ import unittest
 
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.ic_support import get_default_ic_support_resolver
 from plasma_core.models import ExecutionImageRef, JobRequest
 from plasma_interfaces.openocd import OpenOCDInterface
 from plasma_interfaces.openocd_plan import IMAGE_ARTIFACT_TOKEN, OpenOCDPlanCompiler
+from tests.runtime_capability_fixture import build_test_resolver
 
 
 TARGET_CFG = "target/stm32f1x.cfg"
@@ -16,7 +16,7 @@ TARGET_CFG = "target/stm32f1x.cfg"
 
 class OpenOCDPlanCompilerTests(unittest.TestCase):
     def setUp(self) -> None:
-        resolver = get_default_ic_support_resolver()
+        resolver = build_test_resolver()
         self.c8 = resolver.require_exact("STM32F103C8T6")
         self.cb = resolver.require_exact("STM32F103CBT6")
         self.compiler = OpenOCDPlanCompiler()

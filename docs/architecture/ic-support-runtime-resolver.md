@@ -1,273 +1,187 @@
-# IC Support Runtime Resolver and Execution Binding
+# Runtime Capability Resolver and Execution Binding
 
-Status: **Current route-resolution and execution-admission contract; introduced in Phase 3.6 and extended by the OpenOCD planning/executor phases**
+Status: **Current SW/PPU runtime contract**
+
+> Historical filename retained for link compatibility. This document no longer treats `data/ic-support/` as a software runtime source.
 
 ## 1. Purpose
 
-Plasma resolves an exact commercial IC part number into reusable technical support knowledge before a real Programming Site is allowed to queue work.
-
-The current chain is:
+Plasma separates three authorities:
 
 ```text
-Exact ICPN
-  -> Device Catalog identity
-  -> IC Support binding
-  -> ResolvedICSupport
-  -> SiteExecutionRouter
-       -> resolve route
-       -> compile backend plan where supported
-       -> backend-runtime readiness gate
-  -> execution admission
-  -> RoutedProgrammingHandler
-  -> selected Site interface
+ICPN
+  exact commercial identity / user-selectable catalog
+
+AI IC Support
+  manufacturer-evidence research / candidate programming methods
+
+SW/PPU Runtime Capability
+  product-owned executable capability and qualification state
 ```
 
-`ResolvedICSupport` is not a support badge and is not physical validation. It is the deterministic join between one exact ICPN and reusable Programming, Memory Geometry, Package / Hardware, Option and Security profiles owned by `data/ic-support/`.
+The executable runtime may consume only an explicitly supplied **SW/PPU-owned runtime capability source**. It must not auto-promote AI IC Support research artifacts.
 
-A route or command plan being deterministically resolvable is not sufficient for execution admission. The selected backend implementation must separately be runtime-ready.
+## 2. Current runtime state
 
-## 2. Current production knowledge baseline
+There is currently **no Production-promoted runtime capability package**.
 
-The executable production baseline is:
+Therefore the default product state is deliberately:
 
 ```text
-Exact ICPNs:                           286
-Families:                                2
-  STM32F1:                              75
-  STM32F4:                             211
-Base Devices:                           91
-Deterministic OpenOCD-mapped ICPNs:    286
-Direct IC Support-bound ICPNs:           2
-Unresolved Programming Profile ICPNs:  284
-Evidence-backed Programming Profiles:    1
-OpenOCD plan-compiled Profiles:           1
-OpenOCD plan-compiled exact ICPNs:        2
-Native PPU runtime-ready exact ICPNs:     0
+promoted runtime capability records: 0
+hardware-runtime-ready exact ICPNs:   0
+native PPU runtime-ready exact ICPNs: 0
 ```
 
-The two directly resolvable exact ICPNs are:
+This does not change the ICPN Production catalog. Commercial ICPN selectability and runtime capability are independent.
+
+Software unit/regression tests exercise F103-like routing, geometry and OpenOCD planning using a synthetic SW-owned fixture under `software/python/tests/`. That fixture is test input only and creates no support/qualification claim.
+
+## 3. Explicit promotion boundary
+
+The only valid AI-research-to-runtime path is an explicit transaction:
 
 ```text
-STM32F103C8T6
-STM32F103CBT6
+AI IC Support retained evidence
+        -> reviewed candidate programming method/profile
+        -> explicit promotion decision
+        -> SW/PPU-owned runtime capability artifact/implementation
+        -> software tests
+        -> backend/PPU integration
+        -> HIL / physical qualification
 ```
 
-They share:
+A research profile, Evidence Pack, benchmark PASS or semantic extraction result is not itself executable product configuration.
+
+## 4. Resolver contract
+
+`software/python/plasma_core/ic_support.py` retains the historical `ICSupportResolver` / `ResolvedICSupport` names for compatibility, but the authority has changed:
+
+- `ICSupportResolver.from_root(root)` loads only a **caller-selected** root;
+- there is no repository-relative `data/ic-support/` default;
+- there is no `PLASMA_IC_SUPPORT_ROOT` research-data environment fallback;
+- there is no `get_default_ic_support_resolver()`;
+- malformed explicit capability data still fails closed.
+
+The caller is responsible for provenance and for proving that the supplied root belongs to the SW/PPU workstream.
+
+Resolution alone does not imply runtime readiness.
+
+## 5. SiteManager ownership
+
+`SiteManager` accepts an optional resolver through explicit dependency injection:
 
 ```text
-Programming Profile: stm32f1-medium-density-flash-v0
-OpenOCD target:       tcl/target/stm32f1x.cfg
+SiteManager(..., ic_support_resolver=<SW-owned resolver>)
 ```
 
-but intentionally use different Memory Geometry Profiles for 64 KiB and 128 KiB Main Flash.
+It never creates a resolver from AI IC Support research data.
 
-An admitted catalog part such as `STM32F407VGT6` remains unresolved by the IC Support runtime resolver. Its deterministic OpenOCD target mapping is catalog/backend evidence, not proof of a complete Programming Profile.
+For Mock Sites, no runtime capability resolver is needed.
 
-The production counts above are derived from the production Device Catalog and enforced by `data/ic-support/test_coverage_inventory.py`. Historical admission documents retain the counts that were true at their own checkpoints.
-
-## 3. Resolver contract
-
-`software/python/plasma_core/ic_support.py` loads checked-in IC Support profile and binding sets and resolves exact ICPNs case-insensitively.
-
-The resolver fails closed on malformed or contradictory checked-in support data, including duplicate identities, missing required fields, dangling or wrong-kind profile references, and malformed Revision Overrides.
-
-A successful `ResolvedICSupport` contains:
+For non-Mock Sites with no explicit resolver:
 
 ```text
-exact ICPN
-binding set identity/status
-expected catalog identity
-Programming Profile
-Memory Geometry Profile
-Package / Hardware Profile
-Option Profile
-Security Profile
-Revision Overrides[]
-OpenOCD target identity
+SiteManager can initialize/start
+        -> Job route resolution requested
+        -> CONFIG_INVALID
+        -> no JobRegistry insertion
+        -> no PPU execution lease
+        -> no SiteWorker queue insertion
+        -> no hardware access
 ```
 
-## 4. Route resolution, plan compilation and execution admission
+This is an intentional fail-closed state while no promoted capability package exists.
 
-`software/python/plasma_server/execution_router.py` owns the runtime bridge from IC Support knowledge to execution. It deliberately separates three decisions:
+## 6. Route resolution and compatibility metadata
+
+`software/python/plasma_server/execution_router.py` owns the runtime route boundary.
+
+The historical metadata key:
 
 ```text
-resolve support
-    -> Can Plasma deterministically resolve ICPN and reusable profiles?
+resolved_ic_support
+```
+
+is temporarily retained for wire/log compatibility. It now represents a **server-resolved SW/PPU runtime capability route**, not direct AI IC Support research state.
+
+Runtime decisions remain separate:
+
+```text
+resolve promoted capability
+        -> Can SW/PPU resolve an explicitly supplied capability record?
 
 compile backend plan
-    -> Can the selected backend derive deterministic operation intent?
+        -> Can software derive deterministic operation intent?
 
 admit execution
-    -> Is that backend implementation actually runtime-ready now?
+        -> Is the selected backend implementation runtime-ready?
 ```
 
-For every real non-Mock Job, these decisions happen before:
+No earlier PASS implies a later PASS.
+
+## 7. OpenOCD plan compiler and executor
+
+`software/python/plasma_interfaces/openocd_plan.py` remains a software mechanism for deterministic plan construction.
+
+Its F103 programming-profile identifier and geometry behavior are exercised using the SW-owned synthetic fixture. The tests prove software mechanics such as:
+
+- target-config normalization/matching;
+- 64 KiB vs 128 KiB geometry handling;
+- erase/program/verify/read plan construction;
+- image-size and memory-boundary rejection;
+- artifact binding;
+- subprocess materialization and cleanup;
+- timeout/cancellation handling;
+- tampered-plan rejection.
+
+They do **not** prove that an equivalent AI research profile has been promoted, that OpenOCD is hardware-ready, or that a real IC can be programmed.
+
+## 8. Plasma Native / FPGA path
+
+Plasma Native / FPGA programming remains a separate SW/PPU implementation track.
+
+Current route state remains fail-closed until an actual backend implementation and promoted capability source exist. AI IC Support research may inform a future implementation, but it is not a runtime dependency.
+
+## 9. Capability dimensions
+
+A target's state should be represented orthogonally:
 
 ```text
-JobRegistry insertion
-PPU execution-lease reservation
-SiteWorker queue insertion
-hardware/interface execution
+ICPN selectable:             yes/no
+runtime capability promoted: yes/no
+OpenOCD plan available:      yes/no
+OpenOCD execution qualified: yes/no
+Plasma native implemented:   yes/no
+PPU qualified:               yes/no
+Socket qualified:            yes/no
+Electrical qualified:        yes/no
+HIL / real IC passed:        yes/no
 ```
 
-Therefore neither an unsupported target nor a resolved-but-unimplemented backend can create a phantom queued Job, acquire PPU ownership, or touch hardware.
+Do not compress these into one `supported=true` flag.
 
-### 4.1 Mock Site
+## 10. Invariants
 
-Mock is a workflow simulator. It may execute any selected production-catalog ICPN without an IC Support binding.
+1. `data/ic-support/` is AI IC Support research, not runtime configuration.
+2. `SiteManager` does not auto-load research data.
+3. No repository/environment fallback may silently bridge research into runtime.
+4. Runtime capability requires explicit SW/PPU ownership and injection.
+5. Missing promoted capability fails before queue/hardware access.
+6. Synthetic software fixtures are not product-support evidence.
+7. ICPN catalog growth is independent from runtime capability count.
+8. AI research success is independent from runtime/PPU/HIL qualification.
 
-Server-owned route metadata records:
+## 11. Future promotion mechanism
 
-```text
-mode: mock_workflow
-hardware_support_claimed: false
-workflow_runtime_ready: true
-hardware_runtime_ready: false
-```
+A later SW/PPU task may define a signed/versioned runtime capability package, code-generated implementation, or another product-owned representation. That mechanism must define at minimum:
 
-Mock success never creates real programming-support evidence. `workflow_runtime_ready` must not be interpreted as hardware or algorithm readiness.
+- promotion authority;
+- input evidence/review requirements;
+- immutable identity/versioning;
+- provenance back to research evidence without runtime-reading the research tree;
+- backend implementation compatibility;
+- rollback/revocation behavior;
+- CI and HIL gates.
 
-### 4.2 OpenOCD Site
-
-OpenOCD route resolution requires:
-
-1. exact `JobRequest.target` resolves through `ICSupportResolver`;
-2. the resolved Programming Profile has a registered OpenOCD plan compiler;
-3. the Site's configured `target_cfg` matches the resolver-owned OpenOCD target identity after deterministic path normalization;
-4. the Programming and Memory Geometry profiles are internally consistent;
-5. operation-specific inputs fit the resolved Main Flash boundary.
-
-The current compiler supports:
-
-```text
-stm32f1-medium-density-flash-v0
-```
-
-and resolves its target to:
-
-```text
-target/stm32f1x.cfg
-```
-
-A mismatch such as an F103 ICPN with `target/stm32f4x.cfg` is a configuration error and fails before the runtime-readiness gate.
-
-Equivalent OpenOCD target path forms are normalized, for example:
-
-```text
-tcl/target/stm32f1x.cfg
-target/stm32f1x.cfg
-/usr/share/openocd/scripts/target/stm32f1x.cfg
-```
-
-The production route still records:
-
-```text
-backend_implementation_state: plan_compiled_not_executable
-hardware_runtime_ready: false
-```
-
-The server can attach a canonical `openocd_execution_plan` to the route, and the isolated software executor can validate that plan against a fake process. That software validation is not execution authorization for a physical target.
-
-See [Profile-driven OpenOCD Plan Compiler](ic-support-openocd-plan-compiler.md) and [OpenOCD Compiled-Plan Executor](ic-support-openocd-plan-executor.md).
-
-### 4.3 Plasma Native / FPGA Site
-
-A resolvable F103 target can produce a deterministic Plasma Native route identity, but the current contract records:
-
-```text
-mode: plasma_native
-backend_implementation_state: not_implemented
-hardware_runtime_ready: false
-```
-
-and rejects the Job before queue admission. No Native PPU runtime consumes the Programming Profile for real programming yet.
-
-Therefore:
-
-```text
-Programming Profile resolved
-    !=
-backend plan compiled
-    !=
-software executor validated
-    !=
-backend hardware runtime implemented
-    !=
-physical PPU / Socket verified
-```
-
-## 5. Handler ownership
-
-`SiteManager` does not construct `STM32F103Handler` unconditionally for every enabled Site.
-
-The runtime separates:
-
-```text
-ProgrammingOperationHandler
-    generic Erase / Program / Verify / Read stage dispatch
-
-SiteExecutionRouter
-    target identity / IC Support / backend route resolution
-    + backend plan compilation
-    + backend-runtime readiness admission
-
-RoutedProgrammingHandler
-    preserves SiteWorker's one-handler lifecycle and selects
-    an already-admitted Programming Profile handler per Job
-```
-
-`STM32F103Handler` remains only as a compatibility alias for older code/tests. It is no longer the SiteManager execution-selection authority.
-
-Programming Profile identity, not commercial ordering suffix, is the reusable execution-selection unit.
-
-## 6. Server-owned resolution metadata
-
-Route identity is carried in server-owned `resolved_ic_support` metadata. Clients may not provide this field. A caller-supplied value is rejected as `INVALID_ARGUMENT` rather than trusted or silently overwritten.
-
-This prevents a client from claiming a different Programming Profile, backend route, compiled plan or readiness state than the server derived from checked-in IC Support data.
-
-## 7. Remaining hardware implementation boundary
-
-The legacy direct hard-coded 64 KiB erase path is removed. `OpenOCDInterface.erase/program/verify/read` remain fail-closed for production hardware use while the production hardware runtime gate is disabled.
-
-The plan compiler and isolated executor now validate deterministic command intent, artifact staging, subprocess isolation, timeout/cancellation cleanup and output collection in software. Remaining hardware work includes:
-
-- selecting and validating the actual OpenOCD installation and adapter configuration on the PS runtime host;
-- validating target detection, reset/halt and finalization behavior;
-- validating erase/program/verify/read on known STM32F103 hardware;
-- consuming Option and Security profiles for non-Main-Flash operations;
-- creating independent PPU and Socket validation evidence;
-- implementing and validating a separate Plasma Native PS-to-PL programming path.
-
-Because `hardware_runtime_ready=false`, no compiled programming command can enter production hardware execution through resolver-driven admission.
-
-## 8. Scientific scale-out gate remains in force
-
-The STM32F103C IC Support architecture still requires valid evidence before bulk creation of new family Programming Profiles. Catalog expansion alone does not authorize profile inference.
-
-The intended sequence remains:
-
-1. deterministic exact ICPN identity;
-2. evidence-backed reusable IC Support profiles;
-3. deterministic backend route resolution;
-4. deterministic backend plan compilation;
-5. controlled software executor validation;
-6. backend hardware execution implementation;
-7. runtime-readiness admission;
-8. software/hardware validation;
-9. PPU and Socket evidence as independent dimensions.
-
-This prevents catalog coverage, route resolution, plan generation and actual programming capability from collapsing into one misleading `supported=true` flag.
-
-## 9. Non-goals
-
-The current resolver contract does not:
-
-- infer Programming Profiles for the 284 unresolved production exact ICPNs;
-- promote deterministic OpenOCD mapping to programming-profile support;
-- make production OpenOCD programming hardware-ready;
-- implement a Native PPU programming driver;
-- change PMode / EMode IC selection behavior;
-- create PPU or Socket validation evidence;
-- deploy or restart services;
-- access Z2, FPGA or real IC hardware.
+Until such a mechanism is implemented and qualified, the Production runtime capability set remains empty by default.
