@@ -5,10 +5,9 @@ official-ST browser discovery executed on 2026-09-09.
 
 ## Decision boundary
 
-The retained transaction establishes manufacturer-backed commercial identity and
-lifecycle evidence for 13 deterministic STM32F0 Base Devices selected by Phase
-4.5A. It found 42 unique Active exact ICPNs and no excluded non-Active part
-numbers.
+The transaction establishes manufacturer-backed commercial identity and lifecycle
+evidence for 13 deterministic STM32F0 Base Devices. It found 42 unique Active
+exact ICPNs and no excluded non-Active part numbers.
 
 OpenOCD routing is retained only as a historical observation. It does not gate
 commercial ICPN identity, catalog selectability, PPU/SW capability, Socket
@@ -21,33 +20,26 @@ support, or physical programming qualification.
 - GitHub PR checkout SHA: `95276ea5af83819351c7f9f4a2f32db0638842b9`
 - artifact: `10090443968`
 - artifact ZIP SHA-256: `a3c02afd6a1295a612d25e35031d8623da86c0ea76777acaab4caaaab51cb1aa`
-- browser: Chromium `151.0.7922.34`
+- full live-summary SHA-256: `e96c9f09f4f57d2797cd9e3928664dcd67c72f3887eae3795df66aa1e75cbb76`
+- Chromium: `151.0.7922.34`
 - Playwright: `1.62.0`
-- mode: headed Chromium under Xvfb
 - parser profile: `stm32f0_dual_surface_v1`
+- mode: headed Chromium under Xvfb
 
-## Result
+## Retained projection
 
-- attempted targets: 13
-- acquisition success: 13
-- acquisition failure: 0
-- Active exact ICPNs: 42
-- excluded non-Active ICPNs: 0
-- identity manual intervention: 0
-- commercial identity clean: true
-- historical OpenOCD routing: 13 unique / 0 ambiguous / 0 unmapped
-- routing gates commercial identity: false
+`pilot-summary.json` is a normalized decision projection containing the aggregate
+result and the exact 42 Active ICPNs. Per-target evidence-section hashes,
+rendered-DOM hashes, retrieval times and historical routing observations are
+pinned in `stm32f0-phase4.5b-discovery-baseline.json`.
 
-The exact per-target ICPN lists, lifecycle status, rendered-DOM hashes and
-evidence-section hashes are retained in a normalized `pilot-summary.json`
-decision projection and pinned by the Phase 4.5B discovery baseline. The
-original live artifact is independently bound by its ZIP digest and full
-live-summary SHA-256.
+The original 16-file live artifact remains independently bound by its artifact
+ID, ZIP digest and full `live-summary.json` digest.
 
 ## Claims intentionally not made
 
-This evidence package does not authorize canonical/Production admission and does
-not claim OpenOCD, PPU, Socket, electrical, HIL, or physical programming support.
+This package does not authorize canonical/Production admission and does not
+claim OpenOCD, PPU, Socket, electrical, HIL, or physical programming support.
 
 Evidence identity:
 
