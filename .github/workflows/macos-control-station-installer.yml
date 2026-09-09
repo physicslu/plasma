@@ -33,6 +33,7 @@ on:
       - ".github/workflows/macos-control-station-installer.yml"
   workflow_dispatch:
 
+# Qualification repack trigger only; product/runtime sources remain identical to main.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
