@@ -1,0 +1,99 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "kl25_live_bounded_qualification_contract",
+  "contract_id": "nxp-kl25-live-bounded-qualification-v1",
+  "target": "MKL25Z128VLK4",
+  "required_input": {
+    "evidence_boundary_release_id": "nxp-kl25-evidence-boundary-release-v1",
+    "bundle_digest": "ffe9bfaa8a6ed47c8edd6d952fe1ca2cc114513c2a1f0832892ab9484e7322bf",
+    "pre_ai_manifest_digest": "03155ede421cddb7c2ab64e079ef43b1124a7c78cbedf1e7a08c60c29796bb6e",
+    "semantic_contract_id": "nxp-kl25-semantic-extraction-v1",
+    "bounded_contract_id": "nxp-kl25-bounded-extraction-v1",
+    "bounded_contract_digest": "716b6c3d55abe25a43ce6ccff2882fefec8f0a180d4927d85253190fdb629c5e"
+  },
+  "live_runtime": {
+    "execution_mode": "live_bounded_sequential",
+    "transport": "ollama_native_chat",
+    "model_id": "qwen3.8:27b-mlx",
+    "runtime_label": "kl25-live-bounded-qualification",
+    "loopback_only": true,
+    "require_ollama_version": true,
+    "require_model_digest": true,
+    "allowed_done_reasons": ["stop"],
+    "primary_unit_count": 8,
+    "automatic_retries": 0,
+    "generation": {
+      "num_ctx": 65536,
+      "max_tokens": 8192,
+      "temperature": 0.0,
+      "seed": 0,
+      "timeout_seconds": 1800.0
+    }
+  },
+  "semantic_screening": {
+    "require_facts_state_for_all_units": true,
+    "minimum_facts_per_unit": 1,
+    "require_primary_unit_page_citation": true,
+    "forbidden_terms": [
+      "STM32",
+      "FLASH_CR",
+      "FLASH_KEYR",
+      "KEYR",
+      "OPTWRE",
+      "WRPRTERR"
+    ],
+    "required_term_groups": {
+      "nxp-kl25-ftfa-register-model-v0": [
+        ["FTFA"],
+        ["FSTAT"],
+        ["FCCOB", "FCCOBn", "FCCOB0", "FCCOB1", "FCCOB2", "FCCOB3", "FCCOB4", "FCCOB5", "FCCOB6", "FCCOB7", "FCCOB8", "FCCOB9", "FCCOB10", "FCCOB11"]
+      ],
+      "nxp-kl25-ftfa-command-sequencing-v0": [
+        ["FCCOB", "FCCOBn", "FCCOB0", "FCCOB1", "FCCOB2", "FCCOB3", "FCCOB4", "FCCOB5", "FCCOB6", "FCCOB7", "FCCOB8", "FCCOB9", "FCCOB10", "FCCOB11"],
+        ["CCIF"],
+        ["ACCERR", "FPVIOL"]
+      ],
+      "nxp-kl25-program-longword-v0": [
+        ["Program Longword"],
+        ["FCCOB", "FCCOBn", "FCCOB0", "FCCOB1", "FCCOB2", "FCCOB3", "FCCOB4", "FCCOB5", "FCCOB6", "FCCOB7", "FCCOB8", "FCCOB9", "FCCOB10", "FCCOB11"]
+      ],
+      "nxp-kl25-erase-sector-v0": [
+        ["Erase Flash Sector", "Erase Sector"]
+      ],
+      "nxp-kl25-erase-all-blocks-v0": [
+        ["Erase All Blocks"],
+        ["protect", "protected", "protection", "unprotected"]
+      ],
+      "nxp-kl25-flash-security-v0": [
+        ["FSEC"],
+        ["SEC", "MEEN", "KEYEN"]
+      ],
+      "nxp-kl25-debug-security-interaction-v0": [
+        ["SWD"],
+        ["secure", "security"],
+        ["mass erase"]
+      ],
+      "nxp-kl25-swd-mdm-ap-v0": [
+        ["SWD"],
+        ["MDM-AP", "MDM AP"],
+        ["mass erase", "status"]
+      ]
+    }
+  },
+  "review": {
+    "manufacturer_review_required": true,
+    "screening_pass_is_not_semantic_correctness": true,
+    "gate57_can_issue_qualified": false,
+    "next_status_after_screening_pass": "READY_FOR_REVIEW"
+  },
+  "admission": {
+    "live_bounded_qualification_harness": true,
+    "live_bounded_run_retained": false,
+    "semantic_extraction": false,
+    "model_quality": false,
+    "canonical_dataset": false,
+    "hil": false,
+    "production": false,
+    "destructive_security_operation": false
+  }
+}
