@@ -8,33 +8,21 @@ on:
       - .github/workflows/device-catalog-stm32g0-phase48c-policy-oneoff.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   policy:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/device-catalog-stm32g0-phase48c-policy
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate retained evidence and metadata policy
+      - name: Replay retained evidence and Phase 4.8C policy gates
         run: |
           python data/device-catalog/research/validate_stm32g0_phase4_8b_retained_evidence.py
           python data/device-catalog/research/test_stm32g0_phase4_8c_policy.py
-      - name: Generate deterministic Phase 4.8C baseline
-        run: |
-          python data/device-catalog/research/stm32g0_phase4_8c_policy.py --write-baseline
+          python data/device-catalog/research/test_stm32g0_phase4_8c_policy_plan.py
           python data/device-catalog/research/stm32g0_phase4_8c_policy.py
           sha256sum data/device-catalog/research/stm32g0-phase4.8c-policy-baseline.json
           sha256sum data/device-catalog/research/stm32g0-phase4.8c-production-manifest-prestate.json
-      - name: Commit generated baseline only
-        run: |
-          git config user.name 'plasma-ci'
-          git config user.email 'plasma-ci@users.noreply.github.com'
-          git add data/device-catalog/research/stm32g0-phase4.8c-policy-baseline.json
-          git diff --cached --check
-          git commit -m 'device-catalog: freeze STM32G0 Phase 4.8C policy baseline'
-          git push origin HEAD:agent/device-catalog-stm32g0-phase48c-policy
