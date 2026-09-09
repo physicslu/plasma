@@ -1,4 +1,4 @@
-name: STM32F7 Phase 4.6D admission-plan freeze one-off
+name: STM32F7 Phase 4.6D permanent replay one-off
 
 on:
   push:
@@ -8,17 +8,14 @@ on:
       - .github/workflows/device-catalog-stm32f7-phase46d-oneoff.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  freeze-admission-plan:
+  permanent-admission-replay:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/device-catalog-stm32f7-phase46d-admission
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -27,33 +24,18 @@ jobs:
           python data/device-catalog/research/test_stm32f7_phase4_6c_policy.py
           python data/device-catalog/research/test_stm32f7_phase4_6c_policy_plan.py
           python data/device-catalog/research/stm32f7_phase4_6c_policy.py
-      - name: Validate Phase 4.6D admission negatives and clean plan
+      - name: Validate Phase 4.6D admission negatives
         run: python data/device-catalog/research/test_stm32f7_phase4_6d_admission.py
-      - name: Generate deterministic Phase 4.6D admission plan
+      - name: Replay frozen Phase 4.6D admission plan
+        run: python data/device-catalog/research/validate_stm32f7_phase4_6d_admission_plan.py
+      - name: Assert no Phase 4.6D publication occurred
         run: |
-          python data/device-catalog/research/stm32f7_phase4_6d_admission.py \
-            --output data/device-catalog/research/stm32f7-phase4.6d-admission-plan.json
           python - <<'PY'
-          import hashlib, json
+          import json
           from pathlib import Path
-          p = Path('data/device-catalog/research/stm32f7-phase4.6d-admission-plan.json')
-          plan = json.loads(p.read_text())
-          print(json.dumps({
-              'sha256': hashlib.sha256(p.read_bytes()).hexdigest(),
-              'candidate_count': plan['candidate_count'],
-              'decision_counts': plan['decision_counts'],
-              'required_target_config': plan['required_target_config'],
-              'canonical_write_applied': plan['canonical_write_applied'],
-              'production_write_applied': plan['production_write_applied'],
-          }, indent=2, sort_keys=True))
+          assert not Path('data/device-catalog/research/stm32f7-commercial-icpn.csv').exists()
+          manifest = json.loads(Path('data/device-catalog/production/icpn-v1-manifest.json').read_text())
+          assert all(item.get('family') != 'STM32F7' for item in manifest['sources'])
+          assert sum(int(item['row_count']) for item in manifest['sources']) == 544
+          print('Phase 4.6D permanent replay PASS; canonical absent and Production remains 544/F7=0')
           PY
-      - name: Commit immutable read-only admission plan
-        run: |
-          set -Eeuo pipefail
-          git config user.name 'plasma-ci'
-          git config user.email 'plasma-ci@users.noreply.github.com'
-          git add data/device-catalog/research/stm32f7-phase4.6d-admission-plan.json
-          git diff --cached --check
-          git diff --cached --quiet && { echo 'ERROR: admission plan generation produced no changes' >&2; exit 1; }
-          git commit -m 'device-catalog: freeze STM32F7 Phase 4.6D admission plan'
-          git push origin HEAD:agent/device-catalog-stm32f7-phase46d-admission
