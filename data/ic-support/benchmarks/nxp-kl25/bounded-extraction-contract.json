@@ -4,6 +4,7 @@
   "contract_id": "nxp-kl25-bounded-extraction-v1",
   "target": "MKL25Z128VLK4",
   "semantic_contract_id": "nxp-kl25-semantic-extraction-v1",
+  "evidence_boundary_release_id": "nxp-kl25-evidence-boundary-release-v1",
   "primary_unit_count": 8,
   "execution_mode": "mock_only",
   "generation": {
@@ -15,12 +16,13 @@
   },
   "automatic_retries": 0,
   "aggregation": "exact_all_units_fail_closed_v1",
-  "known_acceptance_blockers": [
+  "known_acceptance_blockers": [],
+  "resolved_acceptance_blockers": [
     {
       "id": "program-longword-table-27-36-continuation",
       "primary_unit_id": "nxp-kl25-program-longword-v0",
-      "missing_pdf_page": 446,
-      "disposition": "requires_separate_gate1_evidence_release"
+      "admitted_pdf_page": 446,
+      "resolution": "evidence_boundary_release_v1"
     }
   ],
   "admission": {
