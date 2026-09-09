@@ -12,7 +12,7 @@
   "inputs": {
     "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
     "discovery_manifest_sha256": "652476cbbb26a585de73a8d9c2cc130d221b3805dee3682e823c4299f811d59f",
-    "production_manifest_sha256_at_discovery": "40f8d3928aad3a43d017a377ec2a9e41a610fa7bd232942c3e938d8628af6b3"
+    "production_manifest_sha256_at_discovery": "40f8d3928aad3a43d017a377ec2a9e41a610fa7bd232942c3e938d8628af6b3a"
   },
   "production_snapshot": {
     "exact_icpn_count": 492,
