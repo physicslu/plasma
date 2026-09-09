@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "phase": "4.6B",
+  "pilot_id": "stm32f7-phase4.6b-official-st-discovery-2026-09-09",
+  "targets": [
+    {
+      "subfamily": "STM32F722",
+      "base_device": "STM32F722IC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f722ic.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F722 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F723",
+      "base_device": "STM32F723IC",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f723ic.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F723 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F730",
+      "base_device": "STM32F730I8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f730i8.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F730 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F732",
+      "base_device": "STM32F732IE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f732ie.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F732 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F733",
+      "base_device": "STM32F733IE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f733ie.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F733 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F745",
+      "base_device": "STM32F745IE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f745ie.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F745 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F746",
+      "base_device": "STM32F746BE",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f746be.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F746 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F750",
+      "base_device": "STM32F750N8",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f750n8.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F750 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F756",
+      "base_device": "STM32F756BG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f756bg.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F756 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F765",
+      "base_device": "STM32F765BG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f765bg.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F765 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F767",
+      "base_device": "STM32F767BG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f767bg.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F767 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F768",
+      "base_device": "STM32F768AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f768ai.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F768 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F769",
+      "base_device": "STM32F769AG",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f769ag.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F769 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F777",
+      "base_device": "STM32F777BI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f777bi.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F777 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F778",
+      "base_device": "STM32F778AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f778ai.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F778 OpenOCD source surface"
+    },
+    {
+      "subfamily": "STM32F779",
+      "base_device": "STM32F779AI",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f779ai.html",
+      "selection_reason": "lexicographically first concrete Base Device in the guarded STM32F779 OpenOCD source surface"
+    }
+  ]
+}
