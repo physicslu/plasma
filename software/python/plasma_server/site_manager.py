@@ -9,7 +9,7 @@ from typing import Any
 from plasma_core.config import PlasmaConfig, SiteConfig
 from plasma_core.enums import Operation, SiteState
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_core.ic_support import ICSupportResolver, get_default_ic_support_resolver
+from plasma_core.ic_support import ICSupportResolver
 from plasma_core.job_logging import OutputManager, ServerEventLogger
 from plasma_core.models import JobRequest, JobResult, iso_now
 from plasma_core.protocol import PROTOCOL_VERSION
@@ -63,14 +63,12 @@ class SiteManager:
         self.registry = JobRegistry()
         self._semaphore = asyncio.Semaphore(config.server.max_concurrent_jobs)
         self._site_configs = {site.id: site for site in config.sites}
-        requires_ic_support = any(
-            site.enabled and site.interface != "mock" for site in config.sites
-        )
-        self.ic_support_resolver = (
-            ic_support_resolver
-            if ic_support_resolver is not None
-            else get_default_ic_support_resolver() if requires_ic_support else None
-        )
+
+        # Runtime capability is an explicit SW/PPU dependency. AI IC Support
+        # research data is never auto-loaded. Until a promoted runtime-owned
+        # capability package is supplied, non-Mock routes fail closed in the
+        # SiteExecutionRouter before Job admission or hardware access.
+        self.ic_support_resolver = ic_support_resolver
         self.interfaces: dict[int, BaseInterface] = {}
         self.execution_routers: dict[int, SiteExecutionRouter] = {}
         self.workers: dict[int, SiteWorker] = {}
