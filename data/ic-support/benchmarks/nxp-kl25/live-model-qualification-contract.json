@@ -1,12 +1,12 @@
 {
-  "schema_version": "0.3.0",
+  "schema_version": "0.4.0",
   "artifact_type": "kl25_live_model_qualification_contract",
-  "contract_id": "nxp-kl25-live-model-qualification-v3.1",
+  "contract_id": "nxp-kl25-live-model-qualification-v4",
   "target": "MKL25Z128VLK4",
   "required_input": {
     "bundle_digest": "628aa2c7664cdf9778a11e56a8da0a9cf8816aaec704baf893bfae5a9fba0244",
     "pre_ai_manifest_digest": "b26621b12d5b6f6fc924cbf59f00649767b3b2f9900fd7c5c560ee45cca80e07",
-    "semantic_contract_id": "nxp-kl25-semantic-extraction-v0"
+    "semantic_contract_id": "nxp-kl25-semantic-extraction-v1"
   },
   "live_runtime": {
     "transport": "ollama_native_chat",
@@ -99,7 +99,10 @@
     "require_exact_unit_verdicts": true,
     "allowed_unit_verdicts": ["PASS", "FAIL"],
     "reviewed_verdict_required_for_qualification": true,
-    "screening_pass_is_not_semantic_correctness": true
+    "screening_pass_is_not_semantic_correctness": true,
+    "semantic_truth_and_citation_quality_are_independent": true,
+    "require_complete_fact_citations_for_review_pass": true,
+    "qualification_requires_semantic_and_citation_review_pass": true
   },
   "admission": {
     "live_model_qualification_harness": true,
