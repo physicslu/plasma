@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "status": "current",
+  "workstreams": {
+    "sw_ppu": {
+      "label": "SW/PPU",
+      "authority": "Executable Plasma product behavior, PS runtime, PL integration, packaging and release qualification",
+      "primary_roots": [
+        "software/python/",
+        "software/web/",
+        "pl/",
+        "scripts/",
+        "release/"
+      ],
+      "core_workflows": [
+        ".github/workflows/python-tests.yml",
+        ".github/workflows/ppu-release.yml",
+        ".github/workflows/z2-ps-release.yml",
+        ".github/workflows/control-station-runtime.yml",
+        ".github/workflows/mock-cd.yml",
+        ".github/workflows/mock-cd-browser.yml",
+        ".github/workflows/persistent-integration-host.yml",
+        ".github/workflows/macos-control-station-installer.yml"
+      ]
+    },
+    "icpn": {
+      "label": "ICPN",
+      "authority": "Exact commercial IC identity, canonical metadata and user-selectable Production catalog",
+      "primary_roots": [
+        "data/device-catalog/"
+      ],
+      "core_workflows": [
+        ".github/workflows/device-catalog-validation.yml",
+        ".github/workflows/device-catalog-current-validation.yml",
+        ".github/workflows/device-catalog-stm32f2-bounded-validation.yml",
+        ".github/workflows/device-catalog-stm32f3-foundation-validation.yml"
+      ]
+    },
+    "ai_ic_support": {
+      "label": "AI IC Support",
+      "authority": "AI-assisted manufacturer-evidence research and candidate programming-method derivation",
+      "primary_roots": [
+        "data/ic-support/"
+      ],
+      "core_workflows": [
+        ".github/workflows/ic-support-validation.yml",
+        ".github/workflows/ic-evidence-live-validation.yml",
+        ".github/workflows/nxp-kl25-semantic-runner-ci.yml"
+      ]
+    },
+    "repo": {
+      "label": "REPO",
+      "authority": "Repository-wide documentation, terminology, security and CI ownership governance",
+      "primary_roots": [
+        "docs/",
+        "scripts/tests/"
+      ],
+      "core_workflows": [
+        ".github/workflows/repository-contracts.yml"
+      ]
+    }
+  },
+  "invariants": {
+    "one_primary_workstream_per_workflow": true,
+    "icpn_selectability_is_not_capability": true,
+    "ai_research_is_not_runtime_support": true,
+    "sw_runtime_does_not_own_commercial_identity": true,
+    "cross_workstream_dependencies_must_be_explicit_and_narrow": true
+  }
+}
