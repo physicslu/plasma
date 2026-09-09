@@ -1,0 +1,70 @@
+name: STM32F0 Phase 4.5B live discovery one-off
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/device-catalog-stm32f0-phase45b-live-oneoff.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-discovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Playwright and Chromium
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'playwright==1.62.0'
+          python -m playwright install --with-deps chromium
+      - name: Run bounded 13-target STM32F0 official-ST discovery
+        env:
+          PYTHONPATH: data/device-catalog/research
+        run: |
+          mkdir -p /tmp/stm32f0-phase4.5b-live/evidence
+          set +e
+          xvfb-run -a python data/device-catalog/research/run_stm32f0_phase4_5b_browser_discovery.py \
+            --output /tmp/stm32f0-phase4.5b-live/live-summary.json \
+            --evidence-dir /tmp/stm32f0-phase4.5b-live/evidence \
+            --timeout 90 \
+            --delay 2
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > /tmp/stm32f0-phase4.5b-live/exit-code.txt
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('/tmp/stm32f0-phase4.5b-live')
+          metadata = {
+              'github_sha': os.environ.get('GITHUB_SHA'),
+              'github_run_id': os.environ.get('GITHUB_RUN_ID'),
+              'github_run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+              'github_workflow': os.environ.get('GITHUB_WORKFLOW'),
+          }
+          (root / 'execution-metadata.json').write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+      - name: Upload live discovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32f0-phase4.5b-live-discovery-20260909
+          path: /tmp/stm32f0-phase4.5b-live
+          if-no-files-found: error
+      - name: Enforce commercial identity acquisition result
+        if: always()
+        run: |
+          test -f /tmp/stm32f0-phase4.5b-live/exit-code.txt
+          test "$(cat /tmp/stm32f0-phase4.5b-live/exit-code.txt)" = "0"
