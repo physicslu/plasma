@@ -8,6 +8,7 @@ const ppuSiteDesired = await readFile(new URL("../app/engineering/ppu-site-desir
 const ppuNetwork = await readFile(new URL("../app/engineering/ppu-network-configuration.tsx", import.meta.url), "utf8");
 const registryApi = await readFile(new URL("../app/engineering/ppu-registry-api.ts", import.meta.url), "utf8");
 const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
+const managedSelectionRoute = await readFile(new URL("../app/api/manager/ppu/route.ts", import.meta.url), "utf8");
 const registryRoute = await readFile(new URL("../app/api/manager/registry/route.ts", import.meta.url), "utf8");
 const registryEntryRoute = await readFile(new URL("../app/api/manager/registry/[...path]/route.ts", import.meta.url), "utf8");
 
@@ -27,6 +28,18 @@ test("PPU management uses Manager-owned registry APIs instead of browser-local i
   assert.match(ppuSite, /Remove PPU/);
   assert.doesNotMatch(ppuSite, /const initialPpus/);
   assert.doesNotMatch(ppuSite, /setPpus\(/);
+});
+
+test("validated PPUs can be selected for Managed operations without restarting Console", () => {
+  assert.match(registryApi, /selectManagerPpuForManagedOperations/);
+  assert.match(registryApi, /"\/api\/manager\/ppu"/);
+  assert.match(registryApi, /JSON\.stringify\(\{ ppu_alias: alias \}\)/);
+  assert.match(ppuSite, /selectForManagedOperations/);
+  assert.match(ppuSite, /Use for Managed Operations/);
+  assert.match(ppuSite, /selectedEntry\.lifecycle !== "commissioned"/);
+  assert.match(managedSelectionRoute, /managerPpuAliasIsCommissioned\(alias\)/);
+  assert.match(managedSelectionRoute, /managerPpuSelectionCookie\(alias\)/);
+  assert.match(managerBff, /resolveManagerPpuAlias\(request\)/);
 });
 
 test("PPU topology remains observed while Site desired configuration is PPU-owned and writable", () => {
@@ -85,11 +98,12 @@ test("Browser never sequences the PPU activation API directly", () => {
   assert.match(ppuNetwork, /verify the same <code>ppu_id<\/code>/);
 });
 
-test("browser registry client exposes registry, network, commissioning, and Site desired state through same-origin BFF", () => {
+test("browser registry client exposes registry, network, commissioning, Site desired state, and PPU selection through same-origin BFF", () => {
   assert.match(registryApi, /\/api\/manager\/registry/);
   assert.match(registryApi, /getManagerPpuSites/);
   assert.match(registryApi, /saveManagerPpuSite/);
   assert.match(registryApi, /\/sites\/\$\{siteId\}/);
+  assert.match(registryApi, /selectManagerPpuForManagedOperations/);
   assert.match(registryApi, /method: "POST"/);
   assert.match(registryApi, /method: "PATCH"/);
   assert.match(registryApi, /method: "DELETE"/);
