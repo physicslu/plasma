@@ -8,34 +8,20 @@ on:
       - .github/workflows/device-catalog-stm32g0-phase48d-admission-oneoff.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   admission:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/device-catalog-stm32g0-phase48d-admission
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate Phase 4.8C and Phase 4.8D policy
+      - name: Replay Phase 4.8C / 4.8D permanent gates
         run: |
           python data/device-catalog/research/test_stm32g0_phase4_8c_policy.py
           python data/device-catalog/research/test_stm32g0_phase4_8c_policy_plan.py
           python data/device-catalog/research/test_stm32g0_phase4_8d_admission.py
-      - name: Freeze deterministic admission plan
-        run: |
-          rm -f data/device-catalog/research/stm32g0-commercial-icpn.csv
-          python data/device-catalog/research/stm32g0_phase4_8d_admission.py \
-            --output data/device-catalog/research/stm32g0-phase4.8d-admission-plan.json
+          python data/device-catalog/research/validate_stm32g0_phase4_8d_admission_plan.py
           sha256sum data/device-catalog/research/stm32g0-phase4.8d-admission-plan.json
-      - name: Commit admission plan only
-        run: |
-          git config user.name 'plasma-ci'
-          git config user.email 'plasma-ci@users.noreply.github.com'
-          git add data/device-catalog/research/stm32g0-phase4.8d-admission-plan.json
-          git diff --cached --check
-          git commit -m 'device-catalog: freeze STM32G0 Phase 4.8D admission plan'
-          git push origin HEAD:agent/device-catalog-stm32g0-phase48d-admission
