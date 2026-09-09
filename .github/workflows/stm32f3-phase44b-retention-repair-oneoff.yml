@@ -1,0 +1,64 @@
+name: STM32F3 Phase 4.4B retention repair one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f3-phase44b-discovery
+
+permissions:
+  contents: read
+
+jobs:
+  repair-bindings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Rebuild retained binding transaction offline
+        env:
+          PYTHONPATH: data/device-catalog/research
+        run: |
+          python - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+          from device_catalog_evidence_framework import build_manifest, sha256
+
+          research = Path('data/device-catalog/research')
+          source = research / 'evidence/stm32f3-phase4.4b-official-st-discovery-live-2026-09-08'
+          baseline = research / 'stm32f3-phase4.4b-discovery-baseline.json'
+          work = Path('/tmp/stm32f3-retention-repair')
+          shutil.copytree(source, work)
+
+          baseline_sha = sha256(baseline)
+          provenance_path = work / 'provenance.json'
+          provenance = json.loads(provenance_path.read_text(encoding='utf-8'))
+          provenance['baseline_sha256'] = baseline_sha
+          provenance_path.write_text(json.dumps(provenance, indent=2) + '\n', encoding='utf-8')
+
+          manifest = build_manifest(
+              work,
+              evidence_id='stm32f3-phase4.4b-official-st-discovery-2026-09-08-retained-20260908T083224Z-0ac86cbf',
+              retained_files=['README.md', 'pilot-summary.json', 'provenance.json'],
+          )
+
+          payload = {
+              'baseline_sha256': baseline_sha,
+              'provenance_sha256': sha256(provenance_path),
+              'provenance': provenance,
+              'manifest': manifest,
+          }
+          print('RETENTION_REPAIR_BEGIN')
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          print('RETENTION_REPAIR_END')
+          (work / 'repair-result.json').write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32f3-phase4.4b-retention-repair
+          path: /tmp/stm32f3-retention-repair/repair-result.json
+          retention-days: 2
