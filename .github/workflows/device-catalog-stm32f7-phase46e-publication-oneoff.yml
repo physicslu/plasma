@@ -1,3 +1,4 @@
+# rerun after historical Phase 4.6D fixture repair
 name: STM32F7 Phase 4.6E publication closure one-off
 
 on:
