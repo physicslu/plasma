@@ -57,6 +57,21 @@ def _allowed_page_refs(pack: dict[str, Any]) -> set[tuple[str, int]]:
     return refs
 
 
+def _citation_completeness_policy(contract: dict[str, Any]) -> dict[str, Any]:
+    policy = contract.get("output", {}).get("citation_completeness")
+    require(isinstance(policy, dict), "citation completeness policy missing")
+    required_true = {
+        "facts_should_be_atomic",
+        "every_material_clause_requires_complete_evidence",
+        "multi_page_claim_requires_all_supporting_pages",
+        "split_disjoint_evidence_claims",
+        "irrelevant_padding_citations_forbidden",
+    }
+    for name in sorted(required_true):
+        require(policy.get(name) is True, f"citation completeness policy must enable {name}")
+    return policy
+
+
 def build_output_json_schema(
     contract: dict[str, Any],
     *,
@@ -78,6 +93,7 @@ def build_output_json_schema(
     allowed_kinds = contract.get("output", {}).get("allowed_fact_kinds")
     require(isinstance(allowed_kinds, list) and all(isinstance(item, str) for item in allowed_kinds), "allowed fact kinds malformed")
     require(bool(allowed_kinds), "allowed fact kinds missing")
+    _citation_completeness_policy(contract)
 
     source_ids = sorted({source_id for pack in pack_by_primary.values() for source_id, _ in _allowed_page_refs(pack)})
     primary_unit_ids = sorted(pack_by_primary)
@@ -146,6 +162,7 @@ def render_prompt(
     pack_by_primary = _pack_by_primary(packs)
     allowed_kinds = contract.get("output", {}).get("allowed_fact_kinds")
     require(isinstance(allowed_kinds, list) and all(isinstance(item, str) for item in allowed_kinds), "allowed fact kinds malformed")
+    citation_policy = _citation_completeness_policy(contract)
 
     unit_lines: list[str] = []
     for primary_unit_id in sorted(pack_by_primary):
@@ -156,7 +173,7 @@ def render_prompt(
             f"- {primary_unit_id} | pack={pack.get('pack_id')} | allowed_evidence=[{rendered_refs}]"
         )
 
-    instructions = f"""PLASMA NXP KL25 MANUFACTURER-NEAR SEMANTIC EXTRACTION\n\nTARGET: {target}\n\nReturn exactly one final JSON object. Do not emit analysis, reasoning, <think> tags, Markdown fences, or prose outside JSON.\nThe JSON root must contain exactly: schema_version, target, unit_results.\nschema_version must be {SEMANTIC_SCHEMA_VERSION!r}; target must be {target!r}.\n\nFor every primary Evidence Unit below, return exactly one unit_results entry with exactly:\n  primary_unit_id, state, facts\nstate must be FACTS or UNKNOWN. If evidence is insufficient, use UNKNOWN with facts=[].\nNever guess, synthesize missing identity levels, or convert absence of evidence into a fact.\n\nEvery FACTS entry must contain at least one fact. Each fact must contain exactly:\n  fact_id, kind, statement, evidence\nfact_id must be globally unique across the entire response; do not restart fact numbering for each Evidence Unit. Prefer IDs derived from the primary_unit_id plus a local sequence number.\nkind must be one of: {', '.join(allowed_kinds)}.\nevidence must be a JSON array of objects with exactly source_id and pdf_page_number, for example:\n  [{{\"source_id\":\"nxp_kl25_rm_rev3\",\"pdf_page_number\":150}}]\nNever encode an evidence citation as a string such as \"nxp_kl25_rm_rev3:p150\".\nEvery evidence object must reference a source/page allowed for that unit's pack.\nDo not emit commercial identity equivalence, applicability bindings, cross-target relationships, canonical relationships, production admission, or destructive-security admission.\nPreserve NXP-native concepts such as FTFA, FCCOB, FSTAT, SWD and MDM-AP when supported by manufacturer evidence.\nFor each primary Evidence Unit, cover the programming-relevant named entities that the primary evidence explicitly establishes, including named commands, command-object registers, control/status registers, status fields, security controls, and programming/debug interfaces. Do not replace these named mechanisms with only a high-level paraphrase when the evidence gives the mechanism explicitly.\nDo not invent a named mechanism solely to improve coverage; every emitted mechanism must remain directly supported by cited manufacturer evidence.\n\nPRIMARY EVIDENCE UNITS AND ALLOWED CITATIONS:\n{chr(10).join(unit_lines)}\n\nMANUFACTURER EVIDENCE CONTEXT FOLLOWS:\n{manufacturer_context}"""
+    instructions = f"""PLASMA NXP KL25 MANUFACTURER-NEAR SEMANTIC EXTRACTION\n\nTARGET: {target}\n\nReturn exactly one final JSON object. Do not emit analysis, reasoning, <think> tags, Markdown fences, or prose outside JSON.\nThe JSON root must contain exactly: schema_version, target, unit_results.\nschema_version must be {SEMANTIC_SCHEMA_VERSION!r}; target must be {target!r}.\n\nFor every primary Evidence Unit below, return exactly one unit_results entry with exactly:\n  primary_unit_id, state, facts\nstate must be FACTS or UNKNOWN. If evidence is insufficient, use UNKNOWN with facts=[].\nNever guess, synthesize missing identity levels, or convert absence of evidence into a fact.\n\nEvery FACTS entry must contain at least one fact. Each fact must contain exactly:\n  fact_id, kind, statement, evidence\nfact_id must be globally unique across the entire response; do not restart fact numbering for each Evidence Unit. Prefer IDs derived from the primary_unit_id plus a local sequence number.\nkind must be one of: {', '.join(allowed_kinds)}.\nevidence must be a JSON array of objects with exactly source_id and pdf_page_number, for example:\n  [{{\"source_id\":\"nxp_kl25_rm_rev3\",\"pdf_page_number\":150}}]\nNever encode an evidence citation as a string such as \"nxp_kl25_rm_rev3:p150\".\nEvery evidence object must reference a source/page allowed for that unit's pack.\n\nCITATION COMPLETENESS POLICY:\n- Prefer atomic facts: each fact should express one independently supportable material claim, or only tightly coupled clauses that share the same evidence basis.\n- Every material clause in a fact statement must be supported by that fact's evidence array.\n- If a fact requires multiple manufacturer pages for complete support, cite every necessary page in the evidence array.\n- If materially different clauses rely on disjoint evidence pages, split them into separate atomic facts unless they must remain one claim; if kept together, cite all pages needed for every clause.\n- Do not pad a fact with irrelevant pages merely to appear complete.\n- Generic locality example: if one page establishes a register address and another page establishes a field meaning, a statement claiming both must cite both pages or be split into separate facts with local citations.\nThe deterministic parser can prove citation membership and representation, but it cannot infer natural-language support. Manufacturer-evidence review remains the authority for semantic citation completeness.\n\nDo not emit commercial identity equivalence, applicability bindings, cross-target relationships, canonical relationships, production admission, or destructive-security admission.\nPreserve NXP-native concepts such as FTFA, FCCOB, FSTAT, SWD and MDM-AP when supported by manufacturer evidence.\nFor each primary Evidence Unit, cover the programming-relevant named entities that the primary evidence explicitly establishes, including named commands, command-object registers, control/status registers, status fields, security controls, and programming/debug interfaces. Do not replace these named mechanisms with only a high-level paraphrase when the evidence gives the mechanism explicitly.\nDo not invent a named mechanism solely to improve coverage; every emitted mechanism must remain directly supported by cited manufacturer evidence.\n\nPRIMARY EVIDENCE UNITS AND ALLOWED CITATIONS:\n{chr(10).join(unit_lines)}\n\nMANUFACTURER EVIDENCE CONTEXT FOLLOWS:\n{manufacturer_context}"""
     prompt_meta = {
         "schema_version": SEMANTIC_SCHEMA_VERSION,
         "target": target,
@@ -165,6 +182,7 @@ def render_prompt(
         "manufacturer_context_only": True,
         "canonical_ground_truth_visible": False,
         "production_profile_visible": False,
+        "citation_completeness_policy": dict(citation_policy),
     }
     return instructions, prompt_meta
 
@@ -194,6 +212,7 @@ def parse_model_result(
     allowed_kinds = set(contract.get("output", {}).get("allowed_fact_kinds", []))
     require(allowed_states == {"FACTS", "UNKNOWN"}, "semantic contract states malformed")
     require(bool(allowed_kinds), "semantic contract fact kinds missing")
+    _citation_completeness_policy(contract)
 
     observed_units: set[str] = set()
     observed_fact_ids: set[str] = set()

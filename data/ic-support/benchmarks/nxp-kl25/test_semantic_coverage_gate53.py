@@ -49,9 +49,9 @@ def test_no_fuzzy_or_stemming_behavior() -> None:
     assert not qualify._contains_term("The controller uses FSTATUS.", "FSTAT")
 
 
-def test_gate53_contract_and_protection_vocabulary_are_explicit() -> None:
+def test_gate53_screening_vocabulary_survives_gate54_contract_versioning() -> None:
     contract = _contract()
-    assert contract["contract_id"] == "nxp-kl25-live-model-qualification-v3.1"
+    assert contract["contract_id"] == "nxp-kl25-live-model-qualification-v4.1"
     groups = contract["semantic_screening"]["required_term_groups"]
     protection = groups["nxp-kl25-erase-all-blocks-v0"][1]
     assert protection == ["protect", "protected", "protection", "unprotected"]
@@ -85,13 +85,11 @@ def test_retained_v3_fccob_forms_match_without_fuzzy_prefix_logic() -> None:
     assert any(qualify._contains_term(register_text, term) for term in register_group)
     assert any(qualify._contains_term(program_text, term) for term in program_group)
 
-    # Keep fail-closed behavior for unrelated prefix extensions.
     assert not any(qualify._contains_term("The controller exposes FCCOBX.", term) for term in register_group)
     assert not qualify._contains_term("The controller uses FSTATUS.", "FSTAT")
 
 
 def test_gate52_true_coverage_omissions_remain_omissions() -> None:
-    # These are the two genuine omissions observed in the retained Gate 5.2 v2 run.
     program_longword = (
         "The Program Longword command (FCMD 0x06) programs four previously-erased bytes. "
         "The supplied address must be longword aligned and the target must be unprotected."
@@ -113,7 +111,6 @@ def test_semantic_prompt_uses_generic_coverage_rule_not_per_unit_answer_keys() -
     source = (HERE / "semantic_extraction.py").read_text(encoding="utf-8")
     assert "cover the programming-relevant named entities" in source
     assert "Do not invent a named mechanism solely to improve coverage" in source
-    # Required-term groups belong to the deterministic qualification contract, not the prompt renderer.
     assert "required_term_groups" not in source
 
 
@@ -121,7 +118,6 @@ def test_semantic_prompt_requires_global_fact_id_uniqueness() -> None:
     source = (HERE / "semantic_extraction.py").read_text(encoding="utf-8")
     assert "fact_id must be globally unique across the entire response" in source
     assert "do not restart fact numbering for each Evidence Unit" in source
-    # The deterministic parser remains authoritative and must still fail closed.
     assert "duplicate fact_id" in source
 
 

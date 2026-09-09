@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "artifact_type": "kl25_semantic_extraction_contract",
-  "contract_id": "nxp-kl25-semantic-extraction-v0",
+  "contract_id": "nxp-kl25-semantic-extraction-v1",
   "target": "MKL25Z128VLK4",
   "input": {
     "artifact_type": "pre_ai_input_manifest",
@@ -20,6 +20,13 @@
     "unknown_requires_empty_facts": true,
     "facts_require_evidence": true,
     "evidence_must_resolve_within_primary_pack": true,
+    "citation_completeness": {
+      "facts_should_be_atomic": true,
+      "every_material_clause_requires_complete_evidence": true,
+      "multi_page_claim_requires_all_supporting_pages": true,
+      "split_disjoint_evidence_claims": true,
+      "irrelevant_padding_citations_forbidden": true
+    },
     "allowed_fact_kinds": [
       "REGISTER",
       "REGISTER_FIELD",
