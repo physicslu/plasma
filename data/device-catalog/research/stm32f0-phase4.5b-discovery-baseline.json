@@ -1,0 +1,213 @@
+{
+  "aggregate": {
+    "acquisition_failure": 0,
+    "acquisition_success": 13,
+    "active_exact_icpn_candidates": 42,
+    "attempted": 13,
+    "commercial_identity_clean": true,
+    "excluded_non_active_part_numbers": 0,
+    "identity_manual_intervention_required": 0,
+    "openocd_routing": {
+      "ambiguous": 0,
+      "gates_commercial_identity": false,
+      "unique": 13,
+      "unmapped": 0
+    },
+    "routing_followup_required": 0
+  },
+  "browser": {
+    "browser_version": "151.0.7922.34",
+    "evidence_profile": "stm32f0_dual_surface_v1",
+    "headless": false,
+    "playwright_version": "1.62.0"
+  },
+  "claims": {
+    "canonical_dataset_admission": false,
+    "production_admission_ready": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  },
+  "discovery_execution": {
+    "artifact_id": 10090443968,
+    "artifact_zip_sha256": "a3c02afd6a1295a612d25e35031d8623da86c0ea76777acaab4caaaab51cb1aa",
+    "github_checkout_sha": "95276ea5af83819351c7f9f4a2f32db0638842b9",
+    "head_git_sha": "1fcdf8696bc4d334f6e5f092efc8200b65fc443e",
+    "workflow_run_id": 34315839031
+  },
+  "family": "STM32F0",
+  "phase": "4.5B",
+  "pilot_id": "stm32f0-phase4.5b-official-st-discovery-2026-09-09",
+  "schema_version": 1,
+  "source_bindings": {
+    "discovery_manifest_git_blob_sha": "446969fb89f4bd6b8bd421eb0e4b2506d14c8a36",
+    "openocd_catalog_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+    "production_exact_icpn_count": 502,
+    "production_family_counts": {
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384
+    },
+    "production_manifest_git_blob_sha": "6fb6d103027fc3c7a949f0d4aa2d9c10828cc103",
+    "stm32f0_production_prestate_count": 0
+  },
+  "targets": [
+    {
+      "base_device": "STM32F030C6",
+      "evidence_section_sha256": "127a60443e703136e1f6920122d8f4da611d7c2ac28a02ab368bde801df374c7",
+      "exact_icpns": ["STM32F030C6T6", "STM32F030C6T6TR"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "f240266dd5395ba7989491b4188c2cc069fe9ff2b6edfa32ebf166ccb52e1f8f",
+      "retrieved_at_utc": "2026-09-09T05:41:10Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f030c6.html",
+      "subfamily": "STM32F030"
+    },
+    {
+      "base_device": "STM32F031C4",
+      "evidence_section_sha256": "3a5681bc42f986676705c3b73536224d849c469c2405e4910636bc739dd6a7ba",
+      "exact_icpns": ["STM32F031C4T6", "STM32F031C4T6TR"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "029b3e260f99403f0f82cf4c5d2368abcdb4cf75e0a2784b629f5329b69afc44",
+      "retrieved_at_utc": "2026-09-09T05:41:15Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f031c4.html",
+      "subfamily": "STM32F031"
+    },
+    {
+      "base_device": "STM32F038C6",
+      "evidence_section_sha256": "cd5135d507ebdb1d4bdc361761f5ac3edd99bb5ea606206b2b36c1ba43a0646e",
+      "exact_icpns": ["STM32F038C6T6", "STM32F038C6T6TR", "STM32F038C6T7"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "4cab3217477fedeffd874f203ab128ed039d4e75d99456be3fbb4f123e19501c",
+      "retrieved_at_utc": "2026-09-09T05:41:21Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f038c6.html",
+      "subfamily": "STM32F038"
+    },
+    {
+      "base_device": "STM32F042C4",
+      "evidence_section_sha256": "9b8a491fd47b503cf182613c0beaa4d7f33fc57ac8f168ddac4003a366db4ea4",
+      "exact_icpns": ["STM32F042C4T6", "STM32F042C4U6"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "13506703a29a646870b35f343f520c00379400975868cc1b6bf82221131fd888",
+      "retrieved_at_utc": "2026-09-09T05:41:26Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f042c4.html",
+      "subfamily": "STM32F042"
+    },
+    {
+      "base_device": "STM32F048C6",
+      "evidence_section_sha256": "efc147e66bc25ea36965954489309d726bd8e2c0a4c9ae5c0f4882fc4f823aa4",
+      "exact_icpns": ["STM32F048C6U6", "STM32F048C6U6TR"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "3994e06ccee914b949c05ba75f3d5357ea17610514256848c3ab5f32e59b1937",
+      "retrieved_at_utc": "2026-09-09T05:43:06Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f048c6.html",
+      "subfamily": "STM32F048"
+    },
+    {
+      "base_device": "STM32F051C4",
+      "evidence_section_sha256": "74e557720a4a4062938e95cb30bd5e13e131bed7d13d154a22ff3e0e270508c9",
+      "exact_icpns": ["STM32F051C4T6", "STM32F051C4T6TR", "STM32F051C4U6"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "f9743fc8e2b6ec0f5ccd3f80674d8d3429da6375b13585bcfc3c2cc2e045273d",
+      "retrieved_at_utc": "2026-09-09T05:43:12Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f051c4.html",
+      "subfamily": "STM32F051"
+    },
+    {
+      "base_device": "STM32F058C8",
+      "evidence_section_sha256": "03714fc39df34620bd2be4006250869ef7293ffc1a5dfd19f47853cf52abb43b",
+      "exact_icpns": ["STM32F058C8U6"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "db3b1a6a1fe1920df408294e00ff5fcc4aca1862db865a303a72b77609824ce0",
+      "retrieved_at_utc": "2026-09-09T05:43:18Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f058c8.html",
+      "subfamily": "STM32F058"
+    },
+    {
+      "base_device": "STM32F070C6",
+      "evidence_section_sha256": "41738f5455d9340ffd531d3701aacc0c9dd357112fa709fc45257a7061708a9a",
+      "exact_icpns": ["STM32F070C6T6", "STM32F070C6T6TR"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "f04fc7ebca079357160b773e31d89af8588cbc96a7c21c9bec2fa1f29422247e",
+      "retrieved_at_utc": "2026-09-09T05:43:23Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f070c6.html",
+      "subfamily": "STM32F070"
+    },
+    {
+      "base_device": "STM32F071C8",
+      "evidence_section_sha256": "49139af97a3a6a291ee4b3f6927340d3c034a69407724eb3c0af995d9fc026b9",
+      "exact_icpns": ["STM32F071C8T6", "STM32F071C8T6TR", "STM32F071C8U6", "STM32F071C8U7", "STM32F071C8U7TR"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "f48207083dbeba05aaf672d64a88a6e57d02cbe53efe731a56b2256557d7bcd7",
+      "retrieved_at_utc": "2026-09-09T05:51:03Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f071c8.html",
+      "subfamily": "STM32F071"
+    },
+    {
+      "base_device": "STM32F072C8",
+      "evidence_section_sha256": "d5432e87eec6714257290a34162578f2d61a7290c5d72bee68f424a5a622ab06",
+      "exact_icpns": ["STM32F072C8T6", "STM32F072C8T6TR", "STM32F072C8T7", "STM32F072C8U6", "STM32F072C8U6TR", "STM32F072C8U7"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "d8cc6171bb3192872a560c5bb958caa4c29aa208901d787fb18d19528822bf06",
+      "retrieved_at_utc": "2026-09-09T05:58:42Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f072c8.html",
+      "subfamily": "STM32F072"
+    },
+    {
+      "base_device": "STM32F078CB",
+      "evidence_section_sha256": "1b78b545a312efbd49b2165108e45cff92bd371f3929c66af9d0432c54bfcbcc",
+      "exact_icpns": ["STM32F078CBT6", "STM32F078CBU6", "STM32F078CBU6TR", "STM32F078CBY6TR"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "735183689f79ccbd08cf424b8a4324f114a0a8714c85bb79adcf98f78a53da88",
+      "retrieved_at_utc": "2026-09-09T05:58:48Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f078cb.html",
+      "subfamily": "STM32F078"
+    },
+    {
+      "base_device": "STM32F091CB",
+      "evidence_section_sha256": "a5fd3fd409571d254b7f63443d359ff54d4604abe92a05d045d539d3109dcbd4",
+      "exact_icpns": ["STM32F091CBT6", "STM32F091CBT6TR", "STM32F091CBT7", "STM32F091CBT7TR", "STM32F091CBU6", "STM32F091CBU6TR"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "62d12dac8943881115f8624c17043c4677e7b3c91688c61500e743da8e5fe2e9",
+      "retrieved_at_utc": "2026-09-09T05:58:55Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f091cb.html",
+      "subfamily": "STM32F091"
+    },
+    {
+      "base_device": "STM32F098CC",
+      "evidence_section_sha256": "8aaec014409c27338c36bba877f06b7b640e214dd03dc4397947cbd14c231eea",
+      "exact_icpns": ["STM32F098CCT6", "STM32F098CCT7", "STM32F098CCU6", "STM32F098CCU6TR"],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": ["tcl/target/stm32f0x.cfg"],
+      "rendered_dom_sha256": "d3ecb9f06929ff0f9f9f4e3f59894a0deddd08cf4ae7dd8ca939f78184cf986c",
+      "retrieved_at_utc": "2026-09-09T05:59:00Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32f098cc.html",
+      "subfamily": "STM32F098"
+    }
+  ]
+}
