@@ -1,0 +1,96 @@
+{
+  "adapter_id": "stm32f3-phase4.4c",
+  "base_devices": [
+    "STM32F301C6",
+    "STM32F302C6",
+    "STM32F303C6",
+    "STM32F318C8",
+    "STM32F334C4",
+    "STM32F373C8"
+  ],
+  "candidate_count": 10,
+  "conflicts": 0,
+  "decision_counts": {
+    "admit": 10,
+    "already_present": 0,
+    "manual_review_required": 0,
+    "reject": 0
+  },
+  "evidence_id": "stm32f3-phase4.4b-official-st-discovery-2026-09-08-retained-20260908T083224Z-0ac86cbf",
+  "exact_icpn_admission_deferred": true,
+  "fail_closed": true,
+  "family": "STM32F3",
+  "full_stm32f3_surface_covered": false,
+  "metadata_contract": {
+    "allowed_option_suffixes": [
+      "",
+      "TR"
+    ],
+    "flash_by_code": {
+      "4": "16 KiB",
+      "6": "32 KiB",
+      "8": "64 KiB"
+    },
+    "openocd_target_config": "tcl/target/stm32f3x.cfg",
+    "package_by_code": {
+      "T": "LQFP",
+      "Y": "WLCSP"
+    },
+    "pins_by_combination": {
+      "C/T": "48",
+      "C/Y": "49"
+    },
+    "temperature_by_code": {
+      "6": "-40 to 85 C",
+      "7": "-40 to 105 C"
+    }
+  },
+  "phase": "4.4C",
+  "policy_evidence": {
+    "semantic_decisions": {
+      "4_flash": "16 KiB",
+      "6_flash": "32 KiB",
+      "8_flash": "64 KiB",
+      "C/T": "48",
+      "C/Y": "49",
+      "T_package": "LQFP",
+      "Y_package": "WLCSP",
+      "lifecycle_authority": "retained Phase 4.4B dual-surface official ST evidence",
+      "metadata_authority": "official ST datasheet ordering-information tables",
+      "pin_count": "actual package pin or ball count"
+    },
+    "stm32f301_ordering_information": "https://www.st.com/resource/en/datasheet/stm32f301c6.pdf",
+    "stm32f302_ordering_information": "https://www.st.com/resource/en/datasheet/stm32f302c6.pdf",
+    "stm32f303_ordering_information": "https://www.st.com/resource/en/datasheet/stm32f303r8.pdf",
+    "stm32f318_ordering_information": "https://www.st.com/resource/en/datasheet/stm32f318c8.pdf",
+    "stm32f334_ordering_information": "https://www.st.com/resource/en/datasheet/stm32f334c4.pdf",
+    "stm32f373_ordering_information": "https://www.st.com/resource/en/datasheet/stm32f373c8.pdf"
+  },
+  "policy_ready_exact_icpns": [
+    "STM32F301C6T6",
+    "STM32F301C6T6TR",
+    "STM32F301C6T7",
+    "STM32F302C6T6",
+    "STM32F303C6T6",
+    "STM32F318C8T6",
+    "STM32F318C8Y6TR",
+    "STM32F334C4T6",
+    "STM32F373C8T6",
+    "STM32F373C8T6TR"
+  ],
+  "production_snapshot": {
+    "base_device_count": 169,
+    "exact_icpn_count": 492,
+    "family_exact_icpn_counts": {
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F4": 384
+    },
+    "stm32f3_exact_icpn_count": 0
+  },
+  "production_write_applied": false,
+  "programming_algorithm_equivalence_claimed": false,
+  "retained_evidence_directory": "stm32f3-phase4.4b-official-st-discovery-live-2026-09-08",
+  "runtime_support_claimed": false,
+  "schema_version": 1
+}
