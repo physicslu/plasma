@@ -1,0 +1,90 @@
+name: STM32F0 Phase 4.5D publication proposal one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32f0-phase45d-publication
+    paths:
+      - ".github/workflows/device-catalog-stm32f0-phase45d-publication-proposal-oneoff.yml"
+      - "data/device-catalog/research/stm32f0-phase4.5d-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32f0_admission_policy.py"
+      - "data/device-catalog/research/stm32f0_phase4_5d_admission.py"
+      - "data/device-catalog/research/stm32f0_phase4_5c_policy.py"
+      - "data/device-catalog/research/stm32f0-phase4.5c-policy-baseline.json"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+
+permissions:
+  contents: read
+
+jobs:
+  propose-publication:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate historical plan and canonical candidate
+        env:
+          PYTHONPATH: data/device-catalog/research
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          from pathlib import Path
+
+          from device_catalog_admission_framework import write_canonical_dataset
+          from stm32f0_admission_policy import CANONICAL_FIELDS
+          from stm32f0_phase4_5d_admission import admission_plan_is_clean, build_admission_plan
+
+          out = Path('/tmp/stm32f0-phase4.5d-publication')
+          out.mkdir(parents=True, exist_ok=True)
+          canonical = out / 'stm32f0-commercial-icpn.csv'
+          prestate = Path('data/device-catalog/research/stm32f0-phase4.5d-production-manifest-prestate.json')
+
+          plan = build_admission_plan(
+              canonical_path=canonical,
+              production_manifest_path=prestate,
+          )
+          if not admission_plan_is_clean(plan):
+              raise SystemExit('admission plan is not clean')
+          plan_payload = json.dumps(plan, indent=2, sort_keys=True) + '\n'
+          (out / 'admission-plan.json').write_text(plan_payload, encoding='utf-8')
+
+          with canonical.open('w', newline='', encoding='utf-8') as handle:
+              csv.DictWriter(handle, fieldnames=CANONICAL_FIELDS, lineterminator='\n').writeheader()
+          first = write_canonical_dataset(plan=plan, canonical_path=canonical)
+          second = write_canonical_dataset(plan=plan, canonical_path=canonical)
+          if first.get('status') != 'written' or first.get('rows_after') != 42:
+              raise SystemExit(f'unexpected first writer result: {first}')
+          if second.get('status') != 'no_op':
+              raise SystemExit(f'writer is not idempotent: {second}')
+
+          canonical_bytes = canonical.read_bytes()
+          report = {
+              'schema_version': 1,
+              'phase': '4.5D',
+              'status': 'proposal_clean',
+              'candidate_count': plan['candidate_count'],
+              'decision_counts': plan['decision_counts'],
+              'production_snapshot': plan['production_snapshot'],
+              'admission_plan_sha256': hashlib.sha256(plan_payload.encode()).hexdigest(),
+              'canonical_csv_sha256': hashlib.sha256(canonical_bytes).hexdigest(),
+              'canonical_rows': first['rows_after'],
+              'writer_first': first,
+              'writer_second': second,
+              'canonical_write_applied_to_repo': False,
+              'production_write_applied': False,
+          }
+          (out / 'proposal-report.json').write_text(
+              json.dumps(report, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Upload proposal artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32f0-phase4.5d-publication-proposal
+          path: /tmp/stm32f0-phase4.5d-publication
+          if-no-files-found: error
