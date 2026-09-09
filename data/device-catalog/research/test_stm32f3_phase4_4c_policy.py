@@ -15,6 +15,7 @@ from stm32f3_phase4_4c_policy import (
     metadata_contract,
     policy_plan_is_clean,
     policy_summary,
+    validate_policy,
 )
 
 EXPECTED_ROWS = {
@@ -129,6 +130,11 @@ class STM32F3Phase44CPolicyTests(unittest.TestCase):
         self.assertFalse(summary["runtime_support_claimed"])
         self.assertFalse(summary["full_stm32f3_surface_covered"])
         self.assertTrue(summary["fail_closed"])
+
+    def test_checked_in_policy_baseline_replays_exactly(self) -> None:
+        plan, summary = validate_policy()
+        self.assertTrue(policy_plan_is_clean(plan))
+        self.assertEqual(summary, policy_summary(plan))
 
 
 if __name__ == "__main__":
