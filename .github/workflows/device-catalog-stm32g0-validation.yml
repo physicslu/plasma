@@ -5,18 +5,22 @@ on:
     branches:
       - main
     paths:
-      - "data/device-catalog/research/stm32g0_foundation.py"
+      - "data/device-catalog/research/stm32g0_*.py"
       - "data/device-catalog/research/stm32g0-phase4.8a-foundation-baseline.json"
-      - "data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py"
+      - "data/device-catalog/research/stm32g0-phase4.8b-*.json"
+      - "data/device-catalog/research/evidence/stm32g0-phase4.8b-*/**"
       - "data/device-catalog/research/device-catalog-phase4.8a-stm32g0-foundation.md"
+      - "data/device-catalog/research/device-catalog-phase4.8b-stm32g0-discovery.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - ".github/workflows/device-catalog-stm32g0-validation.yml"
   pull_request:
     paths:
-      - "data/device-catalog/research/stm32g0_foundation.py"
+      - "data/device-catalog/research/stm32g0_*.py"
       - "data/device-catalog/research/stm32g0-phase4.8a-foundation-baseline.json"
-      - "data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py"
+      - "data/device-catalog/research/stm32g0-phase4.8b-*.json"
+      - "data/device-catalog/research/evidence/stm32g0-phase4.8b-*/**"
       - "data/device-catalog/research/device-catalog-phase4.8a-stm32g0-foundation.md"
+      - "data/device-catalog/research/device-catalog-phase4.8b-stm32g0-discovery.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - ".github/workflows/device-catalog-stm32g0-validation.yml"
 
@@ -38,3 +42,11 @@ jobs:
           python-version: '3.12'
       - name: Validate Phase 4.8A STM32G0 source surface and deterministic targets
         run: python data/device-catalog/research/test_stm32g0_phase4_8a_foundation.py
+      - name: Validate STM32G0 dual-surface identity/lifecycle evidence
+        run: python data/device-catalog/research/test_stm32g0_dual_surface_evidence.py
+      - name: Validate Phase 4.8B bounded discovery and identity/routing separation
+        run: python data/device-catalog/research/test_stm32g0_phase4_8b_discovery.py
+      - name: Lock Phase 4.8B live evidence execution contract
+        run: python data/device-catalog/research/test_stm32g0_phase4_8b_live_evidence_contract.py
+      - name: Validate retained Phase 4.8B evidence and semantic replay
+        run: python data/device-catalog/research/validate_stm32g0_phase4_8b_retained_evidence.py

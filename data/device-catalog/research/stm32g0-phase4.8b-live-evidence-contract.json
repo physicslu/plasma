@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "phase": "4.8B",
+  "family": "STM32G0",
+  "workflow_run_id": 34369661142,
+  "executed_git_sha": "233e9300bfac96f868e4d4c372246a3e02ff541b",
+  "artifact_id": 10111790513,
+  "artifact_zip_sha256": "2d261efb10ec0840208337edf8a3d2ebd1d0dc3aeb5effd78af735dd30dac36f",
+  "live_summary_sha256": "9b7cd31d1b0b37cb2960f34edef980159133028c0df9916909be8a0833eaf50d",
+  "playwright_version": "1.62.0",
+  "chromium_version": "151.0.7922.34",
+  "evidence_profile": "stm32g0_dual_surface_v1",
+  "acquisition_time_utc": {
+    "first": "2026-09-09T15:22:04Z",
+    "last": "2026-09-09T15:31:14Z"
+  },
+  "aggregate": {
+    "targets": 12,
+    "active_target_groups": 12,
+    "active_exact_icpns": 49,
+    "proposal_exclusions": 3,
+    "source_unavailable": 0,
+    "manual_review": 0,
+    "routing_unique_target_groups": 11,
+    "routing_unmapped_target_groups": 1
+  },
+  "claims": {
+    "canonical_dataset_admission": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "phase": "4.8B",
+  "manufacturer_identity_authority": "official_st_dual_surface_browser_evidence",
+  "openocd_authority": "routing_only",
+  "cmsis_alias_authority": "routing_name_only",
+  "metadata_policy_defined": false,
+  "canonical_admission_authorized": false,
+  "production_write_authorized": false,
+  "programming_policy_defined": false,
+  "hil_qualified": false,
+  "runtime_support_claimed": false
+}

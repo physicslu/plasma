@@ -1,0 +1,9 @@
+{
+  "evidence_id": "stm32g0-phase4.8b-official-st-discovery-2026-09-09-retained-20260909T153114Z-233e9300",
+  "files": {
+    "README.md": "3516787d74eee506e2bb500b37edde44cbded179b96b6f1fa853a4fd17d74933",
+    "pilot-summary.json": "061922f1a1af9a71a0614dc4f19c9f56c6823503b20d076ab0f6d4a742e45594",
+    "provenance.json": "b5ea18c91af8b8166901bd44879944cb95e0f8cfe22712c757c6991dceb692c8"
+  },
+  "schema_version": 1
+}
