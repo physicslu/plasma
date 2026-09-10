@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/admission/manufacturer-evidence-ref-v1",
+  "title": "Manufacturer evidence reference v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_lock_id", "source_id", "source_digest", "authority", "locator"],
+  "properties": {
+    "source_lock_id": {"type": "string", "minLength": 1},
+    "source_id": {"type": "string", "minLength": 1},
+    "source_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "authority": {"type": "string", "minLength": 1},
+    "locator": {"type": "string", "minLength": 1},
+    "page": {"type": ["integer", "string"]},
+    "section": {"type": ["integer", "string"]},
+    "table": {"type": ["integer", "string"]}
+  }
+}

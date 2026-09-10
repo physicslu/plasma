@@ -1,0 +1,308 @@
+{
+  "by_series": {
+    "STM32C0": {
+      "active_candidate_targets": 6,
+      "active_exact_icpns": 21,
+      "attempted_targets": 6,
+      "commercial_identity_access_clean": true,
+      "disposition_fraction": 1.0,
+      "dispositioned_targets": 6,
+      "excluded_non_active_part_numbers": 0,
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 0,
+      "source_unavailable_404": 0,
+      "verified_identity_fraction": 1.0,
+      "verified_identity_targets": 6
+    },
+    "STM32L1": {
+      "active_candidate_targets": 1,
+      "active_exact_icpns": 1,
+      "attempted_targets": 4,
+      "commercial_identity_access_clean": true,
+      "disposition_fraction": 1.0,
+      "dispositioned_targets": 4,
+      "excluded_non_active_part_numbers": 8,
+      "lifecycle_excluded_targets": 3,
+      "manual_review": 0,
+      "source_unavailable_404": 0,
+      "verified_identity_fraction": 1.0,
+      "verified_identity_targets": 4
+    },
+    "STM32U0": {
+      "active_candidate_targets": 3,
+      "active_exact_icpns": 8,
+      "attempted_targets": 3,
+      "commercial_identity_access_clean": true,
+      "disposition_fraction": 1.0,
+      "dispositioned_targets": 3,
+      "excluded_non_active_part_numbers": 0,
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 0,
+      "source_unavailable_404": 0,
+      "verified_identity_fraction": 1.0,
+      "verified_identity_targets": 3
+    }
+  },
+  "claims": {
+    "cmsis_alias_is_commercial_identity": false,
+    "commercial_identity_asserted_for_unverified_targets": false,
+    "manufacturer_evidence_probe_is_admission": false,
+    "openocd_is_commercial_identity_authority": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false,
+    "selected_next_research_family": false
+  },
+  "pilot_id": "stm32-u0-c0-l1-official-st-evidence-accessibility-2026-09-10",
+  "probe_id": "stm32-cross-family-official-st-evidence-accessibility-probe-v1",
+  "schema_version": 1,
+  "selected_next_research_family": null,
+  "source_unavailable": [],
+  "targets": [
+    {
+      "base_device": "STM32U031C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "4abe69f440e043ca31fd8aeb67ca1329ed67abf9e18afa00d2786c4eee6c887d",
+      "exact_icpns": [
+        "STM32U031C6T6",
+        "STM32U031C6U6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "58b9bb5c4674ba3961117400b0b462816a9cf42e8c95363d97edcc4ca9c09a33",
+      "retrieved_at_utc": "2026-09-10T04:19:02Z",
+      "series": "STM32U0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u031c6.html",
+      "subfamily": "STM32U031"
+    },
+    {
+      "base_device": "STM32U073C8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "4f310c6e5e81af86797b6c2891d761dfefd9eeb4a4507664b9a72bf5ae3b6a00",
+      "exact_icpns": [
+        "STM32U073C8T6",
+        "STM32U073C8U6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "834b94c103574c6e9032f82afdf3157559fc061a24fd26bffd4f1cfa6d579dae",
+      "retrieved_at_utc": "2026-09-10T04:19:08Z",
+      "series": "STM32U0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u073c8.html",
+      "subfamily": "STM32U073"
+    },
+    {
+      "base_device": "STM32U083CC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "93ab4eaeda72d86949209d034a4c5f83c474a9e7cc5eb10c00bef79b10aedfac",
+      "exact_icpns": [
+        "STM32U083CCT6",
+        "STM32U083CCT6TR",
+        "STM32U083CCU6",
+        "STM32U083CCU6TR"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "e3247bbbfae12ea10d01e5d3d8d38fd49cf9d3436d92e2c824895ec489cb211a",
+      "retrieved_at_utc": "2026-09-10T04:19:14Z",
+      "series": "STM32U0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32u083cc.html",
+      "subfamily": "STM32U083"
+    },
+    {
+      "base_device": "STM32C011F4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "8b285e44ebc4001e647ddfc8b21c1eb4775c72abe065c06f2a6d2035e7fc52a4",
+      "exact_icpns": [
+        "STM32C011F4P6",
+        "STM32C011F4P7",
+        "STM32C011F4P7TR",
+        "STM32C011F4U3TR",
+        "STM32C011F4U6TR"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "0d493440522d2cab70dc06b8fa685d1682b15891e1daf93ecc6339e2ea5638fb",
+      "retrieved_at_utc": "2026-09-10T04:19:21Z",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f4.html",
+      "subfamily": "STM32C011"
+    },
+    {
+      "base_device": "STM32C031C4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "ae4857a5fd742b09840a2ce1640e3c700c19c3a8cd156f1a80714c5f79d31015",
+      "exact_icpns": [
+        "STM32C031C4T6",
+        "STM32C031C4T6TR",
+        "STM32C031C4U6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "a19dced9e68e26b9733158b65d513c86b18fa21e536367e5f82ef3b0e0a44c6e",
+      "retrieved_at_utc": "2026-09-10T04:19:29Z",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031c4.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "base_device": "STM32C051C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "8a2bb3d236186527c61857de43d4b89ad9d8eeb5acd02eeed9197e3074dca5af",
+      "exact_icpns": [
+        "STM32C051C6T6",
+        "STM32C051C6U6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "7f3deb409df153fad65e58ece6428298fe0667bac13684b6000f5106975f4616",
+      "retrieved_at_utc": "2026-09-10T04:19:42Z",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051c6.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "base_device": "STM32C071C8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "9752d86f2da3cc74c456f2eff006f0b7337f4e657f5834dc281c8a76fb7d3546",
+      "exact_icpns": [
+        "STM32C071C8T3",
+        "STM32C071C8T3TR",
+        "STM32C071C8T6",
+        "STM32C071C8T6N",
+        "STM32C071C8T6TR",
+        "STM32C071C8U6",
+        "STM32C071C8U6N"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "ec18589e8ce644a1cb38889e8df2f8d7b92a1cb2210eabf4e7d57bb6a7dbb787",
+      "retrieved_at_utc": "2026-09-10T04:19:51Z",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071c8.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "base_device": "STM32C091CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "c0ecc4e81bfcd24be6f535cdf9c71a7d437e11aa5ce4ae46c47a27076ab8c180",
+      "exact_icpns": [
+        "STM32C091CBT6",
+        "STM32C091CBU6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "b46a1409e736c5c004d8c97a823cbb506601ee72519743a4307f2b358cf69a20",
+      "retrieved_at_utc": "2026-09-10T04:19:57Z",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cb.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "base_device": "STM32C092CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "bb0e138468de3311e9d05f688a7ad29c2cee974563f0c5114ce5661661beed00",
+      "exact_icpns": [
+        "STM32C092CBT6",
+        "STM32C092CBU6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "14bcdb636d4ca30c63b66b41613fcdbeb3be3aff7eb3d122528410c104eda96e",
+      "retrieved_at_utc": "2026-09-10T04:20:03Z",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cb.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "base_device": "STM32L100C6",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence_section_sha256": "98b46845979b8e64b280be4fcd8e288a4c0884b7a291890723b6bfa6acb53484",
+      "exact_icpns": [],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32L100C6U6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        },
+        {
+          "icpn": "STM32L100C6U6TR",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ],
+      "rendered_dom_sha256": "03ab7bfff76887016a9e9a1c76d355f2b3f2e68ac84dcc1350ca185c193d5951",
+      "retrieved_at_utc": "2026-09-10T04:20:09Z",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l100c6.html",
+      "subfamily": "STM32L100"
+    },
+    {
+      "base_device": "STM32L151C6",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence_section_sha256": "435ff67c9ad8f1f9c91c31b90758f471e4df7e168e17f39c7ceb8b67d6ed510d",
+      "exact_icpns": [],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32L151C6T6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        },
+        {
+          "icpn": "STM32L151C6T6TR",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        },
+        {
+          "icpn": "STM32L151C6U6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        },
+        {
+          "icpn": "STM32L151C6U6TR",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ],
+      "rendered_dom_sha256": "7e5e6f017fe7cb24b343618295de6de7a1ff98a6ea981baf7275ab65ae7fdb5a",
+      "retrieved_at_utc": "2026-09-10T04:20:15Z",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l151c6.html",
+      "subfamily": "STM32L151"
+    },
+    {
+      "base_device": "STM32L152C6",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence_section_sha256": "c2b90c5a9f351e80e2a7c5ae5b0fd779fe394ed703beedf5807b57ec8febb8df",
+      "exact_icpns": [],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32L152C6T6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        },
+        {
+          "icpn": "STM32L152C6U6",
+          "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+        }
+      ],
+      "rendered_dom_sha256": "03ae2173b95c3bf89e851e9f1c06177eb79ee38bf1e204828b53b360ad1b8a4f",
+      "retrieved_at_utc": "2026-09-10T04:20:21Z",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l152c6.html",
+      "subfamily": "STM32L152"
+    },
+    {
+      "base_device": "STM32L162QC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "bd19895fbf17868f0193f5e01f976b1c2c7e84636a017bd4888f96f20a738d11",
+      "exact_icpns": [
+        "STM32L162QCH6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "rendered_dom_sha256": "c3a1d5d072966494a5d6e57b833ef14b61e938df4c6edffafc8a80b086f846b6",
+      "retrieved_at_utc": "2026-09-10T04:20:26Z",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l162qc.html",
+      "subfamily": "STM32L162"
+    }
+  ]
+}

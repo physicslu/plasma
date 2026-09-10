@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/admission/candidate-review-v1",
+  "title": "Candidate manufacturer review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "artifact_id", "artifact_type", "disposition", "candidate_reviews", "artifact_digest"],
+  "properties": {
+    "schema_id": {"const": "plasma://ic-support/admission/candidate-review-v1"},
+    "schema_version": {"const": "1.0.0"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "artifact_type": {"const": "candidate_manufacturer_review"},
+    "disposition": {"$ref": "artifact-ref-v1.schema.json"},
+    "candidate_reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidate", "evidence", "review_status", "dimensions"],
+        "properties": {
+          "candidate": {"$ref": "artifact-ref-v1.schema.json"},
+          "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "manufacturer-evidence-ref-v1.schema.json"}},
+          "review_status": {"type": "string", "minLength": 1},
+          "dimensions": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string", "minLength": 1}}
+        }
+      }
+    },
+    "artifact_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

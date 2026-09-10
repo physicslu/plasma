@@ -1,0 +1,36 @@
+name: Device catalog production documentation contract
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/production/README.md"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/production/validate_readme_contract.py"
+      - ".github/workflows/device-catalog-production-doc-contract.yml"
+  pull_request:
+    paths:
+      - "data/device-catalog/production/README.md"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - "data/device-catalog/production/validate_readme_contract.py"
+      - ".github/workflows/device-catalog-production-doc-contract.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-production-documentation-contract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Enforce Production manifest single-source contract
+        run: python data/device-catalog/production/validate_readme_contract.py

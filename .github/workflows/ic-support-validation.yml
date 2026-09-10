@@ -41,6 +41,15 @@ jobs:
         run: python data/ic-support/semantic_validate.py
       - name: Run IC Support semantic-validator regression
         run: python data/ic-support/test_semantic_validate.py
+      - name: Validate vendor-neutral admission governance
+        env:
+          ADMISSION_BASE_REF: origin/main
+        run: |
+          python -m py_compile \
+            data/ic-support/admission/digest.py \
+            data/ic-support/admission/validate.py \
+            data/ic-support/tests/test_vendor_neutral_admission.py
+          python data/ic-support/tests/test_vendor_neutral_admission.py
       - name: Validate Programming Execution IR research contract
         run: python data/ic-support/execution-ir/validate.py
       - name: Run Programming Execution IR research regressions

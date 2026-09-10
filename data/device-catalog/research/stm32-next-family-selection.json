@@ -1,0 +1,63 @@
+{
+  "authority_boundaries": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "candidate_evidence": {
+    "STM32C0": {
+      "active_exact_icpns_observed": 21,
+      "active_representative_targets": 6,
+      "blocking_evidence_issues": 0,
+      "evidence_quality": "complete",
+      "identity_lifecycle_access_clean": true,
+      "ordering_authority_covered_targets": 6,
+      "ordering_schema_complete_targets": 6,
+      "representative_targets": 6
+    },
+    "STM32L1": {
+      "active_representative_targets": 1,
+      "disposition": "deprioritized_for_next_family_research_due_to_lifecycle",
+      "identity_lifecycle_access_clean": true,
+      "lifecycle_only_representative_targets": 3,
+      "rejected_for_future_support": false,
+      "representative_targets": 4
+    },
+    "STM32U0": {
+      "active_exact_icpns_observed": 8,
+      "active_representative_targets": 3,
+      "blocking_evidence_issues": 0,
+      "evidence_quality": "complete",
+      "identity_lifecycle_access_clean": true,
+      "ordering_authority_covered_targets": 3,
+      "ordering_schema_complete_targets": 3,
+      "representative_targets": 3
+    }
+  },
+  "decision": {
+    "evidence_quality_comparison": "STM32U0_equals_STM32C0",
+    "frozen_shortlist": [
+      "STM32U0",
+      "STM32C0",
+      "STM32L1"
+    ],
+    "selected_next_research_family": "STM32U0",
+    "selection_reason": "U0 and C0 have equivalent required manufacturer evidence quality; the frozen cross-family prioritization therefore selects the earlier shortlist member, STM32U0, which also has the smaller bounded research surface.",
+    "selection_scope": "next_family_research_only",
+    "tie_break_policy": "frozen_cross_family_prioritization_order"
+  },
+  "decision_date": "2026-09-10",
+  "inputs": {
+    "cross_family_prioritization_sha256": "9a99865865f048e6a7636efd82cb17958fdc593240a329e18e3b68d8b0f862f9",
+    "identity_lifecycle_accessibility_baseline_sha256": "473e979818770fda2661e963d064f3a0cfbd7cbcad920203e7f358b5b6e140b6",
+    "ordering_information_review_sha256": "3fe019d420cbe43c732b9d403acaa2f1b0bf0dc583b38073eb25528217f5efe9",
+    "production_prestate_sha256": "93c2a4541daeb1d4aa1dcc57edef54042862eb6d9da03e3a6b401e4b8481b11d"
+  },
+  "schema_version": 1,
+  "selection_id": "stm32-next-family-evidence-quality-selection-v1"
+}
