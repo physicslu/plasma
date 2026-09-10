@@ -8,8 +8,9 @@ from pathlib import Path
 import pytest
 
 
-ROOT = Path(__file__).resolve().parents[2]
-MAKEFILE = ROOT / "verification" / "cocotb" / "pl_loopback" / "Makefile"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PL_ROOT = Path(__file__).resolve().parents[1]
+MAKEFILE = PL_ROOT / "verification" / "cocotb" / "pl_loopback" / "Makefile"
 
 
 def test_pl_loopback_axi_lite_cocotb_regression() -> None:
@@ -20,7 +21,7 @@ def test_pl_loopback_axi_lite_cocotb_regression() -> None:
 
     completed = subprocess.run(
         ["make", "-f", str(MAKEFILE), "SIM=icarus"],
-        cwd=ROOT,
+        cwd=REPO_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
