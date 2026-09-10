@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "probe_id": "stm32-cross-family-official-st-evidence-accessibility-probe-v1",
+  "pilot_id": "stm32-u0-c0-l1-official-st-evidence-accessibility-2026-09-10",
+  "targets": [
+    {"series":"STM32U0","subfamily":"STM32U031","base_device":"STM32U031C6","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32u031c6.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32U031 OpenOCD ordering-pattern surface"},
+    {"series":"STM32U0","subfamily":"STM32U073","base_device":"STM32U073C8","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32u073c8.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32U073 OpenOCD ordering-pattern surface"},
+    {"series":"STM32U0","subfamily":"STM32U083","base_device":"STM32U083CC","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32u083cc.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32U083 OpenOCD ordering-pattern surface"},
+    {"series":"STM32C0","subfamily":"STM32C011","base_device":"STM32C011F4","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c011f4.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32C011 OpenOCD ordering-pattern surface"},
+    {"series":"STM32C0","subfamily":"STM32C031","base_device":"STM32C031C4","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c031c4.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32C031 OpenOCD ordering-pattern surface"},
+    {"series":"STM32C0","subfamily":"STM32C051","base_device":"STM32C051C6","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c051c6.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32C051 OpenOCD ordering-pattern surface"},
+    {"series":"STM32C0","subfamily":"STM32C071","base_device":"STM32C071C8","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c071c8.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32C071 OpenOCD ordering-pattern surface"},
+    {"series":"STM32C0","subfamily":"STM32C091","base_device":"STM32C091CB","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c091cb.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32C091 OpenOCD ordering-pattern surface"},
+    {"series":"STM32C0","subfamily":"STM32C092","base_device":"STM32C092CB","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c092cb.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32C092 OpenOCD ordering-pattern surface"},
+    {"series":"STM32L1","subfamily":"STM32L100","base_device":"STM32L100C6","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32l100c6.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32L100 OpenOCD ordering-pattern surface"},
+    {"series":"STM32L1","subfamily":"STM32L151","base_device":"STM32L151C6","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32l151c6.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32L151 OpenOCD ordering-pattern surface"},
+    {"series":"STM32L1","subfamily":"STM32L152","base_device":"STM32L152C6","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32l152c6.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32L152 OpenOCD ordering-pattern surface"},
+    {"series":"STM32L1","subfamily":"STM32L162","base_device":"STM32L162QC","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32l162qc.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32L162 OpenOCD ordering-pattern surface"}
+  ]
+}
