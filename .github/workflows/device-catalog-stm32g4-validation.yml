@@ -7,7 +7,11 @@ on:
     paths:
       - "data/device-catalog/research/stm32g4_*.py"
       - "data/device-catalog/research/stm32g4-phase4.9a-foundation-baseline.json"
+      - "data/device-catalog/research/stm32g4-phase4.9b-discovery-manifest.json"
+      - "data/device-catalog/research/stm32g4-phase4.9b-discovery-baseline.json"
+      - "data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/**"
       - "data/device-catalog/research/device-catalog-phase4.9a-stm32g4-foundation.md"
+      - "data/device-catalog/research/device-catalog-phase4.9b-stm32g4-discovery.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32g4-validation.yml"
@@ -15,7 +19,11 @@ on:
     paths:
       - "data/device-catalog/research/stm32g4_*.py"
       - "data/device-catalog/research/stm32g4-phase4.9a-foundation-baseline.json"
+      - "data/device-catalog/research/stm32g4-phase4.9b-discovery-manifest.json"
+      - "data/device-catalog/research/stm32g4-phase4.9b-discovery-baseline.json"
+      - "data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/**"
       - "data/device-catalog/research/device-catalog-phase4.9a-stm32g4-foundation.md"
+      - "data/device-catalog/research/device-catalog-phase4.9b-stm32g4-discovery.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32g4-validation.yml"
@@ -38,3 +46,10 @@ jobs:
           python-version: '3.12'
       - name: Validate Phase 4.9A STM32G4 source surface and deterministic targets
         run: python data/device-catalog/research/test_stm32g4_phase4_9a_foundation.py
+      - name: Validate STM32G4 dual-surface identity/lifecycle evidence
+        run: python data/device-catalog/research/test_stm32g4_dual_surface_evidence.py
+      - name: Validate Phase 4.9B bounded discovery and identity/capability separation
+        run: python data/device-catalog/research/test_stm32g4_phase4_9b_discovery.py
+      - name: Validate retained Phase 4.9B evidence and semantic replay
+        if: ${{ hashFiles('data/device-catalog/research/validate_stm32g4_phase4_9b_retained_evidence.py') != '' }}
+        run: python data/device-catalog/research/validate_stm32g4_phase4_9b_retained_evidence.py
