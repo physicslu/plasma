@@ -48,6 +48,14 @@ jobs:
             --output .artifacts/stm32u0-u02/live-summary.json \
             --evidence-dir .artifacts/stm32u0-u02/evidence
 
+      - name: Validate U0.1 representative continuity and U0.2 live summary
+        id: validate
+        if: always() && hashFiles('.artifacts/stm32u0-u02/live-summary.json') != ''
+        continue-on-error: true
+        run: |
+          python data/device-catalog/research/validate_stm32u0_phase_u0_2_live_summary.py \
+            .artifacts/stm32u0-u02/live-summary.json
+
       - name: Record execution provenance
         if: always() && hashFiles('.artifacts/stm32u0-u02/live-summary.json') != ''
         run: |
@@ -70,6 +78,7 @@ jobs:
               'acquisition_failure': summary.get('acquisition_failure'),
               'active_exact_icpn_candidates': summary.get('active_exact_icpn_candidates'),
               'bounded_discovery_clean': summary.get('bounded_discovery_clean'),
+              'u0_1_representative_validation': '${{ steps.validate.outcome }}',
               'canonical_admission_authorized': False,
               'production_write_authorized': False,
               'runtime_programming_support_claimed': False,
@@ -95,5 +104,9 @@ jobs:
         run: |
           if [ "${{ steps.acquire.outcome }}" != "success" ]; then
             echo "STM32U0 U0.2 live acquisition requires review; inspect the retained workflow artifact." >&2
+            exit 1
+          fi
+          if [ "${{ steps.validate.outcome }}" != "success" ]; then
+            echo "STM32U0 U0.2 live evidence failed U0.1 representative continuity or summary validation." >&2
             exit 1
           fi
