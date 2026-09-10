@@ -17,7 +17,7 @@ from .config import ManagerConfig, load_manager_config
 from .fleet import FleetAggregator
 from .network_commissioning import NetworkCommissioningCoordinator, NetworkCommissioningStore
 from .poller import FleetPoller
-from .registry import RegistryEntryNotFound
+from .registry import PPURegistryStore, RegistryEntryNotFound
 from .server import PlasmaManagerHTTPServer, PlasmaManagerHandler, _build_observation_store
 
 
@@ -95,7 +95,13 @@ class BootstrapPlasmaManagerHandler(PlasmaManagerHandler):
         if action:
             self._json(
                 HTTPStatus.NOT_FOUND,
-                {"ok": False, "error": {"code": "bootstrap_route_not_allowed", "message": "Bootstrap GET route is not allowlisted"}},
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "bootstrap_route_not_allowed",
+                        "message": "Bootstrap GET route is not allowlisted",
+                    },
+                },
             )
             return
         try:
@@ -118,7 +124,9 @@ class BootstrapPlasmaManagerHandler(PlasmaManagerHandler):
                 # Disable it first so credential rotation is an explicit
                 # maintenance transition. Pending first-install PPUs are allowed.
                 if self._registry_lifecycle(alias) == "commissioned":
-                    raise BootstrapManagerError("disable a commissioned PPU before changing its Bootstrap pairing")
+                    raise BootstrapManagerError(
+                        "disable a commissioned PPU before changing its Bootstrap pairing"
+                    )
                 self._json(HTTPStatus.OK, coordinator.pair(alias, body["token"]))
                 return
             if action == "uploads":
@@ -147,7 +155,13 @@ class BootstrapPlasmaManagerHandler(PlasmaManagerHandler):
             return
         self._json(
             HTTPStatus.NOT_FOUND,
-            {"ok": False, "error": {"code": "bootstrap_route_not_allowed", "message": "Bootstrap POST route is not allowlisted"}},
+            {
+                "ok": False,
+                "error": {
+                    "code": "bootstrap_route_not_allowed",
+                    "message": "Bootstrap POST route is not allowlisted",
+                },
+            },
         )
 
     def do_GET(self) -> None:  # noqa: N802
@@ -170,10 +184,7 @@ class BootstrapPlasmaManagerHandler(PlasmaManagerHandler):
 
 
 def serve(config: ManagerConfig) -> None:
-    registry = __import__("plasma_manager.registry", fromlist=["PPURegistryStore"]).PPURegistryStore(
-        config.ppus,
-        config.registry_state_path,
-    )
+    registry = PPURegistryStore(config.ppus, config.registry_state_path)
     commissioning_store = NetworkCommissioningStore(
         NetworkCommissioningCoordinator.state_path_for_registry(config.registry_state_path)
     )
