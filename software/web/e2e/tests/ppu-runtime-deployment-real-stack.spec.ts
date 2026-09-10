@@ -19,7 +19,8 @@ test("pending PPU installs Runtime through BFF -> Manager -> independent Bootstr
   await page.getByRole("button", { name: "Runtime 部署", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "Runtime Deployment", level: 2, exact: true })).toBeVisible();
-  const targetSelect = page.getByLabel("Manager Registry Alias", { exact: true });
+  const deploymentTarget = page.locator('section[aria-label="Deployment target"]');
+  const targetSelect = deploymentTarget.getByRole("combobox");
   await expect(targetSelect).toHaveValue("ppu-bootstrap");
   await expect(targetSelect.locator("option:checked")).toHaveText(/ppu-bootstrap — pending/);
   await expect(page.getByText("bootstrap ready", { exact: true })).toBeVisible();
