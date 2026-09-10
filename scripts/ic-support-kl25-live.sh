@@ -17,6 +17,9 @@ runs_dir="$bench_root/runs"
 legacy_run_dir="$bench_root/qwen-live"
 bounded_pre_ai_dir="$bench_root/pre-ai-boundary-v1"
 bounded_runs_dir="$bench_root/bounded-runs"
+bounded_primary_runs_dir="$bench_root/bounded-primary-runs"
+bounded_contract_path="$bench_dir/live-bounded-qualification-contract.json"
+bounded_primary_contract_path="$bench_dir/live-bounded-primary-qualification-contract.json"
 ollama_url="${PLASMA_OLLAMA_URL:-http://127.0.0.1:11434}"
 
 usage() {
@@ -34,7 +37,12 @@ Gate 5.7 bounded commands:
   bounded-build                Build corrected Gate 5.6 pre-AI workspace into a separate directory.
   bounded-status               Validate Gate 5.6 workspace, Gate 5.7 contract, and loopback model identity.
   bounded-run                  Execute one Gate 5.7 sequential 8-unit bounded experiment; no retries.
-  bounded-diagnose [run-dir]   Diagnose one retained bounded experiment read-only.
+  bounded-diagnose [run-dir]   Diagnose one retained Gate 5.7 bounded experiment read-only.
+
+Gate 5.7A primary-scoped bounded commands:
+  bounded-primary-status               Validate Gate 5.7A primary-scoped contract and runtime identity.
+  bounded-primary-run                  Execute one Gate 5.7A corrective 8-unit experiment; no retries.
+  bounded-primary-diagnose [run-dir]   Diagnose one retained Gate 5.7A experiment read-only.
 
   help                         Show this help.
 
@@ -44,6 +52,7 @@ Default SWPC benchmark layout:
   /storage/projects/plasma-benchmark/nxp-kl25/runs/<UTC-run-id>
   /storage/projects/plasma-benchmark/nxp-kl25/pre-ai-boundary-v1
   /storage/projects/plasma-benchmark/nxp-kl25/bounded-runs/<UTC-run-id>
+  /storage/projects/plasma-benchmark/nxp-kl25/bounded-primary-runs/<UTC-run-id>
 
 Environment overrides:
   PLASMA_KL25_BENCH_ROOT   Benchmark root directory.
@@ -84,10 +93,6 @@ contract_model() {
   model_from_contract "$bench_dir/live-model-qualification-contract.json"
 }
 
-bounded_contract_model() {
-  model_from_contract "$bench_dir/live-bounded-qualification-contract.json"
-}
-
 print_contract_runtime() {
   python3 - "$bench_dir/live-model-qualification-contract.json" <<'PY'
 import json
@@ -105,7 +110,8 @@ PY
 }
 
 print_bounded_contract_runtime() {
-  python3 - "$bench_dir/live-bounded-qualification-contract.json" <<'PY'
+  local contract_path="$1"
+  python3 - "$contract_path" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -120,6 +126,11 @@ print(f"[kl25-live] primary_unit_count: {runtime['primary_unit_count']}")
 print(f"[kl25-live] automatic_retries: {runtime['automatic_retries']}")
 print(f"[kl25-live] num_ctx_per_unit: {generation['num_ctx']}")
 print(f"[kl25-live] max_tokens_per_unit: {generation['max_tokens']}")
+scope = runtime.get("semantic_scope")
+if isinstance(scope, dict):
+    print(f"[kl25-live] fact_generation_authority: {scope.get('fact_generation_authority')}")
+    print(f"[kl25-live] dependency_pages: {scope.get('dependency_pages')}")
+    print(f"[kl25-live] every_fact_requires_primary_citation: {scope.get('every_fact_requires_primary_citation')}")
 PY
 }
 
@@ -153,19 +164,21 @@ PY
 }
 
 validate_bounded_pre_ai_workspace() {
-  python3 - "$bench_dir" "$bounded_pre_ai_dir" <<'PY'
+  local contract_path="$1"
+  python3 - "$bench_dir" "$bounded_pre_ai_dir" "$contract_path" <<'PY'
 import json
 import sys
 from pathlib import Path
 bench_dir = Path(sys.argv[1])
 pre_ai_dir = Path(sys.argv[2])
+contract_path = Path(sys.argv[3])
 sys.path.insert(0, str(bench_dir))
 import bounded_extraction
 import build_evidence_pack
 import qualify_bounded_run
 import run_ollama_semantic
 manifest, packs, _, semantic_contract = run_ollama_semantic.load_pre_ai_workspace(pre_ai_dir)
-contract = json.loads((bench_dir / "live-bounded-qualification-contract.json").read_text(encoding="utf-8"))
+contract = json.loads(contract_path.read_text(encoding="utf-8"))
 qualify_bounded_run.validate_contract(contract)
 required = contract["required_input"]
 rules = bounded_extraction.policy()
@@ -226,10 +239,6 @@ validate_ollama_identity() {
   validate_ollama_identity_for_model "$(contract_model)"
 }
 
-validate_bounded_ollama_identity() {
-  validate_ollama_identity_for_model "$(bounded_contract_model)"
-}
-
 run_status() {
   require_command python3
   require_command curl
@@ -240,14 +249,24 @@ run_status() {
   validate_ollama_identity
 }
 
-run_bounded_status() {
+run_bounded_status_for_contract() {
+  local contract_path="$1"
   require_command python3
   require_command curl
   validate_loopback_url
   [[ -d "$bounded_pre_ai_dir" ]] || fail "bounded pre-AI workspace missing: $bounded_pre_ai_dir; run bounded-build first"
-  validate_bounded_pre_ai_workspace
-  print_bounded_contract_runtime
-  validate_bounded_ollama_identity
+  [[ -f "$contract_path" ]] || fail "bounded qualification contract missing: $contract_path"
+  validate_bounded_pre_ai_workspace "$contract_path"
+  print_bounded_contract_runtime "$contract_path"
+  validate_ollama_identity_for_model "$(model_from_contract "$contract_path")"
+}
+
+run_bounded_status() {
+  run_bounded_status_for_contract "$bounded_contract_path"
+}
+
+run_bounded_primary_status() {
+  run_bounded_status_for_contract "$bounded_primary_contract_path"
 }
 
 run_context_audit() {
@@ -294,7 +313,7 @@ run_bounded_build() {
   mv "$tmp_dir" "$bounded_pre_ai_dir"
   trap - EXIT
   printf '[kl25-live] bounded pre-AI workspace rebuilt atomically: %s\n' "$bounded_pre_ai_dir"
-  validate_bounded_pre_ai_workspace
+  validate_bounded_pre_ai_workspace "$bounded_contract_path"
 }
 
 run_live() {
@@ -325,35 +344,47 @@ run_live() {
   return "$rc"
 }
 
-run_bounded_live() {
-  run_bounded_status
-  mkdir -p "$bounded_runs_dir"
+run_bounded_live_for_contract() {
+  local contract_path="$1"
+  local run_root="$2"
+  local label="$3"
+  run_bounded_status_for_contract "$contract_path"
+  mkdir -p "$run_root"
   local run_id run_dir rc
   run_id="$(date -u +%Y%m%dT%H%M%SZ)"
-  run_dir="$bounded_runs_dir/$run_id"
+  run_dir="$run_root/$run_id"
   if [[ -e "$run_dir" ]]; then
     run_id="$run_id-$$"
-    run_dir="$bounded_runs_dir/$run_id"
+    run_dir="$run_root/$run_id"
   fi
-  printf '[kl25-live] bounded_run_dir: %s\n' "$run_dir"
+  printf '[kl25-live] %s_run_dir: %s\n' "$label" "$run_dir"
   set +e
   python3 "$bench_dir/run_live_bounded_qualification.py" \
     --input-dir "$bounded_pre_ai_dir" \
     --output-dir "$run_dir" \
-    --ollama-url "$ollama_url"
+    --ollama-url "$ollama_url" \
+    --contract "$contract_path"
   rc=$?
   set -e
   if [[ -d "$run_dir" ]]; then
-    ln -sfn "$run_id" "$bounded_runs_dir/latest"
-    printf '[kl25-live] retained bounded run: %s\n' "$run_dir"
+    ln -sfn "$run_id" "$run_root/latest"
+    printf '[kl25-live] retained %s run: %s\n' "$label" "$run_dir"
     if (( rc != 0 )); then
-      printf '[kl25-live] bounded qualification did not reach READY_FOR_REVIEW; retained child artifacts are immutable evidence.\n' >&2
-      printf '[kl25-live] diagnose with: bash scripts/ic-support-kl25-live.sh bounded-diagnose %q\n' "$run_dir" >&2
+      printf '[kl25-live] %s qualification did not reach READY_FOR_REVIEW; retained child artifacts are immutable evidence.\n' "$label" >&2
+      printf '[kl25-live] diagnose with: bash scripts/ic-support-kl25-live.sh %s-diagnose %q\n' "$label" "$run_dir" >&2
     fi
   else
-    printf '[kl25-live] bounded preflight failed before artifact creation.\n' >&2
+    printf '[kl25-live] %s preflight failed before artifact creation.\n' "$label" >&2
   fi
   return "$rc"
+}
+
+run_bounded_live() {
+  run_bounded_live_for_contract "$bounded_contract_path" "$bounded_runs_dir" "bounded"
+}
+
+run_bounded_primary_live() {
+  run_bounded_live_for_contract "$bounded_primary_contract_path" "$bounded_primary_runs_dir" "bounded-primary"
 }
 
 resolve_diagnostic_dir() {
@@ -375,12 +406,13 @@ resolve_diagnostic_dir() {
 
 resolve_bounded_diagnostic_dir() {
   local requested="${1:-}"
+  local run_root="$2"
   if [[ -n "$requested" ]]; then
     if [[ -f "$requested" ]]; then dirname "$requested"; else printf '%s\n' "$requested"; fi
     return
   fi
-  if [[ -L "$bounded_runs_dir/latest" || -d "$bounded_runs_dir/latest" ]]; then
-    printf '%s\n' "$bounded_runs_dir/latest"
+  if [[ -L "$run_root/latest" || -d "$run_root/latest" ]]; then
+    printf '%s\n' "$run_root/latest"
     return
   fi
   fail "no retained bounded run found; pass an explicit run directory"
@@ -496,8 +528,10 @@ PY
 
 run_bounded_diagnose() {
   require_command python3
+  local requested="${1:-}"
+  local run_root="$2"
   local run_dir
-  run_dir="$(resolve_bounded_diagnostic_dir "${1:-}")"
+  run_dir="$(resolve_bounded_diagnostic_dir "$requested" "$run_root")"
   [[ -f "$run_dir/aggregate-report.json" ]] || fail "aggregate-report.json missing under $run_dir"
   python3 - "$run_dir" <<'PY'
 import json
@@ -517,6 +551,9 @@ print("aggregate_errors =", aggregate.get("errors"))
 print("qualification_status =", report.get("status"))
 print("integrity =", report.get("integrity"))
 print("semantic_screening =", report.get("semantic_screening"))
+execution = provenance.get("execution") if isinstance(provenance.get("execution"), dict) else {}
+print("execution_mode =", execution.get("execution_mode"))
+print("semantic_scope =", execution.get("semantic_scope"))
 identity = provenance.get("ollama_runtime_identity") if isinstance(provenance.get("ollama_runtime_identity"), dict) else {}
 print("model =", identity.get("model_id"))
 print("model_digest =", identity.get("model_digest"))
@@ -551,7 +588,10 @@ main() {
     bounded-build) run_bounded_build ;;
     bounded-status) run_bounded_status ;;
     bounded-run) run_bounded_live ;;
-    bounded-diagnose) run_bounded_diagnose "${2:-}" ;;
+    bounded-diagnose) run_bounded_diagnose "${2:-}" "$bounded_runs_dir" ;;
+    bounded-primary-status) run_bounded_primary_status ;;
+    bounded-primary-run) run_bounded_primary_live ;;
+    bounded-primary-diagnose) run_bounded_diagnose "${2:-}" "$bounded_primary_runs_dir" ;;
     help|-h|--help) usage ;;
     *) usage >&2; fail "Unknown command: $command" ;;
   esac

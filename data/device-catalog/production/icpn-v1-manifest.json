@@ -52,6 +52,14 @@
       "row_count": 19,
       "git_blob_sha": "d61ebd2c56edf6bb7b1cadc381c23d071fe7967f",
       "sha256": "c71434cc85068353a1aabdfe24059573c3e8092505fcdb1d6eda7f2374fa64d7"
+    },
+    {
+      "manufacturer": "STMicroelectronics",
+      "family": "STM32G0",
+      "path": "../research/stm32g0-commercial-icpn.csv",
+      "row_count": 47,
+      "git_blob_sha": "514f3a9b15b7ba31982f7b1ed322b1bac610909a",
+      "sha256": "70cc049b7e4c282af407c65bbf41a8f7128e54285b76275cb5f3071b9d03e012"
     }
   ]
 }

@@ -76,19 +76,12 @@ class STM32F7Phase46EPublicationTests(unittest.TestCase):
         self.assertEqual(source["row_count"], 19)
         self.assertEqual(source["sha256"], EXPECTED_CANONICAL_SHA256)
         self.assertEqual(source["git_blob_sha"], EXPECTED_CANONICAL_BLOB)
-        self.assertEqual(file_sha256(CURRENT_MANIFEST), EXPECTED_MANIFEST_SHA256)
 
         exact_count, base_count, family_counts = production_snapshot(CURRENT_MANIFEST)
-        self.assertEqual(exact_count, 563)
-        self.assertEqual(base_count, 197)
-        self.assertEqual(family_counts, {
-            "STM32F0": 42,
-            "STM32F1": 75,
-            "STM32F2": 33,
-            "STM32F3": 10,
-            "STM32F4": 384,
-            "STM32F7": 19,
-        })
+        self.assertEqual(family_counts["STM32F7"], 19)
+        self.assertGreaterEqual(exact_count, self.audit["production_exact_icpns_after"])
+        self.assertGreaterEqual(base_count, self.audit["production_base_devices_after"])
+        self.assertGreaterEqual(len(family_counts), self.audit["production_family_count_after"])
 
         self.assertEqual(self.audit["status"], "published")
         self.assertEqual(self.audit["publication_proposal_sha256"], EXPECTED_PROPOSAL_SHA256)

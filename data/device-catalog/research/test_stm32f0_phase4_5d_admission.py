@@ -63,7 +63,14 @@ class STM32F0Phase45DAdmissionTests(unittest.TestCase):
         self.assertEqual(source["row_count"], 42)
         self.assertEqual(source["sha256"], EXPECTED_CANONICAL_SHA256)
         self.assertEqual(source["git_blob_sha"], EXPECTED_CANONICAL_BLOB)
-        self.assertEqual(len(manifest["sources"]), 6)
+        families = [item["family"] for item in manifest["sources"]]
+        self.assertEqual(families.count("STM32F0"), 1)
+        self.assertEqual(len(families), len(set(families)))
+        self.assertGreaterEqual(
+            sum(int(item["row_count"]) for item in manifest["sources"]),
+            self.audit["production_exact_icpns_after"],
+        )
+        self.assertGreaterEqual(len(families), self.audit["production_family_count_after"])
 
         self.assertEqual(self.audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
         self.assertEqual(self.audit["canonical_csv_file_sha256"], EXPECTED_CANONICAL_SHA256)

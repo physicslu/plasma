@@ -52,7 +52,8 @@ jobs:
             data/ic-support/benchmarks/nxp-kl25/test_citation_completeness_gate54.py \
             data/ic-support/benchmarks/nxp-kl25/test_evidence_boundary_gate56.py \
             data/ic-support/benchmarks/nxp-kl25/test_live_bounded_qualification.py \
-            data/ic-support/benchmarks/nxp-kl25/test_gate57_reporting.py
+            data/ic-support/benchmarks/nxp-kl25/test_gate57_reporting.py \
+            data/ic-support/benchmarks/nxp-kl25/test_gate57a_primary_scope.py
       - name: Validate KL25 operator helper syntax
         run: |
           bash -n scripts/ic-support-kl25-live.sh
@@ -87,3 +88,5 @@ jobs:
         run: python data/ic-support/benchmarks/nxp-kl25/test_live_bounded_qualification.py
       - name: Validate Gate 5.7 skipped-stage reporting semantics
         run: python data/ic-support/benchmarks/nxp-kl25/test_gate57_reporting.py
+      - name: Validate Gate 5.7A primary-scoped bounded extraction without network or model weights
+        run: python data/ic-support/benchmarks/nxp-kl25/test_gate57a_primary_scope.py

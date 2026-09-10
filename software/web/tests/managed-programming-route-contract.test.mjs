@@ -52,7 +52,7 @@ test("macOS Control Station declares managed routing intent independently from B
   assert.match(macConsoleLauncher, /PLASMA_CONTROL_STATION_MODE="managed"/);
   assert.match(managerBff, /PLASMA_CONTROL_STATION_MODE/);
   assert.match(managerBff, /managerRoutingRequired/);
-  assert.match(managedConfig, /managed: managedRequired/);
+  assert.match(managedConfig, /managed: true/);
   assert.match(managedConfig, /configured: false/);
   assert.match(managedConfig, /configured: true/);
 });
@@ -73,9 +73,21 @@ test("Programming APIs continue to use the shared apiBase for jobs, status, cach
   assert.match(plasmaApi, /"\/api\/jobs"/);
 });
 
-test("Browser managed route exposes no PPU endpoint and always resolves the configured Manager alias", () => {
+test("Managed PPU selection is runtime state and no longer requires Console restart", () => {
+  assert.match(managerBff, /MANAGED_PPU_SELECTION_COOKIE = "plasma-manager-ppu-alias"/);
+  assert.match(managerBff, /requestPpuAlias\(request\)/);
+  assert.match(managerBff, /commissionedManagerPpuAliases\(\)/);
+  assert.match(managerBff, /if \(commissionedAliases\.length === 1\) return commissionedAliases\[0\]/);
+  assert.match(managerBff, /ppuAlias = await resolveManagerPpuAlias\(request\)/);
+  assert.match(managedConfig, /export async function POST\(request: Request\)/);
+  assert.match(managedConfig, /managerPpuAliasIsCommissioned\(alias\)/);
+  assert.match(managedConfig, /Set-Cookie.*managerPpuSelectionCookie\(alias\)/s);
+  assert.doesNotMatch(managedConfig, /target_url|NEXT_PUBLIC_PLASMA_API_URL/);
+});
+
+test("Browser managed route exposes no PPU endpoint and keeps Manager as alias-to-endpoint owner", () => {
   assert.match(managedConfig, /managerApiBase\(\)/);
-  assert.match(managedConfig, /managerPpuAlias\(\)/);
+  assert.match(managedConfig, /resolveManagerPpuAlias\(request\)/);
   assert.doesNotMatch(managedConfig, /endpoint|target_url|NEXT_PUBLIC_PLASMA_API_URL/);
   assert.match(managedRoute, /MANAGED_BROWSER_PREFIX = "\/api\/manager\/ppu"/);
   assert.match(managedRoute, /relayManagerPpuRequest/);
@@ -87,7 +99,8 @@ test("BFF preserves only the required security/content headers and keeps Manager
   assert.match(managerBff, /PLASMA_MANAGER_API_URL must remain loopback-only/);
   assert.match(managerBff, /\["Accept", "Authorization", "Content-Type", "Idempotency-Key"\]/);
   assert.match(managerBff, /MAX_MANAGED_REQUEST_BYTES = 24 \* 1024 \* 1024/);
-  assert.doesNotMatch(managerBff, /Cookie|Set-Cookie|target_url/);
+  assert.doesNotMatch(managerBff, /Set-Cookie.*forwardedHeaders/s);
+  assert.doesNotMatch(managerBff, /target_url/);
 });
 
 test("managed non-JSON upstream errors remain HTTP failures instead of transport failures", () => {

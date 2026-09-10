@@ -21,6 +21,13 @@ import semantic_runner
 HERE = Path(__file__).resolve().parent
 POLICY_PATH = HERE / "bounded-extraction-contract.json"
 HEX = set("0123456789abcdef")
+PRIMARY_SCOPE_POLICY = {
+    "fact_generation_authority": "PRIMARY_ONLY",
+    "dependency_pages": "SUPPORTING_CONTEXT_ONLY",
+    "every_fact_requires_primary_citation": True,
+    "dependency_only_fact_forbidden": True,
+    "primary_origin": "PRIMARY",
+}
 
 
 class BoundedExtractionError(ValueError):
@@ -75,7 +82,102 @@ def _execution_profile(value: dict[str, Any] | None) -> dict[str, Any]:
     require(profile.get("automatic_retries") == 0, "execution profile retries are forbidden")
     require(profile.get("primary_unit_count") == rules["primary_unit_count"], "execution profile unit count mismatch")
     require(profile.get("execution_mode") != "mock_only", "external execution profile must not impersonate Gate 5.5 mock mode")
+    semantic_scope = profile.get("semantic_scope")
+    if semantic_scope is not None:
+        require(semantic_scope == PRIMARY_SCOPE_POLICY, "unsupported primary-scoped semantic policy")
     return profile
+
+
+def _primary_page_refs(pack: dict[str, Any]) -> set[tuple[str, int]]:
+    primary_unit_id = pack.get("primary_unit_id")
+    included = pack.get("included_units")
+    require(isinstance(included, list), f"{pack.get('pack_id', '<pack>')}: included_units missing")
+    primary_rows = [
+        row for row in included
+        if isinstance(row, dict) and row.get("origin") == PRIMARY_SCOPE_POLICY["primary_origin"]
+    ]
+    require(len(primary_rows) == 1, f"{pack.get('pack_id', '<pack>')}: expected exactly one PRIMARY unit row")
+    row = primary_rows[0]
+    require(row.get("unit_id") == primary_unit_id, f"{pack.get('pack_id', '<pack>')}: PRIMARY unit identity mismatch")
+    source_id = row.get("source_id")
+    page_range = row.get("pdf_page_range")
+    require(isinstance(source_id, str) and bool(source_id), f"{primary_unit_id}: PRIMARY source missing")
+    require(
+        isinstance(page_range, list) and len(page_range) == 2
+        and all(type(value) is int and value >= 1 for value in page_range)
+        and page_range[0] <= page_range[1],
+        f"{primary_unit_id}: PRIMARY page range malformed",
+    )
+    refs = {(source_id, page) for page in range(page_range[0], page_range[1] + 1)}
+    allowed = semantic._allowed_page_refs(pack)
+    require(refs <= allowed, f"{primary_unit_id}: PRIMARY page range is not fully admitted by the Evidence Pack")
+    return refs
+
+
+def _pair_schema(refs: list[tuple[str, int]]) -> dict[str, Any]:
+    return {
+        "anyOf": [
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["source_id", "pdf_page_number"],
+                "properties": {
+                    "source_id": {"type": "string", "enum": [source]},
+                    "pdf_page_number": {"type": "integer", "enum": [page]},
+                },
+            }
+            for source, page in refs
+        ]
+    }
+
+
+def _apply_primary_scope_to_prompt(
+    prompt: str, *, unit_id: str, pack: dict[str, Any], semantic_scope: dict[str, Any]
+) -> str:
+    require(semantic_scope == PRIMARY_SCOPE_POLICY, "primary-scoped prompt policy mismatch")
+    primary_refs = sorted(_primary_page_refs(pack))
+    rendered = ", ".join(f"{source}:p{page}" for source, page in primary_refs)
+    scope_block = (
+        "PRIMARY-SCOPED FACT GENERATION POLICY:\n"
+        f"- The semantic subject is only PRIMARY_UNIT {unit_id}.\n"
+        "- Generate facts only for claims whose semantic authority comes from PRIMARY pages.\n"
+        "- Dependency pages are SUPPORTING CONTEXT ONLY. They may clarify or complete evidence for a primary-scoped fact, but must not create dependency-only facts.\n"
+        "- EVERY emitted fact must cite at least one PRIMARY page from PRIMARY_ALLOWED_EVIDENCE below.\n"
+        "- Dependency citations may be added only when needed to support a material clause of that same primary-scoped fact.\n"
+        "- Do not pad a dependency-only claim with an irrelevant PRIMARY citation. If the PRIMARY evidence does not support a fact, omit it.\n"
+        "- If no primary-scoped fact is supported, return UNKNOWN with facts=[].\n"
+        f"PRIMARY_ALLOWED_EVIDENCE: [{rendered}]\n\n"
+    )
+    marker = "MANUFACTURER EVIDENCE CONTEXT FOLLOWS:\n"
+    require(marker in prompt, "semantic prompt marker missing")
+    return prompt.replace(marker, scope_block + marker, 1)
+
+
+def _validate_primary_scoped_response(
+    parsed: dict[str, Any], *, pack: dict[str, Any], semantic_scope: dict[str, Any] | None
+) -> None:
+    if semantic_scope is None:
+        return
+    require(semantic_scope == PRIMARY_SCOPE_POLICY, "primary-scoped response policy mismatch")
+    primary_refs = _primary_page_refs(pack)
+    unit_results = parsed.get("unit_results")
+    require(isinstance(unit_results, list) and len(unit_results) == 1, "primary-scoped child must contain exactly one unit result")
+    unit = unit_results[0]
+    unit_id = unit.get("primary_unit_id")
+    require(unit_id == pack.get("primary_unit_id"), "primary-scoped child unit identity mismatch")
+    facts = unit.get("facts")
+    require(isinstance(facts, list), f"{unit_id}: facts missing")
+    for index, fact in enumerate(facts):
+        evidence = fact.get("evidence") if isinstance(fact, dict) else None
+        require(isinstance(evidence, list), f"{unit_id}.facts[{index}]: evidence missing")
+        refs = {
+            (ref.get("source_id"), ref.get("pdf_page_number"))
+            for ref in evidence if isinstance(ref, dict)
+        }
+        require(
+            bool(refs & primary_refs),
+            f"{unit_id}.facts[{index}]: primary-scoped fact requires at least one PRIMARY citation",
+        )
 
 
 def prepare_requests(
@@ -87,6 +189,7 @@ def prepare_requests(
     """Validate the complete input, then render exactly one admitted pack per request."""
     rules = policy()
     execution = _execution_profile(execution_profile)
+    semantic_scope = execution.get("semantic_scope")
     require(contract.get("contract_id") == rules["semantic_contract_id"], "semantic contract mismatch")
     require(contract.get("schema_version") == semantic.SEMANTIC_SCHEMA_VERSION, "semantic schema mismatch")
     require(contract.get("target") == pre_ai_manifest.get("target") == rules["target"], "target mismatch")
@@ -107,8 +210,6 @@ def prepare_requests(
         require(pack.get("pack_id") == pack_id, "pack identity mismatch")
         require(pack.get("target") == rules["target"], "pack target mismatch")
         require(pack.get("pack_digest") == _digest_without(pack, "pack_digest"), "pack content digest mismatch")
-    # Validate framing/page hashes/cross-pack conflicts. The global context is
-    # discarded; every transport call receives only one admitted pack.
     semantic_context.assemble_compact_model_context(pre_ai_manifest, packs=packs, evidence_text=evidence_text)
 
     code_fingerprints = {name: builder.sha256_file(HERE / name) for name in (
@@ -122,13 +223,10 @@ def prepare_requests(
         schema = semantic.build_output_json_schema(contract, packs=one_pack)
         refs = sorted(semantic._allowed_page_refs(pack))
         evidence_schema = schema["properties"]["unit_results"]["items"]["properties"]["facts"]["items"]["properties"]["evidence"]
-        evidence_schema["items"] = {"anyOf": [
-            {"type": "object", "additionalProperties": False,
-             "required": ["source_id", "pdf_page_number"],
-             "properties": {"source_id": {"type": "string", "enum": [source]},
-                            "pdf_page_number": {"type": "integer", "enum": [page]}}}
-            for source, page in refs
-        ]}
+        evidence_schema["items"] = _pair_schema(refs)
+        if semantic_scope is not None:
+            primary_refs = sorted(_primary_page_refs(pack))
+            evidence_schema["contains"] = _pair_schema(primary_refs)
         context = (
             "PLASMA PER-UNIT MANUFACTURER EVIDENCE CONTEXT\n"
             f"TARGET: {rules['target']}\nPRIMARY_UNIT: {unit_id}\n"
@@ -136,6 +234,10 @@ def prepare_requests(
             + evidence_text[pack_id]
         )
         prompt, _ = semantic.render_prompt(context, contract=contract, packs=one_pack)
+        if semantic_scope is not None:
+            prompt = _apply_primary_scope_to_prompt(
+                prompt, unit_id=unit_id, pack=pack, semantic_scope=semantic_scope
+            )
         options = {**execution["generation"], "format_schema": schema}
         binding = {
             "target": rules["target"], "primary_unit_id": unit_id, "pack_id": pack_id,
@@ -157,6 +259,9 @@ def prepare_requests(
             "output_schema_sha256": builder.canonical_sha256(schema),
             "generation": copy.deepcopy(execution["generation"]),
         }
+        if semantic_scope is not None:
+            binding["semantic_scope"] = copy.deepcopy(semantic_scope)
+            binding["semantic_scope_digest"] = builder.canonical_sha256(semantic_scope)
         binding["request_digest"] = builder.canonical_sha256(binding)
         requests.append({"binding": binding, "prompt": prompt, "options": options})
     return requests
@@ -214,6 +319,7 @@ def aggregate_results(
     expected = {r["binding"]["primary_unit_id"]: r["binding"] for r in requests}
     rules = policy()
     execution = _execution_profile(execution_profile)
+    semantic_scope = execution.get("semantic_scope")
     result: dict[str, Any] = {
         "schema_version": "0.1.0", "artifact_type": "kl25_bounded_aggregate",
         "bounded_contract_id": rules["contract_id"],
@@ -227,6 +333,9 @@ def aggregate_results(
         "acceptance_blockers": copy.deepcopy(rules["known_acceptance_blockers"]),
         "review_required": True, "children": [],
     }
+    if semantic_scope is not None:
+        result["semantic_scope"] = copy.deepcopy(semantic_scope)
+        result["semantic_scope_digest"] = builder.canonical_sha256(semantic_scope)
     errors, units, seen = result["errors"], [], set()
     for index, child in enumerate(children):
         try:
@@ -253,6 +362,9 @@ def aggregate_results(
             _validate_completion(child.get("transport_metadata"), binding)
             pack_id = binding["pack_id"]
             parsed = _parse(raw_text, contract=contract, packs={pack_id: packs[pack_id]})
+            _validate_primary_scoped_response(
+                parsed, pack=packs[pack_id], semantic_scope=semantic_scope
+            )
             require(parsed == child.get("response"), f"{unit_id}: raw and parsed response differ")
             units.extend(parsed["unit_results"])
         except (ValueError, KeyError, TypeError, semantic.SemanticExtractionError) as exc:
@@ -304,6 +416,7 @@ def execute_bounded_run(
                  "execution_mode": requests[0]["binding"]["execution_mode"],
                  "requests": [r["binding"] for r in requests]})
     children = []
+    semantic_scope = _execution_profile(execution_profile).get("semantic_scope")
     for index, request in enumerate(requests):
         binding = copy.deepcopy(request["binding"])
         child: dict[str, Any] = {
@@ -327,10 +440,13 @@ def execute_bounded_run(
             require(bool(raw.strip()), "raw response empty")
             pack_id = binding["pack_id"]
             parsed = _parse(raw, contract=inputs["contract"], packs={pack_id: inputs["packs"][pack_id]})
+            _validate_primary_scoped_response(
+                parsed, pack=inputs["packs"][pack_id], semantic_scope=semantic_scope
+            )
             _validate_completion(child["transport_metadata"], binding)
             child["response"] = parsed
             child["status"] = "success"
-        except Exception as exc:  # failed children are retained, never repaired/retried
+        except Exception as exc:
             child["error"] = {"class": (semantic_runner._error_class(exc)
                                        if not isinstance(exc, BoundedExtractionError)
                                        else "bounded_integrity_error"),
