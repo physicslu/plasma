@@ -26,7 +26,7 @@ The bundle contains only the Bootstrap scripts and installer. It intentionally c
 
 SHA-256 proves artifact integrity only. Publisher authenticity/signature is not yet qualified and must not be claimed.
 
-The same workflow publishes a separate `ppu-bootstrap-hil-tools` artifact containing the read-only HIL evidence collector and this procedure. The HIL tool is qualification-only and is **not** installed into `/opt/plasma/bootstrap` by the factory installer.
+The same workflow publishes a separate `ppu-bootstrap-hil-tools` artifact containing the read-only HIL evidence collector, controlled negative-kit builder, the verifiers required by that builder, and this procedure. HIL tools are qualification-only and are **not** installed into `/opt/plasma/bootstrap` by the factory installer.
 
 ## Factory provisioning
 
@@ -206,20 +206,60 @@ sudo /usr/bin/python3 /tmp/plasma-bootstrap-hil/ppu-bootstrap-hil-evidence.py \
 
 Then repeat the managed `ps-loopback` acceptance from the Control Station. Acceptance requires the same release identity and service/control-path recovery without manual repair.
 
+## Controlled rollback negative kit
+
+The rollback injection artifact is derived on the Control Station or another engineering workstation. It is not built or modified on the PPU.
+
+Start from the exact canonical Z2 PS kit selected as the known-good Runtime A source. In the extracted `ppu-bootstrap-hil-tools` directory, run:
+
+```bash
+python3 ppu-bootstrap-hil-negative.py \
+  <NORMAL_Z2_PS_KIT>.tar.gz \
+  --sidecar <NORMAL_Z2_PS_KIT>.tar.gz.sha256 \
+  --output-dir ./negative-hil
+```
+
+The builder performs this deterministic transaction:
+
+```text
+verify normal outer Z2 kit
+  -> verify normal inner PPU release
+  -> preserve source Git SHA
+  -> derive distinct SemVer prerelease: *.hil.rollback.negative
+  -> replace only runtime/ppu/ppu.pyz with fixed exit-86 program
+  -> mark release and outer kit qualification-only / production_eligible=false
+  -> rebuild inner SHA256SUMS + sidecar
+  -> rebuild outer SHA256SUMS + sidecar
+  -> verify derived outer kit again
+  -> verify derived inner PPU release again
+```
+
+Retain all three outputs together:
+
+- `plasma-z2-ps-kit-<NEGATIVE_RELEASE_ID>.tar.gz`
+- its `.sha256` sidecar
+- its `.qualification.json` derivation evidence
+
+The negative kit is deliberately capable of passing normal structural/integrity admission; otherwise it would test artifact rejection rather than activation rollback. It is qualification-only and must not be promoted, catalogued, or distributed as a production Runtime release.
+
 ## Real Z2 HIL evidence B: controlled rollback
 
 Do not simulate rollback by unplugging Ethernet, killing arbitrary processes, deleting `/opt/plasma/current`, or corrupting a production release by hand. Those actions do not provide deterministic evidence and can invalidate the recovery baseline.
 
-Rollback qualification requires a purpose-built negative HIL release that:
-
-1. passes archive/manifest/integrity admission;
-2. reaches activation;
-3. deterministically fails Runtime readiness;
-4. causes the existing Z2 installer to restore the previous release/config/service snapshots;
-5. leaves Bootstrap reachable and records the failed API transaction;
-6. confirms the previous Runtime is active after reboot.
-
 Use an already-qualified Runtime A as the rollback target. Do not use first installation as the rollback proof because rollback-to-no-Runtime is a different recovery case.
+
+Before injection, place the PPU in the same explicit disabled/current/trusted/idle maintenance state required by any normal Runtime upgrade. Then select the derived qualification-only negative kit in the **same Console Runtime Deployment UI** and deploy it through BFF -> Manager -> Bootstrap. Do not invoke the Z2 installer or deployment coordinator manually.
+
+Expected behavior:
+
+1. negative kit passes Browser/Manager/Bootstrap/kit integrity and structural admission;
+2. the derived Runtime reaches activation;
+3. both PPU service entrypoints exit with the fixed qualification failure;
+4. Gateway readiness fails within the bounded installer timeout;
+5. the installer restores the previous Runtime A release/config/service snapshots;
+6. deployment-engine journal ends in `rolled_back`;
+7. Bootstrap API transaction ends in `failed`;
+8. Bootstrap remains independently reachable.
 
 Immediately after the controlled failure, collect:
 
@@ -243,9 +283,9 @@ sudo /usr/bin/python3 /tmp/plasma-bootstrap-hil/ppu-bootstrap-hil-evidence.py \
   --output /tmp/plasma-bootstrap-hil/b2-rollback-after-reboot.json
 ```
 
-Repeat managed PS Loopback after reboot. The negative artifact identity, SHA-256, previous release identity, deterministic failure reason, restored release identity, both journal identities/states, and post-reboot Managed PS evidence must be retained together.
+Repeat managed PS Loopback after reboot. Retain the negative `.qualification.json`, negative kit SHA-256, previous release identity, fixed exit-86 failure reason, restored release identity, both journal identities/states, and post-reboot Managed PS evidence together.
 
-Until this controlled failure injection actually runs on PYNQ-Z2, **real-hardware rollback is NOT QUALIFIED**.
+Until this controlled negative kit actually runs on PYNQ-Z2, **real-hardware rollback is NOT QUALIFIED**.
 
 ## Crash/restart semantics
 
@@ -260,7 +300,7 @@ If the Bootstrap API observes its own `queued`/`running` record after service re
 
 ## Proof boundary
 
-CI can prove Python 3.10 compatibility, state-machine behavior, canonical call graph, Z2 kit packaging, bundle generation, sandbox installation, Manager policy, and Browser -> BFF -> Manager -> independent Bootstrap admission flow.
+CI can prove Python 3.10 compatibility, state-machine behavior, canonical call graph, Z2 kit packaging, negative-kit derivation/admission behavior, bundle generation, sandbox installation, Manager policy, and Browser -> BFF -> Manager -> independent Bootstrap admission flow.
 
 CI cannot prove stock-PYNQ systemd behavior, ARMv7 native Runtime execution on the physical board, physical reboot persistence, Ethernet behavior on the actual PPU, or real rollback. Those claims require the HIL steps above.
 
