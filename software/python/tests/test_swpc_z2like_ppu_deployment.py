@@ -12,7 +12,8 @@ def test_swpc_surrogate_mirrors_z2_ps_ownership_without_claiming_z2_equivalence(
     assert "/opt/plasma/python/<version>/bin/python3" in text
     assert "/opt/plasma/releases/${release_id}" in text
     assert "/opt/plasma/current" in text
-    assert "/etc/plasma/ppu.yaml" in text
+    assert 'config_root="/etc/plasma"' in text
+    assert 'config_path="$config_root/ppu.yaml"' in text
     assert "/etc/systemd/system/plasma-server.service" in text
     assert "/etc/systemd/system/plasma-web.service" in text
     assert 'model: "SWPC-Z2-SURROGATE"' in text
