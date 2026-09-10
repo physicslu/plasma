@@ -30,6 +30,7 @@ class BootstrapCredentialError(BootstrapManagerError):
 @dataclass(frozen=True, slots=True)
 class BootstrapCredential:
     alias: str
+    device_id: str
     token: str
     updated_at: str
 
@@ -39,11 +40,12 @@ def _utc_now() -> str:
 
 
 def bootstrap_endpoint_for_gateway(gateway_endpoint: str) -> str:
-    """Derive the fixed factory Bootstrap endpoint from one registered Gateway endpoint.
+    """Derive the fixed Bootstrap endpoint without changing registry semantics.
 
-    Registry semantics remain unchanged: ``endpoint`` is still the future/current
-    Plasma Gateway root.  Bootstrap is a separate appliance service on the same
-    host at the reserved commissioning port.
+    ``registry.endpoint`` remains the Plasma Gateway root.  Bootstrap is a
+    separate appliance service on the same host at the reserved commissioning
+    port.  Phase 3 deliberately limits this to a controlled private HTTP link;
+    production transport confidentiality is a separate hardening requirement.
     """
 
     canonical = normalize_endpoint(gateway_endpoint)
@@ -69,8 +71,31 @@ def _valid_token(value: object) -> str:
     return token
 
 
+def _valid_device_id(value: object) -> str:
+    if not isinstance(value, str) or not value.startswith("ppu-device-") or not 16 <= len(value) <= 128:
+        raise BootstrapCredentialError("Bootstrap device_id is invalid")
+    if any(ch.isspace() for ch in value):
+        raise BootstrapCredentialError("Bootstrap device_id is invalid")
+    return value
+
+
+def _device_id_from_status(payload: Mapping[str, Any]) -> str:
+    identity = payload.get("identity")
+    if not isinstance(identity, dict):
+        raise BootstrapManagerError("PPU Bootstrap status is missing identity")
+    try:
+        return _valid_device_id(identity.get("device_id"))
+    except BootstrapCredentialError as exc:
+        raise BootstrapManagerError(str(exc)) from exc
+
+
 class BootstrapCredentialStore:
-    """Manager-owned device pairing secrets, deliberately separate from registry state."""
+    """Manager-owned device secrets, separate from public runtime registry state.
+
+    A secret is bound to immutable Bootstrap ``device_id``, not merely an alias.
+    Reusing an alias for another appliance therefore cannot silently reuse an old
+    pairing token.
+    """
 
     def __init__(self, path: Path | None) -> None:
         self.path = path.resolve() if path is not None else None
@@ -94,24 +119,35 @@ class BootstrapCredentialStore:
         with self._lock:
             return normalized in self._credentials
 
-    def token_for(self, alias: str) -> str:
+    def token_for(self, alias: str, device_id: str) -> str:
         normalized = normalize_registry_alias(alias)
+        expected_device = _valid_device_id(device_id)
         with self._lock:
             credential = self._credentials.get(normalized)
             if credential is None:
                 raise BootstrapCredentialError(f"PPU Bootstrap is not paired: {normalized}")
+            if credential.device_id != expected_device:
+                raise BootstrapCredentialError(
+                    "registered alias now resolves to a different Bootstrap device_id; explicit re-pairing is required"
+                )
             return credential.token
 
-    def set(self, alias: str, token: str) -> None:
+    def set(self, alias: str, device_id: str, token: str) -> None:
         if self.path is None:
             raise BootstrapCredentialError(
                 "Bootstrap credential persistence is disabled; configure Manager runtime registry state"
             )
         normalized = normalize_registry_alias(alias)
-        validated = _valid_token(token)
+        validated_device = _valid_device_id(device_id)
+        validated_token = _valid_token(token)
         with self._lock:
             previous = dict(self._credentials)
-            self._credentials[normalized] = BootstrapCredential(normalized, validated, _utc_now())
+            self._credentials[normalized] = BootstrapCredential(
+                normalized,
+                validated_device,
+                validated_token,
+                _utc_now(),
+            )
             try:
                 self._persist_locked()
             except Exception:
@@ -139,6 +175,7 @@ class BootstrapCredentialStore:
             credential = self._credentials.get(normalized)
         return {
             "paired": credential is not None,
+            "device_id": credential.device_id if credential is not None else None,
             "credential_persistence": "file" if self.path is not None else "disabled",
             "updated_at": credential.updated_at if credential is not None else None,
         }
@@ -149,7 +186,11 @@ class BootstrapCredentialStore:
         payload = {
             "schema_version": BOOTSTRAP_CREDENTIAL_SCHEMA,
             "credentials": {
-                alias: {"token": credential.token, "updated_at": credential.updated_at}
+                alias: {
+                    "device_id": credential.device_id,
+                    "token": credential.token,
+                    "updated_at": credential.updated_at,
+                }
                 for alias, credential in sorted(self._credentials.items())
             },
         }
@@ -191,13 +232,18 @@ class BootstrapCredentialStore:
         result: dict[str, BootstrapCredential] = {}
         for alias, record in raw.items():
             normalized = normalize_registry_alias(alias)
-            if normalized != alias or not isinstance(record, dict) or set(record) != {"token", "updated_at"}:
+            if (
+                normalized != alias
+                or not isinstance(record, dict)
+                or set(record) != {"device_id", "token", "updated_at"}
+            ):
                 raise BootstrapCredentialError("Bootstrap credential entry is invalid")
+            device_id = _valid_device_id(record.get("device_id"))
             token = _valid_token(record.get("token"))
             updated_at = record.get("updated_at")
             if not isinstance(updated_at, str) or not updated_at:
                 raise BootstrapCredentialError("Bootstrap credential updated_at is invalid")
-            result[normalized] = BootstrapCredential(normalized, token, updated_at)
+            result[normalized] = BootstrapCredential(normalized, device_id, token, updated_at)
         return result
 
 
@@ -254,7 +300,13 @@ class BootstrapHttpClient:
         return self._json("POST", f"/v1/uploads/{upload_id}/chunks", token=token, body=body, timeout_s=30.0)
 
     def commit_upload(self, token: str, upload_id: str) -> tuple[int, dict[str, Any]]:
-        return self._json("POST", f"/v1/uploads/{upload_id}/commit", token=token, body={"action": "commit"}, timeout_s=30.0)
+        return self._json(
+            "POST",
+            f"/v1/uploads/{upload_id}/commit",
+            token=token,
+            body={"action": "commit"},
+            timeout_s=30.0,
+        )
 
     def start_deployment(self, token: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
         return self._json("POST", "/v1/deployments", token=token, body=body, timeout_s=10.0)
@@ -283,33 +335,41 @@ class ManagerBootstrapCoordinator:
             raise RegistryEntryNotFound(f"PPU registry alias was not found: {normalized}")
         return normalized, record
 
-    def _client(self, alias: str):
+    def _live(self, alias: str):
         normalized, record = self._entry(alias)
         endpoint = bootstrap_endpoint_for_gateway(record.endpoint)
-        return normalized, self.client_factory(endpoint, self.timeout_s)
+        client = self.client_factory(endpoint, self.timeout_s)
+        status, payload = client.status()
+        if status != 200 or payload.get("bootstrap", {}).get("state") != "bootstrap_ready":
+            raise BootstrapManagerError("PPU Bootstrap is not ready")
+        device_id = _device_id_from_status(payload)
+        return normalized, record, client, payload, device_id
+
+    def _authenticated(self, alias: str):
+        normalized, record, client, payload, device_id = self._live(alias)
+        token = self.credentials.token_for(normalized, device_id)
+        return normalized, record, client, payload, device_id, token
 
     def status(self, alias: str) -> dict[str, Any]:
-        normalized, client = self._client(alias)
-        status, payload = client.status()
+        normalized, _record, _client, payload, device_id = self._live(alias)
+        pairing = self.credentials.public_state(normalized)
+        pairing = dict(pairing)
+        pairing["device_match"] = pairing.get("device_id") in {None, device_id}
         return {
-            "ok": status == 200 and payload.get("bootstrap", {}).get("state") == "bootstrap_ready",
+            "ok": True,
             "ppu_alias": normalized,
             "bootstrap_endpoint_policy": "same-host:18081",
-            "pairing": self.credentials.public_state(normalized),
+            "pairing": pairing,
             "bootstrap": payload,
-            "upstream_status": status,
+            "upstream_status": 200,
         }
 
     def pair(self, alias: str, token: str) -> dict[str, Any]:
-        normalized, client = self._client(alias)
-        # Read-only reachability/identity is checked before persisting the secret.
-        # The current Bootstrap API has no authenticated no-op endpoint, so token
-        # correctness is proven by the first authenticated upload operation.  This
-        # limitation is explicit rather than pretending pairing has been verified.
-        status, payload = client.status()
-        if status != 200 or payload.get("bootstrap", {}).get("state") != "bootstrap_ready":
-            raise BootstrapManagerError("PPU Bootstrap is not ready for pairing")
-        self.credentials.set(normalized, token)
+        normalized, _record, _client, _payload, device_id = self._live(alias)
+        # Phase 3 stores a device-bound token after a read-only identity probe.
+        # Token correctness is still proven by the first authenticated Bootstrap
+        # operation because the current PPU endpoint has no authenticated no-op.
+        self.credentials.set(normalized, device_id, token)
         return {
             "ok": True,
             "ppu_alias": normalized,
@@ -318,17 +378,26 @@ class ManagerBootstrapCoordinator:
         }
 
     def create_upload(self, alias: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        normalized, client = self._client(alias)
-        return client.create_upload(self.credentials.token_for(normalized), body)
+        _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)
+        return client.create_upload(token, body)
 
     def append_chunk(self, alias: str, upload_id: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        normalized, client = self._client(alias)
-        return client.append_chunk(self.credentials.token_for(normalized), upload_id, body)
+        _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)
+        return client.append_chunk(token, upload_id, body)
 
     def commit_upload(self, alias: str, upload_id: str) -> tuple[int, dict[str, Any]]:
-        normalized, client = self._client(alias)
-        return client.commit_upload(self.credentials.token_for(normalized), upload_id)
+        _normalized, _record, client, _payload, _device_id, token = self._authenticated(alias)
+        return client.commit_upload(token, upload_id)
 
     def start_deployment(self, alias: str, body: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
-        normalized, client = self._client(alias)
-        return client.start_deployment(self.credentials.token_for(normalized), body)
+        _normalized, record, client, _payload, _device_id, token = self._authenticated(alias)
+        allowed = {"upload_id", "ppu_id", "facility_id", "display_name"}
+        unexpected = set(body) - allowed
+        if unexpected:
+            raise BootstrapManagerError(f"unsupported Manager deployment fields: {', '.join(sorted(unexpected))}")
+        parsed = urlsplit(record.endpoint)
+        if parsed.hostname is None:
+            raise BootstrapManagerError("registered Plasma Gateway endpoint has no host")
+        request = dict(body)
+        request["gateway_host"] = parsed.hostname
+        return client.start_deployment(token, request)
