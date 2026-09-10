@@ -270,7 +270,8 @@ if response.get("payload_base64") != "AA==":
 PY
 
   say "PASS: real Z2 ARMv7 PS runtime + local PS diagnostic loopback + Site Desired service wiring"
-  say "qualification boundary: persistence wiring only; Runtime apply and PL/FPGA/Site/power/real-IC readiness remain separate"
+  say "qualification boundary: persistence wiring only; Runtime apply is not claimed"
+  say "PL/FPGA/Site/power/real-IC readiness is separate"
 }
 
 show_status() {
