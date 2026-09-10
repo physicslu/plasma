@@ -1,0 +1,267 @@
+{
+  "aggregate": {
+    "acquisition_failure": 0,
+    "acquisition_success": 8,
+    "active_candidate_targets": 8,
+    "active_exact_icpn_candidates": 25,
+    "attempted": 11,
+    "bounded_discovery_clean": true,
+    "commercial_identity_clean": false,
+    "commercial_identity_unresolved_targets": 3,
+    "commercial_identity_verified_targets": 8,
+    "dispositioned_targets": 11,
+    "excluded_non_active_part_numbers": 3,
+    "identity_manual_intervention_required": 0,
+    "lifecycle_excluded_targets": 0,
+    "openocd_routing": {
+      "ambiguous": 0,
+      "gates_commercial_identity": false,
+      "not_applicable": 3,
+      "unique": 8,
+      "unmapped": 0
+    },
+    "routing_followup_required": 0,
+    "source_unavailable_exclusions": 3
+  },
+  "claims": {
+    "canonical_dataset_admission": false,
+    "cmsis_alias_is_commercial_identity": false,
+    "production_admission_ready": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  },
+  "family": "STM32G4",
+  "phase": "4.9B",
+  "pilot_id": "stm32g4-phase4.9b-official-st-discovery-2026-09-10",
+  "schema_version": 1,
+  "source_unavailable": [
+    {
+      "base_device": "STM32G411C6",
+      "reason": "canonical_product_page_http_404",
+      "subfamily": "STM32G411"
+    },
+    {
+      "base_device": "STM32G414CB",
+      "reason": "canonical_product_page_http_404",
+      "subfamily": "STM32G414"
+    },
+    {
+      "base_device": "STM32G471CC",
+      "reason": "canonical_product_page_http_404",
+      "subfamily": "STM32G471"
+    }
+  ],
+  "targets": [
+    {
+      "base_device": "STM32G411C6",
+      "commercial_identity_status": "unverified",
+      "disposition": "source_unavailable_excluded",
+      "routing_gates_commercial_identity": false,
+      "source_unavailable_status": "http_404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g411c6.html",
+      "subfamily": "STM32G411"
+    },
+    {
+      "base_device": "STM32G414CB",
+      "commercial_identity_status": "unverified",
+      "disposition": "source_unavailable_excluded",
+      "routing_gates_commercial_identity": false,
+      "source_unavailable_status": "http_404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g414cb.html",
+      "subfamily": "STM32G414"
+    },
+    {
+      "base_device": "STM32G431C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "668104235977e5e0e235f246d0c7b98ca82232777f36bcdadff7c87204853bf5",
+      "exact_icpns": [
+        "STM32G431C6T6",
+        "STM32G431C6U6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32g4x.cfg"
+      ],
+      "rendered_dom_sha256": "d497532790c62fc9907d1910d8a5c21df827a740b408a8feacb3eb8f7ccdfc57",
+      "retrieved_at_utc": "2026-09-10T00:29:39Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g431c6.html",
+      "subfamily": "STM32G431"
+    },
+    {
+      "base_device": "STM32G441CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "5ffc8219c37780e6a6e54a1698abc39467337ccda6b6725d1c1f137235c8aa21",
+      "exact_icpns": [
+        "STM32G441CBT6",
+        "STM32G441CBU6",
+        "STM32G441CBY6TR"
+      ],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32G441CBT3",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        },
+        {
+          "icpn": "STM32G441CBU3",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32g4x.cfg"
+      ],
+      "rendered_dom_sha256": "5e63257b7fbf66bdf895a9222efc1cda0f62fdfa6ae8a23082b1677802ff49cd",
+      "retrieved_at_utc": "2026-09-10T00:29:46Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g441cb.html",
+      "subfamily": "STM32G441"
+    },
+    {
+      "base_device": "STM32G471CC",
+      "commercial_identity_status": "unverified",
+      "disposition": "source_unavailable_excluded",
+      "routing_gates_commercial_identity": false,
+      "source_unavailable_status": "http_404",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g471cc.html",
+      "subfamily": "STM32G471"
+    },
+    {
+      "base_device": "STM32G473CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "fa98ceffcb9f52e3d1ffd6294c99281ddd0307a4d4a0f2cee8375b7a19be2330",
+      "exact_icpns": [
+        "STM32G473CBT3",
+        "STM32G473CBT6",
+        "STM32G473CBU6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32g4x.cfg"
+      ],
+      "rendered_dom_sha256": "3f75d8059b88126101a38873c1e6b6ad62da38864a057661c91c6e784ead5fe0",
+      "retrieved_at_utc": "2026-09-10T00:29:58Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g473cb.html",
+      "subfamily": "STM32G473"
+    },
+    {
+      "base_device": "STM32G474CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "1bafa1ca26a1f6d7d4bf20295021a2959b26060e93fabe02a0d7b02708227550",
+      "exact_icpns": [
+        "STM32G474CBT3",
+        "STM32G474CBT3TR",
+        "STM32G474CBT6TR",
+        "STM32G474CBU6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32g4x.cfg"
+      ],
+      "rendered_dom_sha256": "dd4f258fd3c9c12b7c91a527974ef1dbe2ff4d44e7e32465e94d6f2dab0f93ca",
+      "retrieved_at_utc": "2026-09-10T00:30:15Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g474cb.html",
+      "subfamily": "STM32G474"
+    },
+    {
+      "base_device": "STM32G483CE",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "90a5bbd6bb967c30ce98834344c32bf8b960c12cce7604deddcded43db747b0f",
+      "exact_icpns": [
+        "STM32G483CET3",
+        "STM32G483CET6",
+        "STM32G483CEU6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32g4x.cfg"
+      ],
+      "rendered_dom_sha256": "1849437b7515740ea6f2e3e8f78d1dc8ff23eba004a3f5defc021fdce8a064e5",
+      "retrieved_at_utc": "2026-09-10T00:37:54Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g483ce.html",
+      "subfamily": "STM32G483"
+    },
+    {
+      "base_device": "STM32G484CE",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "fe6733a8c14dab7ca9b1cc84ed5162f18759d4e6538da04fbd5b1f21a1ce3317",
+      "exact_icpns": [
+        "STM32G484CET6",
+        "STM32G484CEU3",
+        "STM32G484CEU6"
+      ],
+      "excluded_non_active_part_numbers": [
+        {
+          "icpn": "STM32G484CET3",
+          "marketing_status": "Proposal Marketing proposal for customer feedback. No commitment taken to design or produce. EN"
+        }
+      ],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32g4x.cfg"
+      ],
+      "rendered_dom_sha256": "5db6597e9720b7969ca59995293bc1c73de726e9e02328996f6e449c13462fd8",
+      "retrieved_at_utc": "2026-09-10T00:38:01Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g484ce.html",
+      "subfamily": "STM32G484"
+    },
+    {
+      "base_device": "STM32G491CC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "39e42aef336b98eb985c7fbd64cba803e3085c39c4cd8b9415bde2c385b39cc2",
+      "exact_icpns": [
+        "STM32G491CCT3",
+        "STM32G491CCT6",
+        "STM32G491CCT6TR",
+        "STM32G491CCU6",
+        "STM32G491CCU6TR"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32g4x.cfg"
+      ],
+      "rendered_dom_sha256": "bad076a948f2198c2273c9a77b6d786cecb10c698a284878902981db01752272",
+      "retrieved_at_utc": "2026-09-10T00:38:08Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g491cc.html",
+      "subfamily": "STM32G491"
+    },
+    {
+      "base_device": "STM32G4A1CE",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence_section_sha256": "3886c31c7e046e2c993a4d36688df1b5b894a690575a24686e094cc340ca1d8d",
+      "exact_icpns": [
+        "STM32G4A1CET6",
+        "STM32G4A1CEU6"
+      ],
+      "excluded_non_active_part_numbers": [],
+      "historical_openocd_routing_status": "unique",
+      "historical_openocd_target_configs": [
+        "tcl/target/stm32g4x.cfg"
+      ],
+      "rendered_dom_sha256": "62d37a377bae8e380522f8e411df3b9714329e2d6532b592f6608f65e3a9c6e3",
+      "retrieved_at_utc": "2026-09-10T00:38:14Z",
+      "routing_gates_commercial_identity": false,
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32g4a1ce.html",
+      "subfamily": "STM32G4A1"
+    }
+  ]
+}
