@@ -152,7 +152,7 @@ export function commitManagerPpuBootstrapUpload(alias: string, uploadId: string)
 
 export function startManagerPpuBootstrapDeployment(
   alias: string,
-  input: { upload_id: string; ppu_id: string; facility_id: string; display_name: string },
+  input: { upload_id: string; gateway_host: string; ppu_id: string; facility_id: string; display_name: string },
 ): Promise<DeploymentPayload> {
   return jsonRequest<DeploymentPayload>(`${root(alias)}/deployments`, {
     method: "POST",
