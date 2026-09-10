@@ -33,10 +33,18 @@ class SiteRuntimeActivationSupportMixin:
         *,
         actual_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        payload = super()._site_configuration_payload(actual_snapshot=actual_snapshot)
+        snapshot = actual_snapshot
+        if snapshot is None:
+            try:
+                snapshot = self._local_snapshot()
+            except Exception:
+                snapshot = None
+        payload = super()._site_configuration_payload(actual_snapshot=snapshot)
         configuration = payload["site_configuration"]
         configuration["runtime_apply_supported"] = self._runtime_activation_socket is not None
         configuration["desired_runtime_revision"] = desired_runtime_revision(configuration)
+        ppu = snapshot.get("ppu") if isinstance(snapshot, dict) else None
+        configuration["runtime_ppu_id"] = ppu.get("ppu_id") if isinstance(ppu, dict) else None
         return payload
 
     def _runtime_activation_status_payload(self) -> dict[str, Any]:
@@ -46,8 +54,7 @@ class SiteRuntimeActivationSupportMixin:
             configuration = site_payload["site_configuration"]
             reconciliation = configuration["reconciliation"]
             revision = configuration["desired_runtime_revision"]
-            ppu = snapshot.get("ppu") if isinstance(snapshot, dict) else None
-            ppu_id = ppu.get("ppu_id") if isinstance(ppu, dict) else None
+            ppu_id = configuration["runtime_ppu_id"]
         except Exception:
             desired = self._site_configuration_controller().current()
             revision = desired_runtime_revision(
