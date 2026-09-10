@@ -83,6 +83,7 @@ def validate_workstream_registry() -> None:
         ".github/workflows/python-tests.yml": "sw_ppu",
         ".github/workflows/ppu-release.yml": "sw_ppu",
         ".github/workflows/z2-ps-release.yml": "sw_ppu",
+        ".github/workflows/persistent-integration-host.yml": "sw_ppu",
         ".github/workflows/device-catalog-validation.yml": "icpn",
         ".github/workflows/device-catalog-current-validation.yml": "icpn",
         ".github/workflows/device-catalog-stm32-family-validation.yml": "icpn",
@@ -109,6 +110,7 @@ def main() -> int:
     validate_workstream_registry()
 
     python_tests = read("python-tests.yml")
+    repository_contracts = read("repository-contracts.yml")
     ppu_release = read("ppu-release.yml")
     z2_release = read("z2-ps-release.yml")
     ai_support = read("ic-support-validation.yml")
@@ -131,6 +133,27 @@ def main() -> int:
         '"!scripts/tests/test-ci-domain-boundaries.py"',
         2,
         owner="SW/PPU Python/PL",
+    )
+
+    # Persistent L4 workflow policy is part of PPU qualification, not the
+    # generic Python source-test trigger surface. Keep its dedicated security
+    # test and workflow path bound to the PPU release gate, and route workflow
+    # changes through repository CI-boundary governance as well.
+    require(
+        ppu_release,
+        '".github/workflows/persistent-integration-host.yml"',
+        owner="SW/PPU persistent L4 qualification",
+    )
+    require(
+        ppu_release,
+        "software/python/tests/test_persistent_integration_host_security.py",
+        owner="SW/PPU persistent L4 qualification",
+    )
+    require_count(
+        repository_contracts,
+        '".github/workflows/persistent-integration-host.yml"',
+        3,
+        owner="REPO persistent L4 governance",
     )
 
     # Preserve positive ownership so trigger cleanup cannot be satisfied by
