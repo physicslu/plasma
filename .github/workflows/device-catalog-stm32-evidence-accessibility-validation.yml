@@ -1,6 +1,7 @@
 name: STM32 evidence accessibility validation
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "data/device-catalog/research/stm32_evidence_accessibility_probe.py"
@@ -9,6 +10,10 @@ on:
       - "data/device-catalog/research/stm32-evidence-accessibility-probe-manifest.json"
       - "data/device-catalog/research/stm32-evidence-accessibility-probe-baseline.json"
       - "data/device-catalog/research/evidence/stm32-u0-c0-l1-evidence-accessibility-probe-live-2026-09-10/**"
+      - "data/device-catalog/research/stm32-u0-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-next-family-selection.json"
+      - "data/device-catalog/research/test_stm32_u0_c0_ordering_selection.py"
+      - "data/device-catalog/research/validate_stm32_u0_c0_ordering_selection.py"
       - "data/device-catalog/research/stm32-cross-family-prioritization-baseline.json"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/production/icpn-v1-manifest.json"
@@ -23,6 +28,10 @@ on:
       - "data/device-catalog/research/stm32-evidence-accessibility-probe-manifest.json"
       - "data/device-catalog/research/stm32-evidence-accessibility-probe-baseline.json"
       - "data/device-catalog/research/evidence/stm32-u0-c0-l1-evidence-accessibility-probe-live-2026-09-10/**"
+      - "data/device-catalog/research/stm32-u0-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/stm32-next-family-selection.json"
+      - "data/device-catalog/research/test_stm32_u0_c0_ordering_selection.py"
+      - "data/device-catalog/research/validate_stm32_u0_c0_ordering_selection.py"
       - "data/device-catalog/research/stm32-cross-family-prioritization-baseline.json"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/production/icpn-v1-manifest.json"
@@ -44,3 +53,7 @@ jobs:
         run: python data/device-catalog/research/test_stm32_evidence_accessibility_probe.py
       - name: Replay immutable retained manufacturer evidence
         run: python data/device-catalog/research/validate_stm32_evidence_accessibility_probe_retained.py
+      - name: Validate U0/C0 ordering-selection negative controls
+        run: python data/device-catalog/research/test_stm32_u0_c0_ordering_selection.py
+      - name: Replay U0/C0 ordering evidence and research selection
+        run: python data/device-catalog/research/validate_stm32_u0_c0_ordering_selection.py
