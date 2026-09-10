@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tempfile
 import textwrap
 import unittest
@@ -8,7 +9,7 @@ from unittest import mock
 
 from plasma_core.config import load_config
 from plasma_core.errors import ErrorCode, PlasmaError
-from plasma_web.site_configuration import SiteConfigurationController
+from plasma_web.site_configuration import SiteConfigurationConflictError, SiteConfigurationController
 
 
 CONFIG = """
@@ -52,17 +53,25 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         self.path.write_text(textwrap.dedent(CONFIG).lstrip(), encoding="utf-8")
         self.controller = SiteConfigurationController(self.path)
 
-    def test_current_reads_canonical_ppu_configuration(self) -> None:
+    def revision(self, site_id: int) -> str:
+        site = next(item for item in self.controller.current()["sites"] if item["site_id"] == site_id)
+        return site["desired_revision"]
+
+    def test_current_reads_canonical_ppu_configuration_with_deterministic_revision(self) -> None:
+        current = self.controller.current()
+        self.assertEqual(current["source"], "canonical_ppu_config")
+        self.assertEqual(len(current["sites"]), 2)
         self.assertEqual(
-            self.controller.current(),
-            {
-                "source": "canonical_ppu_config",
-                "sites": [
-                    {"site_id": 1, "enabled": True, "interface": "mock", "target": "TARGET-A"},
-                    {"site_id": 2, "enabled": False, "interface": "mock", "target": "TARGET-B"},
-                ],
-            },
+            {key: value for key, value in current["sites"][0].items() if key != "desired_revision"},
+            {"site_id": 1, "enabled": True, "interface": "mock", "target": "TARGET-A"},
         )
+        self.assertEqual(
+            {key: value for key, value in current["sites"][1].items() if key != "desired_revision"},
+            {"site_id": 2, "enabled": False, "interface": "mock", "target": "TARGET-B"},
+        )
+        for site in current["sites"]:
+            self.assertRegex(site["desired_revision"], r"^sha256:[0-9a-f]{64}$")
+        self.assertEqual(self.controller.current()["sites"][0]["desired_revision"], current["sites"][0]["desired_revision"])
 
     def test_current_expands_effective_defaults_when_yaml_omits_target(self) -> None:
         self.path.write_text(
@@ -76,14 +85,16 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         current = SiteConfigurationController(self.path).current()
 
         self.assertEqual(current["sites"][1]["target"], "STM32F103C8T6")
+        self.assertRegex(current["sites"][1]["desired_revision"], r"^sha256:[0-9a-f]{64}$")
 
     def test_update_persists_only_writable_site_fields(self) -> None:
         saved = self.controller.update(
             1,
             {"enabled": False, "interface": "openocd", "target": "STM32F103C8T6"},
+            expected_revision=self.revision(1),
         )
         self.assertEqual(
-            saved["sites"][0],
+            {key: value for key, value in saved["sites"][0].items() if key != "desired_revision"},
             {"site_id": 1, "enabled": False, "interface": "openocd", "target": "STM32F103C8T6"},
         )
 
@@ -99,9 +110,45 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         saved = self.controller.update(
             2,
             {"enabled": True, "interface": "fpga", "target": "TARGET-C"},
+            expected_revision=self.revision(2),
         )
         after_restart = SiteConfigurationController(self.path).current()
         self.assertEqual(after_restart, saved)
+
+    def test_revision_changes_only_for_modified_site(self) -> None:
+        before_one = self.revision(1)
+        before_two = self.revision(2)
+        saved = self.controller.update(
+            1,
+            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            expected_revision=before_one,
+        )
+        after_one = saved["sites"][0]["desired_revision"]
+        after_two = saved["sites"][1]["desired_revision"]
+        self.assertNotEqual(after_one, before_one)
+        self.assertEqual(after_two, before_two)
+        self.assertTrue(re.fullmatch(r"sha256:[0-9a-f]{64}", after_one))
+
+    def test_stale_revision_is_rejected_without_mutation(self) -> None:
+        stale = self.revision(1)
+        self.controller.update(
+            1,
+            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            expected_revision=stale,
+        )
+        before_conflict = self.path.read_text(encoding="utf-8")
+
+        with self.assertRaises(SiteConfigurationConflictError) as caught:
+            self.controller.update(
+                1,
+                {"enabled": True, "interface": "mock", "target": "TARGET-STALE"},
+                expected_revision=stale,
+            )
+
+        self.assertEqual(caught.exception.site_id, 1)
+        self.assertEqual(caught.exception.expected_revision, stale)
+        self.assertNotEqual(caught.exception.current_revision, stale)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), before_conflict)
 
     def test_unknown_site_is_rejected_without_mutation(self) -> None:
         before = self.path.read_text(encoding="utf-8")
@@ -109,6 +156,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
             self.controller.update(
                 3,
                 {"enabled": True, "interface": "mock", "target": "TARGET-C"},
+                expected_revision=self.revision(1),
             )
         self.assertEqual(caught.exception.code, ErrorCode.SITE_INVALID)
         self.assertEqual(self.path.read_text(encoding="utf-8"), before)
@@ -122,9 +170,10 @@ class SiteConfigurationControllerTests(unittest.TestCase):
             {"enabled": True, "interface": "mock", "target": "TARGET-A", "extra": True},
         )
         before = self.path.read_text(encoding="utf-8")
+        expected_revision = self.revision(1)
         for candidate in invalid:
             with self.subTest(candidate=candidate), self.assertRaises(PlasmaError) as caught:
-                self.controller.update(1, candidate)
+                self.controller.update(1, candidate, expected_revision=expected_revision)
             self.assertEqual(caught.exception.code, ErrorCode.CONFIG_INVALID)
             self.assertEqual(self.path.read_text(encoding="utf-8"), before)
 
@@ -135,6 +184,7 @@ class SiteConfigurationControllerTests(unittest.TestCase):
                 self.controller.update(
                     1,
                     {"enabled": False, "interface": "mock", "target": "TARGET-A"},
+                    expected_revision=self.revision(1),
                 )
         self.assertEqual(self.path.read_text(encoding="utf-8"), before)
 
