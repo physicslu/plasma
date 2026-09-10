@@ -1,0 +1,75 @@
+name: STM32 U0 C0 ordering-document accessibility one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32-evidence-accessibility-probe
+    paths:
+      - ".github/workflows/device-catalog-stm32-u0-c0-ordering-accessibility-oneoff.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate offline ordering-document contracts
+        run: python data/device-catalog/research/test_stm32_ordering_document_accessibility_probe.py
+      - name: Install pinned browser and PDF text tooling
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.62.0
+          python -m playwright install --with-deps chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+      - name: Run bounded live official-ST ordering-document probe
+        run: |
+          set +e
+          mkdir -p /tmp/stm32-ordering-doc-artifact/evidence
+          xvfb-run -a python data/device-catalog/research/run_stm32_ordering_document_accessibility_probe.py \
+            --output /tmp/stm32-ordering-doc-artifact/summary.json \
+            --evidence-dir /tmp/stm32-ordering-doc-artifact/evidence \
+            --timeout 90
+          rc=$?
+          echo "$rc" > /tmp/stm32-ordering-doc-artifact/runner-exit-code.txt
+          python - <<'PY'
+          import json, os, platform, sys
+          from pathlib import Path
+          meta={
+              'github_run_id':os.environ['GITHUB_RUN_ID'],
+              'github_sha':os.environ['GITHUB_SHA'],
+              'github_ref_name':os.environ['GITHUB_REF_NAME'],
+              'python_version':sys.version,
+              'platform':platform.platform(),
+          }
+          Path('/tmp/stm32-ordering-doc-artifact/execution-metadata.json').write_text(json.dumps(meta,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          PY
+          exit 0
+      - name: Upload immutable ordering-document probe candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32-u0-c0-ordering-document-accessibility
+          path: /tmp/stm32-ordering-doc-artifact
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce bounded probe gate after artifact upload
+        run: |
+          test "$(cat /tmp/stm32-ordering-doc-artifact/runner-exit-code.txt)" = "0"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/stm32-ordering-doc-artifact/summary.json').read_text())
+          assert p['attempted_targets'] == 9
+          assert p['dispositioned_targets'] == 9
+          assert p['manual_review_targets'] == 0
+          assert p['bounded_probe_clean'] is True
+          assert p['selected_next_research_family'] is None
+          assert all(value is False for value in p['claims'].values())
+          print(json.dumps({'by_series':p['by_series'],'selected_next_research_family':None},indent=2,sort_keys=True))
+          PY
