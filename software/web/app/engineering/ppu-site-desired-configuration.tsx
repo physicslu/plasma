@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getManagerPpuSites,
+  ManagerApiError,
   saveManagerPpuSite,
   type ManagerRegistryEntry,
   type PPUSiteConfigurationPayload,
@@ -53,8 +54,10 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
   const alias = entry.alias;
   const [payload, setPayload] = useState<PPUSiteConfigurationPayload | null>(null);
   const [drafts, setDrafts] = useState<Record<number, PPUSiteDesired>>({});
+  const [baselineRevisions, setBaselineRevisions] = useState<Record<number, string>>({});
   const [dirty, setDirty] = useState<Set<number>>(new Set());
   const dirtyRef = useRef<Set<number>>(new Set());
+  const [conflicts, setConflicts] = useState<Set<number>>(new Set());
   const [savingSite, setSavingSite] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,12 +68,28 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
     setDirty(next);
   }, []);
 
+  const clearConflict = useCallback((siteId: number) => {
+    setConflicts(current => {
+      if (!current.has(siteId)) return current;
+      const next = new Set(current);
+      next.delete(siteId);
+      return next;
+    });
+  }, []);
+
   const applyPayload = useCallback((next: PPUSiteConfigurationPayload) => {
     setPayload(next);
     setDrafts(current => {
       const merged = { ...current };
       for (const site of next.site_configuration.sites) {
         if (!dirtyRef.current.has(site.site_id)) merged[site.site_id] = { ...site.desired };
+      }
+      return merged;
+    });
+    setBaselineRevisions(current => {
+      const merged = { ...current };
+      for (const site of next.site_configuration.sites) {
+        if (!dirtyRef.current.has(site.site_id)) merged[site.site_id] = site.desired_revision;
       }
       return merged;
     });
@@ -93,7 +112,9 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
     const initial = window.setTimeout(() => {
       setPayload(null);
       setDrafts({});
+      setBaselineRevisions({});
       replaceDirty(new Set());
+      setConflicts(new Set());
       setNotice(null);
       setError(null);
       if (alias) void refresh();
@@ -129,33 +150,48 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
   }
 
   function updateDraft(siteId: number, patch: Partial<PPUSiteDesired>) {
-    const persisted = payload?.site_configuration.sites.find(site => site.site_id === siteId)?.desired;
+    const persistedSite = payload?.site_configuration.sites.find(site => site.site_id === siteId);
+    const persisted = persistedSite?.desired;
     const baseline = drafts[siteId] ?? persisted;
     if (!baseline) return;
     const nextDraft = { ...baseline, ...patch };
     setDrafts(current => ({ ...current, [siteId]: nextDraft }));
-    if (persisted && sameDesired(nextDraft, persisted)) clearDirty(siteId);
-    else markDirty(siteId);
+    if (persisted && persistedSite && sameDesired(nextDraft, persisted)) {
+      clearDirty(siteId);
+      clearConflict(siteId);
+      setBaselineRevisions(current => ({ ...current, [siteId]: persistedSite.desired_revision }));
+    } else {
+      if (!dirtyRef.current.has(siteId) && persistedSite) {
+        setBaselineRevisions(current => ({ ...current, [siteId]: persistedSite.desired_revision }));
+      }
+      markDirty(siteId);
+    }
     setNotice(null);
   }
 
   function resetDraft(siteId: number) {
-    const desired = payload?.site_configuration.sites.find(site => site.site_id === siteId)?.desired;
-    if (!desired) return;
-    setDrafts(current => ({ ...current, [siteId]: { ...desired } }));
+    const site = payload?.site_configuration.sites.find(item => item.site_id === siteId);
+    if (!site) return;
+    setDrafts(current => ({ ...current, [siteId]: { ...site.desired } }));
+    setBaselineRevisions(current => ({ ...current, [siteId]: site.desired_revision }));
     clearDirty(siteId);
+    clearConflict(siteId);
+    setNotice(`SITE${siteId} Draft reset to the latest saved Desired configuration.`);
   }
 
   async function saveSite(siteId: number) {
-    if (!alias || writeBlockReason) return;
+    if (!alias || writeBlockReason || conflicts.has(siteId)) return;
     const desired = drafts[siteId];
-    if (!desired) return;
+    const persistedSite = payload?.site_configuration.sites.find(site => site.site_id === siteId);
+    const expectedRevision = baselineRevisions[siteId] ?? persistedSite?.desired_revision;
+    if (!desired || !expectedRevision) return;
     setSavingSite(siteId);
     setError(null);
     setNotice(null);
     try {
-      const next = await saveManagerPpuSite(alias, siteId, desired);
+      const next = await saveManagerPpuSite(alias, siteId, desired, expectedRevision);
       clearDirty(siteId);
+      clearConflict(siteId);
       setPayload(next);
       setDrafts(current => {
         const updated = { ...current };
@@ -164,10 +200,23 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
         return updated;
       });
       const saved = next.site_configuration.sites.find(site => site.site_id === siteId);
+      if (saved) {
+        setBaselineRevisions(current => ({ ...current, [siteId]: saved.desired_revision }));
+      }
       const reconciliation = saved ? reconciliationLabel(saved.reconciliation) : overallLabel(next.site_configuration.reconciliation);
       setNotice(`SITE${siteId} desired configuration saved. Runtime reconciliation: ${reconciliation}.`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : `SITE${siteId} save failed`);
+      if (
+        requestError instanceof ManagerApiError
+        && requestError.status === 412
+        && requestError.code === "site_desired_conflict"
+      ) {
+        setConflicts(current => new Set(current).add(siteId));
+        setError(`SITE${siteId} Desired changed elsewhere after this Draft was created. Reset Draft to the latest Desired state, then reapply and confirm the intended change.`);
+        void refresh(true);
+      } else {
+        setError(requestError instanceof Error ? requestError.message : `SITE${siteId} save failed`);
+      }
     } finally {
       setSavingSite(null);
     }
@@ -198,10 +247,10 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
 
       {payload && (
         <div className="ppuConfigurationStateFlow" aria-label="Draft Desired Runtime configuration state">
-          <article className="ppuConfigurationStateStep" data-tone={dirty.size > 0 ? "warning" : "healthy"}>
+          <article className="ppuConfigurationStateStep" data-tone={conflicts.size > 0 ? "danger" : dirty.size > 0 ? "warning" : "healthy"}>
             <small>Draft</small>
-            <strong>{dirty.size > 0 ? "Modified" : "Clean"}</strong>
-            <span>{dirty.size > 0 ? `${dirty.size} Site draft${dirty.size === 1 ? "" : "s"} not saved` : "Browser edits match saved Desired state"}</span>
+            <strong>{conflicts.size > 0 ? "Conflict" : dirty.size > 0 ? "Modified" : "Clean"}</strong>
+            <span>{conflicts.size > 0 ? `${conflicts.size} stale Site draft${conflicts.size === 1 ? "" : "s"} blocked from overwriting newer Desired state` : dirty.size > 0 ? `${dirty.size} Site draft${dirty.size === 1 ? "" : "s"} not saved` : "Browser edits match saved Desired state"}</span>
           </article>
           <span className="ppuConfigurationStateArrow" aria-hidden="true">→</span>
           <article className="ppuConfigurationStateStep" data-tone="info">
@@ -225,6 +274,12 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
         </p>
       )}
 
+      {conflicts.size > 0 && (
+        <p className="ppuRegistryMessage error" role="alert">
+          <strong>Desired changed elsewhere.</strong> Stale Drafts are fail-closed and cannot overwrite the newer saved state. Reset the affected Draft to the latest Desired state before reapplying the intended change.
+        </p>
+      )}
+
       {payload?.site_configuration.sites.length ? (
         <div className="ppuTableWrap">
           <table className="ppuTable">
@@ -243,12 +298,14 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
               {payload.site_configuration.sites.map(site => {
                 const draft = drafts[site.site_id] ?? site.desired;
                 const isDirty = dirty.has(site.site_id);
+                const isConflict = conflicts.has(site.site_id);
                 const disabled = Boolean(writeBlockReason) || savingSite !== null;
                 return (
                   <tr key={`${alias}-desired-site-${site.site_id}`} className={isDirty ? "ppuSiteDirtyRow" : ""}>
                     <td>
                       <span className="ppuIdLink">SITE{site.site_id}</span>
                       {isDirty && <span className="ppuDirtyBadge">Unsaved Draft</span>}
+                      {isConflict && <span className="ppuReconciliationBadge" data-tone="danger">Desired changed elsewhere</span>}
                     </td>
                     <td>
                       <input
@@ -294,7 +351,8 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                         <button
                           className="ppuSiteButton primary"
                           type="button"
-                          disabled={disabled || !isDirty || !draft.target.trim()}
+                          disabled={disabled || !isDirty || !draft.target.trim() || isConflict}
+                          title={isConflict ? "Reset Draft to the latest Desired state before saving" : undefined}
                           onClick={() => void saveSite(site.site_id)}
                         >
                           {savingSite === site.site_id ? "Saving..." : "Save Desired"}
@@ -315,7 +373,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
       )}
 
       <p className="ppuSiteNote">
-        <strong>Configuration boundary:</strong> Draft is browser-local, Desired is persisted in canonical PPU configuration, and Runtime is observed separately. When Desired and Runtime differ, the API reports <code>restart_required</code>. Phase 1 reports <code>runtime_apply_supported=false</code>, so this page does not pretend a save has already changed the running service. Protocol v3.3 also does not expose dormant interface/target bindings for disabled Sites; those rows remain explicitly partially observable instead of guessed.
+        <strong>Configuration boundary:</strong> Draft is browser-local, Desired is persisted in canonical PPU configuration, and Runtime is observed separately. Each Draft keeps the exact <code>desired_revision</code> it was based on and Save Desired sends it with <code>If-Match</code>; a stale Draft receives HTTP 412 and is blocked from silently overwriting newer Desired state. When Desired and Runtime differ, the API reports <code>restart_required</code>. Phase 1 reports <code>runtime_apply_supported=false</code>, so this page does not pretend a save has already changed the running service. Protocol v3.3 also does not expose dormant interface/target bindings for disabled Sites; those rows remain explicitly partially observable instead of guessed.
       </p>
     </section>
   );
