@@ -7,9 +7,9 @@
  */
 
 .operatorCard,
+.ppuSiteCard,
 .settingsCard,
-.diagnosticsTestCard,
-.ppuSiteCard {
+.diagnosticsTestCard {
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -18,9 +18,9 @@
   box-shadow: 0 10px 30px var(--card-shadow);
 }
 
+.ppuSiteCardHeader h3,
 .settingsCardHeader h2,
-.diagnosticsTestCard > header h3,
-.ppuSiteCardHeader h3 {
+.diagnosticsTestCard > header h3 {
   margin: 0;
   font-size: 14px;
 }
@@ -94,9 +94,9 @@
 }
 
 .operatorButton,
+.ppuSiteButton,
 .settingsActions button,
-.loopbackExecutionActions button,
-.ppuSiteButton {
+.loopbackExecutionActions button {
   min-height: 38px;
   box-sizing: border-box;
   border: 1px solid var(--line-strong);
@@ -109,9 +109,9 @@
 }
 
 .operatorButton[data-variant="primary"],
+.ppuSiteButton.primary,
 .settingsActions button[data-variant="primary"],
-.loopbackExecutionActions button.primary,
-.ppuSiteButton.primary {
+.loopbackExecutionActions button.primary {
   border-color: var(--cyan);
   background: var(--cyan);
   color: #fff;
@@ -124,25 +124,25 @@
 }
 
 .operatorButton:disabled,
+.ppuSiteButton:disabled,
 .settingsActions button:disabled,
-.loopbackExecutionActions button:disabled,
-.ppuSiteButton:disabled {
+.loopbackExecutionActions button:disabled {
   opacity: .42;
   cursor: not-allowed;
 }
 
 .operatorButton:not(:disabled):hover,
+.ppuSiteButton:not(:disabled):hover,
 .settingsActions button:not(:disabled):hover,
-.loopbackExecutionActions button:not(:disabled):hover,
-.ppuSiteButton:not(:disabled):hover {
+.loopbackExecutionActions button:not(:disabled):hover {
   border-color: var(--cyan);
   color: var(--cyan);
 }
 
 .operatorButton[data-variant="primary"]:not(:disabled):hover,
+.ppuSiteButton.primary:not(:disabled):hover,
 .settingsActions button[data-variant="primary"]:not(:disabled):hover,
-.loopbackExecutionActions button.primary:not(:disabled):hover,
-.ppuSiteButton.primary:not(:disabled):hover {
+.loopbackExecutionActions button.primary:not(:disabled):hover {
   color: #fff;
 }
 
