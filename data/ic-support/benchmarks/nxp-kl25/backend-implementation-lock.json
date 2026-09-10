@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "kl25_openocd_backend_implementation_lock",
+  "lock_id": "openocd-kl25-56b8d93-v0",
+  "implementation": "OpenOCD",
+  "commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134",
+  "files": {
+    "src/flash/nor/kinetis.c": "847fcbbbba79f0257a5e07ab4b7643fa3c2c168d1471c6828a4c95ff7966f366",
+    "src/flash/nor/core.c": "725e83887f6267410332f4829f5cfa58ca79d89f544c62408ac48c3e8bc02558",
+    "src/flash/nor/tcl.c": "ebd0ffa5d2fb716e14e92be50222bbfb96633ef99cd6ef6f232fe90feca25d69",
+    "src/target/target.c": "4495d55c2a5eba6370cabe900efe9540b710976ac193e2c81b6341dbc2e116aa",
+    "tcl/target/kl25.cfg": "81481fa43561528abc00385634db8dd680b357c00bafc91db08b004cc7ae0f4a",
+    "tcl/target/klx.cfg": "56bd19bbc54aabda4dea676fa2d2208b31c851a549f50d3e700c7e0841b051da"
+  },
+  "admitted_constraints": {
+    "target_config": "target/kl25.cfg",
+    "program_start_alignment_bytes": 4,
+    "program_tail_padding": "0xFF",
+    "program_implicit_erase": false,
+    "erase_requires_exact_sector_range": true,
+    "flash_configuration_field_start": "0x00000400",
+    "flash_configuration_field_size_bytes": 16,
+    "flash_configuration_field_sector_start": "0x00000400",
+    "flash_configuration_field_sector_size_bytes": 1024
+  },
+  "evidence_notes": {
+    "program_alignment": "kinetis.c rejects unaligned offsets and pads write count to the programming width with 0xFF",
+    "implicit_erase": "flash write_image enables erase only when the erase option is explicitly supplied; compiled PROGRAM omits it",
+    "erase_range": "flash erase_address pads only when the pad option is explicitly supplied; compiled ERASE_SECTOR omits it",
+    "fcf": "kinetis.c recognizes 0x400-0x40F and can synthesize or rewrite FCF content; the compiler rejects intersection before launch"
+  },
+  "trust_boundary": {
+    "software_executor_evidence": true,
+    "hardware_behavior_validated": false,
+    "production_admission": false,
+    "destructive_security_operation_admission": false
+  },
+  "lock_digest": "877b3fd9c0b9f8dc3191eb53393e5670efb93b9952ac1747bded155ebcaef4d1"
+}

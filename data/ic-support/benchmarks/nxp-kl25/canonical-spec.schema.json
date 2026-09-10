@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/nxp-kl25/canonical-spec-v0",
+  "title": "NXP KL25 canonical silicon specification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "artifact_type", "target", "applicability", "silicon", "canonical_fields", "blocked_fields", "spec_digest"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "artifact_type": {"const": "nxp_kl25_canonical_specification"},
+    "target": {"const": "MKL25Z128VLK4"},
+    "applicability": {"type": "object"},
+    "silicon": {"type": "object"},
+    "canonical_fields": {"type": "array", "items": {"$ref": "#/$defs/field"}},
+    "blocked_fields": {"type": "array", "items": {"$ref": "#/$defs/blocked"}},
+    "spec_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "value", "candidate_ids", "manufacturer_evidence", "review_record_id"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "value": {},
+        "candidate_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "manufacturer_evidence": {"type": "array", "items": {"type": "object"}},
+        "review_record_id": {"type": ["string", "null"]}
+      }
+    },
+    "blocked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {"path": {"type": "string"}, "reason": {"type": "string", "minLength": 1}}
+    }
+  }
+}

@@ -21,6 +21,8 @@ Exact ICPN
 
 The production hardware gate remains closed.
 
+The NXP `MKL25Z128VLK4` post-review candidate uses the same isolated executor with a dedicated compiler and fake process. It does not enter the production catalog or routing allowlist. Its manufacturer-reviewed canonical fields, operation admission, and pinned OpenOCD backend evidence are separate prerequisites, and all three must agree before a KL25 plan can cross the fake-process boundary.
+
 ## 2. Current system boundary: PS only
 
 The current IC Support execution path stops at the programmer's **PS software layer**. The compiled-plan executor is PS/OpenOCD work.
@@ -162,6 +164,8 @@ The regression executes a real subprocess, but the process is a fake OpenOCD Pyt
 - no-launcher fail-closed behavior.
 
 This test proves the PS software process boundary. It does not prove that OpenOCD accepts every command against STM32F103 silicon and does not validate any PL path.
+
+The KL25 regression applies the same limit: it checks argv construction and safe PROGRAM staging against a fake process only. It never invokes the installed OpenOCD binary, an adapter, or a target.
 
 ## 9. Direct OpenOCD interface remains non-executable
 
