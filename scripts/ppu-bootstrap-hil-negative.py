@@ -103,6 +103,15 @@ def _failure_program() -> str:
     )
 
 
+def _make_owner_writable(path: Path) -> None:
+    """Permit mutation only inside the isolated qualification derivation copy."""
+    try:
+        mode = path.stat().st_mode & 0o777
+        path.chmod(mode | 0o200)
+    except OSError as exc:
+        raise HILNegativeError(f"cannot make qualification derivation file writable: {path}: {exc}") from exc
+
+
 def _derive_release(
     source_release: Any,
     *,
@@ -122,6 +131,7 @@ def _derive_release(
     root = destination_parent / "plasma-release"
     shutil.copytree(source_release.root, root)
     manifest_path = root / "release.json"
+    _make_owner_writable(manifest_path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["product_version"] = negative_version
     manifest["qualification_only"] = {
@@ -137,6 +147,7 @@ def _derive_release(
     app = root / "runtime" / "ppu" / "ppu.pyz"
     if not app.is_file():
         raise HILNegativeError("verified source release is missing ppu/ppu.pyz")
+    _make_owner_writable(app)
     app.write_text(_failure_program(), encoding="utf-8")
     app.chmod(0o644)
     _write_hash_manifest(root)
