@@ -29,7 +29,13 @@ def _build_kit(tmp_path: Path, *, release_id="1.2.3-aaaaaaaaaaaa"):
     (root / "scripts").mkdir(parents=True)
     (root / "artifacts").mkdir()
     (root / "docs").mkdir()
-    for name in ("plasmactl", "plasmactl-z2-ps", "ppu-z2-installer.py", "z2-python-runtime.py"):
+    for name in (
+        "plasmactl",
+        "plasmactl-z2-ps",
+        "ppu-bootstrap-deployment.py",
+        "ppu-z2-installer.py",
+        "z2-python-runtime.py",
+    ):
         (root / "scripts" / name).write_text(f"{name}\n", encoding="utf-8")
     ppu = root / "artifacts" / f"plasma-ppu-{release_id}-linux-armv7l.tar.gz"
     python = root / "artifacts" / "plasma-python-3.12.13-linux-armv7l.tar.gz"
@@ -58,6 +64,29 @@ def test_verify_canonical_kit(tmp_path: Path):
     assert verified.ppu_artifact.name.startswith("plasma-ppu-")
     assert verified.python_artifact.name.startswith("plasma-python-")
     assert verified.kit_sha256 == _sha(archive)
+
+
+def test_missing_durable_deployment_coordinator_is_rejected(tmp_path: Path):
+    archive, sidecar = _build_kit(tmp_path)
+    extracted = tmp_path / "edit"
+    with tarfile.open(archive, "r:gz") as tar:
+        tar.extractall(extracted, filter="data")
+    root = next(extracted.iterdir())
+    (root / "scripts" / "ppu-bootstrap-deployment.py").unlink()
+    files = sorted(path for path in root.rglob("*") if path.is_file() and path.name != "SHA256SUMS")
+    (root / "SHA256SUMS").write_text(
+        "\n".join(f"{_sha(path)}  {path.relative_to(root).as_posix()}" for path in files) + "\n",
+        encoding="utf-8",
+    )
+    rebuilt = tmp_path / archive.name
+    archive.unlink()
+    sidecar.unlink()
+    with tarfile.open(rebuilt, "w:gz") as tar:
+        tar.add(root, arcname=root.name)
+    rebuilt_sidecar = Path(str(rebuilt) + ".sha256")
+    rebuilt_sidecar.write_text(f"{_sha(rebuilt)}  {rebuilt.name}\n", encoding="utf-8")
+    with pytest.raises(kitmod.BootstrapKitError, match="missing required deployment tooling"):
+        kitmod.verify_kit(rebuilt, sidecar=rebuilt_sidecar, extract_to=tmp_path / "verify")
 
 
 def test_outer_digest_mismatch_fails_before_extract(tmp_path: Path):
