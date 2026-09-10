@@ -132,7 +132,10 @@ jobs:
           )
           artifact="$RUNNER_TEMP/plasma-ppu-bootstrap-${identity}.tar.gz"
           tar -C "$RUNNER_TEMP" -czf "$artifact" "plasma-ppu-bootstrap-${identity}"
-          sha256sum "$artifact" > "$artifact.sha256"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum "$(basename "$artifact")" > "$(basename "$artifact").sha256"
+          )
           printf 'artifact=%s\n' "$artifact" >> "$GITHUB_OUTPUT"
           printf 'sidecar=%s\n' "$artifact.sha256" >> "$GITHUB_OUTPUT"
           printf 'root=%s\n' "$root" >> "$GITHUB_OUTPUT"
