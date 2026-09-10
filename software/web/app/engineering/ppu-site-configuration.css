@@ -402,6 +402,322 @@
   line-height: 1.5;
 }
 
+/* P0: Lifecycle, Connectivity, and Health are deliberately orthogonal. */
+.ppuStateSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ppuStateSummaryGroup {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--panel-3) 78%, transparent);
+}
+
+.ppuStateSummaryGroup small {
+  width: 100%;
+  color: var(--text-soft);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.ppuStateSummaryGroup span {
+  color: var(--muted);
+  font: 700 10px var(--font-mono);
+}
+
+.ppuStateSummaryGroup strong {
+  color: var(--text);
+}
+
+.ppuDimensionPill,
+.ppuReconciliationBadge,
+.ppuDirtyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--panel-3);
+  color: var(--muted);
+  font: 700 10px var(--font-mono);
+}
+
+.ppuDimensionPill::before,
+.ppuReconciliationBadge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ppuDimensionPill[data-tone="healthy"],
+.ppuReconciliationBadge[data-tone="healthy"] {
+  border-color: color-mix(in srgb, var(--green) 38%, var(--line));
+  color: var(--green);
+}
+
+.ppuDimensionPill[data-tone="warning"],
+.ppuReconciliationBadge[data-tone="warning"] {
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+  color: var(--amber);
+}
+
+.ppuDimensionPill[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--red) 42%, var(--line));
+  color: var(--red);
+}
+
+.ppuDimensionPill[data-tone="info"] {
+  border-color: color-mix(in srgb, var(--cyan) 40%, var(--line));
+  color: var(--cyan);
+}
+
+.ppuStateDimensionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 16px 0;
+}
+
+.ppuStateDimensionCard {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px 13px;
+  background: color-mix(in srgb, var(--panel-3) 82%, transparent);
+  box-shadow: inset 3px 0 0 var(--muted);
+}
+
+.ppuStateDimensionCard[data-tone="healthy"] { box-shadow: inset 3px 0 0 var(--green); }
+.ppuStateDimensionCard[data-tone="warning"] { box-shadow: inset 3px 0 0 var(--amber); }
+.ppuStateDimensionCard[data-tone="danger"] { box-shadow: inset 3px 0 0 var(--red); }
+.ppuStateDimensionCard[data-tone="info"] { box-shadow: inset 3px 0 0 var(--cyan); }
+
+.ppuStateDimensionCard small {
+  color: var(--text-soft);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.ppuStateDimensionCard strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.ppuStateDimensionCard p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ppuReadinessPanel {
+  margin: 14px 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--panel-3) 70%, transparent);
+}
+
+.ppuReadinessPanel > header,
+.ppuReadinessPanel > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 12px;
+}
+
+.ppuReadinessPanel > header {
+  border-bottom: 1px solid var(--line);
+}
+
+.ppuReadinessPanel > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.ppuReadinessPanel > header small {
+  color: var(--cyan);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .08em;
+}
+
+.ppuReadinessPanel > header h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ppuReadinessPanel > header > span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.ppuReadinessPanel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ppuReadinessPanel li {
+  display: grid;
+  grid-template-columns: 22px minmax(140px, .6fr) minmax(220px, 1.4fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ppuReadinessPanel li strong,
+.ppuReadinessPanel li b {
+  font-size: 10px;
+}
+
+.ppuReadinessPanel li > span:nth-of-type(2) {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.ppuReadinessIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font: 800 12px var(--font-mono);
+}
+
+.ppuReadinessPanel li[data-state="pass"] .ppuReadinessIcon,
+.ppuReadinessPanel li[data-state="pass"] b {
+  color: var(--green);
+}
+
+.ppuReadinessPanel li[data-state="fail"] .ppuReadinessIcon,
+.ppuReadinessPanel li[data-state="fail"] b {
+  color: var(--red);
+}
+
+.ppuReadinessPanel > footer {
+  background: color-mix(in srgb, var(--panel) 84%, transparent);
+}
+
+.ppuReadinessBlocked,
+.ppuReadinessReady {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10px;
+}
+
+.ppuReadinessBlocked strong { color: var(--red); }
+.ppuReadinessReady strong { color: var(--green); }
+.ppuReadinessBlocked span,
+.ppuReadinessReady span { color: var(--muted); }
+
+.ppuSiteHeaderNote {
+  margin: 4px 0 0;
+  max-width: 780px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+/* P0: browser Draft, persisted Desired, and observed Runtime are separate states. */
+.ppuConfigurationStateFlow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ppuConfigurationStateStep {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: var(--panel-3);
+  box-shadow: inset 3px 0 0 var(--muted);
+}
+
+.ppuConfigurationStateStep[data-tone="healthy"] { box-shadow: inset 3px 0 0 var(--green); }
+.ppuConfigurationStateStep[data-tone="warning"] { box-shadow: inset 3px 0 0 var(--amber); }
+.ppuConfigurationStateStep[data-tone="info"] { box-shadow: inset 3px 0 0 var(--cyan); }
+
+.ppuConfigurationStateStep small {
+  color: var(--text-soft);
+  font: 750 9px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.ppuConfigurationStateStep strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.ppuConfigurationStateStep span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.ppuConfigurationStateArrow {
+  align-self: center;
+  color: var(--muted);
+  font: 800 16px var(--font-mono);
+}
+
+.ppuDraftWarning {
+  display: flex;
+  gap: 7px;
+  margin: 12px 16px 0;
+  border: 1px solid color-mix(in srgb, var(--amber) 42%, var(--line));
+  border-radius: 7px;
+  padding: 9px 11px;
+  background: color-mix(in srgb, var(--amber) 6%, var(--panel));
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ppuDraftWarning strong {
+  color: var(--amber);
+}
+
+.ppuSiteDirtyRow {
+  background: color-mix(in srgb, var(--amber) 5%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--amber);
+}
+
+.ppuDirtyBadge {
+  margin-left: 7px;
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+  color: var(--amber);
+}
+
 @media (max-width: 980px) {
   .ppuInfoGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -414,11 +730,27 @@
   .ppuRegistryAddForm > .ppuSiteCardHeaderActions {
     grid-column: 1 / -1;
   }
+
+  .ppuStateSummaryGrid,
+  .ppuStateDimensionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuConfigurationStateFlow {
+    grid-template-columns: 1fr;
+  }
+
+  .ppuConfigurationStateArrow {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
 }
 
 @media (max-width: 760px) {
   .ppuSiteHeader,
-  .ppuRemoveConfirm {
+  .ppuRemoveConfirm,
+  .ppuReadinessPanel > header,
+  .ppuReadinessPanel > footer {
     flex-direction: column;
     align-items: stretch;
   }
@@ -432,5 +764,17 @@
   .ppuInfoGrid div.wide,
   .ppuRegistryAddForm > .ppuSiteCardHeaderActions {
     grid-column: span 1;
+  }
+
+  .ppuReadinessPanel li {
+    grid-template-columns: 22px 1fr auto;
+  }
+
+  .ppuReadinessPanel li > span:nth-of-type(2) {
+    grid-column: 2 / -1;
+  }
+
+  .ppuDraftWarning {
+    flex-direction: column;
   }
 }
