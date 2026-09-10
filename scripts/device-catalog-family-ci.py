@@ -23,7 +23,7 @@ from typing import Iterable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FAMILIES = ("stm32f0", "stm32f2", "stm32f3", "stm32f7", "stm32g0", "stm32g4")
+FAMILIES = ("stm32f0", "stm32f2", "stm32f3", "stm32f7", "stm32g0", "stm32g4", "stm32u0")
 RUNNERS = {
     "stm32f0": "ubuntu-latest",
     "stm32f2": "ubuntu-latest",
@@ -31,6 +31,7 @@ RUNNERS = {
     "stm32f7": "ubuntu-latest",
     "stm32g0": "ubuntu-24.04",
     "stm32g4": "ubuntu-24.04",
+    "stm32u0": "ubuntu-24.04",
 }
 
 DISPATCHER_PATH = ".github/workflows/device-catalog-stm32-family-validation.yml"
@@ -120,6 +121,10 @@ def command_profile(family: str) -> list[list[str]]:
             _py("data/device-catalog/research/validate_stm32g4_phase4_9d_admission_plan.py"),
             _py("data/device-catalog/research/test_stm32g4_phase4_9e_publication.py"),
         ],
+        "stm32u0": [
+            _py("data/device-catalog/research/test_stm32u0_phase_u0_1_foundation.py"),
+            _py("data/device-catalog/research/test_stm32u0_phase_u0_2_discovery.py"),
+        ],
     }
     try:
         return profiles[family]
@@ -189,6 +194,7 @@ def run_family(family: str) -> None:
 
 def self_test() -> None:
     assert affected_families(["data/device-catalog/research/stm32g4_phase4_9d_admission.py"]) == ["stm32g4"]
+    assert affected_families(["data/device-catalog/research/stm32u0_phase_u0_2_discovery.py"]) == ["stm32u0"]
     assert affected_families(["data/device-catalog/research/device-catalog-phase4.5c-stm32f0-policy.md"]) == ["stm32f0"]
     assert affected_families([".github/workflows/device-catalog-stm32f2-bounded-validation.yml"]) == ["stm32f2"]
     assert affected_families(["data/device-catalog/research/openocd-parts-canonical.csv"]) == list(FAMILIES)
