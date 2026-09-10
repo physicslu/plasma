@@ -198,6 +198,7 @@ def verify_kit(artifact: Path, *, sidecar: Path, extract_to: Path) -> VerifiedKi
     required_scripts = [
         plasmactl,
         scripts / "plasmactl-z2-ps",
+        scripts / "ppu-bootstrap-deployment.py",
         scripts / "ppu-z2-installer.py",
         scripts / "z2-python-runtime.py",
     ]
