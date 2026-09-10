@@ -7,6 +7,7 @@ import {
   getManagerFleet,
   getManagerRegistry,
   removeManagerPpu,
+  selectManagerPpuForManagedOperations,
   setManagerPpuLifecycle,
   type ManagerRegistryEntry,
   type ManagerRegistryPayload,
@@ -186,6 +187,16 @@ export default function PpuSiteConfiguration() {
     );
   }
 
+  async function selectForManagedOperations() {
+    if (!selectedEntry?.alias || selectedEntry.lifecycle !== "commissioned") return;
+    const alias = selectedEntry.alias;
+    await runMutation(
+      "select",
+      () => selectManagerPpuForManagedOperations(alias),
+      `${alias} selected for Managed operations.`,
+    );
+  }
+
   async function disablePpu() {
     if (!selectedEntry?.alias) return;
     await runMutation(
@@ -347,6 +358,17 @@ export default function PpuSiteConfiguration() {
                         onClick={() => void validateAndEnable()}
                       >
                         {busyAction === "validate" ? "Validating..." : "Validate & Enable"}
+                      </button>
+                    )}
+                    {selectedEntry.lifecycle === "commissioned" && (
+                      <button
+                        className="ppuSiteButton primary"
+                        type="button"
+                        disabled={busyAction !== null}
+                        title="Select this validated Manager registry alias for Managed Programming and Diagnostics"
+                        onClick={() => void selectForManagedOperations()}
+                      >
+                        {busyAction === "select" ? "Selecting..." : "Use for Managed Operations"}
                       </button>
                     )}
                     {selectedEntry.lifecycle === "commissioned" && (
