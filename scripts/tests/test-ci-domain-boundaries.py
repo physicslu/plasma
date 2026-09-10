@@ -83,6 +83,7 @@ def validate_workstream_registry() -> None:
         ".github/workflows/python-tests.yml": "sw_ppu",
         ".github/workflows/ppu-release.yml": "sw_ppu",
         ".github/workflows/z2-ps-release.yml": "sw_ppu",
+        ".github/workflows/persistent-integration-host.yml": "sw_ppu",
         ".github/workflows/device-catalog-validation.yml": "icpn",
         ".github/workflows/device-catalog-current-validation.yml": "icpn",
         ".github/workflows/device-catalog-stm32-family-validation.yml": "icpn",
@@ -109,6 +110,7 @@ def main() -> int:
     validate_workstream_registry()
 
     python_tests = read("python-tests.yml")
+    repository_contracts = read("repository-contracts.yml")
     ppu_release = read("ppu-release.yml")
     z2_release = read("z2-ps-release.yml")
     ai_support = read("ic-support-validation.yml")
@@ -131,6 +133,22 @@ def main() -> int:
         '"!scripts/tests/test-ci-domain-boundaries.py"',
         2,
         owner="SW/PPU Python/PL",
+    )
+
+    # The persistent L4 workflow is security-sensitive executable CI policy.
+    # A workflow-only change must therefore exercise both its Python security
+    # tests and repository CI-boundary governance before merge.
+    require_count(
+        python_tests,
+        '".github/workflows/persistent-integration-host.yml"',
+        2,
+        owner="SW/PPU persistent L4 security",
+    )
+    require_count(
+        repository_contracts,
+        '".github/workflows/persistent-integration-host.yml"',
+        3,
+        owner="REPO persistent L4 governance",
     )
 
     # Preserve positive ownership so trigger cleanup cannot be satisfied by
