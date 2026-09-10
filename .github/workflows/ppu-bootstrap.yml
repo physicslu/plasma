@@ -5,12 +5,14 @@ on:
     paths:
       - ".github/workflows/ppu-bootstrap.yml"
       - "scripts/ppu-bootstrap.py"
+      - "scripts/ppu-bootstrap-service.py"
       - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/ppu-bootstrap-kit.py"
       - "scripts/ppu-z2-installer.py"
       - "scripts/plasmactl-z2-ps"
       - "scripts/z2-python-runtime.py"
       - "software/python/tests/test_ppu_bootstrap.py"
+      - "software/python/tests/test_ppu_bootstrap_service.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_bootstrap_kit.py"
   push:
@@ -18,12 +20,14 @@ on:
     paths:
       - ".github/workflows/ppu-bootstrap.yml"
       - "scripts/ppu-bootstrap.py"
+      - "scripts/ppu-bootstrap-service.py"
       - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/ppu-bootstrap-kit.py"
       - "scripts/ppu-z2-installer.py"
       - "scripts/plasmactl-z2-ps"
       - "scripts/z2-python-runtime.py"
       - "software/python/tests/test_ppu_bootstrap.py"
+      - "software/python/tests/test_ppu_bootstrap_service.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
       - "software/python/tests/test_ppu_bootstrap_kit.py"
 
@@ -50,6 +54,7 @@ jobs:
         run: >-
           python -m py_compile
           scripts/ppu-bootstrap.py
+          scripts/ppu-bootstrap-service.py
           scripts/ppu-bootstrap-deployment.py
           scripts/ppu-bootstrap-kit.py
       - name: Install test runner
@@ -58,5 +63,6 @@ jobs:
         run: >-
           python -m pytest -q
           software/python/tests/test_ppu_bootstrap.py
+          software/python/tests/test_ppu_bootstrap_service.py
           software/python/tests/test_ppu_bootstrap_deployment.py
           software/python/tests/test_ppu_bootstrap_kit.py
