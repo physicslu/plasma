@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "phase": "4.9B",
+  "pilot_id": "stm32g4-phase4.9b-official-st-discovery-2026-09-10",
+  "targets": [
+    {"subfamily":"STM32G411","base_device":"STM32G411C6","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g411c6.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G411 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G414","base_device":"STM32G414CB","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g414cb.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G414 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G431","base_device":"STM32G431C6","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g431c6.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G431 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G441","base_device":"STM32G441CB","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g441cb.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G441 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G471","base_device":"STM32G471CC","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g471cc.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G471 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G473","base_device":"STM32G473CB","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g473cb.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G473 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G474","base_device":"STM32G474CB","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g474cb.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G474 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G483","base_device":"STM32G483CE","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g483ce.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G483 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G484","base_device":"STM32G484CE","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g484ce.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G484 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G491","base_device":"STM32G491CC","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g491cc.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G491 OpenOCD ordering-pattern surface"},
+    {"subfamily":"STM32G4A1","base_device":"STM32G4A1CE","source_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32g4a1ce.html","selection_reason":"lexicographically first concrete Base Device in the guarded STM32G4A1 OpenOCD ordering-pattern surface"}
+  ]
+}
