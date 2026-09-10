@@ -1,6 +1,6 @@
 # PPU Site Configuration
 
-Status: Phase 1 writable desired-state contract implemented in software; SWPC/CI acceptance required; physical Z2, PL, electrical, and real-IC behavior are separate qualification stages.
+Status: Phase 1 writable desired-state contract plus P1 optimistic concurrency implemented in software; SWPC/CI acceptance required; physical Z2, PL, electrical, and real-IC behavior are separate qualification stages.
 
 ## Purpose
 
@@ -13,6 +13,8 @@ enabled
 interface
 target
 ```
+
+P1 adds per-Site optimistic concurrency so a stale Browser Draft cannot silently overwrite a newer saved Desired state.
 
 The design intentionally does not introduce a second Site schema or a Browser-side settings database.
 
@@ -29,6 +31,7 @@ Plasma Manager
        ↓
 Plasma Gateway
   ├─ authentication / authorization when secure mode is enabled
+  ├─ per-Site If-Match optimistic concurrency gate
   ├─ active-execution write gate
   ├─ authoritative Site validation
   └─ atomic persistence
@@ -65,9 +68,30 @@ POST /api/manager/registry/{ppu_alias}/sites/{site_id}
 
 Manager does not expose a wildcard `/api/settings/*` relay. Only the Site collection GET and individual-Site POST routes are allowlisted.
 
+### Read response and desired revision
+
+Each Site returned by the collection carries a deterministic `desired_revision` in addition to Desired, Actual, and reconciliation state:
+
+```text
+sha256:<64 lowercase hex characters>
+```
+
+The digest is computed from the normalized canonical tuple:
+
+```text
+site_id
+enabled
+interface
+target
+```
+
+It is deliberately derived rather than stored as a mutable YAML counter. Therefore the same Desired state has the same revision across Gateway process restarts, and changing SITE 2 does not invalidate a Draft for unchanged SITE 1.
+
+The revision is concurrency identity only. It is not a configuration schema version, deployment revision, runtime generation, or proof that the target hardware has been applied.
+
 ### Write body
 
-The write body is exact-field and fail-closed:
+The write body remains exact-field and fail-closed:
 
 ```json
 {
@@ -89,6 +113,40 @@ Unknown or missing fields are rejected. `target` must be a non-empty trimmed ide
 
 The target string is configuration identity, not proof that a real IC/driver/hardware path has been qualified. Driver/device semantic qualification remains an execution and device-support responsibility.
 
+### Write precondition
+
+Every Site desired-state POST must include exactly one strong HTTP entity tag carrying the Draft baseline revision:
+
+```http
+If-Match: "sha256:<64 lowercase hex characters>"
+```
+
+The Gateway rejects a missing precondition with HTTP `428 Precondition Required`. A malformed, weak, wildcard, or multi-tag precondition is rejected rather than guessed.
+
+Inside the same Site configuration lock used for persistence, the Gateway compares the supplied revision with the current normalized Desired state. If they differ, the write fails with HTTP `412 Precondition Failed` and error code:
+
+```text
+site_desired_conflict
+```
+
+The response includes the expected and current revisions for diagnosis, but it does not modify canonical configuration.
+
+This produces the intended stale-write behavior:
+
+```text
+Browser Draft based on revision A
+        ↓
+other operator saves revision B
+        ↓
+first Browser sends If-Match A
+        ↓
+Gateway current revision is B
+        ↓
+412 — no persistence, no automatic merge, no silent overwrite
+```
+
+The Control Station BFF and Plasma Manager forward `If-Match` only through their existing explicit header allowlists. This does not create a generic header proxy.
+
 ## Persistence
 
 A successful write updates only these fields for the selected Site:
@@ -108,6 +166,8 @@ load canonical YAML
   ↓
 validate write body
   ↓
+compare current per-Site desired_revision with If-Match
+  ↓
 build and validate candidate PlasmaConfig
   ↓
 modify only selected Site writable fields
@@ -121,9 +181,9 @@ load_config(temporary file) validation
 os.replace(temporary, canonical)
 ```
 
-A failed validation or failed persistence operation must not replace the canonical configuration.
+A failed validation, stale revision, or failed persistence operation must not replace the canonical configuration.
 
-One deployed Plasma Gateway process is assumed to own writes to a PPU configuration file. Cross-process concurrent writers are not a supported Phase 1 deployment model.
+One deployed Plasma Gateway process is assumed to own writes to a PPU configuration file. Cross-process concurrent writers are not a supported deployment model; P1 protects concurrent clients going through that authoritative Gateway process.
 
 ## Active-execution write gate
 
@@ -209,15 +269,18 @@ admin     read + Site desired-state write
 service   no Site settings write by default
 ```
 
-In secure mode, a Site write also requires:
+In secure mode, a Site write requires:
 
 ```text
 valid Bearer principal
 + settings.site.write
 + matching Facility / PPU / Site scope
 + valid Idempotency-Key
++ valid If-Match desired revision
 + durable command admission
 ```
+
+Security authorization remains authoritative before configuration data is exposed to unauthorized writers. An idempotent replay of an already-admitted command returns the durable first result rather than re-executing the write against a newer revision.
 
 The backend remains authoritative even if the UI disables controls.
 
@@ -234,17 +297,19 @@ Reconciliation
 Save / Reset
 ```
 
-Background polling must not overwrite a locally edited dirty Site row before Save.
+Background polling must not overwrite a locally edited dirty Site row before Save. When a row first becomes dirty, the Browser keeps the exact `desired_revision` that the Draft was based on. Later polling may observe a newer Desired state, but it must not silently advance that dirty Draft's baseline.
 
-Writes are disabled in the UI when the PPU is not commissioned or when Fleet state reports active execution. This is operator guidance only; the PPU-local Gateway independently enforces the authoritative busy gate.
+If Save returns HTTP 412, the UI keeps the local Draft, marks `Desired changed elsewhere`, disables stale Save, refreshes observed state, and requires an explicit Reset/re-edit before another write. It does not auto-merge hardware configuration fields or provide an `overwrite anyway` escape hatch.
 
-## Phase 1 non-goals
+Writes are disabled in the UI when the PPU is not commissioned or when Fleet state reports active execution. This is operator guidance only; the PPU-local Gateway independently enforces the authoritative busy and concurrency gates.
 
-Phase 1 does not provide:
+## Phase 1/P1 non-goals
+
+The current contract does not provide:
 
 - hot apply of Site configuration;
 - automatic Plasma Server restart;
-- configuration revision/CAS for multi-operator edit conflicts;
+- automatic merge of conflicting multi-operator Drafts;
 - per-Site live reconfiguration while sibling Sites execute;
 - voltage/current/clock/reset/pinmux settings;
 - automatic driver generation;
@@ -268,6 +333,13 @@ Software acceptance must cover at least:
 9. Manager relay remains alias-scoped and allowlisted;
 10. secure role + Site-scope authorization and idempotency;
 11. Browser uses same-origin BFF and does not own arbitrary PPU endpoint URLs;
-12. UI polling preserves unsaved dirty drafts.
+12. UI polling preserves unsaved dirty Drafts;
+13. each Site read exposes a deterministic restart-stable `desired_revision`;
+14. matching `If-Match` permits a valid write and yields a new revision when Desired state changes;
+15. missing/malformed preconditions fail closed;
+16. stale `If-Match` returns HTTP 412 and leaves canonical configuration unchanged;
+17. changing one Site does not invalidate unchanged sibling-Site revisions;
+18. BFF and Manager forward `If-Match` through explicit header allowlists only;
+19. the Browser preserves the dirty baseline revision and surfaces a stale-write conflict instead of silently overwriting newer Desired state.
 
 Passing these software checks does not prove physical Z2 networking, PS↔PL integration, FPGA timing/isolation, or real IC programming.
