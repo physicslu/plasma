@@ -1,0 +1,89 @@
+{
+  "claims": {
+    "canonical_admission_authorized": false,
+    "cmsis_alias_is_commercial_identity": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "evidence_foundation": {
+    "active_exact_icpns_observed": 8,
+    "ordering_information_review_sha256": "3fe019d420cbe43c732b9d403acaa2f1b0bf0dc583b38073eb25528217f5efe9",
+    "representative_count": 3,
+    "representatives": [
+      {
+        "base_device": "STM32U031C6",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS14581",
+        "datasheet_revision": 2,
+        "exact_icpns": [
+          "STM32U031C6T6",
+          "STM32U031C6U6"
+        ],
+        "ordering_pdf_page": 124,
+        "subfamily": "STM32U031"
+      },
+      {
+        "base_device": "STM32U073C8",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS14548",
+        "datasheet_revision": 2,
+        "exact_icpns": [
+          "STM32U073C8T6",
+          "STM32U073C8U6"
+        ],
+        "ordering_pdf_page": 135,
+        "subfamily": "STM32U073"
+      },
+      {
+        "base_device": "STM32U083CC",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS14463",
+        "datasheet_revision": 2,
+        "exact_icpns": [
+          "STM32U083CCT6",
+          "STM32U083CCT6TR",
+          "STM32U083CCU6",
+          "STM32U083CCU6TR"
+        ],
+        "ordering_pdf_page": 135,
+        "subfamily": "STM32U083"
+      }
+    ],
+    "retained_probe_summary_sha256": "d4339d85a7565f4be731de863ee7db0c1301a335bb5b2777e84a1089aae2769d",
+    "selection_sha256": "2c81a6c3495a75a6f4115252293af6e99b727f3d12d67f31853922279a96d017"
+  },
+  "family": "STM32U0",
+  "identifier_kind_counts": {
+    "cmsis_device_name": 6,
+    "ordering_pattern": 42
+  },
+  "initial_targets": [
+    {
+      "base_device": "STM32U031C6",
+      "subfamily": "STM32U031"
+    },
+    {
+      "base_device": "STM32U073C8",
+      "subfamily": "STM32U073"
+    },
+    {
+      "base_device": "STM32U083CC",
+      "subfamily": "STM32U083"
+    }
+  ],
+  "phase": "U0.1",
+  "schema_version": 1,
+  "source_row_count": 48,
+  "subfamily_counts": {
+    "STM32U031": 16,
+    "STM32U073": 24,
+    "STM32U083": 8
+  },
+  "target_config": "tcl/target/stm32u0x.cfg"
+}
