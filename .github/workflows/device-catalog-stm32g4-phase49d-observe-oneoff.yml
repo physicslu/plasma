@@ -1,4 +1,4 @@
-name: STM32G4 Phase 4.9D admission-plan one-off
+name: STM32G4 Phase 4.9D final replay one-off
 
 on:
   push:
@@ -8,40 +8,25 @@ on:
       - ".github/workflows/device-catalog-stm32g4-phase49d-observe-oneoff.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  validate-and-freeze:
+  replay-admission-plan:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/device-catalog-stm32g4-phase49d-admission
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Replay closed Phase 4.9C metadata policy
+      - name: Replay STM32G4 evidence, metadata, and admission contracts
         run: |
           python data/device-catalog/research/validate_stm32g4_phase4_9b_retained_evidence.py
           python data/device-catalog/research/test_stm32g4_phase4_9c_policy.py
           python data/device-catalog/research/stm32g4_phase4_9c_policy.py
-      - name: Validate Phase 4.9D admission policy
-        run: python data/device-catalog/research/test_stm32g4_phase4_9d_admission.py
-      - name: Generate deterministic Phase 4.9D admission plan
-        run: |
-          rm -f /tmp/stm32g4-commercial-icpn.csv /tmp/stm32g4-phase4.9d-replay.json
-          python data/device-catalog/research/stm32g4_phase4_9d_admission.py \
-            --canonical /tmp/stm32g4-commercial-icpn.csv \
-            --output data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json
-          python data/device-catalog/research/stm32g4_phase4_9d_admission.py \
-            --canonical /tmp/stm32g4-commercial-icpn.csv \
-            --output /tmp/stm32g4-phase4.9d-replay.json
-          cmp data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json /tmp/stm32g4-phase4.9d-replay.json
-          sha256sum data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json
-          sha256sum data/device-catalog/research/stm32g4-phase4.9c-policy-baseline.json
-          sha256sum data/device-catalog/research/openocd-parts-canonical.csv
-      - name: Assert read-only planning boundary
+          python data/device-catalog/research/test_stm32g4_phase4_9d_admission.py
+          python data/device-catalog/research/validate_stm32g4_phase4_9d_admission_plan.py
+      - name: Assert read-only Phase 4.9D boundary
         run: |
           cmp data/device-catalog/production/icpn-v1-manifest.json data/device-catalog/research/stm32g4-phase4.9c-production-manifest-prestate.json
           test ! -e data/device-catalog/research/stm32g4-commercial-icpn.csv
@@ -49,24 +34,19 @@ jobs:
           import json
           from pathlib import Path
           p=json.loads(Path('data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json').read_text())
+          assert p['canonical_dataset_admission'] == 'planned'
           assert p['candidate_count'] == 25
-          assert p['decision_counts'] == {'admit':25,'already_present':0,'manual_review_required':0,'reject':0}
           assert p['capability_unresolved_count'] == 0
-          assert p['capability_unresolved'] == []
           assert p['bounded_commercial_surface_complete'] is False
           assert p['production_snapshot']['exact_icpn_count'] == 610
-          assert p['production_snapshot']['base_device_count'] == 209
           assert p['production_snapshot']['stm32g4_exact_icpn_count'] == 0
-          for flag in ('canonical_write_applied','production_write_applied','programming_algorithm_equivalence_claimed','flash_geometry_equivalence_claimed','option_security_semantics_claimed','physical_target_qualification_claimed','hil_qualification_claimed','runtime_programming_support_claimed','full_stm32g4_surface_covered'):
-              assert p[flag] is False, flag
-          print('STM32G4 Phase 4.9D read-only admission boundary: PASS')
+          assert p['source_unavailable_base_devices'] == ['STM32G411C6','STM32G414CB','STM32G471CC']
+          assert p['proposal_exact_identity_exclusions'] == ['STM32G441CBT3','STM32G441CBU3','STM32G484CET3']
+          print('STM32G4 Phase 4.9D final read-only boundary: PASS')
           PY
-      - name: Commit deterministic admission plan
+      - name: Report immutable Phase 4.9D bindings
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json
-          git diff --cached --quiet && { echo "No admission plan generated"; exit 1; }
-          git commit -m "Device catalog: freeze STM32G4 Phase 4.9D admission plan"
-          git push origin HEAD:agent/device-catalog-stm32g4-phase49d-admission
+          sha256sum data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json
+          sha256sum data/device-catalog/research/stm32g4-phase4.9c-policy-baseline.json
+          sha256sum data/device-catalog/research/openocd-parts-canonical.csv
+          sha256sum data/device-catalog/research/stm32g4-phase4.9c-production-manifest-prestate.json
