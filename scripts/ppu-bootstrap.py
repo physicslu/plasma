@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Minimal PPU factory/recovery bootstrap control surface.
+"""Minimal PPU factory/recovery bootstrap inspection surface.
 
 This module intentionally uses only the Python standard library and remains
-compatible with the stock PYNQ-Z2 Python 3.10 runtime.  It is independent from
-the Plasma application runtime that it observes and will later manage.
+compatible with the stock PYNQ-Z2 Python 3.10 runtime. It owns stable identity,
+runtime inspection and systemd-unit rendering while the authenticated mutation
+surface lives in ``ppu-bootstrap-service.py``.
 
-Phase 1 is read-only over HTTP.  Runtime mutation is deliberately absent until
-the deployment engine and authenticated Control Station transport exist.
+The HTTP server in this module is deliberately read-only and is retained as the
+minimal inspection contract. Production systemd wiring must launch the separate
+authenticated Bootstrap service rather than this read-only server.
 """
 
 from __future__ import annotations
@@ -98,8 +100,6 @@ def _machine_device_id(path: Path) -> str:
         raise BootstrapError(f"cannot read machine identity {path}: {exc}") from exc
     if len(raw) < 16 or len(raw) > 128 or any(ch not in "0123456789abcdef-" for ch in raw):
         raise BootstrapError("machine identity is malformed")
-    # Do not expose the OS machine-id verbatim over the product API.  A stable,
-    # domain-separated identifier is sufficient for pre-commissioning identity.
     digest = hashlib.sha256(("plasma-ppu-bootstrap-v1:" + raw).encode("ascii")).hexdigest()
     return "ppu-device-" + digest[:24]
 
@@ -293,8 +293,6 @@ class _BootstrapHandler(BaseHTTPRequestHandler):
             )
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler contract
-        # Deliberately fail closed in Phase 1.  Do not create an unauthenticated
-        # remote root-mutation surface before the deployment/auth contracts exist.
         self._json(
             HTTPStatus.METHOD_NOT_ALLOWED,
             {"ok": False, "error": "mutation_not_enabled"},
@@ -314,11 +312,15 @@ def _parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", required=True, help="explicit IPv4 bind address")
     serve.add_argument("--port", type=int, default=DEFAULT_PORT)
 
-    unit = sub.add_parser("render-systemd-unit", help="render the bootstrap systemd unit")
+    unit = sub.add_parser("render-systemd-unit", help="render the production Bootstrap systemd unit")
     unit.add_argument("--host", required=True)
     unit.add_argument("--port", type=int, default=DEFAULT_PORT)
     unit.add_argument("--python", dest="python_executable", default="/usr/bin/python3")
-    unit.add_argument("--script", dest="script_path", default="/opt/plasma/bootstrap/ppu-bootstrap.py")
+    unit.add_argument(
+        "--script",
+        dest="script_path",
+        default="/opt/plasma/bootstrap/ppu-bootstrap-service.py",
+    )
     return parser
 
 
