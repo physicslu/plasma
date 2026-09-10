@@ -143,7 +143,7 @@ async function openRuntimeDeployment(page: import("@playwright/test").Page, acti
   await page.goto("/engineering");
   await page.getByRole("button", { name: "PPU / Sites", exact: true }).click();
   await page.getByRole("button", { name: "Runtime 部署", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Runtime Deployment", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Runtime Deployment", level: 2, exact: true })).toBeVisible();
 }
 
 test("Runtime Deployment pairs, uploads a verified kit, and starts deployment without an FPGA action", async ({ page }) => {
