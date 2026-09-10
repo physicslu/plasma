@@ -13,6 +13,9 @@ on:
       - "data/device-catalog/research/stm32g4-phase4.9c-production-manifest-prestate.json"
       - "data/device-catalog/research/stm32g4-phase4.9c-policy-baseline.json"
       - "data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json"
+      - "data/device-catalog/research/stm32g4-phase4.9e-publication-proposal.json"
+      - "data/device-catalog/research/stm32g4-phase4.9e-publication-audit.json"
+      - "data/device-catalog/research/stm32g4-commercial-icpn.csv"
       - "data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/**"
       - "data/device-catalog/research/device-catalog-phase4.9a-stm32g4-foundation.md"
       - "data/device-catalog/research/device-catalog-phase4.9b-stm32g4-discovery.md"
@@ -31,6 +34,9 @@ on:
       - "data/device-catalog/research/stm32g4-phase4.9c-production-manifest-prestate.json"
       - "data/device-catalog/research/stm32g4-phase4.9c-policy-baseline.json"
       - "data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json"
+      - "data/device-catalog/research/stm32g4-phase4.9e-publication-proposal.json"
+      - "data/device-catalog/research/stm32g4-phase4.9e-publication-audit.json"
+      - "data/device-catalog/research/stm32g4-commercial-icpn.csv"
       - "data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/**"
       - "data/device-catalog/research/device-catalog-phase4.9a-stm32g4-foundation.md"
       - "data/device-catalog/research/device-catalog-phase4.9b-stm32g4-discovery.md"
@@ -72,3 +78,5 @@ jobs:
         run: python data/device-catalog/research/test_stm32g4_phase4_9d_admission.py
       - name: Replay immutable Phase 4.9D admission plan
         run: python data/device-catalog/research/validate_stm32g4_phase4_9d_admission_plan.py
+      - name: Validate Phase 4.9E published canonical / Production closure
+        run: python data/device-catalog/research/test_stm32g4_phase4_9e_publication.py
