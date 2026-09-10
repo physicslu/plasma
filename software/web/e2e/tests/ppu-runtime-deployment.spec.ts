@@ -85,7 +85,11 @@ function fleet(active = false) {
   };
 }
 
-function bootstrapStatus(paired: boolean, deployment: Record<string, unknown> | null = null) {
+function bootstrapStatus(
+  paired: boolean,
+  deployment: Record<string, unknown> | null = null,
+  runtimeState = "runtime_absent",
+) {
   return {
     ok: true,
     ppu_alias: alias,
@@ -107,12 +111,12 @@ function bootstrapStatus(paired: boolean, deployment: Record<string, unknown> | 
         hardware_revision: "pynq-z2-rev1",
       },
       runtime: {
-        state: "runtime_absent",
+        state: runtimeState,
         release_id: null,
         product_version: null,
         git_sha: null,
         target: null,
-        reason: null,
+        reason: runtimeState === "recovery_required" ? "unsafe active release" : null,
       },
       fpga: {
         pl_version: null,
@@ -270,5 +274,39 @@ test("Runtime Deployment is fail-closed while the selected PPU has active execut
   await openRuntimeDeployment(page, true);
 
   await expect(page.getByText(/Runtime deployment is blocked while this PPU has active Site execution/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Deploy Runtime", exact: true })).toBeDisabled();
+});
+
+test("Runtime Deployment remains blocked when Bootstrap reports recovery_required", async ({ page }) => {
+  const interrupted = {
+    transaction_id: "deploy-interrupted",
+    state: "recovery_required",
+    upload_id: uploadId,
+    started_at_epoch_s: 1,
+    updated_at_epoch_s: 2,
+    error_code: "interrupted_service_restart",
+    error: "PPU Bootstrap restarted while deployment API transaction was running",
+    result: null,
+  };
+  await page.route(/\/api\/manager\/registry\/ppu-a\/bootstrap$/, route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(bootstrapStatus(true, interrupted)),
+  }));
+
+  await openRuntimeDeployment(page);
+
+  const kitName = "plasma-z2-ps-kit.tar.gz";
+  const kitBytes = Buffer.from("plasma-z2-kit-test");
+  const digest = createHash("sha256").update(kitBytes).digest("hex");
+  await page.getByLabel("Z2 PS Kit", { exact: true }).setInputFiles({ name: kitName, mimeType: "application/gzip", buffer: kitBytes });
+  await page.getByLabel("SHA256 Sidecar", { exact: true }).setInputFiles({
+    name: `${kitName}.sha256`,
+    mimeType: "text/plain",
+    buffer: Buffer.from(`${digest}  ${kitName}\n`),
+  });
+
+  await expect(page.getByText(/Recovery required\. Normal Runtime deployment remains blocked/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "recovery required", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Deploy Runtime", exact: true })).toBeDisabled();
 });
