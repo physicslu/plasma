@@ -6,6 +6,7 @@
  * owner here instead of re-declaring near-identical local scales.
  */
 
+.operatorCard,
 .settingsCard,
 .diagnosticsTestCard {
   min-width: 0;
@@ -30,6 +31,7 @@
   line-height: 1.5;
 }
 
+.operatorField,
 .settingsField,
 .diagnosticsField {
   display: grid;
@@ -37,6 +39,7 @@
   min-width: 0;
 }
 
+.operatorField > span,
 .settingsField > span,
 .diagnosticsField > span {
   color: var(--text-soft);
@@ -44,6 +47,8 @@
   font-weight: 750;
 }
 
+.operatorField input:not([type="checkbox"]),
+.operatorField select,
 .settingsPage input:not([type="checkbox"]),
 .settingsPage select,
 .diagnosticsField input,
@@ -60,6 +65,8 @@
   font: 11px var(--font-mono);
 }
 
+.operatorField input:disabled,
+.operatorField select:disabled,
 .settingsPage input:disabled,
 .settingsPage select:disabled,
 .diagnosticsField input:disabled,
@@ -68,6 +75,8 @@
   cursor: not-allowed;
 }
 
+.operatorField > small,
+.operatorFieldControl > b,
 .settingsField > small,
 .settingsFieldControl > b,
 .diagnosticsField small {
@@ -76,6 +85,13 @@
   line-height: 1.4;
 }
 
+.operatorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.operatorButton,
 .settingsActions button,
 .loopbackExecutionActions button {
   min-height: 38px;
@@ -89,6 +105,7 @@
   cursor: pointer;
 }
 
+.operatorButton[data-variant="primary"],
 .settingsActions button[data-variant="primary"],
 .loopbackExecutionActions button.primary {
   border-color: var(--cyan);
@@ -96,21 +113,38 @@
   color: #fff;
 }
 
+.operatorButton[data-variant="danger"] {
+  border-color: color-mix(in srgb, var(--red) 60%, var(--line));
+  color: var(--red);
+}
+
+.operatorButton:disabled,
 .settingsActions button:disabled,
 .loopbackExecutionActions button:disabled {
   opacity: .42;
   cursor: not-allowed;
 }
 
+.operatorButton:not(:disabled):hover,
 .settingsActions button:not(:disabled):hover,
 .loopbackExecutionActions button:not(:disabled):hover {
   border-color: var(--cyan);
   color: var(--cyan);
 }
 
+.operatorButton[data-variant="primary"]:not(:disabled):hover,
 .settingsActions button[data-variant="primary"]:not(:disabled):hover,
 .loopbackExecutionActions button.primary:not(:disabled):hover {
   color: #fff;
+}
+
+.operatorButton[data-variant="danger"]:not(:disabled):hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.operatorMessage {
+  margin: 0;
 }
 
 /* PPU / Site management consumes the same canonical scale without re-owning it locally. */
