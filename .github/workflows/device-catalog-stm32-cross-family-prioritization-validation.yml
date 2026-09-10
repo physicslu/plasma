@@ -1,0 +1,42 @@
+name: STM32 cross-family prioritization validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32_cross_family_prioritization.py"
+      - "data/device-catalog/research/test_stm32_cross_family_prioritization.py"
+      - "data/device-catalog/research/test_stm32_cross_family_prioritization_replay.py"
+      - "data/device-catalog/research/stm32-cross-family-prioritization-baseline.json"
+      - "data/device-catalog/research/stm32-cross-family-prioritization-production-manifest-prestate.json"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - ".github/workflows/device-catalog-stm32-cross-family-prioritization-validation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/research/stm32_cross_family_prioritization.py"
+      - "data/device-catalog/research/test_stm32_cross_family_prioritization.py"
+      - "data/device-catalog/research/test_stm32_cross_family_prioritization_replay.py"
+      - "data/device-catalog/research/stm32-cross-family-prioritization-baseline.json"
+      - "data/device-catalog/research/stm32-cross-family-prioritization-production-manifest-prestate.json"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - ".github/workflows/device-catalog-stm32-cross-family-prioritization-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-cross-family-prioritization:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate prioritization policy and negative controls
+        run: python data/device-catalog/research/test_stm32_cross_family_prioritization.py
+      - name: Replay immutable historical prioritization snapshot
+        run: python data/device-catalog/research/test_stm32_cross_family_prioritization_replay.py
