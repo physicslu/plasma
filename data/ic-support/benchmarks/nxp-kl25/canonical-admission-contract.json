@@ -1,0 +1,23 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "kl25_canonical_admission_contract",
+  "contract_id": "nxp-kl25-canonical-admission-v0",
+  "target": "MKL25Z128VLK4",
+  "required_target_evidence": {
+    "source_id": "nxp_kl25_ds_rev5",
+    "pdf_page_number": 2,
+    "source_sha256": "e42271b7f612ac1b0812001e62bef10d217be4a61dbee5bb0a1e5c4076209a3b",
+    "locator": "Ordering Information / MKL25Z128VLK4"
+  },
+  "candidate_operation_set": ["READ", "VERIFY", "PROGRAM", "ERASE_SECTOR"],
+  "forbidden_operations": ["ERASE_ALL_BLOCKS", "MDM_MASS_ERASE", "BACKDOOR_KEY", "SECURITY_STATE_MODIFICATION", "FLASH_CONFIGURATION_FIELD_PROGRAM", "FLASH_CONFIGURATION_FIELD_SECTOR_ERASE", "UNPROTECT", "IMPLICIT_DESTRUCTIVE_SECURITY_WORKFLOW"],
+  "required_operation_states": ["ADMITTED", "BLOCKED"],
+  "trust_boundary": {
+    "canonical_dataset_admission": "CONDITIONAL_ON_VALIDATED_ARTIFACT",
+    "software_executor_operation_admission": "PER_OPERATION_ONLY",
+    "production_catalog_admission": false,
+    "production_routing_admission": false,
+    "hil_admission": false,
+    "destructive_security_operation_admission": false
+  }
+}
