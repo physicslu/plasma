@@ -208,7 +208,7 @@ Optional fleet path:
 Fleet client
     |
     v
-Plasma Manager (read-only registry / aggregation + narrow Phase-0 PS Loopback relay)
+Plasma Manager (read-only registry / aggregation + narrow PS Loopback and Site Desired relays)
     |
     +--> PPU A Plasma Gateway -> local execution
     +--> PPU B Plasma Gateway -> local execution
@@ -223,7 +223,8 @@ Implementation facts:
 - Web Console uses REST polling.
 - `plasma_manager` is optional and not required for local PPU execution.
 - Manager deployment is opt-in (`PLASMA_MANAGER_ENABLED=0` by default).
-- Manager fleet observation remains read-only. The only current write-like exception is fixed PS Loopback pass-through at `POST /api/ppus/{ppu_alias}/diagnostics/loopback` with `endpoint=ps`; it is not a generic proxy or general command-routing contract.
+- Manager fleet observation remains read-only. Current write-like exceptions are narrow and explicit: fixed PS Loopback pass-through at `POST /api/ppus/{ppu_alias}/diagnostics/loopback` with `endpoint=ps`, plus alias-scoped Site Desired configuration pass-through at `POST /api/ppus/{ppu_alias}/gateway/api/settings/sites/{site_id}`. Neither is a generic proxy or a general command-routing contract.
+- Site Desired reads/writes remain PPU-owned. Manager only relays the allowlisted Site settings routes and the explicit `If-Match`/idempotency/security headers required by that contract.
 - Current Manager does not provide Job/Batch command routing, central scheduling, discovery, auth policy, Programming Asset rollout, or general Fleet write orchestration.
 - Mock programming success does not prove hardware programming.
 
@@ -302,7 +303,9 @@ Service management is defined by `scripts/plasmactl`.
 | `plasma-server.service` | 9900 | Plasma PPU Programming Server / Protocol v3.3 TCP Server |
 | `plasma-web.service` | 18080 | Plasma Gateway |
 | `plasma-vite.service` | 5173 | Plasma PPU Console development/demo runtime |
-| `plasma-manager.service` | 18180 | Optional Plasma Manager fleet control plane; read-only observation plus narrow Phase-0 PS Loopback pass-through |
+| `plasma-manager.service` | 18180 | Optional Plasma Manager fleet control plane; read-only observation plus narrow PS Loopback and Site Desired relays |
+
+Packaged PPU deployments must bind `plasma-server.service` and `plasma-web.service` to the same explicit canonical PPU configuration path. Site Desired persistence requires directory-level create/rename permission for atomic replacement; grant that write boundary only to the Plasma Gateway service and only for the managed Plasma configuration root. `plasma-server.service` remains read-only for canonical configuration. A successful Save Desired changes persistent desired state only; it does not imply runtime apply or service restart.
 
 Useful commands:
 
@@ -608,8 +611,9 @@ Agents must not silently turn these facts into wrong assumptions:
 5. Web REST v3 and Protocol v3.3 are canonical-only development contracts; there is no legacy compatibility requirement.
 6. Only binary Image Asset normalization is implemented; other declared Asset formats/types are extension points, not validated functionality.
 7. Programming Recipe/Package is an architectural direction, not yet an implemented execution contract.
-8. Plasma Manager currently implements manual read-only PPU registry/fleet aggregation plus opt-in deployment and one narrow Phase-0 PS Loopback pass-through. General command routing, Job/Batch scheduling, discovery, authentication policy, Programming Asset rollout, and general Fleet write orchestration remain future work.
+8. Plasma Manager currently implements manual read-only PPU registry/fleet aggregation plus opt-in deployment and two narrow relays: Phase-0 PS Loopback and alias-scoped Site Desired configuration. General command routing, Job/Batch scheduling, discovery, authentication policy, Programming Asset rollout, and general Fleet write orchestration remain future work.
 9. Mock/software validation does not prove Z2/FPGA/OpenOCD/real-target behavior.
+10. Site Desired persistence and Runtime activation are separate contracts. Current Site settings save persistent Desired state; hot apply/restart from the settings request remains unsupported.
 
 ## 19. Communication and completion report
 
