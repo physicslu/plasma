@@ -1,0 +1,50 @@
+name: STM32G4 Phase 4.9C baseline one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32g4-phase49c-policy
+    paths:
+      - ".github/workflows/device-catalog-stm32g4-phase49c-baseline-oneoff.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32g4-phase49c-policy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate retained Phase 4.9B evidence
+        run: python data/device-catalog/research/validate_stm32g4_phase4_9b_retained_evidence.py
+      - name: Validate Phase 4.9C metadata adapter and planner
+        run: python data/device-catalog/research/test_stm32g4_phase4_9c_policy.py
+      - name: Generate immutable Phase 4.9C policy baseline
+        run: |
+          python data/device-catalog/research/stm32g4_phase4_9c_policy.py --write-baseline
+          python data/device-catalog/research/stm32g4_phase4_9c_policy.py
+          sha256sum data/device-catalog/research/stm32g4-phase4.9c-policy-baseline.json
+      - name: Assert current Production is not modified
+        run: |
+          cmp data/device-catalog/production/icpn-v1-manifest.json data/device-catalog/research/stm32g4-phase4.9c-production-manifest-prestate.json
+          test "$(python - <<'PY'
+          import json
+          x=json.load(open('data/device-catalog/production/icpn-v1-manifest.json'))
+          print(sum(s['row_count'] for s in x['sources']))
+          PY
+          )" = "610"
+      - name: Commit deterministic baseline
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/device-catalog/research/stm32g4-phase4.9c-policy-baseline.json
+          git diff --cached --quiet && { echo "No baseline generated"; exit 1; }
+          git commit -m "Device catalog: freeze STM32G4 Phase 4.9C policy baseline"
+          git push origin HEAD:agent/device-catalog-stm32g4-phase49c-policy
