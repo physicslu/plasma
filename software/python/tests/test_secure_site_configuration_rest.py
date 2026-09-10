@@ -134,7 +134,15 @@ class SecureSiteConfigurationRestTests(unittest.TestCase):
         self.thread.join()
         self.controller.close()
 
-    def request(self, method: str, path: str, token: str, body=None, command_id: str | None = None):
+    def request(
+        self,
+        method: str,
+        path: str,
+        token: str,
+        body=None,
+        command_id: str | None = None,
+        if_match: str | None = None,
+    ):
         connection = HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
         raw = json.dumps(body).encode() if body is not None else None
         headers = {
@@ -145,20 +153,33 @@ class SecureSiteConfigurationRestTests(unittest.TestCase):
             headers["Content-Type"] = "application/json"
         if command_id is not None:
             headers["Idempotency-Key"] = command_id
+        if if_match is not None:
+            headers["If-Match"] = if_match
         connection.request(method, path, body=raw, headers=headers)
         response = connection.getresponse()
         payload = json.loads(response.read())
         status = response.status
+        response_headers = dict(response.getheaders())
         connection.close()
-        return status, payload
+        return status, payload, response_headers
+
+    def revision(self, site_id: int) -> str:
+        status, payload, _ = self.request("GET", "/api/settings/sites", ENGINEER_TOKEN)
+        self.assertEqual(status, 200)
+        site = next(item for item in payload["site_configuration"]["sites"] if item["site_id"] == site_id)
+        return site["desired_revision"]
+
+    @staticmethod
+    def etag(revision: str) -> str:
+        return f'"{revision}"'
 
     def test_operator_can_read_but_cannot_write_site_desired_configuration(self) -> None:
-        status, payload = self.request("GET", "/api/settings/sites", OPERATOR_TOKEN)
+        status, payload, _ = self.request("GET", "/api/settings/sites", OPERATOR_TOKEN)
         self.assertEqual(status, 200)
         self.assertTrue(payload["ok"])
 
         before = self.config_path.read_text(encoding="utf-8")
-        status, denied = self.request(
+        status, denied, _ = self.request(
             "POST",
             "/api/settings/sites/1",
             OPERATOR_TOKEN,
@@ -172,28 +193,33 @@ class SecureSiteConfigurationRestTests(unittest.TestCase):
     def test_engineer_write_is_idempotent_and_site_scoped(self) -> None:
         desired = {"enabled": True, "interface": "mock", "target": "TARGET-NEW"}
         command_id = "site-engineer-write-0001"
-        status, first = self.request(
+        if_match = self.etag(self.revision(1))
+        status, first, _ = self.request(
             "POST",
             "/api/settings/sites/1",
             ENGINEER_TOKEN,
             desired,
             command_id,
+            if_match,
         )
         self.assertEqual(status, 200)
         self.assertEqual(first["site_configuration"]["sites"][0]["desired"]["target"], "TARGET-NEW")
 
-        status, replay = self.request(
+        # Replay returns the durable first result before the now-stale If-Match
+        # is re-evaluated; the idempotency key still identifies one command.
+        status, replay, _ = self.request(
             "POST",
             "/api/settings/sites/1",
             ENGINEER_TOKEN,
             desired,
             command_id,
+            if_match,
         )
         self.assertEqual(status, 200)
         self.assertEqual(replay, first)
 
         before = self.config_path.read_text(encoding="utf-8")
-        status, denied = self.request(
+        status, denied, _ = self.request(
             "POST",
             "/api/settings/sites/2",
             ENGINEER_TOKEN,
@@ -203,6 +229,48 @@ class SecureSiteConfigurationRestTests(unittest.TestCase):
         self.assertEqual(status, 403)
         self.assertEqual(denied["error"]["error_type"], "AUTHORIZATION_DENIED")
         self.assertEqual(self.config_path.read_text(encoding="utf-8"), before)
+
+    def test_secure_stale_write_is_rejected_with_new_command_id(self) -> None:
+        stale = self.revision(1)
+        status, _, _ = self.request(
+            "POST",
+            "/api/settings/sites/1",
+            ENGINEER_TOKEN,
+            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            "site-cas-first-0001",
+            self.etag(stale),
+        )
+        self.assertEqual(status, 200)
+        before = self.config_path.read_text(encoding="utf-8")
+
+        status, conflict, _ = self.request(
+            "POST",
+            "/api/settings/sites/1",
+            ENGINEER_TOKEN,
+            {"enabled": True, "interface": "mock", "target": "TARGET-STALE"},
+            "site-cas-second-0002",
+            self.etag(stale),
+        )
+        self.assertEqual(status, 412)
+        self.assertEqual(conflict["error"]["code"], "site_desired_conflict")
+        self.assertEqual(self.config_path.read_text(encoding="utf-8"), before)
+
+    def test_secure_cors_allows_if_match_header(self) -> None:
+        connection = HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request(
+            "OPTIONS",
+            "/api/settings/sites/1",
+            headers={
+                "Origin": "https://console.example",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "Authorization, Content-Type, Idempotency-Key, If-Match",
+            },
+        )
+        response = connection.getresponse()
+        response.read()
+        allowed = response.getheader("Access-Control-Allow-Headers") or ""
+        connection.close()
+        self.assertIn("If-Match", allowed)
 
 
 if __name__ == "__main__":

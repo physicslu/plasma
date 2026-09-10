@@ -2,6 +2,7 @@ name: Repository contracts
 
 on:
   push:
+    branches: [main]
     paths:
       - "**/*.md"
       - ".github/ci-workstreams.json"
@@ -16,6 +17,8 @@ on:
       - ".github/workflows/ic-support-validation.yml"
       - ".github/workflows/ppu-release.yml"
       - ".github/workflows/z2-ps-release.yml"
+      - ".github/workflows/persistent-integration-host.yml"
+      - ".github/workflows/device-catalog-stm32-family-validation.yml"
       - ".github/workflows/repository-contracts.yml"
   pull_request:
     paths:
@@ -32,6 +35,8 @@ on:
       - ".github/workflows/ic-support-validation.yml"
       - ".github/workflows/ppu-release.yml"
       - ".github/workflows/z2-ps-release.yml"
+      - ".github/workflows/persistent-integration-host.yml"
+      - ".github/workflows/device-catalog-stm32-family-validation.yml"
       - ".github/workflows/repository-contracts.yml"
 
 concurrency:
@@ -111,6 +116,8 @@ jobs:
               ".github/workflows/ic-support-validation.yml",
               ".github/workflows/ppu-release.yml",
               ".github/workflows/z2-ps-release.yml",
+              ".github/workflows/persistent-integration-host.yml",
+              ".github/workflows/device-catalog-stm32-family-validation.yml",
               ".github/workflows/repository-contracts.yml",
           }
 

@@ -1,0 +1,668 @@
+{
+  "candidates": [
+    {
+      "cmsis_device_name_rows": 22,
+      "cohort": "standard_nonwireless_research",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32C0 Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 22,
+        "ordering_pattern": 73
+      },
+      "ordering_pattern_fraction": 0.768421,
+      "ordering_pattern_rows": 73,
+      "plasma_series": "STM32C0",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified"
+      ],
+      "row_count": 95,
+      "shortlist_eligible": true,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32C011",
+        "STM32C031",
+        "STM32C051",
+        "STM32C071",
+        "STM32C091",
+        "STM32C092"
+      ],
+      "subfamily_count": 6,
+      "target_configs": [
+        "tcl/target/stm32c0x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 32,
+      "cohort": "high_complexity_requires_partitioned_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32H7 Series",
+        "STM32H7RS Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 32,
+        "ordering_pattern": 168
+      },
+      "ordering_pattern_fraction": 0.84,
+      "ordering_pattern_rows": 168,
+      "plasma_series": "STM32H7",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "target_config_count_not_one",
+        "openocd_mapping_not_verified",
+        "high_complexity_requires_partitioned_scope"
+      ],
+      "row_count": 200,
+      "shortlist_eligible": false,
+      "structural_gate_pass": false,
+      "subfamilies": [
+        "STM32H723",
+        "STM32H725",
+        "STM32H730",
+        "STM32H733",
+        "STM32H735",
+        "STM32H742",
+        "STM32H743",
+        "STM32H745",
+        "STM32H747",
+        "STM32H750",
+        "STM32H753",
+        "STM32H755",
+        "STM32H757",
+        "STM32H7A3",
+        "STM32H7B0",
+        "STM32H7B3",
+        "STM32H7R3",
+        "STM32H7R7",
+        "STM32H7S3",
+        "STM32H7S7"
+      ],
+      "subfamily_count": 20,
+      "target_configs": [
+        "tcl/target/stm32h7rsx.cfg",
+        "tcl/target/stm32h7x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 2,
+      "cohort": "standard_nonwireless_research",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32L0 Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 2,
+        "ordering_pattern": 164
+      },
+      "ordering_pattern_fraction": 0.987952,
+      "ordering_pattern_rows": 164,
+      "plasma_series": "STM32L0",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified"
+      ],
+      "row_count": 166,
+      "shortlist_eligible": true,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32L010",
+        "STM32L011",
+        "STM32L021",
+        "STM32L031",
+        "STM32L041",
+        "STM32L051",
+        "STM32L052",
+        "STM32L053",
+        "STM32L062",
+        "STM32L063",
+        "STM32L071",
+        "STM32L072",
+        "STM32L073",
+        "STM32L081",
+        "STM32L082",
+        "STM32L083"
+      ],
+      "subfamily_count": 16,
+      "target_configs": [
+        "tcl/target/stm32l0.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 45,
+      "cohort": "standard_nonwireless_research",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32L1 Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 45,
+        "ordering_pattern": 87
+      },
+      "ordering_pattern_fraction": 0.659091,
+      "ordering_pattern_rows": 87,
+      "plasma_series": "STM32L1",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified"
+      ],
+      "row_count": 132,
+      "shortlist_eligible": true,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32L100",
+        "STM32L151",
+        "STM32L152",
+        "STM32L162"
+      ],
+      "subfamily_count": 4,
+      "target_configs": [
+        "tcl/target/stm32l1.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 48,
+      "cohort": "standard_nonwireless_research",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32L4 Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 48,
+        "ordering_pattern": 207
+      },
+      "ordering_pattern_fraction": 0.811765,
+      "ordering_pattern_rows": 207,
+      "plasma_series": "STM32L4",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified"
+      ],
+      "row_count": 255,
+      "shortlist_eligible": true,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32L412",
+        "STM32L422",
+        "STM32L431",
+        "STM32L432",
+        "STM32L433",
+        "STM32L442",
+        "STM32L443",
+        "STM32L451",
+        "STM32L452",
+        "STM32L462",
+        "STM32L471",
+        "STM32L475",
+        "STM32L476",
+        "STM32L486",
+        "STM32L496",
+        "STM32L4A6",
+        "STM32L4P5",
+        "STM32L4Q5",
+        "STM32L4R5",
+        "STM32L4R7",
+        "STM32L4R9",
+        "STM32L4S5",
+        "STM32L4S7",
+        "STM32L4S9"
+      ],
+      "subfamily_count": 24,
+      "target_configs": [
+        "tcl/target/stm32l4x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 23,
+      "cohort": "trustzone_requires_security_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32L5 Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 23,
+        "ordering_pattern": 15
+      },
+      "ordering_pattern_fraction": 0.394737,
+      "ordering_pattern_rows": 15,
+      "plasma_series": "STM32L5",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified",
+        "trustzone_requires_security_scope"
+      ],
+      "row_count": 38,
+      "shortlist_eligible": false,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32L5x2"
+      ],
+      "subfamily_count": 1,
+      "target_configs": [
+        "tcl/target/stm32l5x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 6,
+      "cohort": "standard_nonwireless_research",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32U0 Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 6,
+        "ordering_pattern": 42
+      },
+      "ordering_pattern_fraction": 0.875,
+      "ordering_pattern_rows": 42,
+      "plasma_series": "STM32U0",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified"
+      ],
+      "row_count": 48,
+      "shortlist_eligible": true,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32U031",
+        "STM32U073",
+        "STM32U083"
+      ],
+      "subfamily_count": 3,
+      "target_configs": [
+        "tcl/target/stm32u0x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 96,
+      "cohort": "trustzone_requires_security_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32U3 Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 96,
+        "ordering_pattern": 75
+      },
+      "ordering_pattern_fraction": 0.438596,
+      "ordering_pattern_rows": 75,
+      "plasma_series": "STM32U3",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified",
+        "trustzone_requires_security_scope"
+      ],
+      "row_count": 171,
+      "shortlist_eligible": false,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32U335",
+        "STM32U345",
+        "STM32U356",
+        "STM32U366",
+        "STM32U375",
+        "STM32U385",
+        "STM32U3B5",
+        "STM32U3C5"
+      ],
+      "subfamily_count": 8,
+      "target_configs": [
+        "tcl/target/stm32u3x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 99,
+      "cohort": "trustzone_requires_security_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32U5 Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 99,
+        "ordering_pattern": 63
+      },
+      "ordering_pattern_fraction": 0.388889,
+      "ordering_pattern_rows": 63,
+      "plasma_series": "STM32U5",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified",
+        "trustzone_requires_security_scope"
+      ],
+      "row_count": 162,
+      "shortlist_eligible": false,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32U535",
+        "STM32U545",
+        "STM32U575",
+        "STM32U585",
+        "STM32U595",
+        "STM32U599",
+        "STM32U5A5",
+        "STM32U5A9",
+        "STM32U5F7",
+        "STM32U5F9",
+        "STM32U5G7",
+        "STM32U5G9"
+      ],
+      "subfamily_count": 12,
+      "target_configs": [
+        "tcl/target/stm32u5x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 1,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 1
+      },
+      "ordering_pattern_fraction": 0.0,
+      "ordering_pattern_rows": 0,
+      "plasma_series": "STM32W108",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified",
+        "wireless_requires_dedicated_scope"
+      ],
+      "row_count": 1,
+      "shortlist_eligible": false,
+      "structural_gate_pass": false,
+      "subfamilies": [],
+      "subfamily_count": 0,
+      "target_configs": [
+        "tcl/target/stm32w108xx.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 4,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32WBA Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 4,
+        "ordering_pattern": 4
+      },
+      "ordering_pattern_fraction": 0.5,
+      "ordering_pattern_rows": 4,
+      "plasma_series": "STM32WBA2X",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified",
+        "wireless_requires_dedicated_scope"
+      ],
+      "row_count": 8,
+      "shortlist_eligible": false,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WBA23",
+        "STM32WBA25"
+      ],
+      "subfamily_count": 2,
+      "target_configs": [
+        "tcl/target/stm32wba2x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 17,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32WBA Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 17,
+        "ordering_pattern": 17
+      },
+      "ordering_pattern_fraction": 0.5,
+      "ordering_pattern_rows": 17,
+      "plasma_series": "STM32WBA5X",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified",
+        "wireless_requires_dedicated_scope"
+      ],
+      "row_count": 34,
+      "shortlist_eligible": false,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WBA50",
+        "STM32WBA52",
+        "STM32WBA54",
+        "STM32WBA55",
+        "STM32WBA5M"
+      ],
+      "subfamily_count": 5,
+      "target_configs": [
+        "tcl/target/stm32wba5x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 0,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32WBA Series"
+      ],
+      "identifier_kind_counts": {
+        "ordering_pattern": 19
+      },
+      "ordering_pattern_fraction": 1.0,
+      "ordering_pattern_rows": 19,
+      "plasma_series": "STM32WBA6X",
+      "risk_flags": [
+        "openocd_mapping_not_verified",
+        "wireless_requires_dedicated_scope"
+      ],
+      "row_count": 19,
+      "shortlist_eligible": false,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WBA62",
+        "STM32WBA63",
+        "STM32WBA64",
+        "STM32WBA65",
+        "STM32WBA6M"
+      ],
+      "subfamily_count": 5,
+      "target_configs": [
+        "tcl/target/stm32wba6x.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 4,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32WB Series"
+      ],
+      "identifier_kind_counts": {
+        "cmsis_device_name": 4,
+        "ordering_pattern": 19
+      },
+      "ordering_pattern_fraction": 0.826087,
+      "ordering_pattern_rows": 19,
+      "plasma_series": "STM32WBX",
+      "risk_flags": [
+        "mixed_identifier_kinds",
+        "openocd_mapping_not_verified",
+        "wireless_requires_dedicated_scope"
+      ],
+      "row_count": 23,
+      "shortlist_eligible": false,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WB10",
+        "STM32WB15",
+        "STM32WB1M",
+        "STM32WB30",
+        "STM32WB35",
+        "STM32WB50",
+        "STM32WB55",
+        "STM32WB5M"
+      ],
+      "subfamily_count": 8,
+      "target_configs": [
+        "tcl/target/stm32wbx.cfg"
+      ]
+    },
+    {
+      "cmsis_device_name_rows": 0,
+      "cohort": "wireless_requires_dedicated_scope",
+      "complete_mapping_metadata": true,
+      "expected_openocd_candidate_contract": true,
+      "family_labels": [
+        "STM32WL Series"
+      ],
+      "identifier_kind_counts": {
+        "ordering_pattern": 17
+      },
+      "ordering_pattern_fraction": 1.0,
+      "ordering_pattern_rows": 17,
+      "plasma_series": "STM32WLX",
+      "risk_flags": [
+        "openocd_mapping_not_verified",
+        "wireless_requires_dedicated_scope"
+      ],
+      "row_count": 17,
+      "shortlist_eligible": false,
+      "structural_gate_pass": true,
+      "subfamilies": [
+        "STM32WL54",
+        "STM32WL55",
+        "STM32WLE4",
+        "STM32WLE5"
+      ],
+      "subfamily_count": 4,
+      "target_configs": [
+        "tcl/target/stm32wlx.cfg"
+      ]
+    }
+  ],
+  "claims": {
+    "exact_icpn_claimed_from_openocd": false,
+    "marketing_lifecycle_claimed_from_openocd": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false,
+    "selected_next_research_family": false,
+    "shortlist_is_admission_ready": false
+  },
+  "inputs": {
+    "openocd_catalog": "openocd-parts-canonical.csv",
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "production_manifest": "data/device-catalog/research/stm32-cross-family-prioritization-production-manifest-prestate.json",
+    "production_manifest_sha256": "93c2a4541daeb1d4aa1dcc57edef54042862eb6d9da03e3a6b401e4b8481b11d"
+  },
+  "inventory": {
+    "candidate_ordering_pattern_rows": 970,
+    "candidate_series_count": 15,
+    "candidate_source_row_count": 1369,
+    "cohort_counts": {
+      "high_complexity_requires_partitioned_scope": 1,
+      "standard_nonwireless_research": 5,
+      "trustzone_requires_security_scope": 3,
+      "wireless_requires_dedicated_scope": 6
+    },
+    "shortlist_eligible_series_count": 5
+  },
+  "phase": "cross-family-prioritization",
+  "policy": {
+    "architecture_gate": "standard_nonwireless_research cohort only for first shortlist",
+    "ranking": [
+      "fewest ordering_pattern rows",
+      "fewest total source rows",
+      "highest ordering_pattern fraction",
+      "lexical plasma_series tie-break"
+    ],
+    "selection_boundary": "shortlist only; manufacturer evidence probe required before selecting a family",
+    "shortlist_limit": 3,
+    "structural_gate": [
+      "at least one ordering_pattern row",
+      "exactly one OpenOCD target config",
+      "complete non-blank mapping metadata",
+      "all rows satisfy upstream-openocd/mapping_candidate/not_verified source contract"
+    ]
+  },
+  "policy_id": "stm32-cross-family-prioritization-v1",
+  "production_invariants": {
+    "base_device_count": 217,
+    "exact_icpn_count": 635,
+    "family_exact_icpn_counts": {
+      "STM32F0": 42,
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384,
+      "STM32F7": 19,
+      "STM32G0": 47,
+      "STM32G4": 25
+    },
+    "manufacturer": "STMicroelectronics",
+    "production_series": [
+      "STM32F0",
+      "STM32F1",
+      "STM32F2",
+      "STM32F3",
+      "STM32F4",
+      "STM32F7",
+      "STM32G0",
+      "STM32G4"
+    ]
+  },
+  "research_shortlist": [
+    {
+      "next_required_gate": "bounded_official_manufacturer_evidence_accessibility_probe",
+      "ordering_pattern_fraction": 0.875,
+      "ordering_pattern_rows": 42,
+      "plasma_series": "STM32U0",
+      "shortlist_rank": 1,
+      "source_row_count": 48,
+      "target_config": "tcl/target/stm32u0x.cfg"
+    },
+    {
+      "next_required_gate": "bounded_official_manufacturer_evidence_accessibility_probe",
+      "ordering_pattern_fraction": 0.768421,
+      "ordering_pattern_rows": 73,
+      "plasma_series": "STM32C0",
+      "shortlist_rank": 2,
+      "source_row_count": 95,
+      "target_config": "tcl/target/stm32c0x.cfg"
+    },
+    {
+      "next_required_gate": "bounded_official_manufacturer_evidence_accessibility_probe",
+      "ordering_pattern_fraction": 0.659091,
+      "ordering_pattern_rows": 87,
+      "plasma_series": "STM32L1",
+      "shortlist_rank": 3,
+      "source_row_count": 132,
+      "target_config": "tcl/target/stm32l1.cfg"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "read-only cross-family STM32 research prioritization",
+  "selected_next_research_family": null
+}

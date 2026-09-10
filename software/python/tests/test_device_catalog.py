@@ -7,13 +7,14 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalog, get_default_device_catalog
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 610
+EXPECTED_PRODUCTION_CATALOG_SIZE = 635
 EXPECTED_STM32F0_CATALOG_SIZE = 42
 EXPECTED_STM32F2_CATALOG_SIZE = 33
 EXPECTED_STM32F3_CATALOG_SIZE = 10
 EXPECTED_STM32F4_CATALOG_SIZE = 384
 EXPECTED_STM32F7_CATALOG_SIZE = 19
 EXPECTED_STM32G0_CATALOG_SIZE = 47
+EXPECTED_STM32G4_CATALOG_SIZE = 25
 
 
 LEGACY_COLUMNS = [
@@ -103,6 +104,7 @@ def test_checked_in_production_catalog_contains_only_current_admitted_exact_icpn
         "STM32F4",
         "STM32F7",
         "STM32G0",
+        "STM32G4",
     }
 
 
@@ -224,6 +226,22 @@ def test_production_search_supports_exact_icpn_and_taxonomy_queries() -> None:
     assert len(combined) == 100
 
 
+def test_stm32g4_publication_is_catalog_visible_without_physical_qualification() -> None:
+    record = get_default_device_catalog().search("stm32g441cby6tr", limit=1)[0]
+    assert record.identifier == "STM32G441CBY6TR"
+    assert record.family == "STM32G4"
+    assert record.package == "WLCSP"
+    assert record.pin_count == "49"
+    assert record.target_config == "tcl/target/stm32g4x.cfg"
+    payload = record.to_payload()
+    assert payload["catalog"]["scope"] == "production_admitted"
+    assert payload["physical_validation"] == {
+        "engineering_status": "no_evidence",
+        "ppu_status": "no_evidence",
+        "socket_status": "no_evidence",
+    }
+
+
 def test_production_payload_separates_catalog_verification_from_physical_validation() -> None:
     record = get_default_device_catalog().search("STM32F103C8T6", limit=1)[0]
     payload = record.to_payload()
@@ -242,7 +260,7 @@ def test_production_payload_separates_catalog_verification_from_physical_validat
 def test_production_metadata_reports_vendor_family_taxonomy() -> None:
     metadata = get_default_device_catalog().metadata
     assert metadata["catalog_size"] == EXPECTED_PRODUCTION_CATALOG_SIZE
-    assert metadata["source_count"] == 7
+    assert metadata["source_count"] == 8
     assert metadata["taxonomy"] == [
         {
             "vendor": "STMicroelectronics",
@@ -255,6 +273,7 @@ def test_production_metadata_reports_vendor_family_taxonomy() -> None:
                 {"family": "STM32F4", "count": EXPECTED_STM32F4_CATALOG_SIZE},
                 {"family": "STM32F7", "count": EXPECTED_STM32F7_CATALOG_SIZE},
                 {"family": "STM32G0", "count": EXPECTED_STM32G0_CATALOG_SIZE},
+                {"family": "STM32G4", "count": EXPECTED_STM32G4_CATALOG_SIZE},
             ],
         }
     ]

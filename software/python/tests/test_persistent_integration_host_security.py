@@ -20,6 +20,8 @@ def test_persistent_workflow_rejects_non_main_before_self_hosted_execution() -> 
     workflow = _text(".github/workflows/persistent-integration-host.yml")
     assert "workflow_dispatch:" in workflow
     assert "pull_request:" not in workflow
+    assert "\n  push:" not in workflow
+    assert "\n  schedule:" not in workflow
     assert "main-dispatch-guard:" in workflow
     guard = workflow.split("main-dispatch-guard:", 1)[1].split("persistent-acceptance:", 1)[0]
     assert "runs-on: ubuntu-latest" in guard

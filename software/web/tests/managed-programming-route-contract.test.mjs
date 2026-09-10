@@ -94,10 +94,10 @@ test("Browser managed route exposes no PPU endpoint and keeps Manager as alias-t
   assert.doesNotMatch(managedRoute, /target_url|NEXT_PUBLIC_PLASMA_API_URL/);
 });
 
-test("BFF preserves only the required security/content headers and keeps Manager loopback-only", () => {
+test("BFF preserves only the required security/content/conditional headers and keeps Manager loopback-only", () => {
   assert.match(managerBff, /LOOPBACK_HOSTS/);
   assert.match(managerBff, /PLASMA_MANAGER_API_URL must remain loopback-only/);
-  assert.match(managerBff, /\["Accept", "Authorization", "Content-Type", "Idempotency-Key"\]/);
+  assert.match(managerBff, /\["Accept", "Authorization", "Content-Type", "Idempotency-Key", "If-Match"\]/);
   assert.match(managerBff, /MAX_MANAGED_REQUEST_BYTES = 24 \* 1024 \* 1024/);
   assert.doesNotMatch(managerBff, /Set-Cookie.*forwardedHeaders/s);
   assert.doesNotMatch(managerBff, /target_url/);
