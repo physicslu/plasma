@@ -1,0 +1,66 @@
+name: STM32G4 Phase 4.9B retention one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32g4-phase49b-discovery
+    paths:
+      - ".github/workflows/device-catalog-stm32g4-phase49b-retain-oneoff.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  retain-stm32g4:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32g4-phase49b-discovery
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download exact immutable live artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output /tmp/stm32g4-live.zip \
+            https://api.github.com/repos/physicslu/plasma/actions/artifacts/10131271123/zip
+          actual="$(sha256sum /tmp/stm32g4-live.zip | awk '{print $1}')"
+          test "$actual" = "a10b34d4ea2f28a0e2ae19e1a54d36b684ec0581de5c79fc8d21c90b97989eb1"
+          mkdir -p /tmp/stm32g4-live
+          unzip -q /tmp/stm32g4-live.zip -d /tmp/stm32g4-live
+      - name: Retain compact evidence without re-acquisition
+        run: |
+          python data/device-catalog/research/retain_stm32g4_phase4_9b_artifact.py \
+            --artifact-root /tmp/stm32g4-live \
+            --artifact-id 10131271123 \
+            --artifact-zip-sha256 a10b34d4ea2f28a0e2ae19e1a54d36b684ec0581de5c79fc8d21c90b97989eb1 \
+            --workflow-run-id 34421443430 \
+            --executed-git-sha 3c74395ae8771ccb8abfeb8fa7aeec671b9d6042
+      - name: Verify retained outputs
+        run: |
+          test -f data/device-catalog/research/stm32g4-phase4.9b-discovery-baseline.json
+          test -f data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/pilot-summary.json
+          test -f data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/provenance.json
+          test -f data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/manifest.json
+          sha256sum data/device-catalog/research/stm32g4-phase4.9b-discovery-baseline.json
+          sha256sum data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/*.json
+      - name: Commit retained evidence to branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/device-catalog/research/stm32g4-phase4.9b-discovery-baseline.json \
+            data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/
+          git diff --cached --quiet && { echo "No retained evidence changes"; exit 1; }
+          git commit -m "Device catalog: retain STM32G4 Phase 4.9B official-ST discovery"
+          git push origin HEAD:agent/device-catalog-stm32g4-phase49b-discovery
