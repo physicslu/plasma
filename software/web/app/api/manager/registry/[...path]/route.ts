@@ -1,3 +1,4 @@
+import { relayManagerBootstrapRequest } from "../../bootstrap-bff";
 import {
   relayManagerNetworkCommissioningRequest,
   relayManagerPpuAliasRequest,
@@ -8,8 +9,9 @@ const REGISTRY_BROWSER_PREFIX = "/api/manager/registry";
 
 type RegistryBrowserPath = {
   alias: string;
-  resource: "entry" | "network" | "network-commissioning" | "sites" | "site";
+  resource: "entry" | "network" | "network-commissioning" | "sites" | "site" | "bootstrap";
   siteId?: number;
+  bootstrapAction?: string;
 };
 
 function registryPath(request: Request): RegistryBrowserPath | null {
@@ -18,7 +20,6 @@ function registryPath(request: Request): RegistryBrowserPath | null {
   const encoded = url.pathname.slice(REGISTRY_BROWSER_PREFIX.length + 1);
   if (!encoded) return null;
   const parts = encoded.split("/");
-  if (parts.length > 3) return null;
   let alias: string;
   try {
     alias = decodeURIComponent(parts[0] ?? "");
@@ -27,6 +28,15 @@ function registryPath(request: Request): RegistryBrowserPath | null {
   }
   if (!alias || alias.includes("/") || alias.includes("\\")) return null;
   if (parts.length === 1) return { alias, resource: "entry" };
+  if (parts[1] === "bootstrap") {
+    if (parts.length > 5 || parts.some(part => !part)) return null;
+    return {
+      alias,
+      resource: "bootstrap",
+      bootstrapAction: parts.slice(2).join("/"),
+    };
+  }
+  if (parts.length > 3) return null;
   if (parts.length === 2 && parts[1] === "network") return { alias, resource: "network" };
   if (parts.length === 2 && parts[1] === "network-commissioning") return { alias, resource: "network-commissioning" };
   if (parts.length === 2 && parts[1] === "sites") return { alias, resource: "sites" };
@@ -54,6 +64,9 @@ async function relayResource(request: Request): Promise<Response> {
       { ok: false, error: { code: "invalid_registry_resource", message: "PPU registry resource is invalid" } },
       { status: 400, headers: { "Cache-Control": "no-store" } },
     );
+  }
+  if (parsed.resource === "bootstrap") {
+    return await relayManagerBootstrapRequest(request, parsed.alias, parsed.bootstrapAction ?? "");
   }
   if (parsed.resource === "network") {
     return await relayManagerPpuAliasRequest(request, parsed.alias, "/api/settings/ppu-network");
