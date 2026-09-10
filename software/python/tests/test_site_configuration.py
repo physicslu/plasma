@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import stat
 import tempfile
 import textwrap
 import unittest
@@ -105,6 +106,15 @@ class SiteConfigurationControllerTests(unittest.TestCase):
         self.assertEqual(site.target, "STM32F103C8T6")
         self.assertEqual(site.operation_timeout_s, 12.5)
         self.assertEqual(site.mock["flash_size"], 4096)
+
+    def test_atomic_persistence_preserves_canonical_file_mode(self) -> None:
+        self.path.chmod(0o640)
+        self.controller.update(
+            1,
+            {"enabled": True, "interface": "mock", "target": "TARGET-MODE"},
+            expected_revision=self.revision(1),
+        )
+        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o640)
 
     def test_restart_persistence_round_trip(self) -> None:
         saved = self.controller.update(

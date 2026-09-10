@@ -46,6 +46,7 @@ MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
 RELEASE_ROOT = "plasma-release"
 SERVICE_USER = "plasma"
 SERVICE_GROUP = "plasma"
+CONFIG_ROOT_MODE = 0o770
 
 
 class Z2InstallerError(RuntimeError):
@@ -106,6 +107,15 @@ class FileSnapshot:
     path: Path
     existed: bool
     content: bytes | None
+    mode: int | None
+    uid: int | None
+    gid: int | None
+
+
+@dataclass(frozen=True)
+class DirectorySnapshot:
+    path: Path
+    existed: bool
     mode: int | None
     uid: int | None
     gid: int | None
@@ -485,7 +495,6 @@ def render_systemd_units(
         "PrivateTmp=true",
         "ProtectHome=true",
         "ProtectSystem=strict",
-        f"ReadWritePaths={paths.state_root} {paths.log_root}",
         "Environment=PYTHONUNBUFFERED=1",
         f"Environment=PLASMA_DEVICE_CATALOG_MANIFEST={catalog}",
     ]
@@ -498,6 +507,7 @@ def render_systemd_units(
             "[Service]",
             "Type=simple",
             *common,
+            f"ReadWritePaths={paths.state_root} {paths.log_root}",
             f"ExecStart={python_runtime.path} {app} server --config {config}",
             "",
             "[Install]",
@@ -516,8 +526,10 @@ def render_systemd_units(
             "[Service]",
             "Type=simple",
             *common,
+            f"ReadWritePaths={paths.state_root} {paths.log_root} {paths.config_root}",
             (
                 f"ExecStart={python_runtime.path} {app} gateway "
+                f"--ppu-config {config} "
                 f"--host {gateway_host} --port 18080 "
                 "--plasma-host 127.0.0.1 --plasma-port 9900 "
                 f"--output-root {paths.state_root / 'gateway-output'}"
@@ -572,6 +584,18 @@ def _ensure_service_account() -> None:
         raise Z2InstallerError("plasma service identity was not created") from exc
     if user.pw_gid != group.gr_gid:
         raise Z2InstallerError("created plasma user/group identity is inconsistent")
+
+
+def _prepare_config_directory(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink() or not path.is_dir():
+        raise Z2InstallerError(f"managed config root is not a regular directory: {path}")
+    try:
+        group = grp.getgrnam(SERVICE_GROUP)
+    except KeyError as exc:
+        raise Z2InstallerError("plasma service group is unavailable") from exc
+    os.chown(path, 0, group.gr_gid)
+    path.chmod(CONFIG_ROOT_MODE)
 
 
 def _chown_tree(path: Path, user: str, group: str) -> None:
@@ -659,6 +683,21 @@ def _snapshot_file(path: Path) -> FileSnapshot:
     )
 
 
+def _snapshot_directory(path: Path) -> DirectorySnapshot:
+    if not path.exists() and not path.is_symlink():
+        return DirectorySnapshot(path, False, None, None, None)
+    if not path.is_dir() or path.is_symlink():
+        raise Z2InstallerError(f"refusing to overwrite non-directory managed config root: {path}")
+    metadata = path.stat()
+    return DirectorySnapshot(
+        path=path,
+        existed=True,
+        mode=stat.S_IMODE(metadata.st_mode),
+        uid=metadata.st_uid,
+        gid=metadata.st_gid,
+    )
+
+
 def _restore_file(snapshot: FileSnapshot) -> None:
     if not snapshot.existed:
         try:
@@ -671,6 +710,20 @@ def _restore_file(snapshot: FileSnapshot) -> None:
     assert snapshot.uid is not None
     assert snapshot.gid is not None
     _write_bytes_atomic(snapshot.path, snapshot.content, snapshot.mode)
+    os.chown(snapshot.path, snapshot.uid, snapshot.gid)
+
+
+def _restore_directory(snapshot: DirectorySnapshot) -> None:
+    if not snapshot.existed:
+        try:
+            snapshot.path.rmdir()
+        except FileNotFoundError:
+            pass
+        return
+    assert snapshot.mode is not None
+    assert snapshot.uid is not None
+    assert snapshot.gid is not None
+    snapshot.path.chmod(snapshot.mode)
     os.chown(snapshot.path, snapshot.uid, snapshot.gid)
 
 
@@ -713,6 +766,7 @@ def _rollback_activation(
     paths: InstallPaths,
     previous: Path | None,
     snapshots: Sequence[FileSnapshot],
+    config_root_snapshot: DirectorySnapshot,
     systemctl: Callable[..., None],
 ) -> None:
     errors: list[str] = []
@@ -740,6 +794,11 @@ def _rollback_activation(
             _restore_file(snapshot)
         except OSError as exc:
             errors.append(f"restore {snapshot.path}: {exc}")
+
+    try:
+        _restore_directory(config_root_snapshot)
+    except OSError as exc:
+        errors.append(f"restore {config_root_snapshot.path}: {exc}")
 
     try:
         systemctl("daemon-reload")
@@ -777,14 +836,15 @@ def install_release(
     config_path = paths.config_root / "ppu.yaml"
     server_unit = paths.systemd_root / "plasma-server.service"
     gateway_unit = paths.systemd_root / "plasma-web.service"
+    config_root_snapshot = _snapshot_directory(paths.config_root)
     snapshots = tuple(_snapshot_file(path) for path in (config_path, server_unit, gateway_unit))
 
+    ensure_service_account()
     paths.releases_root.mkdir(parents=True, exist_ok=True)
     paths.install_root.mkdir(parents=True, exist_ok=True)
-    paths.config_root.mkdir(parents=True, exist_ok=True)
+    _prepare_config_directory(paths.config_root)
     paths.state_root.mkdir(parents=True, exist_ok=True)
     paths.log_root.mkdir(parents=True, exist_ok=True)
-    ensure_service_account()
     _copy_release(verified, release_target)
     _chown_tree(paths.state_root, SERVICE_USER, SERVICE_GROUP)
     _chown_tree(paths.log_root, SERVICE_USER, SERVICE_GROUP)
@@ -824,6 +884,7 @@ def install_release(
                 paths=paths,
                 previous=previous,
                 snapshots=snapshots,
+                config_root_snapshot=config_root_snapshot,
                 systemctl=systemctl,
             )
         except Exception as rollback_exc:
@@ -854,6 +915,11 @@ def install_release(
         "gateway_readiness": {
             "gateway": readiness.get("gateway"),
             "execution": readiness.get("execution"),
+        },
+        "site_desired_state": {
+            "config_path": str(config_path),
+            "gateway_write_root": str(paths.config_root),
+            "runtime_apply_supported": False,
         },
         "previous_release": str(previous) if previous is not None else None,
         "hardware_boundary": EXPECTED_HARDWARE_BOUNDARY,

@@ -166,6 +166,7 @@ def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, obje
                 "entrypoint": "ppu/ppu.pyz",
                 "arguments": [
                     "gateway",
+                    "--ppu-config", "<ppu-config>",
                     "--host", "<gateway-bind>",
                     "--port", "18080",
                     "--plasma-host", "127.0.0.1",
@@ -239,6 +240,19 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     processes = _require_mapping(manifest.get("processes"), "processes")
     if set(processes) != {"server", "gateway"}:
         raise PPURuntimePackagingError("PPU runtime must define exactly server and gateway")
+    server = _require_mapping(processes.get("server"), "processes.server")
+    gateway = _require_mapping(processes.get("gateway"), "processes.gateway")
+    if server.get("arguments") != ["server", "--config", "<ppu-config>"]:
+        raise PPURuntimePackagingError("PPU Server runtime must bind the canonical <ppu-config>")
+    gateway_arguments = gateway.get("arguments")
+    if not isinstance(gateway_arguments, list):
+        raise PPURuntimePackagingError("PPU Gateway runtime arguments must be an array")
+    try:
+        config_index = gateway_arguments.index("--ppu-config")
+    except ValueError as exc:
+        raise PPURuntimePackagingError("PPU Gateway runtime must bind the canonical <ppu-config>") from exc
+    if config_index + 1 >= len(gateway_arguments) or gateway_arguments[config_index + 1] != "<ppu-config>":
+        raise PPURuntimePackagingError("PPU Gateway --ppu-config must use the canonical <ppu-config>")
     app = runtime_dir / "ppu" / "ppu.pyz"
     if not app.is_file() or app.stat().st_size <= 0:
         raise PPURuntimePackagingError("PPU runtime is missing ppu/ppu.pyz")
