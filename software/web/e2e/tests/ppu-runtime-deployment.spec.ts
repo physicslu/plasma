@@ -253,7 +253,6 @@ test("Runtime Deployment pairs, uploads a verified kit, and starts deployment wi
   expect(commitBody).toEqual({ action: "commit" });
   expect(deploymentBody).toEqual({
     upload_id: uploadId,
-    gateway_host: "192.168.77.10",
     ppu_id: "ppu-a",
     facility_id: "lab",
     display_name: "ppu-a",
