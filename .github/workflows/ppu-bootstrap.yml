@@ -14,6 +14,7 @@ on:
       - "scripts/ppu-z2-installer.py"
       - "scripts/plasmactl-z2-ps"
       - "scripts/z2-python-runtime.py"
+      - "docs/deployment/ppu-bootstrap-factory-and-hil.md"
       - "software/python/pyproject.toml"
       - "software/python/plasma_manager/bootstrap.py"
       - "software/python/plasma_manager/server_bootstrap.py"
@@ -40,6 +41,7 @@ on:
       - "scripts/ppu-z2-installer.py"
       - "scripts/plasmactl-z2-ps"
       - "scripts/z2-python-runtime.py"
+      - "docs/deployment/ppu-bootstrap-factory-and-hil.md"
       - "software/python/pyproject.toml"
       - "software/python/plasma_manager/bootstrap.py"
       - "software/python/plasma_manager/server_bootstrap.py"
@@ -177,6 +179,16 @@ jobs:
             ${{ steps.bundle.outputs.artifact }}
             ${{ steps.bundle.outputs.sidecar }}
             ${{ runner.temp }}/bootstrap-install-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload qualification-only HIL tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppu-bootstrap-hil-tools
+          path: |
+            scripts/ppu-bootstrap-hil-evidence.py
+            docs/deployment/ppu-bootstrap-factory-and-hil.md
           if-no-files-found: error
           retention-days: 14
 
