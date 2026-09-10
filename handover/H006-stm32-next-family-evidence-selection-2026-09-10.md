@@ -1,10 +1,10 @@
 # H006 — STM32 Next-Family Evidence Selection Handover
 
-**Date:** 2026-09-10  
-**Status:** Current engineering handover — research-family selection formed, PR/merge closure still pending  
-**Repository:** `physicslu/plasma`  
-**Main at handover creation:** `519a81bf563b3b024e21b8e31d2bef5288a8e786`  
-**Working branch:** `agent/device-catalog-stm32-evidence-accessibility-selection`  
+**Date:** 2026-09-10
+**Status:** Current engineering handover — research-family selection formed, PR/merge closure still pending
+**Repository:** `physicslu/plasma`
+**Main at handover creation:** `519a81bf563b3b024e21b8e31d2bef5288a8e786`
+**Working branch:** `agent/device-catalog-stm32-evidence-accessibility-selection`
 **Selection-content head before this handover commit:** `9ee82da2f2cabdb125d2a4985c7b0e164a2a8916`
 
 This handover captures the STM32 Device Catalog state after STM32G4 publication, cross-family prioritization, the U0/C0/L1 manufacturer-evidence accessibility probe, and the U0-vs-C0 Ordering Information review. It is intended to let a new session continue without reconstructing the decision chain from chat history.
