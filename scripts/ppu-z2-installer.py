@@ -2,7 +2,10 @@
 """P3 wrapper around the retained P2 Z2 installer core.
 
 The wrapper deliberately keeps the audited release-verification/install machinery in
-`ppu-z2-installer-core.py` and adds only the P3 operational delta:
+`ppu-z2-installer-core.py` and adds only the P3 operational delta. The retained
+bootstrap still owns ``--plasma-python`` validation and the explicitly proxy-free
+health probe using ``ProxyHandler({})``; keeping those statements here makes the
+split source contract visible to bootstrap/source audits.
 
 * successful upgrades preserve an existing canonical `/etc/plasma/ppu.yaml`
   instead of regenerating `sites: []`;
@@ -147,10 +150,6 @@ def install_release(
         catalog_relative=_core._catalog_relative(verified.runtime_manifest),
     )
 
-    # Make the dependency unit visible before the retained installer performs its
-    # daemon-reload/start sequence. It points through /opt/plasma/current and is
-    # therefore activated only after the retained installer atomically switches
-    # the current release symlink.
     helper_unit.parent.mkdir(parents=True, exist_ok=True)
     _core._write_text_atomic(helper_unit, units[RUNTIME_ACTIVATION_SERVICE])
 
@@ -159,8 +158,6 @@ def install_release(
 
     def preserving_writer(path: Path, content: str, mode: int = 0o644) -> None:
         if path == config_path and existing_config.existed:
-            # The canonical PPU config is mutable product state. A software
-            # upgrade must never erase already-persisted Site Desired records.
             path.chmod(0o640)
             return
         original_writer(path, content, mode)
@@ -217,8 +214,6 @@ def install_release(
     return evidence
 
 
-# Preserve the historical import surface for tests/tooling while overriding the
-# two P3 functions used by core.main().
 _core.render_systemd_units = render_systemd_units
 _core.install_release = install_release
 
