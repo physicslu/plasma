@@ -228,7 +228,7 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
         <button className="ppuSiteButton primary" type="button" disabled={!canDeploy} onClick={() => void deploy()}>
           {busy === "deploy" ? `Uploading${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Deploy Runtime"}
         </button>
-        <p>Console uploads a complete signed/hashed Z2 PS kit through Manager. Bootstrap validates immutable release identity and owns activation/rollback. FPGA bitstream loading is not enabled in this project.</p>
+        <p>Console uploads a SHA-256-verified Z2 PS kit through Manager. Bootstrap validates immutable release identity and owns activation/rollback. Publisher signature verification remains a production-hardening requirement; FPGA bitstream loading is not enabled in this project.</p>
       </div>
 
       <div className="ppuReadinessPanel" aria-label="Deployment status">
