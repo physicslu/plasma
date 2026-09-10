@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import unittest
 from types import SimpleNamespace
 
@@ -19,9 +21,24 @@ def request(operation, *, image=b"", map_data=None):
     return JobRequest(job_id="job", site_id=1, target="MKL25Z128VLK4", operation=operation, image=image, map_data=map_data)
 
 
+def operation_admission():
+    operations = {}
+    for name in ("READ", "VERIFY", "PROGRAM", "ERASE_SECTOR"):
+        operations[name] = {
+            "state": "ADMITTED",
+            "required_fields": ["memory.main_flash_size_bytes"],
+            "canonical_spec_digest": "a" * 64,
+            "backend_lock_digest": "877b3fd9c0b9f8dc3191eb53393e5670efb93b9952ac1747bded155ebcaef4d1",
+            "hardware_runtime_ready": False,
+        }
+    value = {"schema_version": "0.1.0", "artifact_type": "kl25_software_executor_operation_admission", "operations": operations}
+    value["admission_digest"] = hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return value
+
+
 class KL25PlanTests(unittest.TestCase):
     def setUp(self):
-        self.compiler = KL25OpenOCDPlanCompiler()
+        self.compiler = KL25OpenOCDPlanCompiler(operation_admission())
         self.support = support()
 
     def compile(self, req):
@@ -61,6 +78,14 @@ class KL25PlanTests(unittest.TestCase):
     def test_mass_erase_shape_is_rejected(self):
         with self.assertRaisesRegex(PlasmaError, "one exact aligned sector"):
             self.compile(request(Operation.ERASE, map_data={"address": 0, "length": 131072}))
+
+    def test_missing_operation_admission_fails_closed(self):
+        with self.assertRaisesRegex(PlasmaError, "operation admission artifact"):
+            KL25OpenOCDPlanCompiler().compile(
+                self.support,
+                request(Operation.READ),
+                configured_target_config=KL25_TARGET_CONFIG,
+            )
 
 
 if __name__ == "__main__":

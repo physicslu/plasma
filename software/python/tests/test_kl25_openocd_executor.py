@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -53,6 +54,21 @@ def support():
     )
 
 
+def operation_admission():
+    operations = {}
+    for name in ("READ", "VERIFY", "PROGRAM", "ERASE_SECTOR"):
+        operations[name] = {
+            "state": "ADMITTED",
+            "required_fields": ["memory.main_flash_size_bytes"],
+            "canonical_spec_digest": "a" * 64,
+            "backend_lock_digest": "877b3fd9c0b9f8dc3191eb53393e5670efb93b9952ac1747bded155ebcaef4d1",
+            "hardware_runtime_ready": False,
+        }
+    value = {"schema_version": "0.1.0", "artifact_type": "kl25_software_executor_operation_admission", "operations": operations}
+    value["admission_digest"] = hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return value
+
+
 class KL25OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
     async def test_program_plan_crosses_only_the_fake_process_boundary(self):
         with tempfile.TemporaryDirectory() as root:
@@ -69,7 +85,7 @@ class KL25OpenOCDExecutorTests(unittest.IsolatedAsyncioTestCase):
                 map_data={"address": 0x800},
             )
             resolved = support()
-            compiler = KL25OpenOCDPlanCompiler()
+            compiler = KL25OpenOCDPlanCompiler(operation_admission())
             plan = compiler.compile(resolved, request, configured_target_config=KL25_TARGET_CONFIG)
             launched = []
 

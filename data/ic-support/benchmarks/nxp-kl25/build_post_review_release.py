@@ -104,7 +104,6 @@ def canonical(artifact: dict[str, Any], review: dict[str, Any]) -> tuple[dict[st
     field("silicon.command_interface", "FCCOB/FSTAT", ids("ftfa-register-model-v0-019") + ids("ftfa-register-model-v0-001"))
     field("safety.flash_configuration_field_start", "0x00000400", refs=[evidence(423, "27.3.1 Flash Configuration Field")])
     field("safety.flash_configuration_field_size_bytes", 16, refs=[evidence(423, "27.3.1 Flash Configuration Field")])
-    field("security.destructive_operations_admitted", False, ids("debug-security-interaction-v0-009"))
     review["review_digest"] = digest(review, "review_digest")
     spec = {"schema_version": "0.1.0", "artifact_type": "nxp_kl25_canonical_specification", "target": "MKL25Z128VLK4", "applicability": {"exact_target_evidence": canonical_admission.CONTRACT["required_target_evidence"]}, "silicon": {"controller": "FTFA", "debug": "SWD/MDM-AP", "backend_constraints_included": False}, "canonical_fields": fields, "blocked_fields": [{"path": "package.minimum_programming_hardware", "reason": "not required for fake-process Software Executor validation"}, {"path": "security.destructive_workflows", "reason": "explicitly outside milestone and not admitted"}]}
     spec["spec_digest"] = digest(spec, "spec_digest")
