@@ -108,7 +108,7 @@ test("Engineering readability layer is typography-only and loads after layout CS
   assert.ok(refresh >= 0 && readability > refresh, "readability CSS must load after the approved Engineering layout CSS");
 });
 
-test("PPU Site management consumes canonical Settings/Loopback operator primitives and stays single-column", async () => {
+test("PPU Site management consumes canonical shared operator primitives and stays single-column", async () => {
   const [ppuCss, primitives] = await Promise.all([
     source(ppuSiteCssPath),
     source(operatorSurfacePrimitivesPath),
@@ -117,11 +117,11 @@ test("PPU Site management consumes canonical Settings/Loopback operator primitiv
   assert.match(
     ppuCss,
     /^@import "\.\.\/operator-ui\/operator-surface-primitives\.css";/m,
-    "PPU/Site management must consume the canonical Settings/Loopback operator surface owner",
+    "PPU/Site management must consume the canonical operator surface owner",
   );
 
-  assert.match(primitives, /^\.ppuSiteCard\s*\{[\s\S]*border-radius:\s*10px[\s\S]*box-shadow:/m);
-  assert.match(primitives, /^\.ppuSiteButton\s*\{[\s\S]*min-height:\s*38px[\s\S]*font:\s*700 11px\/1\.2 var\(--font-sans\)/m);
+  assert.match(primitives, /\.operatorCard,[\s\S]*\.ppuSiteCard,[\s\S]*\.settingsCard,[\s\S]*\.diagnosticsTestCard\s*\{[\s\S]*border-radius:\s*10px[\s\S]*box-shadow:/);
+  assert.match(primitives, /\.operatorButton,[\s\S]*\.ppuSiteButton,[\s\S]*\.settingsActions button,[\s\S]*\.loopbackExecutionActions button\s*\{[\s\S]*min-height:\s*38px[\s\S]*font:\s*700 11px\/1\.2 var\(--font-sans\)/);
   assert.match(primitives, /^\.ppuRegistryAddForm input\s*\{[\s\S]*min-height:\s*36px[\s\S]*font:\s*11px var\(--font-mono\)/m);
 
   assert.doesNotMatch(ppuCss, /^\.ppuSiteCard\s*\{/m, "PPU cards must not redeclare the shared card primitive");
