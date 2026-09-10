@@ -20,6 +20,7 @@ const CHUNK_BYTES = 1024 * 1024;
 type Props = {
   entry: ManagerRegistryEntry;
   hasActiveExecution: boolean;
+  hasTrustedIdleObservation: boolean;
 };
 
 function stateLabel(value: string | null | undefined): string {
@@ -27,7 +28,11 @@ function stateLabel(value: string | null | undefined): string {
   return value.replaceAll("_", " ");
 }
 
-export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Props) {
+export default function PpuRuntimeDeployment({
+  entry,
+  hasActiveExecution,
+  hasTrustedIdleObservation,
+}: Props) {
   const alias = entry.alias ?? "";
   const [status, setStatus] = useState<ManagerBootstrapStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,15 +79,18 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
   const runtime = bootstrap?.runtime ?? null;
   const deployment = bootstrap?.deployment ?? null;
   const recoveryRequired = runtime?.state === "recovery_required" || deployment?.state === "recovery_required";
+  const firstInstall = entry.lifecycle === "pending";
+  const maintenanceReady = firstInstall || (entry.lifecycle === "disabled" && hasTrustedIdleObservation);
   const canPair = Boolean(
     alias
     && pairingToken.trim().length >= 32
-    && entry.lifecycle !== "commissioned"
+    && maintenanceReady
     && !hasActiveExecution
     && busy === null,
   );
   const canDeploy = Boolean(
     alias
+    && maintenanceReady
     && pairing?.paired
     && pairing.device_match
     && bootstrap?.capabilities.runtime_deployment
@@ -174,6 +182,8 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
       {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Runtime deployment is blocked while this PPU has active Site execution.</p>}
+      {entry.lifecycle === "commissioned" && <p className="ppuRegistryMessage warning" role="status">Disable this commissioned PPU before Runtime maintenance. A commissioned appliance is not an upgrade target.</p>}
+      {entry.lifecycle === "disabled" && !hasTrustedIdleObservation && <p className="ppuRegistryMessage warning" role="status">Normal Runtime maintenance requires a current trusted idle PPU observation. If Runtime health cannot be observed, use the explicit recovery procedure instead of lowering this gate.</p>}
       {recoveryRequired && <p className="ppuRegistryMessage error" role="alert">Recovery required. Normal Runtime deployment remains blocked until the interrupted or unsafe PPU state is explicitly recovered.</p>}
 
       <div className="ppuInfoBody">
@@ -196,7 +206,7 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
             type="password"
             autoComplete="off"
             value={pairingToken}
-            disabled={entry.lifecycle === "commissioned" || hasActiveExecution || busy !== null}
+            disabled={!maintenanceReady || hasActiveExecution || busy !== null}
             placeholder="Factory pairing token"
             onChange={event => setPairingToken(event.target.value)}
           />
@@ -204,7 +214,6 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
         <button className="ppuSiteButton" type="button" disabled={!canPair} onClick={() => void pair()}>
           {busy === "pair" ? "Pairing..." : "Pair Bootstrap"}
         </button>
-        {entry.lifecycle === "commissioned" && <p>Disable this commissioned PPU before rotating or replacing its Bootstrap pairing.</p>}
       </div>
 
       <div className="ppuRegistryAddForm" aria-label="Runtime release deployment">
