@@ -195,6 +195,8 @@ jobs:
           path: |
             scripts/ppu-bootstrap-hil-evidence.py
             scripts/ppu-bootstrap-hil-negative.py
+            scripts/ppu-bootstrap-kit.py
+            scripts/ppu-z2-installer.py
             docs/deployment/ppu-bootstrap-factory-and-hil.md
           if-no-files-found: error
           retention-days: 14
