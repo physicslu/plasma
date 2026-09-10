@@ -18,8 +18,10 @@ test("pending PPU installs Runtime through BFF -> Manager -> independent Bootstr
   await page.getByRole("button", { name: "PPU / Sites", exact: true }).click();
   await page.getByRole("button", { name: "Runtime 部署", exact: true }).click();
 
-  await expect(page.getByRole("heading", { name: "Runtime Deployment", exact: true })).toBeVisible();
-  await expect(page.getByRole("option", { name: /ppu-bootstrap — pending/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Runtime Deployment", level: 2, exact: true })).toBeVisible();
+  const targetSelect = page.getByLabel("Manager Registry Alias", { exact: true });
+  await expect(targetSelect).toHaveValue("ppu-bootstrap");
+  await expect(targetSelect.locator("option:checked")).toHaveText(/ppu-bootstrap — pending/);
   await expect(page.getByText("bootstrap ready", { exact: true })).toBeVisible();
   await expect(page.getByText("runtime absent", { exact: true })).toBeVisible();
   await expect(page.getByText("Reserved / Disabled", { exact: true })).toBeVisible();
