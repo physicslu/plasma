@@ -70,7 +70,7 @@ def test_missing_durable_deployment_coordinator_is_rejected(tmp_path: Path):
     archive, sidecar = _build_kit(tmp_path)
     extracted = tmp_path / "edit"
     with tarfile.open(archive, "r:gz") as tar:
-        tar.extractall(extracted, filter="data")
+        tar.extractall(extracted)
     root = next(extracted.iterdir())
     (root / "scripts" / "ppu-bootstrap-deployment.py").unlink()
     files = sorted(path for path in root.rglob("*") if path.is_file() and path.name != "SHA256SUMS")
