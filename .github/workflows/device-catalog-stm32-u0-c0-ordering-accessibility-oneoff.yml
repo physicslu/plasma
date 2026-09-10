@@ -8,13 +8,18 @@ on:
       - ".github/workflows/device-catalog-stm32-u0-c0-ordering-accessibility-oneoff.yml"
 
 permissions:
+  actions: write
   contents: read
 
 jobs:
   probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Cancel superseded transport run if still active
+        run: gh api -X POST "/repos/${GITHUB_REPOSITORY}/actions/runs/34437946113/cancel" || true
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -34,7 +39,7 @@ jobs:
           xvfb-run -a python data/device-catalog/research/run_stm32_ordering_document_accessibility_probe.py \
             --output /tmp/stm32-ordering-doc-artifact/summary.json \
             --evidence-dir /tmp/stm32-ordering-doc-artifact/evidence \
-            --timeout 90
+            --timeout 45
           rc=$?
           echo "$rc" > /tmp/stm32-ordering-doc-artifact/runner-exit-code.txt
           python - <<'PY'
@@ -46,6 +51,7 @@ jobs:
               'github_ref_name':os.environ['GITHUB_REF_NAME'],
               'python_version':sys.version,
               'platform':platform.platform(),
+              'superseded_run_id':34437946113,
           }
           Path('/tmp/stm32-ordering-doc-artifact/execution-metadata.json').write_text(json.dumps(meta,indent=2,sort_keys=True)+'\n',encoding='utf-8')
           PY
@@ -70,6 +76,7 @@ jobs:
           assert p['manual_review_targets'] == 0
           assert p['bounded_probe_clean'] is True
           assert p['selected_next_research_family'] is None
+          assert p['pdf_transport'] == 'playwright_browser_context_request'
           assert all(value is False for value in p['claims'].values())
           print(json.dumps({'by_series':p['by_series'],'selected_next_research_family':None},indent=2,sort_keys=True))
           PY
