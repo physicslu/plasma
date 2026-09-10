@@ -98,9 +98,24 @@ export type PPUSiteConfigurationPayload = {
   rest_contract_version: string;
   site_configuration: {
     source: "canonical_ppu_config";
-    runtime_apply_supported: false;
+    runtime_apply_supported: boolean;
+    desired_runtime_revision?: string;
     reconciliation: "in_sync" | "restart_required" | "actual_unavailable" | "partially_observable";
     sites: PPUSiteConfigurationView[];
+  };
+};
+
+export type PPURuntimeActivationPayload = {
+  ok: true;
+  rest_contract_version: string;
+  runtime_activation: {
+    supported: boolean;
+    state: "in_sync" | "partially_observable" | "activation_required" | string;
+    desired_runtime_revision: string;
+    ppu_id: string | null;
+    restarted?: boolean;
+    reconciliation?: string;
+    site_configuration?: PPUSiteConfigurationPayload["site_configuration"];
   };
 };
 
@@ -277,6 +292,33 @@ export function saveManagerPpuSite(
         "If-Match": `"${expectedRevision}"`,
       },
       body: JSON.stringify(desired),
+    },
+  );
+}
+
+export function activateManagerPpuSiteDesired(
+  alias: string,
+  expectedRevision: string,
+  expectedPpuId: string,
+): Promise<PPURuntimeActivationPayload> {
+  if (!/^sha256:[0-9a-f]{64}$/.test(expectedRevision)) {
+    return Promise.reject(new Error("Site Desired runtime revision is invalid"));
+  }
+  if (!expectedPpuId.trim()) {
+    return Promise.reject(new Error("PPU identity is required for runtime activation"));
+  }
+  return jsonRequest<PPURuntimeActivationPayload>(
+    `/api/manager/registry/${encodeURIComponent(alias)}/sites/activation`,
+    {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": `site-runtime-activation-${crypto.randomUUID()}`,
+      },
+      body: JSON.stringify({
+        action: "activate",
+        expected_revision: expectedRevision,
+        expected_ppu_id: expectedPpuId,
+      }),
     },
   );
 }
