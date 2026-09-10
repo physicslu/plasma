@@ -43,7 +43,6 @@ class Permission(StrEnum):
     GATEWAY_SETTINGS_WRITE = "settings.gateway.write"
     PPU_NETWORK_SETTINGS_WRITE = "settings.ppu_network.write"
     SITE_SETTINGS_WRITE = "settings.site.write"
-    RUNTIME_ACTIVATION_WRITE = "settings.runtime_activation.write"
     MOCK_SETTINGS_WRITE = "settings.mock.write"
 
 
@@ -74,7 +73,6 @@ ENGINEER_PERMISSIONS = OPERATOR_PERMISSIONS | frozenset(
     {
         Permission.MOCK_SETTINGS_WRITE,
         Permission.SITE_SETTINGS_WRITE,
-        Permission.RUNTIME_ACTIVATION_WRITE,
     }
 )
 ADMIN_PERMISSIONS = ENGINEER_PERMISSIONS | frozenset(
@@ -181,146 +179,404 @@ class GatewaySecurityConfig:
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security config requires at least one principal")
         if len({p.principal_id for p in normalized}) != len(normalized):
             raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security principal IDs must be unique")
+        if len({p.token_sha256 for p in normalized}) != len(normalized):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security token digests must be unique")
         self.principals = normalized
-        self.by_token_sha256 = {p.token_sha256: p for p in normalized}
+
+    @classmethod
+    def load(cls, path: str | Path) -> "GatewaySecurityConfig":
+        source = Path(path).expanduser().resolve()
+        try:
+            raw = yaml.safe_load(source.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as exc:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                f"cannot load Gateway security config: {source}",
+                original_exception=exc,
+            ) from exc
+        if not isinstance(raw, dict) or set(raw) != {"version", "principals"}:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security config fields are invalid")
+        if raw["version"] != SECURITY_CONFIG_VERSION:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "Unsupported Gateway security config version",
+                context={"expected": SECURITY_CONFIG_VERSION, "actual": raw["version"]},
+            )
+        entries = raw["principals"]
+        if not isinstance(entries, list) or not entries:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security principals must be a non-empty array")
+        return cls(cls._principal(entry, index) for index, entry in enumerate(entries))
 
     @staticmethod
-    def _scope(raw: Any) -> ResourceScope:
+    def _principal(raw: Any, index: int) -> Principal:
         if not isinstance(raw, dict):
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "security scope must be an object")
-        allowed = {"facility_id", "ppu_id", "site_ids"}
-        unknown = sorted(set(raw) - allowed)
-        if unknown:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security scope contains unknown fields: {unknown}")
-        facility_id = raw.get("facility_id", "*")
-        ppu_id = raw.get("ppu_id", "*")
-        if not isinstance(facility_id, str) or not facility_id:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "security scope facility_id must be a non-empty string")
-        if not isinstance(ppu_id, str) or not ppu_id:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "security scope ppu_id must be a non-empty string")
-        raw_sites = raw.get("site_ids", "*")
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} must be an object")
+        allowed = {"id", "token_sha256", "roles", "permissions", "scopes"}
+        required = {"id", "token_sha256", "scopes"}
+        if not required <= set(raw) or set(raw) - allowed:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} fields are invalid")
+        principal_id = raw["id"]
+        token_sha256 = raw["token_sha256"]
+        if not isinstance(principal_id, str) or not principal_id or len(principal_id) > 128:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} id is invalid")
+        if not isinstance(token_sha256, str) or not _TOKEN_SHA256_PATTERN.fullmatch(token_sha256.lower()):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} token_sha256 is invalid")
+
+        roles_raw = raw.get("roles", [])
+        if not isinstance(roles_raw, list) or any(not isinstance(role, str) for role in roles_raw):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} roles are invalid")
+        unknown_roles = sorted(set(roles_raw) - set(ROLE_PERMISSIONS))
+        if unknown_roles:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                f"security principal {index} has unknown roles",
+                context={"unknown_roles": unknown_roles},
+            )
+        permissions: set[Permission] = set()
+        for role in roles_raw:
+            permissions.update(ROLE_PERMISSIONS[role])
+
+        explicit = raw.get("permissions", [])
+        if not isinstance(explicit, list) or any(not isinstance(value, str) for value in explicit):
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} permissions are invalid")
+        try:
+            permissions.update(Permission(value) for value in explicit)
+        except ValueError as exc:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                f"security principal {index} contains an unknown permission",
+                original_exception=exc,
+            ) from exc
+        if not permissions:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} has no permissions")
+
+        scopes_raw = raw["scopes"]
+        if not isinstance(scopes_raw, list) or not scopes_raw:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {index} scopes are invalid")
+        scopes = tuple(GatewaySecurityConfig._scope(scope, index) for scope in scopes_raw)
+        return Principal(
+            principal_id=principal_id,
+            roles=tuple(roles_raw),
+            permissions=frozenset(permissions),
+            scopes=scopes,
+            token_sha256=token_sha256.lower(),
+        )
+
+    @staticmethod
+    def _scope(raw: Any, principal_index: int) -> ResourceScope:
+        required = {"facility_id", "ppu_id", "site_ids"}
+        if not isinstance(raw, dict) or set(raw) != required:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope fields are invalid")
+        facility_id = raw["facility_id"]
+        ppu_id = raw["ppu_id"]
+        if not isinstance(facility_id, str) or not facility_id or not isinstance(ppu_id, str) or not ppu_id:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope IDs are invalid")
+        raw_sites = raw["site_ids"]
         if raw_sites == "*":
             site_ids = None
-        elif isinstance(raw_sites, list) and raw_sites and all(isinstance(value, int) and not isinstance(value, bool) and value >= 1 for value in raw_sites):
+        elif (
+            isinstance(raw_sites, list)
+            and raw_sites
+            and all(not isinstance(site, bool) and isinstance(site, int) and site >= 1 for site in raw_sites)
+        ):
             site_ids = frozenset(raw_sites)
         else:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "security scope site_ids must be '*' or a non-empty list of 1-based integers")
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"security principal {principal_index} scope site_ids are invalid")
         return ResourceScope(facility_id=facility_id, ppu_id=ppu_id, site_ids=site_ids)
 
-    @classmethod
-    def from_yaml(cls, raw: Any) -> "GatewaySecurityConfig":
-        if not isinstance(raw, dict) or raw.get("version") != SECURITY_CONFIG_VERSION:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security config version is invalid")
-        principals = raw.get("principals")
-        if not isinstance(principals, list) or not principals:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security config principals must be a non-empty list")
-        parsed: list[Principal] = []
-        for item in principals:
-            if not isinstance(item, dict):
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security principal must be an object")
-            principal_id = item.get("id")
-            token_sha256 = item.get("token_sha256")
-            roles = item.get("roles")
-            scopes = item.get("scopes")
-            if not isinstance(principal_id, str) or not principal_id:
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security principal id is invalid")
-            if not isinstance(token_sha256, str) or not _TOKEN_SHA256_PATTERN.fullmatch(token_sha256):
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security token_sha256 is invalid")
-            if not isinstance(roles, list) or not roles or not all(isinstance(role, str) and role in ROLE_PERMISSIONS for role in roles):
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security principal roles are invalid")
-            if not isinstance(scopes, list) or not scopes:
-                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Gateway security principal scopes are invalid")
-            permissions = frozenset(permission for role in roles for permission in ROLE_PERMISSIONS[role])
-            parsed.append(
-                Principal(
-                    principal_id=principal_id,
-                    roles=tuple(roles),
-                    permissions=permissions,
-                    scopes=tuple(cls._scope(scope) for scope in scopes),
-                    token_sha256=token_sha256,
-                )
-            )
-        return cls(parsed)
 
-    @classmethod
-    def load(cls, path: Path) -> "GatewaySecurityConfig":
-        try:
-            return cls.from_yaml(yaml.safe_load(path.read_text(encoding="utf-8")))
-        except OSError as exc:
-            raise PlasmaError(ErrorCode.CONFIG_INVALID, f"cannot read Gateway security config: {path}", original_exception=exc) from exc
-
-
-class GatewaySecurityController:
-    def __init__(self, config: GatewaySecurityConfig, state_path: Path) -> None:
-        self.config = config
-        self.state_path = state_path
+class GatewaySecurityStore:
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
-        self._connection = sqlite3.connect(state_path, check_same_thread=False)
+        self._connection = sqlite3.connect(self.path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
-        self._connection.execute("PRAGMA journal_mode=WAL")
-        self._connection.execute(
-            "CREATE TABLE IF NOT EXISTS commands (principal_id TEXT NOT NULL, command_id TEXT NOT NULL, request_sha256 TEXT NOT NULL, status INTEGER, response_json TEXT, created_at TEXT NOT NULL, PRIMARY KEY (principal_id, command_id))"
-        )
-        self._connection.commit()
-
-    @classmethod
-    def from_paths(cls, config_path: Path, state_path: Path) -> "GatewaySecurityController":
-        return cls(GatewaySecurityConfig.load(config_path), state_path)
-
-    def close(self) -> None:
         with self._lock:
-            self._connection.close()
+            self._connection.execute("PRAGMA journal_mode=WAL")
+            self._connection.execute("PRAGMA synchronous=FULL")
+            self._connection.execute("PRAGMA foreign_keys=ON")
+            self._migrate()
 
-    def authenticate(self, token: str) -> Principal:
-        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
-        for expected, principal in self.config.by_token_sha256.items():
-            if hmac.compare_digest(digest, expected):
-                return principal
-        raise PlasmaError(ErrorCode.AUTHENTICATION_REQUIRED, "invalid Bearer token")
+    def _migrate(self) -> None:
+        version = int(self._connection.execute("PRAGMA user_version").fetchone()[0])
+        if version == 0:
+            self._connection.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS security_commands (
+                    principal_id TEXT NOT NULL,
+                    command_id TEXT NOT NULL,
+                    request_sha256 TEXT NOT NULL,
+                    method TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    resource_json TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    http_status INTEGER,
+                    response_json TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (principal_id, command_id)
+                );
 
-    def authorize(self, principal: Principal, permission: Permission, resources: Iterable[ResourceRef] = ()) -> None:
-        required = tuple(resources)
-        if permission not in principal.permissions or any(not principal.allows(permission, resource) for resource in required):
-            raise PlasmaError(ErrorCode.PERMISSION_DENIED, f"permission denied: {permission.value}")
-
-    def admit_command(self, principal: Principal, command_id: str, request_body: bytes) -> CommandAdmission:
-        if not _COMMAND_ID_PATTERN.fullmatch(command_id):
-            raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Idempotency-Key is invalid")
-        request_sha256 = hashlib.sha256(request_body).hexdigest()
-        with self._lock:
-            row = self._connection.execute(
-                "SELECT request_sha256, status, response_json FROM commands WHERE principal_id=? AND command_id=?",
-                (principal.principal_id, command_id),
-            ).fetchone()
-            if row is not None:
-                if row["request_sha256"] != request_sha256:
-                    raise PlasmaError(ErrorCode.INVALID_ARGUMENT, "Idempotency-Key was already used for a different request")
-                if row["status"] is None or row["response_json"] is None:
-                    raise PlasmaError(ErrorCode.PPU_BUSY, "idempotent command is already in progress", recoverable=True)
-                return CommandAdmission(
-                    principal.principal_id,
-                    command_id,
-                    request_sha256,
-                    replay_status=int(row["status"]),
-                    replay_payload=json.loads(row["response_json"]),
-                )
-            self._connection.execute(
-                "INSERT INTO commands(principal_id, command_id, request_sha256, created_at) VALUES (?, ?, ?, ?)",
-                (principal.principal_id, command_id, request_sha256, iso_now()),
+                CREATE TABLE IF NOT EXISTS security_audit (
+                    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    principal_id TEXT NOT NULL,
+                    decision TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    method TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    resource_json TEXT NOT NULL,
+                    command_id TEXT,
+                    detail_json TEXT NOT NULL
+                );
+                """
             )
+            self._connection.execute(f"PRAGMA user_version={SECURITY_STATE_SCHEMA_VERSION}")
             self._connection.commit()
-        return CommandAdmission(principal.principal_id, command_id, request_sha256)
+            version = SECURITY_STATE_SCHEMA_VERSION
+        if version != SECURITY_STATE_SCHEMA_VERSION:
+            raise PlasmaError(
+                ErrorCode.CONFIG_INVALID,
+                "Unsupported Gateway security state schema version",
+                context={"expected": SECURITY_STATE_SCHEMA_VERSION, "actual": version},
+            )
 
-    def complete_command(self, admission: CommandAdmission, status: int, payload: dict[str, Any]) -> None:
+    @staticmethod
+    def _json(value: Any) -> str:
+        return json.dumps(value, separators=(",", ":"), sort_keys=True)
+
+    def audit(
+        self,
+        *,
+        principal_id: str,
+        decision: str,
+        action: str,
+        method: str,
+        path: str,
+        resource: ResourceRef | None,
+        command_id: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        if not principal_id:
+            raise PlasmaError(ErrorCode.CONFIG_INVALID, "Durable security audit requires an authenticated principal")
         with self._lock:
             self._connection.execute(
-                "UPDATE commands SET status=?, response_json=? WHERE principal_id=? AND command_id=? AND request_sha256=?",
+                """
+                INSERT INTO security_audit (
+                    timestamp, principal_id, decision, action, method, path,
+                    resource_json, command_id, detail_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
                 (
-                    int(status),
-                    json.dumps(payload, separators=(",", ":"), sort_keys=True),
-                    admission.principal_id,
-                    admission.command_id,
-                    admission.request_sha256,
+                    iso_now(),
+                    principal_id,
+                    decision,
+                    action,
+                    method,
+                    path,
+                    self._json(resource.to_dict() if resource else {}),
+                    command_id,
+                    self._json(detail or {}),
                 ),
             )
             self._connection.commit()
+
+    def audit_count(self) -> int:
+        with self._lock:
+            return int(self._connection.execute("SELECT COUNT(*) FROM security_audit").fetchone()[0])
+
+    def begin_command(
+        self,
+        *,
+        principal_id: str,
+        command_id: str,
+        request_sha256: str,
+        method: str,
+        path: str,
+        action: str,
+        resource: ResourceRef | None,
+    ) -> CommandAdmission:
+        now = iso_now()
+        resource_json = self._json(resource.to_dict() if resource else {})
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM security_commands WHERE principal_id = ? AND command_id = ?",
+                (principal_id, command_id),
+            ).fetchone()
+            if row is not None:
+                if (
+                    row["request_sha256"] != request_sha256
+                    or row["method"] != method
+                    or row["path"] != path
+                    or row["action"] != action
+                    or row["resource_json"] != resource_json
+                ):
+                    raise PlasmaError(
+                        ErrorCode.COMMAND_REPLAY_CONFLICT,
+                        "Idempotency key was already used for a different command",
+                        context={"command_id": command_id},
+                    )
+                if row["state"] == "completed" and row["http_status"] is not None and row["response_json"] is not None:
+                    payload = json.loads(str(row["response_json"]))
+                    if not isinstance(payload, dict):
+                        raise PlasmaError(ErrorCode.CONFIG_INVALID, "Persisted command response must be an object")
+                    return CommandAdmission(
+                        principal_id=principal_id,
+                        command_id=command_id,
+                        request_sha256=request_sha256,
+                        replay_status=int(row["http_status"]),
+                        replay_payload=payload,
+                    )
+                raise PlasmaError(
+                    ErrorCode.COMMAND_IN_PROGRESS,
+                    "Command with this idempotency key is already in progress or requires reconciliation",
+                    recoverable=True,
+                    context={"command_id": command_id},
+                )
+
+            self._connection.execute(
+                """
+                INSERT INTO security_commands (
+                    principal_id, command_id, request_sha256, method, path, action,
+                    resource_json, state, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'started', ?, ?)
+                """,
+                (
+                    principal_id,
+                    command_id,
+                    request_sha256,
+                    method,
+                    path,
+                    action,
+                    resource_json,
+                    now,
+                    now,
+                ),
+            )
+            self._connection.commit()
+        return CommandAdmission(principal_id, command_id, request_sha256)
+
+    def complete_command(self, admission: CommandAdmission, *, http_status: int, response: dict[str, Any]) -> None:
+        with self._lock:
+            cursor = self._connection.execute(
+                """
+                UPDATE security_commands
+                SET state = 'completed', http_status = ?, response_json = ?, updated_at = ?
+                WHERE principal_id = ? AND command_id = ? AND state = 'started'
+                """,
+                (
+                    int(http_status),
+                    self._json(response),
+                    iso_now(),
+                    admission.principal_id,
+                    admission.command_id,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise PlasmaError(ErrorCode.CONFIG_INVALID, "Command admission row is not completable")
+            self._connection.commit()
+
+    def close(self) -> None:
+        with self._lock:
+            self._connection.commit()
+            self._connection.close()
+
+
+class GatewaySecurityController:
+    def __init__(self, config: GatewaySecurityConfig, store: GatewaySecurityStore) -> None:
+        self.config = config
+        self.store = store
+
+    @classmethod
+    def from_paths(cls, config_path: str | Path, state_path: str | Path) -> "GatewaySecurityController":
+        return cls(GatewaySecurityConfig.load(config_path), GatewaySecurityStore(state_path))
+
+    def authenticate(self, authorization: str | None, *, method: str, path: str) -> Principal:
+        # Unauthenticated traffic is intentionally not written to the durable
+        # SQLite audit ledger. A hostile caller must not be able to turn bad
+        # credentials into synchronous microSD writes. The HTTP handler emits
+        # non-durable runtime diagnostics for E4101 instead.
+        if not isinstance(authorization, str) or not authorization.startswith("Bearer "):
+            raise PlasmaError(ErrorCode.AUTHENTICATION_REQUIRED, "Bearer authentication is required")
+        token = authorization[7:]
+        if len(token) < 32 or len(token) > 512:
+            raise PlasmaError(ErrorCode.AUTHENTICATION_REQUIRED, "Bearer authentication is required")
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        matched: Principal | None = None
+        for principal in self.config.principals:
+            if hmac.compare_digest(digest, principal.token_sha256):
+                matched = principal
+        if matched is None:
+            raise PlasmaError(ErrorCode.AUTHENTICATION_REQUIRED, "Bearer authentication is required")
+        return matched
+
+    def authorize(
+        self,
+        principal: Principal,
+        permission: Permission,
+        *,
+        method: str,
+        path: str,
+        resource: ResourceRef | None = None,
+    ) -> None:
+        if principal.allows(permission, resource):
+            return
+        self.store.audit(
+            principal_id=principal.principal_id,
+            decision="denied",
+            action=permission.value,
+            method=method,
+            path=path,
+            resource=resource,
+        )
+        raise PlasmaError(
+            ErrorCode.AUTHORIZATION_DENIED,
+            "Principal is not authorized for this Plasma action or resource",
+            context={
+                "principal_id": principal.principal_id,
+                "permission": permission.value,
+                "resource": resource.to_dict() if resource else {},
+            },
+        )
+
+    def admit_command(
+        self,
+        principal: Principal,
+        *,
+        permission: Permission,
+        command_id: str | None,
+        request_sha256: str,
+        method: str,
+        path: str,
+        resource: ResourceRef | None = None,
+    ) -> CommandAdmission:
+        self.authorize(principal, permission, method=method, path=path, resource=resource)
+        if not isinstance(command_id, str) or not _COMMAND_ID_PATTERN.fullmatch(command_id):
+            raise PlasmaError(
+                ErrorCode.INVALID_ARGUMENT,
+                "State-changing requests require an Idempotency-Key of 8..128 safe characters",
+            )
+        admission = self.store.begin_command(
+            principal_id=principal.principal_id,
+            command_id=command_id,
+            request_sha256=request_sha256,
+            method=method,
+            path=path,
+            action=permission.value,
+            resource=resource,
+        )
+        self.store.audit(
+            principal_id=principal.principal_id,
+            decision="replay" if admission.replay else "accepted",
+            action=permission.value,
+            method=method,
+            path=path,
+            resource=resource,
+            command_id=command_id,
+        )
+        return admission
+
+    def close(self) -> None:
+        self.store.close()
