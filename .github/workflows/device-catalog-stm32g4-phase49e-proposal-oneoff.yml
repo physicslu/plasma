@@ -1,0 +1,69 @@
+name: STM32G4 Phase 4.9E publication proposal one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32g4-phase49e-publication
+    paths:
+      - ".github/workflows/device-catalog-stm32g4-phase49e-proposal-oneoff.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  propose-publication:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/device-catalog-stm32g4-phase49e-publication
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay frozen Phase 4.9D admission plan
+        run: |
+          python data/device-catalog/research/validate_stm32g4_phase4_9d_admission_plan.py
+      - name: Generate deterministic publication proposal
+        run: |
+          rm -f data/device-catalog/research/stm32g4-phase4.9e-publication-proposal.json /tmp/stm32g4-phase4.9e-proposal-replay.json
+          python data/device-catalog/research/publish_stm32g4_phase4_9e.py --write-proposal
+          python data/device-catalog/research/publish_stm32g4_phase4_9e.py --proposal > /tmp/stm32g4-phase4.9e-proposal-replay.json
+          cmp data/device-catalog/research/stm32g4-phase4.9e-publication-proposal.json /tmp/stm32g4-phase4.9e-proposal-replay.json
+          sha256sum data/device-catalog/research/stm32g4-phase4.9e-publication-proposal.json
+      - name: Assert proposal is read-only
+        run: |
+          test ! -e data/device-catalog/research/stm32g4-commercial-icpn.csv
+          test ! -e data/device-catalog/research/stm32g4-phase4.9e-publication-audit.json
+          cmp data/device-catalog/production/icpn-v1-manifest.json data/device-catalog/research/stm32g4-phase4.9c-production-manifest-prestate.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('data/device-catalog/research/stm32g4-phase4.9e-publication-proposal.json').read_text())
+          assert p['status'] == 'publication_proposal_clean'
+          assert p['published_exact_icpn_count_proposed'] == 25
+          assert p['published_base_device_count_proposed'] == 8
+          assert p['production_exact_icpns_before'] == 610
+          assert p['production_exact_icpns_after_proposed'] == 635
+          assert p['production_base_devices_before'] == 209
+          assert p['production_base_devices_after_proposed'] == 217
+          assert p['production_family_count_before'] == 7
+          assert p['production_family_count_after_proposed'] == 8
+          assert p['canonical_write_applied'] is False
+          assert p['production_write_applied'] is False
+          print(json.dumps({
+              'canonical_sha256': p['canonical_csv_file_sha256_proposed'],
+              'canonical_blob': p['canonical_csv_git_blob_sha_proposed'],
+              'manifest_sha256': p['production_manifest_sha256_proposed'],
+              'rows': p['published_exact_icpn_count_proposed'],
+          }, indent=2))
+          PY
+      - name: Commit frozen publication proposal
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/device-catalog/research/stm32g4-phase4.9e-publication-proposal.json
+          git diff --cached --quiet && { echo "No proposal generated"; exit 1; }
+          git commit -m "Device catalog: freeze STM32G4 Phase 4.9E publication proposal"
+          git push origin HEAD:agent/device-catalog-stm32g4-phase49e-publication
