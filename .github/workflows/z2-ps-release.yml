@@ -9,6 +9,7 @@ on:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/plasmactl"
       - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
@@ -27,6 +28,8 @@ on:
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
+      - "software/python/tests/test_ppu_bootstrap_deployment.py"
+      - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
@@ -35,6 +38,7 @@ on:
       - ".github/workflows/z2-ps-release.yml"
       - "scripts/plasmactl"
       - "scripts/plasmactl-z2-ps"
+      - "scripts/ppu-bootstrap-deployment.py"
       - "scripts/z2-python-runtime.py"
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
@@ -53,6 +57,8 @@ on:
       - "software/python/tests/test_ppu_runtime.py"
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
+      - "software/python/tests/test_ppu_bootstrap_deployment.py"
+      - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
       - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
@@ -82,13 +88,19 @@ jobs:
 
       - name: Prove clean-PYNQ bootstrap compatibility
         run: |
-          python -m py_compile scripts/z2-python-runtime.py scripts/ppu-z2-installer.py
+          python -m py_compile \
+            scripts/z2-python-runtime.py \
+            scripts/ppu-z2-installer.py \
+            scripts/ppu-bootstrap-deployment.py
           python scripts/z2-python-runtime.py --help
           python scripts/ppu-z2-installer.py --help
+          python scripts/ppu-bootstrap-deployment.py --help
           python -m pip install pytest
           python -m pytest -q \
             software/python/tests/test_z2_python_runtime_artifact.py \
-            software/python/tests/test_z2_ps_release_cache_contract.py
+            software/python/tests/test_z2_ps_release_cache_contract.py \
+            software/python/tests/test_ppu_bootstrap_deployment.py \
+            software/python/tests/test_z2_bootstrap_deployment_call_graph.py
 
       - name: Restore verified ARMv7 Python build cache
         id: z2-python-cache
@@ -228,6 +240,8 @@ jobs:
           software/python/tests/test_ppu_runtime.py
           software/python/tests/test_ppu_release.py
           software/python/tests/test_ppu_z2_installer.py
+          software/python/tests/test_ppu_bootstrap_deployment.py
+          software/python/tests/test_z2_bootstrap_deployment_call_graph.py
           software/python/tests/test_z2_python_runtime_artifact.py
           software/python/tests/test_z2_ps_release_cache_contract.py
           software/python/tests/test_plasmactl_deployment_profiles.py
@@ -275,19 +289,25 @@ jobs:
           mkdir -p "$root/scripts" "$root/artifacts" "$root/docs"
           cp scripts/plasmactl "$root/scripts/plasmactl"
           cp scripts/plasmactl-z2-ps "$root/scripts/plasmactl-z2-ps"
+          cp scripts/ppu-bootstrap-deployment.py "$root/scripts/ppu-bootstrap-deployment.py"
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
           cp "$PPU_ARCHIVE" "$PPU_ARCHIVE.sha256" "$root/artifacts/"
           cp "$RUNNER_TEMP/z2-python-artifact/"* "$root/artifacts/"
           cp docs/deployment/z2-ps-installer.md "$root/docs/README.md"
-          chmod +x "$root/scripts/plasmactl" "$root/scripts/plasmactl-z2-ps" \
-            "$root/scripts/ppu-z2-installer.py" "$root/scripts/z2-python-runtime.py"
+          chmod +x \
+            "$root/scripts/plasmactl" \
+            "$root/scripts/plasmactl-z2-ps" \
+            "$root/scripts/ppu-bootstrap-deployment.py" \
+            "$root/scripts/ppu-z2-installer.py" \
+            "$root/scripts/z2-python-runtime.py"
           python scripts/z2-python-runtime.py verify \
             "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz" \
             --sidecar "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz.sha256"
           python "$root/scripts/ppu-z2-installer.py" verify \
             --release-artifact "$root/artifacts/$(basename "$PPU_ARCHIVE")" \
             --sidecar "$root/artifacts/$(basename "$PPU_ARCHIVE").sha256"
+          python "$root/scripts/ppu-bootstrap-deployment.py" --help >/dev/null
           bash "$root/scripts/plasmactl" help >/dev/null
           (
             cd "$root"
