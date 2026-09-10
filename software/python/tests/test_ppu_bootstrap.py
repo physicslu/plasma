@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -14,6 +15,7 @@ SCRIPT = ROOT / "scripts" / "ppu-bootstrap.py"
 SPEC = importlib.util.spec_from_file_location("ppu_bootstrap", SCRIPT)
 assert SPEC and SPEC.loader
 bootstrap = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = bootstrap
 SPEC.loader.exec_module(bootstrap)
 
 
