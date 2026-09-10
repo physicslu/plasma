@@ -147,6 +147,7 @@ def validate_admission_package(package: Mapping[str, Any]) -> dict[str, Any]:
     _text(target.get("vendor_id"), "target.vendor_id")
     _text(target.get("icpn"), "target.icpn")
     vendor_payload_ref = _artifact_ref(envelope["vendor_payload"], "vendor_payload")
+    _require("schema_id" in vendor_payload_ref, "vendor_payload schema binding is required")
     _resolve(vendor_payload_ref, artifacts, "vendor_payload")
 
     lineage = _object(envelope["lineage"], "lineage")
@@ -290,7 +291,9 @@ def _validate_backend(backend: dict[str, Any], artifacts: Mapping[str, Any]) -> 
     _require(bool(evidence), "implementation evidence cannot be empty")
     for item in evidence:
         _resolve(item, artifacts, "implementation evidence")
-    _resolve(_artifact_ref(backend["vendor_constraint_payload"], "vendor constraint payload"), artifacts, "vendor constraint payload")
+    constraint_ref = _artifact_ref(backend["vendor_constraint_payload"], "vendor constraint payload")
+    _require("schema_id" in constraint_ref, "vendor constraint payload schema binding is required")
+    _resolve(constraint_ref, artifacts, "vendor constraint payload")
     _digest(backend.get("lock_digest"), "lock_digest")
     expected_lock = canonical_digest(backend, omit=("artifact_digest", "lock_digest"))
     _require(backend["lock_digest"] == expected_lock, "backend lock digest mismatch")

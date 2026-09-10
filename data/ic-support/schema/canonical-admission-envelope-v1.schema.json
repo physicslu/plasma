@@ -16,7 +16,7 @@
       "required": ["vendor_id", "icpn"],
       "properties": {"vendor_id": {"type": "string", "minLength": 1}, "icpn": {"type": "string", "minLength": 1}}
     },
-    "vendor_payload": {"$ref": "artifact-ref-v1.schema.json"},
+    "vendor_payload": {"allOf": [{"$ref": "artifact-ref-v1.schema.json"}, {"required": ["schema_id"]}]},
     "lineage": {
       "type": "object",
       "additionalProperties": false,

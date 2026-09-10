@@ -323,6 +323,22 @@ class VendorNeutralAdmissionTests(unittest.TestCase):
         with self.assertRaisesRegex(AdmissionValidationError, "fields mismatch"):
             validate_admission_package(package)
 
+    def test_vendor_payload_schema_bindings_are_required(self) -> None:
+        envelope_case = copy.deepcopy(self.packages[0])
+        envelope = envelope_case["artifacts"][envelope_case["root_envelope_id"]]
+        del envelope["vendor_payload"]["schema_id"]
+        seal(envelope)
+
+        backend_case = copy.deepcopy(self.packages[0])
+        backend = next(value for value in backend_case["artifacts"].values() if value["artifact_type"] == "backend_implementation_binding")
+        del backend["vendor_constraint_payload"]["schema_id"]
+        backend["lock_digest"] = canonical_digest(backend, omit=("artifact_digest", "lock_digest"))
+        seal(backend)
+
+        for package in (envelope_case, backend_case):
+            with self.assertRaisesRegex(AdmissionValidationError, "schema binding is required"):
+                validate_admission_package(package)
+
     def test_schema_catalog_and_forbidden_term_scan(self) -> None:
         schema_root = IC_SUPPORT / "schema"
         for filename, schema_id in SCHEMA_IDS.items():
