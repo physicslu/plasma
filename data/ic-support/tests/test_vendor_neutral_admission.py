@@ -49,11 +49,11 @@ def seal(value: dict) -> dict:
     return value
 
 
-def ref(value: dict, *, include_schema: bool = True) -> dict:
-    result = {key: value[key] for key in ("artifact_id", "artifact_type", "artifact_digest")}
-    if include_schema:
-        result.update({key: value[key] for key in ("schema_id", "schema_version")})
-    return result
+def ref(value: dict) -> dict:
+    return {
+        key: value[key]
+        for key in ("artifact_id", "artifact_type", "artifact_digest", "schema_id", "schema_version")
+    }
 
 
 def opaque(schema_id: str, artifact_id: str, artifact_type: str, **payload) -> dict:
@@ -68,6 +68,10 @@ def opaque(schema_id: str, artifact_id: str, artifact_type: str, **payload) -> d
     )
 
 
+def pointer_token(value: str) -> str:
+    return value.replace("~", "~0").replace("/", "~1")
+
+
 def fixture(vendor: str, icpn: str, payload_schema: str, semantic_payload: dict) -> dict:
     prefix = vendor.casefold()
     source_digest = hashlib.sha256(f"{vendor}-manufacturer-source".encode()).hexdigest()
@@ -79,9 +83,24 @@ def fixture(vendor: str, icpn: str, payload_schema: str, semantic_payload: dict)
         "source_lock",
         sources=[{"source_id": f"{prefix}-manual", "source_digest": source_digest}],
     )
-    fact = opaque(f"plasma://fixtures/{prefix}/fact-v1", f"{prefix}-fact", "manufacturer_fact", statement="fixture statement")
-    fact_set = opaque(f"plasma://fixtures/{prefix}/fact-set-v1", f"{prefix}-fact-set", "reviewed_fact_set", facts=[ref(fact)])
-    review_report = opaque(f"plasma://fixtures/{prefix}/review-v1", f"{prefix}-review-report", "review_artifact", verdict="fixture-pass")
+    fact = opaque(
+        f"plasma://fixtures/{prefix}/fact-v1",
+        f"{prefix}-fact",
+        "manufacturer_fact",
+        statement="fixture statement",
+    )
+    fact_set = opaque(
+        f"plasma://fixtures/{prefix}/fact-set-v1",
+        f"{prefix}-fact-set",
+        "reviewed_fact_set",
+        facts=[ref(fact)],
+    )
+    review_report = opaque(
+        f"plasma://fixtures/{prefix}/review-v1",
+        f"{prefix}-review-report",
+        "review_artifact",
+        verdict="fixture-pass",
+    )
     artifacts.update({item["artifact_id"]: item for item in (source_lock, fact, fact_set, review_report)})
 
     review_binding = seal(
@@ -92,10 +111,16 @@ def fixture(vendor: str, icpn: str, payload_schema: str, semantic_payload: dict)
             "artifact_type": "review_binding",
             "reviewed_artifact": ref(fact_set),
             "review_artifact": ref(review_report),
+            "review_subjects": [ref(fact)],
             "review_status": "fixture-reviewed",
         }
     )
-    candidate = opaque(f"plasma://fixtures/{prefix}/candidate-v1", f"{prefix}-candidate", "candidate_fact", statement="candidate statement")
+    candidate = opaque(
+        f"plasma://fixtures/{prefix}/candidate-v1",
+        f"{prefix}-candidate",
+        "candidate_fact",
+        statement="candidate statement",
+    )
     artifacts.update({item["artifact_id"]: item for item in (review_binding, candidate)})
     disposition = seal(
         {
@@ -140,11 +165,36 @@ def fixture(vendor: str, icpn: str, payload_schema: str, semantic_payload: dict)
             ],
         }
     )
-    vendor_payload = opaque(payload_schema, f"{prefix}-vendor-payload", "vendor_canonical_payload", **semantic_payload)
-    constraints = opaque(f"plasma://fixtures/{prefix}/constraints-v1", f"{prefix}-constraints", "vendor_backend_constraints", opaque_semantics=semantic_payload)
-    implementation_source = opaque(f"plasma://fixtures/{prefix}/implementation-source-v1", f"{prefix}-implementation-source", "implementation_source", files={"driver": hashlib.sha256(prefix.encode()).hexdigest()})
-    operation_contract = opaque(f"plasma://fixtures/{prefix}/operation-contract-v1", f"{prefix}-operation-contract", "operation_contract", operation="fixture-operation")
-    artifacts.update({item["artifact_id"]: item for item in (candidate_review, vendor_payload, constraints, implementation_source, operation_contract)})
+    vendor_payload = opaque(
+        payload_schema,
+        f"{prefix}-vendor-payload",
+        "vendor_canonical_payload",
+        **semantic_payload,
+    )
+    constraints = opaque(
+        f"plasma://fixtures/{prefix}/constraints-v1",
+        f"{prefix}-constraints",
+        "vendor_backend_constraints",
+        opaque_semantics=semantic_payload,
+    )
+    implementation_source = opaque(
+        f"plasma://fixtures/{prefix}/implementation-source-v1",
+        f"{prefix}-implementation-source",
+        "implementation_source",
+        files={"driver": hashlib.sha256(prefix.encode()).hexdigest()},
+    )
+    operation_contract = opaque(
+        f"plasma://fixtures/{prefix}/operation-contract-v1",
+        f"{prefix}-operation-contract",
+        "operation_contract",
+        operation="fixture-operation",
+    )
+    artifacts.update(
+        {
+            item["artifact_id"]: item
+            for item in (candidate_review, vendor_payload, constraints, implementation_source, operation_contract)
+        }
+    )
 
     backend = {
         "schema_id": SCHEMA_IDS["backend-implementation-binding-v1.schema.json"],
@@ -178,6 +228,7 @@ def fixture(vendor: str, icpn: str, payload_schema: str, semantic_payload: dict)
         }
     )
     artifacts[envelope["artifact_id"]] = envelope
+    requirement_key = next(iter(semantic_payload))
     operation_admission = seal(
         {
             "schema_id": SCHEMA_IDS["operation-admission-v1.schema.json"],
@@ -195,7 +246,12 @@ def fixture(vendor: str, icpn: str, payload_schema: str, semantic_payload: dict)
                     "backend_id": backend["backend_id"],
                     "backend_lock_digest": backend["lock_digest"],
                     "compiler_id": f"{prefix}-compiler",
-                    "canonical_requirements": ["fixture.requirement"],
+                    "canonical_requirements": [
+                        {
+                            "artifact": ref(vendor_payload),
+                            "pointer": "/" + pointer_token(requirement_key),
+                        }
+                    ],
                     "unresolved_requirements": [],
                     "hardware_runtime_ready": False,
                 }
@@ -209,6 +265,44 @@ def fixture(vendor: str, icpn: str, payload_schema: str, semantic_payload: dict)
         "root_envelope_id": envelope["artifact_id"],
         "operation_admission_id": operation_admission["artifact_id"],
     }
+
+
+def first_artifact(package: dict, artifact_type: str) -> dict:
+    return next(value for value in package["artifacts"].values() if value["artifact_type"] == artifact_type)
+
+
+def rebind_disposition_chain(package: dict) -> None:
+    disposition = first_artifact(package, "post_review_disposition")
+    seal(disposition)
+    candidate_review = first_artifact(package, "candidate_manufacturer_review")
+    candidate_review["disposition"] = ref(disposition)
+    seal(candidate_review)
+    envelope = package["artifacts"][package["root_envelope_id"]]
+    envelope["lineage"]["disposition"] = ref(disposition)
+    envelope["lineage"]["candidate_review"] = ref(candidate_review)
+    seal(envelope)
+    operation = package["artifacts"][package["operation_admission_id"]]
+    operation["operations"][0]["canonical_admission_digest"] = envelope["artifact_digest"]
+    seal(operation)
+
+
+def rebind_review_chain(package: dict) -> None:
+    review = first_artifact(package, "review_binding")
+    seal(review)
+    disposition = first_artifact(package, "post_review_disposition")
+    disposition["review_binding"] = ref(review)
+    candidate_review = first_artifact(package, "candidate_manufacturer_review")
+    envelope = package["artifacts"][package["root_envelope_id"]]
+    envelope["lineage"]["review_binding"] = ref(review)
+    seal(disposition)
+    candidate_review["disposition"] = ref(disposition)
+    seal(candidate_review)
+    envelope["lineage"]["disposition"] = ref(disposition)
+    envelope["lineage"]["candidate_review"] = ref(candidate_review)
+    seal(envelope)
+    operation = package["artifacts"][package["operation_admission_id"]]
+    operation["operations"][0]["canonical_admission_digest"] = envelope["artifact_digest"]
+    seal(operation)
 
 
 class VendorNeutralAdmissionTests(unittest.TestCase):
@@ -238,13 +332,15 @@ class VendorNeutralAdmissionTests(unittest.TestCase):
         seal(envelope)
         operation = package["artifacts"][package["operation_admission_id"]]
         operation["operations"][0]["canonical_admission_digest"] = envelope["artifact_digest"]
+        operation["operations"][0]["canonical_requirements"][0]["artifact"] = ref(payload)
         seal(operation)
         self.assertEqual(validate_admission_package(package)["status"], "VALID")
 
     def test_swapped_vendor_payload_fails(self) -> None:
         package = copy.deepcopy(self.packages[0])
         envelope = package["artifacts"][package["root_envelope_id"]]
-        foreign = self.packages[1]["artifacts"][self.packages[1]["artifacts"][self.packages[1]["root_envelope_id"]]["vendor_payload"]["artifact_id"]]
+        foreign_envelope = self.packages[1]["artifacts"][self.packages[1]["root_envelope_id"]]
+        foreign = self.packages[1]["artifacts"][foreign_envelope["vendor_payload"]["artifact_id"]]
         package["artifacts"][envelope["vendor_payload"]["artifact_id"]] = copy.deepcopy(foreign)
         with self.assertRaisesRegex(AdmissionValidationError, "identity mismatch"):
             validate_admission_package(package)
@@ -264,7 +360,7 @@ class VendorNeutralAdmissionTests(unittest.TestCase):
 
     def test_missing_candidate_lineage_fails(self) -> None:
         package = copy.deepcopy(self.packages[0])
-        review = next(value for key, value in package["artifacts"].items() if key.endswith("candidate-review"))
+        review = first_artifact(package, "candidate_manufacturer_review")
         review["candidate_reviews"] = []
         seal(review)
         envelope = package["artifacts"][package["root_envelope_id"]]
@@ -279,14 +375,14 @@ class VendorNeutralAdmissionTests(unittest.TestCase):
     def test_operation_contract_backend_and_compiler_swaps_fail(self) -> None:
         operation_cases = []
         contract_swap = copy.deepcopy(self.packages[0])
-        foreign_contract = next(value for value in self.packages[1]["artifacts"].values() if value["artifact_type"] == "operation_contract")
+        foreign_contract = first_artifact(self.packages[1], "operation_contract")
         local_contract_id = contract_swap["artifacts"][contract_swap["operation_admission_id"]]["operations"][0]["operation_contract_id"]
         contract_swap["artifacts"][local_contract_id] = copy.deepcopy(foreign_contract)
         operation_cases.append(contract_swap)
 
         backend_swap = copy.deepcopy(self.packages[0])
         local_backend_id = backend_swap["artifacts"][backend_swap["operation_admission_id"]]["operations"][0]["backend_id"]
-        foreign_backend = next(value for value in self.packages[1]["artifacts"].values() if value["artifact_type"] == "backend_implementation_binding")
+        foreign_backend = first_artifact(self.packages[1], "backend_implementation_binding")
         backend_swap["artifacts"][local_backend_id] = copy.deepcopy(foreign_backend)
         operation_cases.append(backend_swap)
 
@@ -315,6 +411,86 @@ class VendorNeutralAdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(AdmissionValidationError, message):
                 validate_admission_package(package)
 
+    def test_reviewed_subject_coverage_is_exact(self) -> None:
+        missing = copy.deepcopy(self.packages[0])
+        first_artifact(missing, "post_review_disposition")["dispositions"] = []
+        rebind_disposition_chain(missing)
+
+        extra = copy.deepcopy(self.packages[0])
+        extra_fact = opaque(
+            "plasma://fixtures/acme/extra-fact-v1",
+            "acme-extra-fact",
+            "manufacturer_fact",
+            statement="extra",
+        )
+        extra["artifacts"][extra_fact["artifact_id"]] = extra_fact
+        first_artifact(extra, "post_review_disposition")["dispositions"].append(
+            {
+                "source_fact": ref(extra_fact),
+                "action": "REJECT",
+                "projection_state": "BLOCKED",
+                "candidate_artifacts": [],
+            }
+        )
+        rebind_disposition_chain(extra)
+
+        duplicate = copy.deepcopy(self.packages[0])
+        disposition = first_artifact(duplicate, "post_review_disposition")
+        disposition["dispositions"].append(copy.deepcopy(disposition["dispositions"][0]))
+        rebind_disposition_chain(duplicate)
+
+        swapped = copy.deepcopy(self.packages[0])
+        foreign_fact = copy.deepcopy(first_artifact(self.packages[1], "manufacturer_fact"))
+        swapped["artifacts"][foreign_fact["artifact_id"]] = foreign_fact
+        first_artifact(swapped, "post_review_disposition")["dispositions"][0]["source_fact"] = ref(foreign_fact)
+        rebind_disposition_chain(swapped)
+
+        for package in (missing, extra, duplicate, swapped):
+            with self.assertRaises(AdmissionValidationError):
+                validate_admission_package(package)
+
+    def test_review_subject_duplicates_fail_closed(self) -> None:
+        package = copy.deepcopy(self.packages[0])
+        review = first_artifact(package, "review_binding")
+        review["review_subjects"].append(copy.deepcopy(review["review_subjects"][0]))
+        rebind_review_chain(package)
+        with self.assertRaisesRegex(AdmissionValidationError, "duplicate reviewed subject"):
+            validate_admission_package(package)
+
+    def test_canonical_requirements_resolve_bound_vendor_payload_paths(self) -> None:
+        self.assertEqual(validate_admission_package(self.packages[0])["status"], "VALID")
+
+        missing_path = copy.deepcopy(self.packages[0])
+        operation = missing_path["artifacts"][missing_path["operation_admission_id"]]
+        operation["operations"][0]["canonical_requirements"][0]["pointer"] = "/does/not/exist"
+        seal(operation)
+        with self.assertRaisesRegex(AdmissionValidationError, "pointer does not resolve"):
+            validate_admission_package(missing_path)
+
+        wrong_artifact = copy.deepcopy(self.packages[0])
+        operation = wrong_artifact["artifacts"][wrong_artifact["operation_admission_id"]]
+        contract = first_artifact(wrong_artifact, "operation_contract")
+        operation["operations"][0]["canonical_requirements"][0]["artifact"] = ref(contract)
+        seal(operation)
+        with self.assertRaisesRegex(AdmissionValidationError, "vendor payload binding mismatch"):
+            validate_admission_package(wrong_artifact)
+
+    def test_artifact_refs_require_schema_identity(self) -> None:
+        envelope_case = copy.deepcopy(self.packages[0])
+        envelope = envelope_case["artifacts"][envelope_case["root_envelope_id"]]
+        del envelope["vendor_payload"]["schema_id"]
+        seal(envelope)
+
+        backend_case = copy.deepcopy(self.packages[0])
+        backend = first_artifact(backend_case, "backend_implementation_binding")
+        del backend["vendor_constraint_payload"]["schema_version"]
+        backend["lock_digest"] = canonical_digest(backend, omit=("artifact_digest", "lock_digest"))
+        seal(backend)
+
+        for package in (envelope_case, backend_case):
+            with self.assertRaisesRegex(AdmissionValidationError, "fields mismatch"):
+                validate_admission_package(package)
+
     def test_unknown_field_is_rejected(self) -> None:
         package = copy.deepcopy(self.packages[0])
         envelope = package["artifacts"][package["root_envelope_id"]]
@@ -323,28 +499,17 @@ class VendorNeutralAdmissionTests(unittest.TestCase):
         with self.assertRaisesRegex(AdmissionValidationError, "fields mismatch"):
             validate_admission_package(package)
 
-    def test_vendor_payload_schema_bindings_are_required(self) -> None:
-        envelope_case = copy.deepcopy(self.packages[0])
-        envelope = envelope_case["artifacts"][envelope_case["root_envelope_id"]]
-        del envelope["vendor_payload"]["schema_id"]
-        seal(envelope)
-
-        backend_case = copy.deepcopy(self.packages[0])
-        backend = next(value for value in backend_case["artifacts"].values() if value["artifact_type"] == "backend_implementation_binding")
-        del backend["vendor_constraint_payload"]["schema_id"]
-        backend["lock_digest"] = canonical_digest(backend, omit=("artifact_digest", "lock_digest"))
-        seal(backend)
-
-        for package in (envelope_case, backend_case):
-            with self.assertRaisesRegex(AdmissionValidationError, "schema binding is required"):
-                validate_admission_package(package)
-
     def test_schema_catalog_and_forbidden_term_scan(self) -> None:
         schema_root = IC_SUPPORT / "schema"
         for filename, schema_id in SCHEMA_IDS.items():
             schema = json.loads((schema_root / filename).read_text(encoding="utf-8"))
             self.assertEqual(schema["$id"], schema_id)
             self.assertFalse(schema.get("additionalProperties", True), filename)
+        artifact_ref = json.loads((schema_root / "artifact-ref-v1.schema.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            set(artifact_ref["required"]),
+            {"artifact_id", "artifact_type", "artifact_digest", "schema_id", "schema_version"},
+        )
         scanned = [*sorted((IC_SUPPORT / "admission").glob("*.py"))]
         scanned.extend(schema_root / filename for filename in SCHEMA_IDS)
         scanned.append(ROOT / "docs" / "architecture" / "vendor-neutral-ic-admission.md")
