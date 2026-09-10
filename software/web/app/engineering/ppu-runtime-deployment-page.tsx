@@ -96,7 +96,11 @@ export default function PpuRuntimeDeploymentPage() {
       </section>
 
       {selectedEntry ? (
-        <PpuRuntimeDeployment entry={selectedEntry} hasActiveExecution={busy} />
+        <PpuRuntimeDeployment
+          key={selectedEntry.alias ?? selectedEntry.endpoint}
+          entry={selectedEntry}
+          hasActiveExecution={busy}
+        />
       ) : (
         <section className="ppuSiteCard ppuEmptyRegistry">
           <h3>{loading ? "Loading Manager registry..." : "No registered PPU"}</h3>
