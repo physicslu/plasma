@@ -48,3 +48,5 @@ jobs:
           git diff --cached --quiet && { echo "No baseline generated"; exit 1; }
           git commit -m "Device catalog: freeze STM32G4 Phase 4.9C policy baseline"
           git push origin HEAD:agent/device-catalog-stm32g4-phase49c-policy
+
+# one-off revision 2: rerun after explicit FAMILY import fix
