@@ -21,7 +21,7 @@ Manufacturer Evidence
   -> Software Executor
 ```
 
-Each arrow is an explicit content-addressed binding. A later artifact names the earlier artifact's identity, type, schema where applicable, and canonical SHA-256 digest. Replacing content while retaining an old reference fails validation.
+Each arrow is an explicit content-addressed binding. Every v1 artifact reference carries artifact identity, type, schema identity, schema version, and canonical SHA-256 digest. Replacing content or schema identity while retaining an old reference fails validation.
 
 ## Trust boundaries
 
@@ -36,7 +36,7 @@ production routed != hardware runtime ready
 
 Review status is data supplied by the review process. The generic validator confirms that the review artifact is exactly the artifact named by its binding; it does not hard-code a particular review outcome or infer semantic truth.
 
-A disposition covers every reviewed source fact and records one generic action plus one projection state. Every non-rejected row must identify its candidate artifacts. Candidate review then covers that exact candidate set and binds each candidate to evidence from the named source lock. Deterministic validation checks coverage, identity, lineage, and evidence digests. A reviewer remains responsible for semantic support, citation entailment, atomicity, scope, terminology, and any additional review dimensions.
+A review binding also records the exact content-addressed subject set covered by that review. A disposition must cover exactly that same subject set: missing, extra, duplicate, stale, or swapped source-fact references fail validation. Every non-rejected disposition row must identify its candidate artifacts. Candidate review then covers that exact candidate set and binds each candidate to evidence from the named source lock. Deterministic validation checks coverage, identity, lineage, and evidence digests. A reviewer remains responsible for semantic support, citation entailment, atomicity, scope, terminology, and any additional review dimensions.
 
 ## Canonical admission
 
@@ -53,11 +53,14 @@ Admission is evaluated per request operation. Each row binds:
 - canonical admission digest;
 - backend identity and lock digest;
 - compiler identity;
-- canonical and unresolved requirements;
+- structurally resolved canonical requirements;
+- unresolved requirements;
 - admission state;
 - `hardware_runtime_ready`.
 
-This prevents one high-level request name from silently inheriting the semantics admitted for a different target or operation contract. An admitted row requires resolved canonical requirements, an exact backend lock, and a compiler registered for that backend binding.
+Each canonical requirement contains a strict artifact reference plus an absolute JSON Pointer. The artifact reference must resolve to the exact vendor canonical payload bound by the canonical admission envelope, and the pointer must resolve within that payload. The validator proves only structural existence and content binding; it does not interpret what the referenced field means.
+
+This prevents one high-level request name from silently inheriting the semantics admitted for a different target or operation contract. An admitted row requires at least one structurally resolved canonical requirement, no unresolved requirements, an exact backend lock, and a compiler registered for that backend binding.
 
 ## Backend binding
 
