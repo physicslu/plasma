@@ -14,46 +14,21 @@ import {
 } from "./ppu-registry-api";
 import PpuNetworkConfiguration from "./ppu-network-configuration";
 import PpuSiteDesiredConfiguration from "./ppu-site-desired-configuration";
+import {
+  canValidateAndEnable,
+  connectivityState,
+  healthState,
+  lifecycleState,
+  validationBlockSummary,
+  validationPrerequisites,
+} from "./ppu-ui-state";
 import "./ppu-site-configuration.css";
 
-type PpuStatus = "Online" | "Pending" | "Offline" | "Disabled" | "Error" | "Unknown";
-
 const ACTIVE_SITE_STATES = new Set(["queued", "submitting", "running", "stopping", "erase", "program", "verify", "read"]);
-
-function statusClass(status: PpuStatus | string): string {
-  return status.toLowerCase();
-}
-
-function lifecycleLabel(entry: ManagerRegistryEntry): string {
-  if (entry.lifecycle === "commissioned") return "Validated / Enabled";
-  if (entry.lifecycle === "disabled") return "Disabled";
-  return "Pending";
-}
 
 function fleetForEntry(entry: ManagerRegistryEntry, fleet: FleetWebPayload | null): FleetPPUView | null {
   if (!entry.alias || !fleet) return null;
   return fleet.ppus.find(ppu => ppu.alias === entry.alias) ?? null;
-}
-
-function ppuStatus(entry: ManagerRegistryEntry, fleetView: FleetPPUView | null): PpuStatus {
-  if (entry.lifecycle === "disabled") return "Disabled";
-  if (entry.lifecycle === "pending") return "Pending";
-  if (!fleetView) return "Unknown";
-  if (fleetView.identity_conflict) return "Error";
-  if (fleetView.transport_state === "unreachable") return "Offline";
-  if (fleetView.execution_state !== "ready" || fleetView.degraded) return "Error";
-  return "Online";
-}
-
-function canValidateAndEnable(fleetView: FleetPPUView | null): boolean {
-  return Boolean(
-    fleetView
-    && fleetView.observation.state === "current"
-    && fleetView.transport_state === "reachable"
-    && fleetView.execution_state === "ready"
-    && !fleetView.identity_conflict
-    && !fleetView.degraded,
-  );
 }
 
 function hasActiveExecution(fleetView: FleetPPUView | null): boolean {
@@ -129,21 +104,36 @@ export default function PpuSiteConfiguration() {
 
   const selectedEntry = registry?.ppus.find(entry => entry.alias === effectiveSelectedAlias) ?? null;
   const selectedFleet = selectedEntry ? fleetForEntry(selectedEntry, fleet) : null;
-  const selectedStatus = selectedEntry ? ppuStatus(selectedEntry, selectedFleet) : "Unknown";
+  const selectedLifecycle = selectedEntry ? lifecycleState(selectedEntry) : null;
+  const selectedConnectivity = connectivityState(selectedFleet);
+  const selectedHealth = healthState(selectedFleet);
+  const selectedPrerequisites = validationPrerequisites(selectedFleet);
+  const selectedCanValidate = canValidateAndEnable(selectedFleet);
   const selectedHasActiveExecution = hasActiveExecution(selectedFleet);
   const selectedInterfaces = interfaceSummary(selectedFleet);
 
-  const statusCounts = useMemo(() => {
-    const entries = registry?.ppus ?? [];
-    const counts = { online: 0, pending: 0, offline: 0, disabled: 0, error: 0, unknown: 0 };
-    for (const entry of entries) {
-      const status = ppuStatus(entry, fleetForEntry(entry, fleet));
-      if (status === "Online") counts.online += 1;
-      else if (status === "Pending") counts.pending += 1;
-      else if (status === "Offline") counts.offline += 1;
-      else if (status === "Disabled") counts.disabled += 1;
-      else if (status === "Error") counts.error += 1;
-      else counts.unknown += 1;
+  const stateCounts = useMemo(() => {
+    const counts = {
+      lifecycle: { commissioned: 0, pending: 0, disabled: 0 },
+      connectivity: { online: 0, offline: 0, unknown: 0 },
+      health: { healthy: 0, degraded: 0, error: 0, unknown: 0 },
+    };
+    for (const entry of registry?.ppus ?? []) {
+      if (entry.lifecycle === "commissioned") counts.lifecycle.commissioned += 1;
+      else if (entry.lifecycle === "disabled") counts.lifecycle.disabled += 1;
+      else counts.lifecycle.pending += 1;
+
+      const fleetView = fleetForEntry(entry, fleet);
+      const connectivity = connectivityState(fleetView).label;
+      if (connectivity === "Online") counts.connectivity.online += 1;
+      else if (connectivity === "Offline") counts.connectivity.offline += 1;
+      else counts.connectivity.unknown += 1;
+
+      const health = healthState(fleetView).label;
+      if (health === "Healthy") counts.health.healthy += 1;
+      else if (health === "Degraded") counts.health.degraded += 1;
+      else if (health === "Error") counts.health.error += 1;
+      else counts.health.unknown += 1;
     }
     return counts;
   }, [registry, fleet]);
@@ -219,6 +209,11 @@ export default function PpuSiteConfiguration() {
 
   const managerOnline = Boolean(registry);
   const registryMutable = registry?.mutable === true;
+  const validationBlockedReason = !registryMutable
+    ? "Manager registry is read-only on this deployment."
+    : selectedCanValidate
+      ? null
+      : `Failing prerequisites: ${validationBlockSummary(selectedFleet)}.`;
 
   return (
     <section className="ppuSiteConfiguration" aria-label="PPU and Site Configuration">
@@ -279,13 +274,26 @@ export default function PpuSiteConfiguration() {
               </div>
             )}
 
-            <div className="ppuSiteFilters" aria-label="PPU status summary">
-              <span className="ppuSiteFilter">All {registry?.ppus.length ?? 0}</span>
-              <span className="ppuSiteFilter" data-tone="online">Online {statusCounts.online}</span>
-              <span className="ppuSiteFilter" data-tone="pending">Pending {statusCounts.pending}</span>
-              <span className="ppuSiteFilter">Offline {statusCounts.offline}</span>
-              <span className="ppuSiteFilter">Disabled {statusCounts.disabled}</span>
-              {statusCounts.error > 0 && <span className="ppuSiteFilter" data-tone="error">Error {statusCounts.error}</span>}
+            <div className="ppuStateSummaryGrid" aria-label="PPU orthogonal state summary">
+              <div className="ppuStateSummaryGroup">
+                <small>Lifecycle</small>
+                <span>Commissioned <strong>{stateCounts.lifecycle.commissioned}</strong></span>
+                <span>Pending <strong>{stateCounts.lifecycle.pending}</strong></span>
+                <span>Disabled <strong>{stateCounts.lifecycle.disabled}</strong></span>
+              </div>
+              <div className="ppuStateSummaryGroup">
+                <small>Connectivity</small>
+                <span>Online <strong>{stateCounts.connectivity.online}</strong></span>
+                <span>Offline <strong>{stateCounts.connectivity.offline}</strong></span>
+                {stateCounts.connectivity.unknown > 0 && <span>Unknown <strong>{stateCounts.connectivity.unknown}</strong></span>}
+              </div>
+              <div className="ppuStateSummaryGroup">
+                <small>Health</small>
+                <span>Healthy <strong>{stateCounts.health.healthy}</strong></span>
+                <span>Degraded <strong>{stateCounts.health.degraded}</strong></span>
+                {stateCounts.health.error > 0 && <span>Error <strong>{stateCounts.health.error}</strong></span>}
+                {stateCounts.health.unknown > 0 && <span>Unknown <strong>{stateCounts.health.unknown}</strong></span>}
+              </div>
             </div>
 
             <div className="ppuTableWrap">
@@ -294,7 +302,9 @@ export default function PpuSiteConfiguration() {
                   <tr>
                     <th>Alias</th>
                     <th>PPU ID</th>
-                    <th>Status</th>
+                    <th>Lifecycle</th>
+                    <th>Connectivity</th>
+                    <th>Health</th>
                     <th>Sites</th>
                     <th>Plasma Gateway</th>
                   </tr>
@@ -302,7 +312,9 @@ export default function PpuSiteConfiguration() {
                 <tbody>
                   {(registry?.ppus ?? []).map(entry => {
                     const fleetView = fleetForEntry(entry, fleet);
-                    const status = ppuStatus(entry, fleetView);
+                    const lifecycle = lifecycleState(entry);
+                    const connectivity = connectivityState(fleetView);
+                    const health = healthState(fleetView);
                     const key = entry.alias ?? entry.endpoint;
                     return (
                       <tr
@@ -312,14 +324,16 @@ export default function PpuSiteConfiguration() {
                       >
                         <td><span className="ppuIdLink">{entry.alias ?? "Unaliased"}</span></td>
                         <td>{fleetView?.identity.ppu_id ?? "Awaiting probe"}</td>
-                        <td><span className={`ppuSiteStatus ${statusClass(status)}`}>{status}</span></td>
+                        <td><span className="ppuDimensionPill" data-tone={lifecycle.tone} title={lifecycle.reason}>{lifecycle.label}</span></td>
+                        <td><span className="ppuDimensionPill" data-tone={connectivity.tone} title={connectivity.reason}>{connectivity.label}</span></td>
+                        <td><span className="ppuDimensionPill" data-tone={health.tone} title={health.reason}>{health.label}</span></td>
                         <td>{fleetView?.topology.site_count || "—"}</td>
                         <td>{entry.endpoint}</td>
                       </tr>
                     );
                   })}
                   {!loading && registry?.ppus.length === 0 && (
-                    <tr><td colSpan={5}>No PPU is registered.</td></tr>
+                    <tr><td colSpan={7}>No PPU is registered.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -340,26 +354,15 @@ export default function PpuSiteConfiguration() {
         </div>
 
         <div className="ppuSiteColumn">
-          {selectedEntry ? (
+          {selectedEntry && selectedLifecycle ? (
             <>
               <section className="ppuSiteCard" aria-label="PPU Information">
                 <header className="ppuSiteCardHeader">
                   <div className="ppuSiteCardHeaderActions">
                     <h3>{selectedEntry.alias ?? "Unaliased PPU"}</h3>
-                    <span className={`ppuSiteStatus ${statusClass(selectedStatus)}`}>{selectedStatus}</span>
+                    <span className="ppuDimensionPill" data-tone={selectedLifecycle.tone}>{selectedLifecycle.label}</span>
                   </div>
                   <div className="ppuSiteCardHeaderActions">
-                    {(selectedEntry.lifecycle === "pending" || selectedEntry.lifecycle === "disabled") && (
-                      <button
-                        className="ppuSiteButton primary"
-                        type="button"
-                        disabled={!registryMutable || !canValidateAndEnable(selectedFleet) || busyAction !== null}
-                        title={canValidateAndEnable(selectedFleet) ? "Validate the current PPU identity/topology and enable it" : "Wait for a current trusted PPU observation"}
-                        onClick={() => void validateAndEnable()}
-                      >
-                        {busyAction === "validate" ? "Validating..." : "Validate & Enable"}
-                      </button>
-                    )}
                     {selectedEntry.lifecycle === "commissioned" && (
                       <button
                         className="ppuSiteButton primary"
@@ -404,15 +407,77 @@ export default function PpuSiteConfiguration() {
                   </div>
                 )}
 
+                <div className="ppuStateDimensionGrid" aria-label="PPU orthogonal state dimensions">
+                  <article className="ppuStateDimensionCard" data-tone={selectedLifecycle.tone}>
+                    <small>Lifecycle</small>
+                    <strong>{selectedLifecycle.label}</strong>
+                    <p>{selectedLifecycle.reason}</p>
+                  </article>
+                  <article className="ppuStateDimensionCard" data-tone={selectedConnectivity.tone}>
+                    <small>Connectivity</small>
+                    <strong>{selectedConnectivity.label}</strong>
+                    <p>{selectedConnectivity.reason}</p>
+                  </article>
+                  <article className="ppuStateDimensionCard" data-tone={selectedHealth.tone}>
+                    <small>Health</small>
+                    <strong>{selectedHealth.label}</strong>
+                    <p>{selectedHealth.reason}</p>
+                  </article>
+                </div>
+
+                {selectedEntry.lifecycle !== "commissioned" && (
+                  <div className="ppuReadinessPanel" aria-label="Validate prerequisites">
+                    <header>
+                      <div>
+                        <small>READINESS</small>
+                        <h4>Validate prerequisites</h4>
+                      </div>
+                      <span>All prerequisites must pass before this PPU can be enabled.</span>
+                    </header>
+                    <ul>
+                      {selectedPrerequisites.map(item => (
+                        <li key={item.key} data-state={item.passed ? "pass" : "fail"}>
+                          <span className="ppuReadinessIcon" aria-hidden="true">{item.passed ? "✓" : "×"}</span>
+                          <strong>{item.label}</strong>
+                          <span>{item.detail}</span>
+                          <b>{item.passed ? "OK" : "FAIL"}</b>
+                        </li>
+                      ))}
+                    </ul>
+                    <footer>
+                      {validationBlockedReason ? (
+                        <div className="ppuReadinessBlocked" role="status">
+                          <strong>Blocked</strong>
+                          <span>{validationBlockedReason}</span>
+                        </div>
+                      ) : (
+                        <div className="ppuReadinessReady" role="status">
+                          <strong>Ready</strong>
+                          <span>Current observation satisfies the admission prerequisites.</span>
+                        </div>
+                      )}
+                      <button
+                        className="ppuSiteButton primary"
+                        type="button"
+                        disabled={!registryMutable || !selectedCanValidate || busyAction !== null}
+                        title={validationBlockedReason ?? "Validate the current PPU identity/topology and enable it"}
+                        onClick={() => void validateAndEnable()}
+                      >
+                        {busyAction === "validate" ? "Validating..." : "Validate & Enable"}
+                      </button>
+                    </footer>
+                  </div>
+                )}
+
                 <div className="ppuInfoBody">
                   <dl className="ppuInfoGrid">
                     <div><dt>Registry Alias</dt><dd>{selectedEntry.alias ?? "—"}</dd></div>
-                    <div><dt>Lifecycle</dt><dd>{lifecycleLabel(selectedEntry)}</dd></div>
                     <div><dt>PPU ID</dt><dd>{selectedFleet?.identity.ppu_id ?? "Awaiting probe"}</dd></div>
-                    <div><dt>Status</dt><dd><span className={`ppuSiteStatus ${statusClass(selectedStatus)}`}>{selectedStatus}</span></dd></div>
-                    <div className="wide"><dt>Plasma Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
                     <div><dt>Observation</dt><dd>{selectedFleet?.observation.state ?? "unknown"}</dd></div>
                     <div><dt>Execution</dt><dd>{selectedFleet?.execution_state ?? "unknown"}</dd></div>
+                    <div className="wide"><dt>Plasma Gateway Endpoint</dt><dd>{selectedEntry.endpoint}</dd></div>
+                    <div><dt>Topology Source</dt><dd>{selectedFleet?.topology.source ?? "none"}</dd></div>
+                    <div><dt>Reported Sites</dt><dd>{selectedFleet?.topology.site_count ?? "—"}</dd></div>
                     <div className="wide"><dt>Display Name</dt><dd>{selectedFleet?.identity.display_name ?? "—"}</dd></div>
                     <div><dt>HW Model</dt><dd>{selectedFleet?.identity.model ?? "—"}</dd></div>
                     <div><dt>Facility</dt><dd>{selectedFleet?.identity.facility_id ?? "—"}</dd></div>

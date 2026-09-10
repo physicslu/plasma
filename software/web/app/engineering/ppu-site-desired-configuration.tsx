@@ -24,11 +24,29 @@ function reconciliationLabel(state: PPUSiteReconciliation): string {
   return "Disabled / binding unobservable";
 }
 
+function reconciliationTone(state: PPUSiteReconciliation): "healthy" | "warning" | "muted" {
+  if (state === "in_sync") return "healthy";
+  if (state === "restart_required") return "warning";
+  return "muted";
+}
+
 function overallLabel(state: PPUSiteConfigurationPayload["site_configuration"]["reconciliation"]): string {
   if (state === "in_sync") return "In Sync";
   if (state === "restart_required") return "Restart Required";
   if (state === "actual_unavailable") return "Actual Unavailable";
   return "Partially Observable";
+}
+
+function overallTone(state: PPUSiteConfigurationPayload["site_configuration"]["reconciliation"]): "healthy" | "warning" | "muted" {
+  if (state === "in_sync") return "healthy";
+  if (state === "restart_required") return "warning";
+  return "muted";
+}
+
+function sameDesired(left: PPUSiteDesired, right: PPUSiteDesired): boolean {
+  return left.enabled === right.enabled
+    && left.interface === right.interface
+    && left.target === right.target;
 }
 
 export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution }: Props) {
@@ -93,6 +111,11 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
     return null;
   }, [entry.lifecycle, hasActiveExecution]);
 
+  const observedRuntimeSites = useMemo(
+    () => payload?.site_configuration.sites.filter(site => site.actual !== null).length ?? 0,
+    [payload],
+  );
+
   function markDirty(siteId: number) {
     const next = new Set(dirtyRef.current);
     next.add(siteId);
@@ -106,11 +129,13 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
   }
 
   function updateDraft(siteId: number, patch: Partial<PPUSiteDesired>) {
-    const baseline = drafts[siteId]
-      ?? payload?.site_configuration.sites.find(site => site.site_id === siteId)?.desired;
+    const persisted = payload?.site_configuration.sites.find(site => site.site_id === siteId)?.desired;
+    const baseline = drafts[siteId] ?? persisted;
     if (!baseline) return;
-    setDrafts(current => ({ ...current, [siteId]: { ...baseline, ...patch } }));
-    markDirty(siteId);
+    const nextDraft = { ...baseline, ...patch };
+    setDrafts(current => ({ ...current, [siteId]: nextDraft }));
+    if (persisted && sameDesired(nextDraft, persisted)) clearDirty(siteId);
+    else markDirty(siteId);
     setNotice(null);
   }
 
@@ -138,7 +163,9 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
         if (saved) updated[siteId] = { ...saved.desired };
         return updated;
       });
-      setNotice(`SITE${siteId} desired configuration saved.`);
+      const saved = next.site_configuration.sites.find(site => site.site_id === siteId);
+      const reconciliation = saved ? reconciliationLabel(saved.reconciliation) : overallLabel(next.site_configuration.reconciliation);
+      setNotice(`SITE${siteId} desired configuration saved. Runtime reconciliation: ${reconciliation}.`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : `SITE${siteId} save failed`);
     } finally {
@@ -147,14 +174,18 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
   }
 
   return (
-    <section className="ppuSiteCard" aria-label="Site Configuration">
+    <section className="ppuSiteCard" aria-label="Programming Site Configuration">
       <header className="ppuSiteCardHeader">
         <div>
-          <h3>Site Configuration</h3>
-          <p className="ppuSiteNote">PPU-owned desired state is persisted in canonical PPU configuration. Phase 1 does not restart Plasma Server automatically.</p>
+          <h3>Programming Site Configuration</h3>
+          <p className="ppuSiteHeaderNote">Site is the canonical independently controlled programming position inside a PPU. Topology is discovered from the PPU; this UI does not hard-code an eight-Site assumption.</p>
         </div>
         <div className="ppuSiteCardHeaderActions">
-          {payload && <span className="ppuSiteFilter">{overallLabel(payload.site_configuration.reconciliation)}</span>}
+          {payload && (
+            <span className="ppuReconciliationBadge" data-tone={overallTone(payload.site_configuration.reconciliation)}>
+              {overallLabel(payload.site_configuration.reconciliation)}
+            </span>
+          )}
           <button className="ppuSiteButton" type="button" disabled={loading || savingSite !== null} onClick={() => void refresh()}>
             Refresh
           </button>
@@ -165,6 +196,35 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
       {writeBlockReason && <p className="ppuRegistryMessage warning" role="status">{writeBlockReason}</p>}
 
+      {payload && (
+        <div className="ppuConfigurationStateFlow" aria-label="Draft Desired Runtime configuration state">
+          <article className="ppuConfigurationStateStep" data-tone={dirty.size > 0 ? "warning" : "healthy"}>
+            <small>Draft</small>
+            <strong>{dirty.size > 0 ? "Modified" : "Clean"}</strong>
+            <span>{dirty.size > 0 ? `${dirty.size} Site draft${dirty.size === 1 ? "" : "s"} not saved` : "Browser edits match saved Desired state"}</span>
+          </article>
+          <span className="ppuConfigurationStateArrow" aria-hidden="true">→</span>
+          <article className="ppuConfigurationStateStep" data-tone="info">
+            <small>Desired</small>
+            <strong>Saved</strong>
+            <span>{payload.site_configuration.sites.length} canonical Site record{payload.site_configuration.sites.length === 1 ? "" : "s"} persisted on the PPU</span>
+          </article>
+          <span className="ppuConfigurationStateArrow" aria-hidden="true">→</span>
+          <article className="ppuConfigurationStateStep" data-tone={overallTone(payload.site_configuration.reconciliation)}>
+            <small>Runtime</small>
+            <strong>{overallLabel(payload.site_configuration.reconciliation)}</strong>
+            <span>{observedRuntimeSites} of {payload.site_configuration.sites.length} Site runtime state{payload.site_configuration.sites.length === 1 ? "" : "s"} currently observable</span>
+          </article>
+        </div>
+      )}
+
+      {dirty.size > 0 && (
+        <p className="ppuDraftWarning" role="status">
+          <strong>{dirty.size} unsaved Draft change{dirty.size === 1 ? "" : "s"}.</strong>
+          Saving updates Desired configuration only; Runtime remains separately reconciled.
+        </p>
+      )}
+
       {payload?.site_configuration.sites.length ? (
         <div className="ppuTableWrap">
           <table className="ppuTable">
@@ -174,7 +234,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                 <th>Desired Enabled</th>
                 <th>Desired Interface</th>
                 <th>Desired Target</th>
-                <th>Actual</th>
+                <th>Runtime</th>
                 <th>Reconciliation</th>
                 <th>Action</th>
               </tr>
@@ -185,8 +245,11 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                 const isDirty = dirty.has(site.site_id);
                 const disabled = Boolean(writeBlockReason) || savingSite !== null;
                 return (
-                  <tr key={`${alias}-desired-site-${site.site_id}`}>
-                    <td><span className="ppuIdLink">SITE{site.site_id}</span></td>
+                  <tr key={`${alias}-desired-site-${site.site_id}`} className={isDirty ? "ppuSiteDirtyRow" : ""}>
+                    <td>
+                      <span className="ppuIdLink">SITE{site.site_id}</span>
+                      {isDirty && <span className="ppuDirtyBadge">Unsaved Draft</span>}
+                    </td>
                     <td>
                       <input
                         className="ppuSiteToggle"
@@ -221,7 +284,11 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                         ? `${site.actual.enabled ? "Enabled" : "Disabled"} · ${site.actual.interface ?? "—"} · ${site.actual.target ?? "—"}`
                         : "Unavailable"}
                     </td>
-                    <td>{reconciliationLabel(site.reconciliation)}</td>
+                    <td>
+                      <span className="ppuReconciliationBadge" data-tone={reconciliationTone(site.reconciliation)}>
+                        {reconciliationLabel(site.reconciliation)}
+                      </span>
+                    </td>
                     <td>
                       <div className="ppuSiteCardHeaderActions">
                         <button
@@ -230,10 +297,10 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                           disabled={disabled || !isDirty || !draft.target.trim()}
                           onClick={() => void saveSite(site.site_id)}
                         >
-                          {savingSite === site.site_id ? "Saving..." : "Save"}
+                          {savingSite === site.site_id ? "Saving..." : "Save Desired"}
                         </button>
                         <button className="ppuSiteButton" type="button" disabled={disabled || !isDirty} onClick={() => resetDraft(site.site_id)}>
-                          Reset
+                          Reset Draft
                         </button>
                       </div>
                     </td>
@@ -248,7 +315,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
       )}
 
       <p className="ppuSiteNote">
-        <strong>Reconciliation:</strong> when desired and running state differ, the API reports <code>restart_required</code>. Protocol v3.3 does not expose dormant interface/target bindings for disabled Sites, so those rows are explicitly marked partially observable instead of guessed.
+        <strong>Configuration boundary:</strong> Draft is browser-local, Desired is persisted in canonical PPU configuration, and Runtime is observed separately. When Desired and Runtime differ, the API reports <code>restart_required</code>. Phase 1 reports <code>runtime_apply_supported=false</code>, so this page does not pretend a save has already changed the running service. Protocol v3.3 also does not expose dormant interface/target bindings for disabled Sites; those rows remain explicitly partially observable instead of guessed.
       </p>
     </section>
   );

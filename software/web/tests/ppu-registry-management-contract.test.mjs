@@ -5,6 +5,7 @@ import test from "node:test";
 const engineering = await readFile(new URL("../app/engineering/page.tsx", import.meta.url), "utf8");
 const ppuSite = await readFile(new URL("../app/engineering/ppu-site-configuration.tsx", import.meta.url), "utf8");
 const ppuSiteDesired = await readFile(new URL("../app/engineering/ppu-site-desired-configuration.tsx", import.meta.url), "utf8");
+const ppuUiState = await readFile(new URL("../app/engineering/ppu-ui-state.ts", import.meta.url), "utf8");
 const ppuNetwork = await readFile(new URL("../app/engineering/ppu-network-configuration.tsx", import.meta.url), "utf8");
 const registryApi = await readFile(new URL("../app/engineering/ppu-registry-api.ts", import.meta.url), "utf8");
 const managerBff = await readFile(new URL("../app/api/manager/manager-bff.ts", import.meta.url), "utf8");
@@ -30,6 +31,37 @@ test("PPU management uses Manager-owned registry APIs instead of browser-local i
   assert.doesNotMatch(ppuSite, /setPpus\(/);
 });
 
+test("P0 PPU UI keeps Lifecycle, Connectivity, and Health as orthogonal state dimensions", () => {
+  assert.match(ppuSite, /<th>Lifecycle<\/th>/);
+  assert.match(ppuSite, /<th>Connectivity<\/th>/);
+  assert.match(ppuSite, /<th>Health<\/th>/);
+  assert.match(ppuSite, /aria-label="PPU orthogonal state dimensions"/);
+  assert.match(ppuSite, /lifecycleState\(entry\)/);
+  assert.match(ppuSite, /connectivityState\(fleetView\)/);
+  assert.match(ppuSite, /healthState\(fleetView\)/);
+  assert.doesNotMatch(ppuSite, /<th>Status<\/th>/);
+  assert.match(ppuUiState, /entry\.lifecycle === "commissioned"/);
+  assert.match(ppuUiState, /fleetView\.transport_state === "unreachable"/);
+  assert.match(ppuUiState, /fleetView\.identity_conflict/);
+  assert.match(ppuUiState, /fleetView\.degraded/);
+});
+
+test("P0 admission UI exposes every Validate prerequisite and explains a blocked action", () => {
+  for (const prerequisite of [
+    "Observation current",
+    "Transport reachable",
+    "Execution ready",
+    "No identity conflict",
+    "Not degraded",
+  ]) {
+    assert.match(ppuUiState, new RegExp(prerequisite));
+  }
+  assert.match(ppuSite, /aria-label="Validate prerequisites"/);
+  assert.match(ppuSite, /Failing prerequisites:/);
+  assert.match(ppuSite, /selectedPrerequisites\.map/);
+  assert.match(ppuSite, /disabled=\{!registryMutable \|\| !selectedCanValidate \|\| busyAction !== null\}/);
+});
+
 test("validated PPUs can be selected for Managed operations without restarting Console", () => {
   assert.match(registryApi, /selectManagerPpuForManagedOperations/);
   assert.match(registryApi, /"\/api\/manager\/ppu"/);
@@ -52,11 +84,23 @@ test("PPU topology remains observed while Site desired configuration is PPU-owne
   assert.match(ppuSiteDesired, /Desired Enabled/);
   assert.match(ppuSiteDesired, /Desired Interface/);
   assert.match(ppuSiteDesired, /Desired Target/);
-  assert.match(ppuSiteDesired, /<th>Actual<\/th>/);
+  assert.match(ppuSiteDesired, /<th>Runtime<\/th>/);
   assert.match(ppuSiteDesired, /<th>Reconciliation<\/th>/);
   assert.match(ppuSiteDesired, /Stop or cancel active Jobs before changing Site desired configuration/);
   assert.match(ppuSiteDesired, /canonical PPU configuration/);
   assert.doesNotMatch(ppuSite, /Enable All|Disable All/);
+});
+
+test("P0 Site UI separates browser Draft, persisted Desired, and observed Runtime without hard-coding topology", () => {
+  assert.match(ppuSiteDesired, />Draft</);
+  assert.match(ppuSiteDesired, />Desired</);
+  assert.match(ppuSiteDesired, />Runtime</);
+  assert.match(ppuSiteDesired, /Unsaved Draft/);
+  assert.match(ppuSiteDesired, /Saving updates Desired configuration only; Runtime remains separately reconciled/);
+  assert.match(ppuSiteDesired, /runtime_apply_supported=false/);
+  assert.match(ppuSiteDesired, /Topology is discovered from the PPU/);
+  assert.doesNotMatch(ppuSiteDesired, /Array\(8\)|SITE8|site_count\s*===\s*8/);
+  assert.doesNotMatch(ppuSiteDesired, /Programming Channel|Channel Configuration|CH[1-8]/);
 });
 
 test("PPU management names the northbound service Plasma Gateway", () => {
