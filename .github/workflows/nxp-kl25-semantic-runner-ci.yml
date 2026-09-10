@@ -46,6 +46,7 @@ jobs:
             data/ic-support/benchmarks/nxp-kl25/bounded_extraction.py \
             data/ic-support/benchmarks/nxp-kl25/qualify_bounded_run.py \
             data/ic-support/benchmarks/nxp-kl25/run_live_bounded_qualification.py \
+            data/ic-support/benchmarks/nxp-kl25/gate58_review.py \
             data/ic-support/benchmarks/nxp-kl25/test_output_contract_hardening.py \
             data/ic-support/benchmarks/nxp-kl25/test_context_compaction.py \
             data/ic-support/benchmarks/nxp-kl25/test_semantic_coverage_gate53.py \
@@ -53,7 +54,8 @@ jobs:
             data/ic-support/benchmarks/nxp-kl25/test_evidence_boundary_gate56.py \
             data/ic-support/benchmarks/nxp-kl25/test_live_bounded_qualification.py \
             data/ic-support/benchmarks/nxp-kl25/test_gate57_reporting.py \
-            data/ic-support/benchmarks/nxp-kl25/test_gate57a_primary_scope.py
+            data/ic-support/benchmarks/nxp-kl25/test_gate57a_primary_scope.py \
+            data/ic-support/benchmarks/nxp-kl25/test_gate58_manufacturer_review.py
       - name: Validate KL25 operator helper syntax
         run: |
           bash -n scripts/ic-support-kl25-live.sh
@@ -90,3 +92,5 @@ jobs:
         run: python data/ic-support/benchmarks/nxp-kl25/test_gate57_reporting.py
       - name: Validate Gate 5.7A primary-scoped bounded extraction without network or model weights
         run: python data/ic-support/benchmarks/nxp-kl25/test_gate57a_primary_scope.py
+      - name: Validate Gate 5.8 manufacturer semantic/citation review without network or model weights
+        run: python data/ic-support/benchmarks/nxp-kl25/test_gate58_manufacturer_review.py
