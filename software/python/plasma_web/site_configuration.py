@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import tempfile
 import threading
@@ -16,6 +18,7 @@ from plasma_core.errors import ErrorCode, PlasmaError
 SUPPORTED_SITE_INTERFACES = frozenset({"mock", "openocd", "fpga"})
 SITE_DESIRED_FIELDS = frozenset({"enabled", "interface", "target"})
 MAX_TARGET_LENGTH = 256
+DESIRED_REVISION_PREFIX = "sha256:"
 
 
 def _config_error(message: str, *, context: dict[str, Any] | None = None) -> PlasmaError:
@@ -63,22 +66,47 @@ def _validated_values(raw: dict[str, Any]) -> tuple[bool, str, str]:
     return enabled, interface, target
 
 
+def desired_revision(site: SiteConfig) -> str:
+    canonical = json.dumps(
+        {
+            "enabled": site.enabled,
+            "interface": site.interface,
+            "site_id": site.id,
+            "target": site.target,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return f"{DESIRED_REVISION_PREFIX}{hashlib.sha256(canonical).hexdigest()}"
+
+
 def _site_dict(site: SiteConfig) -> dict[str, Any]:
     return {
         "site_id": site.id,
         "enabled": site.enabled,
         "interface": site.interface,
         "target": site.target,
+        "desired_revision": desired_revision(site),
     }
+
+
+class SiteConfigurationConflictError(Exception):
+    """Raised when a write was based on an older Site desired-state revision."""
+
+    def __init__(self, site_id: int, expected_revision: str, current_revision: str) -> None:
+        super().__init__(f"SITE{site_id} desired configuration changed since the Draft baseline")
+        self.site_id = site_id
+        self.expected_revision = expected_revision
+        self.current_revision = current_revision
 
 
 class SiteConfigurationController:
     """PPU-authoritative desired Site configuration persisted in canonical PPU YAML.
 
-    Phase 1 deliberately does not mutate a running SiteManager. A successful write
-    updates the canonical PPU configuration atomically; the Gateway reports desired
-    and observed runtime state separately so the operator can see whether a Plasma
-    Server restart is still required.
+    A write uses optimistic concurrency against one Site's deterministic desired
+    revision. The revision is derived from normalized canonical Site fields, so it
+    survives Gateway restarts without adding a mutable counter to plasma.yaml.
     """
 
     def __init__(self, config_path: str | Path) -> None:
@@ -93,7 +121,13 @@ class SiteConfigurationController:
                 "sites": [_site_dict(site) for site in sorted(config.sites, key=lambda item: item.id)],
             }
 
-    def update(self, site_id: int, raw: dict[str, Any]) -> dict[str, Any]:
+    def update(
+        self,
+        site_id: int,
+        raw: dict[str, Any],
+        *,
+        expected_revision: str,
+    ) -> dict[str, Any]:
         normalized_site_id = _site_id(site_id)
         enabled, interface, target = _validated_values(raw)
 
@@ -105,6 +139,14 @@ class SiteConfigurationController:
                 raise PlasmaError(
                     ErrorCode.SITE_INVALID,
                     f"site does not exist: SITE{normalized_site_id}",
+                )
+
+            current_revision = desired_revision(existing)
+            if expected_revision != current_revision:
+                raise SiteConfigurationConflictError(
+                    normalized_site_id,
+                    expected_revision,
+                    current_revision,
                 )
 
             candidate_site = replace(
