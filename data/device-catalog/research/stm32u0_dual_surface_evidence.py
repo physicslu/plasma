@@ -1,28 +1,22 @@
 #!/usr/bin/env python3
-"""STM32U0 retained-evidence adapter for ST dual-surface product pages."""
+"""Compatibility import for the U0.2 product-page evidence adapter.
+
+U0.2 intentionally does not gate commercial identity on the dynamically rendered
+Sample & Buy lifecycle cell. The official Quality & Reliability row is authoritative
+because it co-locates exact Part Number and Marketing Status. This module keeps the
+initial transaction import stable while delegating to that explicit U0 policy.
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
-from st_dual_surface_evidence import (
-    EVIDENCE_SURFACE,
-    dual_surface_ready,
-    extract_dual_surface_part_number_records,
-)
-from st_dual_surface_evidence import build_dual_surface_browser_evidence_record as _build
-
-PARSER_PROFILE = "stm32u0_dual_surface_v1"
+from stm32u0_product_page_evidence import PARSER_PROFILE, build_browser_evidence_record
 
 
 def build_dual_surface_browser_evidence_record(**kwargs: Any) -> dict[str, object]:
-    return _build(parser_profile=PARSER_PROFILE, **kwargs)
+    """Return U0 Q&R evidence; the legacy function name carries no dual-surface gate."""
+    return build_browser_evidence_record(**kwargs)
 
 
-__all__ = [
-    "EVIDENCE_SURFACE",
-    "PARSER_PROFILE",
-    "build_dual_surface_browser_evidence_record",
-    "dual_surface_ready",
-    "extract_dual_surface_part_number_records",
-]
+__all__ = ["PARSER_PROFILE", "build_dual_surface_browser_evidence_record"]
