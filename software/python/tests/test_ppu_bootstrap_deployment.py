@@ -102,7 +102,7 @@ def _request(tmp_path: Path):
     python = tmp_path / "opt" / "plasma" / "python" / "3.12.13" / "bin" / "python3"
     artifact.write_bytes(b"artifact")
     sidecar.write_text("sidecar", encoding="utf-8")
-    python.parent.mkdir(parents=True)
+    python.parent.mkdir(parents=True, exist_ok=True)
     python.write_text("python", encoding="utf-8")
     return deployment.DeploymentRequest(
         release_artifact=artifact,
