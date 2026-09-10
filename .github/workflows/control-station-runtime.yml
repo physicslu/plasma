@@ -2,6 +2,7 @@ name: Control Station runtime packaging acceptance
 
 on:
   push:
+    branches: [main]
     paths:
       - "scripts/control-station-runtime.py"
       - "scripts/control-station-release.py"

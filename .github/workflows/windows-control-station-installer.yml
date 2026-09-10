@@ -2,6 +2,7 @@ name: Windows Control Station installer acceptance
 
 on:
   push:
+    branches: [main]
     paths:
       - "packaging/windows/**"
       - "scripts/windows-control-station-msi.py"

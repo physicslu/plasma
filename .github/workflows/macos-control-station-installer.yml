@@ -2,6 +2,7 @@ name: macOS Control Station installer acceptance
 
 on:
   push:
+    branches: [main]
     paths:
       - "packaging/macos/**"
       - "scripts/macos-control-station-pkg.py"
