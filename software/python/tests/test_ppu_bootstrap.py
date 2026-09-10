@@ -163,12 +163,12 @@ def test_release_directory_must_match_release_identity(tmp_path: Path):
 def test_systemd_unit_keeps_bootstrap_separate_from_plasma_runtime():
     unit = bootstrap.render_systemd_unit(
         python_executable="/usr/bin/python3",
-        script_path="/opt/plasma/bootstrap/ppu-bootstrap.py",
+        script_path="/opt/plasma/bootstrap/ppu-bootstrap-service.py",
         host="192.168.2.99",
         port=18081,
     )
     assert "Plasma PPU Bootstrap / Recovery Service" in unit
-    assert "ExecStart=/usr/bin/python3 /opt/plasma/bootstrap/ppu-bootstrap.py serve" in unit
+    assert "ExecStart=/usr/bin/python3 /opt/plasma/bootstrap/ppu-bootstrap-service.py serve" in unit
     assert "plasma-server.service" not in unit
     assert "plasma-web.service" not in unit
     assert "User=root" in unit
