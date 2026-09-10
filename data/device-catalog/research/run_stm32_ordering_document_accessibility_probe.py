@@ -5,8 +5,6 @@ import argparse
 import hashlib
 import json
 import subprocess
-import urllib.error
-import urllib.request
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -16,6 +14,7 @@ from stm32_ordering_document_accessibility_probe import DEFAULT_MANIFEST, probe_
 
 DEFAULT_OUTPUT = Path("/tmp/stm32-ordering-document-accessibility-summary.json")
 MAX_PDF_BYTES = 32 * 1024 * 1024
+PDF_TRANSPORT = "playwright_browser_context_request"
 
 
 def _playwright_version() -> str:
@@ -23,31 +22,6 @@ def _playwright_version() -> str:
         return version("playwright")
     except PackageNotFoundError:
         return "unknown"
-
-
-def fetch_pdf(url: str, timeout_seconds: float) -> tuple[bytes, str, str | None]:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/151 Safari/537.36",
-            "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
-            "Referer": "https://www.st.com/",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            final_url = response.geturl()
-            content_type = response.headers.get("Content-Type")
-            body = response.read(MAX_PDF_BYTES + 1)
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            raise AcquisitionError("datasheet HTTP 404") from exc
-        raise AcquisitionError(f"datasheet HTTP {exc.code}") from exc
-    except urllib.error.URLError as exc:
-        raise AcquisitionError(f"datasheet fetch failed: {exc.reason}") from exc
-    if len(body) > MAX_PDF_BYTES:
-        raise AcquisitionError(f"datasheet exceeds {MAX_PDF_BYTES} bytes")
-    return body, final_url, content_type
 
 
 def extract_pdf_text(body: bytes) -> str:
@@ -68,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--evidence-dir", type=Path)
-    parser.add_argument("--timeout", type=float, default=90.0)
+    parser.add_argument("--timeout", type=float, default=45.0)
     args = parser.parse_args(argv)
 
     pilot, targets = read_manifest(args.manifest)
@@ -76,17 +50,41 @@ def main(argv: list[str] | None = None) -> int:
     pdf_by_url: dict[str, tuple[bytes, str, str | None]] = {}
     text_by_sha: dict[str, str] = {}
 
-    def saving_pdf_fetcher(url: str, timeout: float) -> tuple[bytes, str, str | None]:
-        result = fetch_pdf(url, timeout)
-        pdf_by_url[url] = result
-        return result
-
     def saving_text_extractor(body: bytes) -> str:
         text = extract_pdf_text(body)
         text_by_sha[hashlib.sha256(body).hexdigest()] = text
         return text
 
     with STDualSurfaceBrowserAcquirer(base_by_url=base_by_url, family_label="STM32U0/C0 ordering-document probe", headless=False) as acquirer:
+        def saving_pdf_fetcher(url: str, timeout: float) -> tuple[bytes, str, str | None]:
+            browser = getattr(acquirer, "_browser", None)
+            if browser is None:
+                raise AcquisitionError("browser PDF fetch requires an active product-page browser")
+            context = browser.new_context()
+            try:
+                response = context.request.get(
+                    url,
+                    timeout=int(min(timeout, 45.0) * 1000),
+                    fail_on_status_code=False,
+                    headers={"Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8", "Referer": "https://www.st.com/"},
+                )
+                if response.status == 404:
+                    raise AcquisitionError("datasheet HTTP 404")
+                if response.status >= 400:
+                    raise AcquisitionError(f"datasheet HTTP {response.status}")
+                body = response.body()
+                if len(body) > MAX_PDF_BYTES:
+                    raise AcquisitionError(f"datasheet exceeds {MAX_PDF_BYTES} bytes")
+                result = (body, response.url, response.headers.get("content-type"))
+                pdf_by_url[url] = result
+                return result
+            except AcquisitionError:
+                raise
+            except Exception as exc:
+                raise AcquisitionError(f"browser-context datasheet fetch failed: {type(exc).__name__}: {exc}") from exc
+            finally:
+                context.close()
+
         summary = run_probe(
             pilot_id=pilot,
             targets=targets,
@@ -100,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
             "browser_version": acquirer.browser_version,
             "playwright_version": _playwright_version(),
         }
+        summary["pdf_transport"] = PDF_TRANSPORT
         summary["pdf_text_tool"] = "pdftotext -layout"
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
