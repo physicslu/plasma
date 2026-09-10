@@ -51,5 +51,4 @@ jobs:
       - name: Validate Phase 4.9B bounded discovery and identity/capability separation
         run: python data/device-catalog/research/test_stm32g4_phase4_9b_discovery.py
       - name: Validate retained Phase 4.9B evidence and semantic replay
-        if: ${{ hashFiles('data/device-catalog/research/validate_stm32g4_phase4_9b_retained_evidence.py') != '' }}
         run: python data/device-catalog/research/validate_stm32g4_phase4_9b_retained_evidence.py
