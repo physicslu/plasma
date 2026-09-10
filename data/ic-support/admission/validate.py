@@ -69,15 +69,21 @@ def _array(value: Any, label: str) -> list[Any]:
 
 def _artifact_ref(value: Any, label: str) -> dict[str, Any]:
     ref = _object(value, label)
-    _exact(ref, {"artifact_id", "artifact_type", "artifact_digest"}, label, {"schema_id", "schema_version"})
-    _text(ref.get("artifact_id"), f"{label}.artifact_id")
-    _text(ref.get("artifact_type"), f"{label}.artifact_type")
+    _exact(ref, {"artifact_id", "artifact_type", "artifact_digest", "schema_id", "schema_version"}, label)
+    for field in ("artifact_id", "artifact_type", "schema_id", "schema_version"):
+        _text(ref.get(field), f"{label}.{field}")
     _digest(ref.get("artifact_digest"), f"{label}.artifact_digest")
-    if "schema_id" in ref:
-        _text(ref["schema_id"], f"{label}.schema_id")
-    if "schema_version" in ref:
-        _text(ref["schema_version"], f"{label}.schema_version")
     return ref
+
+
+def _ref_key(ref: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
+    return (
+        str(ref["artifact_id"]),
+        str(ref["artifact_type"]),
+        str(ref["artifact_digest"]),
+        str(ref["schema_id"]),
+        str(ref["schema_version"]),
+    )
 
 
 def _evidence_ref(value: Any, label: str) -> dict[str, Any]:
@@ -114,10 +120,28 @@ def _resolve(ref: dict[str, Any], artifacts: Mapping[str, Any], label: str) -> d
     _require(artifact.get("artifact_id") == ref["artifact_id"], f"{label} identity mismatch")
     _require(artifact.get("artifact_type") == ref["artifact_type"], f"{label} type mismatch")
     _require(artifact.get("artifact_digest") == ref["artifact_digest"], f"{label} digest binding mismatch")
-    if "schema_id" in ref:
-        _require(artifact.get("schema_id") == ref["schema_id"], f"{label} schema mismatch")
-    if "schema_version" in ref:
-        _require(artifact.get("schema_version") == ref["schema_version"], f"{label} schema version mismatch")
+    _require(artifact.get("schema_id") == ref["schema_id"], f"{label} schema mismatch")
+    _require(artifact.get("schema_version") == ref["schema_version"], f"{label} schema version mismatch")
+    try:
+        verify_canonical_digest(artifact)
+    except DigestError as exc:
+        raise AdmissionValidationError(f"{label} stale digest") from exc
+    return artifact
+
+
+def _resolve_id_digest(
+    artifact_id: Any,
+    artifact_type: str,
+    artifact_digest: Any,
+    artifacts: Mapping[str, Any],
+    label: str,
+) -> dict[str, Any]:
+    identity = _text(artifact_id, f"{label}.artifact_id")
+    digest = _digest(artifact_digest, f"{label}.artifact_digest")
+    artifact = _object(artifacts.get(identity), f"{label} target")
+    _require(artifact.get("artifact_id") == identity, f"{label} identity mismatch")
+    _require(artifact.get("artifact_type") == artifact_type, f"{label} type mismatch")
+    _require(artifact.get("artifact_digest") == digest, f"{label} digest binding mismatch")
     try:
         verify_canonical_digest(artifact)
     except DigestError as exc:
@@ -127,6 +151,26 @@ def _resolve(ref: dict[str, Any], artifacts: Mapping[str, Any], label: str) -> d
 
 def _same_ref(left: dict[str, Any], right: dict[str, Any], label: str) -> None:
     _require(left == right, f"{label} binding mismatch")
+
+
+def _resolve_json_pointer(value: Any, pointer: Any, label: str) -> Any:
+    text = _text(pointer, f"{label}.pointer")
+    _require(text.startswith("/"), f"{label}.pointer must be an absolute JSON Pointer")
+    current = value
+    for raw_token in text.split("/")[1:]:
+        _require(re.search(r"~(?:[^01]|$)", raw_token) is None, f"{label}.pointer has invalid escape")
+        token = raw_token.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, dict):
+            _require(token in current, f"{label}.pointer does not resolve")
+            current = current[token]
+        elif isinstance(current, list):
+            _require(re.fullmatch(r"0|[1-9][0-9]*", token) is not None, f"{label}.pointer does not resolve")
+            index = int(token)
+            _require(index < len(current), f"{label}.pointer does not resolve")
+            current = current[index]
+        else:
+            raise AdmissionValidationError(f"{label}.pointer does not resolve")
+    return current
 
 
 def validate_admission_package(package: Mapping[str, Any]) -> dict[str, Any]:
@@ -147,7 +191,6 @@ def validate_admission_package(package: Mapping[str, Any]) -> dict[str, Any]:
     _text(target.get("vendor_id"), "target.vendor_id")
     _text(target.get("icpn"), "target.icpn")
     vendor_payload_ref = _artifact_ref(envelope["vendor_payload"], "vendor_payload")
-    _require("schema_id" in vendor_payload_ref, "vendor_payload schema binding is required")
     _resolve(vendor_payload_ref, artifacts, "vendor_payload")
 
     lineage = _object(envelope["lineage"], "lineage")
@@ -166,8 +209,8 @@ def validate_admission_package(package: Mapping[str, Any]) -> dict[str, Any]:
     if admission["state"] == "ADMITTED":
         _require(not unresolved, "admitted canonical envelope cannot have unresolved requirements")
 
-    _validate_review_binding(review, artifacts)
-    candidates = _validate_disposition(disposition, review, artifacts)
+    reviewed_subjects = _validate_review_binding(review, artifacts)
+    candidates = _validate_disposition(disposition, review, reviewed_subjects, artifacts)
     _validate_candidate_review(candidate_review, disposition, source_lock, candidates, artifacts)
 
     operation_artifact = _object(artifacts.get(root["operation_admission_id"]), "operation admission")
@@ -181,29 +224,48 @@ def validate_admission_package(package: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _validate_review_binding(review: dict[str, Any], artifacts: Mapping[str, Any]) -> None:
-    _exact(review, {"schema_id", "schema_version", "artifact_id", "artifact_type", "reviewed_artifact", "review_artifact", "review_status", "artifact_digest"}, "review binding")
+def _validate_review_binding(review: dict[str, Any], artifacts: Mapping[str, Any]) -> set[tuple[str, str, str, str, str]]:
+    _exact(
+        review,
+        {"schema_id", "schema_version", "artifact_id", "artifact_type", "reviewed_artifact", "review_artifact", "review_subjects", "review_status", "artifact_digest"},
+        "review binding",
+    )
     _header(review, "review-binding-v1", "review_binding")
     _resolve(_artifact_ref(review["reviewed_artifact"], "reviewed_artifact"), artifacts, "reviewed_artifact")
     _resolve(_artifact_ref(review["review_artifact"], "review_artifact"), artifacts, "review_artifact")
     _text(review.get("review_status"), "review_status")
+    subjects: set[tuple[str, str, str, str, str]] = set()
+    for index, raw in enumerate(_array(review["review_subjects"], "review_subjects")):
+        ref = _artifact_ref(raw, f"review_subjects[{index}]")
+        _resolve(ref, artifacts, f"review_subjects[{index}]")
+        key = _ref_key(ref)
+        _require(key not in subjects, "duplicate reviewed subject")
+        subjects.add(key)
+    _require(bool(subjects), "review subject coverage cannot be empty")
+    return subjects
 
 
-def _validate_disposition(disposition: dict[str, Any], review: dict[str, Any], artifacts: Mapping[str, Any]) -> set[str]:
+def _validate_disposition(
+    disposition: dict[str, Any],
+    review: dict[str, Any],
+    reviewed_subjects: set[tuple[str, str, str, str, str]],
+    artifacts: Mapping[str, Any],
+) -> set[str]:
     _exact(disposition, {"schema_id", "schema_version", "artifact_id", "artifact_type", "review_binding", "dispositions", "artifact_digest"}, "disposition")
     _header(disposition, "post-review-disposition-v1", "post_review_disposition")
     review_ref = _artifact_ref(disposition["review_binding"], "disposition.review_binding")
     _resolve(review_ref, artifacts, "disposition.review_binding")
     _same_ref(review_ref, _reference(review), "disposition review")
     candidates: set[str] = set()
-    seen_facts: set[str] = set()
+    seen_facts: set[tuple[str, str, str, str, str]] = set()
     for index, raw in enumerate(_array(disposition["dispositions"], "dispositions")):
         row = _object(raw, f"dispositions[{index}]")
         _exact(row, {"source_fact", "action", "projection_state", "candidate_artifacts"}, f"dispositions[{index}]")
         fact_ref = _artifact_ref(row["source_fact"], f"dispositions[{index}].source_fact")
         _resolve(fact_ref, artifacts, f"dispositions[{index}].source_fact")
-        _require(fact_ref["artifact_id"] not in seen_facts, "duplicate disposition source fact")
-        seen_facts.add(fact_ref["artifact_id"])
+        fact_key = _ref_key(fact_ref)
+        _require(fact_key not in seen_facts, "duplicate disposition source fact")
+        seen_facts.add(fact_key)
         _require(row.get("action") in ACTIONS, "invalid disposition action")
         _require(row.get("projection_state") in PROJECTION_STATES, "invalid projection state")
         refs = [_artifact_ref(item, "candidate artifact") for item in _array(row["candidate_artifacts"], "candidate_artifacts")]
@@ -215,7 +277,7 @@ def _validate_disposition(disposition: dict[str, Any], review: dict[str, Any], a
             _resolve(ref, artifacts, "candidate artifact")
             _require(ref["artifact_id"] not in candidates, "duplicate candidate lineage")
             candidates.add(ref["artifact_id"])
-    _require(bool(seen_facts), "disposition coverage cannot be empty")
+    _require(seen_facts == reviewed_subjects, "disposition reviewed-subject coverage mismatch")
     return candidates
 
 
@@ -251,6 +313,8 @@ def _validate_operations(operation_artifact: dict[str, Any], envelope: dict[str,
     _exact(operation_artifact, {"schema_id", "schema_version", "artifact_id", "artifact_type", "target", "operations", "artifact_digest"}, "operation admission")
     _header(operation_artifact, "operation-admission-v1", "operation_admission")
     _require(operation_artifact["target"] == envelope["target"], "operation target mismatch")
+    vendor_payload_ref = _artifact_ref(envelope["vendor_payload"], "vendor_payload")
+    vendor_payload = _resolve(vendor_payload_ref, artifacts, "vendor_payload")
     admitted = 0
     seen: set[str] = set()
     for index, raw in enumerate(_array(operation_artifact["operations"], "operations")):
@@ -259,8 +323,13 @@ def _validate_operations(operation_artifact: dict[str, Any], envelope: dict[str,
         operation = _text(row.get("request_operation"), "request_operation")
         _require(operation not in seen, "duplicate request operation")
         seen.add(operation)
-        contract_ref = {"artifact_id": row["operation_contract_id"], "artifact_type": "operation_contract", "artifact_digest": row["operation_contract_digest"]}
-        _resolve(_artifact_ref(contract_ref, "operation contract"), artifacts, "operation contract")
+        _resolve_id_digest(
+            row.get("operation_contract_id"),
+            "operation_contract",
+            row.get("operation_contract_digest"),
+            artifacts,
+            "operation contract",
+        )
         _require(row.get("canonical_admission_digest") == envelope["artifact_digest"], "operation canonical admission mismatch")
         backend = _object(artifacts.get(row.get("backend_id")), "backend binding")
         _validate_backend(backend, artifacts)
@@ -270,7 +339,20 @@ def _validate_operations(operation_artifact: dict[str, Any], envelope: dict[str,
         _require(row.get("state") in ADMISSION_STATES, "invalid operation admission state")
         requirements = _array(row.get("canonical_requirements"), "canonical requirements")
         unresolved = _array(row.get("unresolved_requirements"), "unresolved requirements")
-        _require(all(isinstance(item, str) and item for item in requirements + unresolved), "invalid operation requirements")
+        _require(all(isinstance(item, str) and item for item in unresolved), "invalid unresolved requirements")
+        requirement_keys: set[tuple[tuple[str, str, str, str, str], str]] = set()
+        for requirement_index, raw_requirement in enumerate(requirements):
+            label = f"canonical_requirements[{requirement_index}]"
+            requirement = _object(raw_requirement, label)
+            _exact(requirement, {"artifact", "pointer"}, label)
+            requirement_ref = _artifact_ref(requirement["artifact"], f"{label}.artifact")
+            requirement_artifact = _resolve(requirement_ref, artifacts, f"{label}.artifact")
+            _same_ref(requirement_ref, vendor_payload_ref, f"{label} vendor payload")
+            pointer = _text(requirement.get("pointer"), f"{label}.pointer")
+            key = (_ref_key(requirement_ref), pointer)
+            _require(key not in requirement_keys, "duplicate canonical requirement")
+            requirement_keys.add(key)
+            _resolve_json_pointer(requirement_artifact, pointer, label)
         _require(isinstance(row.get("hardware_runtime_ready"), bool), "hardware_runtime_ready must be boolean")
         if row["state"] == "ADMITTED":
             _require(bool(requirements) and not unresolved, "admitted operation requirements invalid")
@@ -292,7 +374,6 @@ def _validate_backend(backend: dict[str, Any], artifacts: Mapping[str, Any]) -> 
     for item in evidence:
         _resolve(item, artifacts, "implementation evidence")
     constraint_ref = _artifact_ref(backend["vendor_constraint_payload"], "vendor constraint payload")
-    _require("schema_id" in constraint_ref, "vendor constraint payload schema binding is required")
     _resolve(constraint_ref, artifacts, "vendor constraint payload")
     _digest(backend.get("lock_digest"), "lock_digest")
     expected_lock = canonical_digest(backend, omit=("artifact_digest", "lock_digest"))
