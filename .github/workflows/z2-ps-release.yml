@@ -2,6 +2,34 @@ name: Z2 PS release candidate
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/z2-ps-release.yml"
+      - "scripts/plasmactl"
+      - "scripts/plasmactl-z2-ps"
+      - "scripts/z2-python-runtime.py"
+      - "scripts/ppu-runtime.py"
+      - "scripts/ppu-release.py"
+      - "scripts/ppu-z2-installer.py"
+      - "scripts/product-release.py"
+      - "docs/deployment/z2-ps-installer.md"
+      - "docs/deployment/plasmactl-deployment-profiles.md"
+      - "release/**"
+      - "software/python/pyproject.toml"
+      - "software/python/plasma_core/**"
+      - "software/python/plasma_interfaces/**"
+      - "software/python/plasma_handlers/**"
+      - "software/python/plasma_server/**"
+      - "software/python/plasma_client/**"
+      - "software/python/plasma_web/**"
+      - "software/python/tests/test_ppu_runtime.py"
+      - "software/python/tests/test_ppu_release.py"
+      - "software/python/tests/test_ppu_z2_installer.py"
+      - "software/python/tests/test_z2_python_runtime_artifact.py"
+      - "software/python/tests/test_z2_ps_release_cache_contract.py"
+      - "software/python/tests/test_plasmactl_deployment_profiles.py"
   pull_request:
     paths:
       - ".github/workflows/z2-ps-release.yml"
@@ -26,6 +54,7 @@ on:
       - "software/python/tests/test_ppu_release.py"
       - "software/python/tests/test_ppu_z2_installer.py"
       - "software/python/tests/test_z2_python_runtime_artifact.py"
+      - "software/python/tests/test_z2_ps_release_cache_contract.py"
       - "software/python/tests/test_plasmactl_deployment_profiles.py"
 
 concurrency:
@@ -38,6 +67,7 @@ permissions:
 env:
   Z2_PYTHON_VERSION: "3.12.13"
   Z2_PYTHON_SOURCE_SHA256: "c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684"
+  Z2_PYTHON_CACHE_SCHEMA: "v1"
 
 jobs:
   z2-python-runtime:
@@ -56,7 +86,19 @@ jobs:
           python scripts/z2-python-runtime.py --help
           python scripts/ppu-z2-installer.py --help
           python -m pip install pytest
-          python -m pytest -q software/python/tests/test_z2_python_runtime_artifact.py
+          python -m pytest -q \
+            software/python/tests/test_z2_python_runtime_artifact.py \
+            software/python/tests/test_z2_ps_release_cache_contract.py
+
+      - name: Restore verified ARMv7 Python build cache
+        id: z2-python-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/z2-python-artifact
+          key: >-
+            z2-python-${{ env.Z2_PYTHON_CACHE_SCHEMA }}-${{ runner.os }}-armv7-ubuntu22.04-
+            py${{ env.Z2_PYTHON_VERSION }}-${{ env.Z2_PYTHON_SOURCE_SHA256 }}-
+            ${{ hashFiles('.github/workflows/z2-ps-release.yml', 'scripts/z2-python-runtime.py') }}
 
       - name: Set up QEMU for ARMv7 build and runtime smoke
         uses: docker/setup-qemu-action@v4
@@ -65,10 +107,12 @@ jobs:
           platforms: arm
 
       - name: Build CPython against Ubuntu 22.04 ARMv7 userspace
+        if: steps.z2-python-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
           output="$RUNNER_TEMP/z2-python-artifact"
+          rm -rf "$output"
           mkdir -p "$output"
           docker run --rm \
             --platform linux/arm/v7 \
@@ -112,6 +156,8 @@ jobs:
         run: |
           set -euo pipefail
           artifact="$RUNNER_TEMP/z2-python-artifact/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz"
+          test -f "$artifact"
+          test -f "$artifact.sha256"
           python scripts/z2-python-runtime.py verify "$artifact" --sidecar "$artifact.sha256"
 
       - name: Install Python artifact on fresh Ubuntu 22.04 ARMv7 userspace
@@ -136,6 +182,19 @@ jobs:
                 "import ssl,sqlite3,urllib.request; print(ssl.OPENSSL_VERSION, sqlite3.sqlite_version)"
               test "$(python3 -c "import sys; print(sys.version_info[:2])")" != "$(/opt/plasma/python/${PYTHON_VERSION}/bin/python3 -c "import sys; print(sys.version_info[:2])")"
             '
+
+      - name: Save verified ARMv7 Python build cache
+        if: >-
+          steps.z2-python-cache.outputs.cache-hit != 'true' &&
+          (github.event_name == 'push' ||
+           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/z2-python-artifact
+          key: >-
+            z2-python-${{ env.Z2_PYTHON_CACHE_SCHEMA }}-${{ runner.os }}-armv7-ubuntu22.04-
+            py${{ env.Z2_PYTHON_VERSION }}-${{ env.Z2_PYTHON_SOURCE_SHA256 }}-
+            ${{ hashFiles('.github/workflows/z2-ps-release.yml', 'scripts/z2-python-runtime.py') }}
 
       - name: Upload qualified Plasma Python runtime candidate
         uses: actions/upload-artifact@v4
@@ -170,6 +229,7 @@ jobs:
           software/python/tests/test_ppu_release.py
           software/python/tests/test_ppu_z2_installer.py
           software/python/tests/test_z2_python_runtime_artifact.py
+          software/python/tests/test_z2_ps_release_cache_contract.py
           software/python/tests/test_plasmactl_deployment_profiles.py
 
       - name: Download qualified Plasma Python runtime candidate
