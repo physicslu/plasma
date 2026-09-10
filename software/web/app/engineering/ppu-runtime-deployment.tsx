@@ -73,6 +73,7 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
   const pairing = status?.pairing ?? null;
   const runtime = bootstrap?.runtime ?? null;
   const deployment = bootstrap?.deployment ?? null;
+  const recoveryRequired = runtime?.state === "recovery_required" || deployment?.state === "recovery_required";
   const canPair = Boolean(
     alias
     && pairingToken.trim().length >= 32
@@ -91,6 +92,7 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
     && facilityId.trim()
     && displayName.trim()
     && !hasActiveExecution
+    && !recoveryRequired
     && busy === null
     && deployment?.state !== "queued"
     && deployment?.state !== "running",
@@ -98,7 +100,7 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
   const deploymentTone = useMemo(() => {
     if (!deployment) return "neutral";
     if (deployment.state === "succeeded") return "success";
-    if (deployment.state === "failed") return "danger";
+    if (deployment.state === "failed" || deployment.state === "recovery_required") return "danger";
     return "warning";
   }, [deployment]);
 
@@ -172,6 +174,7 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
       {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Runtime deployment is blocked while this PPU has active Site execution.</p>}
+      {recoveryRequired && <p className="ppuRegistryMessage error" role="alert">Recovery required. Normal Runtime deployment remains blocked until the interrupted or unsafe PPU state is explicitly recovered.</p>}
 
       <div className="ppuInfoBody">
         <dl className="ppuInfoGrid">
@@ -228,7 +231,7 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
         <button className="ppuSiteButton primary" type="button" disabled={!canDeploy} onClick={() => void deploy()}>
           {busy === "deploy" ? `Uploading${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Deploy Runtime"}
         </button>
-        <p>Console uploads a SHA-256-verified Z2 PS kit through Manager. Bootstrap validates immutable release identity and owns activation/rollback. Publisher signature verification remains a production-hardening requirement; FPGA bitstream loading is not enabled in this project.</p>
+        <p>Console uploads a SHA-256-verified Z2 PS kit through Manager. Bootstrap validates immutable release identity and owns activation plus automatic rollback on failed activation. Publisher signature verification remains a production-hardening requirement; FPGA bitstream loading is not enabled in this project.</p>
       </div>
 
       <div className="ppuReadinessPanel" aria-label="Deployment status">
