@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from plasma_core.config import PlasmaConfig, PPUIdentity, ServerConfig, SiteConfig
+from plasma_core.config import PlasmaConfig, PPUConfig, ServerConfig, SiteConfig
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
@@ -17,7 +17,7 @@ from plasma_web.runtime_activation_helper import RuntimeActivationExecutor, Runt
 
 def config(tmp_path: Path) -> PlasmaConfig:
     return PlasmaConfig(
-        ppu=PPUIdentity(id="ppu-a", facility_id="lab", model="test", display_name="PPU A"),
+        ppu=PPUConfig(id="ppu-a", facility_id="lab", model="test", display_name="PPU A"),
         server=ServerConfig(
             host="127.0.0.1",
             port=9900,
