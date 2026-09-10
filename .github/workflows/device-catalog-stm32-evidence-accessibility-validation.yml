@@ -14,6 +14,11 @@ on:
       - "data/device-catalog/research/stm32-next-family-selection.json"
       - "data/device-catalog/research/test_stm32_u0_c0_ordering_selection.py"
       - "data/device-catalog/research/validate_stm32_u0_c0_ordering_selection.py"
+      - "data/device-catalog/research/stm32u0_phase_u0_1_foundation.py"
+      - "data/device-catalog/research/stm32u0-phase-u0.1-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32u0_phase_u0_1_foundation.py"
+      - "data/device-catalog/research/validate_stm32u0_phase_u0_1_foundation.py"
+      - "data/device-catalog/research/device-catalog-stm32u0-phase-u0.1-foundation.md"
       - "data/device-catalog/research/stm32-cross-family-prioritization-baseline.json"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/production/icpn-v1-manifest.json"
@@ -32,6 +37,11 @@ on:
       - "data/device-catalog/research/stm32-next-family-selection.json"
       - "data/device-catalog/research/test_stm32_u0_c0_ordering_selection.py"
       - "data/device-catalog/research/validate_stm32_u0_c0_ordering_selection.py"
+      - "data/device-catalog/research/stm32u0_phase_u0_1_foundation.py"
+      - "data/device-catalog/research/stm32u0-phase-u0.1-foundation-baseline.json"
+      - "data/device-catalog/research/test_stm32u0_phase_u0_1_foundation.py"
+      - "data/device-catalog/research/validate_stm32u0_phase_u0_1_foundation.py"
+      - "data/device-catalog/research/device-catalog-stm32u0-phase-u0.1-foundation.md"
       - "data/device-catalog/research/stm32-cross-family-prioritization-baseline.json"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/production/icpn-v1-manifest.json"
@@ -57,3 +67,7 @@ jobs:
         run: python data/device-catalog/research/test_stm32_u0_c0_ordering_selection.py
       - name: Replay U0/C0 ordering evidence and research selection
         run: python data/device-catalog/research/validate_stm32_u0_c0_ordering_selection.py
+      - name: Validate STM32U0 U0.1 foundation negative controls
+        run: python data/device-catalog/research/test_stm32u0_phase_u0_1_foundation.py
+      - name: Replay STM32U0 U0.1 frozen foundation
+        run: python data/device-catalog/research/validate_stm32u0_phase_u0_1_foundation.py
