@@ -8,7 +8,7 @@ const REGISTRY_BROWSER_PREFIX = "/api/manager/registry";
 
 type RegistryBrowserPath = {
   alias: string;
-  resource: "entry" | "network" | "network-commissioning" | "sites" | "site";
+  resource: "entry" | "network" | "network-commissioning" | "sites" | "site" | "site-activation";
   siteId?: number;
 };
 
@@ -30,6 +30,9 @@ function registryPath(request: Request): RegistryBrowserPath | null {
   if (parts.length === 2 && parts[1] === "network") return { alias, resource: "network" };
   if (parts.length === 2 && parts[1] === "network-commissioning") return { alias, resource: "network-commissioning" };
   if (parts.length === 2 && parts[1] === "sites") return { alias, resource: "sites" };
+  if (parts.length === 3 && parts[1] === "sites" && parts[2] === "activation") {
+    return { alias, resource: "site-activation" };
+  }
   if (parts.length === 3 && parts[1] === "sites" && /^[1-9][0-9]*$/.test(parts[2] ?? "")) {
     return { alias, resource: "site", siteId: Number(parts[2]) };
   }
@@ -69,6 +72,15 @@ async function relayResource(request: Request): Promise<Response> {
       );
     }
     return await relayManagerPpuAliasRequest(request, parsed.alias, "/api/settings/sites");
+  }
+  if (parsed.resource === "site-activation") {
+    if (request.method !== "POST") {
+      return Response.json(
+        { ok: false, error: { code: "method_not_allowed", message: "Site runtime activation supports POST only" } },
+        { status: 405, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    return await relayManagerPpuAliasRequest(request, parsed.alias, "/api/settings/sites/activation");
   }
   if (request.method !== "POST" || parsed.siteId == null) {
     return Response.json(
