@@ -12,10 +12,12 @@ on:
       - "data/device-catalog/research/stm32g4-phase4.9c-ordering-authority.json"
       - "data/device-catalog/research/stm32g4-phase4.9c-production-manifest-prestate.json"
       - "data/device-catalog/research/stm32g4-phase4.9c-policy-baseline.json"
+      - "data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json"
       - "data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/**"
       - "data/device-catalog/research/device-catalog-phase4.9a-stm32g4-foundation.md"
       - "data/device-catalog/research/device-catalog-phase4.9b-stm32g4-discovery.md"
       - "data/device-catalog/research/device-catalog-phase4.9c-stm32g4-policy.md"
+      - "data/device-catalog/research/device-catalog-phase4.9d-stm32g4-admission.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32g4-validation.yml"
@@ -28,10 +30,12 @@ on:
       - "data/device-catalog/research/stm32g4-phase4.9c-ordering-authority.json"
       - "data/device-catalog/research/stm32g4-phase4.9c-production-manifest-prestate.json"
       - "data/device-catalog/research/stm32g4-phase4.9c-policy-baseline.json"
+      - "data/device-catalog/research/stm32g4-phase4.9d-admission-plan.json"
       - "data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/**"
       - "data/device-catalog/research/device-catalog-phase4.9a-stm32g4-foundation.md"
       - "data/device-catalog/research/device-catalog-phase4.9b-stm32g4-discovery.md"
       - "data/device-catalog/research/device-catalog-phase4.9c-stm32g4-policy.md"
+      - "data/device-catalog/research/device-catalog-phase4.9d-stm32g4-admission.md"
       - "data/device-catalog/research/openocd-parts-canonical.csv"
       - "data/device-catalog/production/icpn-v1-manifest.json"
       - ".github/workflows/device-catalog-stm32g4-validation.yml"
@@ -64,3 +68,7 @@ jobs:
         run: python data/device-catalog/research/test_stm32g4_phase4_9c_policy.py
       - name: Replay immutable Phase 4.9C policy baseline
         run: python data/device-catalog/research/stm32g4_phase4_9c_policy.py
+      - name: Validate Phase 4.9D capability/admission policy
+        run: python data/device-catalog/research/test_stm32g4_phase4_9d_admission.py
+      - name: Replay immutable Phase 4.9D admission plan
+        run: python data/device-catalog/research/validate_stm32g4_phase4_9d_admission_plan.py
