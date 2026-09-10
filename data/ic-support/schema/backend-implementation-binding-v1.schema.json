@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/admission/backend-implementation-binding-v1",
+  "title": "Backend implementation binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "artifact_id", "artifact_type", "backend_id", "implementation", "implementation_evidence", "vendor_constraint_payload", "lock_digest", "artifact_digest"],
+  "properties": {
+    "schema_id": {"const": "plasma://ic-support/admission/backend-implementation-binding-v1"},
+    "schema_version": {"const": "1.0.0"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "artifact_type": {"const": "backend_implementation_binding"},
+    "backend_id": {"type": "string", "minLength": 1},
+    "implementation": {"type": "object", "additionalProperties": false, "required": ["identity", "revision"], "properties": {"identity": {"type": "string", "minLength": 1}, "revision": {"type": "string", "minLength": 1}}},
+    "implementation_evidence": {"type": "array", "minItems": 1, "items": {"$ref": "artifact-ref-v1.schema.json"}},
+    "vendor_constraint_payload": {"allOf": [{"$ref": "artifact-ref-v1.schema.json"}, {"required": ["schema_id"]}]},
+    "lock_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

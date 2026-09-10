@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/admission/post-review-disposition-v1",
+  "title": "Post-review disposition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "artifact_id", "artifact_type", "review_binding", "dispositions", "artifact_digest"],
+  "properties": {
+    "schema_id": {"const": "plasma://ic-support/admission/post-review-disposition-v1"},
+    "schema_version": {"const": "1.0.0"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "artifact_type": {"const": "post_review_disposition"},
+    "review_binding": {"$ref": "artifact-ref-v1.schema.json"},
+    "dispositions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_fact", "action", "projection_state", "candidate_artifacts"],
+        "properties": {
+          "source_fact": {"$ref": "artifact-ref-v1.schema.json"},
+          "action": {"enum": ["ACCEPT", "REJECT", "REPLACE_WITH_MANUFACTURER_FACT", "SPLIT", "NARROW", "CITATION_SUPPLEMENT_FOR_CANONICAL"]},
+          "projection_state": {"enum": ["KNOWLEDGE_ONLY", "CANONICAL_REQUIRED", "EXECUTION_PROFILE_REQUIRED", "BLOCKED"]},
+          "candidate_artifacts": {"type": "array", "items": {"$ref": "artifact-ref-v1.schema.json"}}
+        }
+      }
+    },
+    "artifact_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
