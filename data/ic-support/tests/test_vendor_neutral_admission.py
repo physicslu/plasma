@@ -41,7 +41,7 @@ FORBIDDEN = (
     "FCCOB",
     "FSEC",
 )
-LEGACY_SCHEMA_SHA256 = "3d056f3dd6ec038e826f31a5ae7674058555ba569eb1243deef3f04afa8a38a6"
+LEGACY_SCHEMA_SHA256 = "900cf98da5fbe308dfc69715f667291ab04512a67892c6f0bfff1f5e26c3811b"
 
 
 def seal(value: dict) -> dict:
@@ -338,9 +338,22 @@ class VendorNeutralAdmissionTests(unittest.TestCase):
                 self.assertNotIn(term, text, f"{path}: forbidden term {term}")
 
     def test_historical_artifacts_are_unchanged(self) -> None:
-        legacy = IC_SUPPORT / "schema" / "post-review-disposition-v0.schema.json"
-        self.assertEqual(hashlib.sha256(legacy.read_bytes()).hexdigest(), LEGACY_SCHEMA_SHA256)
         base_ref = os.environ.get("ADMISSION_BASE_REF", "origin/main")
+        legacy_path = "data/ic-support/schema/post-review-disposition-v0.schema.json"
+        head_blob = subprocess.run(
+            ["git", "show", f"HEAD:{legacy_path}"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        base_blob = subprocess.run(
+            ["git", "show", f"{base_ref}:{legacy_path}"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        self.assertEqual(head_blob, base_blob)
+        self.assertEqual(hashlib.sha256(head_blob).hexdigest(), LEGACY_SCHEMA_SHA256)
         changed = subprocess.run(
             ["git", "diff", "--name-only", f"{base_ref}...HEAD"],
             cwd=ROOT,
