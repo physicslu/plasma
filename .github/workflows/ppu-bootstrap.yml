@@ -94,4 +94,4 @@ jobs:
       - name: Prove production Manager entrypoint owns Bootstrap routes
         run: >-
           python -c
-          'import importlib.metadata as m; assert m.entry_points(group="console_scripts", name="plasma-manager")[0].value == "plasma_manager.server_bootstrap:main"'
+          'import importlib.metadata as m; eps=m.entry_points(group="console_scripts", name="plasma-manager"); ep=next(iter(eps)); assert ep.value == "plasma_manager.server_bootstrap:main", ep.value'
