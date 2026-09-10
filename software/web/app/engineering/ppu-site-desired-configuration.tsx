@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  OperatorActions,
+  OperatorButton,
+  OperatorCard,
+  OperatorMessage,
+} from "../operator-ui/operator-surface";
+import {
   getManagerPpuSites,
   ManagerApiError,
   saveManagerPpuSite,
@@ -223,27 +229,27 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
   }
 
   return (
-    <section className="ppuSiteCard" aria-label="Programming Site Configuration">
+    <OperatorCard className="ppuSiteCard" ariaLabel="Programming Site Configuration">
       <header className="ppuSiteCardHeader">
         <div>
           <h3>Programming Site Configuration</h3>
           <p className="ppuSiteHeaderNote">Site is the canonical independently controlled programming position inside a PPU. Topology is discovered from the PPU; this UI does not hard-code an eight-Site assumption.</p>
         </div>
-        <div className="ppuSiteCardHeaderActions">
+        <OperatorActions className="ppuSiteCardHeaderActions">
           {payload && (
             <span className="ppuReconciliationBadge" data-tone={overallTone(payload.site_configuration.reconciliation)}>
               {overallLabel(payload.site_configuration.reconciliation)}
             </span>
           )}
-          <button className="ppuSiteButton" type="button" disabled={loading || savingSite !== null} onClick={() => void refresh()}>
+          <OperatorButton className="ppuSiteButton" type="button" disabled={loading || savingSite !== null} onClick={() => void refresh()}>
             Refresh
-          </button>
-        </div>
+          </OperatorButton>
+        </OperatorActions>
       </header>
 
-      {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
-      {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
-      {writeBlockReason && <p className="ppuRegistryMessage warning" role="status">{writeBlockReason}</p>}
+      {error && <OperatorMessage className="ppuRegistryMessage error" tone="error" role="alert">{error}</OperatorMessage>}
+      {notice && <OperatorMessage className="ppuRegistryMessage success" tone="success" role="status">{notice}</OperatorMessage>}
+      {writeBlockReason && <OperatorMessage className="ppuRegistryMessage warning" tone="warning" role="status">{writeBlockReason}</OperatorMessage>}
 
       {payload && (
         <div className="ppuConfigurationStateFlow" aria-label="Draft Desired Runtime configuration state">
@@ -275,9 +281,9 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
       )}
 
       {conflicts.size > 0 && (
-        <p className="ppuRegistryMessage error" role="alert">
+        <OperatorMessage className="ppuRegistryMessage error" tone="error" role="alert">
           <strong>Desired changed elsewhere.</strong> Stale Drafts are fail-closed and cannot overwrite the newer saved state. Reset the affected Draft to the latest Desired state before reapplying the intended change.
-        </p>
+        </OperatorMessage>
       )}
 
       {payload?.site_configuration.sites.length ? (
@@ -347,20 +353,21 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
                       </span>
                     </td>
                     <td>
-                      <div className="ppuSiteCardHeaderActions">
-                        <button
+                      <OperatorActions className="ppuSiteCardHeaderActions">
+                        <OperatorButton
                           className="ppuSiteButton primary"
+                          variant="primary"
                           type="button"
                           disabled={disabled || !isDirty || !draft.target.trim() || isConflict}
                           title={isConflict ? "Reset Draft to the latest Desired state before saving" : undefined}
                           onClick={() => void saveSite(site.site_id)}
                         >
                           {savingSite === site.site_id ? "Saving..." : "Save Desired"}
-                        </button>
-                        <button className="ppuSiteButton" type="button" disabled={disabled || !isDirty} onClick={() => resetDraft(site.site_id)}>
+                        </OperatorButton>
+                        <OperatorButton className="ppuSiteButton" type="button" disabled={disabled || !isDirty} onClick={() => resetDraft(site.site_id)}>
                           Reset Draft
-                        </button>
-                      </div>
+                        </OperatorButton>
+                      </OperatorActions>
                     </td>
                   </tr>
                 );
@@ -375,6 +382,6 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
       <p className="ppuSiteNote">
         <strong>Configuration boundary:</strong> Draft is browser-local, Desired is persisted in canonical PPU configuration, and Runtime is observed separately. Each Draft keeps the exact <code>desired_revision</code> it was based on and Save Desired sends it with <code>If-Match</code>; a stale Draft receives HTTP 412 and is blocked from silently overwriting newer Desired state. When Desired and Runtime differ, the API reports <code>restart_required</code>. Phase 1 reports <code>runtime_apply_supported=false</code>, so this page does not pretend a save has already changed the running service. Protocol v3.3 also does not expose dormant interface/target bindings for disabled Sites; those rows remain explicitly partially observable instead of guessed.
       </p>
-    </section>
+    </OperatorCard>
   );
 }
