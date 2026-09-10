@@ -47,7 +47,7 @@ def _base(phase: str, *, expected: str | None = None):
         },
         "gateway_ready": {
             "status": 200,
-            "payload": {"gateway": "alive", "execution": "ready"},
+            "payload": {"ok": True, "gateway": "alive", "execution": "ready"},
         },
         "deployment_engine_journal": _trusted("runtime_active"),
         "deployment_api_journal": _trusted("succeeded"),
@@ -71,7 +71,15 @@ def test_runtime_checkpoint_requires_exact_release_services_and_ready_gateway():
     snapshot["gateway_ready"]["payload"]["execution"] = "unavailable"
     failures = hil.evaluate_snapshot(snapshot)
     assert "active release does not match expected_release_id" in failures
-    assert "Gateway readiness payload is not gateway=alive/execution=ready" in failures
+    assert "Gateway readiness payload is not ok=true/gateway=alive/execution=ready" in failures
+
+
+def test_runtime_checkpoint_rejects_http_200_without_ok_true():
+    expected = "0.1.1-0123456789ab"
+    snapshot = _base("runtime-active", expected=expected)
+    snapshot["gateway_ready"]["payload"]["ok"] = False
+    failures = hil.evaluate_snapshot(snapshot)
+    assert "Gateway readiness payload is not ok=true/gateway=alive/execution=ready" in failures
 
 
 def test_runtime_checkpoint_rejects_untrusted_or_nonterminal_journals():
