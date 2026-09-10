@@ -82,6 +82,47 @@ def _stop(server, thread):
     thread.join(timeout=2)
 
 
+def _committed_upload(paths, content=b"kit"):
+    created = service.create_upload(paths, size=len(content), sha256=hashlib.sha256(content).hexdigest())
+    upload_id = created["upload_id"]
+    service.append_chunk(
+        paths,
+        upload_id,
+        offset=0,
+        data_base64=base64.b64encode(content).decode(),
+        sha256=hashlib.sha256(content).hexdigest(),
+    )
+    service.commit_upload(paths, upload_id)
+    return upload_id
+
+
+def _deployment_body(upload_id: str):
+    return {
+        "upload_id": upload_id,
+        "gateway_host": "192.168.2.99",
+        "ppu_id": "ppu-01",
+        "facility_id": "lab",
+        "display_name": "PPU 01",
+    }
+
+
+def _write_api_record(paths, *, upload_id: str, state: str, mode=0o600):
+    record = {
+        "schema_version": 1,
+        "transaction_id": "tx-old",
+        "state": state,
+        "upload_id": upload_id,
+        "started_at_epoch_s": 10.0,
+        "updated_at_epoch_s": 11.0,
+        "error_code": None,
+        "error": None,
+        "result": None,
+    }
+    service._atomic_json(paths.deployment_record, record)
+    paths.deployment_record.chmod(mode)
+    return record
+
+
 def test_token_provisioning_is_local_and_mode_0600(tmp_path: Path):
     token_file = tmp_path / "state" / "control-token"
     token = service.provision_token(token_file, token="x" * 40)
@@ -265,13 +306,7 @@ def test_deployment_is_async_single_flight_and_pollable(tmp_path: Path):
             token=token,
             body={"action": "commit"},
         )
-        request = {
-            "upload_id": uid,
-            "gateway_host": "192.168.2.99",
-            "ppu_id": "ppu-01",
-            "facility_id": "lab",
-            "display_name": "PPU 01",
-        }
+        request = _deployment_body(uid)
         status, payload = _request(
             f"{base_url}/v1/deployments",
             method="POST",
@@ -306,3 +341,64 @@ def test_deployment_is_async_single_flight_and_pollable(tmp_path: Path):
     finally:
         release.set()
         _stop(server, thread)
+
+
+def test_restart_promotes_inflight_api_record_to_recovery_required(tmp_path: Path):
+    paths = _paths(tmp_path)
+    upload_id = _committed_upload(paths)
+    _write_api_record(paths, upload_id=upload_id, state="running")
+
+    server = service.BootstrapHTTPServer(
+        ("127.0.0.1", 0),
+        paths=paths,
+        base_module=base,
+        deployment_runner=lambda *_args: {"result": "PASS"},
+    )
+    try:
+        recovered = service._deployment_api_record(paths)
+        assert recovered is not None
+        assert recovered["transaction_id"] == "tx-old"
+        assert recovered["upload_id"] == upload_id
+        assert recovered["state"] == "recovery_required"
+        assert recovered["error_code"] == "interrupted_service_restart"
+        assert "running" in recovered["error"]
+        assert recovered["result"] is None
+        assert paths.deployment_record.stat().st_mode & 0o077 == 0
+    finally:
+        server.server_close()
+
+
+def test_restart_recovery_blocks_new_deployment_without_overwriting_evidence(tmp_path: Path):
+    paths = _paths(tmp_path)
+    upload_id = _committed_upload(paths)
+    _write_api_record(paths, upload_id=upload_id, state="queued")
+    server = service.BootstrapHTTPServer(
+        ("127.0.0.1", 0),
+        paths=paths,
+        base_module=base,
+        deployment_runner=lambda *_args: {"result": "PASS"},
+    )
+    try:
+        before = paths.deployment_record.read_text(encoding="utf-8")
+        with pytest.raises(service.BootstrapServiceError, match="requires explicit recovery"):
+            server.start_deployment(_deployment_body(upload_id))
+        after = paths.deployment_record.read_text(encoding="utf-8")
+        assert after == before
+        record = json.loads(after)
+        assert record["state"] == "recovery_required"
+        assert record["transaction_id"] == "tx-old"
+    finally:
+        server.server_close()
+
+
+def test_invalid_or_overpermissive_api_record_prevents_service_start(tmp_path: Path):
+    paths = _paths(tmp_path)
+    upload_id = "a" * 32
+    _write_api_record(paths, upload_id=upload_id, state="succeeded", mode=0o644)
+    with pytest.raises(service.BootstrapServiceError, match="permissions are too broad"):
+        service.BootstrapHTTPServer(("127.0.0.1", 0), paths=paths, base_module=base)
+
+    paths.deployment_record.chmod(0o600)
+    paths.deployment_record.write_text("not-json\n", encoding="utf-8")
+    with pytest.raises(service.BootstrapServiceError, match="cannot read bootstrap state"):
+        service.BootstrapHTTPServer(("127.0.0.1", 0), paths=paths, base_module=base)
