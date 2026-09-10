@@ -20,6 +20,7 @@ on:
       - "software/web/app/engineering/page.tsx"
       - "software/web/e2e/playwright.ppu-bootstrap.config.ts"
       - "software/web/e2e/tests/ppu-runtime-deployment-real-stack.spec.ts"
+      - "software/web/e2e/tests/ppu-runtime-deployment.spec.ts"
       - "software/web/e2e/package.json"
       - "software/web/e2e/package-lock.json"
   push:
@@ -42,6 +43,7 @@ on:
       - "software/web/app/engineering/page.tsx"
       - "software/web/e2e/playwright.ppu-bootstrap.config.ts"
       - "software/web/e2e/tests/ppu-runtime-deployment-real-stack.spec.ts"
+      - "software/web/e2e/tests/ppu-runtime-deployment.spec.ts"
       - "software/web/e2e/package.json"
       - "software/web/e2e/package-lock.json"
   workflow_dispatch:
