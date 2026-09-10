@@ -11,6 +11,11 @@ on:
       - "scripts/ppu-z2-installer.py"
       - "scripts/plasmactl-z2-ps"
       - "scripts/z2-python-runtime.py"
+      - "software/python/pyproject.toml"
+      - "software/python/plasma_manager/bootstrap.py"
+      - "software/python/plasma_manager/server_bootstrap.py"
+      - "software/python/tests/test_manager_bootstrap.py"
+      - "software/python/tests/test_manager_bootstrap_rest.py"
       - "software/python/tests/test_ppu_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_service.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
@@ -26,6 +31,11 @@ on:
       - "scripts/ppu-z2-installer.py"
       - "scripts/plasmactl-z2-ps"
       - "scripts/z2-python-runtime.py"
+      - "software/python/pyproject.toml"
+      - "software/python/plasma_manager/bootstrap.py"
+      - "software/python/plasma_manager/server_bootstrap.py"
+      - "software/python/tests/test_manager_bootstrap.py"
+      - "software/python/tests/test_manager_bootstrap_rest.py"
       - "software/python/tests/test_ppu_bootstrap.py"
       - "software/python/tests/test_ppu_bootstrap_service.py"
       - "software/python/tests/test_ppu_bootstrap_deployment.py"
@@ -39,7 +49,7 @@ permissions:
   contents: read
 
 jobs:
-  bootstrap:
+  bootstrap-scripts:
     strategy:
       fail-fast: false
       matrix:
@@ -59,10 +69,29 @@ jobs:
           scripts/ppu-bootstrap-kit.py
       - name: Install test runner
         run: python -m pip install pytest
-      - name: Run bootstrap contract regressions
+      - name: Run factory Bootstrap contract regressions
         run: >-
           python -m pytest -q
           software/python/tests/test_ppu_bootstrap.py
           software/python/tests/test_ppu_bootstrap_service.py
           software/python/tests/test_ppu_bootstrap_deployment.py
           software/python/tests/test_ppu_bootstrap_kit.py
+
+  manager-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Manager package and tests
+        run: python -m pip install "./software/python[dev]"
+      - name: Run Manager Bootstrap policy and REST regressions
+        run: >-
+          python -m pytest -q
+          software/python/tests/test_manager_bootstrap.py
+          software/python/tests/test_manager_bootstrap_rest.py
+      - name: Prove production Manager entrypoint owns Bootstrap routes
+        run: >-
+          python -c
+          'import importlib.metadata as m; assert m.entry_points(group="console_scripts", name="plasma-manager")[0].value == "plasma_manager.server_bootstrap:main"'
