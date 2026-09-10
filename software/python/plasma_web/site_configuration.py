@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import tempfile
 import threading
 from dataclasses import replace
@@ -197,6 +198,10 @@ class SiteConfigurationController:
 
     def _write_atomic(self, document: dict[str, Any]) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            canonical_mode = stat.S_IMODE(self._path.stat().st_mode)
+        except OSError as exc:
+            raise _config_error(f"cannot stat canonical PPU configuration: {self._path.name}") from exc
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{self._path.name}.",
             suffix=".tmp",
@@ -207,6 +212,7 @@ class SiteConfigurationController:
             with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
                 handle.write(yaml.safe_dump(document, sort_keys=False))
                 handle.flush()
+                os.fchmod(handle.fileno(), canonical_mode)
                 os.fsync(handle.fileno())
             # Validate exactly what is about to replace the canonical configuration.
             load_config(temporary)
