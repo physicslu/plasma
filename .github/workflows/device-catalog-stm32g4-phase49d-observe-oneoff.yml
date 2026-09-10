@@ -1,0 +1,67 @@
+name: STM32G4 Phase 4.9D routing observation one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32g4-phase49d-admission
+    paths:
+      - ".github/workflows/device-catalog-stm32g4-phase49d-observe-oneoff.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  observe-current-routing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay closed Phase 4.9C policy and observe exact-ICPN mappings
+        run: |
+          cd data/device-catalog/research
+          python stm32g4_phase4_9c_policy.py
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          from stm32g4_foundation import TARGET_CONFIG, read_catalog
+          from stm32g4_phase4_9b_discovery import resolve_mapping
+
+          baseline = json.loads(Path('stm32g4-phase4.9c-policy-baseline.json').read_text())
+          assert baseline['phase'] == '4.9C'
+          assert baseline['candidate_count'] == 25
+          assert baseline['decision_counts'] == {'metadata_ready': 25, 'manual_review_required': 0, 'reject': 0}
+          assert baseline['production_snapshot']['exact_icpn_count'] == 610
+          assert baseline['production_snapshot']['stm32g4_exact_icpn_count'] == 0
+
+          catalog = read_catalog()
+          observations = []
+          for icpn in baseline['policy_ready_exact_icpns']:
+              mapping = resolve_mapping(icpn, catalog)
+              observations.append({'icpn': icpn, **mapping})
+
+          counts = Counter(o['status'] for o in observations)
+          strict_unique = [o for o in observations if (
+              o.get('status') == 'unique'
+              and o.get('match_count') == 1
+              and o.get('identifier_kind') == 'ordering_pattern'
+              and o.get('target_configs') == [TARGET_CONFIG]
+              and isinstance(o.get('existing_identifier'), str)
+              and o.get('existing_identifier')
+          )]
+          unresolved = [o for o in observations if o not in strict_unique]
+          print(json.dumps({
+              'candidate_count': len(observations),
+              'status_counts': dict(sorted(counts.items())),
+              'strict_unique_count': len(strict_unique),
+              'strict_unique_icpns': [o['icpn'] for o in strict_unique],
+              'unresolved_count': len(unresolved),
+              'unresolved': unresolved,
+              'observations': observations,
+              'required_target_config': TARGET_CONFIG,
+          }, indent=2, sort_keys=True))
+          assert len(observations) == 25
+          PY
