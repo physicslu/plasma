@@ -12,7 +12,8 @@ def test_swpc_surrogate_mirrors_z2_ps_ownership_without_claiming_z2_equivalence(
     assert "/opt/plasma/python/<version>/bin/python3" in text
     assert "/opt/plasma/releases/${release_id}" in text
     assert "/opt/plasma/current" in text
-    assert "/etc/plasma/ppu.yaml" in text
+    assert 'config_root="/etc/plasma"' in text
+    assert 'config_path="$config_root/ppu.yaml"' in text
     assert "/etc/systemd/system/plasma-server.service" in text
     assert "/etc/systemd/system/plasma-web.service" in text
     assert 'model: "SWPC-Z2-SURROGATE"' in text
@@ -23,7 +24,7 @@ def test_swpc_surrogate_mirrors_z2_ps_ownership_without_claiming_z2_equivalence(
 
 def test_swpc_surrogate_keeps_gateway_private_and_public_ingress_allowlisted() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
-    assert "gateway --host 127.0.0.1 --port 18080" in text
+    assert "gateway --ppu-config $config_path --host 127.0.0.1 --port 18080" in text
     assert "listen 127.0.0.1:$proxy_port" in text
     assert "location = /api/health/live" in text
     assert "location = /api/health/ready" in text
@@ -33,6 +34,16 @@ def test_swpc_surrogate_keeps_gateway_private_and_public_ingress_allowlisted() -
     assert "location / { return 404; }" in text
     assert "proxy_set_header Host \\$host;" in text
     assert "--engineering-mock" not in text
+
+
+def test_swpc_surrogate_site_config_write_boundary_is_gateway_only() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert 'install -d -m 0770 -o root -g plasma "$config_root"' in text
+    assert 'chmod 0640 "$config_path"' in text
+    assert 'chown plasma:plasma "$config_path"' in text
+    assert "ReadWritePaths=$state_root $log_root $config_root" in text
+    assert "ReadWritePaths=$state_root $log_root\n" in text
+    assert '"runtime_apply_supported": false' in text
 
 
 def test_swpc_surrogate_requires_clean_source_and_isolated_final_python() -> None:

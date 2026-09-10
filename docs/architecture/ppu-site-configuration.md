@@ -1,6 +1,6 @@
 # PPU Site Configuration
 
-Status: Phase 1 writable desired-state contract plus P1 optimistic concurrency implemented in software; SWPC/CI acceptance required; physical Z2, PL, electrical, and real-IC behavior are separate qualification stages.
+Status: Phase 1 writable desired-state contract, P1 optimistic concurrency, and P2 packaged-service persistence wiring implemented in software; physical Z2, PL, electrical, and real-IC behavior remain separate qualification stages.
 
 ## Purpose
 
@@ -15,6 +15,8 @@ target
 ```
 
 P1 adds per-Site optimistic concurrency so a stale Browser Draft cannot silently overwrite a newer saved Desired state.
+
+P2 closes the packaged-service path so Plasma Server and Plasma Gateway use the same explicit canonical PPU configuration and the Gateway has the minimum deployment write boundary required by atomic persistence.
 
 The design intentionally does not introduce a second Site schema or a Browser-side settings database.
 
@@ -172,18 +174,51 @@ build and validate candidate PlasmaConfig
   ↓
 modify only selected Site writable fields
   ↓
-write temporary YAML
+write temporary YAML in the canonical directory
   ↓
-flush + fsync
+flush + preserve canonical file mode + fsync
   ↓
 load_config(temporary file) validation
   ↓
 os.replace(temporary, canonical)
 ```
 
-A failed validation, stale revision, or failed persistence operation must not replace the canonical configuration.
+A failed validation, stale revision, or failed persistence operation must not replace the canonical configuration. Atomic replacement preserves the canonical file mode rather than silently falling back to the temporary file's default mode.
 
 One deployed Plasma Gateway process is assumed to own writes to a PPU configuration file. Cross-process concurrent writers are not a supported deployment model; P1 protects concurrent clients going through that authoritative Gateway process.
+
+## P2 packaged-service operational closure
+
+For system PPU deployments the canonical configuration path is explicit and shared:
+
+```text
+/etc/plasma/ppu.yaml
+```
+
+Both service command lines bind that same path:
+
+```text
+plasma-server.service -> server --config /etc/plasma/ppu.yaml
+plasma-web.service    -> gateway --ppu-config /etc/plasma/ppu.yaml
+```
+
+The Gateway must create a temporary file in the same directory before `os.replace`, so file-only write permission is insufficient. P2 keeps `ProtectSystem=strict` and opens only the managed Plasma configuration root to `plasma-web.service`:
+
+```text
+/etc/plasma           root:plasma 0770
+/etc/plasma/ppu.yaml  plasma:plasma 0640
+
+plasma-server.service ReadWritePaths -> state + log only
+plasma-web.service    ReadWritePaths -> state + log + /etc/plasma
+```
+
+This is the smallest write boundary compatible with the existing single-directory canonical path and same-filesystem atomic replacement. It does not make `/etc` writable, does not grant the Plasma Server configuration-write capability, and does not create a privileged generic configuration service.
+
+The Z2 installer snapshots pre-existing configuration-directory metadata before migration. If service activation/readiness fails, rollback restores the previous release, configuration, units, and the previous configuration-directory mode/ownership. The SWPC Z2-like deployment surrogate carries the same operational contract and snapshots/restores its configuration-directory metadata during failed upgrade rollback.
+
+The SWPC restricted Nginx ingress deliberately continues to return 404 for `/api/settings/sites`; P2 does not expose a new public configuration-write surface. Manager-to-PPU Site settings must use an explicitly registered/reachable Plasma Gateway path appropriate to the deployment security model.
+
+P2 is persistence wiring only. It does not restart Plasma Server after a save, hot-apply configuration, or prove that Runtime now matches Desired.
 
 ## Active-execution write gate
 
@@ -199,7 +234,7 @@ This deliberately uses a PPU-wide write gate in Phase 1. Per-Site configuration 
 
 Saving desired configuration does **not** mean the running Plasma Server has applied it.
 
-Phase 1 intentionally does not restart Plasma Server from inside the HTTP request and does not extend Protocol v3.3 with a hidden hot-reconfiguration command.
+Phase 1/P1/P2 intentionally do not restart Plasma Server from inside the HTTP request and do not extend Protocol v3.3 with a hidden hot-reconfiguration command.
 
 The GET/write response therefore carries both domains:
 
@@ -303,7 +338,7 @@ If Save returns HTTP 412, the UI keeps the local Draft, marks `Desired changed e
 
 Writes are disabled in the UI when the PPU is not commissioned or when Fleet state reports active execution. This is operator guidance only; the PPU-local Gateway independently enforces the authoritative busy and concurrency gates.
 
-## Phase 1/P1 non-goals
+## Phase 1/P1/P2 non-goals
 
 The current contract does not provide:
 
@@ -314,13 +349,14 @@ The current contract does not provide:
 - voltage/current/clock/reset/pinmux settings;
 - automatic driver generation;
 - proof that a target identifier is physically programmable;
+- public exposure of Site settings through the SWPC restricted ingress;
 - Z2/PL/electrical/real-IC qualification.
 
 These omissions are intentional boundaries, not implied support.
 
 ## Acceptance criteria
 
-Software acceptance must cover at least:
+Software/deployment-contract acceptance must cover at least:
 
 1. desired configuration read from canonical PPU config;
 2. exact-field authoritative validation;
@@ -340,6 +376,12 @@ Software acceptance must cover at least:
 16. stale `If-Match` returns HTTP 412 and leaves canonical configuration unchanged;
 17. changing one Site does not invalidate unchanged sibling-Site revisions;
 18. BFF and Manager forward `If-Match` through explicit header allowlists only;
-19. the Browser preserves the dirty baseline revision and surfaces a stale-write conflict instead of silently overwriting newer Desired state.
+19. the Browser preserves the dirty baseline revision and surfaces a stale-write conflict instead of silently overwriting newer Desired state;
+20. packaged Server and Gateway bind one explicit canonical PPU config path;
+21. packaged Gateway has the bounded config-directory write path required for atomic persistence while Server does not;
+22. canonical file mode survives Site Desired atomic replacement;
+23. failed Z2 activation restores prior config-directory metadata in addition to prior release/config/units;
+24. SWPC Z2-like install/deploy uses the same config-path and permission model and restores directory metadata on failed upgrade;
+25. restricted SWPC ingress remains closed to Site settings.
 
-Passing these software checks does not prove physical Z2 networking, PS↔PL integration, FPGA timing/isolation, or real IC programming.
+Passing these software and deployment-contract checks does not prove physical Z2 networking, PS↔PL integration, FPGA timing/isolation, socket/electrical behavior, or real IC programming.

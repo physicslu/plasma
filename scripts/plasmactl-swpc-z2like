@@ -14,7 +14,8 @@ nginx_conf="${PLASMA_SWPC_Z2LIKE_NGINX_CONF:-/etc/nginx/conf.d/plasma-swpc-z2lik
 nginx_marker="# Managed by Plasma SWPC Z2-like lab installer"
 server_unit="/etc/systemd/system/plasma-server.service"
 gateway_unit="/etc/systemd/system/plasma-web.service"
-ppu_config="/etc/plasma/ppu.yaml"
+config_root="/etc/plasma"
+ppu_config="$config_root/ppu.yaml"
 current_link="/opt/plasma/current"
 release_root="/opt/plasma/releases"
 
@@ -165,6 +166,21 @@ require_managed_installation() {
     die "install evidence/current release mismatch: evidence=$expected_current current=$observed_current"
 }
 
+verify_site_desired_operational_contract() {
+  require_command stat
+  [[ "$(stat -c '%a' "$config_root")" == "770" ]] || die "PPU config root must be mode 0770"
+  [[ "$(stat -c '%U:%G' "$config_root")" == "root:plasma" ]] || die "PPU config root must be owned root:plasma"
+  [[ "$(stat -c '%a' "$ppu_config")" == "640" ]] || die "PPU config must be mode 0640"
+  [[ "$(stat -c '%U:%G' "$ppu_config")" == "plasma:plasma" ]] || die "PPU config must be owned plasma:plasma"
+  grep -Fq "server --config $ppu_config" "$server_unit" || die "Plasma Server is not bound to canonical PPU config"
+  grep -Fq "gateway --ppu-config $ppu_config" "$gateway_unit" || die "Plasma Gateway is not bound to canonical PPU config"
+  grep -Fq "ReadWritePaths=/var/lib/plasma /var/log/plasma $config_root" "$gateway_unit" || \
+    die "Plasma Gateway does not have the bounded canonical config write root"
+  if grep -F 'ReadWritePaths=' "$server_unit" | grep -Fq "$config_root"; then
+    die "Plasma Server must not receive canonical config write access"
+  fi
+}
+
 require_clean_first_install_boundary() {
   local artifact
   for artifact in "$current_link" "$ppu_config" "$server_unit" "$gateway_unit" "$nginx_conf"; do
@@ -218,6 +234,7 @@ verify_profile() {
   require_command systemctl
   validate_identity
   require_managed_installation
+  verify_site_desired_operational_contract
 
   systemctl is-active --quiet plasma-server.service || die "plasma-server.service is not active"
   systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
@@ -241,7 +258,7 @@ verify_profile() {
     "http://127.0.0.1:$proxy_port/api/engineering/diagnostics/loopback")"
   verify_loopback_json <<<"$loopback"
 
-  say "PASS: local PS-only surrogate is ready and restricted ingress remains closed"
+  say "PASS: local PS-only surrogate is ready and Site desired-state service wiring is coherent"
   say "qualification boundary: x86_64 SWPC PS surrogate only; no Z2/ARMv7/PL/FPGA/Site/IC claim"
 }
 
@@ -290,8 +307,14 @@ run_installer() {
     --proxy-port "$proxy_port"
 }
 
+restore_config_root_metadata() {
+  local mode="$1" uid="$2" gid="$3"
+  chown "$uid:$gid" "$config_root"
+  chmod "$mode" "$config_root"
+}
+
 cleanup_failed_first_install() {
-  local target_release="$1"
+  local target_release="$1" config_root_existed="$2" config_root_mode="$3" config_root_uid="$4" config_root_gid="$5"
   say "first install failed; removing only artifacts created inside the clean SWPC Z2-like boundary"
   set +e
   systemctl stop plasma-web.service plasma-server.service >/dev/null 2>&1
@@ -300,6 +323,11 @@ cleanup_failed_first_install() {
   fi
   [[ -f "$nginx_conf" ]] && grep -Fxq "$nginx_marker" "$nginx_conf" && rm -f "$nginx_conf"
   rm -f "$server_unit" "$gateway_unit" "$ppu_config" "$evidence"
+  if [[ "$config_root_existed" == "1" && -d "$config_root" ]]; then
+    restore_config_root_metadata "$config_root_mode" "$config_root_uid" "$config_root_gid" >/dev/null 2>&1 || true
+  elif [[ "$config_root_existed" == "0" ]]; then
+    rmdir "$config_root" >/dev/null 2>&1 || true
+  fi
   if [[ "$target_release" == "$release_root/"* && "$target_release" != "$release_root/" ]]; then
     rm -rf --one-file-system "$target_release"
   fi
@@ -314,12 +342,20 @@ install_profile() {
   require_root install
   require_command git
   require_command python3
+  require_command stat
   validate_identity
   require_clean_source
   [[ ! -f "$evidence" ]] || die "SWPC Z2-like is already installed; use 'plasmactl deploy swpc-z2like'"
   require_clean_first_install_boundary
 
   local plasma_python current_sha target_release install_complete=0
+  local config_root_existed=0 config_root_mode="" config_root_uid="" config_root_gid=""
+  if [[ -e "$config_root" || -L "$config_root" ]]; then
+    [[ -d "$config_root" && ! -L "$config_root" ]] || die "managed config root must be a regular directory: $config_root"
+    config_root_existed=1
+    read -r config_root_mode config_root_uid config_root_gid < <(stat -c '%a %u %g' "$config_root")
+  fi
+
   plasma_python="$(resolve_plasma_python)"
   current_sha="$(git -C "$repo_root" rev-parse HEAD)"
   target_release="$(release_dir_for_sha "$current_sha")"
@@ -332,7 +368,7 @@ install_profile() {
     local rc=$?
     trap - EXIT
     if (( rc != 0 && ! install_complete )); then
-      cleanup_failed_first_install "$target_release"
+      cleanup_failed_first_install "$target_release" "$config_root_existed" "$config_root_mode" "$config_root_uid" "$config_root_gid"
     fi
     exit "$rc"
   }
@@ -358,6 +394,7 @@ deploy_profile() {
   require_command python3
   require_command systemctl
   require_command nginx
+  require_command stat
   validate_identity
   require_clean_source
 
@@ -393,10 +430,11 @@ deploy_profile() {
   cp -a "$ppu_config" "$snapshot/ppu.yaml"
   cp -a "$nginx_conf" "$snapshot/nginx.conf"
   cp -a "$evidence" "$snapshot/install.json"
+  stat -c '%a %u %g' "$config_root" >"$snapshot/config-root.stat"
   rollback_required=1
 
   rollback() {
-    local rollback_failed=0
+    local rollback_failed=0 mode uid gid
     say "deployment failed; restoring previous qualified SWPC Z2-like activation"
     set +e
     systemctl stop plasma-web.service plasma-server.service >/dev/null 2>&1
@@ -407,6 +445,8 @@ deploy_profile() {
     restore_file "$snapshot/ppu.yaml" "$ppu_config" || rollback_failed=1
     restore_file "$snapshot/nginx.conf" "$nginx_conf" || rollback_failed=1
     restore_file "$snapshot/install.json" "$evidence" || rollback_failed=1
+    read -r mode uid gid <"$snapshot/config-root.stat"
+    restore_config_root_metadata "$mode" "$uid" "$gid" || rollback_failed=1
     if [[ "$target_release" == "$release_root/"* && "$target_release" != "$release_root/" && "$target_release" != "$previous_current" ]]; then
       rm -rf --one-file-system "$target_release" || rollback_failed=1
     else
