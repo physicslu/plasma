@@ -28,6 +28,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
 TERMINAL_STATES = {"runtime_active", "rolled_back", "recovery_required", "verify_failed"}
+SAFE_RESTART_STATES = {"runtime_active", "rolled_back", "verify_failed"}
 
 
 class DeploymentError(RuntimeError):
@@ -84,6 +85,31 @@ class Journal:
         self.path = path
         self.clock = clock
 
+    def read(self) -> DeploymentRecord | None:
+        if not self.path.exists():
+            return None
+        try:
+            mode = self.path.stat().st_mode & 0o777
+            if mode & 0o077:
+                raise DeploymentError(
+                    f"deployment journal permissions are too broad: {oct(mode)}"
+                )
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                raise DeploymentError("deployment journal must contain a JSON object")
+            record = DeploymentRecord(**payload)
+        except DeploymentError:
+            raise
+        except (OSError, json.JSONDecodeError, TypeError) as exc:
+            raise DeploymentError(f"deployment journal is unreadable: {exc}") from exc
+        if record.schema_version != SCHEMA_VERSION:
+            raise DeploymentError(
+                f"unsupported deployment journal schema: {record.schema_version}"
+            )
+        if not record.transaction_id or record.sequence < 1:
+            raise DeploymentError("deployment journal identity/sequence is invalid")
+        return record
+
     def write(self, record: DeploymentRecord, state: str, **updates: Any) -> None:
         record.sequence += 1
         record.state = state
@@ -94,9 +120,22 @@ class Journal:
             setattr(record, key, value)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_name(self.path.name + ".new")
-        temporary.write_text(json.dumps(asdict(record), indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        temporary.chmod(0o600)
+        payload = json.dumps(asdict(record), indent=2, sort_keys=True) + "\n"
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", closefd=False) as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+        finally:
+            os.close(fd)
+        os.chmod(temporary, 0o600)
         os.replace(temporary, self.path)
+        directory_fd = os.open(self.path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
 
 
 class DeploymentCoordinator:
@@ -123,13 +162,37 @@ class DeploymentCoordinator:
             systemd_root=self.paths.systemd_root,
         )
 
+    def _admit_previous_transaction(self) -> None:
+        previous = self.journal.read()
+        if previous is None or previous.state in SAFE_RESTART_STATES:
+            return
+        if previous.state == "recovery_required":
+            raise DeploymentError(
+                "previous deployment requires recovery before another transaction may start"
+            )
+        interrupted_state = previous.state
+        self.journal.write(
+            previous,
+            "recovery_required",
+            error_code="interrupted_transaction",
+            error_message=(
+                "previous deployment ended without a terminal result while in state "
+                f"{interrupted_state}; inspect active release/service state before recovery"
+            ),
+        )
+        raise DeploymentError(
+            f"previous deployment transaction was interrupted in state {interrupted_state}; recovery is required"
+        )
+
     def execute(self, request: DeploymentRequest) -> Mapping[str, Any]:
         self.paths.bootstrap_state_root.mkdir(parents=True, exist_ok=True)
         with self.paths.lock.open("a+b") as lock_stream:
+            os.chmod(self.paths.lock, 0o600)
             try:
                 fcntl.flock(lock_stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as exc:
                 raise DeploymentError("another PPU deployment transaction is active") from exc
+            self._admit_previous_transaction()
             return self._execute_locked(request)
 
     def _execute_locked(self, request: DeploymentRequest) -> Mapping[str, Any]:
