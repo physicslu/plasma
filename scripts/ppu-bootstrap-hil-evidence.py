@@ -213,8 +213,12 @@ def evaluate_snapshot(snapshot: Mapping[str, Any]) -> list[str]:
     if gateway_probe.get("status") != 200:
         failures.append("Gateway /api/health/ready is not HTTP 200")
     gateway = _payload(gateway_probe)
-    if gateway.get("gateway") != "alive" or gateway.get("execution") != "ready":
-        failures.append("Gateway readiness payload is not gateway=alive/execution=ready")
+    if (
+        gateway.get("ok") is not True
+        or gateway.get("gateway") != "alive"
+        or gateway.get("execution") != "ready"
+    ):
+        failures.append("Gateway readiness payload is not ok=true/gateway=alive/execution=ready")
 
     if phase in {"runtime-active", "runtime-after-reboot"}:
         if not isinstance(engine, dict) or engine.get("trusted") is not True:
