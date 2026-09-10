@@ -1,0 +1,47 @@
+name: STM32G4 Phase 4.9B final replay one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32g4-phase49b-discovery
+    paths:
+      - ".github/workflows/device-catalog-stm32g4-phase49b-final-replay-oneoff.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  replay-stm32g4:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay STM32G4 Phase 4.9A and 4.9B contracts
+        run: |
+          python data/device-catalog/research/test_stm32g4_phase4_9a_foundation.py
+          python data/device-catalog/research/test_stm32g4_dual_surface_evidence.py
+          python data/device-catalog/research/test_stm32g4_phase4_9b_discovery.py
+          python data/device-catalog/research/validate_stm32g4_phase4_9b_retained_evidence.py
+      - name: Assert Production remains unchanged by Phase 4.9B
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/device-catalog/production/icpn-v1-manifest.json')
+          data=json.loads(p.read_text())
+          counts={x['family']:x['row_count'] for x in data['sources']}
+          assert counts == {
+              'STM32F0':42,'STM32F1':75,'STM32F2':33,'STM32F3':10,
+              'STM32F4':384,'STM32F7':19,'STM32G0':47,
+          }, counts
+          assert sum(counts.values()) == 610
+          assert 'STM32G4' not in counts
+          print('Production prestate unchanged: 610 exact ICPNs; STM32G4 absent')
+          PY
+      - name: Report retained hard-lock digests
+        run: |
+          sha256sum data/device-catalog/research/stm32g4-phase4.9b-discovery-baseline.json
+          sha256sum data/device-catalog/research/evidence/stm32g4-phase4.9b-official-st-discovery-live-2026-09-10/{README.md,pilot-summary.json,provenance.json,manifest.json}
