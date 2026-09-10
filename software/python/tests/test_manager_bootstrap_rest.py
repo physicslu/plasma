@@ -14,15 +14,30 @@ from plasma_manager.server_bootstrap import BootstrapPlasmaManagerHandler
 
 
 class FakePoller:
-    def __init__(self, *, active: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        active: bool = False,
+        observation_state: str = "current",
+        include_ppu: bool = True,
+        identity_conflict: bool = False,
+        errors: list[str] | None = None,
+    ) -> None:
         self.active = active
+        self.observation_state = observation_state
+        self.include_ppu = include_ppu
+        self.identity_conflict = identity_conflict
+        self.errors = [] if errors is None else errors
 
     def snapshot(self):
-        return {
-            "ok": True,
-            "ppus": [
+        ppus = []
+        if self.include_ppu:
+            ppus.append(
                 {
                     "alias": "z2",
+                    "observation": {"state": self.observation_state},
+                    "identity_conflict": self.identity_conflict,
+                    "errors": self.errors,
                     "sites": [
                         {
                             "state": "running" if self.active else "ready",
@@ -30,8 +45,8 @@ class FakePoller:
                         }
                     ],
                 }
-            ],
-        }
+            )
+        return {"ok": True, "ppus": ppus}
 
 
 class FakeBootstrapCoordinator:
@@ -133,12 +148,49 @@ class ManagerBootstrapRestTests(unittest.TestCase):
         self.assertTrue(payload["pairing"]["paired"])
         self.assertEqual(self.coordinator.calls[-1], ("pair", "z2", token))
 
-    def test_commissioned_ppu_must_be_disabled_before_repairing(self) -> None:
+    def test_commissioned_ppu_requires_disable_before_any_runtime_maintenance(self) -> None:
         self.registry.set_lifecycle("z2", "commissioned")
-        status, payload = self.request("POST", "/api/registry/z2/bootstrap/pair", {"token": "t" * 40})
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/uploads",
+            {"size": 3, "sha256": "0" * 64},
+        )
         self.assertEqual(status, 409)
-        self.assertEqual(payload["error"]["code"], "bootstrap_operation_rejected")
+        self.assertEqual(payload["error"]["code"], "ppu_maintenance_required")
         self.assertEqual(self.coordinator.calls, [])
+
+    def test_disabled_ppu_requires_current_trusted_idle_observation(self) -> None:
+        self.registry.set_lifecycle("z2", "disabled")
+        cases = [
+            FakePoller(include_ppu=False),
+            FakePoller(observation_state="stale"),
+            FakePoller(identity_conflict=True),
+            FakePoller(errors=["gateway_unreachable"]),
+            FakePoller(active=True),
+        ]
+        for poller in cases:
+            with self.subTest(poller=poller.__dict__):
+                BootstrapPlasmaManagerHandler.poller = poller
+                status, payload = self.request(
+                    "POST",
+                    "/api/registry/z2/bootstrap/uploads",
+                    {"size": 3, "sha256": "0" * 64},
+                )
+                self.assertEqual(status, 409)
+                self.assertIn(payload["error"]["code"], {"ppu_idle_state_unproven", "ppu_busy"})
+                self.assertEqual(self.coordinator.calls, [])
+
+    def test_disabled_ppu_with_current_trusted_idle_observation_can_upgrade(self) -> None:
+        self.registry.set_lifecycle("z2", "disabled")
+        BootstrapPlasmaManagerHandler.poller = FakePoller()
+        status, payload = self.request(
+            "POST",
+            "/api/registry/z2/bootstrap/uploads",
+            {"size": 3, "sha256": "0" * 64},
+        )
+        self.assertEqual(status, 201)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(self.coordinator.calls[-1][0], "create_upload")
 
     def test_upload_and_deployment_routes_are_explicit(self) -> None:
         status, _ = self.request(
@@ -177,7 +229,7 @@ class ManagerBootstrapRestTests(unittest.TestCase):
             ["create_upload", "append_chunk", "commit_upload", "start_deployment"],
         )
 
-    def test_active_execution_blocks_all_bootstrap_mutations(self) -> None:
+    def test_active_execution_blocks_pending_bootstrap_mutations(self) -> None:
         BootstrapPlasmaManagerHandler.poller = FakePoller(active=True)
         status, payload = self.request(
             "POST",
