@@ -1,0 +1,70 @@
+{
+  "claims": {
+    "canonical_dataset_admission": false,
+    "cmsis_alias_is_commercial_identity": false,
+    "exact_commercial_icpn_asserted": false,
+    "manufacturer_evidence_retained": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false
+  },
+  "cmsis_alias_counts": {
+    "STM32G411": 0,
+    "STM32G414": 0,
+    "STM32G431": 2,
+    "STM32G441": 0,
+    "STM32G471": 0,
+    "STM32G473": 2,
+    "STM32G474": 0,
+    "STM32G483": 0,
+    "STM32G484": 0,
+    "STM32G491": 2,
+    "STM32G4A1": 0
+  },
+  "cmsis_alias_row_count": 6,
+  "commercial_ordering_row_count": 177,
+  "family": "STM32G4",
+  "initial_targets": [
+    {"base_device": "STM32G411C6", "subfamily": "STM32G411"},
+    {"base_device": "STM32G414CB", "subfamily": "STM32G414"},
+    {"base_device": "STM32G431C6", "subfamily": "STM32G431"},
+    {"base_device": "STM32G441CB", "subfamily": "STM32G441"},
+    {"base_device": "STM32G471CC", "subfamily": "STM32G471"},
+    {"base_device": "STM32G473CB", "subfamily": "STM32G473"},
+    {"base_device": "STM32G474CB", "subfamily": "STM32G474"},
+    {"base_device": "STM32G483CE", "subfamily": "STM32G483"},
+    {"base_device": "STM32G484CE", "subfamily": "STM32G484"},
+    {"base_device": "STM32G491CC", "subfamily": "STM32G491"},
+    {"base_device": "STM32G4A1CE", "subfamily": "STM32G4A1"}
+  ],
+  "ordering_pattern_counts": {
+    "STM32G411": 22,
+    "STM32G414": 10,
+    "STM32G431": 25,
+    "STM32G441": 9,
+    "STM32G471": 17,
+    "STM32G473": 25,
+    "STM32G474": 25,
+    "STM32G483": 9,
+    "STM32G484": 9,
+    "STM32G491": 17,
+    "STM32G4A1": 9
+  },
+  "phase": "4.9A",
+  "schema_version": 1,
+  "source_row_count": 183,
+  "subfamily_counts": {
+    "STM32G411": 22,
+    "STM32G414": 10,
+    "STM32G431": 27,
+    "STM32G441": 9,
+    "STM32G471": 17,
+    "STM32G473": 27,
+    "STM32G474": 25,
+    "STM32G483": 9,
+    "STM32G484": 9,
+    "STM32G491": 19,
+    "STM32G4A1": 9
+  },
+  "target_config": "tcl/target/stm32g4x.cfg"
+}

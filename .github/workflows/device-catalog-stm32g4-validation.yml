@@ -1,0 +1,40 @@
+name: STM32G4 validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "data/device-catalog/research/stm32g4_*.py"
+      - "data/device-catalog/research/stm32g4-phase4.9a-foundation-baseline.json"
+      - "data/device-catalog/research/device-catalog-phase4.9a-stm32g4-foundation.md"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - ".github/workflows/device-catalog-stm32g4-validation.yml"
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32g4_*.py"
+      - "data/device-catalog/research/stm32g4-phase4.9a-foundation-baseline.json"
+      - "data/device-catalog/research/device-catalog-phase4.9a-stm32g4-foundation.md"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/production/icpn-v1-manifest.json"
+      - ".github/workflows/device-catalog-stm32g4-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stm32g4-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-stm32g4:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Phase 4.9A STM32G4 source surface and deterministic targets
+        run: python data/device-catalog/research/test_stm32g4_phase4_9a_foundation.py
