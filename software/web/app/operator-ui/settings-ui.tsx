@@ -1,4 +1,10 @@
 import type { ReactNode } from "react";
+import {
+  OperatorActions,
+  OperatorCard,
+  OperatorField,
+  OperatorMessage,
+} from "./operator-surface";
 import "./settings-ui.css";
 
 function joinClasses(...parts: Array<string | undefined | false>): string {
@@ -67,7 +73,7 @@ export function SettingsCard({
   className?: string;
 }) {
   return (
-    <section className={joinClasses("settingsCard", className)} aria-label={ariaLabel}>
+    <OperatorCard className={joinClasses("settingsCard", className)} ariaLabel={ariaLabel}>
       {(eyebrow || title || description) && (
         <header className="settingsCardHeader">
           {eyebrow && <small>{eyebrow}</small>}
@@ -76,7 +82,7 @@ export function SettingsCard({
         </header>
       )}
       {children}
-    </section>
+    </OperatorCard>
   );
 }
 
@@ -106,19 +112,20 @@ export function SettingsField({
   className?: string;
 }) {
   return (
-    <label className={joinClasses("settingsField", className)}>
-      <span>{label}</span>
-      <div className="settingsFieldControl">
-        {children}
-        {unit && <b>{unit}</b>}
-      </div>
-      {hint && <small>{hint}</small>}
-    </label>
+    <OperatorField
+      label={label}
+      hint={hint}
+      unit={unit}
+      className={joinClasses("settingsField", className)}
+      controlClassName="settingsFieldControl"
+    >
+      {children}
+    </OperatorField>
   );
 }
 
 export function SettingsActions({ children }: { children: ReactNode }) {
-  return <div className="settingsActions">{children}</div>;
+  return <OperatorActions className="settingsActions">{children}</OperatorActions>;
 }
 
 export function SettingsMessage({
@@ -130,7 +137,7 @@ export function SettingsMessage({
   children: ReactNode;
   role?: "alert" | "status";
 }) {
-  return <p className="settingsMessage" data-tone={tone} role={role}>{children}</p>;
+  return <OperatorMessage className="settingsMessage" tone={tone} role={role}>{children}</OperatorMessage>;
 }
 
 export function SettingsMetaGrid({
