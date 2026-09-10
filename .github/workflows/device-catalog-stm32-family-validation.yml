@@ -1,0 +1,122 @@
+name: STM32 family validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/device-catalog-family-ci.py"
+      - ".github/workflows/device-catalog-stm32-family-validation.yml"
+      - ".github/workflows/device-catalog-stm32f0-validation.yml"
+      - ".github/workflows/device-catalog-stm32f2-bounded-validation.yml"
+      - ".github/workflows/device-catalog-stm32f3-foundation-validation.yml"
+      - ".github/workflows/device-catalog-stm32f7-validation.yml"
+      - ".github/workflows/device-catalog-stm32g0-validation.yml"
+      - ".github/workflows/device-catalog-stm32g4-validation.yml"
+      - "data/device-catalog/production/**"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/research/device_catalog_*.py"
+      - "data/device-catalog/research/st_*.py"
+      - "data/device-catalog/research/test_st_*.py"
+      - "data/device-catalog/research/*stm32f0*"
+      - "data/device-catalog/research/*stm32f2*"
+      - "data/device-catalog/research/*stm32f3*"
+      - "data/device-catalog/research/*stm32f7*"
+      - "data/device-catalog/research/*stm32g0*"
+      - "data/device-catalog/research/*stm32g4*"
+      - "data/device-catalog/research/evidence/stm32f0*/**"
+      - "data/device-catalog/research/evidence/stm32f2*/**"
+      - "data/device-catalog/research/evidence/stm32f3*/**"
+      - "data/device-catalog/research/evidence/stm32f7*/**"
+      - "data/device-catalog/research/evidence/stm32g0*/**"
+      - "data/device-catalog/research/evidence/stm32g4*/**"
+  pull_request:
+    paths:
+      - "scripts/device-catalog-family-ci.py"
+      - ".github/workflows/device-catalog-stm32-family-validation.yml"
+      - ".github/workflows/device-catalog-stm32f0-validation.yml"
+      - ".github/workflows/device-catalog-stm32f2-bounded-validation.yml"
+      - ".github/workflows/device-catalog-stm32f3-foundation-validation.yml"
+      - ".github/workflows/device-catalog-stm32f7-validation.yml"
+      - ".github/workflows/device-catalog-stm32g0-validation.yml"
+      - ".github/workflows/device-catalog-stm32g4-validation.yml"
+      - "data/device-catalog/production/**"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - "data/device-catalog/research/device_catalog_*.py"
+      - "data/device-catalog/research/st_*.py"
+      - "data/device-catalog/research/test_st_*.py"
+      - "data/device-catalog/research/*stm32f0*"
+      - "data/device-catalog/research/*stm32f2*"
+      - "data/device-catalog/research/*stm32f3*"
+      - "data/device-catalog/research/*stm32f7*"
+      - "data/device-catalog/research/*stm32g0*"
+      - "data/device-catalog/research/*stm32g4*"
+      - "data/device-catalog/research/evidence/stm32f0*/**"
+      - "data/device-catalog/research/evidence/stm32f2*/**"
+      - "data/device-catalog/research/evidence/stm32f3*/**"
+      - "data/device-catalog/research/evidence/stm32f7*/**"
+      - "data/device-catalog/research/evidence/stm32g0*/**"
+      - "data/device-catalog/research/evidence/stm32g4*/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  detect-affected-families:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.detect.outputs.matrix }}
+      has-families: ${{ steps.detect.outputs.has-families }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate dispatcher invariants
+        run: python scripts/device-catalog-family-ci.py self-test
+      - name: Detect affected STM32 families
+        id: detect
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+            if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+              base="${GITHUB_SHA}^"
+            fi
+          fi
+
+          matrix="$(python scripts/device-catalog-family-ci.py detect --base "$base" --head "$GITHUB_SHA")"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+          count="$(python -c 'import json,sys; print(len(json.loads(sys.argv[1])["include"]))' "$matrix")"
+          if [[ "$count" -gt 0 ]]; then
+            echo "has-families=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-families=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Affected matrix: $matrix"
+
+  validate-family:
+    needs: detect-affected-families
+    if: needs.detect-affected-families.outputs.has-families == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect-affected-families.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate ${{ matrix.family }} deterministic family profile
+        run: python scripts/device-catalog-family-ci.py run --family "${{ matrix.family }}"
