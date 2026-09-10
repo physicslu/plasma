@@ -125,6 +125,35 @@ def _coordinator(tmp_path: Path, installer):
     )
 
 
+def _write_journal(tmp_path: Path, *, state: str, error_code=None, error_message=None, mode=0o600):
+    path = _paths(tmp_path).journal
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "transaction_id": "tx-old",
+                "state": state,
+                "sequence": 4,
+                "started_at_epoch_s": 10.0,
+                "updated_at_epoch_s": 11.0,
+                "release_artifact": "/tmp/old-release.tar.gz",
+                "release_id": "old-release",
+                "artifact_sha256": "a" * 64,
+                "previous_release": "/opt/plasma/releases/older",
+                "error_code": error_code,
+                "error_message": error_message,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    path.chmod(mode)
+    return path
+
+
 def test_successful_transaction_orders_verify_stage_activate_health(tmp_path: Path):
     installer = FakeInstaller()
     coordinator = _coordinator(tmp_path, installer)
@@ -150,6 +179,8 @@ def test_successful_transaction_orders_verify_stage_activate_health(tmp_path: Pa
     assert journal["sequence"] >= 8
     assert journal["previous_release"].endswith("1.2.2-bbbbbbbbbbbb")
     assert journal["error_code"] is None
+    assert coordinator.paths.journal.stat().st_mode & 0o077 == 0
+    assert coordinator.paths.lock.stat().st_mode & 0o077 == 0
 
 
 def test_verification_failure_is_terminal_and_never_stages(tmp_path: Path):
@@ -201,3 +232,65 @@ def test_nonblocking_lock_prevents_overlapping_deployments(tmp_path: Path):
         fcntl.flock(held.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         with pytest.raises(deployment.DeploymentError, match="another PPU deployment"):
             coordinator.execute(_request(tmp_path))
+
+
+def test_interrupted_transaction_is_promoted_to_recovery_required_before_new_work(tmp_path: Path):
+    journal_path = _write_journal(tmp_path, state="activating")
+    installer = FakeInstaller()
+    coordinator = _coordinator(tmp_path, installer)
+
+    with pytest.raises(deployment.DeploymentError, match="interrupted in state activating"):
+        coordinator.execute(_request(tmp_path))
+
+    journal = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert journal["transaction_id"] == "tx-old"
+    assert journal["state"] == "recovery_required"
+    assert journal["sequence"] == 5
+    assert journal["error_code"] == "interrupted_transaction"
+    assert "activating" in journal["error_message"]
+    assert installer.calls == []
+
+
+def test_recovery_required_journal_blocks_retry_without_overwriting_evidence(tmp_path: Path):
+    journal_path = _write_journal(
+        tmp_path,
+        state="recovery_required",
+        error_code="rollback_failed",
+        error_message="manual recovery required",
+    )
+    before = journal_path.read_text(encoding="utf-8")
+    installer = FakeInstaller()
+    coordinator = _coordinator(tmp_path, installer)
+
+    with pytest.raises(deployment.DeploymentError, match="requires recovery"):
+        coordinator.execute(_request(tmp_path))
+
+    assert journal_path.read_text(encoding="utf-8") == before
+    assert installer.calls == []
+
+
+def test_corrupt_or_overpermissive_journal_fails_closed(tmp_path: Path):
+    paths = _paths(tmp_path)
+    paths.bootstrap_state_root.mkdir(parents=True, exist_ok=True)
+    paths.journal.write_text("not-json\n", encoding="utf-8")
+    paths.journal.chmod(0o600)
+    coordinator = _coordinator(tmp_path, FakeInstaller())
+    with pytest.raises(deployment.DeploymentError, match="journal is unreadable"):
+        coordinator.execute(_request(tmp_path))
+
+    _write_journal(tmp_path, state="runtime_active", mode=0o644)
+    coordinator = _coordinator(tmp_path, FakeInstaller())
+    with pytest.raises(deployment.DeploymentError, match="permissions are too broad"):
+        coordinator.execute(_request(tmp_path))
+
+
+def test_safe_terminal_journal_allows_next_transaction(tmp_path: Path):
+    _write_journal(tmp_path, state="runtime_active")
+    installer = FakeInstaller()
+    coordinator = _coordinator(tmp_path, installer)
+
+    result = coordinator.execute(_request(tmp_path))
+
+    assert result["result"] == "PASS"
+    assert result["transaction"]["state"] == "runtime_active"
+    assert installer.calls[-2:] == ["activate", "health"]
