@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Authenticated PPU Bootstrap service for Console-managed runtime deployment.
 
-The service is intentionally independent from Plasma Server/Gateway.  Read-only
+The service is intentionally independent from Plasma Server/Gateway. Read-only
 health/status remain available when the product runtime is absent or broken.
 All mutation endpoints require a device-local bearer token provisioned outside
-the product runtime.  Release transport is chunked and bounded so the Manager
+the product runtime. Release transport is chunked and bounded so the Manager
 never needs a single multi-hundred-megabyte request.
 
-Phase 3 security boundary: bearer authentication over HTTP is acceptable only on
-the explicitly controlled lab/private commissioning link.  Production transport
-confidentiality and publisher authenticity remain Phase-5 requirements and are
-not claimed by this service.
+Bearer authentication over HTTP is acceptable only on the explicitly controlled
+lab/private commissioning link. Production transport confidentiality and
+publisher authenticity are not claimed by this service. Durable deployment API
+state fails closed after a service restart so an interrupted deployment cannot
+be silently overwritten by a later request.
 """
 
 from __future__ import annotations
@@ -45,6 +46,8 @@ MAX_CHUNK_BYTES = 1024 * 1024
 MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+DEPLOYMENT_API_IN_FLIGHT_STATES = {"queued", "running"}
+DEPLOYMENT_API_TERMINAL_STATES = {"succeeded", "failed", "recovery_required"}
 
 
 class BootstrapServiceError(RuntimeError):
@@ -100,6 +103,14 @@ def _atomic_json(path: Path, payload: Mapping[str, Any], mode: int = 0o600) -> N
         os.fsync(stream.fileno())
     temporary.chmod(mode)
     os.replace(temporary, path)
+    try:
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -110,6 +121,51 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise BootstrapServiceError(f"bootstrap state must be a JSON object: {path}")
     return payload
+
+
+def _read_private_json(path: Path) -> dict[str, Any]:
+    try:
+        metadata = path.stat()
+    except OSError as exc:
+        raise BootstrapServiceError(f"cannot stat bootstrap state {path}: {exc}") from exc
+    if metadata.st_mode & 0o077:
+        raise BootstrapServiceError(f"bootstrap state permissions are too broad: {path}")
+    return _read_json(path)
+
+
+def _deployment_api_record(paths: ServicePaths) -> dict[str, Any] | None:
+    if not paths.deployment_record.exists():
+        return None
+    record = _read_private_json(paths.deployment_record)
+    if record.get("schema_version") != 1:
+        raise BootstrapServiceError("deployment API state schema is unsupported")
+    transaction_id = record.get("transaction_id")
+    upload_id = record.get("upload_id")
+    state = record.get("state")
+    if not isinstance(transaction_id, str) or not transaction_id:
+        raise BootstrapServiceError("deployment API transaction_id is invalid")
+    if not isinstance(upload_id, str) or not UPLOAD_ID_RE.fullmatch(upload_id):
+        raise BootstrapServiceError("deployment API upload_id is invalid")
+    if state not in DEPLOYMENT_API_IN_FLIGHT_STATES | DEPLOYMENT_API_TERMINAL_STATES:
+        raise BootstrapServiceError(f"deployment API state is invalid: {state!r}")
+    return record
+
+
+def _recover_interrupted_api_deployment(paths: ServicePaths) -> dict[str, Any] | None:
+    record = _deployment_api_record(paths)
+    if record is None or record["state"] not in DEPLOYMENT_API_IN_FLIGHT_STATES:
+        return record
+    interrupted_state = record["state"]
+    record["state"] = "recovery_required"
+    record["updated_at_epoch_s"] = time.time()
+    record["error_code"] = "interrupted_service_restart"
+    record["error"] = (
+        "PPU Bootstrap restarted while deployment API transaction was "
+        f"{interrupted_state}; explicit recovery is required before another deployment"
+    )
+    record["result"] = None
+    _atomic_json(paths.deployment_record, record)
+    return record
 
 
 def _valid_token(value: str) -> bool:
@@ -332,6 +388,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         self.deployment_runner = deployment_runner
         self.mutation_lock = threading.RLock()
         self.deployment_thread: threading.Thread | None = None
+        self.recovered_deployment = _recover_interrupted_api_deployment(paths)
         super().__init__(address, BootstrapHandler)
 
     def start_deployment(self, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -344,6 +401,13 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
         with self.mutation_lock:
             if self.deployment_thread is not None and self.deployment_thread.is_alive():
                 raise BootstrapServiceError("another deployment is already running")
+            existing = _deployment_api_record(self.bootstrap_paths)
+            if existing is not None and existing["state"] in DEPLOYMENT_API_IN_FLIGHT_STATES:
+                existing = _recover_interrupted_api_deployment(self.bootstrap_paths)
+            if existing is not None and existing["state"] == "recovery_required":
+                raise BootstrapServiceError(
+                    "previous deployment requires explicit recovery before another deployment"
+                )
             transaction_id = uuid.uuid4().hex
             record = {
                 "schema_version": 1,
@@ -352,6 +416,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                 "upload_id": upload_id,
                 "started_at_epoch_s": time.time(),
                 "updated_at_epoch_s": time.time(),
+                "error_code": None,
                 "error": None,
                 "result": None,
             }
@@ -365,6 +430,7 @@ class BootstrapHTTPServer(ThreadingHTTPServer):
                     result = dict(self.deployment_runner(self.bootstrap_paths, upload_id, request))
                 except Exception as exc:
                     record["state"] = "failed"
+                    record["error_code"] = "deployment_runner_failed"
                     record["error"] = str(exc)
                 else:
                     record["state"] = "succeeded"
@@ -418,7 +484,10 @@ class BootstrapHandler(BaseHTTPRequestHandler):
         try:
             expected = load_token(self.owner.bootstrap_paths.token_file)
         except BootstrapServiceError as exc:
-            self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": "control_not_provisioned", "message": str(exc)})
+            self._json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"ok": False, "error": "control_not_provisioned", "message": str(exc)},
+            )
             return False
         header = self.headers.get("Authorization", "")
         prefix = "Bearer "
@@ -431,7 +500,10 @@ class BootstrapHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         if path == "/v1/health":
-            self._json(HTTPStatus.OK, {"ok": True, "service": "plasma-ppu-bootstrap", "api_version": API_VERSION})
+            self._json(
+                HTTPStatus.OK,
+                {"ok": True, "service": "plasma-ppu-bootstrap", "api_version": API_VERSION},
+            )
             return
         if path == "/v1/status":
             try:
@@ -442,29 +514,33 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                 )
                 payload = self.owner.base_module.status_document(base_paths)
                 payload["capabilities"]["runtime_deployment"] = (
-                    self.owner.bootstrap_paths.token_file.is_file() and self.owner.bootstrap_paths.kit_tool.is_file()
+                    self.owner.bootstrap_paths.token_file.is_file()
+                    and self.owner.bootstrap_paths.kit_tool.is_file()
                 )
                 payload["security"] = {
                     "control_token_provisioned": self.owner.bootstrap_paths.token_file.is_file(),
                     "transport_confidentiality": "not_qualified",
                     "publisher_authenticity": "not_qualified",
                 }
-                if self.owner.bootstrap_paths.deployment_record.is_file():
-                    payload["deployment"] = _read_json(self.owner.bootstrap_paths.deployment_record)
-                else:
-                    payload["deployment"] = None
+                payload["deployment"] = _deployment_api_record(self.owner.bootstrap_paths)
                 self._json(HTTPStatus.OK, payload)
             except BootstrapServiceError as exc:
-                self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": "bootstrap_state_invalid", "message": str(exc)})
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"ok": False, "error": "bootstrap_state_invalid", "message": str(exc)},
+                )
             return
         if path == "/v1/deployment":
-            if self.owner.bootstrap_paths.deployment_record.is_file():
-                try:
-                    self._json(HTTPStatus.OK, {"ok": True, "deployment": _read_json(self.owner.bootstrap_paths.deployment_record)})
-                except BootstrapServiceError as exc:
-                    self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": "bootstrap_state_invalid", "message": str(exc)})
-            else:
-                self._json(HTTPStatus.OK, {"ok": True, "deployment": None})
+            try:
+                self._json(
+                    HTTPStatus.OK,
+                    {"ok": True, "deployment": _deployment_api_record(self.owner.bootstrap_paths)},
+                )
+            except BootstrapServiceError as exc:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"ok": False, "error": "bootstrap_state_invalid", "message": str(exc)},
+                )
             return
         self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not_found"})
 
@@ -476,7 +552,11 @@ class BootstrapHandler(BaseHTTPRequestHandler):
             body = self._body()
             with self.owner.mutation_lock:
                 if path == "/v1/uploads":
-                    upload = create_upload(self.owner.bootstrap_paths, size=body.get("size"), sha256=body.get("sha256"))
+                    upload = create_upload(
+                        self.owner.bootstrap_paths,
+                        size=body.get("size"),
+                        sha256=body.get("sha256"),
+                    )
                     self._json(HTTPStatus.CREATED, {"ok": True, "upload": upload})
                     return
                 match = re.fullmatch(r"/v1/uploads/([0-9a-f]{32})/chunks", path)
@@ -501,7 +581,10 @@ class BootstrapHandler(BaseHTTPRequestHandler):
                 return
             self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not_found"})
         except BootstrapServiceError as exc:
-            self._json(HTTPStatus.CONFLICT, {"ok": False, "error": "bootstrap_request_rejected", "message": str(exc)})
+            self._json(
+                HTTPStatus.CONFLICT,
+                {"ok": False, "error": "bootstrap_request_rejected", "message": str(exc)},
+            )
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -509,8 +592,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--product-root", type=Path, default=Path("/opt/plasma"))
     parser.add_argument("--state-root", type=Path, default=Path("/var/lib/plasma-bootstrap"))
     parser.add_argument("--machine-id", type=Path, default=Path("/etc/machine-id"))
-    parser.add_argument("--bootstrap-script", type=Path, default=Path(__file__).with_name("ppu-bootstrap.py"))
-    parser.add_argument("--kit-tool", type=Path, default=Path(__file__).with_name("ppu-bootstrap-kit.py"))
+    parser.add_argument(
+        "--bootstrap-script",
+        type=Path,
+        default=Path(__file__).with_name("ppu-bootstrap.py"),
+    )
+    parser.add_argument(
+        "--kit-tool",
+        type=Path,
+        default=Path(__file__).with_name("ppu-bootstrap-kit.py"),
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     provision = sub.add_parser("provision-token")
