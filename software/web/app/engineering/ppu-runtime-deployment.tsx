@@ -61,22 +61,13 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
   }, [alias]);
 
   useEffect(() => {
-    setStatus(null);
-    setPairingToken("");
-    setKit(null);
-    setSidecar(null);
-    setPpuId(alias);
-    setFacilityId("lab");
-    setDisplayName(alias || "Plasma PPU");
-    setUploadProgress(null);
-    setNotice(null);
     const initial = window.setTimeout(() => { void refresh(); }, 0);
     const timer = window.setInterval(() => { void refresh(true); }, 3000);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
-  }, [alias, refresh]);
+  }, [refresh]);
 
   const bootstrap = status?.bootstrap ?? null;
   const pairing = status?.pairing ?? null;
@@ -119,7 +110,7 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
     try {
       await pairManagerPpuBootstrap(alias, pairingToken);
       setPairingToken("");
-      setNotice("Bootstrap pairing credential is now owned by Manager. The browser copy was cleared.");
+      setNotice("Bootstrap pairing stored by Manager for this immutable device identity.");
       await refresh(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Bootstrap pairing failed");
@@ -135,36 +126,34 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
     setNotice(null);
     setUploadProgress(0);
     try {
-      const expectedSha = parseSha256Sidecar(await sidecar.text(), kit.name);
-      const created = await createManagerPpuBootstrapUpload(alias, kit.size, expectedSha);
-      const uploadId = created.upload.upload_id;
+      const sidecarText = await sidecar.text();
+      const expected = parseSha256Sidecar(sidecarText, kit.name);
+      const wholeDigest = await sha256Hex(await kit.arrayBuffer());
+      if (wholeDigest !== expected) throw new Error("Selected kit SHA256 does not match its sidecar");
+
+      const created = await createManagerPpuBootstrapUpload(alias, kit.size, expected);
       let offset = 0;
       while (offset < kit.size) {
-        const end = Math.min(offset + CHUNK_BYTES, kit.size);
-        const buffer = await kit.slice(offset, end).arrayBuffer();
-        const chunkSha = await sha256Hex(buffer);
-        await appendManagerPpuBootstrapChunk(
-          alias,
-          uploadId,
-          offset,
-          bytesToBase64(buffer),
-          chunkSha,
-        );
-        offset = end;
+        const bytes = new Uint8Array(await kit.slice(offset, Math.min(offset + CHUNK_BYTES, kit.size)).arrayBuffer());
+        const chunkDigest = await sha256Hex(bytes);
+        await appendManagerPpuBootstrapChunk(alias, created.upload.upload_id, offset, bytesToBase64(bytes), chunkDigest);
+        offset += bytes.byteLength;
         setUploadProgress(Math.round((offset / kit.size) * 100));
       }
-      await commitManagerPpuBootstrapUpload(alias, uploadId);
+      await commitManagerPpuBootstrapUpload(alias, created.upload.upload_id);
       await startManagerPpuBootstrapDeployment(alias, {
-        upload_id: uploadId,
+        upload_id: created.upload.upload_id,
+        gateway_host: new URL(entry.endpoint).hostname,
         ppu_id: ppuId.trim(),
         facility_id: facilityId.trim(),
         display_name: displayName.trim(),
       });
-      setNotice("Verified kit upload committed. PPU Bootstrap deployment has started asynchronously.");
+      setNotice("Runtime deployment accepted by PPU Bootstrap. Status will continue updating asynchronously.");
       await refresh(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Runtime deployment failed");
     } finally {
+      setUploadProgress(null);
       setBusy(null);
     }
   }
@@ -173,115 +162,86 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
     <section className="ppuSiteCard" aria-label="PPU Runtime Deployment">
       <header className="ppuSiteCardHeader">
         <div>
-          <small>APPLIANCE LIFECYCLE</small>
-          <h3>PPU Runtime Deployment</h3>
-          <p>Console declares the desired runtime; Manager controls the device-bound credential; PPU Bootstrap performs installation and recovery.</p>
+          <small>FACTORY / RECOVERY</small>
+          <h3>Runtime Deployment</h3>
         </div>
-        <div className="ppuSiteCardHeaderActions">
-          <span className="ppuSiteFilter">Bootstrap {bootstrap?.bootstrap.state ?? (loading ? "checking" : "unavailable")}</span>
-          <button className="ppuSiteButton" type="button" disabled={busy !== null} onClick={() => void refresh()}>Refresh</button>
-        </div>
+        <button className="ppuSiteButton" type="button" disabled={loading || busy !== null} onClick={() => void refresh()}>
+          {loading ? "Checking..." : "Refresh Bootstrap"}
+        </button>
       </header>
 
       {error && <p className="ppuRegistryMessage error" role="alert">{error}</p>}
       {notice && <p className="ppuRegistryMessage success" role="status">{notice}</p>}
+      {hasActiveExecution && <p className="ppuRegistryMessage warning" role="status">Runtime deployment is blocked while this PPU has active Site execution.</p>}
 
-      {bootstrap ? (
-        <>
-          <div className="ppuInfoBody">
-            <dl className="ppuInfoGrid">
-              <div><dt>Bootstrap</dt><dd>{bootstrap.bootstrap.version} / {stateLabel(bootstrap.bootstrap.state)}</dd></div>
-              <div><dt>Device ID</dt><dd>{bootstrap.identity.device_id}</dd></div>
-              <div><dt>Pairing</dt><dd>{pairing?.paired && pairing.device_match ? "Paired / device matched" : pairing?.paired ? "Device mismatch" : "Not paired"}</dd></div>
-              <div><dt>Runtime</dt><dd>{stateLabel(runtime?.state)}</dd></div>
-              <div><dt>Runtime Version</dt><dd>{runtime?.product_version ?? "Not installed"}</dd></div>
-              <div><dt>Release ID</dt><dd>{runtime?.release_id ?? "—"}</dd></div>
-              <div><dt>Hardware Revision</dt><dd>{bootstrap.identity.hardware_revision ?? "Not provisioned"}</dd></div>
-              <div><dt>FPGA Image</dt><dd>{bootstrap.fpga.pl_version ?? "Not managed"}</dd></div>
-              <div><dt>PL Qualification</dt><dd>{stateLabel(bootstrap.fpga.pl_qualification)}</dd></div>
-              <div><dt>FPGA Update</dt><dd>{bootstrap.capabilities.fpga_update ? "Supported" : "Reserved / disabled"}</dd></div>
-            </dl>
+      <div className="ppuInfoBody">
+        <dl className="ppuInfoGrid">
+          <div><dt>Bootstrap</dt><dd>{stateLabel(bootstrap?.bootstrap.state)}</dd></div>
+          <div><dt>Device ID</dt><dd>{bootstrap?.identity.device_id ?? "Unavailable"}</dd></div>
+          <div><dt>Runtime</dt><dd>{stateLabel(runtime?.state)}</dd></div>
+          <div><dt>Runtime Version</dt><dd>{runtime?.product_version ?? "Not installed"}</dd></div>
+          <div><dt>Pairing</dt><dd>{pairing?.paired && pairing.device_match ? "Paired" : "Required"}</dd></div>
+          <div><dt>Runtime Deployment</dt><dd>{bootstrap?.capabilities.runtime_deployment ? "Available" : "Unavailable"}</dd></div>
+          <div><dt>FPGA Image</dt><dd>{stateLabel(bootstrap?.fpga.pl_compatibility)}</dd></div>
+          <div><dt>FPGA Update</dt><dd>{bootstrap?.capabilities.fpga_update ? "Available" : "Reserved / Disabled"}</dd></div>
+        </dl>
+      </div>
+
+      <div className="ppuRegistryAddForm" aria-label="Bootstrap pairing">
+        <label>
+          <span>Bootstrap Pairing Token</span>
+          <input
+            type="password"
+            autoComplete="off"
+            value={pairingToken}
+            disabled={entry.lifecycle === "commissioned" || hasActiveExecution || busy !== null}
+            placeholder="Factory pairing token"
+            onChange={event => setPairingToken(event.target.value)}
+          />
+        </label>
+        <button className="ppuSiteButton" type="button" disabled={!canPair} onClick={() => void pair()}>
+          {busy === "pair" ? "Pairing..." : "Pair Bootstrap"}
+        </button>
+        {entry.lifecycle === "commissioned" && <p>Disable this commissioned PPU before rotating or replacing its Bootstrap pairing.</p>}
+      </div>
+
+      <div className="ppuRegistryAddForm" aria-label="Runtime release deployment">
+        <label>
+          <span>Z2 PS Kit</span>
+          <input type="file" disabled={busy !== null} onChange={event => setKit(event.target.files?.[0] ?? null)} />
+        </label>
+        <label>
+          <span>SHA256 Sidecar</span>
+          <input type="file" disabled={busy !== null} onChange={event => setSidecar(event.target.files?.[0] ?? null)} />
+        </label>
+        <label>
+          <span>PPU ID</span>
+          <input value={ppuId} disabled={busy !== null} onChange={event => setPpuId(event.target.value)} />
+        </label>
+        <label>
+          <span>Facility ID</span>
+          <input value={facilityId} disabled={busy !== null} onChange={event => setFacilityId(event.target.value)} />
+        </label>
+        <label>
+          <span>Display Name</span>
+          <input value={displayName} disabled={busy !== null} onChange={event => setDisplayName(event.target.value)} />
+        </label>
+        <button className="ppuSiteButton primary" type="button" disabled={!canDeploy} onClick={() => void deploy()}>
+          {busy === "deploy" ? `Uploading${uploadProgress == null ? "" : ` ${uploadProgress}%`}` : "Deploy Runtime"}
+        </button>
+        <p>Console uploads a complete signed/hashed Z2 PS kit through Manager. Bootstrap validates immutable release identity and owns activation/rollback. FPGA bitstream loading is not enabled in this project.</p>
+      </div>
+
+      <div className="ppuReadinessPanel" aria-label="Deployment status">
+        <header>
+          <div>
+            <small>DEPLOYMENT</small>
+            <h4>{stateLabel(deployment?.state)}</h4>
           </div>
-
-          {!pairing?.paired || pairing.device_match === false ? (
-            <div className="ppuRegistryAddForm" aria-label="Pair PPU Bootstrap">
-              <label>
-                <span>One-time Bootstrap Pairing Token</span>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  value={pairingToken}
-                  disabled={busy !== null || entry.lifecycle === "commissioned"}
-                  onChange={event => setPairingToken(event.target.value)}
-                  placeholder="Enter factory/recovery token"
-                />
-              </label>
-              <div className="ppuSiteCardHeaderActions">
-                <button className="ppuSiteButton primary" type="button" disabled={!canPair} onClick={() => void pair()}>
-                  {busy === "pair" ? "Pairing..." : "Pair Bootstrap"}
-                </button>
-              </div>
-              <p>
-                {entry.lifecycle === "commissioned"
-                  ? "Disable this PPU before changing Bootstrap pairing. Existing commissioned credentials cannot be silently replaced."
-                  : "The token is sent once through the same-origin BFF to Manager, persisted there as a device-bound secret, then cleared from browser state."}
-              </p>
-            </div>
-          ) : (
-            <div className="ppuRegistryAddForm" aria-label="Deploy Plasma Runtime">
-              <label>
-                <span>Canonical Z2 PS Kit</span>
-                <input type="file" accept=".gz,application/gzip" disabled={busy !== null} onChange={event => setKit(event.target.files?.[0] ?? null)} />
-              </label>
-              <label>
-                <span>Detached SHA-256 Sidecar</span>
-                <input type="file" accept=".sha256,text/plain" disabled={busy !== null} onChange={event => setSidecar(event.target.files?.[0] ?? null)} />
-              </label>
-              <label>
-                <span>PPU ID</span>
-                <input value={ppuId} disabled={busy !== null} onChange={event => setPpuId(event.target.value)} />
-              </label>
-              <label>
-                <span>Facility ID</span>
-                <input value={facilityId} disabled={busy !== null} onChange={event => setFacilityId(event.target.value)} />
-              </label>
-              <label>
-                <span>Display Name</span>
-                <input value={displayName} disabled={busy !== null} onChange={event => setDisplayName(event.target.value)} />
-              </label>
-              <div className="ppuSiteCardHeaderActions">
-                <button className="ppuSiteButton primary" type="button" disabled={!canDeploy} onClick={() => void deploy()}>
-                  {busy === "deploy" ? `Uploading ${uploadProgress ?? 0}%...` : runtime?.state === "runtime_active" ? "Deploy / Upgrade Runtime" : "Install Runtime"}
-                </button>
-              </div>
-              <p>Upload is 1 MiB chunked with per-chunk SHA-256 and final artifact SHA-256. SHA-256 proves integrity only; publisher authenticity remains a production-hardening requirement.</p>
-              {hasActiveExecution && <p className="ppuRegistryMessage warning">Runtime deployment is blocked while any Site has an active Job.</p>}
-            </div>
-          )}
-
-          <div className="ppuStateDimensionGrid" aria-label="Runtime deployment status">
-            <article className="ppuStateDimensionCard" data-tone={deploymentTone}>
-              <small>Deployment</small>
-              <strong>{deployment ? stateLabel(deployment.state) : "No transaction"}</strong>
-              <p>{deployment?.error ?? (deployment ? `Transaction ${deployment.transaction_id}` : "No Bootstrap deployment has been recorded.")}</p>
-            </article>
-            <article className="ppuStateDimensionCard" data-tone="neutral">
-              <small>Transport Security</small>
-              <strong>{stateLabel(bootstrap.security?.transport_confidentiality)}</strong>
-              <p>Phase 3 is limited to the controlled private commissioning link. TLS/mTLS is not yet qualified.</p>
-            </article>
-            <article className="ppuStateDimensionCard" data-tone="neutral">
-              <small>Publisher Authenticity</small>
-              <strong>{stateLabel(bootstrap.security?.publisher_authenticity)}</strong>
-              <p>Release signing is intentionally deferred to production hardening; no authenticity claim is made here.</p>
-            </article>
-          </div>
-        </>
-      ) : (
-        <div className="ppuDiscoveredBody">
-          <p className="ppuSiteNote">Bootstrap status is unavailable. Runtime deployment remains fail-closed; the normal Plasma Gateway path is not used as a fallback.</p>
-        </div>
-      )}
+          <span data-tone={deploymentTone}>{deployment?.transaction_id ?? "No deployment transaction"}</span>
+        </header>
+        {deployment?.error && <p className="ppuRegistryMessage error">{deployment.error}</p>}
+      </div>
     </section>
   );
 }
