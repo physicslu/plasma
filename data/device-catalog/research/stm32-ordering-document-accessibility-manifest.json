@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "probe_id": "stm32-u0-c0-official-st-ordering-document-accessibility-v1",
+  "pilot_id": "stm32-u0-c0-ordering-document-accessibility-2026-09-10",
+  "source_identity_probe": "stm32-cross-family-official-st-evidence-accessibility-probe-v1",
+  "targets": [
+    {"series":"STM32U0","subfamily":"STM32U031","base_device":"STM32U031C6","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32u031c6.html"},
+    {"series":"STM32U0","subfamily":"STM32U073","base_device":"STM32U073C8","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32u073c8.html"},
+    {"series":"STM32U0","subfamily":"STM32U083","base_device":"STM32U083CC","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32u083cc.html"},
+    {"series":"STM32C0","subfamily":"STM32C011","base_device":"STM32C011F4","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c011f4.html"},
+    {"series":"STM32C0","subfamily":"STM32C031","base_device":"STM32C031C4","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c031c4.html"},
+    {"series":"STM32C0","subfamily":"STM32C051","base_device":"STM32C051C6","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c051c6.html"},
+    {"series":"STM32C0","subfamily":"STM32C071","base_device":"STM32C071C8","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c071c8.html"},
+    {"series":"STM32C0","subfamily":"STM32C091","base_device":"STM32C091CB","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c091cb.html"},
+    {"series":"STM32C0","subfamily":"STM32C092","base_device":"STM32C092CB","product_url":"https://www.st.com/en/microcontrollers-microprocessors/stm32c092cb.html"}
+  ]
+}
