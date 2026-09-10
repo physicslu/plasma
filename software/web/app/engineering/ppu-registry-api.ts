@@ -87,6 +87,7 @@ export type PPUSiteReconciliation =
 
 export type PPUSiteConfigurationView = {
   site_id: number;
+  desired_revision: string;
   desired: PPUSiteDesired;
   actual: PPUSiteActual | null;
   reconciliation: PPUSiteReconciliation;
@@ -163,10 +164,22 @@ type ErrorPayload = {
   };
 };
 
+export class ManagerApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+
+  constructor(status: number, code: string | null, message: string) {
+    super(code ? `${code}: ${message}` : message);
+    this.name = "ManagerApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function requestError(status: number, payload: ErrorPayload | null): Error {
   const message = payload?.error?.message ?? `Request failed with HTTP ${status}`;
-  const code = payload?.error?.code ?? payload?.error?.error_type;
-  return new Error(code ? `${code}: ${message}` : message);
+  const code = payload?.error?.code ?? payload?.error?.error_type ?? null;
+  return new ManagerApiError(status, code, message);
 }
 
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
@@ -247,9 +260,13 @@ export function saveManagerPpuSite(
   alias: string,
   siteId: number,
   desired: PPUSiteDesired,
+  expectedRevision: string,
 ): Promise<PPUSiteConfigurationPayload> {
   if (!Number.isInteger(siteId) || siteId < 1) {
     return Promise.reject(new Error("Site ID must be a positive 1-based integer"));
+  }
+  if (!/^sha256:[0-9a-f]{64}$/.test(expectedRevision)) {
+    return Promise.reject(new Error("Site desired revision is invalid"));
   }
   return jsonRequest<PPUSiteConfigurationPayload>(
     `/api/manager/registry/${encodeURIComponent(alias)}/sites/${siteId}`,
@@ -257,6 +274,7 @@ export function saveManagerPpuSite(
       method: "POST",
       headers: {
         "Idempotency-Key": `site-desired-${siteId}-${crypto.randomUUID()}`,
+        "If-Match": `"${expectedRevision}"`,
       },
       body: JSON.stringify(desired),
     },
