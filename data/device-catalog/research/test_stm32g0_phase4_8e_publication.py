@@ -23,7 +23,8 @@ CURRENT_CANONICAL = HERE / "stm32g0-commercial-icpn.csv"
 EXPECTED_PLAN_SHA256 = "d5f83bb3a2417a368e2d0bfb66a146e47b7649675341dc44e9d28c0a5de39801"
 EXPECTED_CANONICAL_SHA256 = "70cc049b7e4c282af407c65bbf41a8f7128e54285b76275cb5f3071b9d03e012"
 EXPECTED_CANONICAL_BLOB = "514f3a9b15b7ba31982f7b1ed322b1bac610909a"
-EXPECTED_MANIFEST_SHA256 = "0dbb7df5a3ddc771326507fb42a47416d892d1d17f4e4141dde37cde23e95ddf"
+EXPECTED_G0_POST_MANIFEST_SHA256 = "0dbb7df5a3ddc771326507fb42a47416d892d1d17f4e4141dde37cde23e95ddf"
+EXPECTED_CURRENT_MANIFEST_SHA256 = "93c2a4541daeb1d4aa1dcc57edef54042862eb6d9da03e3a6b401e4b8481b11d"
 EXPECTED_AUDIT_SHA256 = "63b0e7e5d8a0fa9ce53b26f493cf8f3506edd158ef2d95ad207cd4da2a782ac9"
 EXPECTED_ICPNS = {
     "STM32G030C6T6", "STM32G030C6T6TR", "STM32G031C4T6", "STM32G031C4U6",
@@ -69,7 +70,7 @@ class STM32G0Phase48EPublicationTests(unittest.TestCase):
     def test_published_canonical_manifest_and_audit_are_bound(self) -> None:
         self.assertEqual(file_sha256(PLAN_PATH), EXPECTED_PLAN_SHA256)
         self.assertEqual(file_sha256(CURRENT_CANONICAL), EXPECTED_CANONICAL_SHA256)
-        self.assertEqual(file_sha256(CURRENT_MANIFEST), EXPECTED_MANIFEST_SHA256)
+        self.assertEqual(file_sha256(CURRENT_MANIFEST), EXPECTED_CURRENT_MANIFEST_SHA256)
         self.assertEqual(file_sha256(AUDIT_PATH), EXPECTED_AUDIT_SHA256)
 
         with CURRENT_CANONICAL.open(newline="", encoding="utf-8") as handle:
@@ -90,18 +91,18 @@ class STM32G0Phase48EPublicationTests(unittest.TestCase):
         self.assertEqual(source["git_blob_sha"], EXPECTED_CANONICAL_BLOB)
 
         exact_count, base_count, family_counts = production_snapshot(CURRENT_MANIFEST)
-        self.assertEqual(exact_count, 610)
-        self.assertEqual(base_count, 209)
+        self.assertEqual(exact_count, 635)
+        self.assertEqual(base_count, 217)
         self.assertEqual(family_counts, {
             "STM32F0": 42, "STM32F1": 75, "STM32F2": 33, "STM32F3": 10,
-            "STM32F4": 384, "STM32F7": 19, "STM32G0": 47,
+            "STM32F4": 384, "STM32F7": 19, "STM32G0": 47, "STM32G4": 25,
         })
 
         self.assertEqual(self.audit["status"], "published")
         self.assertEqual(self.audit["admission_plan_sha256"], EXPECTED_PLAN_SHA256)
         self.assertEqual(self.audit["canonical_csv_file_sha256"], EXPECTED_CANONICAL_SHA256)
         self.assertEqual(self.audit["canonical_csv_git_blob_sha"], EXPECTED_CANONICAL_BLOB)
-        self.assertEqual(self.audit["production_manifest_sha256_after"], EXPECTED_MANIFEST_SHA256)
+        self.assertEqual(self.audit["production_manifest_sha256_after"], EXPECTED_G0_POST_MANIFEST_SHA256)
         self.assertEqual(set(self.audit["added_exact_icpns"]), EXPECTED_ICPNS)
         self.assertEqual(self.audit["manufacturer_verified_identity_count"], 49)
         self.assertEqual(self.audit["published_exact_icpn_count"], 47)

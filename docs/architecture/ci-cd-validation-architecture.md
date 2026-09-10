@@ -87,9 +87,10 @@ Primary workflows:
 ```text
 .github/workflows/device-catalog-validation.yml
 .github/workflows/device-catalog-current-validation.yml
-.github/workflows/device-catalog-stm32f2-bounded-validation.yml
-.github/workflows/device-catalog-stm32f3-foundation-validation.yml
+.github/workflows/device-catalog-stm32-family-validation.yml
 ```
+
+The STM32 family workflow classifies the changed paths and dispatches only the affected deterministic family profiles for STM32F0, STM32F2, STM32F3, STM32F7, STM32G0, and STM32G4. Shared catalog infrastructure changes fail closed to all managed profiles. The command profiles remain explicitly family-specific so distinct validation semantics, such as the STM32F2 bounded replay/shadow contract, are not hidden behind a false assumption that every family lifecycle is identical.
 
 Catalog changes may run targeted catalog-facing adapter tests when those tests are part of the catalog contract. They must not fan out into the complete Python/PL suite, PPU release, or Z2 release merely because the Production manifest gained rows.
 
