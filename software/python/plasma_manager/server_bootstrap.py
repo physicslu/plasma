@@ -72,24 +72,79 @@ class BootstrapPlasmaManagerHandler(PlasmaManagerHandler):
     def _bootstrap_body(self) -> dict[str, Any]:
         return self._read_json_object()
 
+    def _trusted_idle_observation(self, alias: str) -> bool:
+        item = self._fleet_item_for_alias(alias)
+        if item is None:
+            return False
+        observation = item.get("observation")
+        if not isinstance(observation, dict) or observation.get("state") != "current":
+            return False
+        if item.get("identity_conflict") is True or item.get("errors"):
+            return False
+        return not self._alias_has_active_execution(alias)
+
     def _bootstrap_mutation_allowed(self, alias: str) -> bool:
-        # Runtime deployment is a maintenance operation. It must never race a
-        # programming execution, regardless of registry lifecycle. Pending PPUs
-        # are intentionally allowed because first installation occurs before the
-        # normal Gateway can satisfy Validate & Enable.
-        if self._alias_has_active_execution(alias):
+        # Runtime deployment is a maintenance operation. A pending PPU is the
+        # one deliberate exception because first installation must work before
+        # Plasma Runtime/Gateway can produce a fleet observation.
+        lifecycle = self._registry_lifecycle(alias)
+        if lifecycle == "pending":
+            if self._alias_has_active_execution(alias):
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {
+                        "ok": False,
+                        "error": {
+                            "code": "ppu_busy",
+                            "message": "active PPU Jobs must finish or be cancelled before runtime deployment",
+                        },
+                    },
+                )
+                return False
+            return True
+
+        if lifecycle == "commissioned":
             self._json(
                 HTTPStatus.CONFLICT,
                 {
                     "ok": False,
                     "error": {
-                        "code": "ppu_busy",
-                        "message": "active PPU Jobs must finish or be cancelled before runtime deployment",
+                        "code": "ppu_maintenance_required",
+                        "message": "disable this commissioned PPU before Runtime maintenance",
                     },
                 },
             )
             return False
-        return True
+
+        if lifecycle == "disabled":
+            if not self._trusted_idle_observation(alias):
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {
+                        "ok": False,
+                        "error": {
+                            "code": "ppu_idle_state_unproven",
+                            "message": (
+                                "a current trusted idle PPU observation is required for normal Runtime maintenance; "
+                                "use the explicit recovery procedure when Runtime health cannot be observed"
+                            ),
+                        },
+                    },
+                )
+                return False
+            return True
+
+        self._json(
+            HTTPStatus.CONFLICT,
+            {
+                "ok": False,
+                "error": {
+                    "code": "ppu_lifecycle_invalid",
+                    "message": f"PPU lifecycle {lifecycle!r} is not eligible for Runtime maintenance",
+                },
+            },
+        )
+        return False
 
     def _bootstrap_get(self, alias: str, action: str) -> None:
         if action:
@@ -120,13 +175,6 @@ class BootstrapPlasmaManagerHandler(PlasmaManagerHandler):
             if action == "pair":
                 if set(body) != {"token"} or not isinstance(body.get("token"), str):
                     raise ValueError("Bootstrap pairing request requires only token")
-                # Re-pairing a commissioned appliance silently is too powerful.
-                # Disable it first so credential rotation is an explicit
-                # maintenance transition. Pending first-install PPUs are allowed.
-                if self._registry_lifecycle(alias) == "commissioned":
-                    raise BootstrapManagerError(
-                        "disable a commissioned PPU before changing its Bootstrap pairing"
-                    )
                 self._json(HTTPStatus.OK, coordinator.pair(alias, body["token"]))
                 return
             if action == "uploads":
