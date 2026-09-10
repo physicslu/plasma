@@ -1,6 +1,6 @@
 # PYNQ-Z2 PS Release Kit and Managed Loopback Acceptance
 
-Status: **PS-only release-kit implementation; every deployment candidate still requires real Z2 qualification**
+Status: **PS-only release-kit implementation with P2 Site Desired persistence wiring; every deployment candidate still requires real Z2 qualification**
 
 ## Purpose
 
@@ -164,6 +164,8 @@ The installer does not mutate `/usr/bin/python3`.
 8. production Device Catalog presence;
 9. explicit Plasma-owned ARMv7 final Python >=3.11.
 
+The packaged PPU runtime manifest also requires both processes to identify the same `<ppu-config>` resource. The Server declares `server --config <ppu-config>` and the Gateway declares `gateway --ppu-config <ppu-config>`. An artifact that drops the Gateway configuration identity is rejected by runtime validation.
+
 ## Filesystem and service boundary
 
 ```text
@@ -184,7 +186,35 @@ The installer does not mutate `/usr/bin/python3`.
 /etc/systemd/system/plasma-web.service
 ```
 
-A dedicated `plasma` system user owns mutable state/logs. Immutable release content and systemd units remain system-owned.
+A dedicated `plasma` system identity owns mutable PPU state/logs and the canonical PPU YAML file. Immutable release content and systemd units remain system-owned.
+
+P2 adds one intentionally narrow exception to the otherwise read-only `/etc` sandbox because Site Desired persistence uses a same-directory temporary file followed by atomic `os.replace`. File-write permission alone cannot support this operation; the Gateway needs directory create/rename permission. The deployed contract is:
+
+```text
+/etc/plasma           root:plasma   0770
+/etc/plasma/ppu.yaml  plasma:plasma 0640
+```
+
+Both services retain `ProtectSystem=strict`. Their write boundaries differ:
+
+```text
+plasma-server.service
+  ReadWritePaths=/var/lib/plasma /var/log/plasma
+
+plasma-web.service
+  ReadWritePaths=/var/lib/plasma /var/log/plasma /etc/plasma
+```
+
+This means the Server can read but cannot persist canonical configuration, while the Gateway can perform the atomic Site Desired write contract inside `/etc/plasma`. It does not make `/etc` generally writable and does not grant a generic privileged configuration API.
+
+Both services bind the exact same canonical configuration path:
+
+```text
+plasma-server.service -> server --config /etc/plasma/ppu.yaml
+plasma-web.service    -> gateway --ppu-config /etc/plasma/ppu.yaml
+```
+
+A Site Desired write preserves the canonical file mode across the temporary-file replacement. Saving Desired still does **not** restart Plasma Server or prove Runtime has applied the new configuration.
 
 ## PS-only topology contract
 
@@ -263,15 +293,18 @@ PPU activation remains side-by-side and source-identity-aware:
 ```text
 verify everything
   -> copy immutable <release-id>
-  -> snapshot managed config + units
-  -> write candidate PS-only config + units
+  -> snapshot managed config + units + config-root metadata
+  -> provision /etc/plasma root:plasma 0770
+  -> write candidate /etc/plasma/ppu.yaml plasma:plasma 0640 + units
   -> atomically switch /opt/plasma/current
   -> daemon-reload
   -> enable/start Server + Gateway
   -> direct/no-proxy readiness
 ```
 
-PPU activation failure restores the previous release/configuration/service state. Python runtime installation is separate and fail-closed; a Python runtime must execute successfully on the real ARMv7 target before PPU activation begins.
+PPU activation failure restores the previous release, configuration, service units, **and the previous `/etc/plasma` mode/ownership**. On a first install, a newly created empty config root is removed after candidate files are rolled back. This prevents a failed upgrade from leaving behind a broadened configuration-directory permission boundary.
+
+Python runtime installation is separate and fail-closed; a Python runtime must execute successfully on the real ARMv7 target before PPU activation begins.
 
 ## Local Z2 verification
 
@@ -291,13 +324,15 @@ local POST /api/engineering/diagnostics/loopback executes at endpoint=ps/source=
 closed hardware boundary retained in install evidence
 ```
 
+P2 software/release validation can prove that the generated service definitions contain the shared canonical config path and bounded write policy. A **real Z2** verification is still required to prove Linux/systemd/DAC behavior on the target image. No CI result is promoted into that evidence class.
+
 A PASS here means:
 
 ```text
 Real Z2 ARMv7 PS runtime + local PS diagnostic path qualified
 ```
 
-It does **not** yet prove the Control Station managed route.
+It does **not** yet prove the Control Station managed route, PL behavior, target electrical behavior, or a real Site Desired save on production hardware unless those operations were separately exercised and recorded.
 
 ## Control Station enrollment and Managed PS Loopback
 
@@ -336,6 +371,7 @@ After installation, re-check PYNQ-owned Python/PYNQ. Plasma installation must no
 This phase does not qualify:
 
 ```text
+Site Desired -> Runtime hot apply/restart
 PS <-> PL
 FPGA execution/loading
 PMOD/Site electrical behavior
