@@ -32,7 +32,8 @@
       "core_workflows": [
         ".github/workflows/device-catalog-validation.yml",
         ".github/workflows/device-catalog-current-validation.yml",
-        ".github/workflows/device-catalog-stm32-family-validation.yml"
+        ".github/workflows/device-catalog-stm32-family-validation.yml",
+        ".github/workflows/device-catalog-production-doc-contract.yml"
       ]
     },
     "ai_ic_support": {
