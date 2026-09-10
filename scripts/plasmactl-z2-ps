@@ -5,6 +5,7 @@ script_path="$(readlink -f "${BASH_SOURCE[0]}")"
 script_dir="$(cd "$(dirname "$script_path")" && pwd)"
 python_runtime_tool="${PLASMA_Z2_PYTHON_RUNTIME_TOOL:-$script_dir/z2-python-runtime.py}"
 ppu_installer="${PLASMA_Z2_PPU_INSTALLER:-$script_dir/ppu-z2-installer.py}"
+deployment_tool="${PLASMA_Z2_BOOTSTRAP_DEPLOYMENT:-$script_dir/ppu-bootstrap-deployment.py}"
 product_root="${PLASMA_Z2_PRODUCT_ROOT:-/opt/plasma}"
 install_root="$product_root/install"
 install_evidence="$install_root/last-install.json"
@@ -86,6 +87,9 @@ Install/deploy options:
 A first install requires either --python-artifact or --plasma-python. Deploy reuses
 /opt/plasma/install/python-runtime.json when neither is supplied.
 
+Activation always passes through the durable Bootstrap deployment coordinator so
+CLI and Console deployment share the same transaction journal and restart policy.
+
 Qualification boundary:
   z2-ps proves only the real Z2 ARMv7 PS software runtime and local PS diagnostic
   path. It does not qualify PS<->PL, FPGA execution/loading, Site electrical I/O,
@@ -134,6 +138,7 @@ parse_activation_args() {
     fi
   fi
   require_file "$ppu_installer" "Z2 PPU installer"
+  require_file "$deployment_tool" "Bootstrap deployment coordinator"
 }
 
 install_or_reuse_python() {
@@ -157,18 +162,19 @@ activate_release() {
   require_command python3
   install_or_reuse_python
   local -a args=(
-    install
+    --installer "$ppu_installer"
+    --product-root "$product_root"
+    deploy
     --release-artifact "$release_artifact"
     --plasma-python "$plasma_python"
     --gateway-host "$gateway_host"
     --ppu-id "$ppu_id"
     --facility-id "$facility_id"
     --display-name "$display_name"
-    --product-root "$product_root"
   )
   [[ -n "$release_sidecar" ]] && args+=(--sidecar "$release_sidecar")
-  say "activating verified Z2 PS-only PPU release"
-  python3 "$ppu_installer" "${args[@]}"
+  say "activating verified Z2 PS-only PPU release through durable deployment coordinator"
+  python3 "$deployment_tool" "${args[@]}"
 }
 
 local_health_url() {
