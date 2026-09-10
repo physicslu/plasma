@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { OperatorCard } from "../operator-ui/operator-surface";
 
 export function DiagnosticsTestPage({
   eyebrow,
@@ -40,13 +41,13 @@ export function DiagnosticsTestCard({
   children: ReactNode;
 }) {
   return (
-    <section className={`diagnosticsTestCard ${className}`.trim()}>
+    <OperatorCard className={`diagnosticsTestCard ${className}`.trim()}>
       <header>
         <h3>{title}</h3>
         {description && <p>{description}</p>}
       </header>
       <div className="diagnosticsTestCardBody">{children}</div>
-    </section>
+    </OperatorCard>
   );
 }
 
