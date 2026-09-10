@@ -28,25 +28,39 @@ class SiteRuntimeActivationSupportMixin:
     def configure_runtime_activation(cls, socket_path: Path | None) -> None:
         cls._runtime_activation_socket = socket_path.expanduser().resolve() if socket_path is not None else None
 
+    def _site_configuration_payload(
+        self,
+        *,
+        actual_snapshot: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        payload = super()._site_configuration_payload(actual_snapshot=actual_snapshot)
+        configuration = payload["site_configuration"]
+        configuration["runtime_apply_supported"] = self._runtime_activation_socket is not None
+        configuration["desired_runtime_revision"] = desired_runtime_revision(configuration)
+        return payload
+
     def _runtime_activation_status_payload(self) -> dict[str, Any]:
-        desired = self._site_configuration_controller().current()
-        configuration = {
-            "sites": [
-                {
-                    "site_id": site["site_id"],
-                    "desired_revision": site["desired_revision"],
-                }
-                for site in desired["sites"]
-            ]
-        }
-        revision = desired_runtime_revision(configuration)
         try:
             snapshot = self._local_snapshot()
             site_payload = self._site_configuration_payload(actual_snapshot=snapshot)
-            reconciliation = site_payload["site_configuration"]["reconciliation"]
+            configuration = site_payload["site_configuration"]
+            reconciliation = configuration["reconciliation"]
+            revision = configuration["desired_runtime_revision"]
             ppu = snapshot.get("ppu") if isinstance(snapshot, dict) else None
             ppu_id = ppu.get("ppu_id") if isinstance(ppu, dict) else None
         except Exception:
+            desired = self._site_configuration_controller().current()
+            revision = desired_runtime_revision(
+                {
+                    "sites": [
+                        {
+                            "site_id": site["site_id"],
+                            "desired_revision": site["desired_revision"],
+                        }
+                        for site in desired["sites"]
+                    ]
+                }
+            )
             reconciliation = "actual_unavailable"
             ppu_id = None
         return {
