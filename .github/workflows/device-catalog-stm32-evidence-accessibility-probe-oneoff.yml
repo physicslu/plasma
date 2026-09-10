@@ -1,4 +1,4 @@
-name: STM32 evidence accessibility probe inspection one-off
+name: STM32 evidence accessibility probe live one-off
 
 on:
   push:
@@ -11,45 +11,66 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
+  probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Inspect bounded ordering-pattern surfaces
+      - name: Validate offline probe contracts
+        run: python data/device-catalog/research/test_stm32_evidence_accessibility_probe.py
+      - name: Install pinned browser tooling
         run: |
+          python -m pip install --disable-pip-version-check playwright==1.62.0
+          python -m playwright install --with-deps chromium
+      - name: Run bounded live official-ST probe
+        run: |
+          set +e
+          mkdir -p /tmp/stm32-accessibility-artifact/evidence
+          xvfb-run -a python data/device-catalog/research/run_stm32_evidence_accessibility_probe.py \
+            --output /tmp/stm32-accessibility-artifact/summary.json \
+            --evidence-dir /tmp/stm32-accessibility-artifact/evidence \
+            --timeout 90 \
+            --delay 2
+          rc=$?
+          echo "$rc" > /tmp/stm32-accessibility-artifact/runner-exit-code.txt
           python - <<'PY'
-          import csv, json, re
-          from collections import Counter, defaultdict
+          import json, os, platform, sys
           from pathlib import Path
-
-          catalog=Path('data/device-catalog/research/openocd-parts-canonical.csv')
-          target_series=('STM32U0','STM32C0','STM32L1')
-          grouped=defaultdict(list)
-          with catalog.open(newline='',encoding='utf-8') as f:
-              for row in csv.DictReader(f):
-                  if row.get('vendor') == 'STMicroelectronics' and row.get('plasma_series') in target_series:
-                      grouped[row['plasma_series']].append(row)
-
-          for series in target_series:
-              rows=grouped[series]
-              print(f'=== {series} ===')
-              print('rows',len(rows))
-              print('kinds',dict(sorted(Counter(r['identifier_kind'] for r in rows).items())))
-              print('subfamilies',json.dumps(dict(sorted(Counter(r['subfamily'] for r in rows).items())),sort_keys=True))
-              print('targets',sorted({r['target_config'] for r in rows}))
-              for sub in sorted({r['subfamily'] for r in rows}):
-                  pats=sorted(r['part_number'] for r in rows if r['subfamily']==sub and r['identifier_kind']=='ordering_pattern')
-                  aliases=sorted(r['part_number'] for r in rows if r['subfamily']==sub and r['identifier_kind']=='cmsis_device_name')
-                  print(f'SUBFAMILY {sub}')
-                  print('  ORDERING',json.dumps(pats,separators=(',',':')))
-                  print('  CMSIS',json.dumps(aliases,separators=(',',':')))
-                  candidates=[]
-                  for p in pats:
-                      m=re.fullmatch(r'(.+)[A-Z]x',p)
-                      candidates.append(m.group(1) if m else None)
-                  print('  BASE_HEURISTIC',json.dumps(candidates,separators=(',',':')))
+          meta={
+              'github_run_id': os.environ['GITHUB_RUN_ID'],
+              'github_sha': os.environ['GITHUB_SHA'],
+              'github_ref_name': os.environ['GITHUB_REF_NAME'],
+              'python_version': sys.version,
+              'platform': platform.platform(),
+          }
+          Path('/tmp/stm32-accessibility-artifact/execution-metadata.json').write_text(
+              json.dumps(meta,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          PY
+          exit 0
+      - name: Upload immutable probe candidate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32-u0-c0-l1-evidence-accessibility-probe
+          path: /tmp/stm32-accessibility-artifact
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce bounded probe gate after artifact upload
+        run: |
+          test "$(cat /tmp/stm32-accessibility-artifact/runner-exit-code.txt)" = "0"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('/tmp/stm32-accessibility-artifact/summary.json').read_text())
+          assert p['attempted_targets'] == 13
+          assert p['dispositioned_targets'] == 13
+          assert p['manual_review_targets'] == 0
+          assert p['bounded_probe_clean'] is True
+          assert p['selected_next_research_family'] is None
+          assert list(p['by_series']) == ['STM32C0','STM32L1','STM32U0'] or set(p['by_series']) == {'STM32U0','STM32C0','STM32L1'}
+          assert all(value is False for value in p['claims'].values())
+          print(json.dumps({'by_series':p['by_series'],'selected_next_research_family':p['selected_next_research_family']},indent=2,sort_keys=True))
           PY
