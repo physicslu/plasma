@@ -91,16 +91,28 @@ class SiteConfigurationRestTests(unittest.TestCase):
         self.server.server_close()
         self.thread.join()
 
-    def request(self, method: str, path: str, body=None):
+    def request(self, method: str, path: str, body=None, *, if_match: str | None = None):
         connection = HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
         raw = json.dumps(body).encode() if body is not None else None
         headers = {"Content-Type": "application/json"} if raw is not None else {}
+        if if_match is not None:
+            headers["If-Match"] = if_match
         connection.request(method, path, body=raw, headers=headers)
         response = connection.getresponse()
         payload = json.loads(response.read())
         status = response.status
         connection.close()
         return status, payload
+
+    def revision(self, site_id: int) -> str:
+        status, payload = self.request("GET", "/api/settings/sites")
+        self.assertEqual(status, 200)
+        site = next(item for item in payload["site_configuration"]["sites"] if item["site_id"] == site_id)
+        return site["desired_revision"]
+
+    @staticmethod
+    def etag(revision: str) -> str:
+        return f'"{revision}"'
 
     def test_get_separates_desired_and_actual_state(self) -> None:
         status, payload = self.request("GET", "/api/settings/sites")
@@ -112,30 +124,73 @@ class SiteConfigurationRestTests(unittest.TestCase):
         self.assertEqual(configuration["sites"][0]["reconciliation"], "in_sync")
         self.assertEqual(configuration["sites"][0]["desired"]["target"], "TARGET-A")
         self.assertEqual(configuration["sites"][0]["actual"]["target"], "TARGET-A")
+        self.assertRegex(configuration["sites"][0]["desired_revision"], r"^sha256:[0-9a-f]{64}$")
         self.assertEqual(
             configuration["sites"][1]["reconciliation"],
             "disabled_runtime_binding_unobservable",
         )
 
+    def test_post_requires_strong_if_match_precondition(self) -> None:
+        before = self.path.read_text(encoding="utf-8")
+        body = {"enabled": True, "interface": "mock", "target": "TARGET-NEW"}
+
+        status, payload = self.request("POST", "/api/settings/sites/1", body)
+        self.assertEqual(status, 428)
+        self.assertEqual(payload["error"]["code"], "site_precondition_required")
+        self.assertEqual(self.path.read_text(encoding="utf-8"), before)
+
+        status, payload = self.request("POST", "/api/settings/sites/1", body, if_match="sha256:not-an-etag")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"]["code"], "invalid_site_precondition")
+        self.assertEqual(self.path.read_text(encoding="utf-8"), before)
+
     def test_post_persists_desired_without_mutating_actual_runtime(self) -> None:
+        previous_revision = self.revision(1)
         status, payload = self.request(
             "POST",
             "/api/settings/sites/1",
             {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            if_match=self.etag(previous_revision),
         )
         self.assertEqual(status, 200)
         site = payload["site_configuration"]["sites"][0]
         self.assertEqual(site["desired"]["target"], "TARGET-NEW")
         self.assertEqual(site["actual"]["target"], "TARGET-A")
         self.assertEqual(site["reconciliation"], "restart_required")
+        self.assertNotEqual(site["desired_revision"], previous_revision)
         self.assertEqual(payload["site_configuration"]["reconciliation"], "restart_required")
         self.assertEqual(
             SiteConfigurationController(self.path).current()["sites"][0]["target"],
             "TARGET-NEW",
         )
 
+    def test_stale_if_match_returns_412_and_preserves_newer_desired_state(self) -> None:
+        stale_revision = self.revision(1)
+        status, first = self.request(
+            "POST",
+            "/api/settings/sites/1",
+            {"enabled": True, "interface": "mock", "target": "TARGET-NEW"},
+            if_match=self.etag(stale_revision),
+        )
+        self.assertEqual(status, 200)
+        current_revision = first["site_configuration"]["sites"][0]["desired_revision"]
+        before_conflict = self.path.read_text(encoding="utf-8")
+
+        status, conflict = self.request(
+            "POST",
+            "/api/settings/sites/1",
+            {"enabled": True, "interface": "mock", "target": "TARGET-STALE"},
+            if_match=self.etag(stale_revision),
+        )
+        self.assertEqual(status, 412)
+        self.assertEqual(conflict["error"]["code"], "site_desired_conflict")
+        self.assertEqual(conflict["error"]["context"]["expected_revision"], stale_revision)
+        self.assertEqual(conflict["error"]["context"]["current_revision"], current_revision)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), before_conflict)
+
     def test_active_execution_rejects_write_before_persistence(self) -> None:
         before = self.path.read_text(encoding="utf-8")
+        revision = self.revision(1)
         self.handler.snapshot["ppu"]["execution"]["busy"] = True
         self.handler.snapshot["ppu"]["execution"]["active_job_count"] = 1
         self.handler.snapshot["sites"][0]["state"] = "program"
@@ -145,6 +200,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
             "POST",
             "/api/settings/sites/1",
             {"enabled": False, "interface": "mock", "target": "TARGET-A"},
+            if_match=self.etag(revision),
         )
         self.assertEqual(status, 409)
         self.assertFalse(payload["ok"])
@@ -152,10 +208,12 @@ class SiteConfigurationRestTests(unittest.TestCase):
 
     def test_invalid_site_and_payload_fail_closed(self) -> None:
         before = self.path.read_text(encoding="utf-8")
+        revision = self.revision(1)
         status, _ = self.request(
             "POST",
             "/api/settings/sites/9",
             {"enabled": True, "interface": "mock", "target": "TARGET-X"},
+            if_match=self.etag(revision),
         )
         self.assertEqual(status, 400)
         self.assertEqual(self.path.read_text(encoding="utf-8"), before)
@@ -164,6 +222,7 @@ class SiteConfigurationRestTests(unittest.TestCase):
             "POST",
             "/api/settings/sites/1",
             {"enabled": True, "interface": "uart", "target": "TARGET-X"},
+            if_match=self.etag(revision),
         )
         self.assertEqual(status, 400)
         self.assertEqual(self.path.read_text(encoding="utf-8"), before)

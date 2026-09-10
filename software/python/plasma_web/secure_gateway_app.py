@@ -112,7 +112,7 @@ class DeployedSecurePlasmaWebHandler(
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header(
             "Access-Control-Allow-Headers",
-            "Content-Type, Authorization, Idempotency-Key",
+            "Content-Type, Authorization, Idempotency-Key, If-Match",
         )
         self.send_header("Access-Control-Max-Age", "600")
 

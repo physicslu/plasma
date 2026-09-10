@@ -17,7 +17,11 @@ from .ppu_network_activation import (
     PPUNetworkActivationError,
     PPUNetworkActivationHelperClient,
 )
-from .site_configuration import SiteConfigurationController
+from .site_configuration import (
+    DESIRED_REVISION_PREFIX,
+    SiteConfigurationConflictError,
+    SiteConfigurationController,
+)
 
 
 NETWORK_SETTINGS_PATH = "/api/settings/ppu-network"
@@ -225,9 +229,9 @@ class SiteConfigurationSupportMixin:
     """Expose PPU-owned desired Site configuration without pretending hot apply.
 
     Desired values live in the canonical PPU YAML. Actual values come from the
-    running Plasma Server. Phase 1 persists a desired change and reports whether
-    the running process already matches it; it never restarts Plasma Server from
-    inside an HTTP request.
+    running Plasma Server. A Site write is conditional on the exact Desired
+    revision observed when the Browser Draft was created; runtime reconciliation
+    remains separate and this mixin never restarts Plasma Server.
     """
 
     site_configuration: SiteConfigurationController | None = None
@@ -254,6 +258,59 @@ class SiteConfigurationSupportMixin:
                 "PPU Site configuration controller is unavailable",
             )
         return controller
+
+    def _site_expected_revision(self) -> str | None:
+        raw = self.headers.get("If-Match")
+        if raw is None or not raw.strip():
+            self._json(
+                HTTPStatus.PRECONDITION_REQUIRED,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "site_precondition_required",
+                        "message": "Site desired configuration requires If-Match with the current desired_revision",
+                    },
+                },
+            )
+            return None
+        candidate = raw.strip()
+        if (
+            len(candidate) < 2
+            or candidate[0] != '"'
+            or candidate[-1] != '"'
+            or candidate.startswith('W/"')
+            or "," in candidate
+        ):
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "invalid_site_precondition",
+                        "message": "If-Match must contain exactly one strong Site desired_revision entity tag",
+                    },
+                },
+            )
+            return None
+        revision = candidate[1:-1]
+        digest = revision.removeprefix(DESIRED_REVISION_PREFIX)
+        if (
+            not revision.startswith(DESIRED_REVISION_PREFIX)
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)
+        ):
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "invalid_site_precondition",
+                        "message": "If-Match Site desired_revision is invalid",
+                    },
+                },
+            )
+            return None
+        return revision
 
     @staticmethod
     def _active_execution(snapshot: dict[str, Any]) -> dict[str, Any] | None:
@@ -330,6 +387,7 @@ class SiteConfigurationSupportMixin:
             sites.append(
                 {
                     "site_id": site_id,
+                    "desired_revision": desired_site["desired_revision"],
                     "desired": {
                         "enabled": desired_site["enabled"],
                         "interface": desired_site["interface"],
@@ -375,6 +433,9 @@ class SiteConfigurationSupportMixin:
         site_id = self._site_settings_id(path)
         if site_id is None:
             return False
+        expected_revision = self._site_expected_revision()
+        if expected_revision is None:
+            return True
         try:
             snapshot = self._local_snapshot()
         except Exception:
@@ -388,7 +449,29 @@ class SiteConfigurationSupportMixin:
                 recoverable=True,
                 context={"execution": active},
             )
-        self._site_configuration_controller().update(site_id, self._body())
+        try:
+            self._site_configuration_controller().update(
+                site_id,
+                self._body(),
+                expected_revision=expected_revision,
+            )
+        except SiteConfigurationConflictError as exc:
+            self._json(
+                HTTPStatus.PRECONDITION_FAILED,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "site_desired_conflict",
+                        "message": str(exc),
+                        "context": {
+                            "site_id": exc.site_id,
+                            "expected_revision": exc.expected_revision,
+                            "current_revision": exc.current_revision,
+                        },
+                    },
+                },
+            )
+            return True
         self._json(HTTPStatus.OK, self._site_configuration_payload(actual_snapshot=snapshot))
         return True
 

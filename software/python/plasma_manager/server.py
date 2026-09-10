@@ -44,7 +44,7 @@ REGISTRY_ROUTE_PREFIX = "/api/registry/"
 NETWORK_COMMISSIONING_SUFFIX = "/network-commissioning"
 MAX_MANAGER_REQUEST_BYTES = 24 * 1024 * 1024
 MAX_MANAGER_RESPONSE_BYTES = 32 * 1024 * 1024
-FORWARDED_REQUEST_HEADERS = frozenset({"authorization", "idempotency-key", "content-type", "accept"})
+FORWARDED_REQUEST_HEADERS = frozenset({"authorization", "idempotency-key", "content-type", "accept", "if-match"})
 ACTIVE_SITE_STATES = frozenset({"queued", "submitting", "running", "stopping", "erase", "program", "verify", "read"})
 
 _SEGMENT = r"[^/]+"
