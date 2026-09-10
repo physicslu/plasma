@@ -11,6 +11,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 Z2_INSTALLER = ROOT / "scripts" / "ppu-z2-installer.py"
+Z2_CONTROL = ROOT / "scripts" / "plasmactl-z2-ps"
 PPU_RUNTIME = ROOT / "scripts" / "ppu-runtime.py"
 SWPC_INSTALLER = ROOT / "scripts" / "swpc-z2like-ppu-install.sh"
 SWPC_CONTROL = ROOT / "scripts" / "plasmactl-swpc-z2like"
@@ -86,6 +87,20 @@ def test_ppu_runtime_manifest_requires_gateway_and_server_config_identity() -> N
     gateway_args = processes["gateway"]["arguments"]
     index = gateway_args.index("--ppu-config")
     assert gateway_args[index + 1] == "<ppu-config>"
+
+
+def test_real_z2_verify_checks_p2_service_and_evidence_boundaries() -> None:
+    source = Z2_CONTROL.read_text(encoding="utf-8")
+    assert "verify_site_desired_operational_contract" in source
+    assert "gateway --ppu-config $ppu_config" in source
+    assert "server --config $ppu_config" in source
+    assert "PPU config root must be mode 0770" in source
+    assert "PPU config must be mode 0640" in source
+    assert "Plasma Server must not receive canonical config write access" in source
+    assert "site_desired_state.config_path" in source
+    assert "site_desired_state.gateway_write_root" in source
+    assert "site_desired_state.runtime_apply_supported" in source
+    assert "Runtime apply" in source
 
 
 def test_swpc_surrogate_matches_bounded_site_config_contract_and_rolls_permissions_back() -> None:
