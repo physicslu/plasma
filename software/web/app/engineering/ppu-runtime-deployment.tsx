@@ -143,7 +143,6 @@ export default function PpuRuntimeDeployment({ entry, hasActiveExecution }: Prop
       await commitManagerPpuBootstrapUpload(alias, created.upload.upload_id);
       await startManagerPpuBootstrapDeployment(alias, {
         upload_id: created.upload.upload_id,
-        gateway_host: new URL(entry.endpoint).hostname,
         ppu_id: ppuId.trim(),
         facility_id: facilityId.trim(),
         display_name: displayName.trim(),
