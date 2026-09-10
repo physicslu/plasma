@@ -118,6 +118,7 @@ def command_profile(family: str) -> list[list[str]]:
             _py("data/device-catalog/research/stm32g4_phase4_9c_policy.py"),
             _py("data/device-catalog/research/test_stm32g4_phase4_9d_admission.py"),
             _py("data/device-catalog/research/validate_stm32g4_phase4_9d_admission_plan.py"),
+            _py("data/device-catalog/research/test_stm32g4_phase4_9e_publication.py"),
         ],
     }
     try:
