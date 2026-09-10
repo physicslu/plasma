@@ -85,6 +85,7 @@ def validate_workstream_registry() -> None:
         ".github/workflows/z2-ps-release.yml": "sw_ppu",
         ".github/workflows/device-catalog-validation.yml": "icpn",
         ".github/workflows/device-catalog-current-validation.yml": "icpn",
+        ".github/workflows/device-catalog-stm32-family-validation.yml": "icpn",
         ".github/workflows/ic-support-validation.yml": "ai_ic_support",
         ".github/workflows/ic-evidence-live-validation.yml": "ai_ic_support",
         ".github/workflows/repository-contracts.yml": "repo",
