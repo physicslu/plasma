@@ -11,13 +11,14 @@ This directory contains numbered engineering handover documents intended to let 
 | [H003](H003-nxp-kl25-evidence-applicability-foundation-2026-09-07.md) | 2026-09-07 | NXP KL25 evidence applicability foundation and admission state | Current | Confirm repository/PR state before continuing KL25 evidence work |
 | [H004](H004-real-z2-managed-ps-control-station-2026-09-10.md) | 2026-09-10 | Real PYNQ-Z2 PS qualification, macOS Control Station Managed routing, PR #450, and CI cache follow-up | Current | Continue PR #451 or formal Plasma PS<->PL loopback qualification |
 | [H005](H005-nxp-kl25-live-semantic-qualification-2026-09-10.md) | 2026-09-10 | NXP KL25 live bounded semantic qualification through Gate 5.7A | Current | Continue Gate 5.8 manufacturer-evidence semantic/citation review |
+| [H006](H006-stm32-next-family-evidence-selection-2026-09-10.md) | 2026-09-10 | STM32 cross-family evidence accessibility, U0/C0 Ordering Information review, and next-family research selection | Current | Finish STM32 evidence-selection PR/merge closure; then begin a separate STM32U0 research pipeline |
 
 ## Usage
 
 For a new session, ask the agent to read the relevant handover before proposing changes. Example:
 
 ```text
-Read repo handover H005 and continue NXP KL25 Gate 5.8.
+Read repo handover H006 and continue the STM32 next-family evidence-selection transaction.
 ```
 
 A handover records engineering state; it does not override `AGENTS.md`, checked-in executable code, or current repository state. If a handover conflicts with newer code, tests, or contracts, the newer repository state is authoritative.

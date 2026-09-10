@@ -1,0 +1,9 @@
+{
+  "evidence_id": "stm32-u0-c0-l1-evidence-accessibility-probe-retained-20260910T042026Z-e30c2aca",
+  "files": {
+    "README.md": "04d4c6200f048744acdadde8703687488ca65c8d8f2a2ba0a9a730e49c2df9ba",
+    "probe-summary.json": "d4339d85a7565f4be731de863ee7db0c1301a335bb5b2777e84a1089aae2769d",
+    "provenance.json": "8c5751803719449ed0be345c2a1b264f7dfa4341faf41c22cbefc2a8aca3d1d7"
+  },
+  "schema_version": 1
+}

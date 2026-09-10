@@ -1,0 +1,204 @@
+{
+  "by_series": {
+    "STM32C0": {
+      "blocking_evidence_issues": 0,
+      "ordering_authority_covered_targets": 6,
+      "ordering_evidence_quality": "complete",
+      "representative_targets": 6,
+      "required_schema_complete_targets": 6,
+      "unique_official_datasheets": 5
+    },
+    "STM32U0": {
+      "blocking_evidence_issues": 0,
+      "ordering_authority_covered_targets": 3,
+      "ordering_evidence_quality": "complete",
+      "representative_targets": 3,
+      "required_schema_complete_targets": 3,
+      "unique_official_datasheets": 3
+    }
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "runtime_programming_support_claimed": false
+  },
+  "comparison": {
+    "eligible_for_frozen_priority_tiebreak": [
+      "STM32U0",
+      "STM32C0"
+    ],
+    "result": "equivalent_required_evidence_quality",
+    "selected_next_research_family": null
+  },
+  "method": {
+    "authority": "official_st_datasheet",
+    "notes": [
+      "GitHub-hosted runner PDF transport failures are treated as method limitations, not family evidence-quality failures.",
+      "C091 and C092 legitimately share one official ST datasheet authority.",
+      "Selection is not performed by this review artifact."
+    ],
+    "required_ordering_fields": [
+      "device_family",
+      "product_type",
+      "device_subfamily",
+      "pin_count",
+      "flash_memory_size",
+      "package",
+      "temperature_range",
+      "packing_or_options"
+    ],
+    "review_mode": "official_st_pdf_structured_text_plus_visual_where_available",
+    "transport_diagnostics_are_selection_evidence": false,
+    "visual_screenshot_review_is_selection_gate": false
+  },
+  "review_date": "2026-09-10",
+  "review_id": "stm32-u0-c0-official-st-ordering-information-review-v1",
+  "schema_version": 1,
+  "scope": {
+    "families": [
+      "STM32U0",
+      "STM32C0"
+    ],
+    "purpose": "compare official ST ordering-information evidence quality before next-family research selection",
+    "representative_target_count": 9,
+    "unique_official_datasheet_count": 8
+  },
+  "targets": [
+    {
+      "base_device": "STM32U031C6",
+      "datasheet_id": "DS14581",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u031c6.pdf",
+      "ordering_pdf_page": 124,
+      "ordering_section": 8,
+      "required_fields_complete": true,
+      "revision": 2,
+      "series": "STM32U0",
+      "special_semantics": [],
+      "structured_text_review": "verified",
+      "subfamily": "STM32U031",
+      "visual_screenshot_review": "cache_miss"
+    },
+    {
+      "base_device": "STM32U073C8",
+      "datasheet_id": "DS14548",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u073c8.pdf",
+      "ordering_pdf_page": 135,
+      "ordering_section": 8,
+      "required_fields_complete": true,
+      "revision": 2,
+      "series": "STM32U0",
+      "special_semantics": [],
+      "structured_text_review": "verified",
+      "subfamily": "STM32U073",
+      "visual_screenshot_review": "cache_miss"
+    },
+    {
+      "base_device": "STM32U083CC",
+      "datasheet_id": "DS14463",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32u083cc.pdf",
+      "ordering_pdf_page": 135,
+      "ordering_section": 8,
+      "required_fields_complete": true,
+      "revision": 2,
+      "series": "STM32U0",
+      "special_semantics": [],
+      "structured_text_review": "verified",
+      "subfamily": "STM32U083",
+      "visual_screenshot_review": "cache_miss"
+    },
+    {
+      "base_device": "STM32C011F4",
+      "datasheet_id": "DS13866",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c011f4.pdf",
+      "ordering_pdf_page": 93,
+      "ordering_section": 7,
+      "required_fields_complete": true,
+      "revision": 5,
+      "series": "STM32C0",
+      "special_semantics": [],
+      "structured_text_review": "verified",
+      "subfamily": "STM32C011",
+      "visual_screenshot_review": "cache_miss"
+    },
+    {
+      "base_device": "STM32C031C4",
+      "datasheet_id": "DS13867",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c031c4.pdf",
+      "ordering_pdf_page": 100,
+      "ordering_section": 7,
+      "required_fields_complete": true,
+      "revision": 4,
+      "series": "STM32C0",
+      "special_semantics": [],
+      "structured_text_review": "verified",
+      "subfamily": "STM32C031",
+      "visual_screenshot_review": "reviewed"
+    },
+    {
+      "base_device": "STM32C051C6",
+      "datasheet_id": "DS14721",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c051c6.pdf",
+      "ordering_pdf_page": 107,
+      "ordering_section": 7,
+      "required_fields_complete": true,
+      "revision": 2,
+      "series": "STM32C0",
+      "special_semantics": [],
+      "structured_text_review": "verified",
+      "subfamily": "STM32C051",
+      "visual_screenshot_review": "reviewed"
+    },
+    {
+      "base_device": "STM32C071C8",
+      "datasheet_id": "DS14693",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c071c8.pdf",
+      "ordering_pdf_page": 128,
+      "ordering_section": 7,
+      "required_fields_complete": true,
+      "revision": 2,
+      "series": "STM32C0",
+      "special_semantics": [
+        "N is an official product-version option and must not be normalized away"
+      ],
+      "structured_text_review": "verified",
+      "subfamily": "STM32C071",
+      "visual_screenshot_review": "reviewed"
+    },
+    {
+      "base_device": "STM32C091CB",
+      "datasheet_id": "DS14720",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c091cb.pdf",
+      "ordering_pdf_page": 121,
+      "ordering_section": 7,
+      "required_fields_complete": true,
+      "revision": 3,
+      "series": "STM32C0",
+      "special_semantics": [
+        "shared authority: 09x explicitly resolves to 091 (STM32C091) or 092 (STM32C092)"
+      ],
+      "structured_text_review": "verified",
+      "subfamily": "STM32C091",
+      "visual_screenshot_review": "reviewed"
+    },
+    {
+      "base_device": "STM32C092CB",
+      "datasheet_id": "DS14720",
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c091cb.pdf",
+      "ordering_pdf_page": 121,
+      "ordering_section": 7,
+      "required_fields_complete": true,
+      "revision": 3,
+      "series": "STM32C0",
+      "special_semantics": [
+        "shared authority: 09x explicitly resolves to 091 (STM32C091) or 092 (STM32C092)"
+      ],
+      "structured_text_review": "verified",
+      "subfamily": "STM32C092",
+      "visual_screenshot_review": "reviewed"
+    }
+  ]
+}
