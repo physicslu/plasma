@@ -9,6 +9,10 @@ product_root="${PLASMA_Z2_PRODUCT_ROOT:-/opt/plasma}"
 install_root="$product_root/install"
 install_evidence="$install_root/last-install.json"
 python_evidence="$install_root/python-runtime.json"
+config_root="/etc/plasma"
+ppu_config="$config_root/ppu.yaml"
+server_unit="/etc/systemd/system/plasma-server.service"
+gateway_unit="/etc/systemd/system/plasma-web.service"
 
 say() {
   printf '[plasmactl z2-ps] %s\n' "$*"
@@ -173,6 +177,30 @@ local_health_url() {
   printf 'http://%s:18080\n' "$gateway_host"
 }
 
+verify_site_desired_operational_contract() {
+  require_command stat
+  require_file "$ppu_config" "canonical PPU configuration"
+  require_file "$server_unit" "Plasma Server unit"
+  require_file "$gateway_unit" "Plasma Gateway unit"
+  [[ "$(stat -c '%a' "$config_root")" == "770" ]] || die "PPU config root must be mode 0770"
+  [[ "$(stat -c '%U:%G' "$config_root")" == "root:plasma" ]] || die "PPU config root must be owned root:plasma"
+  [[ "$(stat -c '%a' "$ppu_config")" == "640" ]] || die "PPU config must be mode 0640"
+  [[ "$(stat -c '%U:%G' "$ppu_config")" == "plasma:plasma" ]] || die "PPU config must be owned plasma:plasma"
+  grep -Fq "server --config $ppu_config" "$server_unit" || die "Plasma Server is not bound to canonical PPU config"
+  grep -Fq "gateway --ppu-config $ppu_config" "$gateway_unit" || die "Plasma Gateway is not bound to canonical PPU config"
+  grep -Fq "ReadWritePaths=/var/lib/plasma /var/log/plasma $config_root" "$gateway_unit" || \
+    die "Plasma Gateway does not have the bounded canonical config write root"
+  if grep -F 'ReadWritePaths=' "$server_unit" | grep -Fq "$config_root"; then
+    die "Plasma Server must not receive canonical config write access"
+  fi
+  [[ "$(json_field "$install_evidence" site_desired_state.config_path 2>/dev/null || true)" == "$ppu_config" ]] || \
+    die "install evidence does not identify the canonical Site Desired config"
+  [[ "$(json_field "$install_evidence" site_desired_state.gateway_write_root 2>/dev/null || true)" == "$config_root" ]] || \
+    die "install evidence does not identify the bounded Gateway write root"
+  [[ "$(json_field "$install_evidence" site_desired_state.runtime_apply_supported 2>/dev/null || true)" == "false" ]] || \
+    die "install evidence must keep Site Desired Runtime apply unsupported"
+}
+
 verify_runtime() {
   require_command python3
   require_command systemctl
@@ -203,6 +231,7 @@ if machine not in {"armv7", "armv7l"}:
     raise SystemExit(f"runtime host is not ARMv7: {machine}")
 PY
 
+  verify_site_desired_operational_contract
   systemctl is-active --quiet plasma-server.service || die "plasma-server.service is not active"
   systemctl is-active --quiet plasma-web.service || die "plasma-web.service is not active"
 
@@ -240,8 +269,8 @@ if response.get("payload_base64") != "AA==":
     raise SystemExit(f"loopback payload echo is invalid: {response!r}")
 PY
 
-  say "PASS: real Z2 ARMv7 PS runtime + local PS diagnostic loopback"
-  say "qualification boundary: PS-only; PL/FPGA/Site/power/real-IC readiness is separate"
+  say "PASS: real Z2 ARMv7 PS runtime + local PS diagnostic loopback + Site Desired service wiring"
+  say "qualification boundary: persistence wiring only; Runtime apply and PL/FPGA/Site/power/real-IC readiness remain separate"
 }
 
 show_status() {
@@ -260,6 +289,7 @@ show_status() {
   printf 'Gateway:       http://%s:18080\n' "$gateway_host"
   printf 'Server svc:    %s\n' "${server_state:-unknown}"
   printf 'Gateway svc:   %s\n' "${web_state:-unknown}"
+  printf 'Site desired:  %s (persistent only; no Runtime apply)\n' "$ppu_config"
   printf 'Hardware:      PS-only; PL/Site/real-IC not qualified by this profile\n'
 }
 
