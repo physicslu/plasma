@@ -22,6 +22,17 @@ function activeExecution(view: FleetPPUView | null): boolean {
   return view.topology.sites.some(site => Boolean(site.current_job_id) || ACTIVE_SITE_STATES.has(site.state.toLowerCase()));
 }
 
+function trustedIdleObservation(view: FleetPPUView | null): boolean {
+  if (!view || activeExecution(view)) return false;
+  return (
+    view.observation.state === "current"
+    && view.transport_state === "reachable"
+    && !view.identity_conflict
+    && !view.degraded
+    && view.topology.source === "current"
+  );
+}
+
 export default function PpuRuntimeDeploymentPage() {
   const [registry, setRegistry] = useState<ManagerRegistryPayload | null>(null);
   const [fleet, setFleet] = useState<FleetWebPayload | null>(null);
@@ -61,6 +72,7 @@ export default function PpuRuntimeDeploymentPage() {
   );
   const selectedFleet = selectedEntry ? fleetForEntry(selectedEntry, fleet) : null;
   const busy = activeExecution(selectedFleet);
+  const trustedIdle = trustedIdleObservation(selectedFleet);
 
   return (
     <section className="ppuSiteConfiguration" aria-label="PPU Runtime Deployment Workspace">
@@ -100,6 +112,7 @@ export default function PpuRuntimeDeploymentPage() {
           key={selectedEntry.alias ?? selectedEntry.endpoint}
           entry={selectedEntry}
           hasActiveExecution={busy}
+          hasTrustedIdleObservation={trustedIdle}
         />
       ) : (
         <section className="ppuSiteCard ppuEmptyRegistry">
