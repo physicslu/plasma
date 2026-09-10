@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/ppu-bootstrap.yml"
+      - ".github/workflows/z2-ps-release.yml"
       - "scripts/ppu-bootstrap.py"
       - "scripts/ppu-bootstrap-service.py"
       - "scripts/ppu-bootstrap-deployment.py"
@@ -24,10 +25,12 @@ on:
       - "software/python/tests/test_ppu_bootstrap_kit.py"
       - "software/python/tests/test_ppu_bootstrap_installer.py"
       - "software/python/tests/test_ppu_bootstrap_hil_evidence.py"
+      - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
   push:
     branches: [main]
     paths:
       - ".github/workflows/ppu-bootstrap.yml"
+      - ".github/workflows/z2-ps-release.yml"
       - "scripts/ppu-bootstrap.py"
       - "scripts/ppu-bootstrap-service.py"
       - "scripts/ppu-bootstrap-deployment.py"
@@ -48,6 +51,7 @@ on:
       - "software/python/tests/test_ppu_bootstrap_kit.py"
       - "software/python/tests/test_ppu_bootstrap_installer.py"
       - "software/python/tests/test_ppu_bootstrap_hil_evidence.py"
+      - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -88,6 +92,7 @@ jobs:
           software/python/tests/test_ppu_bootstrap_kit.py
           software/python/tests/test_ppu_bootstrap_installer.py
           software/python/tests/test_ppu_bootstrap_hil_evidence.py
+          software/python/tests/test_z2_bootstrap_deployment_call_graph.py
 
   factory-bundle:
     needs: bootstrap-scripts
