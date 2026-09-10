@@ -129,7 +129,7 @@ export function managerPpuSelectionCookie(alias: string): string {
 
 function forwardedHeaders(request: Request): Headers {
   const headers = new Headers();
-  for (const name of ["Accept", "Authorization", "Content-Type", "Idempotency-Key"]) {
+  for (const name of ["Accept", "Authorization", "Content-Type", "Idempotency-Key", "If-Match"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
