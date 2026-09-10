@@ -135,14 +135,19 @@ def main() -> int:
         owner="SW/PPU Python/PL",
     )
 
-    # The persistent L4 workflow is security-sensitive executable CI policy.
-    # A workflow-only change must therefore exercise both its Python security
-    # tests and repository CI-boundary governance before merge.
-    require_count(
-        python_tests,
+    # Persistent L4 workflow policy is part of PPU qualification, not the
+    # generic Python source-test trigger surface. Keep its dedicated security
+    # test and workflow path bound to the PPU release gate, and route workflow
+    # changes through repository CI-boundary governance as well.
+    require(
+        ppu_release,
         '".github/workflows/persistent-integration-host.yml"',
-        2,
-        owner="SW/PPU persistent L4 security",
+        owner="SW/PPU persistent L4 qualification",
+    )
+    require(
+        ppu_release,
+        "software/python/tests/test_persistent_integration_host_security.py",
+        owner="SW/PPU persistent L4 qualification",
     )
     require_count(
         repository_contracts,
