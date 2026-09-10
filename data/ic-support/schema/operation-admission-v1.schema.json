@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/admission/operation-admission-v1",
+  "title": "Operation admission v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "artifact_id", "artifact_type", "target", "operations", "artifact_digest"],
+  "properties": {
+    "schema_id": {"const": "plasma://ic-support/admission/operation-admission-v1"},
+    "schema_version": {"const": "1.0.0"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "artifact_type": {"const": "operation_admission"},
+    "target": {"type": "object", "additionalProperties": false, "required": ["vendor_id", "icpn"], "properties": {"vendor_id": {"type": "string", "minLength": 1}, "icpn": {"type": "string", "minLength": 1}}},
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["request_operation", "operation_contract_id", "operation_contract_digest", "state", "canonical_admission_digest", "backend_id", "backend_lock_digest", "compiler_id", "canonical_requirements", "unresolved_requirements", "hardware_runtime_ready"],
+        "properties": {
+          "request_operation": {"type": "string", "minLength": 1},
+          "operation_contract_id": {"type": "string", "minLength": 1},
+          "operation_contract_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "state": {"enum": ["ADMITTED", "BLOCKED", "INCOMPLETE"]},
+          "canonical_admission_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "backend_id": {"type": "string", "minLength": 1},
+          "backend_lock_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "compiler_id": {"type": "string", "minLength": 1},
+          "canonical_requirements": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "unresolved_requirements": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "hardware_runtime_ready": {"type": "boolean"}
+        }
+      }
+    },
+    "artifact_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

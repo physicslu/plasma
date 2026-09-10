@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/admission/review-binding-v1",
+  "title": "Review binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "artifact_id", "artifact_type", "reviewed_artifact", "review_artifact", "review_status", "artifact_digest"],
+  "properties": {
+    "schema_id": {"const": "plasma://ic-support/admission/review-binding-v1"},
+    "schema_version": {"const": "1.0.0"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "artifact_type": {"const": "review_binding"},
+    "reviewed_artifact": {"$ref": "artifact-ref-v1.schema.json"},
+    "review_artifact": {"$ref": "artifact-ref-v1.schema.json"},
+    "review_status": {"type": "string", "minLength": 1},
+    "artifact_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

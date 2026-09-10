@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/admission/canonical-admission-envelope-v1",
+  "title": "Canonical admission envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "artifact_id", "artifact_type", "target", "vendor_payload", "lineage", "admission", "artifact_digest"],
+  "properties": {
+    "schema_id": {"const": "plasma://ic-support/admission/canonical-admission-envelope-v1"},
+    "schema_version": {"const": "1.0.0"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "artifact_type": {"const": "canonical_admission_envelope"},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vendor_id", "icpn"],
+      "properties": {"vendor_id": {"type": "string", "minLength": 1}, "icpn": {"type": "string", "minLength": 1}}
+    },
+    "vendor_payload": {"$ref": "artifact-ref-v1.schema.json"},
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_lock", "review_binding", "disposition", "candidate_review"],
+      "properties": {
+        "source_lock": {"$ref": "artifact-ref-v1.schema.json"},
+        "review_binding": {"$ref": "artifact-ref-v1.schema.json"},
+        "disposition": {"$ref": "artifact-ref-v1.schema.json"},
+        "candidate_review": {"$ref": "artifact-ref-v1.schema.json"}
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "unresolved_requirements"],
+      "properties": {
+        "state": {"enum": ["ADMITTED", "BLOCKED", "INCOMPLETE"]},
+        "unresolved_requirements": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "artifact_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
