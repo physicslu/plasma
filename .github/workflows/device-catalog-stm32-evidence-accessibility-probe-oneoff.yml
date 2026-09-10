@@ -1,4 +1,4 @@
-name: STM32 evidence accessibility probe retention one-off
+name: STM32 evidence accessibility final replay one-off
 
 on:
   push:
@@ -8,63 +8,31 @@ on:
       - ".github/workflows/device-catalog-stm32-evidence-accessibility-probe-oneoff.yml"
 
 permissions:
-  actions: read
-  contents: write
+  contents: read
 
 jobs:
-  retain:
+  replay:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    env:
-      ARTIFACT_ID: "10136442964"
-      ARTIFACT_SHA256: "4423e91a1c5eec5491084e6fedd7afc5a53f1701ec583f86163d2ddf64c16d4b"
-      SOURCE_RUN_ID: "34436667425"
-      EXECUTED_SHA: "e30c2aca6a3f4e3ede3b40e6352aa9d8dbe2d163"
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: agent/device-catalog-stm32-evidence-accessibility-probe
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate offline probe contracts before retention
+      - name: Validate offline probe contracts
         run: python data/device-catalog/research/test_stm32_evidence_accessibility_probe.py
-      - name: Download exact immutable artifact and verify digest
+      - name: Replay retained official-ST evidence
+        run: python data/device-catalog/research/validate_stm32_evidence_accessibility_probe_retained.py
+      - name: Assert Production remains outside probe scope
         run: |
-          set -euo pipefail
-          mkdir -p /tmp/stm32-accessibility-retention
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > /tmp/stm32-accessibility-artifact.zip
-          test "$(sha256sum /tmp/stm32-accessibility-artifact.zip | cut -d' ' -f1)" = "$ARTIFACT_SHA256"
-          unzip -q /tmp/stm32-accessibility-artifact.zip -d /tmp/stm32-accessibility-retention
-          find /tmp/stm32-accessibility-retention -maxdepth 2 -type f -print | sort
-      - name: Project artifact into retained evidence
-        run: |
-          python data/device-catalog/research/retain_stm32_evidence_accessibility_probe_artifact.py \
-            --artifact-root /tmp/stm32-accessibility-retention \
-            --artifact-id "$ARTIFACT_ID" \
-            --artifact-zip-sha256 "$ARTIFACT_SHA256" \
-            --workflow-run-id "$SOURCE_RUN_ID" \
-            --executed-git-sha "$EXECUTED_SHA"
-      - name: Assert retention transaction scope
-        run: |
-          set -euo pipefail
-          git status --short
-          changed="$(git status --short | awk '{print $2}' | sort)"
-          test -f data/device-catalog/research/stm32-evidence-accessibility-probe-baseline.json
-          test -f data/device-catalog/research/evidence/stm32-u0-c0-l1-evidence-accessibility-probe-live-2026-09-10/probe-summary.json
-          test -f data/device-catalog/research/evidence/stm32-u0-c0-l1-evidence-accessibility-probe-live-2026-09-10/provenance.json
-          test -f data/device-catalog/research/evidence/stm32-u0-c0-l1-evidence-accessibility-probe-live-2026-09-10/manifest.json
-          test -f data/device-catalog/research/evidence/stm32-u0-c0-l1-evidence-accessibility-probe-live-2026-09-10/README.md
-          test "$(sha256sum data/device-catalog/production/icpn-v1-manifest.json | cut -d' ' -f1)" = "93c2a4541daeb1d4aa1dcc57edef54042862eb6d9da03e3a6b401e4b8481b11d"
-      - name: Commit retention outputs only
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            data/device-catalog/research/stm32-evidence-accessibility-probe-baseline.json \
-            data/device-catalog/research/evidence/stm32-u0-c0-l1-evidence-accessibility-probe-live-2026-09-10
-          test "$(git diff --cached --name-only | wc -l)" -eq 5
-          git commit -m "Device catalog: retain STM32 accessibility probe evidence"
-          git push origin HEAD:agent/device-catalog-stm32-evidence-accessibility-probe
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('data/device-catalog/production/icpn-v1-manifest.json').read_text())
+          counts={str(x['family']):int(x['row_count']) for x in p['sources']}
+          assert sum(counts.values()) == 635
+          assert counts.get('STM32U0',0) == 0
+          assert counts.get('STM32C0',0) == 0
+          assert counts.get('STM32L1',0) == 0
+          print({'production_exact_icpns':sum(counts.values()),'probe_family_counts':{k:counts.get(k,0) for k in ('STM32U0','STM32C0','STM32L1')}})
+          PY
