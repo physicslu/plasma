@@ -110,7 +110,8 @@ PY
 release_id="${version}-${sha:0:12}"
 release_dir="/opt/plasma/releases/${release_id}"
 runtime_dir="${release_dir}/runtime"
-config_path="/etc/plasma/ppu.yaml"
+config_root="/etc/plasma"
+config_path="$config_root/ppu.yaml"
 state_root="/var/lib/plasma"
 log_root="/var/log/plasma"
 
@@ -131,7 +132,11 @@ else
   useradd --system --home-dir /var/lib/plasma --shell /usr/sbin/nologin --user-group plasma
 fi
 
-install -d -m 0755 /opt/plasma/releases /opt/plasma/install /etc/plasma
+install -d -m 0755 /opt/plasma/releases /opt/plasma/install
+# P2 operational closure: Gateway needs directory-level create/rename permission for
+# atomic Site desired-state persistence. Keep this bounded to the Plasma config root;
+# plasma-server.service remains systemd-read-only for this directory.
+install -d -m 0770 -o root -g plasma "$config_root"
 install -d -m 0750 -o plasma -g plasma "$state_root" "$state_root/output" "$state_root/gateway-output" "$log_root"
 if [[ -e "$release_dir" ]]; then
   printf 'swpc-z2like-ppu-install: immutable release already exists: %s\n' "$release_dir" >&2
@@ -164,8 +169,8 @@ server:
 
 sites: []
 EOF
-chmod 0644 "$config_path"
-chown root:root "$config_path"
+chmod 0640 "$config_path"
+chown plasma:plasma "$config_path"
 
 catalog="/opt/plasma/current/runtime/data/device-catalog/production/icpn-v1-manifest.json"
 app="/opt/plasma/current/runtime/ppu/ppu.pyz"
@@ -210,10 +215,10 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=$state_root $log_root
+ReadWritePaths=$state_root $log_root $config_root
 Environment=PYTHONUNBUFFERED=1
 Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$catalog
-ExecStart=$plasma_python $app gateway --host 127.0.0.1 --port 18080 --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $state_root/gateway-output
+ExecStart=$plasma_python $app gateway --ppu-config $config_path --host 127.0.0.1 --port 18080 --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $state_root/gateway-output
 
 [Install]
 WantedBy=multi-user.target
@@ -257,7 +262,6 @@ EOF
 
 ln -sfn "$release_dir" /opt/plasma/current.new
 mv -Tf /opt/plasma/current.new /opt/plasma/current
-
 systemctl daemon-reload
 systemctl enable --now plasma-server.service plasma-web.service
 nginx -t
@@ -305,6 +309,8 @@ cat >/opt/plasma/install/last-swpc-z2like-install.json <<EOF
   "gateway_bind": "127.0.0.1:18080",
   "restricted_ingress": "127.0.0.1:$proxy_port",
   "hardware_boundary": "closed",
+  "site_desired_config": "$config_path",
+  "runtime_apply_supported": false,
   "configured_site_count": 0,
   "max_supported_sites": 8
 }
