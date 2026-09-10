@@ -1,0 +1,55 @@
+name: STM32 evidence accessibility probe inspection one-off
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32-evidence-accessibility-probe
+    paths:
+      - ".github/workflows/device-catalog-stm32-evidence-accessibility-probe-oneoff.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Inspect bounded ordering-pattern surfaces
+        run: |
+          python - <<'PY'
+          import csv, json, re
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          catalog=Path('data/device-catalog/research/openocd-parts-canonical.csv')
+          target_series=('STM32U0','STM32C0','STM32L1')
+          grouped=defaultdict(list)
+          with catalog.open(newline='',encoding='utf-8') as f:
+              for row in csv.DictReader(f):
+                  if row.get('vendor') == 'STMicroelectronics' and row.get('plasma_series') in target_series:
+                      grouped[row['plasma_series']].append(row)
+
+          for series in target_series:
+              rows=grouped[series]
+              print(f'=== {series} ===')
+              print('rows',len(rows))
+              print('kinds',dict(sorted(Counter(r['identifier_kind'] for r in rows).items())))
+              print('subfamilies',json.dumps(dict(sorted(Counter(r['subfamily'] for r in rows).items())),sort_keys=True))
+              print('targets',sorted({r['target_config'] for r in rows}))
+              for sub in sorted({r['subfamily'] for r in rows}):
+                  pats=sorted(r['part_number'] for r in rows if r['subfamily']==sub and r['identifier_kind']=='ordering_pattern')
+                  aliases=sorted(r['part_number'] for r in rows if r['subfamily']==sub and r['identifier_kind']=='cmsis_device_name')
+                  print(f'SUBFAMILY {sub}')
+                  print('  ORDERING',json.dumps(pats,separators=(',',':')))
+                  print('  CMSIS',json.dumps(aliases,separators=(',',':')))
+                  candidates=[]
+                  for p in pats:
+                      m=re.fullmatch(r'(.+)[A-Z]x',p)
+                      candidates.append(m.group(1) if m else None)
+                  print('  BASE_HEURISTIC',json.dumps(candidates,separators=(',',':')))
+          PY
