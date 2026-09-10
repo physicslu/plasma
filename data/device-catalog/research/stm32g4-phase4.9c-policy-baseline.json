@@ -1,0 +1,839 @@
+{
+  "adapter_id": "stm32g4-phase4.9c-metadata",
+  "base_devices": [
+    "STM32G431C6",
+    "STM32G441CB",
+    "STM32G473CB",
+    "STM32G474CB",
+    "STM32G483CE",
+    "STM32G484CE",
+    "STM32G491CC",
+    "STM32G4A1CE"
+  ],
+  "candidate_count": 25,
+  "capability_mapping_deferred": true,
+  "cmsis_alias_gate_applied": false,
+  "decision_counts": {
+    "manual_review_required": 0,
+    "metadata_ready": 25,
+    "reject": 0
+  },
+  "evidence_id": "stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+  "exact_icpn_admission_deferred": true,
+  "fail_closed": true,
+  "family": "STM32G4",
+  "full_stm32g4_surface_covered": false,
+  "metadata_contract": {
+    "bounded_active_base_devices": [
+      "STM32G431C6",
+      "STM32G441CB",
+      "STM32G473CB",
+      "STM32G474CB",
+      "STM32G483CE",
+      "STM32G484CE",
+      "STM32G491CC",
+      "STM32G4A1CE"
+    ],
+    "bounded_active_candidate_count": 25,
+    "capability_mapping_deferred_to": "4.9D",
+    "cmsis_alias_gates_metadata": false,
+    "openocd_routing_gates_metadata": false,
+    "package_specific_pin_count_required": true,
+    "production_write_authorized": false,
+    "proposal_exact_identity_exclusions": [
+      "STM32G441CBT3",
+      "STM32G441CBU3",
+      "STM32G484CET3"
+    ],
+    "source_unavailable_base_devices": [
+      "STM32G411C6",
+      "STM32G414CB",
+      "STM32G471CC"
+    ],
+    "wlcsp49_exception": "STM32G441CBY6TR decodes C/Y as WLCSP49; C must not be normalized globally to 48 pins"
+  },
+  "metadata_distribution": {
+    "flash_size": {
+      "128 KiB": 10,
+      "256 KiB": 5,
+      "32 KiB": 2,
+      "512 KiB": 8
+    },
+    "option_suffix": {
+      "": 20,
+      "TR": 5
+    },
+    "package": {
+      "LQFP": 14,
+      "UFQFPN": 10,
+      "WLCSP": 1
+    },
+    "pin_count": {
+      "48": 24,
+      "49": 1
+    },
+    "temperature_grade": {
+      "-40 to 125 C": 6,
+      "-40 to 85 C": 19
+    }
+  },
+  "metadata_rows": [
+    {
+      "base_device": "STM32G431C6",
+      "family": "STM32G4",
+      "flash_size": "32 KiB",
+      "icpn": "STM32G431C6T6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G431",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g431c6.pdf#document=DS12589;revision=6;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G431C6",
+      "family": "STM32G4",
+      "flash_size": "32 KiB",
+      "icpn": "STM32G431C6U6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G431",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g431c6.pdf#document=DS12589;revision=6;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G441CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G441CBT6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G441",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g441cb.pdf#document=DS12960;revision=5;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G441CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G441CBU6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G441",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g441cb.pdf#document=DS12960;revision=5;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G441CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G441CBY6TR",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "TR",
+      "package": "WLCSP",
+      "pin_count": "49",
+      "series": "STM32G441",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g441cb.pdf#document=DS12960;revision=5;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G473CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G473CBT3",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G473",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g473cb.pdf#document=DS12712;revision=5;table=119;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 125 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G473CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G473CBT6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G473",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g473cb.pdf#document=DS12712;revision=5;table=119;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G473CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G473CBU6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G473",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g473cb.pdf#document=DS12712;revision=5;table=119;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G474CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G474CBT3",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G474",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g474cb.pdf#document=DS12288;revision=6;table=124;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 125 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G474CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G474CBT3TR",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "TR",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G474",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g474cb.pdf#document=DS12288;revision=6;table=124;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 125 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G474CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G474CBT6TR",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "TR",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G474",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g474cb.pdf#document=DS12288;revision=6;table=124;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G474CB",
+      "family": "STM32G4",
+      "flash_size": "128 KiB",
+      "icpn": "STM32G474CBU6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G474",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g474cb.pdf#document=DS12288;revision=6;table=124;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G483CE",
+      "family": "STM32G4",
+      "flash_size": "512 KiB",
+      "icpn": "STM32G483CET3",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G483",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g483ce.pdf#document=DS12997;revision=4;table=119;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 125 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G483CE",
+      "family": "STM32G4",
+      "flash_size": "512 KiB",
+      "icpn": "STM32G483CET6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G483",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g483ce.pdf#document=DS12997;revision=4;table=119;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G483CE",
+      "family": "STM32G4",
+      "flash_size": "512 KiB",
+      "icpn": "STM32G483CEU6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G483",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g483ce.pdf#document=DS12997;revision=4;table=119;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G484CE",
+      "family": "STM32G4",
+      "flash_size": "512 KiB",
+      "icpn": "STM32G484CET6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G484",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g484ce.pdf#document=DS12983;revision=5;table=123;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G484CE",
+      "family": "STM32G4",
+      "flash_size": "512 KiB",
+      "icpn": "STM32G484CEU3",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G484",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g484ce.pdf#document=DS12983;revision=5;table=123;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 125 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G484CE",
+      "family": "STM32G4",
+      "flash_size": "512 KiB",
+      "icpn": "STM32G484CEU6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G484",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g484ce.pdf#document=DS12983;revision=5;table=123;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G491CC",
+      "family": "STM32G4",
+      "flash_size": "256 KiB",
+      "icpn": "STM32G491CCT3",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G491",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g491cc.pdf#document=DS13122;revision=4;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 125 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G491CC",
+      "family": "STM32G4",
+      "flash_size": "256 KiB",
+      "icpn": "STM32G491CCT6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G491",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g491cc.pdf#document=DS13122;revision=4;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G491CC",
+      "family": "STM32G4",
+      "flash_size": "256 KiB",
+      "icpn": "STM32G491CCT6TR",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "TR",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G491",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g491cc.pdf#document=DS13122;revision=4;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G491CC",
+      "family": "STM32G4",
+      "flash_size": "256 KiB",
+      "icpn": "STM32G491CCU6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G491",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g491cc.pdf#document=DS13122;revision=4;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G491CC",
+      "family": "STM32G4",
+      "flash_size": "256 KiB",
+      "icpn": "STM32G491CCU6TR",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "TR",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G491",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g491cc.pdf#document=DS13122;revision=4;table=101;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G4A1CE",
+      "family": "STM32G4",
+      "flash_size": "512 KiB",
+      "icpn": "STM32G4A1CET6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "LQFP",
+      "pin_count": "48",
+      "series": "STM32G4A1",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g4a1ce.pdf#document=DS13268;revision=4;table=103;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    },
+    {
+      "base_device": "STM32G4A1CE",
+      "family": "STM32G4",
+      "flash_size": "512 KiB",
+      "icpn": "STM32G4A1CEU6",
+      "manufacturer": "STMicroelectronics",
+      "option_suffix": "",
+      "package": "UFQFPN",
+      "pin_count": "48",
+      "series": "STM32G4A1",
+      "source_authority": "STMicroelectronics official",
+      "source_reference": "https://www.st.com/resource/en/datasheet/stm32g4a1ce.pdf#document=DS13268;revision=4;table=103;identity=stm32g4-phase4.9b-official-st-discovery-2026-09-10-retained-20260910T003814Z-3c74395a",
+      "source_type": "official_st_ordering_information_plus_retained_phase4_9b_identity",
+      "temperature_grade": "-40 to 85 C",
+      "verification_status": "verified_st_datasheet_ordering_information_plus_retained_exact_identity"
+    }
+  ],
+  "openocd_routing_gate_applied": false,
+  "ordering_authority_manifest": "stm32g4-phase4.9c-ordering-authority.json",
+  "ordering_authority_manifest_sha256": "fa681acb3dc039799e4ffccdf8eb2441660d4103bed940a9ba3fbbf37433187e",
+  "phase": "4.9C",
+  "policy_evidence": {
+    "authority_version": "stm32g4-phase4.9c-retained25-v1",
+    "ordering_authority_manifest": "stm32g4-phase4.9c-ordering-authority.json",
+    "ordering_authority_manifest_sha256": "fa681acb3dc039799e4ffccdf8eb2441660d4103bed940a9ba3fbbf37433187e",
+    "ordering_documents": [
+      {
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g431c6.pdf",
+        "document_id": "DS12589",
+        "ordering_table": 101,
+        "pdf_page": 194,
+        "retained_semantics": {
+          "flash": {
+            "6": "32 KiB"
+          },
+          "option": {
+            "": "standard",
+            "TR": "tape and reel"
+          },
+          "package": {
+            "T": "LQFP",
+            "U": "UFQFPN",
+            "Y": "WLCSP"
+          },
+          "pin_package": {
+            "C/T": "48",
+            "C/U": "48",
+            "C/Y": "49"
+          },
+          "temperature": {
+            "3": "-40 to 125 C",
+            "6": "-40 to 85 C"
+          }
+        },
+        "review": {
+          "text_extraction": true,
+          "visual_ordering_table": true
+        },
+        "revision": 6,
+        "series": "STM32G431"
+      },
+      {
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g441cb.pdf",
+        "document_id": "DS12960",
+        "ordering_table": 101,
+        "pdf_page": 194,
+        "retained_semantics": {
+          "flash": {
+            "B": "128 KiB"
+          },
+          "option": {
+            "": "standard",
+            "TR": "tape and reel"
+          },
+          "package": {
+            "T": "LQFP",
+            "U": "UFQFPN",
+            "Y": "WLCSP"
+          },
+          "pin_package": {
+            "C/T": "48",
+            "C/U": "48",
+            "C/Y": "49"
+          },
+          "temperature": {
+            "3": "-40 to 125 C",
+            "6": "-40 to 85 C"
+          }
+        },
+        "review": {
+          "text_extraction": true,
+          "visual_ordering_table": true
+        },
+        "revision": 5,
+        "series": "STM32G441"
+      },
+      {
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g473cb.pdf",
+        "document_id": "DS12712",
+        "ordering_table": 119,
+        "pdf_page": 225,
+        "retained_semantics": {
+          "flash": {
+            "B": "128 KiB"
+          },
+          "option": {
+            "": "standard",
+            "TR": "tape and reel"
+          },
+          "package": {
+            "T": "LQFP",
+            "U": "UFQFPN"
+          },
+          "pin_package": {
+            "C/T": "48",
+            "C/U": "48"
+          },
+          "temperature": {
+            "3": "-40 to 125 C",
+            "6": "-40 to 85 C"
+          }
+        },
+        "review": {
+          "text_extraction": true,
+          "visual_ordering_table": true
+        },
+        "revision": 5,
+        "series": "STM32G473"
+      },
+      {
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g474cb.pdf",
+        "document_id": "DS12288",
+        "ordering_table": 124,
+        "pdf_page": 232,
+        "retained_semantics": {
+          "flash": {
+            "B": "128 KiB"
+          },
+          "option": {
+            "": "standard",
+            "TR": "tape and reel"
+          },
+          "package": {
+            "T": "LQFP",
+            "U": "UFQFPN"
+          },
+          "pin_package": {
+            "C/T": "48",
+            "C/U": "48"
+          },
+          "temperature": {
+            "3": "-40 to 125 C",
+            "6": "-40 to 85 C"
+          }
+        },
+        "review": {
+          "text_extraction": true,
+          "visual_ordering_table": true
+        },
+        "revision": 6,
+        "series": "STM32G474"
+      },
+      {
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g483ce.pdf",
+        "document_id": "DS12997",
+        "ordering_table": 119,
+        "pdf_page": 227,
+        "retained_semantics": {
+          "flash": {
+            "E": "512 KiB"
+          },
+          "option": {
+            "": "standard",
+            "TR": "tape and reel"
+          },
+          "package": {
+            "T": "LQFP",
+            "U": "UFQFPN"
+          },
+          "pin_package": {
+            "C/T": "48",
+            "C/U": "48"
+          },
+          "temperature": {
+            "3": "-40 to 125 C",
+            "6": "-40 to 85 C"
+          }
+        },
+        "review": {
+          "text_extraction": true,
+          "visual_ordering_table": false,
+          "visual_review_note": "ST PDF screenshot retrieval returned a cache miss; ordering table was verified from the official PDF text surface"
+        },
+        "revision": 4,
+        "series": "STM32G483"
+      },
+      {
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g484ce.pdf",
+        "document_id": "DS12983",
+        "ordering_table": 123,
+        "pdf_page": 231,
+        "retained_semantics": {
+          "flash": {
+            "E": "512 KiB"
+          },
+          "option": {
+            "": "standard",
+            "TR": "tape and reel"
+          },
+          "package": {
+            "T": "LQFP",
+            "U": "UFQFPN"
+          },
+          "pin_package": {
+            "C/T": "48",
+            "C/U": "48"
+          },
+          "temperature": {
+            "3": "-40 to 125 C",
+            "6": "-40 to 85 C"
+          }
+        },
+        "review": {
+          "text_extraction": true,
+          "visual_ordering_table": true
+        },
+        "revision": 5,
+        "series": "STM32G484"
+      },
+      {
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g491cc.pdf",
+        "document_id": "DS13122",
+        "ordering_table": 101,
+        "pdf_page": 193,
+        "retained_semantics": {
+          "flash": {
+            "C": "256 KiB"
+          },
+          "option": {
+            "": "standard",
+            "TR": "tape and reel"
+          },
+          "package": {
+            "T": "LQFP",
+            "U": "UFQFPN"
+          },
+          "pin_package": {
+            "C/T": "48",
+            "C/U": "48"
+          },
+          "temperature": {
+            "3": "-40 to 125 C",
+            "6": "-40 to 85 C"
+          }
+        },
+        "review": {
+          "text_extraction": true,
+          "visual_ordering_table": true
+        },
+        "revision": 4,
+        "series": "STM32G491"
+      },
+      {
+        "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32g4a1ce.pdf",
+        "document_id": "DS13268",
+        "ordering_table": 103,
+        "pdf_page": 198,
+        "retained_semantics": {
+          "flash": {
+            "E": "512 KiB"
+          },
+          "option": {
+            "": "standard",
+            "TR": "tape and reel"
+          },
+          "package": {
+            "T": "LQFP",
+            "U": "UFQFPN"
+          },
+          "pin_package": {
+            "C/T": "48",
+            "C/U": "48"
+          },
+          "temperature": {
+            "3": "-40 to 125 C",
+            "6": "-40 to 85 C"
+          }
+        },
+        "review": {
+          "text_extraction": true,
+          "visual_ordering_table": true
+        },
+        "revision": 4,
+        "series": "STM32G4A1"
+      }
+    ],
+    "semantic_decisions": {
+      "c_t_pin_package": "48 physical pins",
+      "c_u_pin_package": "48 physical pins",
+      "c_y_pin_package": "49 physical balls only where explicitly bound by the retained-series authority",
+      "cmsis_role": "alias/name surface only; not commercial identity or metadata authority",
+      "flash_6": "32 KiB",
+      "flash_B": "128 KiB",
+      "flash_C": "256 KiB",
+      "flash_E": "512 KiB",
+      "http_404_role": "current canonical source unavailable only; not historical nonexistence",
+      "identity_lifecycle_authority": "retained Phase 4.9B official ST dual-surface evidence",
+      "metadata_authority": "official ST datasheet ordering-information tables",
+      "openocd_role": "not a metadata authority; routing/capability deferred to Phase 4.9D",
+      "option_TR": "tape and reel",
+      "option_blank": "standard/programmed-part option as represented by exact ICPN",
+      "temperature_3": "-40 to 125 C",
+      "temperature_6": "-40 to 85 C"
+    }
+  },
+  "policy_ready_exact_icpns": [
+    "STM32G431C6T6",
+    "STM32G431C6U6",
+    "STM32G441CBT6",
+    "STM32G441CBU6",
+    "STM32G441CBY6TR",
+    "STM32G473CBT3",
+    "STM32G473CBT6",
+    "STM32G473CBU6",
+    "STM32G474CBT3",
+    "STM32G474CBT3TR",
+    "STM32G474CBT6TR",
+    "STM32G474CBU6",
+    "STM32G483CET3",
+    "STM32G483CET6",
+    "STM32G483CEU6",
+    "STM32G484CET6",
+    "STM32G484CEU3",
+    "STM32G484CEU6",
+    "STM32G491CCT3",
+    "STM32G491CCT6",
+    "STM32G491CCT6TR",
+    "STM32G491CCU6",
+    "STM32G491CCU6TR",
+    "STM32G4A1CET6",
+    "STM32G4A1CEU6"
+  ],
+  "production_manifest_sha256": "0dbb7df5a3ddc771326507fb42a47416d892d1d17f4e4141dde37cde23e95ddf",
+  "production_snapshot": {
+    "base_device_count": 209,
+    "exact_icpn_count": 610,
+    "family_exact_icpn_counts": {
+      "STM32F0": 42,
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384,
+      "STM32F7": 19,
+      "STM32G0": 47
+    },
+    "stm32g4_exact_icpn_count": 0
+  },
+  "production_write_applied": false,
+  "programming_algorithm_equivalence_claimed": false,
+  "proposal_exact_identity_exclusions": [
+    "STM32G441CBT3",
+    "STM32G441CBU3",
+    "STM32G484CET3"
+  ],
+  "retained_discovery_baseline_sha256": "474dbe34de46d654262497d3a6bd306c94fb5157e5e6cffb0f4bc753b5d228e3",
+  "retained_evidence_directory": "stm32g4-phase4.9b-official-st-discovery-live-2026-09-10",
+  "retained_evidence_manifest_sha256": "b9df96eeac45dfe051df8ea8e5d464e41d8e4136d65df2bdd44076ba2be81cfb",
+  "runtime_support_claimed": false,
+  "schema_version": 1,
+  "source_unavailable_base_devices": [
+    "STM32G411C6",
+    "STM32G414CB",
+    "STM32G471CC"
+  ]
+}
