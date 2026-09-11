@@ -13,6 +13,7 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
+      - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
@@ -39,6 +40,7 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
+      - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
       - "docs/deployment/z2-ps-installer.md"
       - "docs/deployment/plasmactl-deployment-profiles.md"
@@ -82,7 +84,7 @@ jobs:
 
       - name: Prove clean-PYNQ bootstrap compatibility
         run: |
-          python -m py_compile scripts/z2-python-runtime.py scripts/ppu-z2-installer.py
+          python -m py_compile scripts/z2-python-runtime.py scripts/ppu-z2-installer.py scripts/ppu-z2-installer-core.py
           python scripts/z2-python-runtime.py --help
           python scripts/ppu-z2-installer.py --help
           python -m pip install pytest
@@ -276,12 +278,14 @@ jobs:
           cp scripts/plasmactl "$root/scripts/plasmactl"
           cp scripts/plasmactl-z2-ps "$root/scripts/plasmactl-z2-ps"
           cp scripts/ppu-z2-installer.py "$root/scripts/ppu-z2-installer.py"
+          cp scripts/ppu-z2-installer-core.py "$root/scripts/ppu-z2-installer-core.py"
           cp scripts/z2-python-runtime.py "$root/scripts/z2-python-runtime.py"
           cp "$PPU_ARCHIVE" "$PPU_ARCHIVE.sha256" "$root/artifacts/"
           cp "$RUNNER_TEMP/z2-python-artifact/"* "$root/artifacts/"
           cp docs/deployment/z2-ps-installer.md "$root/docs/README.md"
           chmod +x "$root/scripts/plasmactl" "$root/scripts/plasmactl-z2-ps" \
             "$root/scripts/ppu-z2-installer.py" "$root/scripts/z2-python-runtime.py"
+          test -f "$root/scripts/ppu-z2-installer-core.py"
           python scripts/z2-python-runtime.py verify \
             "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz" \
             --sidecar "$root/artifacts/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz.sha256"
