@@ -1,11 +1,11 @@
 # H009 — STM32C0 C0.3 Metadata Policy Handover
 
 **Date:** 2026-09-12
-**Status:** C0.3 Gate 1 approved; implementation and CI qualification in progress
+**Status:** C0.3 implementation complete; PR #496 merge-ready candidate pending Gate 2
 **Primary workstream:** Device Catalog / STM32C0
 **Repository:** `physicslu/plasma`
 **C0.3 branch:** `agent/device-catalog-stm32c0-phase-c03-metadata-policy`
-**Draft PR:** `#496`
+**PR:** `#496`
 
 ## 1. Transaction boundary
 
@@ -21,7 +21,7 @@ Commercial identity/lifecycle authority remains the retained C0.2 official-ST Qu
 
 C0.3 does not authorize canonical admission, Production publication, programming-policy or algorithm equivalence, Flash-controller qualification, option/security qualification, HIL/electrical qualification, or runtime support.
 
-## 2. Current Production boundary
+## 2. Production boundary
 
 C0.3 freezes the transaction prestate at:
 
@@ -32,7 +32,12 @@ Production STM32 families: 9
 Production STM32C0 ICPNs:  0
 ```
 
-The C0.3 Production prestate is byte-identical to Git blob `89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc`. Production itself is not modified by this transaction.
+The C0.3 Production prestate is byte-identical to:
+
+- Git blob: `89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc`;
+- SHA-256: `903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0`.
+
+Both identities are enforced by the C0.3 planner/tests. Production itself is not modified by this transaction.
 
 ## 3. Official Ordering Information authority
 
@@ -59,23 +64,25 @@ C071 semantics are explicitly hard-locked:
 
 ## 4. Implemented C0.3 assets
 
-Current branch contains:
+The transaction adds or updates:
 
-- `data/device-catalog/research/stm32c0_metadata_policy.py`
-- `data/device-catalog/research/stm32c0_phase_c0_3_policy.py`
-- `data/device-catalog/research/test_stm32c0_phase_c0_3_policy.py`
-- `data/device-catalog/research/stm32c0-phase-c0.3-ordering-authority.json`
-- `data/device-catalog/research/stm32c0-phase-c0.3-production-manifest-prestate.json`
-- `data/device-catalog/research/stm32c0-phase-c0.3-policy-baseline.json`
-- `.github/workflows/device-catalog-stm32c0-c03-metadata-validation.yml`
+- `data/device-catalog/research/stm32c0_metadata_policy.py`;
+- `data/device-catalog/research/stm32c0_phase_c0_3_policy.py`;
+- `data/device-catalog/research/test_stm32c0_phase_c0_3_policy.py`;
+- `data/device-catalog/research/stm32c0-phase-c0.3-ordering-authority.json`;
+- `data/device-catalog/research/stm32c0-phase-c0.3-production-manifest-prestate.json`;
+- `data/device-catalog/research/stm32c0-phase-c0.3-policy-baseline.json`;
+- `data/device-catalog/research/device-catalog-stm32c0-phase-c0.3-metadata-policy.md`;
+- `.github/workflows/device-catalog-stm32c0-c03-metadata-validation.yml`;
+- centralized `stm32c0` family-CI profile and trigger routing.
 
-The temporary runner-only baseline generation step was used only to obtain deterministic output, then removed. Final C0.3 validation is read-only replay.
+The temporary runner-only baseline-generation step was used only to obtain deterministic output and was removed before merge readiness. Final C0.3 validation is read-only replay.
 
-## 5. Deterministic runner result
+## 5. Deterministic closure
 
-GitHub Actions C0.3 run #2 executed the retained C0.2 validator, 14 C0.3 negative/boundary tests, and the planner successfully.
+The synchronized PR merge candidate replayed C0.1, C0.2, and C0.3 successfully. The C0.3 test suite contains 15 negative/boundary tests and the centralized STM32C0 profile contains six deterministic entrypoints.
 
-Observed deterministic closure:
+Observed C0.3 result:
 
 ```text
 candidate_count:        220
@@ -101,11 +108,11 @@ Metadata distributions:
 - temperature: -40..85 C=127, -40..105 C=54, -40..125 C=39;
 - option suffix: blank=121, `TR`=80, `N`=16, `NTR`=3.
 
-These are observed runner results, not targets forced by policy.
+These are observed deterministic runner results, not targets forced by the policy.
 
-## 6. Negative controls already passing
+## 6. Fail-closed controls
 
-The current C0.3 tests cover:
+C0.3 validation covers:
 
 - retained C0.2 evidence and exact 220/50 scope;
 - all 220 metadata decodes;
@@ -117,18 +124,25 @@ The current C0.3 tests cover:
 - syntactically plausible but unretained exact identity rejection;
 - CMSIS-shaped identity rejection;
 - removal of C071 `N` authority failing closed;
+- Production prestate Git-blob and SHA-256 identity;
 - Production and runtime/capability claims remaining false.
 
-## 7. Remaining work before Gate 2
+## 7. Merge-readiness state
 
-The transaction is not merge-ready yet. Remaining work is routine Gate-1 execution:
+Current `main` was merge-forwarded into the C0.3 branch through PR #497 without rebase, force-push, or history rewrite. The synchronized branch has merge base exactly current `main` (`222d052a6442c7f7230e69b03cd290cbdf179c57`) and was 19 commits ahead / 0 behind at qualification.
 
-1. integrate C0.3 into the centralized `stm32c0` family-CI profile;
-2. add/finalize the C0.3 transaction documentation;
-3. resolve the branch-only H009 whitespace regression and verify `git diff --check`;
-4. review current `main` drift and merge-forward without rebase/history rewrite if needed;
-5. run final PR workflows on the synchronized head;
-6. inspect PR diff, reviews, mergeability, and CI;
-7. mark PR Ready when merge-ready, then stop for Gate 2 Merge Approval.
+On the synchronized implementation head, all applicable PR workflows passed:
 
-Do not start C0.4 or C0.5 under this Gate 1 approval.
+- STM32C0 C0.3 metadata validation;
+- STM32 family validation, including F0/F2/F3/F7/G0/G4/U0/C0;
+- Device Catalog validation;
+- Device Catalog current validation;
+- Repository contracts.
+
+PR #496 had no submitted reviews, no inline review threads, and GitHub reported it mergeable. This handover/index status update is documentation-only; final-head CI must remain green before Gate 2 is presented.
+
+## 8. Next action
+
+If final-head CI remains green and `main` has not advanced again, the only next gate is **Gate 2 — Merge Approval for PR #496**.
+
+Do not start C0.4 or C0.5 under the C0.3 Gate 1 approval. C0.4 is a separate read-only admission-plan transaction and requires a new Gate 1 after C0.3 is merged.
