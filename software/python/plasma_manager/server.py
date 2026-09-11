@@ -73,6 +73,7 @@ _MANAGED_POST_PATTERNS = tuple(
     for pattern in (
         r"^/api/settings/gateway$",
         r"^/api/settings/ppu-network$",
+        r"^/api/settings/sites/activation$",
         rf"^/api/settings/sites/{_SEGMENT}$",
         r"^/api/mock/runtime$",
         r"^/api/engineering/diagnostics/loopback$",
@@ -831,7 +832,7 @@ def main() -> None:
         required=True,
         help="Path to an explicit Plasma Manager registry configuration",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     serve(load_manager_config(args.config))
 
 
