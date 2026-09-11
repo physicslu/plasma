@@ -380,7 +380,7 @@ export default function PpuSiteDesiredConfiguration({ entry, hasActiveExecution 
       )}
 
       <p className="ppuSiteNote">
-        <strong>Configuration boundary:</strong> Draft is browser-local, Desired is persisted in canonical PPU configuration, and Runtime is observed separately. Each Draft keeps the exact <code>desired_revision</code> it was based on and Save Desired sends it with <code>If-Match</code>; a stale Draft receives HTTP 412 and is blocked from silently overwriting newer Desired state. When Desired and Runtime differ, the API reports <code>restart_required</code>. Phase 1 reports <code>runtime_apply_supported=false</code>, so this page does not pretend a save has already changed the running service. Protocol v3.3 also does not expose dormant interface/target bindings for disabled Sites; those rows remain explicitly partially observable instead of guessed.
+        <strong>Configuration boundary:</strong> Draft is browser-local, Desired is persisted in canonical PPU configuration, and Runtime is observed separately. Each Draft keeps the exact <code>desired_revision</code> it was based on and Save Desired sends it with <code>If-Match</code>; a stale Draft receives HTTP 412 and is blocked from silently overwriting newer Desired state. Save Desired persists configuration only; when Desired and Runtime differ, the API reports <code>restart_required</code>. Runtime application is a separate PPU-level controlled activation and is exposed only when the deployment reports <code>runtime_apply_supported=true</code>. Protocol v3.3 also does not expose dormant interface/target bindings for disabled Sites; those rows remain explicitly partially observable instead of guessed.
       </p>
     </OperatorCard>
   );
