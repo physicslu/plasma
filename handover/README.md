@@ -14,7 +14,7 @@ This directory contains numbered engineering handover documents intended to let 
 | [H006](H006-stm32-next-family-evidence-selection-2026-09-10.md) | 2026-09-10 | STM32 cross-family evidence accessibility, U0/C0 Ordering Information review, and historical next-family research selection | Superseded by H009 for current STM32 Device Catalog continuation | Retain as historical U0/C0 selection evidence; use H009 for current C0 work |
 | [H007](H007-vendor-neutral-ic-admission-handover-2026-09-10.md) | 2026-09-10 | Vendor-neutral admission architecture and NXP KL25 compatibility plan before PR-B/PR-C/PR-D closure | Superseded by H008 | Use H008 for current continuation state; retain H007 as historical architecture context |
 | [H008](H008-ic-support-architecture-freeze-v1-2026-09-11.md) | 2026-09-11 | Vendor-neutral IC Support Architecture Freeze v1 after PR-A/PR-B/PR-C/PR-D | Current | Define a bounded first real-hardware qualification Gate 1 for one exact target and narrow operation set |
-| [H009](H009-stm32c0-c03-metadata-policy-2026-09-12.md) | 2026-09-12 | STM32C0 Device Catalog through C0.2 and approved C0.3 manufacturer-authoritative metadata policy | Current | Continue C0.3 on the approved branch through metadata freeze, permanent CI, PR closure, and Gate 2 |
+| [H009](H009-stm32c0-c03-metadata-policy-2026-09-12.md) | 2026-09-12 | STM32C0 C0.3 manufacturer-authoritative metadata policy over the retained C0.2 commercial set | Current / Gate 2 pending | Verify PR #496 final-head CI/main drift, then Gate 2 merge; do not begin C0.4 under the C0.3 approval |
 
 ## Usage
 
@@ -25,7 +25,7 @@ Read repo handover H008 and the IC Support Architecture Freeze v1 document befor
 ```
 
 ```text
-Read repo handover H009 and AGENTS.md, then continue the already-approved STM32C0 C0.3 metadata-policy transaction on its existing branch. Verify current main/branch drift first and stop only at Gate 2.
+Read repo handover H009 and AGENTS.md, verify PR #496 final-head CI and current main drift, then continue the STM32C0 C0.3 Gate 2 transaction. Do not begin C0.4 without a new Gate 1.
 ```
 
 A handover records engineering state; it does not override `AGENTS.md`, checked-in executable code, or current repository state. If a handover conflicts with newer code, tests, or contracts, the newer repository state is authoritative.
