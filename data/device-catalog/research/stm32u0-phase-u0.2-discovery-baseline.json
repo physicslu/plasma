@@ -1,0 +1,80 @@
+{
+  "aggregate": {
+    "acquisition_failure": 0,
+    "acquisition_success": 26,
+    "active_candidate_targets": 26,
+    "active_exact_icpn_candidates": 68,
+    "attempted": 26,
+    "bounded_discovery_clean": true,
+    "commercial_identity_clean": true,
+    "commercial_identity_unresolved_targets": 0,
+    "commercial_identity_verified_targets": 26,
+    "dispositioned_targets": 26,
+    "excluded_non_active_part_numbers": 0,
+    "identity_manual_intervention_required": 0,
+    "lifecycle_excluded_targets": 0,
+    "openocd_routing": {
+      "ambiguous": 0,
+      "gates_commercial_identity": false,
+      "not_applicable": 0,
+      "unique": 26,
+      "unmapped": 0
+    },
+    "routing_followup_required": 0,
+    "source_unavailable_exclusions": 0
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "cmsis_alias_is_commercial_identity": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "discovery_execution": {
+    "artifact_id": 10179167672,
+    "artifact_zip_sha256": "2296dca761deaee6a72895bf9ba489fb70295d11654a7c69df339b91a9ea995a",
+    "executed_git_sha": "80a6312e04db2876ff68f64125b99dda11b53691",
+    "live_summary_sha256": "10adcbb137842a7d9e4ead7fc1007ba25284b84c8e5aba1c76de76772e1a948a",
+    "pr_head_sha": "d08b4fe2d6b9de772204e9530af5410f71351f18",
+    "workflow_run_id": 34545996184
+  },
+  "family": "STM32U0",
+  "phase": "U0.2",
+  "pilot_id": "stm32u0-u0.2-official-st-commercial-discovery-2026-09-10",
+  "retained_target_projection": {
+    "active_exact_icpn_count": 68,
+    "path": "evidence/stm32u0-u0.2-official-st-discovery-live-2026-09-11/targets.csv",
+    "row_count": 26,
+    "sha256": "4133860a090b1c5cc01449041fb49e0b5dd60d686e1338a343f8ea18d577e2e0",
+    "u0_1_representative_drift": false
+  },
+  "schema_version": 1,
+  "source_bindings": {
+    "browser_acquisition_git_blob_sha": "925b6d3044584302c2b3c88d1fde382c34cd67fb",
+    "discovery_manifest_git_blob_sha": "a0643d5d0103969d7ea835859bac5fc93aac27d5",
+    "discovery_script_git_blob_sha": "39d202da027be6299ca4d84fa2fee6838a4476ff",
+    "evidence_adapter_git_blob_sha": "ca23a1b3079f52499611dee7ae20f7c2af857150",
+    "live_workflow_git_blob_sha": "77bcaabc23a20c4b0d8692c6a702debc45c67453",
+    "openocd_catalog_git_blob_sha": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+    "product_page_acquisition_git_blob_sha": "7a0aaa5e6e5fbac3968e4b47dd1ee3c4e05bc01f",
+    "production_exact_icpn_count": 635,
+    "production_family_counts": {
+      "STM32F0": 42,
+      "STM32F1": 75,
+      "STM32F2": 33,
+      "STM32F3": 10,
+      "STM32F4": 384,
+      "STM32F7": 19,
+      "STM32G0": 47,
+      "STM32G4": 25
+    },
+    "production_manifest_git_blob_sha": "34ad9299ff0c063a8c8b5de1c253dfee47b63428",
+    "stm32u0_production_prestate_count": 0,
+    "u0_1_foundation_baseline_git_blob_sha": "4c0036b1fb66ce393a53134de8ce724c0ba0be50"
+  }
+}

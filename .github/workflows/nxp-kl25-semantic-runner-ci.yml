@@ -50,6 +50,7 @@ jobs:
             data/ic-support/benchmarks/nxp-kl25/post_review_disposition.py \
             data/ic-support/benchmarks/nxp-kl25/canonical_admission.py \
             data/ic-support/benchmarks/nxp-kl25/build_post_review_release.py \
+            data/ic-support/benchmarks/nxp-kl25/vendor_neutral_admission_adapter.py \
             data/ic-support/benchmarks/nxp-kl25/test_output_contract_hardening.py \
             data/ic-support/benchmarks/nxp-kl25/test_context_compaction.py \
             data/ic-support/benchmarks/nxp-kl25/test_semantic_coverage_gate53.py \
@@ -60,7 +61,8 @@ jobs:
             data/ic-support/benchmarks/nxp-kl25/test_gate57a_primary_scope.py \
             data/ic-support/benchmarks/nxp-kl25/test_gate58_manufacturer_review.py \
             data/ic-support/benchmarks/nxp-kl25/test_post_review_disposition.py \
-            data/ic-support/benchmarks/nxp-kl25/test_canonical_admission.py
+            data/ic-support/benchmarks/nxp-kl25/test_canonical_admission.py \
+            data/ic-support/benchmarks/nxp-kl25/test_vendor_neutral_admission_adapter.py
       - name: Validate KL25 operator helper syntax
         run: |
           bash -n scripts/ic-support-kl25-live.sh
@@ -103,3 +105,5 @@ jobs:
         run: |
           python data/ic-support/benchmarks/nxp-kl25/test_post_review_disposition.py
           python data/ic-support/benchmarks/nxp-kl25/test_canonical_admission.py
+      - name: Validate NXP vendor-neutral admission projection without external artifacts
+        run: python data/ic-support/benchmarks/nxp-kl25/test_vendor_neutral_admission_adapter.py

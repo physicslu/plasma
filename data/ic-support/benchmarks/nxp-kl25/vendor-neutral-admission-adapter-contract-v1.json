@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "nxp_kl25_vendor_neutral_admission_adapter_contract",
+  "contract_id": "nxp-kl25-vendor-neutral-admission-adapter-v1",
+  "target": {
+    "vendor_id": "NXP",
+    "icpn": "MKL25Z128VLK4"
+  },
+  "retained_run": {
+    "run_id": "20260909T080946Z",
+    "aggregate_digest": "926f0e95e230a32ce9f6eacc4cd468314d3af370100cbaf6d7acc5d0fee65618",
+    "aggregate_file_sha256": "b80a78d2f5a21719d71c12ab6086ee5a013f0e6ff489958cea830386595e410a"
+  },
+  "gate58": {
+    "review_view_digest": "f56b721994cfacceae2e2ac621503e3b24530b3994f5176a8c6cc4aed12d7bc3",
+    "review_view_file_sha256": "aca24b9869027ef95273eb4aa9683c718eb1367066af44f8d11ac26ce9708627",
+    "review_verdict_file_sha256": "c0ba866ffa9acb7f3f0956f2271c2159f016ac6881cfd18354b5f9f35b16b526",
+    "qualification_digest": "746e70b8209324692552ffb1d868da837de14bd86e05750d70a3314867259473",
+    "qualification_status": "REJECTED_REVIEW"
+  },
+  "legacy_release": {
+    "release_digest": "dc256318618f20d3d5bffbee8fe74fd0c9554b7b457d448f1bc13ed86f18f987",
+    "manifest_file_sha256": "e7329635f3855f0c4fec98a4f07112f1b1572a18153c4870f74b36f4a602e441",
+    "backend_lock_digest": "877b3fd9c0b9f8dc3191eb53393e5670efb93b9952ac1747bded155ebcaef4d1",
+    "openocd_commit": "56b8d93fbe61a78dc903d770820d6d896b6d8134"
+  },
+  "source_lock_content_digest": "8b6ec72cb229685c0937c02246853c539d340169e9b0b0d4023b5dea068004cc",
+  "expected_counts": {
+    "facts": 140,
+    "gate58_full_pass": 130,
+    "gate58_findings": 10,
+    "accepted_candidates": 130,
+    "transformed_candidates": 13,
+    "candidates": 143,
+    "admitted_operations": 4,
+    "blocked_operations": 8
+  },
+  "review_dimensions": [
+    "semantic_support",
+    "citation_entailment",
+    "atomicity",
+    "scope",
+    "terminology"
+  ],
+  "operation_mapping": {
+    "READ": "READ",
+    "VERIFY": "VERIFY",
+    "PROGRAM": "PROGRAM",
+    "ERASE_SECTOR": "ERASE",
+    "ERASE_ALL_BLOCKS": "ERASE_ALL_BLOCKS",
+    "MDM_MASS_ERASE": "MDM_MASS_ERASE",
+    "BACKDOOR_KEY": "BACKDOOR_KEY",
+    "SECURITY_STATE_MODIFICATION": "SECURITY_STATE_MODIFICATION",
+    "FLASH_CONFIGURATION_FIELD_PROGRAM": "FLASH_CONFIGURATION_FIELD_PROGRAM",
+    "FLASH_CONFIGURATION_FIELD_SECTOR_ERASE": "FLASH_CONFIGURATION_FIELD_SECTOR_ERASE",
+    "UNPROTECT": "UNPROTECT",
+    "IMPLICIT_DESTRUCTIVE_SECURITY_WORKFLOW": "IMPLICIT_DESTRUCTIVE_SECURITY_WORKFLOW"
+  }
+}
