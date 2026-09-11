@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "review_id": "stm32-c0-l0-post-u0-official-st-ordering-information-review-v1",
+  "review_date": "2026-09-11",
+  "scope": {
+    "families": ["STM32C0", "STM32L0"],
+    "purpose": "compare official ST Ordering Information evidence quality after the post-U0 commercial identity/lifecycle probe",
+    "c0_representative_target_count": 6,
+    "l0_representative_target_count": 16,
+    "c0_unique_official_datasheet_count": 5,
+    "l0_unique_official_datasheet_count": 16
+  },
+  "method": {
+    "authority": "official_st_datasheet",
+    "review_mode": "official_st_pdf_structured_text_plus_visual_where_available",
+    "required_ordering_fields": [
+      "device_family",
+      "product_type",
+      "device_subfamily",
+      "pin_count",
+      "flash_memory_size",
+      "package",
+      "temperature_range",
+      "packing_or_options"
+    ],
+    "current_revision_check_date": "2026-09-11",
+    "transport_diagnostics_are_selection_evidence": false,
+    "visual_screenshot_review_is_selection_gate": false,
+    "notes": [
+      "The retained STM32C0 review from the pre-U0 selection transaction is reused only because all five official ST datasheet revisions were rechecked on 2026-09-11 and no revision drift was observed.",
+      "STM32L031 has an official S option for the UFQFPN28 power-pair variant and that option must not be normalized away in future metadata work.",
+      "STM32L010 has a narrower ordering grammar and does not expose the general STM32L0 D/BOR option used by many other L0 subfamilies.",
+      "Ordering Information completeness is commercial metadata evidence only; it is not programming-algorithm, Flash-controller, security, HIL, or runtime evidence."
+    ]
+  },
+  "by_series": {
+    "STM32C0": {
+      "representative_targets": 6,
+      "unique_official_datasheets": 5,
+      "ordering_authority_covered_targets": 6,
+      "required_schema_complete_targets": 6,
+      "blocking_evidence_issues": 0,
+      "ordering_evidence_quality": "complete",
+      "prior_review": "stm32-u0-c0-ordering-authority-review.json",
+      "prior_review_sha256": "3fe019d420cbe43c732b9d403acaa2f1b0bf0dc583b38073eb25528217f5efe9",
+      "revision_drift": false,
+      "authorities": [
+        {"datasheet_id": "DS13866", "revision": 5, "ordering_pdf_page": 93, "url": "https://www.st.com/resource/en/datasheet/stm32c011f4.pdf"},
+        {"datasheet_id": "DS13867", "revision": 4, "ordering_pdf_page": 100, "url": "https://www.st.com/resource/en/datasheet/stm32c031c4.pdf"},
+        {"datasheet_id": "DS14721", "revision": 2, "ordering_pdf_page": 107, "url": "https://www.st.com/resource/en/datasheet/stm32c051c6.pdf"},
+        {"datasheet_id": "DS14693", "revision": 2, "ordering_pdf_page": 128, "url": "https://www.st.com/resource/en/datasheet/stm32c071c8.pdf"},
+        {"datasheet_id": "DS14720", "revision": 3, "ordering_pdf_page": 121, "url": "https://www.st.com/resource/en/datasheet/stm32c091cb.pdf"}
+      ]
+    },
+    "STM32L0": {
+      "representative_targets": 16,
+      "unique_official_datasheets": 16,
+      "ordering_authority_covered_targets": 16,
+      "required_schema_complete_targets": 16,
+      "blocking_evidence_issues": 0,
+      "ordering_evidence_quality": "complete",
+      "revision_drift": false
+    }
+  },
+  "l0_targets": [
+    {"base_device": "STM32L010C6", "subfamily": "STM32L010", "datasheet_id": "DS12324", "revision": 3, "ordering_pdf_page": 87, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l010c6.pdf", "required_fields_complete": true, "special_semantics": ["narrow grammar: no general D/BOR option in the ordering scheme"]},
+    {"base_device": "STM32L011D3", "subfamily": "STM32L011", "datasheet_id": "DocID027973", "revision": 5, "ordering_pdf_page": 115, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l011d3.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L021D4", "subfamily": "STM32L021", "datasheet_id": "DocID027982", "revision": 5, "ordering_pdf_page": 110, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l021d4.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L031C4", "subfamily": "STM32L031", "datasheet_id": "DS10668", "revision": 6, "ordering_pdf_page": 120, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l031f4.pdf", "required_fields_complete": true, "special_semantics": ["S is an official UFQFPN28 one-power-pair option; blank means two power pairs"]},
+    {"base_device": "STM32L041C6", "subfamily": "STM32L041", "datasheet_id": "DS10780", "revision": 6, "ordering_pdf_page": 118, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l041c6.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L051C6", "subfamily": "STM32L051", "datasheet_id": "DS10184", "revision": 10, "ordering_pdf_page": 125, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l051c6.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L052C6", "subfamily": "STM32L052", "datasheet_id": "DS10182", "revision": 10, "ordering_pdf_page": 142, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l052c6.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L053C6", "subfamily": "STM32L053", "datasheet_id": "DS10152", "revision": 10, "ordering_pdf_page": 132, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l053c6.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L062C8", "subfamily": "STM32L062", "datasheet_id": "DS10183", "revision": 11, "ordering_pdf_page": 117, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l062c8.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L063C8", "subfamily": "STM32L063", "datasheet_id": "DS10090", "revision": 8, "ordering_pdf_page": 123, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l063c8.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L071C8", "subfamily": "STM32L071", "datasheet_id": "DS10690", "revision": 7, "ordering_pdf_page": 143, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l071c8.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L072CB", "subfamily": "STM32L072", "datasheet_id": "DS10689", "revision": 5, "ordering_pdf_page": 155, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l072cb.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L073CB", "subfamily": "STM32L073", "datasheet_id": "DS10685", "revision": 7, "ordering_pdf_page": 156, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l073cb.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L081CB", "subfamily": "STM32L081", "datasheet_id": "DS10888", "revision": 6, "ordering_pdf_page": 114, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l081cb.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L082CZ", "subfamily": "STM32L082", "datasheet_id": "DS10688", "revision": 7, "ordering_pdf_page": 126, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l082cz.pdf", "required_fields_complete": true, "special_semantics": []},
+    {"base_device": "STM32L083CB", "subfamily": "STM32L083", "datasheet_id": "DS10671", "revision": 5, "ordering_pdf_page": 144, "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32l083cz.pdf", "required_fields_complete": true, "special_semantics": []}
+  ],
+  "comparison": {
+    "eligible_for_current_priority_tiebreak": ["STM32C0", "STM32L0"],
+    "result": "equivalent_required_ordering_evidence_quality",
+    "selected_next_research_family": null
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false,
+    "selected_next_research_family": false
+  }
+}
