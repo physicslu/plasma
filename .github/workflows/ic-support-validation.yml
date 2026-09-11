@@ -50,6 +50,22 @@ jobs:
             data/ic-support/admission/validate.py \
             data/ic-support/tests/test_vendor_neutral_admission.py
           python data/ic-support/tests/test_vendor_neutral_admission.py
+      - name: Validate STM32F103C vendor-neutral admission migration
+        run: |
+          python -m py_compile \
+            data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission.py \
+            data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_v1.py
+          python data/ic-support/benchmarks/stm32f103c/test_vendor_neutral_admission_v1.py
+          out="$RUNNER_TEMP/stm32f103c-vendor-neutral-admission"
+          rm -rf "$out"
+          python data/ic-support/benchmarks/stm32f103c/stm32f103c_vendor_neutral_admission.py --output-dir "$out"
+          cat "$out/release-manifest.json"
+      - name: Upload STM32F103C vendor-neutral admission sidecar
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32f103c-vendor-neutral-admission
+          path: ${{ runner.temp }}/stm32f103c-vendor-neutral-admission
+          if-no-files-found: error
       - name: Validate Programming Execution IR research contract
         run: python data/ic-support/execution-ir/validate.py
       - name: Run Programming Execution IR research regressions

@@ -1,0 +1,216 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "stm32f103c-vendor-neutral-admission-contract-v1",
+  "migration_base_commit": "21c6b3c114355f951af40402eda4073fac0826ff",
+  "source_lock": {
+    "source_lock_id": "stm32f103c-source-lock-v0",
+    "manufacturer_sources": {
+      "st_ds5319_rev20": "1e54ce18e6c34c5b4a78986f26e245e143748c721009fc9af5953795c30686bc",
+      "st_pm0075_rev2": "2296c5d528f71ddc7502baa907a0d6a7473ad10f1c67e8b07bb046f291dd4a8a"
+    }
+  },
+  "legacy_inputs": {
+    "ground_truth": {
+      "path": "data/ic-support/benchmarks/stm32f103c/ground-truth.json",
+      "git_blob_sha1": "1d30840a89f39f120c4e3ef4461c2d1fad655db2"
+    },
+    "binding": {
+      "path": "data/ic-support/bindings/stm32f103c-pilot-v0.json",
+      "git_blob_sha1": "4cb9f27e1ae53b7d409ea99cfc9d0133bbf75611"
+    },
+    "programming_profile": {
+      "path": "data/ic-support/profiles/programming/stm32f1-medium-density-flash-v0.json",
+      "git_blob_sha1": "e869dd9e4494677080e3474ad9b55f4c00b3bea6"
+    },
+    "memory_geometry_profiles": {
+      "STM32F103C8T6": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103c8-64k-v0.json",
+        "git_blob_sha1": "80aa5ed4103f78bdd07a15045a093a44af3f317e"
+      },
+      "STM32F103CBT6": {
+        "path": "data/ic-support/profiles/memory-geometry/stm32f103cb-128k-v0.json",
+        "git_blob_sha1": "6603eca3490d09cb93ecee37008891f945b24dd9"
+      }
+    },
+    "execution_ir": {
+      "path": "data/ic-support/execution-ir/stm32f103c-programming-execution-ir-v0.json",
+      "git_blob_sha1": "1be63701b4a5202d8cee71d50910b7287d92e84c"
+    },
+    "compiler": {
+      "path": "software/python/plasma_interfaces/openocd_plan.py",
+      "git_blob_sha1": "a3f6f1f903d989da53fff5d3e660f1abd0e9d781",
+      "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler"
+    }
+  },
+  "shared": {
+    "vendor_id": "st",
+    "manufacturer": "STMicroelectronics",
+    "programming_profile_id": "stm32f1-medium-density-flash-v0",
+    "openocd_target_config": "tcl/target/stm32f1x.cfg",
+    "main_flash_start": "0x08000000",
+    "page_size_bytes": 1024,
+    "erase_granularity_bytes": 1024,
+    "program_granularity_bytes": 2,
+    "unlock_keys": [
+      "0x45670123",
+      "0xCDEF89AB"
+    ]
+  },
+  "targets": {
+    "STM32F103C8T6": {
+      "base_device": "STM32F103C8",
+      "density_class": "medium",
+      "memory_geometry_profile_id": "stm32f103c8-64k-v0",
+      "main_flash_size_bytes": 65536,
+      "main_flash_end": "0x0800FFFF",
+      "page_count": 64
+    },
+    "STM32F103CBT6": {
+      "base_device": "STM32F103CB",
+      "density_class": "medium",
+      "memory_geometry_profile_id": "stm32f103cb-128k-v0",
+      "main_flash_size_bytes": 131072,
+      "main_flash_end": "0x0801FFFF",
+      "page_count": 128
+    }
+  },
+  "review_facts": [
+    {
+      "fact_id": "stm32f103c-family-applicability",
+      "statement": "DS5319 Rev 20 covers STM32F103x8 and STM32F103xB medium-density devices, including STM32F103C8 and STM32F103CB, with 64 or 128 Kbytes of Flash.",
+      "projection_state": "CANONICAL_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_ds5319_rev20",
+          "locator": "Features; Table 1. Device summary",
+          "page": 1
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-medium-density-page-geometry",
+      "statement": "PM0075 Rev 2 defines medium-density main Flash as 128 pages of 1 Kbyte, starting at 0x08000000 and ending at 0x0801FFFF for page 127.",
+      "projection_state": "CANONICAL_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "1.2 Flash module organization; Table 3. Flash module organization (medium-density devices)",
+          "page": 8
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c8-main-flash-geometry",
+      "statement": "STM32F103C8T6 has 64 KiB main Flash; with the medium-density 1 KiB page geometry this yields 64 pages from 0x08000000 through 0x0800FFFF.",
+      "projection_state": "CANONICAL_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_ds5319_rev20",
+          "locator": "Features; Table 1. Device summary",
+          "page": 1
+        },
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "1.2 Flash module organization; Table 3. Flash module organization (medium-density devices)",
+          "page": 8
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103cb-main-flash-geometry",
+      "statement": "STM32F103CBT6 has 128 KiB main Flash and therefore uses the complete medium-density geometry of 128 1 KiB pages from 0x08000000 through 0x0801FFFF.",
+      "projection_state": "CANONICAL_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_ds5319_rev20",
+          "locator": "Features; Table 1. Device summary",
+          "page": 1
+        },
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "1.2 Flash module organization; Table 3. Flash module organization (medium-density devices)",
+          "page": 8
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-flash-unlock-keys",
+      "statement": "PM0075 Rev 2 defines KEY1 as 0x45670123 and KEY2 as 0xCDEF89AB for the Flash unlock sequence.",
+      "projection_state": "EXECUTION_PROFILE_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.1 Key values; 2.3.2 Unlocking the Flash memory",
+          "page": 13
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-program-granularity",
+      "statement": "PM0075 Rev 2 states that main Flash is programmed 16 bits at a time using half-word writes with FLASH_CR.PG set.",
+      "projection_state": "EXECUTION_PROFILE_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.3 Main Flash memory programming",
+          "page": 14
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-standard-program-sequence",
+      "statement": "The documented standard main-Flash programming flow checks BSY, sets PG, writes a half-word, waits for BSY to clear, then reads back and verifies the programmed value.",
+      "projection_state": "EXECUTION_PROFILE_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.3 Main Flash memory programming; Standard programming",
+          "page": 14
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-erase-capabilities",
+      "statement": "PM0075 Rev 2 documents both page erase and complete main-Flash Mass Erase as distinct Flash erase capabilities.",
+      "projection_state": "EXECUTION_PROFILE_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.4 Flash memory erase",
+          "page": 15
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-rdp-unprotect-destructive",
+      "statement": "Changing read protection from protected to unprotected causes a Mass Erase of the main Flash memory.",
+      "projection_state": "BLOCKED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.5 Option byte programming; 2.4.1 Read protection",
+          "page": 18
+        }
+      ]
+    }
+  ],
+  "operations": {
+    "admitted": [
+      "READ",
+      "VERIFY",
+      "PROGRAM",
+      "ERASE"
+    ],
+    "blocked": [
+      "FLASH_MASS_ERASE_CONTROLLER",
+      "OPTION_PROGRAM",
+      "OPTION_ERASE",
+      "RDP_ENABLE",
+      "RDP_DISABLE",
+      "WRITE_PROTECTION_CHANGE"
+    ],
+    "erase_scope": "full_resolved_main_flash_range",
+    "program_implicit_erase": false,
+    "hardware_runtime_ready": false
+  }
+}
