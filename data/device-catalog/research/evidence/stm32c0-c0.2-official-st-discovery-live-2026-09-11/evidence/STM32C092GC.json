@@ -1,0 +1,50 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C092GC",
+  "evidence_section_sha256": "1f94006e954d68355a6c74edf11697fd4836a2102107d8b613521efb3518fdf1",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C092GCU3",
+    "STM32C092GCU3TR",
+    "STM32C092GCU6",
+    "STM32C092GCU7",
+    "STM32C092GCU7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092gc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C092GCU3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092GCU3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092GCU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092GCU7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092GCU7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "d7e2fcb6c41bb4e07def9e5501628830f341c043497648e222d6c83231d73f24",
+  "retrieved_at_utc": "2026-09-11T07:38:00Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092gc.html"
+}

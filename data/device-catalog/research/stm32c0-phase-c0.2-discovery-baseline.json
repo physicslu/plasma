@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "family": "STM32C0",
+  "phase": "C0.2",
+  "scope": "retained official-ST commercial identity/lifecycle discovery evidence; no Production write",
+  "evidence_root": "data/device-catalog/research/evidence/stm32c0-c0.2-official-st-discovery-live-2026-09-11",
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_identity_plus_sample_and_buy_marketing_status_exact_set_join",
+  "retained_evidence": {
+    "workflow_run_id": 34573244983,
+    "workflow_run_attempt": 1,
+    "executed_git_sha": "64fa5800a5f495da3818a44a71d5bcf8918d16e1",
+    "retention_commit_sha": "5d8ffd2b10411773d1300b7351e1f8d3be9e20b8",
+    "artifact_id": 5650035967,
+    "artifact_name": "stm32c0-c0.2-official-st-discovery-live-2026-09-11",
+    "artifact_digest_sha256": "fdce5cde3894ce57f6b1b39a90a61e26f9005111555560336b51a33b11e72549",
+    "pilot_summary_git_blob_sha": "030703dfaa45405d1541de41a250a712ca0ab834",
+    "provenance_git_blob_sha": "fd005b19ebd6d5f117afe2518ccbeb1f1a7c9c92",
+    "leaf_evidence_tree_git_sha": "3f2b01d0d3d8c67fbc6ed8da90a5ea75d2c0d7f4",
+    "live_summary_sha256": "bbbfb5ccd7695bff2933ed87d4a45985221d6e267e5a75792be4e5a81b943612"
+  },
+  "source_bindings": {
+    "discovery_manifest_git_blob_sha": "2423432595448f81d96e86e5265fb196721099a6",
+    "c0_1_foundation_git_blob_sha": "59eaaa5b367ba889fe547e89b36e4ce58736e794",
+    "c0_1_foundation_sha256": "c89e8c528f80f9b199a2b153d3d40aa4af090e50c492a7c88bfa7876ce406515",
+    "production_manifest_git_blob_sha": "89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc",
+    "production_manifest_sha256": "903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0",
+    "production_exact_icpn_count": 703,
+    "production_base_device_count": 243,
+    "production_stm32_family_count": 9
+  },
+  "aggregate": {
+    "required_targets": 50,
+    "attempted": 50,
+    "dispositioned_targets": 50,
+    "commercial_identity_verified_targets": 50,
+    "active_candidate_targets": 50,
+    "active_exact_icpn_candidates": 220,
+    "active_exact_icpn_unique_count": 220,
+    "lifecycle_excluded_targets": 0,
+    "excluded_non_active_part_numbers": 1,
+    "source_unavailable_exclusions": 0,
+    "identity_manual_intervention_required": 0,
+    "commercial_identity_unresolved_targets": 0,
+    "routing_followup_required": 6,
+    "openocd_routing": {
+      "gates_commercial_identity": false,
+      "unique": 44,
+      "unmapped": 6,
+      "ambiguous": 0,
+      "not_applicable": 0
+    },
+    "bounded_discovery_clean": true,
+    "commercial_identity_clean": true,
+    "representative_continuity_clean": true
+  },
+  "browser": {
+    "acquisition_transport": "chromium_rendered_dom",
+    "evidence_profile": "stm32c0_c0_2_dual_surface_v1",
+    "playwright_version": "1.62.0",
+    "browser_version": "151.0.7922.34",
+    "headless": false
+  },
+  "authority_boundaries": {
+    "openocd_routing_gates_commercial_identity": false,
+    "manufacturer_evidence_is_canonical_admission": false,
+    "discovery_authorizes_production_write": false,
+    "discovery_proves_programming_algorithm_equivalence": false,
+    "discovery_proves_runtime_programming_support": false,
+    "discovery_proves_physical_hil_support": false
+  },
+  "claims": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  }
+}

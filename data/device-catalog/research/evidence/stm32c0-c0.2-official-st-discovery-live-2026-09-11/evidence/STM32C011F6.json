@@ -1,0 +1,74 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C011F6",
+  "evidence_section_sha256": "da05fecfe1ad2c1db9ed2a55985405f2f7f12b1637ccf88f27dca0cd0204b35a",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C011F6P3",
+    "STM32C011F6P3TR",
+    "STM32C011F6P6",
+    "STM32C011F6P6TR",
+    "STM32C011F6P7",
+    "STM32C011F6P7TR",
+    "STM32C011F6U3TR",
+    "STM32C011F6U6TR",
+    "STM32C011F6U7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f6.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C011F6P3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C011F6P3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C011F6P6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C011F6P6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C011F6P7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C011F6P7TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C011F6U3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C011F6U6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C011F6U7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "64ef246f4a5ffbd8ab54adb581ecfb60160e540731e57fc53adb416feed5f5f4",
+  "retrieved_at_utc": "2026-09-11T07:13:09Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f6.html"
+}

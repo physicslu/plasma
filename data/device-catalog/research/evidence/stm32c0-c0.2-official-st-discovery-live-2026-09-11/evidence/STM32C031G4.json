@@ -1,0 +1,32 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C031G4",
+  "evidence_section_sha256": "f33c88fb70c05efed751ad0f7c8b025d66233e5e61e731c87c1ec3823e6cefce",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C031G4U3",
+    "STM32C031G4U6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031g4.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C031G4U3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031G4U6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "b91cf6e98872522428c2973406855a6d5ff44941bec33fde42a09e0345a954fc",
+  "retrieved_at_utc": "2026-09-11T07:15:07Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031g4.html"
+}

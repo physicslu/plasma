@@ -1,0 +1,56 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C092KC",
+  "evidence_section_sha256": "2f0ac3eac41b7df6ac50d058a2c841c76e164c515bdcc52b20b4eb274e79d724",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C092KCT6",
+    "STM32C092KCU3",
+    "STM32C092KCU3TR",
+    "STM32C092KCU6",
+    "STM32C092KCU7",
+    "STM32C092KCU7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092kc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C092KCT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092KCU3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092KCU3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092KCU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092KCU7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092KCU7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "926b33b1375a1e6947bbfe27ec2d7d064f66db04ff8fef827ffa180a5b636e5d",
+  "retrieved_at_utc": "2026-09-11T07:38:10Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092kc.html"
+}

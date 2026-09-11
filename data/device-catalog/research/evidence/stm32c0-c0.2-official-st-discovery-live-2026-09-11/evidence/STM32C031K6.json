@@ -1,0 +1,80 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C031K6",
+  "evidence_section_sha256": "a50f40910c5fd89876c148f80f80582218de676fdaa337480c59ce1826f60aea",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C031K6T3",
+    "STM32C031K6T3TR",
+    "STM32C031K6T6",
+    "STM32C031K6T7",
+    "STM32C031K6T7TR",
+    "STM32C031K6U3TR",
+    "STM32C031K6U6",
+    "STM32C031K6U6TR",
+    "STM32C031K6U7",
+    "STM32C031K6U7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k6.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C031K6T3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6T3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6T6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6T7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6T7TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6U3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6U6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6U6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6U7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K6U7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "effbc6b27af8367061f54541bbeb79cf0311020763ee15873fc97fa6e9107e8f",
+  "retrieved_at_utc": "2026-09-11T07:15:24Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k6.html"
+}

@@ -1,0 +1,26 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C092FB",
+  "evidence_section_sha256": "f1f8b2cd44c3c8cf6f8e014868fb801590a0022f3884d80eaf3a23410f0c71e8",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C092FBP6"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092fb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C092FBP6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "ee5f020dcdfaadc449b4a00272e03fcdf6c05824bac75b90afb07b816894ebf7",
+  "retrieved_at_utc": "2026-09-11T07:37:45Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092fb.html"
+}

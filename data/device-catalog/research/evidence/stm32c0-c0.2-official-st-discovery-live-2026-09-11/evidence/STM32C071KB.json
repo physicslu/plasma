@@ -1,0 +1,68 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C071KB",
+  "evidence_section_sha256": "1cb55f7bfa66ed6511162940056c56b0b7857b2ddbb2536a4e93c1e7390b8e14",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C071KBT3",
+    "STM32C071KBT6",
+    "STM32C071KBT6N",
+    "STM32C071KBT6NTR",
+    "STM32C071KBU6",
+    "STM32C071KBU6N",
+    "STM32C071KBU7",
+    "STM32C071KBU7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071kb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C071KBT3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C071KBT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C071KBT6N",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C071KBT6NTR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C071KBU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C071KBU6N",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C071KBU7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C071KBU7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "473bbb6f2cb8e24a3cdce56dca9121c4e9167bee3b37701917c003e065bdd803",
+  "retrieved_at_utc": "2026-09-11T07:35:07Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071kb.html"
+}
