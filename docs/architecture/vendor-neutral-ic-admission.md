@@ -68,11 +68,11 @@ A backend implementation binding records an implementation identity and revision
 
 ## Compiler registry boundary
 
-The runtime `CompilerRegistry` consumes the operation-level decision after generic package validation. It selects by `compiler_id` only when the exact target and request operation are `ADMITTED`, and it requires the selected compiler registration to match both `backend_id` and `backend_lock_digest`. Registering a compiler alone never admits an operation.
+The runtime `CompilerRegistry` consumes a small content-addressed admission projection that is deterministically checked against generic-valid admission packages in CI. Runtime does not import benchmark or migration code as an authority. The projection contains only operation rows that already passed generic admission validation, and its own digest is verified before registry construction.
 
-Existing admitted routes carry their operation-admission, operation-contract, backend-lock, and compiler identities into the resolved route metadata before plan compilation. A compiler may also be registered for candidate use without adding its target to the Production resolver or routing profile set.
+The registry selects by `compiler_id` only when the exact target and request operation are `ADMITTED`, and it requires the selected compiler registration to match both `backend_id` and `backend_lock_digest`. Registering a compiler alone never admits an operation. Existing admitted routes carry their operation-admission, operation-contract, backend-lock, and compiler identities into the resolved route metadata before plan compilation.
 
-Compiler selection remains separate from execution readiness. The registry passes through `hardware_runtime_ready` as admission data, while current routes continue to set runtime readiness to false and stop before hardware execution.
+Compiler selection remains separate from execution readiness. A projection with `hardware_runtime_ready=true` is rejected by the current software-only runtime integration; current routes continue to stop before hardware execution.
 
 ## Current integration boundary
 
