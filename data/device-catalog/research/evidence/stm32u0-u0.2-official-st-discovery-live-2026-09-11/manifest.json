@@ -1,0 +1,23 @@
+{
+  "canonical_dataset_admission": false,
+  "evidence_id": "stm32u0-u0.2-official-st-discovery-2026-09-11-retained-20260911T002533Z-80a6312e",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "c710f1e562375c6f46076d01b3b3f745a71fd9162d5ce9356130d41c3fc7af54"
+    },
+    {
+      "path": "pilot-summary.json",
+      "sha256": "81a5d6b5dbbb141e840cff8bc38e8c664d785a6568ae565fa676c559181c876c"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "36a9806019e82bcd26ccfd3e4969a9c539b2f03848e31a7a1b20fad184abf3e8"
+    },
+    {
+      "path": "targets.csv",
+      "sha256": "4133860a090b1c5cc01449041fb49e0b5dd60d686e1338a343f8ea18d577e2e0"
+    }
+  ],
+  "schema_version": 1
+}
