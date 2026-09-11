@@ -10,6 +10,12 @@ from plasma_core.models import ExecutionOutput, JobRequest
 from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
+from plasma_interfaces.compiler_registry import (
+    CompilerBinding,
+    CompilerRegistry,
+    load_operation_admission_projection,
+)
+from plasma_interfaces.kl25_openocd_plan import KL25OpenOCDPlanCompiler
 from plasma_interfaces.openocd_plan import (
     OPENOCD_PLAN_PROGRAMMING_PROFILES,
     OpenOCDPlanCompiler,
@@ -22,6 +28,50 @@ MOCK_ROUTE = "mock_workflow"
 OPENOCD_ROUTE = "openocd"
 PLASMA_NATIVE_ROUTE = "plasma_native"
 ROUTABLE_PROGRAMMING_PROFILES = OPENOCD_PLAN_PROGRAMMING_PROFILES
+STM32_COMPILER_ID = "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler"
+KL25_COMPILER_ID = "plasma_interfaces.kl25_openocd_plan.KL25OpenOCDPlanCompiler"
+KL25_BACKEND_ID = "nxp-kl25-openocd-backend-v1"
+KL25_BACKEND_LOCK_DIGEST = "7628554b4b34a3587688824e95f861bcd95c792699f023e2ae5ad7880196e1c5"
+
+
+def _default_compiler_registry() -> CompilerRegistry:
+    admissions = load_operation_admission_projection()
+    stm32_bindings = {
+        (row.compiler_id, row.backend_id, row.backend_lock_digest)
+        for row in admissions
+    }
+    if len(stm32_bindings) != 1:
+        raise PlasmaError(
+            ErrorCode.CONFIG_INVALID,
+            "STM32 compiler admission projection must resolve to one compiler/backend lock",
+        )
+    compiler_id, backend_id, backend_lock_digest = next(iter(stm32_bindings))
+    if compiler_id != STM32_COMPILER_ID:
+        raise PlasmaError(
+            ErrorCode.CONFIG_INVALID,
+            "STM32 compiler admission projection references an unsupported compiler",
+            context={"compiler_id": compiler_id},
+        )
+
+    return CompilerRegistry(
+        bindings=(
+            CompilerBinding(
+                compiler_id,
+                backend_id,
+                backend_lock_digest,
+                OpenOCDPlanCompiler(),
+            ),
+            # Candidate availability only. There is intentionally no KL25
+            # Production operation admission in the default runtime registry.
+            CompilerBinding(
+                KL25_COMPILER_ID,
+                KL25_BACKEND_ID,
+                KL25_BACKEND_LOCK_DIGEST,
+                KL25OpenOCDPlanCompiler(),
+            ),
+        ),
+        admissions=admissions,
+    )
 
 
 class SiteExecutionRouter:
@@ -39,12 +89,12 @@ class SiteExecutionRouter:
         site: SiteConfig,
         interface: BaseInterface,
         resolver: ICSupportResolver | None,
-        openocd_plan_compiler: OpenOCDPlanCompiler | None = None,
+        compiler_registry: CompilerRegistry | None = None,
     ) -> None:
         self.site = site
         self.interface = interface
         self.resolver = resolver
-        self.openocd_plan_compiler = openocd_plan_compiler or OpenOCDPlanCompiler()
+        self.compiler_registry = compiler_registry or _default_compiler_registry()
         self._generic_handler = ProgrammingOperationHandler(interface)
         self._profile_handlers: dict[str, BaseHandler] = {
             profile_id: ProgrammingOperationHandler(interface)
@@ -136,7 +186,8 @@ class SiteExecutionRouter:
 
     def _resolve_openocd(self, request: JobRequest) -> JobRequest:
         programming_profile_id, support, support_payload = self._resolved_support(request)
-        plan = self.openocd_plan_compiler.compile(
+        selection = self.compiler_registry.select(support.icpn, request.operation)
+        plan = selection.compiler.compile(
             support,
             request,
             configured_target_config=self.site.openocd.get("target_cfg"),
@@ -148,6 +199,13 @@ class SiteExecutionRouter:
                 "mode": OPENOCD_ROUTE,
                 "selected_programming_profile_id": programming_profile_id,
                 "selected_openocd_target_config": plan.target_config,
+                "operation_admission_id": selection.admission.operation_admission_id,
+                "operation_admission_digest": selection.admission.operation_admission_digest,
+                "operation_contract_id": selection.admission.operation_contract_id,
+                "operation_contract_digest": selection.admission.operation_contract_digest,
+                "compiler_id": selection.admission.compiler_id,
+                "backend_id": selection.admission.backend_id,
+                "backend_lock_digest": selection.admission.backend_lock_digest,
                 "backend_implementation_state": "plan_compiled_not_executable",
                 "openocd_execution_plan": plan.to_dict(),
                 "hardware_runtime_ready": False,

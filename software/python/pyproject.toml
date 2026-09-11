@@ -32,6 +32,9 @@ packages = [
   "plasma_manager",
 ]
 
+[tool.setuptools.package-data]
+plasma_interfaces = ["stm32f103c-compiler-admission-projection-v1.json"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
