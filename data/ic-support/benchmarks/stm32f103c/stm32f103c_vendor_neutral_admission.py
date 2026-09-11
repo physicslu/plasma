@@ -248,7 +248,7 @@ def validate_frozen_inputs() -> dict[str, Any]:
         'f"flash erase_address {_hex32(geometry.start)} {_hex32(geometry.size_bytes)}"',
         '"flash write_image"',
         '"flash verify_image"',
-        '"dump_image"',
+        "dump_image ",
         '"hardware_runtime_ready": False',
     ):
         require(sentinel in compiler_text, f"compiler semantic sentinel missing: {sentinel}")
