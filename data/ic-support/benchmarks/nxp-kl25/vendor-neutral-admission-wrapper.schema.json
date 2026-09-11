@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/benchmarks/nxp-kl25/vendor-neutral-admission-wrapper-v1",
+  "title": "NXP KL25 vendor-neutral admission package wrapper",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifacts", "compiler_bindings", "root_envelope_id", "operation_admission_id"],
+  "properties": {
+    "artifacts": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object"}},
+    "compiler_bindings": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "array", "items": {"type": "string", "minLength": 1}}},
+    "root_envelope_id": {"type": "string", "minLength": 1},
+    "operation_admission_id": {"type": "string", "minLength": 1}
+  }
+}
