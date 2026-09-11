@@ -46,6 +46,12 @@ class PPUStatusTests(unittest.TestCase):
                         "owner_id": None,
                         "active_job_count": 0,
                     },
+                    "runtime_activation": {
+                        "active": False,
+                        "ttl_remaining_s": None,
+                        "ppu_id": "ppu-42",
+                        "facility_id": "factory-a",
+                    },
                     "capabilities": {
                         "max_supported_sites": 8,
                         "operations": ["erase", "program", "verify", "read"],
