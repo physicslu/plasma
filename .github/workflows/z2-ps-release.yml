@@ -167,8 +167,8 @@ jobs:
         with:
           name: plasma-z2-python-${{ env.Z2_PYTHON_VERSION }}-linux-armv7l-${{ github.sha }}
           path: |
-            ${{ runner.temp }}/z2-python-artifact/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz
-            ${{ runner.temp }}/z2-python-artifact/plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz.sha256
+            ${{ runner.temp }}/z2-python-artifact/plasma-python-${{ env.Z2_PYTHON_VERSION }}-linux-armv7l.tar.gz
+            ${{ runner.temp }}/z2-python-artifact/plasma-python-${{ env.Z2_PYTHON_VERSION }}-linux-armv7l.tar.gz.sha256
           if-no-files-found: error
           retention-days: 14
 
