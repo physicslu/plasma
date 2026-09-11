@@ -1,0 +1,122 @@
+{
+  "claims": {
+    "canonical_admission_authorized": false,
+    "complete_family_inventory_claimed": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "evidence_foundation": {
+    "active_exact_icpns_observed": 21,
+    "ordering_information_review_sha256": "9f4bde47508100025d3d6e92813f244431a18d95cf3fc73a45de93849dddd38d",
+    "representative_count": 6,
+    "representatives": [
+      {
+        "base_device": "STM32C011F4",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS13866",
+        "datasheet_revision": 5,
+        "exact_icpns": [
+          "STM32C011F4P6",
+          "STM32C011F4P7",
+          "STM32C011F4P7TR",
+          "STM32C011F4U3TR",
+          "STM32C011F4U6TR"
+        ],
+        "ordering_pdf_page": 93,
+        "subfamily": "STM32C011"
+      },
+      {
+        "base_device": "STM32C031C4",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS13867",
+        "datasheet_revision": 4,
+        "exact_icpns": [
+          "STM32C031C4T6",
+          "STM32C031C4T6TR",
+          "STM32C031C4U6"
+        ],
+        "ordering_pdf_page": 100,
+        "subfamily": "STM32C031"
+      },
+      {
+        "base_device": "STM32C051C6",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS14721",
+        "datasheet_revision": 2,
+        "exact_icpns": [
+          "STM32C051C6T6",
+          "STM32C051C6U6"
+        ],
+        "ordering_pdf_page": 107,
+        "subfamily": "STM32C051"
+      },
+      {
+        "base_device": "STM32C071C8",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS14693",
+        "datasheet_revision": 2,
+        "exact_icpns": [
+          "STM32C071C8T3",
+          "STM32C071C8T3TR",
+          "STM32C071C8T6",
+          "STM32C071C8T6N",
+          "STM32C071C8T6TR",
+          "STM32C071C8U6",
+          "STM32C071C8U6N"
+        ],
+        "ordering_pdf_page": 128,
+        "subfamily": "STM32C071"
+      },
+      {
+        "base_device": "STM32C091CB",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS14720",
+        "datasheet_revision": 3,
+        "exact_icpns": [
+          "STM32C091CBT6",
+          "STM32C091CBU6"
+        ],
+        "ordering_pdf_page": 121,
+        "subfamily": "STM32C091"
+      },
+      {
+        "base_device": "STM32C092CB",
+        "commercial_identity_status": "verified_active",
+        "datasheet_id": "DS14720",
+        "datasheet_revision": 3,
+        "exact_icpns": [
+          "STM32C092CBT6",
+          "STM32C092CBU6"
+        ],
+        "ordering_pdf_page": 121,
+        "subfamily": "STM32C092"
+      }
+    ],
+    "retained_probe_summary_sha256": "1bfa9da6e6b3d020c3f643eb5d6c72ee7ee5c8aa995c66de21fa7576b79a9228",
+    "scope": "representative_evidence_only_not_complete_family_inventory",
+    "selection_sha256": "f2bc4d955952cc8c25362ca5568e944470f7a1b43bf41dee2fcca9516e9c8773"
+  },
+  "family": "STM32C0",
+  "identifier_kind_counts": {
+    "cmsis_device_name": 22,
+    "ordering_pattern": 73
+  },
+  "initial_targets": [
+    {"base_device": "STM32C011F4", "subfamily": "STM32C011"},
+    {"base_device": "STM32C031C4", "subfamily": "STM32C031"},
+    {"base_device": "STM32C051C6", "subfamily": "STM32C051"},
+    {"base_device": "STM32C071C8", "subfamily": "STM32C071"},
+    {"base_device": "STM32C091CB", "subfamily": "STM32C091"},
+    {"base_device": "STM32C092CB", "subfamily": "STM32C092"}
+  ],
+  "phase": "C0.1",
+  "schema_version": 1,
+  "source_row_count": 95,
+  "target_config": "tcl/target/stm32c0x.cfg"
+}

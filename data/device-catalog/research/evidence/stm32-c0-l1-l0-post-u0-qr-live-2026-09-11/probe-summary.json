@@ -1,0 +1,1162 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "attempted_targets": 26,
+  "bounded_probe_complete": false,
+  "browser": {
+    "browser_version": "151.0.7922.34",
+    "evidence_profile": "stm32_post_u0_qr_identity_v1",
+    "headless": false,
+    "playwright_version": "1.62.0"
+  },
+  "by_series": {
+    "STM32C0": {
+      "active_candidate_targets": 0,
+      "active_exact_icpns": 0,
+      "attempted_targets": 6,
+      "commercial_identity_access_clean": false,
+      "disposition_fraction": 0.0,
+      "dispositioned_targets": 0,
+      "excluded_non_active_part_numbers": 0,
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 6,
+      "source_unavailable_404": 0,
+      "verified_identity_fraction": 0.0,
+      "verified_identity_targets": 0
+    },
+    "STM32L0": {
+      "active_candidate_targets": 16,
+      "active_exact_icpns": 44,
+      "attempted_targets": 16,
+      "commercial_identity_access_clean": true,
+      "disposition_fraction": 1.0,
+      "dispositioned_targets": 16,
+      "excluded_non_active_part_numbers": 0,
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 0,
+      "source_unavailable_404": 0,
+      "verified_identity_fraction": 1.0,
+      "verified_identity_targets": 16
+    },
+    "STM32L1": {
+      "active_candidate_targets": 1,
+      "active_exact_icpns": 1,
+      "attempted_targets": 4,
+      "commercial_identity_access_clean": true,
+      "disposition_fraction": 1.0,
+      "dispositioned_targets": 4,
+      "excluded_non_active_part_numbers": 8,
+      "lifecycle_excluded_targets": 3,
+      "manual_review": 0,
+      "source_unavailable_404": 0,
+      "verified_identity_fraction": 1.0,
+      "verified_identity_targets": 4
+    }
+  },
+  "candidate_series": [
+    "STM32C0",
+    "STM32L1",
+    "STM32L0"
+  ],
+  "claims": {
+    "cmsis_alias_is_commercial_identity": false,
+    "commercial_identity_asserted_for_unverified_targets": false,
+    "manufacturer_evidence_probe_is_admission": false,
+    "openocd_is_commercial_identity_authority": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "programming_policy_defined": false,
+    "runtime_support_claimed": false,
+    "selected_next_research_family": false
+  },
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+  "dispositioned_targets": 20,
+  "manual_review_targets": 6,
+  "phase": "C0.0",
+  "probe_id": "stm32-post-u0-official-st-evidence-accessibility-probe-v1",
+  "results": [
+    {
+      "acquisition_status": "failure",
+      "base_device": "STM32C011F4",
+      "commercial_identity_status": "unverified",
+      "disposition": "manual_review",
+      "error": "browser evidence readiness timed out: Quality and Reliability Part Number / Marketing Status surface incomplete",
+      "error_type": "AcquisitionError",
+      "manual_intervention_required": true,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f4.html",
+      "subfamily": "STM32C011"
+    },
+    {
+      "acquisition_status": "failure",
+      "base_device": "STM32C031C4",
+      "commercial_identity_status": "unverified",
+      "disposition": "manual_review",
+      "error": "browser evidence readiness timed out: Quality and Reliability Part Number / Marketing Status surface incomplete",
+      "error_type": "AcquisitionError",
+      "manual_intervention_required": true,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031c4.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "failure",
+      "base_device": "STM32C051C6",
+      "commercial_identity_status": "unverified",
+      "disposition": "manual_review",
+      "error": "browser evidence readiness timed out: Quality and Reliability Part Number / Marketing Status surface incomplete",
+      "error_type": "AcquisitionError",
+      "manual_intervention_required": true,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051c6.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "failure",
+      "base_device": "STM32C071C8",
+      "commercial_identity_status": "unverified",
+      "disposition": "manual_review",
+      "error": "browser evidence readiness timed out: Quality and Reliability Part Number / Marketing Status surface incomplete",
+      "error_type": "AcquisitionError",
+      "manual_intervention_required": true,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071c8.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "failure",
+      "base_device": "STM32C091CB",
+      "commercial_identity_status": "unverified",
+      "disposition": "manual_review",
+      "error": "browser evidence readiness timed out: Quality and Reliability Part Number / Marketing Status surface incomplete",
+      "error_type": "AcquisitionError",
+      "manual_intervention_required": true,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cb.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "failure",
+      "base_device": "STM32C092CB",
+      "commercial_identity_status": "unverified",
+      "disposition": "manual_review",
+      "error": "browser evidence readiness timed out: Quality and Reliability Part Number / Marketing Status surface incomplete",
+      "error_type": "AcquisitionError",
+      "manual_intervention_required": true,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32C0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cb.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L100C6",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L100C6",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "a1c4c2230fd8ed6eb64a7b2caac8171642f6a912baec5b8229cbe3768f93e6a1",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32L100C6U6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32L100C6U6TR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l100c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32L100C6U6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32L100C6U6TR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "90a8252737f9743a29dce78e288b038287938689bdb8d728a5ad45cf66acc379",
+        "retrieved_at_utc": "2026-09-11T04:31:32Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l100c6.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l100c6.html",
+      "subfamily": "STM32L100"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L151C6",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L151C6",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "1a7d9d120f23685e924cadf2df1c709f8c350a3ac7157dc1c832bc660116373e",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32L151C6T6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32L151C6T6TR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32L151C6U6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32L151C6U6TR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l151c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32L151C6T6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32L151C6T6TR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32L151C6U6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32L151C6U6TR",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "3d8d7d1a603aafb009f21c90d0ed282229e2a117ba55cb8e991bed1a24f8f226",
+        "retrieved_at_utc": "2026-09-11T04:31:37Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l151c6.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l151c6.html",
+      "subfamily": "STM32L151"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L152C6",
+      "commercial_identity_status": "verified_non_active_only",
+      "disposition": "lifecycle_excluded",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L152C6",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "bc1ada1e26368e6f0561c8ae80cc3fe3d41bd7f9145e80486f2b5fcb790cf08c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32L152C6T6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "icpn": "STM32L152C6U6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l152c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32L152C6T6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          },
+          {
+            "active": false,
+            "icpn": "STM32L152C6U6",
+            "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+          }
+        ],
+        "rendered_dom_sha256": "9fbf1f2d23a096077c701f9ae31fdfcba93b455be16a969df6cace71b18e8991",
+        "retrieved_at_utc": "2026-09-11T04:32:47Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l152c6.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l152c6.html",
+      "subfamily": "STM32L152"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L162QC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L162QC",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "dda1f4ec0476c2f686bd3cf1512d56cdf397b6a7322d6b2e5c4b1954a95d2268",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L162QCH6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l162qc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L162QCH6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "36a2300e6c45f9f2beda861f2378ec8213188d1ae58a098874f5899b927feccc",
+        "retrieved_at_utc": "2026-09-11T04:32:52Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l162qc.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L1",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l162qc.html",
+      "subfamily": "STM32L162"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L010C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L010C6",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "5b65d6c2c449af31d70bff04cf6dc7a8f4a9d9bcdeb555e75b7eb7198fabe4c4",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L010C6T6",
+          "STM32L010C6T6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L010C6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L010C6T6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "2c3c99c72975f144bf89702ea760933b39fb611c15044ed78f3ac132a9283a50",
+        "retrieved_at_utc": "2026-09-11T04:32:58Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010c6.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l010c6.html",
+      "subfamily": "STM32L010"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L011D3",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L011D3",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "72286bdbc3fd1b9fca2b0e5ff73adeaee4b97d9558bf6b5ffc19ac5e8646b328",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L011D3P6",
+          "STM32L011D3P6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011d3.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L011D3P6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L011D3P6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "24de172058eaf2d59911e0e76a84a3dee6f984d06867026131c7bb5e18a7cce4",
+        "retrieved_at_utc": "2026-09-11T04:33:03Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011d3.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l011d3.html",
+      "subfamily": "STM32L011"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L021D4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L021D4",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "f2a84962289ab373956cffd38faf97dca98a580d49e7bea310e22949a25bd42b",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L021D4P6",
+          "STM32L021D4P7",
+          "STM32L021D4P7D",
+          "STM32L021D4P7DTR",
+          "STM32L021D4P7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021d4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L021D4P6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L021D4P7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L021D4P7D",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L021D4P7DTR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L021D4P7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "df43d3fe148282c56a59913dadea6418a4222868e7c633f9180a2a3d9e742454",
+        "retrieved_at_utc": "2026-09-11T04:33:20Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021d4.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021d4.html",
+      "subfamily": "STM32L021"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L031C4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L031C4",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "e3417961aa776821f298352e89f433fc8c4c5a03bfe55a6062bb0fabc8295f91",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L031C4T6",
+          "STM32L031C4T6TR",
+          "STM32L031C4U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031c4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L031C4T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L031C4T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L031C4U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "1cb514869632a2436e5e17e214c52c034d8a782dd8bc1e5b6b3ebf2fe10a8f0d",
+        "retrieved_at_utc": "2026-09-11T04:34:26Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031c4.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l031c4.html",
+      "subfamily": "STM32L031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L041C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L041C6",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "35e007ca84597b11e8be94ee390c4dce4547f9d3797d45c95f447c1c54a6b7bf",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L041C6T6TR",
+          "STM32L041C6T7",
+          "STM32L041C6U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L041C6T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L041C6T7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L041C6U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "648601f30035aa4267196f8dab9d8fc7e4c3085c0669cf885b8dcd20b944570c",
+        "retrieved_at_utc": "2026-09-11T04:34:32Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041c6.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l041c6.html",
+      "subfamily": "STM32L041"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L051C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L051C6",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "87e26d29a3430c287678492c55b4716686ef1e72d3ac2eb877b589750d52a12c",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L051C6T6",
+          "STM32L051C6T6TR",
+          "STM32L051C6U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L051C6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L051C6T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L051C6U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3e4387d56067c09207ddb7ad34ce645d604932e579089a4ead0c94440921c9aa",
+        "retrieved_at_utc": "2026-09-11T04:34:37Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051c6.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l051c6.html",
+      "subfamily": "STM32L051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L052C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L052C6",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "c8c955ee615eee27006c0e573328a20577e62ea249c0ea093a8332ebb4def546",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L052C6T6",
+          "STM32L052C6U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L052C6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L052C6U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "4180f5579d18094a8a01825ccea30803aeaa62be284c99e71c1653ffb6e36cd7",
+        "retrieved_at_utc": "2026-09-11T04:34:43Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052c6.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l052c6.html",
+      "subfamily": "STM32L052"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L053C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L053C6",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "e3a50a48f6cc61b5a50411fe1e1c7461a2c8d8d94902448df9a6fe0c28e7f3b8",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L053C6T6",
+          "STM32L053C6T6TR",
+          "STM32L053C6T7",
+          "STM32L053C6U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l053c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L053C6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L053C6T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L053C6T7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L053C6U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "02b6136c32eeee5ca14e73b680f3896060c7e85959c6c2521cbd58b43f63aa26",
+        "retrieved_at_utc": "2026-09-11T04:34:48Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l053c6.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l053c6.html",
+      "subfamily": "STM32L053"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L062C8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L062C8",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "4d99e122a360c11194898fc25286697cd8a623984b3e1166572cba48577f67d3",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L062C8U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l062c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L062C8U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "8be45558772e57c18d4916adb212726709edfb5f2565e89910ca7745962e45f2",
+        "retrieved_at_utc": "2026-09-11T04:34:54Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l062c8.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l062c8.html",
+      "subfamily": "STM32L062"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L063C8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L063C8",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "c6408e2615a6dd0732a431559d9b99575aa0d06fdf5a523167ec1543668040c0",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L063C8T6",
+          "STM32L063C8U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l063c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L063C8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L063C8U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "c3b150c4d7dda7e25d9bffe4e44836ba0d326544fb19744b1f6dd066e067ed3f",
+        "retrieved_at_utc": "2026-09-11T04:34:59Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l063c8.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l063c8.html",
+      "subfamily": "STM32L063"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L071C8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L071C8",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "1912318632e1da491164afb4758975d02db85f4dcda0ba259872400f64f3815f",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L071C8T6",
+          "STM32L071C8T6TR",
+          "STM32L071C8T7",
+          "STM32L071C8U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L071C8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L071C8T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L071C8T7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L071C8U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "009a3ca828cd72c60814f7628810addeaca4fdfdf429c2c5937994582b087e1c",
+        "retrieved_at_utc": "2026-09-11T04:35:16Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071c8.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l071c8.html",
+      "subfamily": "STM32L071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L072CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L072CB",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "019598d6c5dda3eff49793047d72664a6b376990c628a26865bb5b98ded0e821",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L072CBT6",
+          "STM32L072CBT6TR",
+          "STM32L072CBU6",
+          "STM32L072CBY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L072CBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L072CBT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L072CBU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L072CBY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "a5ca9c7bb4e6c3e69cfc667e655d7e3a4ca33817c6eeb8b4ae1c732621224594",
+        "retrieved_at_utc": "2026-09-11T04:35:22Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072cb.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l072cb.html",
+      "subfamily": "STM32L072"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L073CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L073CB",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "f91a5039bf0d9cf6dccfaef2d27dd63b546b3c4065adff8e7ec90ffc6d4eb7cb",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L073CBT6",
+          "STM32L073CBT6TR",
+          "STM32L073CBU6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L073CBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L073CBT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L073CBU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "2232eeaa7374979e6c5aa038458a2f020a12d02c1a69a9ea8cbd3c2071ab24dc",
+        "retrieved_at_utc": "2026-09-11T04:35:41Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073cb.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l073cb.html",
+      "subfamily": "STM32L073"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L081CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L081CB",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "3605c0b77987f52970f2d9b7e581e3467a170443084c68707241ad56524984bc",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L081CBT6",
+          "STM32L081CBT6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L081CBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L081CBT6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "fd2af2d6169b322ba6ee259a6631f1b3b9a6318a9e9c4083d1ba5c285afe87d9",
+        "retrieved_at_utc": "2026-09-11T04:35:46Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081cb.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l081cb.html",
+      "subfamily": "STM32L081"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L082CZ",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L082CZ",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "4b8cee53ab7d460e5de254b40071af85ecabdff544fe4f1e6b891d51bbfbbde2",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L082CZU6",
+          "STM32L082CZY3TR",
+          "STM32L082CZY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l082cz.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L082CZU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L082CZY3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32L082CZY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "37a960c1c4680b2ec61ca907037bfa130f800599c443ba4136d2ab56965b2773",
+        "retrieved_at_utc": "2026-09-11T04:35:51Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l082cz.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l082cz.html",
+      "subfamily": "STM32L082"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32L083CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32L083CB",
+        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+        "evidence_section_sha256": "aa2e4a420feca40ff339d33b080da4fd8b2054fa2f2c96b35b2536bff91b1000",
+        "evidence_surface": "quality_and_reliability_part_number",
+        "exact_icpns": [
+          "STM32L083CBT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32_post_u0_qr_identity_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32L083CBT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "0ecee0a9bb3167a9312041739c37188a7fb85f1d1156a613797b74a541baa638",
+        "retrieved_at_utc": "2026-09-11T04:35:57Z",
+        "sample_buy_is_identity_gate": false,
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083cb.html"
+      },
+      "manual_intervention_required": false,
+      "selection_reason": "deterministic lexical-min Base Device in guarded ordering-pattern subfamily",
+      "series": "STM32L0",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l083cb.html",
+      "subfamily": "STM32L083"
+    }
+  ],
+  "sample_buy_is_identity_gate": false,
+  "schema_version": 1,
+  "scope": "post-U0 bounded read-only official-ST commercial identity/lifecycle evidence accessibility comparison",
+  "selected_next_research_family": null
+}

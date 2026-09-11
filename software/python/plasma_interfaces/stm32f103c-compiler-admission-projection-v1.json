@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "compiler_admission_projection",
+  "artifact_id": "stm32f103c-compiler-admission-projection-v1",
+  "source_governance": "vendor-neutral-admission-v1",
+  "targets": [
+    {
+      "target_icpn": "STM32F103C8T6",
+      "operation_admission_id": "stm32f103c-stm32f103c8t6-operation-admission-v1",
+      "operation_admission_digest": "6d8a4df4d16fdac95d15274b1215f2f70ca576e7511e952e8348797190e05e28",
+      "operations": [
+        {
+          "request_operation": "READ",
+          "state": "ADMITTED",
+          "operation_contract_id": "stm32f103c-operation-contract-read-v1",
+          "operation_contract_digest": "0a073d9c5ec716cc77c6b5f25c1e8af972866124ca747758d4cf96cc2ebbed55",
+          "canonical_admission_digest": "186e24dd768343e9e924a661573ae6fc2da6c86028c37ed876b7fdab3244ef56",
+          "backend_id": "stm32f103c-openocd-backend-v1",
+          "backend_lock_digest": "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+          "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler",
+          "hardware_runtime_ready": false
+        },
+        {
+          "request_operation": "VERIFY",
+          "state": "ADMITTED",
+          "operation_contract_id": "stm32f103c-operation-contract-verify-v1",
+          "operation_contract_digest": "bce2403bc5132c6d7c0ccbd23fcbdda7098b8d99a1286739ddce03452c17675c",
+          "canonical_admission_digest": "186e24dd768343e9e924a661573ae6fc2da6c86028c37ed876b7fdab3244ef56",
+          "backend_id": "stm32f103c-openocd-backend-v1",
+          "backend_lock_digest": "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+          "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler",
+          "hardware_runtime_ready": false
+        },
+        {
+          "request_operation": "PROGRAM",
+          "state": "ADMITTED",
+          "operation_contract_id": "stm32f103c-operation-contract-program-v1",
+          "operation_contract_digest": "124d2ceb2eefc249cb79a40f5435082d1688845e4479f1412beb05505a721d4c",
+          "canonical_admission_digest": "186e24dd768343e9e924a661573ae6fc2da6c86028c37ed876b7fdab3244ef56",
+          "backend_id": "stm32f103c-openocd-backend-v1",
+          "backend_lock_digest": "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+          "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler",
+          "hardware_runtime_ready": false
+        },
+        {
+          "request_operation": "ERASE",
+          "state": "ADMITTED",
+          "operation_contract_id": "stm32f103c-operation-contract-erase-v1",
+          "operation_contract_digest": "4754a708c498fbf0e2972f77589122746cbd27a71371320517ee4ec4d50f1730",
+          "canonical_admission_digest": "186e24dd768343e9e924a661573ae6fc2da6c86028c37ed876b7fdab3244ef56",
+          "backend_id": "stm32f103c-openocd-backend-v1",
+          "backend_lock_digest": "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+          "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler",
+          "hardware_runtime_ready": false
+        }
+      ]
+    },
+    {
+      "target_icpn": "STM32F103CBT6",
+      "operation_admission_id": "stm32f103c-stm32f103cbt6-operation-admission-v1",
+      "operation_admission_digest": "5499d74d2c7ba1246a473ce40f66590d92743797f0d3358f190669d0768b4f13",
+      "operations": [
+        {
+          "request_operation": "READ",
+          "state": "ADMITTED",
+          "operation_contract_id": "stm32f103c-operation-contract-read-v1",
+          "operation_contract_digest": "0a073d9c5ec716cc77c6b5f25c1e8af972866124ca747758d4cf96cc2ebbed55",
+          "canonical_admission_digest": "24bb3fa0e4245186d92b02b93bc2bd49f9eea9d8a0e3bb787d0bbb78e38d7b01",
+          "backend_id": "stm32f103c-openocd-backend-v1",
+          "backend_lock_digest": "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+          "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler",
+          "hardware_runtime_ready": false
+        },
+        {
+          "request_operation": "VERIFY",
+          "state": "ADMITTED",
+          "operation_contract_id": "stm32f103c-operation-contract-verify-v1",
+          "operation_contract_digest": "bce2403bc5132c6d7c0ccbd23fcbdda7098b8d99a1286739ddce03452c17675c",
+          "canonical_admission_digest": "24bb3fa0e4245186d92b02b93bc2bd49f9eea9d8a0e3bb787d0bbb78e38d7b01",
+          "backend_id": "stm32f103c-openocd-backend-v1",
+          "backend_lock_digest": "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+          "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler",
+          "hardware_runtime_ready": false
+        },
+        {
+          "request_operation": "PROGRAM",
+          "state": "ADMITTED",
+          "operation_contract_id": "stm32f103c-operation-contract-program-v1",
+          "operation_contract_digest": "124d2ceb2eefc249cb79a40f5435082d1688845e4479f1412beb05505a721d4c",
+          "canonical_admission_digest": "24bb3fa0e4245186d92b02b93bc2bd49f9eea9d8a0e3bb787d0bbb78e38d7b01",
+          "backend_id": "stm32f103c-openocd-backend-v1",
+          "backend_lock_digest": "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+          "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler",
+          "hardware_runtime_ready": false
+        },
+        {
+          "request_operation": "ERASE",
+          "state": "ADMITTED",
+          "operation_contract_id": "stm32f103c-operation-contract-erase-v1",
+          "operation_contract_digest": "4754a708c498fbf0e2972f77589122746cbd27a71371320517ee4ec4d50f1730",
+          "canonical_admission_digest": "24bb3fa0e4245186d92b02b93bc2bd49f9eea9d8a0e3bb787d0bbb78e38d7b01",
+          "backend_id": "stm32f103c-openocd-backend-v1",
+          "backend_lock_digest": "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+          "compiler_id": "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler",
+          "hardware_runtime_ready": false
+        }
+      ]
+    }
+  ],
+  "artifact_digest": "80f233cf5197e78c22de96522f1c19cce00050b67d37850856e64a0560b57255"
+}

@@ -39,28 +39,10 @@ def load_backend_lock() -> dict[str, Any]:
 
 
 class KL25OpenOCDPlanCompiler(OpenOCDPlanCompiler):
-    """Software-only compiler for the explicitly admitted KL25 operation subset."""
-
-    def __init__(self, operation_admission: dict[str, Any] | None = None) -> None:
-        self._operation_admission = operation_admission
-
-    def _require_operation_admission(self, request: JobRequest, lock: dict[str, Any]) -> None:
-        admission = self._operation_admission
-        _require(isinstance(admission, dict), "KL25 operation admission artifact is required")
-        digest = admission.get("admission_digest")
-        payload = {k: v for k, v in admission.items() if k != "admission_digest"}
-        actual = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        _require(digest == actual, "KL25 operation admission digest mismatch")
-        operation_name = "ERASE_SECTOR" if request.operation is Operation.ERASE else request.operation.name
-        row = admission.get("operations", {}).get(operation_name)
-        _require(isinstance(row, dict) and row.get("state") == "ADMITTED", "KL25 operation is not admitted")
-        _require(row.get("backend_lock_digest") == lock["lock_digest"], "KL25 operation/backend binding mismatch")
-        _require(isinstance(row.get("canonical_spec_digest"), str) and len(row["canonical_spec_digest"]) == 64, "KL25 canonical specification binding is required")
-        _require(row.get("hardware_runtime_ready") is False, "KL25 candidate must remain software-only")
+    """Compile KL25-specific plan semantics after registry admission."""
 
     def compile(self, support: Any, request: JobRequest, *, configured_target_config: object) -> OpenOCDExecutionPlan:
         lock = load_backend_lock()
-        self._require_operation_admission(request, lock)
         _require(support.programming_profile.profile_id == KL25_PROGRAMMING_PROFILE_ID, "unsupported KL25 Programming Profile")
         _require(support.memory_geometry_profile.profile_id == KL25_MEMORY_GEOMETRY_PROFILE_ID, "unsupported KL25 Memory Geometry Profile")
         _require(support.openocd_target_config == KL25_TARGET_CONFIG, "KL25 target config binding mismatch")

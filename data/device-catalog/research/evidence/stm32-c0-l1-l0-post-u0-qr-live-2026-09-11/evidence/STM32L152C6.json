@@ -1,0 +1,40 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L152C6",
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+  "evidence_section_sha256": "bc1ada1e26368e6f0561c8ae80cc3fe3d41bd7f9145e80486f2b5fcb790cf08c",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32L152C6T6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "icpn": "STM32L152C6U6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l152c6.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_qr_identity_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": false,
+      "icpn": "STM32L152C6T6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "active": false,
+      "icpn": "STM32L152C6U6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "rendered_dom_sha256": "9fbf1f2d23a096077c701f9ae31fdfcba93b455be16a969df6cace71b18e8991",
+  "retrieved_at_utc": "2026-09-11T04:32:47Z",
+  "sample_buy_is_identity_gate": false,
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l152c6.html"
+}
