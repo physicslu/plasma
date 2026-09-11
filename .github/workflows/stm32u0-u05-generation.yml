@@ -1,0 +1,217 @@
+name: STM32U0 U0.5 generation
+
+on:
+  push:
+    branches:
+      - agent/device-catalog-stm32u0-phase-u05-publication
+    paths:
+      - .github/workflows/stm32u0-u05-generation.yml
+      - data/device-catalog/research/stm32u0_phase_u0_4_admission.py
+      - data/device-catalog/research/stm32u0_admission_policy.py
+      - data/device-catalog/research/stm32u0_metadata_policy.py
+      - data/device-catalog/research/stm32u0-phase-u0.4-admission-plan.json
+      - data/device-catalog/research/stm32u0-phase-u0.3-production-manifest-prestate.json
+      - data/device-catalog/production/icpn-v1-manifest.json
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate deterministic U0.5 publication artifacts
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          root = Path.cwd()
+          research = root / "data/device-catalog/research"
+          production = root / "data/device-catalog/production"
+          out = root / "u05-generated"
+          out.mkdir()
+          sys.path.insert(0, str(research))
+
+          from device_catalog_admission_framework import file_sha256, write_canonical_dataset
+          from stm32u0_admission_policy import CANONICAL_FIELDS
+          from stm32u0_phase_u0_4_admission import admission_plan_is_clean, build_admission_plan
+
+          plan_path = research / "stm32u0-phase-u0.4-admission-plan.json"
+          prestate_path = research / "stm32u0-phase-u0.3-production-manifest-prestate.json"
+          current_manifest_path = production / "icpn-v1-manifest.json"
+          expected_plan_sha = "525fc7301c470fbf3f38b4ddb5d1a4effac5c47da343b1ca43654d6278bbbe94"
+          expected_prestate_sha = "93c2a4541daeb1d4aa1dcc57edef54042862eb6d9da03e3a6b401e4b8481b11d"
+
+          def git_blob(data: bytes) -> str:
+              return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
+
+          def snapshot(manifest_path: Path):
+              manifest = json.loads(manifest_path.read_text())
+              family_counts = {}
+              bases = set()
+              for source in manifest["sources"]:
+                  path = (manifest_path.parent / source["path"]).resolve()
+                  data = path.read_bytes()
+                  rows = list(csv.DictReader(path.open(newline="", encoding="utf-8")))
+                  assert len(rows) == source["row_count"]
+                  assert hashlib.sha256(data).hexdigest() == source["sha256"]
+                  assert git_blob(data) == source["git_blob_sha"]
+                  family_counts[source["family"]] = len(rows)
+                  bases.update((source["family"], row["base_device"]) for row in rows)
+              return sum(family_counts.values()), len(bases), family_counts
+
+          assert file_sha256(plan_path) == expected_plan_sha
+          assert file_sha256(prestate_path) == expected_prestate_sha
+          assert file_sha256(current_manifest_path) == expected_prestate_sha
+          assert git_blob(current_manifest_path.read_bytes()) == "34ad9299ff0c063a8c8b5de1c253dfee47b63428"
+          before_exact, before_bases, before_families = snapshot(current_manifest_path)
+          assert (before_exact, before_bases, len(before_families)) == (635, 217, 8)
+          assert "STM32U0" not in before_families
+
+          with tempfile.TemporaryDirectory() as td:
+              canonical = Path(td) / "stm32u0-commercial-icpn.csv"
+              with canonical.open("w", newline="", encoding="utf-8") as handle:
+                  csv.DictWriter(handle, fieldnames=list(CANONICAL_FIELDS), lineterminator="\n").writeheader()
+              plan = build_admission_plan(canonical_path=canonical, production_manifest_path=prestate_path)
+              assert admission_plan_is_clean(plan)
+              assert plan["candidate_count"] == 68
+              result = write_canonical_dataset(plan=plan, canonical_path=canonical)
+              assert result["status"] == "written" and result["rows_after"] == 68
+              canonical_bytes = canonical.read_bytes()
+              rows = list(csv.DictReader(canonical.open(newline="", encoding="utf-8")))
+
+          assert len(rows) == 68
+          assert len({row["icpn"] for row in rows}) == 68
+          assert len({row["base_device"] for row in rows}) == 26
+          assert all(row["family"] == "STM32U0" for row in rows)
+          assert all(row["openocd_target_config"] == "tcl/target/stm32u0x.cfg" for row in rows)
+          assert all(row["existing_identifier_kind"] == "ordering_pattern" for row in rows)
+          assert all(row["cmsis_device_name"] == "" for row in rows)
+
+          canonical_sha = hashlib.sha256(canonical_bytes).hexdigest()
+          canonical_blob = git_blob(canonical_bytes)
+          manifest = json.loads(current_manifest_path.read_text())
+          manifest["sources"].append({
+              "manufacturer": "STMicroelectronics",
+              "family": "STM32U0",
+              "path": "../research/stm32u0-commercial-icpn.csv",
+              "row_count": 68,
+              "git_blob_sha": canonical_blob,
+              "sha256": canonical_sha,
+          })
+          manifest_bytes = (json.dumps(manifest, indent=2) + "\n").encode()
+          manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+          manifest_blob = git_blob(manifest_bytes)
+
+          post_family_counts = dict(before_families)
+          post_family_counts["STM32U0"] = 68
+          after_exact = before_exact + 68
+          after_bases = before_bases + 26
+          after_family_count = len(post_family_counts)
+          assert (after_exact, after_bases, after_family_count) == (703, 243, 9)
+
+          exacts = sorted(row["icpn"] for row in rows)
+          proposal = {
+              "schema_version": 1,
+              "phase": "U0.5",
+              "family": "STM32U0",
+              "status": "publication_proposal_clean",
+              "admission_plan_sha256": expected_plan_sha,
+              "production_manifest_sha256_before": expected_prestate_sha,
+              "production_manifest_git_blob_sha_before": "34ad9299ff0c063a8c8b5de1c253dfee47b63428",
+              "canonical_csv_file_sha256_proposed": canonical_sha,
+              "canonical_csv_git_blob_sha_proposed": canonical_blob,
+              "production_manifest_sha256_proposed": manifest_sha,
+              "production_manifest_git_blob_sha_proposed": manifest_blob,
+              "manufacturer_verified_identity_count": 68,
+              "published_exact_icpn_count_proposed": 68,
+              "published_base_device_count_proposed": 26,
+              "added_exact_icpns": exacts,
+              "bounded_commercial_surface_complete": True,
+              "capability_unresolved_count": 0,
+              "production_exact_icpns_before": before_exact,
+              "production_exact_icpns_after_proposed": after_exact,
+              "production_base_devices_before": before_bases,
+              "production_base_devices_after_proposed": after_bases,
+              "production_family_count_before": len(before_families),
+              "production_family_count_after_proposed": after_family_count,
+              "canonical_write_applied": False,
+              "production_write_applied": False,
+              "programming_algorithm_equivalence_claimed": False,
+              "flash_geometry_equivalence_claimed": False,
+              "option_security_semantics_claimed": False,
+              "physical_target_qualification_claimed": False,
+              "hil_qualification_claimed": False,
+              "runtime_programming_support_claimed": False,
+              "full_stm32u0_surface_covered": False,
+          }
+          proposal_bytes = (json.dumps(proposal, indent=2, sort_keys=True) + "\n").encode()
+          proposal_sha = hashlib.sha256(proposal_bytes).hexdigest()
+
+          audit = {
+              "schema_version": 1,
+              "phase": "U0.5",
+              "family": "STM32U0",
+              "status": "published",
+              "admission_plan_sha256": expected_plan_sha,
+              "publication_proposal_sha256": proposal_sha,
+              "canonical_csv_file_sha256": canonical_sha,
+              "canonical_csv_git_blob_sha": canonical_blob,
+              "production_manifest_sha256_before": expected_prestate_sha,
+              "production_manifest_git_blob_sha_before": "34ad9299ff0c063a8c8b5de1c253dfee47b63428",
+              "production_manifest_sha256_after": manifest_sha,
+              "production_manifest_git_blob_sha_after": manifest_blob,
+              "manufacturer_verified_identity_count": 68,
+              "published_exact_icpn_count": 68,
+              "published_base_device_count": 26,
+              "added_exact_icpns": exacts,
+              "stm32u0_rows_before": 0,
+              "stm32u0_rows_after": 68,
+              "stm32u0_base_devices_after": 26,
+              "production_exact_icpns_before": before_exact,
+              "production_exact_icpns_after": after_exact,
+              "production_base_devices_before": before_bases,
+              "production_base_devices_after": after_bases,
+              "production_family_count_before": len(before_families),
+              "production_family_count_after": after_family_count,
+              "bounded_commercial_surface_complete": True,
+              "capability_unresolved_count": 0,
+              "capability_unresolved": [],
+              "canonical_write_applied": True,
+              "production_write_applied": True,
+              "programming_algorithm_equivalence_claimed": False,
+              "flash_geometry_equivalence_claimed": False,
+              "option_security_semantics_claimed": False,
+              "physical_target_qualification_claimed": False,
+              "hil_qualification_claimed": False,
+              "runtime_programming_support_claimed": False,
+              "full_stm32u0_surface_covered": False,
+          }
+          audit_bytes = (json.dumps(audit, indent=2, sort_keys=True) + "\n").encode()
+
+          (out / "stm32u0-commercial-icpn.csv").write_bytes(canonical_bytes)
+          (out / "stm32u0-phase-u0.5-publication-proposal.json").write_bytes(proposal_bytes)
+          (out / "stm32u0-phase-u0.5-publication-audit.json").write_bytes(audit_bytes)
+          (out / "icpn-v1-manifest.json").write_bytes(manifest_bytes)
+          summary = {
+              "canonical_sha256": canonical_sha,
+              "canonical_git_blob": canonical_blob,
+              "proposal_sha256": proposal_sha,
+              "audit_sha256": hashlib.sha256(audit_bytes).hexdigest(),
+              "manifest_sha256": manifest_sha,
+              "manifest_git_blob": manifest_blob,
+              "production_poststate": {"exact": after_exact, "bases": after_bases, "families": after_family_count},
+          }
+          (out / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stm32u0-u05-generated
+          path: u05-generated/
+          if-no-files-found: error
+          retention-days: 1
