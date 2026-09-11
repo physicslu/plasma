@@ -190,6 +190,9 @@ fi
 chmod 0640 "$config_path"
 chown plasma:plasma "$config_path"
 
+# Validate enough of the canonical schema to fail before activation if a preserved
+# Desired file cannot be consumed by the P3 runtime. Canonical Site identity is
+# one-based `id`; `site_id` is a wire/API concept and is not a YAML field.
 configured_site_count="$("$plasma_python" - "$config_path" <<'PY'
 import sys
 import yaml
@@ -199,16 +202,25 @@ with open(path, encoding="utf-8") as handle:
     payload = yaml.safe_load(handle)
 if not isinstance(payload, dict):
     raise SystemExit("canonical PPU configuration must be a YAML mapping")
+server = payload.get("server")
+if not isinstance(server, dict):
+    raise SystemExit("canonical PPU configuration server must be a mapping")
+maximum = server.get("max_supported_sites")
+if isinstance(maximum, bool) or not isinstance(maximum, int) or not 1 <= maximum <= 8:
+    raise SystemExit("canonical PPU configuration max_supported_sites must be in the range 1..8")
 sites = payload.get("sites")
 if not isinstance(sites, list):
     raise SystemExit("canonical PPU configuration sites must be a list")
 site_ids = []
 for entry in sites:
-    if not isinstance(entry, dict) or not isinstance(entry.get("site_id"), int):
+    if not isinstance(entry, dict):
         raise SystemExit("canonical PPU configuration contains an invalid Site entry")
-    site_ids.append(entry["site_id"])
-if any(site_id < 1 or site_id > 8 for site_id in site_ids):
-    raise SystemExit("canonical PPU configuration Site IDs must be in the range 1..8")
+    site_id = entry.get("id")
+    if isinstance(site_id, bool) or not isinstance(site_id, int):
+        raise SystemExit("canonical PPU configuration Site id must be an integer")
+    site_ids.append(site_id)
+if any(site_id < 1 or site_id > maximum for site_id in site_ids):
+    raise SystemExit(f"canonical PPU configuration Site IDs must be in the range 1..{maximum}")
 if len(site_ids) != len(set(site_ids)):
     raise SystemExit("canonical PPU configuration contains duplicate Site IDs")
 print(len(site_ids))
