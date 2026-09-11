@@ -125,6 +125,9 @@ require_clean_source() {
   }
 }
 
+# Legacy P2 evidence used the fixed literal "configured_site_count": 0. P3
+# accepts any validated dynamic Site count in 0..8 and does not make zero Sites
+# an invariant of the surrogate profile.
 validate_install_evidence() {
   [[ -f "$evidence" ]] || die "SWPC Z2-like install evidence is missing: $evidence"
   python3 - "$evidence" <<'PY'
@@ -217,10 +220,10 @@ verify_site_desired_operational_contract() {
   [[ "$(stat -c '%a' "$ppu_config")" == "640" ]] || die "PPU config must be mode 0640"
   [[ "$(stat -c '%U:%G' "$ppu_config")" == "plasma:plasma" ]] || die "PPU config must be owned plasma:plasma"
   grep -Fq "server --config $ppu_config" "$server_unit" || die "Plasma Server is not bound to canonical PPU config"
-  grep -Fq "--runtime-control-socket $server_control_socket" "$server_unit" || \
+  grep -Fq -- "--runtime-control-socket $server_control_socket" "$server_unit" || \
     die "Plasma Server is missing the authoritative P3 runtime-control socket"
   grep -Fq "gateway --ppu-config $ppu_config" "$gateway_unit" || die "Plasma Gateway is not bound to canonical PPU config"
-  grep -Fq "--runtime-activation-socket $runtime_activation_socket" "$gateway_unit" || \
+  grep -Fq -- "--runtime-activation-socket $runtime_activation_socket" "$gateway_unit" || \
     die "Plasma Gateway is missing the bounded P3 runtime-activation helper socket"
   grep -Fq "ReadWritePaths=/var/lib/plasma /var/log/plasma $config_root" "$gateway_unit" || \
     die "Plasma Gateway does not have the bounded canonical config write root"
