@@ -7,6 +7,8 @@ const sharedCss = await readFile(new URL("../app/operator-ui/operator-surface-pr
 const settingsUi = await readFile(new URL("../app/operator-ui/settings-ui.tsx", import.meta.url), "utf8");
 const diagnosticsUi = await readFile(new URL("../app/engineering/diagnostics-test-page.tsx", import.meta.url), "utf8");
 const siteDesiredUi = await readFile(new URL("../app/engineering/ppu-site-desired-configuration.tsx", import.meta.url), "utf8");
+const siteDesiredCore = await readFile(new URL("../app/engineering/ppu-site-desired-configuration-core.tsx", import.meta.url), "utf8");
+const runtimeActivationUi = await readFile(new URL("../app/engineering/ppu-runtime-activation.tsx", import.meta.url), "utf8");
 
 test("operator-ui exposes narrow reusable component primitives", () => {
   for (const primitive of [
@@ -34,11 +36,14 @@ test("Diagnostics and PPU Site Desired reuse operator components without sharing
   assert.match(diagnosticsUi, /from "\.\.\/operator-ui\/operator-surface"/);
   assert.match(diagnosticsUi, /<OperatorCard className=\{`diagnosticsTestCard/);
 
-  assert.match(siteDesiredUi, /from "\.\.\/operator-ui\/operator-surface"/);
-  assert.match(siteDesiredUi, /<OperatorCard className="ppuSiteCard" ariaLabel="Programming Site Configuration">/);
-  assert.match(siteDesiredUi, /<OperatorActions className="ppuSiteCardHeaderActions">/);
-  assert.match(siteDesiredUi, /<OperatorButton[\s\S]*variant="primary"/);
-  assert.match(siteDesiredUi, /<OperatorMessage className="ppuRegistryMessage error" tone="error"/);
+  assert.match(siteDesiredUi, /PpuSiteDesiredConfigurationCore/);
+  assert.match(siteDesiredUi, /PpuRuntimeActivation/);
+  assert.match(siteDesiredCore, /from "\.\.\/operator-ui\/operator-surface"/);
+  assert.match(siteDesiredCore, /<OperatorCard className="ppuSiteCard" ariaLabel="Programming Site Configuration">/);
+  assert.match(siteDesiredCore, /<OperatorActions className="ppuSiteCardHeaderActions">/);
+  assert.match(siteDesiredCore, /<OperatorButton[\s\S]*variant="primary"/);
+  assert.match(siteDesiredCore, /<OperatorMessage className="ppuRegistryMessage error" tone="error"/);
+  assert.match(runtimeActivationUi, /from "\.\.\/operator-ui\/operator-surface"/);
 
   assert.doesNotMatch(operatorSurface, /desired_revision|If-Match|restart_required|runtime_apply_supported/);
 });
