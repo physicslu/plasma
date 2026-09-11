@@ -6,6 +6,7 @@ repo_root="$(cd "$(dirname "$wrapper_path")/.." && pwd)"
 integration_backend="${PLASMACTL_INTEGRATION_BACKEND:-$repo_root/scripts/plasmactl-integration}"
 local_control_station_backend="${PLASMA_LOCAL_CONTROL_STATION_BACKEND:-$repo_root/scripts/plasmactl-local-control-station}"
 swpc_z2like_backend="${PLASMA_SWPC_Z2LIKE_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like}"
+swpc_z2like_bootstrap_backend="${PLASMA_SWPC_Z2LIKE_BOOTSTRAP_BACKEND:-$repo_root/scripts/plasmactl-swpc-z2like-bootstrap-sites}"
 z2_ps_backend="${PLASMA_Z2_PS_BACKEND:-$repo_root/scripts/plasmactl-z2-ps}"
 # Compatibility marker for repository documentation/contracts. The integration
 # backend owns migration behavior; the operator entrypoint publishes its schema.
@@ -48,6 +49,11 @@ run_swpc_z2like_backend() {
   bash "$swpc_z2like_backend" "$@"
 }
 
+run_swpc_z2like_bootstrap_backend() {
+  require_backend "$swpc_z2like_bootstrap_backend" "swpc-z2like bootstrap-sites"
+  bash "$swpc_z2like_bootstrap_backend" "$@"
+}
+
 run_z2_ps_backend() {
   require_backend "$z2_ps_backend" "z2-ps"
   bash "$z2_ps_backend" "$@"
@@ -86,6 +92,8 @@ Profile-aware commands:
 
   sudo plasmactl install swpc-z2like [--plasma-python PATH] [--ppu-id ID] [--facility-id ID] [--proxy-port PORT]
   sudo plasmactl deploy swpc-z2like  [same options]
+  sudo plasmactl bootstrap-sites swpc-z2like
+                                       One-time sites: [] -> disabled mock SITE1..SITE8; no runtime activation
   plasmactl verify swpc-z2like       Read-only local surrogate readiness/restricted-ingress/PS-loopback checks
   plasmactl status swpc-z2like       Installed release identity and system-service state
 
@@ -148,6 +156,12 @@ case "$command" in
         deploy
         ;;
     esac
+    ;;
+  bootstrap-sites)
+    [[ "${1:-}" == "swpc-z2like" ]] || wrapper_die "bootstrap-sites currently supports swpc-z2like only"
+    shift
+    (($# == 0)) || wrapper_die "bootstrap-sites swpc-z2like accepts no additional arguments"
+    run_swpc_z2like_bootstrap_backend
     ;;
   update-and-restart)
     case "${1:-}" in
