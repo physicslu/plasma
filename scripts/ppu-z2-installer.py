@@ -56,6 +56,7 @@ def render_runtime_activation_unit(*, paths, python_runtime) -> str:
             "Description=Plasma bounded runtime activation helper",
             "After=plasma-server.service",
             "Requires=plasma-server.service",
+            "PartOf=plasma-web.service",
             "",
             "[Service]",
             "Type=simple",
@@ -75,9 +76,6 @@ def render_runtime_activation_unit(*, paths, python_runtime) -> str:
                 f"--socket {RUNTIME_ACTIVATION_SOCKET} "
                 f"--server-control-socket {SERVER_CONTROL_SOCKET}"
             ),
-            "",
-            "[Install]",
-            "WantedBy=multi-user.target",
             "",
         ]
     )
@@ -180,24 +178,35 @@ def install_release(
             health_check=health_check,
             ensure_service_account=ensure_service_account,
         )
-    except Exception:
+    except Exception as activation_exc:
+        helper_rollback_errors: list[str] = []
         try:
             _core._restore_file(helper_snapshot)
+        except Exception as exc:
+            helper_rollback_errors.append(f"restore helper unit: {exc}")
+        try:
             systemctl("daemon-reload")
-        except Exception:
-            pass
+        except Exception as exc:
+            helper_rollback_errors.append(f"daemon-reload helper rollback: {exc}")
+        if helper_snapshot.existed:
+            try:
+                systemctl("restart", RUNTIME_ACTIVATION_SERVICE)
+            except Exception as exc:
+                helper_rollback_errors.append(f"restart previous helper: {exc}")
+        if helper_rollback_errors:
+            raise _core.Z2InstallerError(
+                f"{activation_exc}; runtime activation helper rollback also failed: "
+                + "; ".join(helper_rollback_errors)
+            ) from activation_exc
         raise
     finally:
         _core._write_text_atomic = original_writer
         _core.render_systemd_units = original_renderer
 
-    try:
-        systemctl("enable", "--now", RUNTIME_ACTIVATION_SERVICE)
-    except Exception as exc:
-        raise _core.Z2InstallerError(
-            f"runtime activation helper failed to enable after release activation: {exc}"
-        ) from exc
-
+    # The helper is deliberately not independently enabled. plasma-web.service
+    # Requires= it, so Gateway lifecycle owns helper start/stop and rollback via
+    # PartOf=plasma-web.service. This avoids a post-activation enable step that
+    # could leave an otherwise successful release only partially committed.
     site_state = evidence.get("site_desired_state")
     if isinstance(site_state, dict):
         site_state["runtime_apply_supported"] = True
@@ -206,6 +215,7 @@ def install_release(
         site_state["upgrade_preserves_existing_config"] = True
     evidence["runtime_activation"] = {
         "service": RUNTIME_ACTIVATION_SERVICE,
+        "lifecycle_owner": "plasma-web.service",
         "scope": "restart-plasma-server-only",
         "server_authoritative_quiesce": True,
         "quiesce_ttl_bounded": True,
