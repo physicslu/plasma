@@ -1,0 +1,58 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L151C6",
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+  "evidence_section_sha256": "1a7d9d120f23685e924cadf2df1c709f8c350a3ac7157dc1c832bc660116373e",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32L151C6T6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "icpn": "STM32L151C6T6TR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "icpn": "STM32L151C6U6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "icpn": "STM32L151C6U6TR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l151c6.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_qr_identity_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": false,
+      "icpn": "STM32L151C6T6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "active": false,
+      "icpn": "STM32L151C6T6TR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "active": false,
+      "icpn": "STM32L151C6U6",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    },
+    {
+      "active": false,
+      "icpn": "STM32L151C6U6TR",
+      "marketing_status": "NRND Not recommended for New Design. Product is in volume production only to support customers ongoing production. EN"
+    }
+  ],
+  "rendered_dom_sha256": "3d8d7d1a603aafb009f21c90d0ed282229e2a117ba55cb8e991bed1a24f8f226",
+  "retrieved_at_utc": "2026-09-11T04:31:37Z",
+  "sample_buy_is_identity_gate": false,
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l151c6.html"
+}

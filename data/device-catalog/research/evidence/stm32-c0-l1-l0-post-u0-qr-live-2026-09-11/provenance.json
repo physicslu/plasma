@@ -1,0 +1,65 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "browser": {
+    "browser_version": "151.0.7922.34",
+    "evidence_profile": "stm32_post_u0_qr_identity_v1",
+    "headless": false,
+    "playwright_version": "1.62.0"
+  },
+  "candidate_series": [
+    "STM32C0",
+    "STM32L1",
+    "STM32L0"
+  ],
+  "claims": {
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence_claimed": false,
+    "runtime_programming_support_claimed": false,
+    "selected_next_research_family": false
+  },
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+  "dispositioned_targets": 20,
+  "evidence_file_count": 20,
+  "evidence_files": {
+    "STM32L010C6.json": "cacf5c6622e300868f2cdca58282892cf5ac9ecd9fc751239a4ce40052d4c43e",
+    "STM32L011D3.json": "ac6454082eb861951433ea4e6cbde437a5d2e3f413a5727bf34936e0251d9163",
+    "STM32L021D4.json": "b43c3f8d228d8dd73a3c18441898acd5dd7a3abff52ba0270df92451df565c22",
+    "STM32L031C4.json": "9215a3e3bf8da694a5ca6d90289c9dc634693b1857e3e2c97a52735a43382cd7",
+    "STM32L041C6.json": "06414818d4f4798d64bbf1293941026a1309fde63ad2c80ee4e4fc9de2eb1fda",
+    "STM32L051C6.json": "349f2071bc217dfafbb87b1eb5ee9876167743992fdce3c633195248cb6e1dd5",
+    "STM32L052C6.json": "371ef85ad9912d87ef0145ada85d133782b76e289de188485cc7c8e4e3b536f0",
+    "STM32L053C6.json": "e9653490890574e2f68d7e69f5b63404f3898f05f76df320e42b5a2f406324de",
+    "STM32L062C8.json": "9fde17dc2f213ca2447f35be544fff31692c4e4fd914b721521323918b5bb400",
+    "STM32L063C8.json": "3548e6c08bc9682a184fbe3534a9e5c5dd4465d78402bc94edf9afd3c4506a61",
+    "STM32L071C8.json": "6686d0b8531e3b325d65c577b6ef7efeb3ec88b9478521365fa2d2333753e54b",
+    "STM32L072CB.json": "b94a1afa92468cbbf746e2ffeb06969e42f91a80d63e945d32b52a3c0d16a76a",
+    "STM32L073CB.json": "bd4a472fcb58f56a220ab9bb6ce309b89ef0e264bf417e0d39d9e290d9285d9c",
+    "STM32L081CB.json": "a67ba3cb699a1ddceef7f5c2bded3191721d362ebf6c884bdbfea2b4d9c43f80",
+    "STM32L082CZ.json": "fdcc80539a1d6c839caa9fa81ebd47577a38c0c9be1ec3c29e1d46a0f00fd076",
+    "STM32L083CB.json": "64c1b5850231fd7c9600ae84352f67dab75c31eeb02746e25207bff335dfaff3",
+    "STM32L100C6.json": "7b0ad166d55875ded9d361fec57043ec569116ca634d978977a2d48704ed5bcd",
+    "STM32L151C6.json": "7193a2d2dba7c2ac6dec42852639269298fc66d1626539cbddf8b739a7c1ac71",
+    "STM32L152C6.json": "824d7423e02a688698479bed2ae9e2450a18f7acb18228a5305a4539135bb0e3",
+    "STM32L162QC.json": "56c283ae0dc54238156834f94dbcecc375702195e10e887321ade01bab430179"
+  },
+  "evidence_role": "authoritative_commercial_identity_lifecycle_probe",
+  "executed_git_sha": "a52dbdcdd168fb14a40f469b514fbdfaeb8411bc",
+  "manual_review_targets": 6,
+  "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+  "phase": "C0.0",
+  "probe_summary_sha256": "0634a3044738a19fad163e6ff013c9dab60731f4ee5678612fc3ce9b8a8918b4",
+  "production_manifest_sha256": "903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0",
+  "production_state": {
+    "base_devices": 243,
+    "exact_icpns": 703,
+    "stm32_families": 9
+  },
+  "sample_buy_is_identity_gate": false,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 26,
+  "targets_sha256": "c2b30151a5e52975562f03478c7665e16b17ac0751c06275cfd5db717d504671",
+  "transaction": "post_u0_next_family_evidence_selection",
+  "workflow_run_attempt": 1,
+  "workflow_run_id": 34561677731
+}
