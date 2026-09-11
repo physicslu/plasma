@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Post-U0 STM32 next-family research selection policy.
 
-This policy consumes retained authoritative ST Quality & Reliability evidence and
-an independent official-ST Ordering Information review. It may select the next
-research family only; it never admits devices or claims programming/runtime
-support.
+This policy consumes retained official-ST product-page evidence plus an independent
+Ordering Information review. Commercial identity/lifecycle authority is defined by
+manufacturer-controlled facts, not by a single ST UI layout: exact Part Number comes
+from Quality & Reliability and Marketing Status may be joined from Sample & Buy only
+when the exact Part Number sets match fail-closed.
+
+The transaction may select the next research family only. It never admits devices,
+defines programming behavior, or claims runtime/HIL support.
 """
 from __future__ import annotations
 
@@ -17,8 +21,13 @@ from stm32_post_u0_evidence_probe import EXPECTED_SHORTLIST, EXPECTED_SURFACES, 
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_EVIDENCE = HERE / "evidence" / "stm32-c0-l1-l0-post-u0-live-2026-09-11" / "probe-summary.json"
+DEFAULT_QR_DIAGNOSTIC = HERE / "evidence" / "stm32-c0-l1-l0-post-u0-qr-live-2026-09-11" / "probe-summary.json"
 DEFAULT_ORDERING_REVIEW = HERE / "stm32-c0-l0-post-u0-ordering-authority-review.json"
-AUTHORITY_SURFACE = "quality_and_reliability_part_number"
+AUTHORITY_SURFACE = "quality_and_reliability_identity_plus_sample_and_buy_lifecycle"
+COMMERCIAL_IDENTITY_AUTHORITY = (
+    "official_st_quality_and_reliability_exact_identity_plus_"
+    "sample_and_buy_marketing_status_exact_set_join"
+)
 SELECTION_ID = "stm32-post-u0-next-family-selection-v1"
 
 
@@ -40,12 +49,19 @@ def validate_authoritative_summary(summary: dict[str, Any]) -> None:
         raise AcquisitionError("post-U0 evidence candidate order drifted")
     if summary.get("attempted_targets") != EXPECTED_TARGET_COUNT:
         raise AcquisitionError("post-U0 evidence target count drifted")
+    if summary.get("dispositioned_targets") != EXPECTED_TARGET_COUNT:
+        raise AcquisitionError("authoritative evidence did not disposition every target")
+    if summary.get("manual_review_targets") != 0 or summary.get("bounded_probe_complete") is not True:
+        raise AcquisitionError("authoritative evidence probe is not clean/complete")
     if summary.get("selected_next_research_family") is not None:
         raise AcquisitionError("evidence probe must remain pre-selection")
     if not _all_false(summary.get("claims")):
         raise AcquisitionError("evidence probe claims escaped fail-closed state")
 
-    expected_counts = {series: len(EXPECTED_SURFACES[series]["subfamilies"]) for series in EXPECTED_SHORTLIST}
+    expected_counts = {
+        series: len(EXPECTED_SURFACES[series]["subfamilies"])
+        for series in EXPECTED_SHORTLIST
+    }
     by_series = summary.get("by_series")
     if not isinstance(by_series, dict):
         raise AcquisitionError("evidence summary lacks by_series")
@@ -53,23 +69,71 @@ def validate_authoritative_summary(summary: dict[str, Any]) -> None:
         row = by_series.get(series)
         if not isinstance(row, dict) or row.get("attempted_targets") != attempted:
             raise AcquisitionError(f"{series}: evidence target partition drifted")
+        if row.get("commercial_identity_access_clean") is not True:
+            raise AcquisitionError(f"{series}: commercial identity evidence is not clean")
 
     results = summary.get("results")
     if not isinstance(results, list) or len(results) != EXPECTED_TARGET_COUNT:
         raise AcquisitionError("authoritative evidence result count drifted")
     for result in results:
-        if not isinstance(result, dict):
-            raise AcquisitionError("authoritative evidence result must be object")
-        if result.get("acquisition_status") != "success":
-            continue
+        if not isinstance(result, dict) or result.get("acquisition_status") != "success":
+            raise AcquisitionError("authoritative evidence requires success for every target")
+        source = result.get("source_url")
+        if not isinstance(source, str) or not source.startswith(
+            "https://www.st.com/en/microcontrollers-microprocessors/"
+        ):
+            raise AcquisitionError("authoritative evidence source is not official ST")
         evidence = result.get("evidence")
         if not isinstance(evidence, dict):
             raise AcquisitionError("successful evidence result lacks evidence object")
         if evidence.get("evidence_surface") != AUTHORITY_SURFACE:
             raise AcquisitionError(
-                f"{result.get('base_device')}: non-authoritative identity surface "
+                f"{result.get('base_device')}: unsupported commercial evidence surface "
                 f"{evidence.get('evidence_surface')!r}"
             )
+        exact = evidence.get("exact_icpns")
+        excluded = evidence.get("excluded_non_active_part_numbers")
+        records = evidence.get("part_number_records")
+        if not isinstance(exact, list) or not isinstance(excluded, list) or not isinstance(records, list):
+            raise AcquisitionError(f"{result.get('base_device')}: incomplete exact-identity evidence")
+        record_ids = [row.get("icpn") for row in records if isinstance(row, dict)]
+        disposition_ids = list(exact) + [
+            row.get("icpn") for row in excluded if isinstance(row, dict)
+        ]
+        if len(record_ids) != len(set(record_ids)) or set(record_ids) != set(disposition_ids):
+            raise AcquisitionError(
+                f"{result.get('base_device')}: joined lifecycle set does not equal exact identity set"
+            )
+
+
+def validate_qr_only_method_diagnostic(summary: dict[str, Any]) -> None:
+    """Lock the observed C0 layout limitation without treating it as family evidence."""
+    if tuple(summary.get("candidate_series", [])) != EXPECTED_SHORTLIST:
+        raise AcquisitionError("Q&R diagnostic candidate order drifted")
+    by_series = summary.get("by_series")
+    if not isinstance(by_series, dict):
+        raise AcquisitionError("Q&R diagnostic lacks by_series")
+    c0 = by_series.get("STM32C0")
+    if not isinstance(c0, dict):
+        raise AcquisitionError("Q&R diagnostic lacks STM32C0")
+    if (
+        c0.get("attempted_targets") != 6
+        or c0.get("verified_identity_targets") != 0
+        or c0.get("manual_review") != 6
+        or c0.get("commercial_identity_access_clean") is not False
+    ):
+        raise AcquisitionError("Q&R-only C0 method diagnostic drifted")
+    results = summary.get("results")
+    c0_errors = [
+        item.get("error", "")
+        for item in results or []
+        if isinstance(item, dict) and item.get("series") == "STM32C0"
+    ]
+    if len(c0_errors) != 6 or not all(
+        "Quality and Reliability Part Number / Marketing Status surface incomplete" in error
+        for error in c0_errors
+    ):
+        raise AcquisitionError("Q&R-only C0 failure mode drifted")
 
 
 def classify_series(summary: dict[str, Any]) -> dict[str, str]:
@@ -79,14 +143,7 @@ def classify_series(summary: dict[str, Any]) -> dict[str, str]:
     for series in EXPECTED_SHORTLIST:
         row = by_series[series]
         attempted = int(row["attempted_targets"])
-        if (
-            row.get("commercial_identity_access_clean") is not True
-            or int(row.get("manual_review", 0)) != 0
-            or int(row.get("source_unavailable_404", 0)) != 0
-            or int(row.get("verified_identity_targets", 0)) != attempted
-        ):
-            out[series] = "evidence_incomplete"
-        elif int(row.get("lifecycle_excluded_targets", 0)) > 0:
+        if int(row.get("lifecycle_excluded_targets", 0)) > 0:
             out[series] = "deprioritized_for_next_family_research_due_to_lifecycle"
         elif int(row.get("active_candidate_targets", 0)) == attempted:
             out[series] = "ordering_review_candidate"
@@ -125,19 +182,18 @@ def validate_ordering_review(review: dict[str, Any], required_series: list[str])
             raise AcquisitionError(f"{series}: Ordering Information evidence is not complete/current")
 
 
-def build_selection(
-    summary: dict[str, Any],
-    ordering_review: dict[str, Any],
-) -> dict[str, Any]:
+def build_selection(summary: dict[str, Any], ordering_review: dict[str, Any]) -> dict[str, Any]:
     dispositions = classify_series(summary)
-    eligible = [series for series in EXPECTED_SHORTLIST if dispositions[series] == "ordering_review_candidate"]
-
-    selected: str | None = None
-    selection_status: str
-    if not eligible:
-        selection_status = "blocked_no_active_clean_candidate"
-    elif any(dispositions[series] == "evidence_incomplete" for series in EXPECTED_SHORTLIST):
+    eligible = [
+        series for series in EXPECTED_SHORTLIST
+        if dispositions[series] == "ordering_review_candidate"
+    ]
+    if any(dispositions[series] == "evidence_incomplete" for series in EXPECTED_SHORTLIST):
+        selected = None
         selection_status = "blocked_incomplete_manufacturer_evidence"
+    elif not eligible:
+        selected = None
+        selection_status = "blocked_no_active_clean_candidate"
     else:
         validate_ordering_review(ordering_review, eligible)
         comparison = ordering_review.get("comparison")
@@ -149,6 +205,7 @@ def build_selection(
                 f"Ordering Information comparison set drifted: expected {eligible}, got {reviewed}"
             )
         if comparison.get("result") != "equivalent_required_ordering_evidence_quality":
+            selected = None
             selection_status = "blocked_unequal_or_unresolved_ordering_evidence"
         else:
             selected = eligible[0]
@@ -176,8 +233,8 @@ def build_selection(
         "selection_date": "2026-09-11",
         "scope": "next_family_research_only",
         "current_shortlist": list(EXPECTED_SHORTLIST),
-        "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
-        "sample_buy_is_identity_gate": False,
+        "commercial_identity_authority": COMMERCIAL_IDENTITY_AUTHORITY,
+        "evidence_surface": AUTHORITY_SURFACE,
         "candidate_evidence": candidate_evidence,
         "ordering_review_candidates": eligible,
         "ordering_evidence_result": (
@@ -185,7 +242,10 @@ def build_selection(
         ),
         "selection_status": selection_status,
         "selected_next_research_family": selected,
-        "tie_break_policy": "current_post_u0_cross_family_prioritization_order_after_equivalent_required_evidence",
+        "tie_break_policy": (
+            "current_post_u0_cross_family_prioritization_order_after_"
+            "equivalent_required_evidence"
+        ),
         "authority_boundaries": {
             "canonical_admission_authorized": False,
             "flash_geometry_qualified": False,
