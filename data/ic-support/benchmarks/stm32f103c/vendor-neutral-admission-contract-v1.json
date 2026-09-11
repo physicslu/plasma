@@ -74,6 +74,126 @@
       "page_count": 128
     }
   },
+  "review_facts": [
+    {
+      "fact_id": "stm32f103c-family-applicability",
+      "statement": "DS5319 Rev 20 covers STM32F103x8 and STM32F103xB medium-density devices, including STM32F103C8 and STM32F103CB, with 64 or 128 Kbytes of Flash.",
+      "projection_state": "CANONICAL_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_ds5319_rev20",
+          "locator": "Features; Table 1. Device summary",
+          "page": 1
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-medium-density-page-geometry",
+      "statement": "PM0075 Rev 2 defines medium-density main Flash as 128 pages of 1 Kbyte, starting at 0x08000000 and ending at 0x0801FFFF for page 127.",
+      "projection_state": "CANONICAL_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "1.2 Flash module organization; Table 3. Flash module organization (medium-density devices)",
+          "page": 8
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c8-main-flash-geometry",
+      "statement": "STM32F103C8T6 has 64 KiB main Flash; with the medium-density 1 KiB page geometry this yields 64 pages from 0x08000000 through 0x0800FFFF.",
+      "projection_state": "CANONICAL_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_ds5319_rev20",
+          "locator": "Features; Table 1. Device summary",
+          "page": 1
+        },
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "1.2 Flash module organization; Table 3. Flash module organization (medium-density devices)",
+          "page": 8
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103cb-main-flash-geometry",
+      "statement": "STM32F103CBT6 has 128 KiB main Flash and therefore uses the complete medium-density geometry of 128 1 KiB pages from 0x08000000 through 0x0801FFFF.",
+      "projection_state": "CANONICAL_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_ds5319_rev20",
+          "locator": "Features; Table 1. Device summary",
+          "page": 1
+        },
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "1.2 Flash module organization; Table 3. Flash module organization (medium-density devices)",
+          "page": 8
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-flash-unlock-keys",
+      "statement": "PM0075 Rev 2 defines KEY1 as 0x45670123 and KEY2 as 0xCDEF89AB for the Flash unlock sequence.",
+      "projection_state": "EXECUTION_PROFILE_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.1 Key values; 2.3.2 Unlocking the Flash memory",
+          "page": 13
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-program-granularity",
+      "statement": "PM0075 Rev 2 states that main Flash is programmed 16 bits at a time using half-word writes with FLASH_CR.PG set.",
+      "projection_state": "EXECUTION_PROFILE_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.3 Main Flash memory programming",
+          "page": 14
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-standard-program-sequence",
+      "statement": "The documented standard main-Flash programming flow checks BSY, sets PG, writes a half-word, waits for BSY to clear, then reads back and verifies the programmed value.",
+      "projection_state": "EXECUTION_PROFILE_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.3 Main Flash memory programming; Standard programming",
+          "page": 14
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-erase-capabilities",
+      "statement": "PM0075 Rev 2 documents both page erase and complete main-Flash Mass Erase as distinct Flash erase capabilities.",
+      "projection_state": "EXECUTION_PROFILE_REQUIRED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.4 Flash memory erase",
+          "page": 15
+        }
+      ]
+    },
+    {
+      "fact_id": "stm32f103c-rdp-unprotect-destructive",
+      "statement": "Changing read protection from protected to unprotected causes a Mass Erase of the main Flash memory.",
+      "projection_state": "BLOCKED",
+      "evidence": [
+        {
+          "source_id": "st_pm0075_rev2",
+          "locator": "2.3.5 Option byte programming; 2.4.1 Read protection",
+          "page": 18
+        }
+      ]
+    }
+  ],
   "operations": {
     "admitted": [
       "READ",
