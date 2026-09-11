@@ -1,0 +1,107 @@
+name: STM32U0 U0.2 live commercial discovery
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stm32u0-u02-live-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-discovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run deterministic U0.1/U0.2 boundary tests
+        run: |
+          python data/device-catalog/research/test_stm32u0_phase_u0_1_foundation.py
+          python data/device-catalog/research/test_stm32u0_phase_u0_2_discovery.py
+
+      - name: Install bounded browser acquisition dependencies
+        run: |
+          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Acquire all 26 deterministic STM32U0 Base Devices
+        id: acquire
+        continue-on-error: true
+        run: |
+          mkdir -p .artifacts/stm32u0-u02/evidence
+          xvfb-run -a python data/device-catalog/research/stm32u0_phase_u0_2_discovery.py \
+            --headed \
+            --delay 1.0 \
+            --timeout 60 \
+            --output .artifacts/stm32u0-u02/live-summary.json \
+            --evidence-dir .artifacts/stm32u0-u02/evidence
+
+      - name: Validate U0.1 representative continuity and U0.2 live summary
+        id: validate
+        if: always() && hashFiles('.artifacts/stm32u0-u02/live-summary.json') != ''
+        continue-on-error: true
+        run: |
+          python data/device-catalog/research/validate_stm32u0_phase_u0_2_live_summary.py \
+            .artifacts/stm32u0-u02/live-summary.json
+
+      - name: Record execution provenance
+        if: always() && hashFiles('.artifacts/stm32u0-u02/live-summary.json') != ''
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path('.artifacts/stm32u0-u02')
+          summary = json.loads((root / 'live-summary.json').read_text())
+          provenance = {
+              'schema_version': 1,
+              'phase': 'U0.2',
+              'family': 'STM32U0',
+              'source_repository': os.environ['GITHUB_REPOSITORY'],
+              'executed_git_sha': os.environ['GITHUB_SHA'],
+              'workflow_run_id': int(os.environ['GITHUB_RUN_ID']),
+              'workflow_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+              'acquisition_transport': summary.get('acquisition_transport'),
+              'browser_version': summary.get('browser_version'),
+              'target_count': summary.get('attempted'),
+              'acquisition_success': summary.get('acquisition_success'),
+              'acquisition_failure': summary.get('acquisition_failure'),
+              'active_exact_icpn_candidates': summary.get('active_exact_icpn_candidates'),
+              'bounded_discovery_clean': summary.get('bounded_discovery_clean'),
+              'u0_1_representative_validation': '${{ steps.validate.outcome }}',
+              'canonical_admission_authorized': False,
+              'production_write_authorized': False,
+              'runtime_programming_support_claimed': False,
+          }
+          (root / 'provenance.json').write_text(json.dumps(provenance, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Upload immutable live acquisition candidate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32u0-u02-live-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            .artifacts/stm32u0-u02/live-summary.json
+            .artifacts/stm32u0-u02/provenance.json
+            .artifacts/stm32u0-u02/evidence/*.json
+            data/device-catalog/research/stm32u0-phase-u0.2-discovery-manifest.json
+
+      - name: Enforce bounded discovery gate
+        if: always()
+        run: |
+          if [ "${{ steps.acquire.outcome }}" != "success" ]; then
+            echo "STM32U0 U0.2 live acquisition requires review; inspect the retained workflow artifact." >&2
+            exit 1
+          fi
+          if [ "${{ steps.validate.outcome }}" != "success" ]; then
+            echo "STM32U0 U0.2 live evidence failed U0.1 representative continuity or summary validation." >&2
+            exit 1
+          fi
