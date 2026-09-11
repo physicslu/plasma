@@ -6,8 +6,8 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 
-: "${PYTHON_VERSION:?PYTHON_VERSION is required}"
-: "${PYTHON_SOURCE_SHA256:?PYTHON_SOURCE_SHA256 is required}"
+: "${Z2_PYTHON_VERSION:?Z2_PYTHON_VERSION is required}"
+: "${Z2_PYTHON_SOURCE_SHA256:?Z2_PYTHON_SOURCE_SHA256 is required}"
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output="$1"
@@ -19,8 +19,8 @@ docker run --rm \
   --platform linux/arm/v7 \
   --volume "$repo_root:/repo:ro" \
   --volume "$output:/out" \
-  --env PYTHON_VERSION="$PYTHON_VERSION" \
-  --env PYTHON_SOURCE_SHA256="$PYTHON_SOURCE_SHA256" \
+  --env PYTHON_VERSION="$Z2_PYTHON_VERSION" \
+  --env PYTHON_SOURCE_SHA256="$Z2_PYTHON_SOURCE_SHA256" \
   arm32v7/ubuntu:22.04 \
   bash -euxo pipefail -c '
     export DEBIAN_FRONTEND=noninteractive

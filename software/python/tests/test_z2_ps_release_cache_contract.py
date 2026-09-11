@@ -32,6 +32,10 @@ def test_build_recipe_is_an_explicit_cache_dependency() -> None:
     recipe = recipe_text()
     assert '- "scripts/build-z2-python-runtime.sh"' in text
     assert 'bash scripts/build-z2-python-runtime.sh "$RUNNER_TEMP/z2-python-artifact"' in text
+    assert 'Z2_PYTHON_VERSION:?Z2_PYTHON_VERSION is required' in recipe
+    assert 'Z2_PYTHON_SOURCE_SHA256:?Z2_PYTHON_SOURCE_SHA256 is required' in recipe
+    assert '--env PYTHON_VERSION="$Z2_PYTHON_VERSION"' in recipe
+    assert '--env PYTHON_SOURCE_SHA256="$Z2_PYTHON_SOURCE_SHA256"' in recipe
     assert "docker run --rm" in recipe
     assert "arm32v7/ubuntu:22.04" in recipe
     assert "./configure" in recipe
