@@ -5,6 +5,8 @@ import test from "node:test";
 const engineering = await readFile(new URL("../app/engineering/page.tsx", import.meta.url), "utf8");
 const ppuSite = await readFile(new URL("../app/engineering/ppu-site-configuration.tsx", import.meta.url), "utf8");
 const ppuSiteDesired = await readFile(new URL("../app/engineering/ppu-site-desired-configuration.tsx", import.meta.url), "utf8");
+const ppuSiteDesiredCore = await readFile(new URL("../app/engineering/ppu-site-desired-configuration-core.tsx", import.meta.url), "utf8");
+const ppuRuntimeActivation = await readFile(new URL("../app/engineering/ppu-runtime-activation.tsx", import.meta.url), "utf8");
 const ppuUiState = await readFile(new URL("../app/engineering/ppu-ui-state.ts", import.meta.url), "utf8");
 const ppuNetwork = await readFile(new URL("../app/engineering/ppu-network-configuration.tsx", import.meta.url), "utf8");
 const registryApi = await readFile(new URL("../app/engineering/ppu-registry-api.ts", import.meta.url), "utf8");
@@ -79,28 +81,38 @@ test("PPU topology remains observed while Site desired configuration is PPU-owne
   assert.match(ppuSite, /fleetView\?\.topology\.site_count/);
   assert.match(ppuSite, /import PpuSiteDesiredConfiguration/);
   assert.match(ppuSite, /<PpuSiteDesiredConfiguration/);
-  assert.match(ppuSiteDesired, /getManagerPpuSites/);
-  assert.match(ppuSiteDesired, /saveManagerPpuSite/);
-  assert.match(ppuSiteDesired, /Desired Enabled/);
-  assert.match(ppuSiteDesired, /Desired Interface/);
-  assert.match(ppuSiteDesired, /Desired Target/);
-  assert.match(ppuSiteDesired, /<th>Runtime<\/th>/);
-  assert.match(ppuSiteDesired, /<th>Reconciliation<\/th>/);
-  assert.match(ppuSiteDesired, /Stop or cancel active Jobs before changing Site desired configuration/);
-  assert.match(ppuSiteDesired, /canonical PPU configuration/);
+  assert.match(ppuSiteDesired, /PpuSiteDesiredConfigurationCore/);
+  assert.match(ppuSiteDesired, /PpuRuntimeActivation/);
+  assert.match(ppuSiteDesiredCore, /getManagerPpuSites/);
+  assert.match(ppuSiteDesiredCore, /saveManagerPpuSite/);
+  assert.match(ppuSiteDesiredCore, /Desired Enabled/);
+  assert.match(ppuSiteDesiredCore, /Desired Interface/);
+  assert.match(ppuSiteDesiredCore, /Desired Target/);
+  assert.match(ppuSiteDesiredCore, /<th>Runtime<\/th>/);
+  assert.match(ppuSiteDesiredCore, /<th>Reconciliation<\/th>/);
+  assert.match(ppuSiteDesiredCore, /Stop or cancel active Jobs before changing Site desired configuration/);
+  assert.match(ppuSiteDesiredCore, /canonical PPU configuration/);
   assert.doesNotMatch(ppuSite, /Enable All|Disable All/);
 });
 
 test("P0 Site UI separates browser Draft, persisted Desired, and observed Runtime without hard-coding topology", () => {
-  assert.match(ppuSiteDesired, />Draft</);
-  assert.match(ppuSiteDesired, />Desired</);
-  assert.match(ppuSiteDesired, />Runtime</);
-  assert.match(ppuSiteDesired, /Unsaved Draft/);
-  assert.match(ppuSiteDesired, /Saving updates Desired configuration only; Runtime remains separately reconciled/);
-  assert.match(ppuSiteDesired, /runtime_apply_supported=false/);
-  assert.match(ppuSiteDesired, /Topology is discovered from the PPU/);
-  assert.doesNotMatch(ppuSiteDesired, /Array\(8\)|SITE8|site_count\s*===\s*8/);
-  assert.doesNotMatch(ppuSiteDesired, /Programming Channel|Channel Configuration|CH[1-8]/);
+  assert.match(ppuSiteDesiredCore, />Draft</);
+  assert.match(ppuSiteDesiredCore, />Desired</);
+  assert.match(ppuSiteDesiredCore, />Runtime</);
+  assert.match(ppuSiteDesiredCore, /Unsaved Draft/);
+  assert.match(ppuSiteDesiredCore, /Saving updates Desired configuration only; Runtime remains separately reconciled/);
+  assert.match(ppuSiteDesiredCore, /Topology is discovered from the PPU/);
+  assert.doesNotMatch(ppuSiteDesiredCore, /Array\(8\)|SITE8|site_count\s*===\s*8/);
+  assert.doesNotMatch(ppuSiteDesiredCore, /Programming Channel|Channel Configuration|CH[1-8]/);
+});
+
+test("P3 exposes controlled PPU-level runtime activation instead of pretending Save Desired applies runtime", () => {
+  assert.match(ppuRuntimeActivation, /Activate Desired Configuration/);
+  assert.match(ppuRuntimeActivation, /All-Site impact/);
+  assert.match(ppuRuntimeActivation, /runtime_apply_supported/);
+  assert.match(ppuRuntimeActivation, /Runtime In Sync/);
+  assert.match(ppuRuntimeActivation, /Server-authoritative admission gate/);
+  assert.doesNotMatch(ppuSiteDesiredCore, /onClick=\{[^}]*restart/i);
 });
 
 test("PPU management names the northbound service Plasma Gateway", () => {
@@ -129,7 +141,7 @@ test("PPU network UI distinguishes Linux Default Gateway from the Plasma Gateway
   assert.doesNotMatch(ppuNetwork, /<span>Gateway<\/span>/);
 });
 
-test("Browser never sequences the PPU activation API directly", () => {
+test("Browser never sequences the PPU network activation API directly", () => {
   assert.match(registryApi, /getManagerPpuNetwork/);
   assert.match(registryApi, /saveManagerPpuNetwork/);
   assert.match(registryApi, /commissionManagerPpuStaticNetwork/);
@@ -142,10 +154,11 @@ test("Browser never sequences the PPU activation API directly", () => {
   assert.match(ppuNetwork, /verify the same <code>ppu_id<\/code>/);
 });
 
-test("browser registry client exposes registry, network, commissioning, Site desired state, and PPU selection through same-origin BFF", () => {
+test("browser registry client exposes registry, network, commissioning, Site desired state, activation, and PPU selection through same-origin BFF", () => {
   assert.match(registryApi, /\/api\/manager\/registry/);
   assert.match(registryApi, /getManagerPpuSites/);
   assert.match(registryApi, /saveManagerPpuSite/);
+  assert.match(registryApi, /activateManagerPpuSiteDesired/);
   assert.match(registryApi, /\/sites\/\$\{siteId\}/);
   assert.match(registryApi, /selectManagerPpuForManagedOperations/);
   assert.match(registryApi, /method: "POST"/);
@@ -166,14 +179,15 @@ test("Manager registry BFF remains loopback-only and commissioning is a Manager 
   assert.doesNotMatch(managerBff, /gateway\$\{targetPath\}.*network-commissioning/);
 });
 
-test("registry BFF routes keep desired-state relay and Manager-owned commissioning explicit", () => {
+test("registry BFF routes keep desired-state relay, controlled runtime activation, and Manager-owned commissioning explicit", () => {
   assert.match(registryRoute, /export async function GET/);
   assert.match(registryRoute, /export async function POST/);
   assert.doesNotMatch(registryRoute, /export async function PATCH|export async function DELETE/);
-  assert.match(registryEntryRoute, /"entry" \| "network" \| "network-commissioning" \| "sites" \| "site"/);
+  assert.match(registryEntryRoute, /"entry" \| "network" \| "network-commissioning" \| "sites" \| "site" \| "site-activation"/);
   assert.match(registryEntryRoute, /relayManagerPpuAliasRequest\(request, parsed\.alias, "\/api\/settings\/ppu-network"\)/);
   assert.match(registryEntryRoute, /relayManagerPpuAliasRequest\(request, parsed\.alias, "\/api\/settings\/sites"\)/);
   assert.match(registryEntryRoute, /`\/api\/settings\/sites\/\$\{parsed\.siteId\}`/);
+  assert.match(registryEntryRoute, /\/api\/settings\/sites\/activation/);
   assert.match(registryEntryRoute, /relayManagerNetworkCommissioningRequest\(request, parsed\.alias\)/);
   assert.match(registryEntryRoute, /export async function GET/);
   assert.match(registryEntryRoute, /export async function POST/);
