@@ -33,5 +33,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Replay C0.1 foundation planner
-        run: python data/device-catalog/research/stm32c0_phase_c0_1_foundation.py
+      - name: Run C0.1 negative controls
+        run: python data/device-catalog/research/test_stm32c0_phase_c0_1_foundation.py
+      - name: Replay frozen C0.1 baseline
+        run: python data/device-catalog/research/stm32c0_phase_c0_1_foundation.py --check
+      - name: Report frozen baseline digest
+        run: sha256sum data/device-catalog/research/stm32c0-phase-c0.1-foundation-baseline.json
+      - name: Run C0.1 hard-lock validator when present
+        shell: bash
+        run: |
+          if test -f data/device-catalog/research/validate_stm32c0_phase_c0_1_foundation.py; then
+            python data/device-catalog/research/validate_stm32c0_phase_c0_1_foundation.py
+          fi
