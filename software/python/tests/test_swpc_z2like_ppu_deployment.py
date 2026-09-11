@@ -49,6 +49,15 @@ def test_swpc_surrogate_site_config_write_boundary_is_gateway_only() -> None:
     assert "preserving existing canonical Desired configuration" in text
 
 
+def test_swpc_surrogate_validates_dynamic_canonical_site_ids() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert 'site_id = entry.get("id")' in text
+    assert 'entry.get("site_id")' not in text
+    assert "canonical Site identity is" in text
+    assert "not 1 <= maximum <= 8" in text
+    assert "len(site_ids) != len(set(site_ids))" in text
+
+
 def test_swpc_surrogate_reuses_bounded_p3_activation_units() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
     assert 'server_control_socket="/run/plasma-server/control.sock"' in text
