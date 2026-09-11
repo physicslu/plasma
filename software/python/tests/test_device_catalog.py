@@ -7,7 +7,7 @@ from pathlib import Path
 from plasma_web.device_catalog import DeviceCatalog, get_default_device_catalog
 
 
-EXPECTED_PRODUCTION_CATALOG_SIZE = 635
+EXPECTED_PRODUCTION_CATALOG_SIZE = 703
 EXPECTED_STM32F0_CATALOG_SIZE = 42
 EXPECTED_STM32F2_CATALOG_SIZE = 33
 EXPECTED_STM32F3_CATALOG_SIZE = 10
@@ -15,6 +15,7 @@ EXPECTED_STM32F4_CATALOG_SIZE = 384
 EXPECTED_STM32F7_CATALOG_SIZE = 19
 EXPECTED_STM32G0_CATALOG_SIZE = 47
 EXPECTED_STM32G4_CATALOG_SIZE = 25
+EXPECTED_STM32U0_CATALOG_SIZE = 68
 
 
 LEGACY_COLUMNS = [
@@ -105,6 +106,7 @@ def test_checked_in_production_catalog_contains_only_current_admitted_exact_icpn
         "STM32F7",
         "STM32G0",
         "STM32G4",
+        "STM32U0",
     }
 
 
@@ -260,7 +262,7 @@ def test_production_payload_separates_catalog_verification_from_physical_validat
 def test_production_metadata_reports_vendor_family_taxonomy() -> None:
     metadata = get_default_device_catalog().metadata
     assert metadata["catalog_size"] == EXPECTED_PRODUCTION_CATALOG_SIZE
-    assert metadata["source_count"] == 8
+    assert metadata["source_count"] == 9
     assert metadata["taxonomy"] == [
         {
             "vendor": "STMicroelectronics",
@@ -274,6 +276,7 @@ def test_production_metadata_reports_vendor_family_taxonomy() -> None:
                 {"family": "STM32F7", "count": EXPECTED_STM32F7_CATALOG_SIZE},
                 {"family": "STM32G0", "count": EXPECTED_STM32G0_CATALOG_SIZE},
                 {"family": "STM32G4", "count": EXPECTED_STM32G4_CATALOG_SIZE},
+                {"family": "STM32U0", "count": EXPECTED_STM32U0_CATALOG_SIZE},
             ],
         }
     ]
