@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import socket
 import time
+from contextlib import nullcontext
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, ContextManager, Mapping
 
 
 DEFAULT_QUIESCE_TTL_S = 20
 MAX_HELPER_RESPONSE_BYTES = 64 * 1024
+DESIRED_RUNTIME_REVISION_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 class RuntimeActivationError(RuntimeError):
@@ -42,7 +45,14 @@ def desired_runtime_revision(site_configuration: Mapping[str, Any]) -> str:
                 "desired_revision": site.get("desired_revision"),
             }
         )
-    normalized.sort(key=lambda item: int(item["site_id"]))
+    try:
+        normalized.sort(key=lambda item: int(item["site_id"]))
+    except (TypeError, ValueError) as exc:
+        raise RuntimeActivationError(
+            "Site Desired payload contains invalid Site identity",
+            error_type="RUNTIME_ACTIVATION_STATE_INVALID",
+            http_status=500,
+        ) from exc
     digest = hashlib.sha256(
         json.dumps(normalized, separators=(",", ":"), sort_keys=True).encode("utf-8")
     ).hexdigest()
@@ -106,7 +116,12 @@ class RuntimeActivationHelperClient:
 
 
 class SiteRuntimeActivationController:
-    """Synchronous bounded restart transaction for applying persisted Site Desired state."""
+    """Synchronous bounded restart transaction for applying persisted Site Desired state.
+
+    The optional activation guard is owned by the canonical Site configuration
+    controller. Production wiring supplies it so a Desired write cannot race the
+    revision check, quiesce, restart, and post-restart reconciliation sequence.
+    """
 
     def __init__(
         self,
@@ -116,12 +131,14 @@ class SiteRuntimeActivationController:
         reconciliation_provider: Callable[[dict[str, Any]], dict[str, Any]],
         *,
         ready_timeout_s: float = 20.0,
+        activation_guard: Callable[[], ContextManager[None]] | None = None,
     ) -> None:
         self.helper = helper
         self.desired_payload_provider = desired_payload_provider
         self.runtime_snapshot_provider = runtime_snapshot_provider
         self.reconciliation_provider = reconciliation_provider
         self.ready_timeout_s = ready_timeout_s
+        self.activation_guard = activation_guard or nullcontext
 
     def current(self) -> dict[str, Any]:
         payload = self.desired_payload_provider()
@@ -142,11 +159,15 @@ class SiteRuntimeActivationController:
             )
         expected_revision = request.get("expected_revision")
         expected_ppu_id = request.get("expected_ppu_id")
-        if not isinstance(expected_revision, str) or not expected_revision.startswith("sha256:"):
+        if not isinstance(expected_revision, str) or DESIRED_RUNTIME_REVISION_RE.fullmatch(expected_revision) is None:
             raise RuntimeActivationError("expected_revision is invalid", error_type="INVALID_RUNTIME_ACTIVATION_REQUEST", http_status=400)
-        if not isinstance(expected_ppu_id, str) or not expected_ppu_id:
+        if not isinstance(expected_ppu_id, str) or not expected_ppu_id or len(expected_ppu_id) > 256:
             raise RuntimeActivationError("expected_ppu_id is invalid", error_type="INVALID_RUNTIME_ACTIVATION_REQUEST", http_status=400)
 
+        with self.activation_guard():
+            return self._activate_guarded(expected_revision, expected_ppu_id)
+
+    def _activate_guarded(self, expected_revision: str, expected_ppu_id: str) -> dict[str, Any]:
         before_payload = self.desired_payload_provider()
         before_configuration = before_payload["site_configuration"]
         actual_revision = desired_runtime_revision(before_configuration)
