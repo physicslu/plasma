@@ -90,11 +90,13 @@ class SiteRuntimeActivationSupportMixin:
                 error_type="RUNTIME_ACTIVATION_UNAVAILABLE",
                 http_status=503,
             )
+        site_configuration = self._site_configuration_controller()
         return SiteRuntimeActivationController(
             RuntimeActivationHelperClient(socket_path),
             lambda: self._site_configuration_payload(),
             self._local_snapshot,
             lambda snapshot: self._site_configuration_payload(actual_snapshot=snapshot),
+            activation_guard=site_configuration.runtime_activation_guard,
         )
 
     def _runtime_activation_error(self, exc: RuntimeActivationError) -> None:
