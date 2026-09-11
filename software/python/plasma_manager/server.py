@@ -824,7 +824,7 @@ def serve(config: ManagerConfig) -> None:
         poller.stop(timeout_s=max(5.0, config.request_timeout_s * 4 + 1.0))
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Plasma Manager fleet control plane")
     parser.add_argument(
         "--config",
