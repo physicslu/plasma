@@ -45,7 +45,7 @@ ADAPTER_ID = "stm32c0-c0.3-metadata"
 DEFAULT_POLICY_BASELINE = HERE / "stm32c0-phase-c0.3-policy-baseline.json"
 DEFAULT_PRODUCTION_MANIFEST = HERE / "stm32c0-phase-c0.3-production-manifest-prestate.json"
 EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB = "89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc"
-EXPECTED_PRODUCTION_MANIFEST_SHA256 = "903476d41997f9c55bc8c1ca0bc1c05eaec1fc"
+EXPECTED_PRODUCTION_MANIFEST_SHA256 = "903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0"
 EXPECTED_PRODUCTION_EXACT_COUNT = 703
 EXPECTED_PRODUCTION_BASE_DEVICE_COUNT = 243
 EXPECTED_PRODUCTION_FAMILY_COUNTS = {
@@ -108,6 +108,8 @@ def production_snapshot(manifest_path: Path = DEFAULT_PRODUCTION_MANIFEST) -> di
     manifest = read_json(manifest_path)
     if _git_blob_sha(manifest_path) != EXPECTED_PRODUCTION_MANIFEST_GIT_BLOB:
         raise STM32C0PolicyError("C0.3 Production prestate blob drifted")
+    if file_sha256(manifest_path) != EXPECTED_PRODUCTION_MANIFEST_SHA256:
+        raise STM32C0PolicyError("C0.3 Production prestate SHA-256 drifted")
     sources = manifest.get("sources")
     if not isinstance(sources, list):
         raise STM32C0PolicyError("Production prestate sources must be a list")
