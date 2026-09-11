@@ -1,6 +1,6 @@
 # STM32U0 Phase U0.2 — Manufacturer-Authoritative Commercial Discovery
 
-**Status:** merge-ready evidence transaction pending final CI
+**Status:** merge-ready; Gate 2 pending
 **Primary workstream:** ICPN
 **Scope:** research evidence only; no Production admission
 
