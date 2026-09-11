@@ -32,16 +32,21 @@ def config(tmp_path: Path) -> PlasmaConfig:
 
 
 def test_quiesce_gate_and_job_reservation_share_authoritative_lock(tmp_path: Path) -> None:
-    manager = SiteManager(config(tmp_path))
-    asyncio.run(manager.start())
-    lease = manager.acquire_runtime_quiesce(2)
-    assert lease["ppu_id"] == "ppu-a"
-    request = JobRequest(site_id=1, operation=Operation.READ, job_id="job-quiesce-test")
-    with pytest.raises(PlasmaError) as exc_info:
-        manager.enqueue(request)
-    assert exc_info.value.code is ErrorCode.PPU_BUSY
-    manager.release_runtime_quiesce(lease["token"])
-    asyncio.run(manager.shutdown())
+    async def scenario() -> None:
+        manager = SiteManager(config(tmp_path))
+        await manager.start()
+        try:
+            lease = manager.acquire_runtime_quiesce(2)
+            assert lease["ppu_id"] == "ppu-a"
+            request = JobRequest(site_id=1, operation=Operation.READ, job_id="job-quiesce-test")
+            with pytest.raises(PlasmaError) as exc_info:
+                manager.enqueue(request)
+            assert exc_info.value.code is ErrorCode.PPU_BUSY
+            manager.release_runtime_quiesce(lease["token"])
+        finally:
+            await manager.shutdown()
+
+    asyncio.run(scenario())
 
 
 def test_quiesce_is_bounded_and_expires(tmp_path: Path) -> None:
