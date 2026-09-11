@@ -12,6 +12,9 @@ def test_site_runtime_activation_is_exact_post_only_managed_route() -> None:
     assert PlasmaManagerHandler._managed_route_allowed("POST", "/api/settings/sites") is False
 
 
-def test_existing_per_site_desired_write_allowlist_remains_distinct() -> None:
+def test_existing_per_site_desired_write_allowlist_is_numeric_and_distinct() -> None:
     assert PlasmaManagerHandler._managed_route_allowed("POST", "/api/settings/sites/1") is True
+    assert PlasmaManagerHandler._managed_route_allowed("POST", "/api/settings/sites/42") is True
+    assert PlasmaManagerHandler._managed_route_allowed("POST", "/api/settings/sites/0") is False
+    assert PlasmaManagerHandler._managed_route_allowed("POST", "/api/settings/sites/debug") is False
     assert PlasmaManagerHandler._managed_route_allowed("GET", "/api/settings/sites") is True
