@@ -6,9 +6,10 @@ import os
 import stat
 import tempfile
 import threading
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import yaml
 
@@ -108,11 +109,33 @@ class SiteConfigurationController:
     A write uses optimistic concurrency against one Site's deterministic desired
     revision. The revision is derived from normalized canonical Site fields, so it
     survives Gateway restarts without adding a mutable counter to plasma.yaml.
+
+    Runtime activation establishes a short process-local transaction guard before
+    checking the aggregate Desired revision. Site writes observe that guard under
+    the same lock and fail closed instead of changing the file between the stale
+    check and the controlled Server restart.
     """
 
     def __init__(self, config_path: str | Path) -> None:
         self._path = Path(config_path).expanduser().resolve()
         self._lock = threading.RLock()
+        self._runtime_activation_active = False
+
+    @contextmanager
+    def runtime_activation_guard(self) -> Iterator[None]:
+        with self._lock:
+            if self._runtime_activation_active:
+                raise PlasmaError(
+                    ErrorCode.PPU_BUSY,
+                    "Site Desired runtime activation is already in progress",
+                    recoverable=True,
+                )
+            self._runtime_activation_active = True
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._runtime_activation_active = False
 
     def current(self) -> dict[str, Any]:
         with self._lock:
@@ -133,6 +156,12 @@ class SiteConfigurationController:
         enabled, interface, target = _validated_values(raw)
 
         with self._lock:
+            if self._runtime_activation_active:
+                raise PlasmaError(
+                    ErrorCode.PPU_BUSY,
+                    "Site desired configuration cannot change during runtime activation",
+                    recoverable=True,
+                )
             document = self._load_document()
             config = load_config(self._path)
             existing = next((site for site in config.sites if site.id == normalized_site_id), None)
