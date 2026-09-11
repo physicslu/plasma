@@ -3,9 +3,12 @@
 
 The wrapper deliberately keeps the audited release-verification/install machinery in
 `ppu-z2-installer-core.py` and adds only the P3 operational delta. The retained
-bootstrap still owns ``--plasma-python`` validation and the explicitly proxy-free
-health probe using ``ProxyHandler({})``; keeping those statements here makes the
-split source contract visible to bootstrap/source audits.
+bootstrap still owns ``--plasma-python`` validation: the isolated runtime must be a
+final ``release >= 3.11`` and its ``releaselevel`` must be ``final``. Local health
+probing remains explicitly proxy-free through
+``urllib.request.build_opener(urllib.request.ProxyHandler({}))``. The wrapper and
+its sibling core are one bootstrap unit and release packaging must ship and verify
+both files together.
 
 * successful upgrades preserve an existing canonical `/etc/plasma/ppu.yaml`
   instead of regenerating `sites: []`;
