@@ -44,9 +44,5 @@ jobs:
         run: python data/device-catalog/research/validate_stm32c0_phase_c0_2_retained_evidence.py
       - name: Run C0.3 metadata policy negative and boundary controls
         run: python data/device-catalog/research/test_stm32c0_phase_c0_3_policy.py
-      - name: Generate diagnostic C0.3 baseline in runner scratch space
-        shell: bash
-        run: |
-          baseline="${RUNNER_TEMP}/stm32c0-c0.3-policy-baseline.json"
-          python data/device-catalog/research/stm32c0_phase_c0_3_policy.py --write-baseline --baseline "$baseline"
-          cat "$baseline"
+      - name: Replay frozen C0.3 metadata policy
+        run: python data/device-catalog/research/stm32c0_phase_c0_3_policy.py
