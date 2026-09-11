@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
+from importlib.resources import files
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -8,9 +11,12 @@ import unittest
 from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_interfaces.compiler_registry import (
+    DEFAULT_ADMISSION_PROJECTION_RESOURCE,
     CompilerBinding,
     CompilerRegistry,
     OperationAdmission,
+    load_operation_admission_projection,
+    parse_operation_admission_projection,
 )
 from plasma_interfaces.kl25_openocd_plan import KL25OpenOCDPlanCompiler
 from plasma_interfaces.openocd_plan import OpenOCDPlanCompiler
@@ -46,6 +52,12 @@ def admission(
         compiler_id=compiler_id,
         hardware_runtime_ready=False,
     )
+
+
+def reseal_projection(value: dict) -> None:
+    unsigned = {key: item for key, item in value.items() if key != "artifact_digest"}
+    payload = json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    value["artifact_digest"] = hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class CompilerRegistryTests(unittest.TestCase):
@@ -88,7 +100,28 @@ class CompilerRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(PlasmaError, "registered backend lock"):
             registry.select("MKL25Z128VLK4", Operation.ERASE)
 
-    def test_default_stm32_admissions_match_pr_c_packages(self) -> None:
+    def test_projection_digest_tamper_fails_closed(self) -> None:
+        value = json.loads(
+            files("plasma_interfaces")
+            .joinpath(DEFAULT_ADMISSION_PROJECTION_RESOURCE)
+            .read_text(encoding="utf-8")
+        )
+        value["targets"][0]["operations"][0]["backend_id"] = "forged-backend"
+        with self.assertRaisesRegex(PlasmaError, "projection digest mismatch"):
+            parse_operation_admission_projection(value)
+
+    def test_resealed_hardware_ready_projection_fails_closed(self) -> None:
+        value = json.loads(
+            files("plasma_interfaces")
+            .joinpath(DEFAULT_ADMISSION_PROJECTION_RESOURCE)
+            .read_text(encoding="utf-8")
+        )
+        value["targets"][0]["operations"][0]["hardware_runtime_ready"] = True
+        reseal_projection(value)
+        with self.assertRaisesRegex(PlasmaError, "hardware-runtime blocked"):
+            parse_operation_admission_projection(value)
+
+    def test_default_stm32_projection_matches_generic_valid_pr_c_packages(self) -> None:
         repository_root = Path(__file__).resolve().parents[3]
         admission_root = repository_root / "data/ic-support"
         migration_root = admission_root / "benchmarks/stm32f103c"
@@ -97,22 +130,38 @@ class CompilerRegistryTests(unittest.TestCase):
             import stm32f103c_vendor_neutral_admission as migration
             from plasma_server.execution_router import _default_compiler_registry
 
+            projected = {
+                (row.target_icpn, row.request_operation): row
+                for row in load_operation_admission_projection()
+            }
             registry = _default_compiler_registry()
+            expected_keys: set[tuple[str, str]] = set()
+
             for target in migration.CONTRACT["targets"]:
                 package = migration.build_package(target)
+                result = migration.validate_projection(package, target)
+                self.assertEqual(result["status"], "VALID")
                 artifact = package["artifacts"][package["operation_admission_id"]]
                 for row in artifact["operations"]:
                     if row["state"] != "ADMITTED":
                         continue
+                    key = (target, row["request_operation"])
+                    expected_keys.add(key)
+                    projected_row = projected[key]
+                    self.assertEqual(projected_row.operation_admission_id, artifact["artifact_id"])
+                    self.assertEqual(projected_row.operation_admission_digest, artifact["artifact_digest"])
+                    self.assertEqual(projected_row.operation_contract_id, row["operation_contract_id"])
+                    self.assertEqual(projected_row.operation_contract_digest, row["operation_contract_digest"])
+                    self.assertEqual(projected_row.canonical_admission_digest, row["canonical_admission_digest"])
+                    self.assertEqual(projected_row.backend_id, row["backend_id"])
+                    self.assertEqual(projected_row.backend_lock_digest, row["backend_lock_digest"])
+                    self.assertEqual(projected_row.compiler_id, row["compiler_id"])
+                    self.assertFalse(projected_row.hardware_runtime_ready)
+
                     selected = registry.select(target, Operation[row["request_operation"]])
-                    self.assertEqual(selected.admission.operation_admission_id, artifact["artifact_id"])
-                    self.assertEqual(selected.admission.operation_admission_digest, artifact["artifact_digest"])
-                    self.assertEqual(selected.admission.operation_contract_id, row["operation_contract_id"])
-                    self.assertEqual(selected.admission.operation_contract_digest, row["operation_contract_digest"])
-                    self.assertEqual(selected.admission.canonical_admission_digest, row["canonical_admission_digest"])
-                    self.assertEqual(selected.admission.backend_id, row["backend_id"])
-                    self.assertEqual(selected.admission.backend_lock_digest, row["backend_lock_digest"])
-                    self.assertEqual(selected.admission.compiler_id, row["compiler_id"])
+                    self.assertEqual(selected.admission, projected_row)
+
+            self.assertEqual(set(projected), expected_keys)
         finally:
             del sys.path[:2]
 
