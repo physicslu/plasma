@@ -90,10 +90,17 @@ def test_swpc_surrogate_retries_readiness_before_failing_install() -> None:
     assert "python3 - <<'PY'" not in text
 
 
-def test_swpc_surrogate_fails_closed_on_existing_runtime_ports() -> None:
+def test_swpc_surrogate_fails_closed_on_runtime_ports_and_bounds_nginx_upgrade_exception() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
-    assert 'for port in 9900 18080 "$proxy_port"' in text
+    assert 'for port in 9900 18080; do' in text
     assert 'ss -H -ltn "sport = :$port"' in text
+    assert 'qualified_managed_proxy_residual_listener()' in text
+    assert '[[ ! -e "$nginx_conf" ]] || return 1' in text
+    assert '"restricted_ingress": f"127.0.0.1:{proxy_port}"' not in text
+    assert 'payload.get("restricted_ingress") != f"127.0.0.1:{proxy_port}"' in text
+    assert 'os.path.realpath(current_link)' in text
+    assert 'ss -H -ltnp "sport = :$proxy_port" | grep -Fq \'"nginx"\'' in text
+    assert "accepting qualified residual Nginx listener" in text
     assert "TCP port %s is already in use" in text
     assert "stop or migrate the owning service explicitly before installation" in text
     assert "systemctl --user stop" not in text
