@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plasma://ic-support/benchmarks/nxp-kl25/vendor-neutral-admission-payload-v1",
+  "title": "NXP KL25 vendor payload for vendor-neutral admission",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "artifact_id", "artifact_type", "target", "legacy_release", "canonical_fields_by_path", "blocked_fields", "silicon", "artifact_digest"],
+  "properties": {
+    "schema_id": {"const": "plasma://ic-support/benchmarks/nxp-kl25/vendor-neutral-admission-payload-v1"},
+    "schema_version": {"const": "1.0.0"},
+    "artifact_id": {"const": "nxp-kl25-vendor-payload-v1"},
+    "artifact_type": {"const": "vendor_canonical_payload"},
+    "target": {"const": "MKL25Z128VLK4"},
+    "legacy_release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["release_digest", "canonical_spec_digest"],
+      "properties": {
+        "release_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "canonical_spec_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "canonical_fields_by_path": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "object"}},
+    "blocked_fields": {"type": "array"},
+    "silicon": {"type": "object"},
+    "artifact_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
