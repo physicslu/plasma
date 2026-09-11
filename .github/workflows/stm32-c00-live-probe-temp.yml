@@ -1,4 +1,4 @@
-name: STM32 C0.0 temporary authoritative Q&R evidence probe
+name: STM32 C0.0 temporary selection freezer
 
 on:
   push:
@@ -11,13 +11,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: stm32-c00-qr-authoritative
+  group: stm32-c00-selection-freeze
   cancel-in-progress: true
 
 jobs:
-  acquire-and-retain:
+  freeze-selection:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,86 +26,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate current post-U0 boundary and deterministic targets
-        run: python data/device-catalog/research/test_stm32_post_u0_evidence_probe.py
-
-      - name: Install bounded browser acquisition dependencies
+      - name: Validate post-U0 evidence boundaries and selection policy
         run: |
-          python -m pip install -r data/device-catalog/research/requirements-st-browser.txt
-          python -m playwright install --with-deps chromium
+          python data/device-catalog/research/test_stm32_post_u0_evidence_probe.py
+          python data/device-catalog/research/test_stm32_post_u0_selection.py
 
-      - name: Acquire 26 deterministic representatives from authoritative ST Q&R
+      - name: Generate deterministic frozen selection
         run: |
-          mkdir -p .artifacts/c00/evidence
-          xvfb-run -a python data/device-catalog/research/run_stm32_post_u0_evidence_probe.py \
-            --delay 1.0 \
-            --timeout 60 \
-            --output .artifacts/c00/probe-summary.json \
-            --targets-output .artifacts/c00/targets.json \
-            --evidence-dir .artifacts/c00/evidence
+          python data/device-catalog/research/freeze_stm32_post_u0_selection.py \
+            --output /tmp/stm32-post-u0-next-family-selection.json
 
-      - name: Record authoritative provenance and retained digests
-        run: |
-          python - <<'PY'
-          import hashlib, json, os, pathlib
-          root = pathlib.Path('.artifacts/c00')
-          summary = json.loads((root / 'probe-summary.json').read_text())
-          def sha(path):
-              return hashlib.sha256(path.read_bytes()).hexdigest()
-          evidence_files = sorted((root / 'evidence').glob('*.json'))
-          if summary.get('commercial_identity_authority') != 'official_st_quality_and_reliability_exact_part_number_marketing_status':
-              raise SystemExit('unexpected commercial identity authority')
-          if summary.get('sample_buy_is_identity_gate') is not False:
-              raise SystemExit('Sample & Buy must not gate identity')
-          provenance = {
-              'schema_version': 1,
-              'phase': 'C0.0',
-              'transaction': 'post_u0_next_family_evidence_selection',
-              'evidence_role': 'authoritative_commercial_identity_lifecycle_probe',
-              'source_repository': os.environ['GITHUB_REPOSITORY'],
-              'executed_git_sha': os.environ['GITHUB_SHA'],
-              'workflow_run_id': int(os.environ['GITHUB_RUN_ID']),
-              'workflow_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
-              'production_state': {'exact_icpns': 703, 'base_devices': 243, 'stm32_families': 9},
-              'candidate_series': summary['candidate_series'],
-              'target_count': summary['attempted_targets'],
-              'dispositioned_targets': summary['dispositioned_targets'],
-              'manual_review_targets': summary['manual_review_targets'],
-              'browser': summary.get('browser'),
-              'acquisition_transport': summary.get('acquisition_transport'),
-              'commercial_identity_authority': summary.get('commercial_identity_authority'),
-              'sample_buy_is_identity_gate': False,
-              'openocd_catalog_sha256': sha(pathlib.Path('data/device-catalog/research/openocd-parts-canonical.csv')),
-              'production_manifest_sha256': sha(pathlib.Path('data/device-catalog/production/icpn-v1-manifest.json')),
-              'probe_summary_sha256': sha(root / 'probe-summary.json'),
-              'targets_sha256': sha(root / 'targets.json'),
-              'evidence_file_count': len(evidence_files),
-              'evidence_files': {p.name: sha(p) for p in evidence_files},
-              'claims': {
-                  'production_write_authorized': False,
-                  'selected_next_research_family': False,
-                  'programming_algorithm_equivalence_claimed': False,
-                  'runtime_programming_support_claimed': False,
-              },
-          }
-          (root / 'provenance.json').write_text(json.dumps(provenance, indent=2, sort_keys=True) + '\n')
-          PY
-
-      - name: Retain authoritative live evidence on feature branch
+      - name: Retain runner-generated frozen selection
         run: |
           set -euo pipefail
           branch=agent/device-catalog-stm32c0-phase-c00-evidence-selection
           git fetch origin "$branch"
           git rebase "origin/$branch"
-          dst=data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-qr-live-2026-09-11
-          rm -rf "$dst"
-          mkdir -p "$dst/evidence"
-          cp .artifacts/c00/probe-summary.json "$dst/probe-summary.json"
-          cp .artifacts/c00/targets.json "$dst/targets.json"
-          cp .artifacts/c00/provenance.json "$dst/provenance.json"
-          cp .artifacts/c00/evidence/*.json "$dst/evidence/"
+          cp /tmp/stm32-post-u0-next-family-selection.json \
+            data/device-catalog/research/stm32-post-u0-next-family-selection.json
           git config user.name plasma-ci
           git config user.email plasma-ci@users.noreply.github.com
-          git add "$dst"
-          git commit -m "Device catalog: retain authoritative post-U0 STM32 Q&R evidence"
+          git add data/device-catalog/research/stm32-post-u0-next-family-selection.json
+          git commit -m "Device catalog: freeze post-U0 STM32 next-family selection"
           git push origin HEAD:"$branch"
