@@ -41,12 +41,13 @@ plasmactl
 └── z2-ps
     └── scripts/plasmactl-z2-ps
         ├── scripts/z2-python-runtime.py
-        └── scripts/ppu-z2-installer.py
+        ├── scripts/ppu-z2-installer.py
+        └── scripts/ppu-z2-installer-core.py
 ```
 
 The local Control Station backend owns only Console/BFF + Manager lifecycle. It never starts a local Plasma Server or Plasma Gateway.
 
-The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals.
+The SWPC backend remains a surrogate-only host adapter. The Z2 backend is distinct: it accepts only a real ARMv7 target at runtime and reuses the canonical PPU release plus the existing Z2 installer instead of reimplementing those internals. The Z2 installer bootstrap is intentionally a two-file unit: the P3 wrapper `ppu-z2-installer.py` requires its sibling `ppu-z2-installer-core.py`.
 
 ## Backward compatibility
 
@@ -268,9 +269,11 @@ The full package and qualification contract is documented at `docs/deployment/z2
 Plasma-owned CPython ARMv7 runtime
 canonical ppu/linux/armv7l release
 plasmactl router + z2-ps backend
-Z2 PPU installer
+Z2 PPU installer wrapper + sibling installer core
 hash/evidence metadata
 ```
+
+The canonical PPU release carries the Server/Gateway runtime plus the bounded P3 runtime-activation helper wiring. The helper is not a general privileged command surface: it is limited to controlled restart of `plasma-server.service` after Server-authoritative quiesce.
 
 The CPython build runs in an Ubuntu 22.04 ARMv7 userspace and uses a pinned official Python source archive SHA-256. This removes target-local compilation from the normal clean-Z2 deployment flow.
 
@@ -297,9 +300,9 @@ The order is intentional:
 verify Python artifact
   -> install /opt/plasma/python/<version>
   -> execute/import-probe it on real ARMv7
-  -> verify PPU artifact
+  -> verify PPU artifact + installer wrapper/core pair
   -> activate immutable PPU release
-  -> start system services
+  -> start Server + Gateway; Gateway pulls the bounded runtime-activation helper
   -> local health
   -> local PS diagnostic loopback
 ```
@@ -325,7 +328,7 @@ When no new Python artifact/path is provided, `deploy z2-ps` reuses `/opt/plasma
 bash scripts/plasmactl verify z2-ps
 ```
 
-A PASS requires a real Linux ARMv7 runtime, active Plasma Server/Gateway, Gateway readiness and a local PS diagnostic loopback with `endpoint=ps` / `source=ps`.
+A PASS requires a real Linux ARMv7 runtime, active Plasma Server/Gateway, Gateway readiness and a local PS diagnostic loopback with `endpoint=ps` / `source=ps`. P3 additionally requires the bounded runtime-activation helper to be installed with the packaged service ownership/DAC contract; CI can prove packaging and software contracts, while the real Z2 must prove the actual systemd and Unix-socket permissions.
 
 This qualifies only:
 
@@ -385,7 +388,7 @@ This is not Real Z2 qualification.
 Real PYNQ-Z2 / ARMv7
 + isolated Plasma Python
 + canonical PPU release
-+ systemd Server/Gateway
++ systemd Server/Gateway/bounded runtime-activation helper
 + local PS diagnostic behavior
 ```
 
