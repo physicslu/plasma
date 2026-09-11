@@ -53,7 +53,7 @@ def test_swpc_surrogate_validates_dynamic_canonical_site_ids() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
     assert 'site_id = entry.get("id")' in text
     assert 'entry.get("site_id")' not in text
-    assert "canonical Site identity is" in text
+    assert "Canonical Site identity is" in text
     assert "not 1 <= maximum <= 8" in text
     assert "len(site_ids) != len(set(site_ids))" in text
 
