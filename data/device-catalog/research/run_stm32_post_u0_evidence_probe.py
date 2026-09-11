@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the authoritative post-U0 STM32C0/L1/L0 official-ST Q&R probe."""
+"""Run the authoritative post-U0 STM32C0/L1/L0 official-ST evidence probe."""
 from __future__ import annotations
 
 import argparse
@@ -7,22 +7,18 @@ import json
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from st_browser_acquisition import STBrowserAcquirer
+from st_dual_surface_browser_acquisition import STDualSurfaceBrowserAcquirer
 from stm32_post_u0_evidence_probe import (
     DEFAULT_CATALOG,
     DEFAULT_OUTPUT,
+    PARSER_PROFILE,
     RateLimitedFetcher,
+    build_probe_evidence_record,
     deterministic_targets,
     read_catalog,
     run_probe,
     target_manifest,
     write_evidence_files,
-)
-from stm32_post_u0_qr_evidence import (
-    EVIDENCE_AUTHORITY,
-    PARSER_PROFILE,
-    SAMPLE_BUY_IS_IDENTITY_GATE,
-    build_qr_evidence_record,
 )
 
 
@@ -45,12 +41,17 @@ def main(argv: list[str] | None = None) -> int:
 
     rows = read_catalog(DEFAULT_CATALOG)
     targets = deterministic_targets(rows)
-    with STBrowserAcquirer(headless=args.headless) as acquirer:
+    base_by_url = {target.source_url: target.base_device for target in targets}
+    with STDualSurfaceBrowserAcquirer(
+        base_by_url=base_by_url,
+        family_label="STM32 C0/L1/L0 post-U0 evidence probe",
+        headless=args.headless,
+    ) as acquirer:
         fetcher = RateLimitedFetcher(delay_seconds=args.delay, fetcher=acquirer.fetch)
         summary = run_probe(
             targets=targets,
             fetcher=fetcher,
-            evidence_builder=build_qr_evidence_record,
+            evidence_builder=build_probe_evidence_record,
             timeout_seconds=args.timeout,
         )
         summary["browser"] = {
@@ -59,8 +60,10 @@ def main(argv: list[str] | None = None) -> int:
             "playwright_version": _playwright_version(),
             "evidence_profile": PARSER_PROFILE,
         }
-        summary["commercial_identity_authority"] = EVIDENCE_AUTHORITY
-        summary["sample_buy_is_identity_gate"] = SAMPLE_BUY_IS_IDENTITY_GATE
+        summary["commercial_identity_authority"] = (
+            "official_st_quality_and_reliability_exact_identity_plus_"
+            "sample_and_buy_marketing_status_exact_set_join"
+        )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -73,8 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.evidence_dir is not None:
         write_evidence_files(summary, args.evidence_dir)
     print(json.dumps(summary, indent=2, sort_keys=True))
-    # Preserve fail-closed evidence even if some representatives need review.
-    return 0
+    return 0 if summary.get("bounded_probe_complete") is True else 1
 
 
 if __name__ == "__main__":
