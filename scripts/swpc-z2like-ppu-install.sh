@@ -21,6 +21,9 @@ ppu_id=""
 facility_id=""
 proxy_port="18081"
 nginx_marker="# Managed by Plasma SWPC Z2-like lab installer"
+managed_evidence="/opt/plasma/install/last-swpc-z2like-install.json"
+managed_current_link="/opt/plasma/current"
+managed_release_root="/opt/plasma/releases"
 
 while (($#)); do
   case "$1" in
@@ -69,13 +72,62 @@ if [[ -e "$nginx_conf" ]] && ! grep -Fxq "$nginx_marker" "$nginx_conf"; then
   exit 78
 fi
 
-for port in 9900 18080 "$proxy_port"; do
+qualified_managed_proxy_residual_listener() {
+  # During a managed deploy the wrapper has already validated ownership, stopped
+  # Plasma runtime services, removed only the Plasma-owned Nginx config, and
+  # reloaded Nginx. A graceful reload can leave the old Nginx worker/listener
+  # alive briefly. Accept only that narrowly proven residual state; first install
+  # and all unrelated listeners remain fail-closed.
+  [[ ! -e "$nginx_conf" ]] || return 1
+  [[ -f "$managed_evidence" && -L "$managed_current_link" ]] || return 1
+  ss -H -ltnp "sport = :$proxy_port" | grep -Fq '"nginx"' || return 1
+
+  "$plasma_python" - "$managed_evidence" "$proxy_port" "$managed_current_link" "$managed_release_root" <<'PY'
+import json
+import os
+import sys
+
+evidence_path, proxy_port, current_link, release_root = sys.argv[1:]
+with open(evidence_path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+expected = {
+    "schema_version": 1,
+    "role": "ppu-surrogate",
+    "platform": "linux",
+    "z2_equivalent": False,
+    "hardware_boundary": "closed",
+}
+for field, value in expected.items():
+    if payload.get(field) != value:
+        raise SystemExit(f"managed upgrade evidence field {field} is invalid")
+if payload.get("restricted_ingress") != f"127.0.0.1:{proxy_port}":
+    raise SystemExit("managed upgrade evidence does not own the requested restricted ingress")
+release_id = payload.get("release_id")
+if not isinstance(release_id, str) or not release_id:
+    raise SystemExit("managed upgrade evidence is missing release identity")
+expected_current = os.path.join(release_root, release_id)
+if os.path.realpath(current_link) != expected_current:
+    raise SystemExit("managed upgrade evidence/current release identity mismatch")
+PY
+}
+
+for port in 9900 18080; do
   if ss -H -ltn "sport = :$port" | grep -q .; then
     printf 'swpc-z2like-ppu-install: TCP port %s is already in use; stop or migrate the owning service explicitly before installation\n' "$port" >&2
     ss -H -ltnp "sport = :$port" >&2 || true
     exit 78
   fi
 done
+
+if ss -H -ltn "sport = :$proxy_port" | grep -q .; then
+  if qualified_managed_proxy_residual_listener; then
+    printf '[swpc-z2like] accepting qualified residual Nginx listener on restricted ingress 127.0.0.1:%s during managed upgrade\n' "$proxy_port"
+  else
+    printf 'swpc-z2like-ppu-install: TCP port %s is already in use; stop or migrate the owning service explicitly before installation\n' "$proxy_port" >&2
+    ss -H -ltnp "sport = :$proxy_port" >&2 || true
+    exit 78
+  fi
+fi
 
 read -r py_version py_releaselevel py_machine < <("$plasma_python" - <<'PY'
 import platform, sys
