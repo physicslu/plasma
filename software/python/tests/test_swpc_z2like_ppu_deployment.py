@@ -14,8 +14,10 @@ def test_swpc_surrogate_mirrors_z2_ps_ownership_without_claiming_z2_equivalence(
     assert "/opt/plasma/current" in text
     assert 'config_root="/etc/plasma"' in text
     assert 'config_path="$config_root/ppu.yaml"' in text
-    assert "/etc/systemd/system/plasma-server.service" in text
-    assert "/etc/systemd/system/plasma-web.service" in text
+    assert 'systemd_root="/etc/systemd/system"' in text
+    assert 'server_unit="$systemd_root/plasma-server.service"' in text
+    assert 'gateway_unit="$systemd_root/plasma-web.service"' in text
+    assert 'activation_unit="$systemd_root/plasma-runtime-activation.service"' in text
     assert 'model: "SWPC-Z2-SURROGATE"' in text
     assert "sites: []" in text
     assert '"z2_equivalent": false' in text
@@ -24,7 +26,7 @@ def test_swpc_surrogate_mirrors_z2_ps_ownership_without_claiming_z2_equivalence(
 
 def test_swpc_surrogate_keeps_gateway_private_and_public_ingress_allowlisted() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
-    assert "gateway --ppu-config $config_path --host 127.0.0.1 --port 18080" in text
+    assert 'gateway_host="127.0.0.1"' in text
     assert "listen 127.0.0.1:$proxy_port" in text
     assert "location = /api/health/live" in text
     assert "location = /api/health/ready" in text
@@ -41,9 +43,20 @@ def test_swpc_surrogate_site_config_write_boundary_is_gateway_only() -> None:
     assert 'install -d -m 0770 -o root -g plasma "$config_root"' in text
     assert 'chmod 0640 "$config_path"' in text
     assert 'chown plasma:plasma "$config_path"' in text
-    assert "ReadWritePaths=$state_root $log_root $config_root" in text
-    assert "ReadWritePaths=$state_root $log_root\n" in text
-    assert '"runtime_apply_supported": false' in text
+    assert "module.render_systemd_units(" in text
+    assert '"runtime_apply_supported": true' in text
+    assert '"upgrade_preserves_existing_config": true' in text
+    assert "preserving existing canonical Desired configuration" in text
+
+
+def test_swpc_surrogate_reuses_bounded_p3_activation_units() -> None:
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert 'server_control_socket="/run/plasma-server/control.sock"' in text
+    assert 'runtime_activation_socket="/run/plasma-runtime-activation/helper.sock"' in text
+    assert 'module.render_systemd_units(' in text
+    assert '"scope": "restart-plasma-server-only"' in text
+    assert "systemctl enable --now plasma-server.service plasma-web.service" in text
+    assert "systemctl enable --now plasma-runtime-activation.service" not in text
 
 
 def test_swpc_surrogate_requires_clean_source_and_isolated_final_python() -> None:
