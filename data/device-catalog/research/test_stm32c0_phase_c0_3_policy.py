@@ -8,7 +8,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from device_catalog_admission_framework import AdmissionError, CandidateReject
+from device_catalog_admission_framework import AdmissionError, CandidateReject, file_sha256
 from stm32c0_metadata_policy import (
     DEFAULT_ORDERING_AUTHORITY,
     EXPECTED_ACTIVE_CANDIDATE_COUNT,
@@ -19,7 +19,7 @@ from stm32c0_metadata_policy import (
     build_metadata_row,
     load_ordering_authority,
 )
-from stm32c0_phase_c0_3_policy import build_policy_plan, policy_plan_is_clean
+from stm32c0_phase_c0_3_policy import DEFAULT_PRODUCTION_MANIFEST, build_policy_plan, policy_plan_is_clean
 from validate_stm32c0_phase_c0_2_retained_evidence import BASELINE, EVIDENCE, main as validate_retained
 
 
@@ -42,6 +42,12 @@ class STM32C0PhaseC03PolicyTests(unittest.TestCase):
         self.assertEqual(aggregate["identity_manual_intervention_required"], 0)
         self.assertFalse(self.baseline["claims"]["production_write_authorized"])
         self.assertFalse(self.summary["openocd_routing"]["gates_commercial_identity"])
+
+    def test_production_prestate_is_byte_locked(self) -> None:
+        self.assertEqual(
+            file_sha256(DEFAULT_PRODUCTION_MANIFEST),
+            "903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0",
+        )
 
     def test_exactly_220_retained_active_identities_from_50_bases_enter_metadata_scope(self) -> None:
         self.assertEqual(len(self.candidates), EXPECTED_ACTIVE_CANDIDATE_COUNT)
