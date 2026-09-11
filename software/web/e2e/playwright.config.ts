@@ -9,6 +9,7 @@ export default defineConfig({
     "mock-runtime-settings-runtime.spec.ts",
     "programming-job-real-stack-parity.spec.ts",
     "render-public-runtime.spec.ts",
+    "ppu-runtime-deployment-real-stack.spec.ts",
   ],
   snapshotPathTemplate: "{testDir}/__snapshots__/{testFilePath}/{arg}{ext}",
   fullyParallel: false,
@@ -52,8 +53,8 @@ export default defineConfig({
     // deliberately exercises Standalone routing. Supplying a Manager alias here
     // would select Managed Mode and move the downstream fetch into the server-side
     // BFF, outside Playwright's browser interception boundary. Managed routing is
-    // covered by the explicit BFF/Manager contract tests and real cross-stack
-    // runtime acceptance; do not fake a healthy Manager in this suite.
+    // covered by dedicated no-mock cross-stack configs; do not run those specs in
+    // this default mocked suite.
     env: {
       ...process.env,
       PLASMA_FLEET_UI_ENABLED: "1",

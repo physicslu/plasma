@@ -4,11 +4,27 @@ on:
   push:
     paths:
       - "software/web/**"
+      - "software/python/plasma_manager/bootstrap.py"
+      - "software/python/plasma_manager/server_bootstrap.py"
+      - "software/python/pyproject.toml"
+      - "scripts/ppu-bootstrap-browser-stack.py"
+      - "scripts/ppu-bootstrap.py"
+      - "scripts/ppu-bootstrap-service.py"
+      - "scripts/ppu-bootstrap-deployment.py"
+      - "scripts/ppu-bootstrap-kit.py"
       - "scripts/plasmactl"
       - ".github/workflows/web-tests.yml"
   pull_request:
     paths:
       - "software/web/**"
+      - "software/python/plasma_manager/bootstrap.py"
+      - "software/python/plasma_manager/server_bootstrap.py"
+      - "software/python/pyproject.toml"
+      - "scripts/ppu-bootstrap-browser-stack.py"
+      - "scripts/ppu-bootstrap.py"
+      - "scripts/ppu-bootstrap-service.py"
+      - "scripts/ppu-bootstrap-deployment.py"
+      - "scripts/ppu-bootstrap-kit.py"
       - "scripts/plasmactl"
       - ".github/workflows/web-tests.yml"
   workflow_dispatch:
@@ -95,3 +111,124 @@ jobs:
           name: playwright-report
           path: software/web/e2e/playwright-report/
           retention-days: 14
+
+  ppu-bootstrap-browser:
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: software/python/pyproject.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: |
+            software/web/package-lock.json
+            software/web/e2e/package-lock.json
+      - name: Install Python runtime
+        run: python -m pip install -e 'software/python[dev]'
+      - name: Install Web runtime
+        working-directory: software/web
+        run: npm ci
+      - name: Install Playwright runtime
+        run: npm --prefix software/web/e2e ci
+      - name: Install Chromium
+        timeout-minutes: 10
+        run: cd software/web/e2e && npx playwright install chromium
+      - name: Start Bootstrap first-install stack
+        env:
+          PPU_BOOTSTRAP_BROWSER_ARTIFACT_DIR: ${{ github.workspace }}/artifacts/ppu-bootstrap-browser
+        run: |
+          mkdir -p artifacts/ppu-bootstrap-browser
+          python scripts/ppu-bootstrap-browser-stack.py > artifacts/ppu-bootstrap-browser/stack-driver.log 2>&1 &
+          echo $! > artifacts/ppu-bootstrap-browser/stack-driver.pid
+          python - <<'PY'
+          import json
+          import os
+          import time
+          from pathlib import Path
+
+          runtime_path = Path("artifacts/ppu-bootstrap-browser/runtime.json")
+          deadline = time.monotonic() + 75
+          while time.monotonic() < deadline:
+              if runtime_path.is_file():
+                  runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+                  if runtime.get("state") == "ready":
+                      token_path = Path(runtime["token_file"])
+                      token = token_path.read_text(encoding="utf-8").strip()
+                      print("::add-mask::" + token)
+                      with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as stream:
+                          stream.write(f"PPU_BOOTSTRAP_WEB_URL={runtime['web_url']}\n")
+                          stream.write(f"PPU_BOOTSTRAP_TOKEN={token}\n")
+                      print(json.dumps({k: v for k, v in runtime.items() if k != "token_file"}, indent=2, sort_keys=True))
+                      break
+              time.sleep(0.25)
+          else:
+              raise SystemExit("PPU Bootstrap browser stack did not become ready within 75 seconds")
+          PY
+      - name: Run no-mock Bootstrap Playwright acceptance
+        id: browser
+        continue-on-error: true
+        working-directory: software/web/e2e
+        run: npx playwright test --config=playwright.ppu-bootstrap.config.ts
+      - name: Publish Bootstrap browser acceptance summary
+        if: ${{ always() }}
+        env:
+          BROWSER_OUTCOME: ${{ steps.browser.outcome }}
+          ACCEPTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          passed = os.environ.get("BROWSER_OUTCOME") == "success"
+          runtime_path = Path("artifacts/ppu-bootstrap-browser/runtime.json")
+          runtime = json.loads(runtime_path.read_text(encoding="utf-8")) if runtime_path.is_file() else {}
+          payload = {
+              "schema_version": 1,
+              "commit": os.environ.get("ACCEPTED_COMMIT", "unknown"),
+              "result": "PASS" if passed else "FAIL",
+              "proof_boundary": runtime.get("proof_boundary"),
+              "browser_api_mocking": False,
+              "target_runtime_present_at_start": False,
+              "deployment_executor": "deterministic CI simulator after real BFF/Manager/Bootstrap admission",
+              "not_proven": runtime.get("not_proven", []),
+          }
+          path = Path("artifacts/ppu-bootstrap-browser/acceptance.json")
+          path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(path.read_text(encoding="utf-8"))
+          PY
+      - name: Stop Bootstrap first-install stack
+        if: ${{ always() }}
+        run: |
+          if [[ -f artifacts/ppu-bootstrap-browser/stack-driver.pid ]]; then
+            pid="$(cat artifacts/ppu-bootstrap-browser/stack-driver.pid)"
+            kill "$pid" 2>/dev/null || true
+            for _ in $(seq 1 40); do
+              kill -0 "$pid" 2>/dev/null || break
+              sleep 0.1
+            done
+            kill -9 "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+          fi
+          tail -n 160 artifacts/ppu-bootstrap-browser/stack-driver.log 2>/dev/null || true
+      - name: Upload Bootstrap browser acceptance artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppu-bootstrap-browser-acceptance
+          path: artifacts/ppu-bootstrap-browser/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Enforce Bootstrap browser acceptance result
+        if: ${{ steps.browser.outcome != 'success' }}
+        run: exit 1

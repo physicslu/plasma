@@ -1,0 +1,221 @@
+name: PPU bootstrap regression
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ppu-bootstrap.yml"
+      - ".github/workflows/z2-ps-release.yml"
+      - "scripts/ppu-bootstrap.py"
+      - "scripts/ppu-bootstrap-service.py"
+      - "scripts/ppu-bootstrap-deployment.py"
+      - "scripts/ppu-bootstrap-kit.py"
+      - "scripts/ppu-bootstrap-installer.py"
+      - "scripts/ppu-bootstrap-hil-evidence.py"
+      - "scripts/ppu-bootstrap-hil-negative.py"
+      - "scripts/ppu-z2-installer.py"
+      - "scripts/plasmactl-z2-ps"
+      - "scripts/z2-python-runtime.py"
+      - "docs/deployment/ppu-bootstrap-factory-and-hil.md"
+      - "software/python/pyproject.toml"
+      - "software/python/plasma_manager/bootstrap.py"
+      - "software/python/plasma_manager/server_bootstrap.py"
+      - "software/python/tests/test_manager_bootstrap.py"
+      - "software/python/tests/test_manager_bootstrap_rest.py"
+      - "software/python/tests/test_ppu_bootstrap.py"
+      - "software/python/tests/test_ppu_bootstrap_service.py"
+      - "software/python/tests/test_ppu_bootstrap_deployment.py"
+      - "software/python/tests/test_ppu_bootstrap_kit.py"
+      - "software/python/tests/test_ppu_bootstrap_installer.py"
+      - "software/python/tests/test_ppu_bootstrap_hil_evidence.py"
+      - "software/python/tests/test_ppu_bootstrap_hil_negative.py"
+      - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ppu-bootstrap.yml"
+      - ".github/workflows/z2-ps-release.yml"
+      - "scripts/ppu-bootstrap.py"
+      - "scripts/ppu-bootstrap-service.py"
+      - "scripts/ppu-bootstrap-deployment.py"
+      - "scripts/ppu-bootstrap-kit.py"
+      - "scripts/ppu-bootstrap-installer.py"
+      - "scripts/ppu-bootstrap-hil-evidence.py"
+      - "scripts/ppu-bootstrap-hil-negative.py"
+      - "scripts/ppu-z2-installer.py"
+      - "scripts/plasmactl-z2-ps"
+      - "scripts/z2-python-runtime.py"
+      - "docs/deployment/ppu-bootstrap-factory-and-hil.md"
+      - "software/python/pyproject.toml"
+      - "software/python/plasma_manager/bootstrap.py"
+      - "software/python/plasma_manager/server_bootstrap.py"
+      - "software/python/tests/test_manager_bootstrap.py"
+      - "software/python/tests/test_manager_bootstrap_rest.py"
+      - "software/python/tests/test_ppu_bootstrap.py"
+      - "software/python/tests/test_ppu_bootstrap_service.py"
+      - "software/python/tests/test_ppu_bootstrap_deployment.py"
+      - "software/python/tests/test_ppu_bootstrap_kit.py"
+      - "software/python/tests/test_ppu_bootstrap_installer.py"
+      - "software/python/tests/test_ppu_bootstrap_hil_evidence.py"
+      - "software/python/tests/test_ppu_bootstrap_hil_negative.py"
+      - "software/python/tests/test_z2_bootstrap_deployment_call_graph.py"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap-scripts:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile stock-PYNQ-compatible bootstrap scripts
+        run: >-
+          python -m py_compile
+          scripts/ppu-bootstrap.py
+          scripts/ppu-bootstrap-service.py
+          scripts/ppu-bootstrap-deployment.py
+          scripts/ppu-bootstrap-kit.py
+          scripts/ppu-bootstrap-installer.py
+          scripts/ppu-bootstrap-hil-evidence.py
+          scripts/ppu-bootstrap-hil-negative.py
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Run factory Bootstrap contract regressions
+        run: >-
+          python -m pytest -q
+          software/python/tests/test_ppu_bootstrap.py
+          software/python/tests/test_ppu_bootstrap_service.py
+          software/python/tests/test_ppu_bootstrap_deployment.py
+          software/python/tests/test_ppu_bootstrap_kit.py
+          software/python/tests/test_ppu_bootstrap_installer.py
+          software/python/tests/test_ppu_bootstrap_hil_evidence.py
+          software/python/tests/test_ppu_bootstrap_hil_negative.py
+          software/python/tests/test_z2_bootstrap_deployment_call_graph.py
+
+  factory-bundle:
+    needs: bootstrap-scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Build factory Bootstrap bundle
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="0.1.0"
+          identity="${version}-${GITHUB_SHA:0:12}"
+          root="$RUNNER_TEMP/plasma-ppu-bootstrap-${identity}"
+          mkdir -p "$root/scripts"
+          cp \
+            scripts/ppu-bootstrap.py \
+            scripts/ppu-bootstrap-service.py \
+            scripts/ppu-bootstrap-deployment.py \
+            scripts/ppu-bootstrap-kit.py \
+            scripts/ppu-bootstrap-installer.py \
+            "$root/scripts/"
+          python - "$root/manifest.json" "$version" "$GITHUB_SHA" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          path, version, git_sha = sys.argv[1:]
+          payload = {
+              "schema_version": 1,
+              "product": "plasma-ppu-bootstrap",
+              "bootstrap_version": version,
+              "git_sha": git_sha,
+              "python_min": "3.10",
+              "runtime_included": False,
+              "control_token_included": False,
+              "fpga_update": False,
+              "publisher_authenticity": "not_qualified",
+          }
+          Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+          (
+            cd "$root"
+            sha256sum manifest.json scripts/* > SHA256SUMS
+          )
+          artifact="$RUNNER_TEMP/plasma-ppu-bootstrap-${identity}.tar.gz"
+          tar -C "$RUNNER_TEMP" -czf "$artifact" "plasma-ppu-bootstrap-${identity}"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum "$(basename "$artifact")" > "$(basename "$artifact").sha256"
+          )
+          printf 'artifact=%s\n' "$artifact" >> "$GITHUB_OUTPUT"
+          printf 'sidecar=%s\n' "$artifact.sha256" >> "$GITHUB_OUTPUT"
+          printf 'root=%s\n' "$root" >> "$GITHUB_OUTPUT"
+
+      - name: Prove bundle installs only the factory layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          sandbox="$RUNNER_TEMP/bootstrap-install-proof"
+          mkdir -p "$sandbox"
+          python scripts/ppu-bootstrap-installer.py \
+            --source-root "${{ steps.bundle.outputs.root }}/scripts" \
+            --host 192.168.2.99 \
+            --install-root "$sandbox/opt/plasma/bootstrap" \
+            --state-root "$sandbox/var/lib/plasma-bootstrap" \
+            --systemd-unit "$sandbox/etc/systemd/system/plasma-bootstrap.service" \
+            > "$RUNNER_TEMP/bootstrap-install-evidence.json"
+          test -f "$sandbox/etc/systemd/system/plasma-bootstrap.service"
+          test ! -e "$sandbox/opt/plasma/current"
+          grep -q 'ppu-bootstrap-service.py serve --host 192.168.2.99 --port 18081' \
+            "$sandbox/etc/systemd/system/plasma-bootstrap.service"
+
+      - name: Upload factory Bootstrap bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppu-bootstrap-factory-bundle
+          path: |
+            ${{ steps.bundle.outputs.artifact }}
+            ${{ steps.bundle.outputs.sidecar }}
+            ${{ runner.temp }}/bootstrap-install-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload qualification-only HIL tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppu-bootstrap-hil-tools
+          path: |
+            scripts/ppu-bootstrap-hil-evidence.py
+            scripts/ppu-bootstrap-hil-negative.py
+            scripts/ppu-bootstrap-kit.py
+            scripts/ppu-z2-installer.py
+            docs/deployment/ppu-bootstrap-factory-and-hil.md
+          if-no-files-found: error
+          retention-days: 14
+
+  manager-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Manager package and tests
+        run: python -m pip install "./software/python[dev]"
+      - name: Run Manager Bootstrap policy and REST regressions
+        run: >-
+          python -m pytest -q
+          software/python/tests/test_manager_bootstrap.py
+          software/python/tests/test_manager_bootstrap_rest.py
+      - name: Prove production Manager entrypoint owns Bootstrap routes
+        run: >-
+          python -c
+          'import importlib.metadata as m; eps=m.entry_points(group="console_scripts", name="plasma-manager"); ep=next(iter(eps)); assert ep.value == "plasma_manager.server_bootstrap:main", ep.value'
