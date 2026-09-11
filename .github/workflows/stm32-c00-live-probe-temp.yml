@@ -23,12 +23,7 @@ jobs:
           python-version: "3.12"
 
       - name: Validate current post-U0 boundary and deterministic targets
-        run: |
-          python - <<'PY'
-          import json
-          from data.device-catalog.research import stm32_post_u0_evidence_probe
-          PY
-        continue-on-error: true
+        run: python data/device-catalog/research/test_stm32_post_u0_evidence_probe.py
 
       - name: Install bounded browser acquisition dependencies
         run: |
@@ -48,7 +43,7 @@ jobs:
       - name: Record provenance and retained digests
         run: |
           python - <<'PY'
-          import hashlib, json, os, pathlib, subprocess
+          import hashlib, json, os, pathlib
           root = pathlib.Path('.artifacts/c00')
           summary = json.loads((root / 'probe-summary.json').read_text())
           def sha(path):
@@ -88,6 +83,9 @@ jobs:
       - name: Retain live evidence on feature branch
         run: |
           set -euo pipefail
+          branch=agent/device-catalog-stm32c0-phase-c00-evidence-selection
+          git fetch origin "$branch"
+          git rebase "origin/$branch"
           dst=data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-live-2026-09-11
           mkdir -p "$dst/evidence"
           cp .artifacts/c00/probe-summary.json "$dst/probe-summary.json"
@@ -98,4 +96,4 @@ jobs:
           git config user.email plasma-ci@users.noreply.github.com
           git add "$dst"
           git commit -m "Device catalog: retain post-U0 STM32 live evidence"
-          git push origin HEAD:agent/device-catalog-stm32c0-phase-c00-evidence-selection
+          git push origin HEAD:"$branch"
