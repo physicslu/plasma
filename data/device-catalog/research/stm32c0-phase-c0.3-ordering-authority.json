@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "authority_version": "stm32c0-c0.3-retained220-v1",
+  "phase": "C0.3",
+  "family": "STM32C0",
+  "manufacturer": "STMicroelectronics",
+  "scope": "narrow ordering-information authority for the 220 retained C0.2 Active exact ICPNs only",
+  "governance": {
+    "identity_lifecycle_authority": "retained C0.2 official ST Quality & Reliability exact identity plus Sample & Buy Marketing Status exact-set join",
+    "metadata_authority": "official ST datasheet Ordering Information",
+    "openocd_is_metadata_authority": false,
+    "cmsis_alias_is_metadata_authority": false,
+    "scope_expansion_authorized": false,
+    "canonical_admission_authorized": false,
+    "production_write_authorized": false,
+    "programming_policy_defined": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "runtime_programming_support_claimed": false
+  },
+  "records": [
+    {
+      "series": "STM32C011",
+      "document_id": "DS13866",
+      "revision": 5,
+      "ordering_section": 7,
+      "pdf_page": 93,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c011f4.pdf",
+      "review": {
+        "structured_text": true,
+        "visual_ordering_table": false,
+        "visual_review_note": "Official ST PDF structured text verified; screenshot retrieval cache miss is a transport limitation, not an authority failure."
+      },
+      "current_revision_check": {
+        "checked_on": "2026-09-12",
+        "observed_revision": 5,
+        "revision_drift": false,
+        "source": "official_st_datasheet_surface"
+      },
+      "retained_semantics": {
+        "pin_package": {
+          "F/P": "20",
+          "F/U": "20",
+          "J/M": "8"
+        },
+        "flash": {
+          "4": "16 KiB",
+          "6": "32 KiB"
+        },
+        "package": {
+          "M": "SO8N",
+          "P": "TSSOP",
+          "U": "UFQFPN",
+          "Y": "WLCSP"
+        },
+        "temperature": {
+          "3": "-40 to 125 C",
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "option": {
+          "": "tray packing",
+          "TR": "tape and reel packing"
+        }
+      }
+    },
+    {
+      "series": "STM32C031",
+      "document_id": "DS13867",
+      "revision": 4,
+      "ordering_section": 7,
+      "pdf_page": 100,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c031c4.pdf",
+      "review": {
+        "structured_text": true,
+        "visual_ordering_table": true,
+        "visual_review_note": "Official ST Ordering Information table visually and structurally verified."
+      },
+      "current_revision_check": {
+        "checked_on": "2026-09-12",
+        "observed_revision": 4,
+        "revision_drift": false,
+        "source": "official_st_datasheet_surface"
+      },
+      "retained_semantics": {
+        "pin_package": {
+          "C/T": "48",
+          "C/U": "48",
+          "F/P": "20",
+          "G/U": "28",
+          "K/T": "32",
+          "K/U": "32"
+        },
+        "flash": {
+          "4": "16 KiB",
+          "6": "32 KiB"
+        },
+        "package": {
+          "P": "TSSOP",
+          "T": "LQFP",
+          "U": "UFQFPN"
+        },
+        "temperature": {
+          "3": "-40 to 125 C",
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "option": {
+          "": "tray packing",
+          "TR": "tape and reel packing"
+        }
+      }
+    },
+    {
+      "series": "STM32C051",
+      "document_id": "DS14721",
+      "revision": 2,
+      "ordering_section": 7,
+      "pdf_page": 107,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c051c6.pdf",
+      "review": {
+        "structured_text": true,
+        "visual_ordering_table": true,
+        "visual_review_note": "Official ST Ordering Information table visually and structurally verified."
+      },
+      "current_revision_check": {
+        "checked_on": "2026-09-12",
+        "observed_revision": 2,
+        "revision_drift": false,
+        "source": "official_st_datasheet_surface"
+      },
+      "retained_semantics": {
+        "pin_package": {
+          "C/T": "48",
+          "C/U": "48",
+          "F/P": "20",
+          "G/U": "28",
+          "K/T": "32",
+          "K/U": "32"
+        },
+        "flash": {
+          "6": "32 KiB",
+          "8": "64 KiB"
+        },
+        "package": {
+          "P": "TSSOP",
+          "T": "LQFP",
+          "U": "UFQFPN",
+          "Y": "WLCSP"
+        },
+        "temperature": {
+          "3": "-40 to 125 C",
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "option": {
+          "": "tray packing",
+          "TR": "tape and reel packing"
+        }
+      }
+    },
+    {
+      "series": "STM32C071",
+      "document_id": "DS14693",
+      "revision": 2,
+      "ordering_section": 7,
+      "pdf_page": 128,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c071c8.pdf",
+      "review": {
+        "structured_text": true,
+        "visual_ordering_table": true,
+        "visual_review_note": "Official ST Ordering Information table visually and structurally verified, including N product-version semantics."
+      },
+      "current_revision_check": {
+        "checked_on": "2026-09-12",
+        "observed_revision": 2,
+        "revision_drift": false,
+        "source": "official_st_datasheet_surface"
+      },
+      "retained_semantics": {
+        "pin_package": {
+          "C/T": "48",
+          "C/U": "48",
+          "F/P": "20",
+          "F/Y": "19",
+          "G/U": "28",
+          "K/T": "32",
+          "K/U": "32",
+          "R/I": "64",
+          "R/T": "64"
+        },
+        "flash": {
+          "8": "64 KiB",
+          "B": "128 KiB"
+        },
+        "package": {
+          "I": "UFBGA",
+          "P": "TSSOP",
+          "T": "LQFP",
+          "U": "UFQFPN",
+          "Y": "WLCSP"
+        },
+        "temperature": {
+          "3": "-40 to 125 C",
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "option": {
+          "": "tray packing; standard product version",
+          "TR": "tape and reel packing; standard product version",
+          "N": "tray packing; N product version",
+          "NTR": "tape and reel packing; N product version"
+        }
+      }
+    },
+    {
+      "series": "STM32C091",
+      "document_id": "DS14720",
+      "revision": 3,
+      "ordering_section": 7,
+      "pdf_page": 121,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c091cb.pdf",
+      "review": {
+        "structured_text": true,
+        "visual_ordering_table": true,
+        "visual_review_note": "Official ST shared STM32C091/STM32C092 Ordering Information table visually and structurally verified."
+      },
+      "current_revision_check": {
+        "checked_on": "2026-09-12",
+        "observed_revision": 3,
+        "revision_drift": false,
+        "source": "official_st_datasheet_surface"
+      },
+      "retained_semantics": {
+        "pin_package": {
+          "C/T": "48",
+          "C/U": "48",
+          "E/Y": "24",
+          "F/P": "20",
+          "G/U": "28",
+          "K/T": "32",
+          "K/U": "32",
+          "R/I": "64",
+          "R/T": "64"
+        },
+        "flash": {
+          "B": "128 KiB",
+          "C": "256 KiB"
+        },
+        "package": {
+          "I": "UFBGA",
+          "P": "TSSOP",
+          "T": "LQFP",
+          "U": "UFQFPN",
+          "Y": "WLCSP"
+        },
+        "temperature": {
+          "3": "-40 to 125 C",
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "option": {
+          "": "tray packing",
+          "TR": "tape and reel packing"
+        }
+      }
+    },
+    {
+      "series": "STM32C092",
+      "document_id": "DS14720",
+      "revision": 3,
+      "ordering_section": 7,
+      "pdf_page": 121,
+      "datasheet_url": "https://www.st.com/resource/en/datasheet/stm32c091cb.pdf",
+      "review": {
+        "structured_text": true,
+        "visual_ordering_table": true,
+        "visual_review_note": "Official ST shared STM32C091/STM32C092 Ordering Information table visually and structurally verified; 09x explicitly resolves to distinct 091 and 092 series."
+      },
+      "current_revision_check": {
+        "checked_on": "2026-09-12",
+        "observed_revision": 3,
+        "revision_drift": false,
+        "source": "official_st_datasheet_surface"
+      },
+      "retained_semantics": {
+        "pin_package": {
+          "C/T": "48",
+          "C/U": "48",
+          "E/Y": "24",
+          "F/P": "20",
+          "G/U": "28",
+          "K/T": "32",
+          "K/U": "32",
+          "R/I": "64",
+          "R/T": "64"
+        },
+        "flash": {
+          "B": "128 KiB",
+          "C": "256 KiB"
+        },
+        "package": {
+          "I": "UFBGA",
+          "P": "TSSOP",
+          "T": "LQFP",
+          "U": "UFQFPN",
+          "Y": "WLCSP"
+        },
+        "temperature": {
+          "3": "-40 to 125 C",
+          "6": "-40 to 85 C",
+          "7": "-40 to 105 C"
+        },
+        "option": {
+          "": "tray packing",
+          "TR": "tape and reel packing"
+        }
+      }
+    }
+  ]
+}
