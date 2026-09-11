@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,7 @@ from plasma_core.enums import Operation
 from plasma_core.errors import ErrorCode, PlasmaError
 from plasma_core.models import JobRequest
 from plasma_server.site_manager import SiteManager
-from plasma_web.runtime_activation import SiteRuntimeActivationController, desired_runtime_revision
+from plasma_web.runtime_activation import RuntimeActivationError, SiteRuntimeActivationController, desired_runtime_revision
 from plasma_web.runtime_activation_helper import RuntimeActivationExecutor, RuntimeActivationHelperError
 
 
@@ -82,10 +83,83 @@ def test_activation_rejects_stale_revision_without_restart() -> None:
         lambda: {"ppu": {"ppu_id": "ppu-a"}},
         lambda _: {"site_configuration": configuration},
     )
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(RuntimeActivationError) as exc_info:
         controller.activate({"action": "activate", "expected_revision": "sha256:" + "f" * 64, "expected_ppu_id": "ppu-a"})
     assert "changed before runtime activation" in str(exc_info.value)
     assert calls == []
+
+
+def test_activation_rejects_malformed_revision_before_restart() -> None:
+    calls: list[str] = []
+
+    class Helper:
+        def restart_server(self, **_: object) -> dict[str, object]:
+            calls.append("restart")
+            return {}
+
+    controller = SiteRuntimeActivationController(
+        Helper(),
+        lambda: {"site_configuration": {"reconciliation": "restart_required", "sites": []}},
+        lambda: {"ppu": {"ppu_id": "ppu-a"}},
+        lambda _: {"site_configuration": {"reconciliation": "in_sync", "sites": []}},
+    )
+    with pytest.raises(RuntimeActivationError) as exc_info:
+        controller.activate({"action": "activate", "expected_revision": "sha256:abc", "expected_ppu_id": "ppu-a"})
+    assert exc_info.value.http_status == 400
+    assert calls == []
+
+
+def test_activation_guard_covers_revision_check_restart_and_reconciliation() -> None:
+    before = {
+        "source": "canonical_ppu_config",
+        "runtime_apply_supported": True,
+        "reconciliation": "restart_required",
+        "sites": [{"site_id": 1, "desired_revision": "sha256:" + "a" * 64}],
+    }
+    after = {**before, "reconciliation": "in_sync"}
+    expected = desired_runtime_revision(before)
+    guarded = False
+
+    @contextmanager
+    def guard():
+        nonlocal guarded
+        assert guarded is False
+        guarded = True
+        try:
+            yield
+        finally:
+            guarded = False
+
+    class Helper:
+        def restart_server(self, **_: object) -> dict[str, object]:
+            assert guarded is True
+            return {"restarted_service": "plasma-server.service"}
+
+    def desired_payload() -> dict[str, object]:
+        assert guarded is True
+        return {"site_configuration": before}
+
+    def runtime_snapshot() -> dict[str, object]:
+        assert guarded is True
+        return {"ppu": {"ppu_id": "ppu-a"}}
+
+    def reconcile(_: dict[str, object]) -> dict[str, object]:
+        assert guarded is True
+        return {"site_configuration": after}
+
+    controller = SiteRuntimeActivationController(
+        Helper(),
+        desired_payload,
+        runtime_snapshot,
+        reconcile,
+        activation_guard=guard,
+    )
+    result = controller.activate(
+        {"action": "activate", "expected_revision": expected, "expected_ppu_id": "ppu-a"}
+    )
+    assert result["restarted"] is True
+    assert result["state"] == "in_sync"
+    assert guarded is False
 
 
 def test_narrow_helper_does_not_accept_arbitrary_service(tmp_path: Path) -> None:
