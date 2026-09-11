@@ -75,3 +75,14 @@ def test_cache_is_not_the_release_distribution_boundary() -> None:
     assert "plasma-z2-python-${{ env.Z2_PYTHON_VERSION }}-linux-armv7l-${{ github.sha }}" in text
     assert "actions/download-artifact@v4" in text
     assert "Build canonical PPU release" in text
+
+
+def test_artifact_upload_paths_use_actions_expressions_not_shell_expansion() -> None:
+    text = workflow_text()
+    assert (
+        "${{ runner.temp }}/z2-python-artifact/"
+        "plasma-python-${{ env.Z2_PYTHON_VERSION }}-linux-armv7l.tar.gz"
+    ) in text
+    assert "plasma-python-$Z2_PYTHON_VERSION-linux-armv7l.tar.gz" not in text.split(
+        "Upload qualified Plasma Python runtime candidate", 1
+    )[1].split("z2-ps-kit:", 1)[0]
