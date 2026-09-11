@@ -129,7 +129,11 @@ class STM32F103CVendorNeutralAdmissionTests(unittest.TestCase):
 
     def test_unlock_key_mutation_fails_closed_after_reseal(self) -> None:
         package = self._package()
-        self._payload(package)["programming"]["unlock_keys"][0] = "0x00000000"
+        payload = self._payload(package)
+        payload["programming"]["unlock_keys"] = [
+            "0x00000000",
+            payload["programming"]["unlock_keys"][1],
+        ]
         self._reseal_payload_chain(package)
         self._assert_semantic_fail(package, "STM32F103C8T6")
 
