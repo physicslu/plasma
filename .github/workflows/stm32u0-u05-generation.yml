@@ -13,6 +13,9 @@ on:
       - data/device-catalog/research/stm32u0-phase-u0.3-production-manifest-prestate.json
       - data/device-catalog/production/icpn-v1-manifest.json
 
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-24.04
@@ -215,3 +218,19 @@ jobs:
           path: u05-generated/
           if-no-files-found: error
           retention-days: 1
+      - name: Commit runner-generated publication bytes
+        shell: bash
+        run: |
+          cp u05-generated/stm32u0-commercial-icpn.csv data/device-catalog/research/stm32u0-commercial-icpn.csv
+          cp u05-generated/stm32u0-phase-u0.5-publication-proposal.json data/device-catalog/research/stm32u0-phase-u0.5-publication-proposal.json
+          cp u05-generated/stm32u0-phase-u0.5-publication-audit.json data/device-catalog/research/stm32u0-phase-u0.5-publication-audit.json
+          cp u05-generated/icpn-v1-manifest.json data/device-catalog/production/icpn-v1-manifest.json
+          git config user.name "plasma-ci"
+          git config user.email "plasma-ci@users.noreply.github.com"
+          git add data/device-catalog/research/stm32u0-commercial-icpn.csv \
+                  data/device-catalog/research/stm32u0-phase-u0.5-publication-proposal.json \
+                  data/device-catalog/research/stm32u0-phase-u0.5-publication-audit.json \
+                  data/device-catalog/production/icpn-v1-manifest.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Device catalog: publish STM32U0 canonical surface"
+          git push origin HEAD:${GITHUB_REF_NAME}
