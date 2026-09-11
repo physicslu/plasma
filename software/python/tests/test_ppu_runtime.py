@@ -17,7 +17,7 @@ runtime = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runtime)
 
 
-def test_build_runtime_creates_server_gateway_zipapp_and_catalog(tmp_path: Path) -> None:
+def test_build_runtime_creates_server_gateway_helper_zipapp_and_catalog(tmp_path: Path) -> None:
     output = tmp_path / "runtime"
     result = runtime.build_runtime(repo_root=ROOT, output_dir=output)
 
@@ -30,7 +30,8 @@ def test_build_runtime_creates_server_gateway_zipapp_and_catalog(tmp_path: Path)
     manifest = json.loads((output / "ppu-runtime.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 1
     assert manifest["role"] == "ppu"
-    assert set(manifest["processes"]) == {"server", "gateway"}
+    assert set(manifest["processes"]) == {"server", "gateway", "runtime_activation_helper"}
+    assert manifest["processes"]["runtime_activation_helper"]["privilege_boundary"] == "restart-plasma-server-only"
     assert manifest["packaging"] == {"python": "python-zipapp"}
     assert manifest["hardware_boundary"] == {
         "loads_fpga": False,
@@ -42,6 +43,7 @@ def test_build_runtime_creates_server_gateway_zipapp_and_catalog(tmp_path: Path)
     for command, expected in (
         ("server", "Plasma multi-site programming server"),
         ("gateway", "Plasma browser REST gateway"),
+        ("runtime-activation-helper", "Plasma bounded runtime activation helper"),
     ):
         completed = subprocess.run(
             [sys.executable, str(app), command, "--help"],

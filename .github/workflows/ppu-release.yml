@@ -12,6 +12,7 @@ on:
       - "scripts/ppu-runtime.py"
       - "scripts/ppu-release.py"
       - "scripts/ppu-z2-installer.py"
+      - "scripts/ppu-z2-installer-core.py"
       - "scripts/product-release.py"
       - "scripts/ppu-armv7-runtime-acceptance.py"
       - "scripts/ppu-armv7-runtime-lab.py"
@@ -68,7 +69,7 @@ jobs:
           python-version: "3.10"
       - name: Prove bootstrap parses under the stock PYNQ Python generation
         run: |
-          python -m py_compile scripts/ppu-z2-installer.py
+          python -m py_compile scripts/ppu-z2-installer.py scripts/ppu-z2-installer-core.py
           python scripts/ppu-z2-installer.py --help
       - name: Run installer-only regressions without the Plasma Python package
         run: |
@@ -138,12 +139,16 @@ jobs:
           sidecar="$archive.sha256"
           installer="$output/plasma-ppu-z2-installer-$identity.py"
           installer_sidecar="$installer.sha256"
+          installer_core="$output/ppu-z2-installer-core.py"
+          installer_core_sidecar="$installer_core.sha256"
           test -f "$archive"
           test -f "$sidecar"
           cp scripts/ppu-z2-installer.py "$installer"
+          cp scripts/ppu-z2-installer-core.py "$installer_core"
           (
             cd "$output"
             sha256sum "$(basename "$installer")" > "$(basename "$installer_sidecar")"
+            sha256sum "$(basename "$installer_core")" > "$(basename "$installer_core_sidecar")"
           )
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -152,6 +157,8 @@ jobs:
           echo "sidecar=$sidecar" >> "$GITHUB_OUTPUT"
           echo "installer=$installer" >> "$GITHUB_OUTPUT"
           echo "installer_sidecar=$installer_sidecar" >> "$GITHUB_OUTPUT"
+          echo "installer_core=$installer_core" >> "$GITHUB_OUTPUT"
+          echo "installer_core_sidecar=$installer_core_sidecar" >> "$GITHUB_OUTPUT"
 
       - name: Verify release and closed hardware boundary from clean extraction
         shell: bash
@@ -196,14 +203,23 @@ jobs:
           cd "$(dirname "$ARCHIVE")"
           sha256sum --check "$(basename "$SIDECAR")"
 
-      - name: Verify Z2 installer consumes the canonical release independently
+      - name: Verify packaged Z2 installer consumes the canonical release independently
         shell: bash
         env:
           ARCHIVE: ${{ steps.release.outputs.archive }}
           SIDECAR: ${{ steps.release.outputs.sidecar }}
+          INSTALLER: ${{ steps.release.outputs.installer }}
+          INSTALLER_CORE: ${{ steps.release.outputs.installer_core }}
+          INSTALLER_SIDECAR: ${{ steps.release.outputs.installer_sidecar }}
+          INSTALLER_CORE_SIDECAR: ${{ steps.release.outputs.installer_core_sidecar }}
         run: |
           set -euo pipefail
-          python scripts/ppu-z2-installer.py verify \
+          test -f "$INSTALLER"
+          test -f "$INSTALLER_CORE"
+          cd "$(dirname "$INSTALLER")"
+          sha256sum --check "$(basename "$INSTALLER_SIDECAR")"
+          sha256sum --check "$(basename "$INSTALLER_CORE_SIDECAR")"
+          python "$INSTALLER" verify \
             --release-artifact "$ARCHIVE" \
             --sidecar "$SIDECAR"
 
@@ -302,5 +318,7 @@ jobs:
             ${{ steps.release.outputs.sidecar }}
             ${{ steps.release.outputs.installer }}
             ${{ steps.release.outputs.installer_sidecar }}
+            ${{ steps.release.outputs.installer_core }}
+            ${{ steps.release.outputs.installer_core_sidecar }}
           if-no-files-found: error
           retention-days: 14

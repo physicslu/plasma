@@ -20,6 +20,7 @@ from plasma_interfaces.openocd import OpenOCDInterface
 
 from .execution_router import RoutedProgrammingHandler, SiteExecutionRouter
 from .job_manager import JobRegistry, JobRuntime
+from .runtime_control import RuntimeQuiesceGate
 from .site_worker import SiteWorker
 
 InterfaceFactory = Callable[[SiteConfig], BaseInterface]
@@ -76,6 +77,7 @@ class SiteManager:
         self.workers: dict[int, SiteWorker] = {}
         self._execution_lock = threading.RLock()
         self._execution_lease: PPUExecutionLease | None = None
+        self._runtime_quiesce = RuntimeQuiesceGate()
         self._started = False
 
         for site in config.sites:
@@ -182,11 +184,6 @@ class SiteManager:
         if batch_id is not None:
             return "batch", cls._validate_execution_owner(batch_id, "batch_id")
 
-        # REST gateway client IDs are process-global labels, not authenticated
-        # client identities. Treat an unscoped REST Job as its own execution so
-        # two browser tabs/PCs cannot bypass PPU ownership merely because both
-        # requests carry the same fixed gateway client_id. Multi-Site Web work
-        # that needs one shared owner must use the server-side Batch contract.
         if request.client_id in {"plasma-web", "plasma-web-engineering"}:
             return "rest_job", cls._validate_execution_owner(request.job_id, "job_id")
 
@@ -197,6 +194,13 @@ class SiteManager:
         acquired = False
         conflict: PPUExecutionLease | None = None
         with self._execution_lock:
+            if self._runtime_quiesce.active():
+                raise PlasmaError(
+                    ErrorCode.PPU_BUSY,
+                    "PPU is quiesced for controlled runtime activation",
+                    recoverable=True,
+                    context={"runtime_activation": self._runtime_quiesce.snapshot()},
+                )
             lease = self._execution_lease
             if lease is not None and (lease.owner_kind, lease.owner_id) != (owner_kind, owner_id):
                 conflict = PPUExecutionLease(
@@ -248,6 +252,47 @@ class SiteManager:
             )
         return owner_kind, owner_id
 
+    def acquire_runtime_quiesce(self, ttl_s: int) -> dict[str, Any]:
+        with self._execution_lock:
+            if self._execution_lease is not None:
+                raise PlasmaError(
+                    ErrorCode.PPU_BUSY,
+                    "PPU execution is active; runtime activation cannot quiesce",
+                    recoverable=True,
+                    context={"execution": self._execution_lease.snapshot()},
+                )
+            lease = self._runtime_quiesce.acquire(ttl_s)
+            self.server_log.event(
+                "INFO",
+                "runtime_activation_quiesced",
+                ppu_id=self.config.ppu.id,
+                facility_id=self.config.ppu.facility_id,
+                ttl_s=ttl_s,
+            )
+            return {
+                **lease,
+                "ppu_id": self.config.ppu.id,
+                "facility_id": self.config.ppu.facility_id,
+            }
+
+    def release_runtime_quiesce(self, token: str) -> None:
+        with self._execution_lock:
+            self._runtime_quiesce.release(token)
+            self.server_log.event(
+                "INFO",
+                "runtime_activation_quiesce_released",
+                ppu_id=self.config.ppu.id,
+                facility_id=self.config.ppu.facility_id,
+            )
+
+    def runtime_quiesce_snapshot(self) -> dict[str, Any]:
+        with self._execution_lock:
+            return {
+                **self._runtime_quiesce.snapshot(),
+                "ppu_id": self.config.ppu.id,
+                "facility_id": self.config.ppu.facility_id,
+            }
+
     def _release_execution_job(self, job_id: str) -> None:
         released: tuple[str, str] | None = None
         with self._execution_lock:
@@ -295,9 +340,6 @@ class SiteManager:
                 recoverable=True,
             )
 
-        # Registry insertion happens before lease reservation, but still before
-        # any worker dispatch. This makes duplicate job IDs fail without
-        # touching the active execution lease or an existing JobRuntime.
         runtime = self.registry.create(request)
         try:
             owner_kind, owner_id = self._reserve_execution_job(request)
@@ -358,6 +400,7 @@ class SiteManager:
             "site_count": self.config.site_count,
             "enabled_site_count": self.config.enabled_site_count,
             "execution": self.execution_lease_snapshot(),
+            "runtime_activation": self.runtime_quiesce_snapshot(),
             "capabilities": {
                 "max_supported_sites": self.config.server.max_supported_sites,
                 "operations": [

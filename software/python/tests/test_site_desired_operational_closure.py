@@ -83,7 +83,10 @@ def test_z2_config_directory_permission_migration_is_rollback_safe(
 def test_ppu_runtime_manifest_requires_gateway_and_server_config_identity() -> None:
     manifest = runtime._manifest(python_requirement=">=3.11", pyyaml_version="6.0.2")
     processes = manifest["processes"]
-    assert processes["server"]["arguments"] == ["server", "--config", "<ppu-config>"]
+    server_args = processes["server"]["arguments"]
+    assert server_args[:3] == ["server", "--config", "<ppu-config>"]
+    control_index = server_args.index("--runtime-control-socket")
+    assert server_args[control_index + 1] == "<server-control-socket>"
     gateway_args = processes["gateway"]["arguments"]
     index = gateway_args.index("--ppu-config")
     assert gateway_args[index + 1] == "<ppu-config>"

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Build and validate the source-tree-independent Plasma PPU runtime payload.
 
-The PPU runtime contains only the Python control plane required for Plasma Server
-and the REST Gateway. It deliberately excludes the Control Console, Manager,
-Node.js/npm, Git metadata, FPGA bitstreams, PL access, and real-target tooling.
+The PPU runtime contains only the Python control plane required for Plasma Server,
+the REST Gateway, and the bounded local runtime-activation helper. It deliberately
+excludes the Control Console, Manager, Node.js/npm, Git metadata, FPGA bitstreams,
+PL access, and real-target tooling.
 """
 
 from __future__ import annotations
@@ -95,13 +96,15 @@ import sys
 
 def main() -> None:
     if len(sys.argv) < 2 or sys.argv[1] in {"-h", "--help"}:
-        print("usage: ppu.pyz {server|gateway} [arguments ...]")
+        print("usage: ppu.pyz {server|gateway|runtime-activation-helper} [arguments ...]")
         return
     command = sys.argv.pop(1)
     if command == "server":
-        from plasma_server.server import main as entrypoint
+        from plasma_server.runtime_server import main as entrypoint
     elif command == "gateway":
-        from plasma_web.gateway_phase2 import main as entrypoint
+        from plasma_web.gateway_phase3 import main as entrypoint
+    elif command == "runtime-activation-helper":
+        from plasma_web.runtime_activation_helper import main as entrypoint
     else:
         raise SystemExit(f"unsupported PPU process: {command}")
     entrypoint()
@@ -157,7 +160,11 @@ def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, obje
                 "runtime": "python",
                 "runtime_requirement": python_requirement,
                 "entrypoint": "ppu/ppu.pyz",
-                "arguments": ["server", "--config", "<ppu-config>"],
+                "arguments": [
+                    "server",
+                    "--config", "<ppu-config>",
+                    "--runtime-control-socket", "<server-control-socket>",
+                ],
                 "default_bind": "127.0.0.1:9900",
             },
             "gateway": {
@@ -167,11 +174,23 @@ def _manifest(*, python_requirement: str, pyyaml_version: str) -> dict[str, obje
                 "arguments": [
                     "gateway",
                     "--ppu-config", "<ppu-config>",
+                    "--runtime-activation-socket", "<runtime-activation-socket>",
                     "--host", "<gateway-bind>",
                     "--port", "18080",
                     "--plasma-host", "127.0.0.1",
                     "--plasma-port", "9900",
                 ],
+            },
+            "runtime_activation_helper": {
+                "runtime": "python",
+                "runtime_requirement": python_requirement,
+                "entrypoint": "ppu/ppu.pyz",
+                "arguments": [
+                    "runtime-activation-helper",
+                    "--socket", "<runtime-activation-socket>",
+                    "--server-control-socket", "<server-control-socket>",
+                ],
+                "privilege_boundary": "restart-plasma-server-only",
             },
         },
         "packaging": {"python": "python-zipapp"},
@@ -238,21 +257,34 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
     if manifest.get("schema_version") != RUNTIME_SCHEMA_VERSION or manifest.get("role") != ROLE:
         raise PPURuntimePackagingError("invalid PPU runtime identity/schema")
     processes = _require_mapping(manifest.get("processes"), "processes")
-    if set(processes) != {"server", "gateway"}:
-        raise PPURuntimePackagingError("PPU runtime must define exactly server and gateway")
+    if set(processes) != {"server", "gateway", "runtime_activation_helper"}:
+        raise PPURuntimePackagingError("PPU runtime must define server, gateway, and runtime activation helper")
     server = _require_mapping(processes.get("server"), "processes.server")
     gateway = _require_mapping(processes.get("gateway"), "processes.gateway")
-    if server.get("arguments") != ["server", "--config", "<ppu-config>"]:
-        raise PPURuntimePackagingError("PPU Server runtime must bind the canonical <ppu-config>")
+    helper = _require_mapping(processes.get("runtime_activation_helper"), "processes.runtime_activation_helper")
+    if server.get("arguments") != [
+        "server", "--config", "<ppu-config>", "--runtime-control-socket", "<server-control-socket>"
+    ]:
+        raise PPURuntimePackagingError("PPU Server runtime must bind canonical config and local control socket")
     gateway_arguments = gateway.get("arguments")
     if not isinstance(gateway_arguments, list):
         raise PPURuntimePackagingError("PPU Gateway runtime arguments must be an array")
-    try:
-        config_index = gateway_arguments.index("--ppu-config")
-    except ValueError as exc:
-        raise PPURuntimePackagingError("PPU Gateway runtime must bind the canonical <ppu-config>") from exc
-    if config_index + 1 >= len(gateway_arguments) or gateway_arguments[config_index + 1] != "<ppu-config>":
-        raise PPURuntimePackagingError("PPU Gateway --ppu-config must use the canonical <ppu-config>")
+    for name, value in (
+        ("--ppu-config", "<ppu-config>"),
+        ("--runtime-activation-socket", "<runtime-activation-socket>"),
+    ):
+        try:
+            index = gateway_arguments.index(name)
+        except ValueError as exc:
+            raise PPURuntimePackagingError(f"PPU Gateway runtime must bind {name}") from exc
+        if index + 1 >= len(gateway_arguments) or gateway_arguments[index + 1] != value:
+            raise PPURuntimePackagingError(f"PPU Gateway {name} has invalid binding")
+    if helper.get("arguments") != [
+        "runtime-activation-helper",
+        "--socket", "<runtime-activation-socket>",
+        "--server-control-socket", "<server-control-socket>",
+    ] or helper.get("privilege_boundary") != "restart-plasma-server-only":
+        raise PPURuntimePackagingError("runtime activation helper contract is not narrow enough")
     app = runtime_dir / "ppu" / "ppu.pyz"
     if not app.is_file() or app.stat().st_size <= 0:
         raise PPURuntimePackagingError("PPU runtime is missing ppu/ppu.pyz")
@@ -265,9 +297,14 @@ def validate_runtime(runtime_dir: Path) -> dict[str, object]:
         "__main__.py",
         "plasma_core/config.py",
         "plasma_server/server.py",
+        "plasma_server/runtime_server.py",
+        "plasma_server/runtime_control.py",
         "plasma_client/client.py",
         "plasma_web/gateway.py",
         "plasma_web/gateway_phase2.py",
+        "plasma_web/gateway_phase3.py",
+        "plasma_web/runtime_activation.py",
+        "plasma_web/runtime_activation_helper.py",
         "plasma_web/ppu_network_activation.py",
         "yaml/__init__.py",
     }
