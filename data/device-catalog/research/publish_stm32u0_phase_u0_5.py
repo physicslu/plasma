@@ -94,7 +94,6 @@ def _historical_plan() -> dict[str, Any]:
     frozen = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory() as td:
         canonical = Path(td) / "stm32u0-commercial-icpn.csv"
-        _write_empty_canonical(canonical)
         plan = build_admission_plan(
             canonical_path=canonical,
             production_manifest_path=PRESTATE_MANIFEST,
@@ -251,17 +250,27 @@ def verify_current_publication() -> dict[str, Any]:
         raise RuntimeError("published STM32U0 canonical CSV drifted")
     if _git_blob_sha(CANONICAL_PATH.read_bytes()) != EXPECTED_CANONICAL_BLOB:
         raise RuntimeError("published STM32U0 canonical Git blob drifted")
-    if file_sha256(PRODUCTION_MANIFEST) != EXPECTED_POST_MANIFEST_SHA256:
-        raise RuntimeError("published Production manifest drifted")
-    if _git_blob_sha(PRODUCTION_MANIFEST.read_bytes()) != EXPECTED_POST_MANIFEST_BLOB:
-        raise RuntimeError("published Production manifest Git blob drifted")
+    manifest = json.loads(PRODUCTION_MANIFEST.read_text(encoding="utf-8"))
+    u0_sources = [source for source in manifest.get("sources", []) if source.get("family") == "STM32U0"]
+    if len(u0_sources) != 1:
+        raise RuntimeError("current Production manifest must contain exactly one STM32U0 source")
+    expected_source = {
+        "manufacturer": "STMicroelectronics",
+        "family": "STM32U0",
+        "path": "../research/stm32u0-commercial-icpn.csv",
+        "row_count": EXPECTED_PUBLISHED_ROWS,
+        "git_blob_sha": EXPECTED_CANONICAL_BLOB,
+        "sha256": EXPECTED_CANONICAL_SHA256,
+    }
+    if u0_sources[0] != expected_source:
+        raise RuntimeError("current STM32U0 Production source drifted")
     audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
     if file_sha256(AUDIT_PATH) != EXPECTED_AUDIT_SHA256 or audit != _build_audit(proposal):
         raise RuntimeError("U0.5 publication audit drifted")
 
     exact, bases, families = _production_snapshot(PRODUCTION_MANIFEST)
-    if (exact, len(bases), len(families)) != EXPECTED_POSTSTATE:
-        raise RuntimeError("published Production aggregate state drifted")
+    if exact < EXPECTED_POSTSTATE[0] or len(bases) < EXPECTED_POSTSTATE[1] or len(families) < EXPECTED_POSTSTATE[2]:
+        raise RuntimeError("current Production state regressed below U0.5 publication poststate")
     if families.get("STM32U0") != EXPECTED_PUBLISHED_ROWS:
         raise RuntimeError("published STM32U0 Production row count drifted")
     return {
@@ -273,7 +282,7 @@ def verify_current_publication() -> dict[str, Any]:
         "production_base_devices": len(bases),
         "production_family_count": len(families),
         "canonical_sha256": EXPECTED_CANONICAL_SHA256,
-        "production_manifest_sha256": EXPECTED_POST_MANIFEST_SHA256,
+        "production_manifest_sha256": file_sha256(PRODUCTION_MANIFEST),
     }
 
 
@@ -282,7 +291,7 @@ def publish() -> dict[str, Any]:
     if not PROPOSAL_PATH.exists() or json.loads(PROPOSAL_PATH.read_text(encoding="utf-8")) != proposal:
         raise RuntimeError("frozen U0.5 publication proposal is missing or drifted")
 
-    if CANONICAL_PATH.exists() and file_sha256(PRODUCTION_MANIFEST) == EXPECTED_POST_MANIFEST_SHA256:
+    if CANONICAL_PATH.exists():
         verify_current_publication()
         return {"status": "no_op_already_published", "published_exact_icpns": EXPECTED_PUBLISHED_ROWS}
 
