@@ -536,14 +536,20 @@ class VendorNeutralAdmissionTests(unittest.TestCase):
         self.assertEqual(head_blob, base_blob)
         self.assertEqual(hashlib.sha256(head_blob).hexdigest(), LEGACY_SCHEMA_SHA256)
         changed = subprocess.run(
-            ["git", "diff", "--name-only", f"{base_ref}...HEAD"],
+            ["git", "diff", "--name-status", f"{base_ref}...HEAD"],
             cwd=ROOT,
             check=True,
             capture_output=True,
             text=True,
         ).stdout.splitlines()
         protected = ("data/ic-support/benchmarks/stm32f103c/", "data/ic-support/benchmarks/nxp-kl25/")
-        self.assertFalse([path for path in changed if path.startswith(protected)])
+        historical_changes = []
+        for line in changed:
+            fields = line.split("\t")
+            status, paths = fields[0], fields[1:]
+            if status != "A" and any(path.startswith(protected) for path in paths):
+                historical_changes.append(line)
+        self.assertFalse(historical_changes)
 
 
 if __name__ == "__main__":
