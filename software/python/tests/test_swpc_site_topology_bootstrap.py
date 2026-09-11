@@ -12,6 +12,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BOOTSTRAP_PATH = REPO_ROOT / "scripts" / "swpc-site-topology-bootstrap.py"
+BOOTSTRAP_FRONTEND_PATH = REPO_ROOT / "scripts" / "plasmactl-swpc-z2like-bootstrap-sites"
 PLASMACTL_PATH = REPO_ROOT / "scripts" / "plasmactl"
 
 
@@ -112,6 +113,21 @@ def test_bootstrap_refuses_symlink_config(tmp_path: Path) -> None:
 
     with pytest.raises(bootstrap.BootstrapError, match="non-symlink"):
         bootstrap.bootstrap_sites(link.absolute())
+
+
+def test_bootstrap_frontend_is_syntax_valid_and_does_not_restart_services() -> None:
+    completed = subprocess.run(
+        ["bash", "-n", str(BOOTSTRAP_FRONTEND_PATH)],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+    source = BOOTSTRAP_FRONTEND_PATH.read_text(encoding="utf-8")
+    assert "systemctl" not in source
+    assert "P3 Runtime Activation remains a separate explicit operator action" in source
 
 
 def test_plasmactl_routes_bootstrap_only_to_explicit_swpc_backend(tmp_path: Path) -> None:
