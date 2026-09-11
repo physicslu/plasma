@@ -74,7 +74,7 @@ _MANAGED_POST_PATTERNS = tuple(
         r"^/api/settings/gateway$",
         r"^/api/settings/ppu-network$",
         r"^/api/settings/sites/activation$",
-        rf"^/api/settings/sites/{_SEGMENT}$",
+        r"^/api/settings/sites/[1-9][0-9]*$",
         r"^/api/mock/runtime$",
         r"^/api/engineering/diagnostics/loopback$",
         r"^/api/engineering/session$",
