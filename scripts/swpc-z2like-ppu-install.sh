@@ -9,8 +9,9 @@ usage: sudo bash scripts/swpc-z2like-ppu-install.sh \
   --facility-id lab
 
 Installs a PS-only, closed-hardware PPU surrogate on SWPC using the same
-filesystem and systemd ownership model as the Z2 PS installer. This is an
-x86_64 integration surrogate, not ARMv7/Z2 qualification evidence.
+filesystem, bounded runtime-activation, and systemd ownership model as the Z2
+PS installer. This is an x86_64 integration surrogate, not ARMv7/Z2
+qualification evidence.
 EOF
 }
 
@@ -20,6 +21,9 @@ ppu_id=""
 facility_id=""
 proxy_port="18081"
 nginx_marker="# Managed by Plasma SWPC Z2-like lab installer"
+managed_evidence="/opt/plasma/install/last-swpc-z2like-install.json"
+managed_current_link="/opt/plasma/current"
+managed_release_root="/opt/plasma/releases"
 
 while (($#)); do
   case "$1" in
@@ -68,13 +72,62 @@ if [[ -e "$nginx_conf" ]] && ! grep -Fxq "$nginx_marker" "$nginx_conf"; then
   exit 78
 fi
 
-for port in 9900 18080 "$proxy_port"; do
+qualified_managed_proxy_residual_listener() {
+  # During a managed deploy the wrapper has already validated ownership, stopped
+  # Plasma runtime services, removed only the Plasma-owned Nginx config, and
+  # reloaded Nginx. A graceful reload can leave the old Nginx worker/listener
+  # alive briefly. Accept only that narrowly proven residual state; first install
+  # and all unrelated listeners remain fail-closed.
+  [[ ! -e "$nginx_conf" ]] || return 1
+  [[ -f "$managed_evidence" && -L "$managed_current_link" ]] || return 1
+  ss -H -ltnp "sport = :$proxy_port" | grep -Fq '"nginx"' || return 1
+
+  "$plasma_python" - "$managed_evidence" "$proxy_port" "$managed_current_link" "$managed_release_root" <<'PY'
+import json
+import os
+import sys
+
+evidence_path, proxy_port, current_link, release_root = sys.argv[1:]
+with open(evidence_path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+expected = {
+    "schema_version": 1,
+    "role": "ppu-surrogate",
+    "platform": "linux",
+    "z2_equivalent": False,
+    "hardware_boundary": "closed",
+}
+for field, value in expected.items():
+    if payload.get(field) != value:
+        raise SystemExit(f"managed upgrade evidence field {field} is invalid")
+if payload.get("restricted_ingress") != f"127.0.0.1:{proxy_port}":
+    raise SystemExit("managed upgrade evidence does not own the requested restricted ingress")
+release_id = payload.get("release_id")
+if not isinstance(release_id, str) or not release_id:
+    raise SystemExit("managed upgrade evidence is missing release identity")
+expected_current = os.path.join(release_root, release_id)
+if os.path.realpath(current_link) != expected_current:
+    raise SystemExit("managed upgrade evidence/current release identity mismatch")
+PY
+}
+
+for port in 9900 18080; do
   if ss -H -ltn "sport = :$port" | grep -q .; then
     printf 'swpc-z2like-ppu-install: TCP port %s is already in use; stop or migrate the owning service explicitly before installation\n' "$port" >&2
     ss -H -ltnp "sport = :$port" >&2 || true
     exit 78
   fi
 done
+
+if ss -H -ltn "sport = :$proxy_port" | grep -q .; then
+  if qualified_managed_proxy_residual_listener; then
+    printf '[swpc-z2like] accepting qualified residual Nginx listener on restricted ingress 127.0.0.1:%s during managed upgrade\n' "$proxy_port"
+  else
+    printf 'swpc-z2like-ppu-install: TCP port %s is already in use; stop or migrate the owning service explicitly before installation\n' "$proxy_port" >&2
+    ss -H -ltnp "sport = :$proxy_port" >&2 || true
+    exit 78
+  fi
+fi
 
 read -r py_version py_releaselevel py_machine < <("$plasma_python" - <<'PY'
 import platform, sys
@@ -114,6 +167,12 @@ config_root="/etc/plasma"
 config_path="$config_root/ppu.yaml"
 state_root="/var/lib/plasma"
 log_root="/var/log/plasma"
+systemd_root="/etc/systemd/system"
+server_unit="$systemd_root/plasma-server.service"
+gateway_unit="$systemd_root/plasma-web.service"
+activation_unit="$systemd_root/plasma-runtime-activation.service"
+server_control_socket="/run/plasma-server/control.sock"
+runtime_activation_socket="/run/plasma-runtime-activation/helper.sock"
 
 printf '[swpc-z2like] release_id=%s source_sha=%s python=%s machine=%s\n' \
   "$release_id" "$sha" "$py_version" "$py_machine"
@@ -148,7 +207,17 @@ chown -R root:root "$release_dir"
 find "$release_dir" -type d -exec chmod 0755 {} +
 find "$release_dir" -type f -exec chmod 0644 {} +
 
-cat >"$config_path" <<EOF
+# P3 upgrade contract: an existing canonical Desired configuration is authoritative
+# and must survive deployment. First installation still creates the safe empty-Site
+# baseline. The Gateway remains the only service allowed to mutate this file later.
+if [[ -e "$config_path" || -L "$config_path" ]]; then
+  if [[ ! -f "$config_path" || -L "$config_path" ]]; then
+    printf 'swpc-z2like-ppu-install: canonical PPU configuration must be a regular file: %s\n' "$config_path" >&2
+    exit 78
+  fi
+  printf '[swpc-z2like] preserving existing canonical Desired configuration: %s\n' "$config_path"
+else
+  cat >"$config_path" <<EOF
 ppu:
   id: "$ppu_id"
   facility_id: "$facility_id"
@@ -169,63 +238,82 @@ server:
 
 sites: []
 EOF
+fi
 chmod 0640 "$config_path"
 chown plasma:plasma "$config_path"
 
-catalog="/opt/plasma/current/runtime/data/device-catalog/production/icpn-v1-manifest.json"
-app="/opt/plasma/current/runtime/ppu/ppu.pyz"
-cat >/etc/systemd/system/plasma-server.service <<EOF
-[Unit]
-Description=Plasma PPU Programming Server
-After=network.target
+# Validate enough of the canonical schema to fail before activation if a preserved
+# Desired file cannot be consumed by the P3 runtime. Canonical Site identity is
+# one-based `id`; `site_id` is a wire/API concept and is not a YAML field.
+configured_site_count="$("$plasma_python" - "$config_path" <<'PY'
+import sys
+import yaml
 
-[Service]
-Type=simple
-User=plasma
-Group=plasma
-Restart=on-failure
-RestartSec=2
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectHome=true
-ProtectSystem=strict
-ReadWritePaths=$state_root $log_root
-Environment=PYTHONUNBUFFERED=1
-Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$catalog
-ExecStart=$plasma_python $app server --config $config_path
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    payload = yaml.safe_load(handle)
+if not isinstance(payload, dict):
+    raise SystemExit("canonical PPU configuration must be a YAML mapping")
+server = payload.get("server")
+if not isinstance(server, dict):
+    raise SystemExit("canonical PPU configuration server must be a mapping")
+maximum = server.get("max_supported_sites")
+if isinstance(maximum, bool) or not isinstance(maximum, int) or not 1 <= maximum <= 8:
+    raise SystemExit("canonical PPU configuration max_supported_sites must be in the range 1..8")
+sites = payload.get("sites")
+if not isinstance(sites, list):
+    raise SystemExit("canonical PPU configuration sites must be a list")
+site_ids = []
+for entry in sites:
+    if not isinstance(entry, dict):
+        raise SystemExit("canonical PPU configuration contains an invalid Site entry")
+    site_id = entry.get("id")
+    if isinstance(site_id, bool) or not isinstance(site_id, int):
+        raise SystemExit("canonical PPU configuration Site id must be an integer")
+    site_ids.append(site_id)
+if any(site_id < 1 or site_id > maximum for site_id in site_ids):
+    raise SystemExit(f"canonical PPU configuration Site IDs must be in the range 1..{maximum}")
+if len(site_ids) != len(set(site_ids)):
+    raise SystemExit("canonical PPU configuration contains duplicate Site IDs")
+print(len(site_ids))
+PY
+)"
 
-[Install]
-WantedBy=multi-user.target
-EOF
+# Reuse the audited P3 Z2 unit renderer. The SWPC surrogate differs in CPU/ABI,
+# not in privilege boundaries: Server owns the authoritative quiesce socket,
+# Gateway gets only the helper socket, and the root helper can restart only the
+# exact plasma-server.service unit.
+"$plasma_python" - "$repo_root" "$plasma_python" "$py_version" "$py_machine" <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
 
-cat >/etc/systemd/system/plasma-web.service <<EOF
-[Unit]
-Description=Plasma Gateway
-After=network-online.target plasma-server.service
-Wants=network-online.target
-Requires=plasma-server.service
-
-[Service]
-Type=simple
-User=plasma
-Group=plasma
-Restart=on-failure
-RestartSec=2
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectHome=true
-ProtectSystem=strict
-ReadWritePaths=$state_root $log_root $config_root
-Environment=PYTHONUNBUFFERED=1
-Environment=PLASMA_DEVICE_CATALOG_MANIFEST=$catalog
-ExecStart=$plasma_python $app gateway --ppu-config $config_path --host 127.0.0.1 --port 18080 --plasma-host 127.0.0.1 --plasma-port 9900 --output-root $state_root/gateway-output
-
-[Install]
-WantedBy=multi-user.target
-EOF
-chmod 0644 /etc/systemd/system/plasma-server.service /etc/systemd/system/plasma-web.service
+repo_root = Path(sys.argv[1])
+python_path = Path(sys.argv[2])
+python_version = sys.argv[3]
+architecture = sys.argv[4]
+installer_path = repo_root / "scripts" / "ppu-z2-installer.py"
+spec = importlib.util.spec_from_file_location("plasma_swpc_p3_units", installer_path)
+if spec is None or spec.loader is None:
+    raise SystemExit(f"cannot load P3 unit renderer: {installer_path}")
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+paths = module.InstallPaths()
+units = module.render_systemd_units(
+    paths=paths,
+    python_runtime=module.PythonRuntime(python_path, python_version, architecture),
+    gateway_host="127.0.0.1",
+    catalog_relative="data/device-catalog/production/icpn-v1-manifest.json",
+)
+for name, content in units.items():
+    module._write_text_atomic(paths.systemd_root / name, content)
+PY
+chmod 0644 "$server_unit" "$gateway_unit" "$activation_unit"
 
 # The public tunnel must terminate on this restricted proxy, never on :18080.
+# This Gate-1 transaction deliberately keeps the historical public allowlist
+# unchanged; full managed-control ingress is a separate architecture/security task.
 cat >"$nginx_conf" <<EOF
 $nginx_marker
 server {
@@ -263,6 +351,8 @@ EOF
 ln -sfn "$release_dir" /opt/plasma/current.new
 mv -Tf /opt/plasma/current.new /opt/plasma/current
 systemctl daemon-reload
+# plasma-web.service Requires=plasma-runtime-activation.service and owns helper
+# lifecycle through PartOf=. The helper is intentionally not independently enabled.
 systemctl enable --now plasma-server.service plasma-web.service
 nginx -t
 systemctl reload nginx
@@ -310,12 +400,22 @@ cat >/opt/plasma/install/last-swpc-z2like-install.json <<EOF
   "restricted_ingress": "127.0.0.1:$proxy_port",
   "hardware_boundary": "closed",
   "site_desired_config": "$config_path",
-  "runtime_apply_supported": false,
-  "configured_site_count": 0,
-  "max_supported_sites": 8
+  "runtime_apply_supported": true,
+  "runtime_activation_socket": "$runtime_activation_socket",
+  "server_control_socket": "$server_control_socket",
+  "upgrade_preserves_existing_config": true,
+  "configured_site_count": $configured_site_count,
+  "max_supported_sites": 8,
+  "runtime_activation": {
+    "service": "plasma-runtime-activation.service",
+    "lifecycle_owner": "plasma-web.service",
+    "scope": "restart-plasma-server-only",
+    "server_authoritative_quiesce": true,
+    "quiesce_ttl_bounded": true
+  }
 }
 EOF
 chmod 0644 /opt/plasma/install/last-swpc-z2like-install.json
 
-printf '[swpc-z2like] PASS: local PPU ready; restricted ingress is http://127.0.0.1:%s\n' "$proxy_port"
+printf '[swpc-z2like] PASS: local P3-capable PPU ready; restricted ingress is http://127.0.0.1:%s\n' "$proxy_port"
 printf '[swpc-z2like] Cloudflare Tunnel must target the restricted ingress, never 127.0.0.1:18080\n'

@@ -67,6 +67,25 @@ def test_z2_installer_preserves_existing_desired_state_and_bounds_privilege() ->
     assert 'systemctl("enable", "--now", RUNTIME_ACTIVATION_SERVICE)' not in source
 
 
+def test_swpc_surrogate_reuses_p3_privilege_boundary_and_preserves_desired_state() -> None:
+    installer = (ROOT / "scripts/swpc-z2like-ppu-install.sh").read_text(encoding="utf-8")
+    control = (ROOT / "scripts/plasmactl-swpc-z2like").read_text(encoding="utf-8")
+
+    assert "preserving existing canonical Desired configuration" in installer
+    assert "module.render_systemd_units(" in installer
+    assert '"runtime_apply_supported": true' in installer
+    assert '"upgrade_preserves_existing_config": true' in installer
+    assert '"scope": "restart-plasma-server-only"' in installer
+    assert "systemctl enable --now plasma-server.service plasma-web.service" in installer
+    assert "systemctl enable --now plasma-runtime-activation.service" not in installer
+
+    assert "verify_p3_activation_operational_contract" in control
+    assert "plasma-runtime-activation.service is not active" in control
+    assert "local Site Desired API is not operational" in control
+    assert "Accept a previously qualified P2 surrogate" in control
+    assert "restricted ingress unexpectedly exposed /api/settings/sites" in control
+
+
 def test_release_workflows_ship_both_installer_bootstrap_files() -> None:
     z2 = (ROOT / ".github/workflows/z2-ps-release.yml").read_text(encoding="utf-8")
     ppu = (ROOT / ".github/workflows/ppu-release.yml").read_text(encoding="utf-8")

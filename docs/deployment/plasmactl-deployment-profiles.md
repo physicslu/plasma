@@ -190,6 +190,8 @@ A first install is accepted only when no prior SWPC Z2-like install evidence or 
 
 If first-install activation fails after that clean boundary is proven, the profile stops/removes only artifacts created inside that prechecked boundary and removes the unqualified target release. Persistent state/log directories are not treated as qualification evidence and are not used to claim installation success.
 
+The SWPC surrogate uses the same P3 privilege boundary as the Z2 PS runtime: Plasma Server owns the authoritative local quiesce socket, Plasma Gateway can reach only the bounded activation-helper socket, and `plasma-runtime-activation.service` can restart exactly `plasma-server.service`. The surrogate remains x86_64 software evidence only.
+
 ### Deploy an updated committed source revision
 
 ```bash
@@ -198,7 +200,7 @@ sudo ./scripts/plasmactl deploy swpc-z2like
 
 The privileged SWPC profile does **not** fetch or merge Git. It activates the repository's current **clean committed HEAD**. Source control update and privileged host activation are separate responsibilities.
 
-Before any mutation, deployment requires the install evidence, `/opt/plasma/current`, PPU configuration, system units, and restricted Nginx ownership to agree. An evidence/current-release mismatch fails closed.
+Before any mutation, deployment requires the install evidence, `/opt/plasma/current`, PPU configuration, system units, and restricted Nginx ownership to agree. An evidence/current-release mismatch fails closed. An existing canonical `/etc/plasma/ppu.yaml` is preserved across the upgrade; deployment must not regenerate `sites: []` over saved Desired state.
 
 Deployment behavior:
 
@@ -229,7 +231,13 @@ temporarily withdraw only Plasma-owned restricted Nginx config
 run hardened SWPC Z2-like installer
         |
         v
-verify readiness + restricted boundary + local PS loopback
+preserve canonical Site Desired + install P3 helper/quiesce wiring
+        |
+        v
+verify readiness + local Site Desired + bounded activation helper
+        |
+        v
+verify restricted public boundary + local PS loopback
         |
         +-- PASS -> keep new activation
         |
@@ -245,9 +253,11 @@ The backend never implicitly stops integration-host **user** systemd services. P
 ./scripts/plasmactl verify swpc-z2like
 ```
 
-This is a local, read-only qualification check of the already installed surrogate. It verifies install evidence/current identity, Plasma-owned config/system units/restricted ingress, active Server/Gateway, local/restricted health, negative-route isolation, and PS diagnostic loopback.
+This is a local, read-only qualification check of the already installed surrogate. It verifies install evidence/current identity, Plasma-owned canonical config, Server/Gateway/runtime-activation system units, active services, direct local Site Desired API, local/restricted health, negative-route isolation, and PS diagnostic loopback. Dynamic canonical Site configuration is accepted within the one-based `id` and `max_supported_sites <= 8` contract.
 
-It does **not** prove the Render/Manager managed path.
+The public restricted ingress remains intentionally diagnostics/status-only in this profile revision: `/api/settings/sites` is still expected to return `404` there. Expanding the public `z2like-demo` managed-control surface is a separate architecture/security transaction.
+
+It does **not** prove the Render/Manager managed path, ARMv7/PYNQ behavior, PL/FPGA, Site electrical behavior, or real IC programming.
 
 ### Status
 
@@ -255,7 +265,7 @@ It does **not** prove the Render/Manager managed path.
 ./scripts/plasmactl status swpc-z2like
 ```
 
-Status reports installed evidence and service state; it does not manufacture a PASS claim.
+Status reports installed evidence and service state, including bounded runtime-activation capability; it does not manufacture a PASS claim.
 
 ## Real Z2 PS operator flow
 
@@ -376,11 +386,13 @@ Status reports release ID, source SHA, isolated Plasma Python path, Gateway endp
 ```text
 x86_64 SWPC
 + Plasma Server/Gateway
++ canonical Site Desired persistence
++ bounded P3 runtime-activation helper/quiesce wiring
 + PS diagnostic behavior
 + production-like filesystem/service ownership
 ```
 
-This is not Real Z2 qualification.
+This is not Real Z2 qualification. The public restricted ingress remains narrower than the local Gateway capability until separately approved.
 
 ### `z2-ps`
 

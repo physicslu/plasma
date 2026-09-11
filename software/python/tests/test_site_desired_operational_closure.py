@@ -113,11 +113,14 @@ def test_swpc_surrogate_matches_bounded_site_config_contract_and_rolls_permissio
     assert 'install -d -m 0770 -o root -g plasma "$config_root"' in installer_source
     assert 'chmod 0640 "$config_path"' in installer_source
     assert 'chown plasma:plasma "$config_path"' in installer_source
-    assert "gateway --ppu-config $config_path" in installer_source
-    assert "ReadWritePaths=$state_root $log_root $config_root" in installer_source
-    assert "ReadWritePaths=$state_root $log_root\n" in installer_source
+    assert 'preserving existing canonical Desired configuration' in installer_source
+    assert 'module.render_systemd_units(' in installer_source
+    assert '"runtime_apply_supported": true' in installer_source
+    assert '"upgrade_preserves_existing_config": true' in installer_source
 
     assert 'stat -c \'%a %u %g\' "$config_root" >"$snapshot/config-root.stat"' in control_source
     assert 'restore_config_root_metadata "$mode" "$uid" "$gid"' in control_source
     assert "verify_site_desired_operational_contract" in control_source
+    assert "verify_p3_activation_operational_contract" in control_source
+    assert "local Site Desired API is not operational" in control_source
     assert "restricted ingress unexpectedly exposed /api/settings/sites" in control_source
