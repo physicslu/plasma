@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+repo_root="$(cd "$(dirname "$script_path")/.." && pwd)"
+core="${PLASMA_SWPC_Z2LIKE_BOOTSTRAP_CORE:-$repo_root/scripts/swpc-site-topology-bootstrap.py}"
+evidence="${PLASMA_SWPC_Z2LIKE_EVIDENCE:-/opt/plasma/install/last-swpc-z2like-install.json}"
+ppu_config="${PLASMA_SWPC_Z2LIKE_CONFIG:-/etc/plasma/ppu.yaml}"
+plasma_python_override="${PLASMA_SWPC_Z2LIKE_PYTHON:-}"
+
+say() {
+  printf '[plasmactl swpc-z2like bootstrap-sites] %s\n' "$*"
+}
+
+die() {
+  printf '[plasmactl swpc-z2like bootstrap-sites] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+(( EUID == 0 )) || die "bootstrap-sites requires root; run: sudo ./scripts/plasmactl bootstrap-sites swpc-z2like"
+command -v python3 >/dev/null 2>&1 || die "missing required command: python3"
+command -v stat >/dev/null 2>&1 || die "missing required command: stat"
+[[ -f "$core" ]] || die "topology bootstrap core is missing: $core"
+[[ -f "$evidence" ]] || die "SWPC Z2-like install evidence is missing: $evidence"
+[[ -f "$ppu_config" && ! -L "$ppu_config" ]] || die "canonical PPU configuration must be a regular non-symlink file: $ppu_config"
+[[ "$(stat -c '%a' "$ppu_config")" == "640" ]] || die "canonical PPU configuration must be mode 0640"
+[[ "$(stat -c '%U:%G' "$ppu_config")" == "plasma:plasma" ]] || die "canonical PPU configuration must be owned plasma:plasma"
+
+plasma_python="$plasma_python_override"
+if [[ -z "$plasma_python" ]]; then
+  plasma_python="$(python3 - "$evidence" "$ppu_config" <<'PY'
+import json
+import sys
+
+path, config_path = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    payload = json.load(handle)
+expected = {
+    "role": "ppu-surrogate",
+    "platform": "linux",
+    "z2_equivalent": False,
+    "hardware_boundary": "closed",
+    "max_supported_sites": 8,
+    "runtime_apply_supported": True,
+}
+for field, value in expected.items():
+    if payload.get(field) != value:
+        raise SystemExit(f"invalid SWPC P3 evidence field {field}: {payload.get(field)!r}")
+if payload.get("site_desired_config") != config_path:
+    raise SystemExit("SWPC P3 evidence does not identify the canonical Site Desired configuration")
+python = payload.get("plasma_python")
+if not isinstance(python, str) or not python:
+    raise SystemExit("SWPC P3 evidence is missing plasma_python")
+print(python)
+PY
+)" || die "SWPC P3 install evidence is not eligible for topology bootstrap"
+fi
+[[ -x "$plasma_python" ]] || die "Plasma Python is not executable: $plasma_python"
+
+say "bootstrapping only explicit empty Desired topology; services will not be restarted"
+"$plasma_python" "$core" --config "$ppu_config"
+
+[[ "$(stat -c '%a' "$ppu_config")" == "640" ]] || die "bootstrap changed canonical config mode unexpectedly"
+[[ "$(stat -c '%U:%G' "$ppu_config")" == "plasma:plasma" ]] || die "bootstrap changed canonical config ownership unexpectedly"
+say "SITE1..SITE8 Desired topology is present as disabled mock Sites"
+say "P3 Runtime Activation remains a separate explicit operator action"
