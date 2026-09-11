@@ -1,0 +1,42 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C091KB",
+  "evidence_section_sha256": "496dcc558538d2dbed6d2849ca571319111940091c7dbd5e5cbe064e61825f87",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C091KBT6",
+    "STM32C091KBU6"
+  ],
+  "excluded_non_active_part_numbers": [
+    {
+      "icpn": "STM32C091KBT3",
+      "marketing_status": "Preview Product is in design stage. EN"
+    }
+  ],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091kb.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": false,
+      "icpn": "STM32C091KBT3",
+      "marketing_status": "Preview Product is in design stage. EN"
+    },
+    {
+      "active": true,
+      "icpn": "STM32C091KBT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C091KBU6",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "719d5c5ea12c29d6522b6f1226274551bc4d08bf9a70ea5da91f95190d35dbf7",
+  "retrieved_at_utc": "2026-09-11T07:35:57Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091kb.html"
+}

@@ -1,0 +1,44 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C031F6",
+  "evidence_section_sha256": "c9b8ac76719956b32303b72600a241c36698f2e726b08bc89273ea24d8273f7c",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C031F6P6",
+    "STM32C031F6P6TR",
+    "STM32C031F6P7",
+    "STM32C031F6P7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031f6.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C031F6P6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031F6P6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031F6P7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031F6P7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "caec95f1ce9556efc1bc110fc629d25b24becad65e61476fcc5a432b578bb87d",
+  "retrieved_at_utc": "2026-09-11T07:13:43Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031f6.html"
+}

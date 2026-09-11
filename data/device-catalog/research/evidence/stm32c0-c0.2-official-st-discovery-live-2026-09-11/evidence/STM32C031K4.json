@@ -1,0 +1,62 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C031K4",
+  "evidence_section_sha256": "ce38d7797ca36408bef4ce02ea32fb2974814d808ae610a44a31f0b5cec45c75",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C031K4T6",
+    "STM32C031K4T7",
+    "STM32C031K4T7TR",
+    "STM32C031K4U6",
+    "STM32C031K4U6TR",
+    "STM32C031K4U7",
+    "STM32C031K4U7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k4.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C031K4T6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K4T7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K4T7TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K4U6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K4U6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K4U7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C031K4U7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "4188c16dbebe27c5d1092219c64941986b21a8bb5473ae45673e207fe1a0c311",
+  "retrieved_at_utc": "2026-09-11T07:15:19Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k4.html"
+}

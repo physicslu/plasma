@@ -1,0 +1,68 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C051K8",
+  "evidence_section_sha256": "e0fc0c8f0c611ecb2a7a2302ea9d0ba0bde11464a91ec0e9b802a8ac6a88ce3f",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C051K8T6",
+    "STM32C051K8T6TR",
+    "STM32C051K8U3",
+    "STM32C051K8U3TR",
+    "STM32C051K8U6",
+    "STM32C051K8U6TR",
+    "STM32C051K8U7",
+    "STM32C051K8U7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051k8.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C051K8T6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C051K8T6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C051K8U3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C051K8U3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C051K8U6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C051K8U6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C051K8U7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C051K8U7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "8cc3f84da5273fdf5fe3556156ca9d7812b1fd00c608ff24deba42f8c7b1e994",
+  "retrieved_at_utc": "2026-09-11T07:23:37Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051k8.html"
+}

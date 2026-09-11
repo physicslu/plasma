@@ -1,0 +1,4480 @@
+{
+  "acquisition_failure": 0,
+  "acquisition_transport": "chromium_rendered_dom",
+  "active_candidate_targets": 50,
+  "active_exact_icpn_candidates": 220,
+  "attempted": 50,
+  "base_device_count": 50,
+  "bounded_discovery_clean": true,
+  "browser": {
+    "browser_version": "151.0.7922.34",
+    "evidence_profile": "stm32c0_c0_2_dual_surface_v1",
+    "headless": false,
+    "playwright_version": "1.62.0"
+  },
+  "c0_1_foundation_sha256": "c89e8c528f80f9b199a2b153d3d40aa4af090e50c492a7c88bfa7876ce406515",
+  "claims": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "manufacturer_evidence_is_admission": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_identity_plus_sample_and_buy_marketing_status_exact_set_join",
+  "commercial_identity_clean": true,
+  "commercial_identity_verified_targets": 50,
+  "discovery_id": "stm32c0-c0.2-official-st-commercial-discovery-v1",
+  "dispositioned_targets": 50,
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "excluded_non_active_part_numbers": 1,
+  "family": "STM32C0",
+  "identity_manual_intervention_required": 0,
+  "lifecycle_excluded_targets": 0,
+  "openocd_routing": {
+    "ambiguous": 0,
+    "gates_commercial_identity": false,
+    "not_applicable": 0,
+    "unique": 44,
+    "unmapped": 6
+  },
+  "phase": "C0.2",
+  "representative_continuity_clean": true,
+  "results": [
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C011F4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C011F4",
+        "evidence_section_sha256": "8b285e44ebc4001e647ddfc8b21c1eb4775c72abe065c06f2a6d2035e7fc52a4",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C011F4P6",
+          "STM32C011F4P7",
+          "STM32C011F4P7TR",
+          "STM32C011F4U3TR",
+          "STM32C011F4U6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C011F4P6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F4P7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F4P7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F4U3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F4U6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "485705812c9d672cc1ee291797629a2b7fa3458611948458344c128b510cd734",
+        "retrieved_at_utc": "2026-09-11T07:13:02Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f4.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C011F4P6",
+          "ordering_pattern": "STM32C011F4Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F4P7",
+          "ordering_pattern": "STM32C011F4Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F4P7TR",
+          "ordering_pattern": "STM32C011F4Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F4U3TR",
+          "ordering_pattern": "STM32C011F4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F4U6TR",
+          "ordering_pattern": "STM32C011F4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f4.html",
+      "subfamily": "STM32C011"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C011F6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C011F6",
+        "evidence_section_sha256": "da05fecfe1ad2c1db9ed2a55985405f2f7f12b1637ccf88f27dca0cd0204b35a",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C011F6P3",
+          "STM32C011F6P3TR",
+          "STM32C011F6P6",
+          "STM32C011F6P6TR",
+          "STM32C011F6P7",
+          "STM32C011F6P7TR",
+          "STM32C011F6U3TR",
+          "STM32C011F6U6TR",
+          "STM32C011F6U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C011F6P3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F6P3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F6P6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F6P6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F6P7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F6P7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F6U3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F6U6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011F6U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "64ef246f4a5ffbd8ab54adb581ecfb60160e540731e57fc53adb416feed5f5f4",
+        "retrieved_at_utc": "2026-09-11T07:13:09Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C011F6P3",
+          "ordering_pattern": "STM32C011F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F6P3TR",
+          "ordering_pattern": "STM32C011F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F6P6",
+          "ordering_pattern": "STM32C011F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F6P6TR",
+          "ordering_pattern": "STM32C011F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F6P7",
+          "ordering_pattern": "STM32C011F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F6P7TR",
+          "ordering_pattern": "STM32C011F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F6U3TR",
+          "ordering_pattern": "STM32C011F6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F6U6TR",
+          "ordering_pattern": "STM32C011F6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011F6U7TR",
+          "ordering_pattern": "STM32C011F6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011f6.html",
+      "subfamily": "STM32C011"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C011J4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C011J4",
+        "evidence_section_sha256": "9470af1765945fc1bb7e7de67e25e2576cd8d100266409e401b2ee111f972a1c",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C011J4M6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011j4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C011J4M6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e6867e79f4b5c40b89c57d2e2ac89c86cfccac427005f4ad8b232248d0637ecf",
+        "retrieved_at_utc": "2026-09-11T07:13:15Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011j4.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C011J4M6",
+          "ordering_pattern": "STM32C011J4Mx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011j4.html",
+      "subfamily": "STM32C011"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C011J6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C011J6",
+        "evidence_section_sha256": "9c01e38aa705af47e2e7792af7b56744d5e0570575ba74d8334ff6c5ec91456b",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C011J6M3",
+          "STM32C011J6M3TR",
+          "STM32C011J6M6",
+          "STM32C011J6M6TR",
+          "STM32C011J6M7",
+          "STM32C011J6M7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011j6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C011J6M3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011J6M3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011J6M6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011J6M6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011J6M7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C011J6M7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "d53aafc9d50cf84eb299465097a0d5afc14ef28f341cd0906bd9d0b0a22d4fa9",
+        "retrieved_at_utc": "2026-09-11T07:13:21Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011j6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C011J6M3",
+          "ordering_pattern": "STM32C011J6Mx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011J6M3TR",
+          "ordering_pattern": "STM32C011J6Mx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011J6M6",
+          "ordering_pattern": "STM32C011J6Mx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011J6M6TR",
+          "ordering_pattern": "STM32C011J6Mx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011J6M7",
+          "ordering_pattern": "STM32C011J6Mx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C011J6M7TR",
+          "ordering_pattern": "STM32C011J6Mx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c011j6.html",
+      "subfamily": "STM32C011"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C031C4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C031C4",
+        "evidence_section_sha256": "ae4857a5fd742b09840a2ce1640e3c700c19c3a8cd156f1a80714c5f79d31015",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C031C4T6",
+          "STM32C031C4T6TR",
+          "STM32C031C4U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031c4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C031C4T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C4T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C4U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "4776ae10a2b2c8a0b0cd237d9e6c6ee43fc30c642c82c4f27c348d511df62976",
+        "retrieved_at_utc": "2026-09-11T07:13:26Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031c4.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C031C4T6",
+          "ordering_pattern": "STM32C031C4Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C4T6TR",
+          "ordering_pattern": "STM32C031C4Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C4U6",
+          "ordering_pattern": "STM32C031C4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031c4.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C031C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C031C6",
+        "evidence_section_sha256": "cbfdd6583e8fe472668b92ccd872c6b58e4c183e6affaba89b0b945ba6d26109",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C031C6T3",
+          "STM32C031C6T3TR",
+          "STM32C031C6T6",
+          "STM32C031C6T6TR",
+          "STM32C031C6T7",
+          "STM32C031C6T7TR",
+          "STM32C031C6U6",
+          "STM32C031C6U6TR",
+          "STM32C031C6U7",
+          "STM32C031C6U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C031C6T3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6T3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6T7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6T7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6U6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6U7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031C6U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ea5c2d0eff04c854d93b7e809d3549ce547a73daa4c55d3e326de604d86b0056",
+        "retrieved_at_utc": "2026-09-11T07:13:32Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031c6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C031C6T3",
+          "ordering_pattern": "STM32C031C6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6T3TR",
+          "ordering_pattern": "STM32C031C6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6T6",
+          "ordering_pattern": "STM32C031C6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6T6TR",
+          "ordering_pattern": "STM32C031C6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6T7",
+          "ordering_pattern": "STM32C031C6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6T7TR",
+          "ordering_pattern": "STM32C031C6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6U6",
+          "ordering_pattern": "STM32C031C6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6U6TR",
+          "ordering_pattern": "STM32C031C6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6U7",
+          "ordering_pattern": "STM32C031C6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031C6U7TR",
+          "ordering_pattern": "STM32C031C6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031c6.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C031F4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C031F4",
+        "evidence_section_sha256": "211547a1dbcdfd027efe29f2983d088cceb5655a1c4ae65154f3a0fe4f62ab15",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C031F4P6",
+          "STM32C031F4P6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031f4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C031F4P6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031F4P6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "885d099a0830779630ecff1d51f312be5b1d17ae90297046adf548c193ac4649",
+        "retrieved_at_utc": "2026-09-11T07:13:37Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031f4.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C031F4P6",
+          "ordering_pattern": "STM32C031F4Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031F4P6TR",
+          "ordering_pattern": "STM32C031F4Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031f4.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C031F6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C031F6",
+        "evidence_section_sha256": "c9b8ac76719956b32303b72600a241c36698f2e726b08bc89273ea24d8273f7c",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C031F6P6",
+          "STM32C031F6P6TR",
+          "STM32C031F6P7",
+          "STM32C031F6P7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031f6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C031F6P6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031F6P6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031F6P7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031F6P7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "caec95f1ce9556efc1bc110fc629d25b24becad65e61476fcc5a432b578bb87d",
+        "retrieved_at_utc": "2026-09-11T07:13:43Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031f6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C031F6P6",
+          "ordering_pattern": "STM32C031F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031F6P6TR",
+          "ordering_pattern": "STM32C031F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031F6P7",
+          "ordering_pattern": "STM32C031F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031F6P7TR",
+          "ordering_pattern": "STM32C031F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031f6.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C031G4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C031G4",
+        "evidence_section_sha256": "f33c88fb70c05efed751ad0f7c8b025d66233e5e61e731c87c1ec3823e6cefce",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C031G4U3",
+          "STM32C031G4U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031g4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C031G4U3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031G4U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b91cf6e98872522428c2973406855a6d5ff44941bec33fde42a09e0345a954fc",
+        "retrieved_at_utc": "2026-09-11T07:15:07Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031g4.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C031G4U3",
+          "ordering_pattern": "STM32C031G4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031G4U6",
+          "ordering_pattern": "STM32C031G4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031g4.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C031G6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C031G6",
+        "evidence_section_sha256": "662b60bc209ab4bb10659c05877e8a4e656c93f0706f2a051ced44d886c4bc54",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C031G6U3",
+          "STM32C031G6U3TR",
+          "STM32C031G6U6",
+          "STM32C031G6U6TR",
+          "STM32C031G6U7",
+          "STM32C031G6U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031g6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C031G6U3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031G6U3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031G6U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031G6U6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031G6U7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031G6U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "65246210933dd9d4cd53a5ee95705426cccd9b54b68e7312593848ac49729df1",
+        "retrieved_at_utc": "2026-09-11T07:15:13Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031g6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C031G6U3",
+          "ordering_pattern": "STM32C031G6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031G6U3TR",
+          "ordering_pattern": "STM32C031G6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031G6U6",
+          "ordering_pattern": "STM32C031G6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031G6U6TR",
+          "ordering_pattern": "STM32C031G6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031G6U7",
+          "ordering_pattern": "STM32C031G6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031G6U7TR",
+          "ordering_pattern": "STM32C031G6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031g6.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C031K4",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C031K4",
+        "evidence_section_sha256": "ce38d7797ca36408bef4ce02ea32fb2974814d808ae610a44a31f0b5cec45c75",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C031K4T6",
+          "STM32C031K4T7",
+          "STM32C031K4T7TR",
+          "STM32C031K4U6",
+          "STM32C031K4U6TR",
+          "STM32C031K4U7",
+          "STM32C031K4U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k4.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C031K4T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K4T7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K4T7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K4U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K4U6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K4U7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K4U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "4188c16dbebe27c5d1092219c64941986b21a8bb5473ae45673e207fe1a0c311",
+        "retrieved_at_utc": "2026-09-11T07:15:19Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k4.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C031K4T6",
+          "ordering_pattern": "STM32C031K4Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K4T7",
+          "ordering_pattern": "STM32C031K4Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K4T7TR",
+          "ordering_pattern": "STM32C031K4Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K4U6",
+          "ordering_pattern": "STM32C031K4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K4U6TR",
+          "ordering_pattern": "STM32C031K4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K4U7",
+          "ordering_pattern": "STM32C031K4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K4U7TR",
+          "ordering_pattern": "STM32C031K4Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k4.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C031K6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C031K6",
+        "evidence_section_sha256": "a50f40910c5fd89876c148f80f80582218de676fdaa337480c59ce1826f60aea",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C031K6T3",
+          "STM32C031K6T3TR",
+          "STM32C031K6T6",
+          "STM32C031K6T7",
+          "STM32C031K6T7TR",
+          "STM32C031K6U3TR",
+          "STM32C031K6U6",
+          "STM32C031K6U6TR",
+          "STM32C031K6U7",
+          "STM32C031K6U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C031K6T3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6T3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6T7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6T7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6U3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6U6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6U7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C031K6U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "effbc6b27af8367061f54541bbeb79cf0311020763ee15873fc97fa6e9107e8f",
+        "retrieved_at_utc": "2026-09-11T07:15:24Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C031K6T3",
+          "ordering_pattern": "STM32C031K6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6T3TR",
+          "ordering_pattern": "STM32C031K6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6T6",
+          "ordering_pattern": "STM32C031K6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6T7",
+          "ordering_pattern": "STM32C031K6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6T7TR",
+          "ordering_pattern": "STM32C031K6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6U3TR",
+          "ordering_pattern": "STM32C031K6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6U6",
+          "ordering_pattern": "STM32C031K6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6U6TR",
+          "ordering_pattern": "STM32C031K6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6U7",
+          "ordering_pattern": "STM32C031K6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C031K6U7TR",
+          "ordering_pattern": "STM32C031K6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c031k6.html",
+      "subfamily": "STM32C031"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C051C6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C051C6",
+        "evidence_section_sha256": "8a2bb3d236186527c61857de43d4b89ad9d8eeb5acd02eeed9197e3074dca5af",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C051C6T6",
+          "STM32C051C6U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051c6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C051C6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051C6U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3990ffc3c25dc72667c72797b64273256e63930aaa988f01b2e1996376d32b23",
+        "retrieved_at_utc": "2026-09-11T07:15:29Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051c6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C051C6T6",
+          "ordering_pattern": "STM32C051C6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051C6U6",
+          "ordering_pattern": "STM32C051C6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051c6.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C051C8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C051C8",
+        "evidence_section_sha256": "17c65359b333bfd1f0122c59e4f9c9729afd2997a7cafcb0640e0da57a081c48",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C051C8T6",
+          "STM32C051C8T6TR",
+          "STM32C051C8T7",
+          "STM32C051C8T7TR",
+          "STM32C051C8U6",
+          "STM32C051C8U6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C051C8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051C8T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051C8T7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051C8T7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051C8U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051C8U6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3763487f279e63f4fdd6cfe80fa5f823db1b268fbe3f8effb1fbfbfc36b33fd5",
+        "retrieved_at_utc": "2026-09-11T07:23:05Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051c8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C051C8T6",
+          "ordering_pattern": "STM32C051C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051C8T6TR",
+          "ordering_pattern": "STM32C051C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051C8T7",
+          "ordering_pattern": "STM32C051C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051C8T7TR",
+          "ordering_pattern": "STM32C051C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051C8U6",
+          "ordering_pattern": "STM32C051C8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051C8U6TR",
+          "ordering_pattern": "STM32C051C8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051c8.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C051F6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C051F6",
+        "evidence_section_sha256": "b8be251a3ecbb4124aeefc5f220820d131909f8b565df34e5847f0ec05b74c62",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C051F6P6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051f6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C051F6P6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "5f153a125b00d556b6b48df08cb63caae48080c25535b0e699cfe35d4ebf7009",
+        "retrieved_at_utc": "2026-09-11T07:23:10Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051f6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C051F6P6",
+          "ordering_pattern": "STM32C051F6Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051f6.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C051F8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C051F8",
+        "evidence_section_sha256": "c021f77e82ce5d445912a9810f0fe8359b513062c6746b8aaa7bf95cd3bd3996",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C051F8P6",
+          "STM32C051F8P6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051f8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C051F8P6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051F8P6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "bdcebdab0fc166fb6a85de1bb3dd1d1eb92584188b0f76ac9ab3a50e4246ca01",
+        "retrieved_at_utc": "2026-09-11T07:23:15Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051f8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C051F8P6",
+          "ordering_pattern": "STM32C051F8Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051F8P6TR",
+          "ordering_pattern": "STM32C051F8Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051f8.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C051G6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C051G6",
+        "evidence_section_sha256": "91793d9a7fbcbda202dd4a1c663f16c10e5c6c4d0f8961b262907fa40055df5a",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C051G6U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051g6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C051G6U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "be3466986c7f5b4fd78d82f3c9cbea34e0bd69322d99d72389396b99352620d4",
+        "retrieved_at_utc": "2026-09-11T07:23:21Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051g6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C051G6U6",
+          "ordering_pattern": "STM32C051G6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051g6.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C051G8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C051G8",
+        "evidence_section_sha256": "9814be10e5b3ecba8813c212f7b9f9a6816b4c33b53fea5f795202d98411d033",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C051G8U6",
+          "STM32C051G8U6TR",
+          "STM32C051G8U7",
+          "STM32C051G8U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051g8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C051G8U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051G8U6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051G8U7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051G8U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "608c9a3cacd3f89c722e71f7911da8711479a2bc1d470fd2484171355bb08cba",
+        "retrieved_at_utc": "2026-09-11T07:23:26Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051g8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C051G8U6",
+          "ordering_pattern": "STM32C051G8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051G8U6TR",
+          "ordering_pattern": "STM32C051G8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051G8U7",
+          "ordering_pattern": "STM32C051G8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051G8U7TR",
+          "ordering_pattern": "STM32C051G8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051g8.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C051K6",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C051K6",
+        "evidence_section_sha256": "a94076c9464a953891c2e41463bbe9ea5f8cd18dbda84ecea49e9ec692afca74",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C051K6T6",
+          "STM32C051K6U6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051k6.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C051K6T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051K6U6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "720488c46f62adf3f5934eadb450849b185e6bc3bf985b73df0cfa8aed162751",
+        "retrieved_at_utc": "2026-09-11T07:23:31Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051k6.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C051K6T6",
+          "ordering_pattern": "STM32C051K6Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051K6U6",
+          "ordering_pattern": "STM32C051K6Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051k6.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C051K8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C051K8",
+        "evidence_section_sha256": "e0fc0c8f0c611ecb2a7a2302ea9d0ba0bde11464a91ec0e9b802a8ac6a88ce3f",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C051K8T6",
+          "STM32C051K8T6TR",
+          "STM32C051K8U3",
+          "STM32C051K8U3TR",
+          "STM32C051K8U6",
+          "STM32C051K8U6TR",
+          "STM32C051K8U7",
+          "STM32C051K8U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051k8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C051K8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051K8T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051K8U3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051K8U3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051K8U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051K8U6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051K8U7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C051K8U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "8cc3f84da5273fdf5fe3556156ca9d7812b1fd00c608ff24deba42f8c7b1e994",
+        "retrieved_at_utc": "2026-09-11T07:23:37Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051k8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unmapped"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C051K8T6",
+          "ordering_pattern": "STM32C051K8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051K8T6TR",
+          "ordering_pattern": "STM32C051K8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C051K8U3",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C051K8U3TR",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C051K8U6",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C051K8U6TR",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C051K8U7",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C051K8U7TR",
+          "status": "unmapped"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c051k8.html",
+      "subfamily": "STM32C051"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071C8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071C8",
+        "evidence_section_sha256": "9752d86f2da3cc74c456f2eff006f0b7337f4e657f5834dc281c8a76fb7d3546",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071C8T3",
+          "STM32C071C8T3TR",
+          "STM32C071C8T6",
+          "STM32C071C8T6N",
+          "STM32C071C8T6TR",
+          "STM32C071C8U6",
+          "STM32C071C8U6N"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071c8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071C8T3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071C8T3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071C8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071C8T6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071C8T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071C8U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071C8U6N",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "4500d3be2857ae8bb676f9d8d9a791cef7f87c755e0f6658c059ec60d4163375",
+        "retrieved_at_utc": "2026-09-11T07:23:41Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071c8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071C8T3",
+          "ordering_pattern": "STM32C071C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071C8T3TR",
+          "ordering_pattern": "STM32C071C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071C8T6",
+          "ordering_pattern": "STM32C071C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071C8T6N",
+          "ordering_pattern": "STM32C071C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071C8T6TR",
+          "ordering_pattern": "STM32C071C8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071C8U6",
+          "ordering_pattern": "STM32C071C8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071C8U6N",
+          "ordering_pattern": "STM32C071C8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071c8.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071CB",
+        "evidence_section_sha256": "1d83c2101b16e4910dae05063ec3fa52d50dd38cd4737e0da3e4fbb4567cc1b9",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071CBT3",
+          "STM32C071CBT3TR",
+          "STM32C071CBT6",
+          "STM32C071CBT6N",
+          "STM32C071CBT6NTR",
+          "STM32C071CBT7",
+          "STM32C071CBT7TR",
+          "STM32C071CBU6",
+          "STM32C071CBU6N",
+          "STM32C071CBU6TR",
+          "STM32C071CBU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071CBT3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBT3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBT6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBT6NTR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBT7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBT7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBU6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071CBU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "eef1f1b8c9c949d0ee65362696284ac35cc94fb7f749180ca818ab5b197ad3f9",
+        "retrieved_at_utc": "2026-09-11T07:23:52Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071cb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071CBT3",
+          "ordering_pattern": "STM32C071CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBT3TR",
+          "ordering_pattern": "STM32C071CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBT6",
+          "ordering_pattern": "STM32C071CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBT6N",
+          "ordering_pattern": "STM32C071CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBT6NTR",
+          "ordering_pattern": "STM32C071CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBT7",
+          "ordering_pattern": "STM32C071CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBT7TR",
+          "ordering_pattern": "STM32C071CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBU6",
+          "ordering_pattern": "STM32C071CBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBU6N",
+          "ordering_pattern": "STM32C071CBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBU6TR",
+          "ordering_pattern": "STM32C071CBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071CBU7",
+          "ordering_pattern": "STM32C071CBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071cb.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071F8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071F8",
+        "evidence_section_sha256": "05f8c6222bbdfd04c5df7dafa1c7cf545f2c1f2899df61da4a0c4e31203e4462",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071F8P6",
+          "STM32C071F8P6N",
+          "STM32C071F8P6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071f8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071F8P6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071F8P6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071F8P6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "b88983a2d642113da05c98c9b1d0139ccaae794d0221b6267b5ef78a6a52174b",
+        "retrieved_at_utc": "2026-09-11T07:25:17Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071f8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071F8P6",
+          "ordering_pattern": "STM32C071F8Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071F8P6N",
+          "ordering_pattern": "STM32C071F8Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071F8P6TR",
+          "ordering_pattern": "STM32C071F8Px",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071f8.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071FB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071FB",
+        "evidence_section_sha256": "317bc4b7341ebca808f8226954b976326bc7522d7f88f40a88c1e48cc2838663",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071FBP6",
+          "STM32C071FBP6N",
+          "STM32C071FBP6NTR",
+          "STM32C071FBP6TR",
+          "STM32C071FBP7",
+          "STM32C071FBP7TR",
+          "STM32C071FBY6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071fb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071FBP6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071FBP6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071FBP6NTR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071FBP6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071FBP7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071FBP7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071FBY6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "eb0ee20076eb0b6cf86366b55dac21839cc8e87b89165cc53d7a92bcd68bb1bd",
+        "retrieved_at_utc": "2026-09-11T07:25:27Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071fb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unmapped"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071FBP6",
+          "ordering_pattern": "STM32C071FBPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071FBP6N",
+          "ordering_pattern": "STM32C071FBPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071FBP6NTR",
+          "ordering_pattern": "STM32C071FBPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071FBP6TR",
+          "ordering_pattern": "STM32C071FBPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071FBP7",
+          "ordering_pattern": "STM32C071FBPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071FBP7TR",
+          "ordering_pattern": "STM32C071FBPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071FBY6TR",
+          "status": "unmapped"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071fb.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071G8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071G8",
+        "evidence_section_sha256": "91c4a86fa3546568b40537935ad61d149d196165903e0f68de9daaf4ea3258b7",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071G8U6",
+          "STM32C071G8U6N",
+          "STM32C071G8U6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071g8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071G8U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071G8U6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071G8U6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "55433d5d960abd5140d6d82b307008273c1a1b87accd16a021d4efbbad68631c",
+        "retrieved_at_utc": "2026-09-11T07:25:36Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071g8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071G8U6",
+          "ordering_pattern": "STM32C071G8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071G8U6N",
+          "ordering_pattern": "STM32C071G8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071G8U6TR",
+          "ordering_pattern": "STM32C071G8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071g8.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071GB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071GB",
+        "evidence_section_sha256": "82f7545187344f78515d1943d0010d61b305abb50fcbf0a8c4e9a2ed4251248c",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071GBU3TR",
+          "STM32C071GBU6",
+          "STM32C071GBU6N"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071gb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071GBU3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071GBU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071GBU6N",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "3797f62bcea99f1788ebec1fd045f57259ca74d1faa086a243d000b69aeeb3a4",
+        "retrieved_at_utc": "2026-09-11T07:33:35Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071gb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071GBU3TR",
+          "ordering_pattern": "STM32C071GBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071GBU6",
+          "ordering_pattern": "STM32C071GBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071GBU6N",
+          "ordering_pattern": "STM32C071GBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071gb.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071K8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071K8",
+        "evidence_section_sha256": "24b829bc22fe5d8a206f2e798e137ba397a38a178c927c9be5a7708e8f1d48a0",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071K8T3",
+          "STM32C071K8T3TR",
+          "STM32C071K8T6",
+          "STM32C071K8T6N",
+          "STM32C071K8T6TR",
+          "STM32C071K8U3",
+          "STM32C071K8U3TR",
+          "STM32C071K8U6",
+          "STM32C071K8U6N",
+          "STM32C071K8U7",
+          "STM32C071K8U7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071k8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071K8T3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8T3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8T6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8T6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8U3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8U3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8U6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8U6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8U7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071K8U7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "68170bef169c001b9cb31cf5f2d91757554eba17c45297a7be17ff5a42063c12",
+        "retrieved_at_utc": "2026-09-11T07:33:41Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071k8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071K8T3",
+          "ordering_pattern": "STM32C071K8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8T3TR",
+          "ordering_pattern": "STM32C071K8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8T6",
+          "ordering_pattern": "STM32C071K8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8T6N",
+          "ordering_pattern": "STM32C071K8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8T6TR",
+          "ordering_pattern": "STM32C071K8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8U3",
+          "ordering_pattern": "STM32C071K8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8U3TR",
+          "ordering_pattern": "STM32C071K8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8U6",
+          "ordering_pattern": "STM32C071K8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8U6N",
+          "ordering_pattern": "STM32C071K8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8U7",
+          "ordering_pattern": "STM32C071K8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071K8U7TR",
+          "ordering_pattern": "STM32C071K8Ux",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071k8.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071KB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071KB",
+        "evidence_section_sha256": "1cb55f7bfa66ed6511162940056c56b0b7857b2ddbb2536a4e93c1e7390b8e14",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071KBT3",
+          "STM32C071KBT6",
+          "STM32C071KBT6N",
+          "STM32C071KBT6NTR",
+          "STM32C071KBU6",
+          "STM32C071KBU6N",
+          "STM32C071KBU7",
+          "STM32C071KBU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071kb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071KBT3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071KBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071KBT6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071KBT6NTR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071KBU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071KBU6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071KBU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071KBU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "473bbb6f2cb8e24a3cdce56dca9121c4e9167bee3b37701917c003e065bdd803",
+        "retrieved_at_utc": "2026-09-11T07:35:07Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071kb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071KBT3",
+          "ordering_pattern": "STM32C071KBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071KBT6",
+          "ordering_pattern": "STM32C071KBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071KBT6N",
+          "ordering_pattern": "STM32C071KBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071KBT6NTR",
+          "ordering_pattern": "STM32C071KBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071KBU6",
+          "ordering_pattern": "STM32C071KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071KBU6N",
+          "ordering_pattern": "STM32C071KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071KBU7",
+          "ordering_pattern": "STM32C071KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071KBU7TR",
+          "ordering_pattern": "STM32C071KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071kb.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071R8",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071R8",
+        "evidence_section_sha256": "54d7e25e851b131a87ede5473883b6dd0be28faa078f70c50f38347b4506db8e",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071R8I6N",
+          "STM32C071R8T3",
+          "STM32C071R8T6",
+          "STM32C071R8T6N",
+          "STM32C071R8T6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071r8.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071R8I6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071R8T3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071R8T6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071R8T6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071R8T6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "c082ec8e51bd5d307094c26adcf01052d3068f64ef87c071072f07a78e90e2a5",
+        "retrieved_at_utc": "2026-09-11T07:35:17Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071r8.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unmapped"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071R8I6N",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C071R8T3",
+          "ordering_pattern": "STM32C071R8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071R8T6",
+          "ordering_pattern": "STM32C071R8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071R8T6N",
+          "ordering_pattern": "STM32C071R8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071R8T6TR",
+          "ordering_pattern": "STM32C071R8Tx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071r8.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C071RB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C071RB",
+        "evidence_section_sha256": "7071ff0586e8e8c27845788f6a4cb9659fd551cb3747610288b2acc5009874a7",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C071RBI6N",
+          "STM32C071RBT6",
+          "STM32C071RBT6N",
+          "STM32C071RBT6TR",
+          "STM32C071RBT7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071rb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C071RBI6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071RBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071RBT6N",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071RBT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C071RBT7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "77179081e1f3408b421379967b579a7410489cc158d2a1eccd96ee4adae5dc8b",
+        "retrieved_at_utc": "2026-09-11T07:35:22Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071rb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unmapped"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C071RBI6N",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C071RBT6",
+          "ordering_pattern": "STM32C071RBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071RBT6N",
+          "ordering_pattern": "STM32C071RBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071RBT6TR",
+          "ordering_pattern": "STM32C071RBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C071RBT7",
+          "ordering_pattern": "STM32C071RBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c071rb.html",
+      "subfamily": "STM32C071"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091CB",
+        "evidence_section_sha256": "c0ecc4e81bfcd24be6f535cdf9c71a7d437e11aa5ce4ae46c47a27076ab8c180",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091CBT6",
+          "STM32C091CBU6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091CBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091CBU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "aa1575123461a08e74762a747ffe75f88524e8968a1b4e8a670ff8dac94d21cf",
+        "retrieved_at_utc": "2026-09-11T07:35:27Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091CBT6",
+          "ordering_pattern": "STM32C091CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091CBU6",
+          "ordering_pattern": "STM32C091CBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cb.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091CC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091CC",
+        "evidence_section_sha256": "60194736530092dec83315534520bf5e2daf8218214527f5764d0960e6f18f9d",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091CCT6",
+          "STM32C091CCT6TR",
+          "STM32C091CCU6",
+          "STM32C091CCU6TR",
+          "STM32C091CCU7",
+          "STM32C091CCU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091CCT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091CCT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091CCU6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091CCU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091CCU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "f8d8f4d5bfa14280988f38552a601129597af2e1d417b05d6072f5f313c44317",
+        "retrieved_at_utc": "2026-09-11T07:35:32Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091CCT6",
+          "ordering_pattern": "STM32C091CCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091CCT6TR",
+          "ordering_pattern": "STM32C091CCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091CCU6",
+          "ordering_pattern": "STM32C091CCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091CCU6TR",
+          "ordering_pattern": "STM32C091CCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091CCU7",
+          "ordering_pattern": "STM32C091CCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091CCU7TR",
+          "ordering_pattern": "STM32C091CCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cc.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091FB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091FB",
+        "evidence_section_sha256": "1eff73243b65409b76667ac8683d1ef428dce56b097e6dcf515d3a08976bdb39",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091FBP6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091fb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091FBP6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "208d8b2ec8e7e98108e054ebe20ec65b6dba215584c65b9908a22c0e99393d6c",
+        "retrieved_at_utc": "2026-09-11T07:35:37Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091fb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091FBP6",
+          "ordering_pattern": "STM32C091FBPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091fb.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091FC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091FC",
+        "evidence_section_sha256": "6ce102e58c94eb849bda79a5b5c26383e84cadc818ef717a40489c56b7dc5808",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091FCP6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091fc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091FCP6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "2804d6bd73798fa8b94dbb8fa4d99f38a3a6e4e157ac5363d15594f5c570cff5",
+        "retrieved_at_utc": "2026-09-11T07:35:42Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091fc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091FCP6",
+          "ordering_pattern": "STM32C091FCPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091fc.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091GB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091GB",
+        "evidence_section_sha256": "2df931282fc327bf4a6d49d60dd3d50f4cd06301a2447244d33b53195481a167",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091GBU6",
+          "STM32C091GBU7",
+          "STM32C091GBU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091gb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091GBU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091GBU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091GBU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e69bb82f7e3f134259aabb858549fd487c64d271dff7df5741fb6e3daeccede1",
+        "retrieved_at_utc": "2026-09-11T07:35:46Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091gb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091GBU6",
+          "ordering_pattern": "STM32C091GBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091GBU7",
+          "ordering_pattern": "STM32C091GBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091GBU7TR",
+          "ordering_pattern": "STM32C091GBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091gb.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091GC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091GC",
+        "evidence_section_sha256": "5b879e188d6cd15f6f1bd71d9acfd1814ed2dab8d8c861521e86c53677981c11",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091GCU3",
+          "STM32C091GCU3TR",
+          "STM32C091GCU6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091gc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091GCU3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091GCU3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091GCU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "899d0614c0316e5ff4e3e0232618d2ddd4d2265047c0fca7c7db5f9f5e50f3b8",
+        "retrieved_at_utc": "2026-09-11T07:35:52Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091gc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091GCU3",
+          "ordering_pattern": "STM32C091GCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091GCU3TR",
+          "ordering_pattern": "STM32C091GCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091GCU6",
+          "ordering_pattern": "STM32C091GCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091gc.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091KB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091KB",
+        "evidence_section_sha256": "496dcc558538d2dbed6d2849ca571319111940091c7dbd5e5cbe064e61825f87",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091KBT6",
+          "STM32C091KBU6"
+        ],
+        "excluded_non_active_part_numbers": [
+          {
+            "icpn": "STM32C091KBT3",
+            "marketing_status": "Preview Product is in design stage. EN"
+          }
+        ],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091kb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": false,
+            "icpn": "STM32C091KBT3",
+            "marketing_status": "Preview Product is in design stage. EN"
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091KBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091KBU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "719d5c5ea12c29d6522b6f1226274551bc4d08bf9a70ea5da91f95190d35dbf7",
+        "retrieved_at_utc": "2026-09-11T07:35:57Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091kb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091KBT6",
+          "ordering_pattern": "STM32C091KBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091KBU6",
+          "ordering_pattern": "STM32C091KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091kb.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091KC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091KC",
+        "evidence_section_sha256": "b66740b13959564d124b2e6f261b9178974fbe9e4804954ab845f2ee95d3ca3c",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091KCT6",
+          "STM32C091KCU3",
+          "STM32C091KCU3TR",
+          "STM32C091KCU6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091kc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091KCT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091KCU3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091KCU3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091KCU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "e8a214ca042bc316b6720849d23ab9b7a285a2c42ad8a7201af30d7ac215c5c1",
+        "retrieved_at_utc": "2026-09-11T07:37:19Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091kc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091KCT6",
+          "ordering_pattern": "STM32C091KCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091KCU3",
+          "ordering_pattern": "STM32C091KCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091KCU3TR",
+          "ordering_pattern": "STM32C091KCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091KCU6",
+          "ordering_pattern": "STM32C091KCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091kc.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091RB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091RB",
+        "evidence_section_sha256": "83b34a3073156b221bc24606d61f4eb59bd892a94a4154dfe542b325ba21a234",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091RBI6",
+          "STM32C091RBT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091rb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091RBI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091RBT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6b1abfe9a244b32d056971a5e958c9bbedfa4747e5bea3225befcb1ee673716a",
+        "retrieved_at_utc": "2026-09-11T07:37:24Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091rb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unmapped"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091RBI6",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C091RBT6",
+          "ordering_pattern": "STM32C091RBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091rb.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C091RC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C091RC",
+        "evidence_section_sha256": "e7cc7e8058fb73fe26dac13e662b99c947c874ef82d5e853b60b4ba8df189893",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C091RCI6",
+          "STM32C091RCI6TR",
+          "STM32C091RCT6",
+          "STM32C091RCT6TR",
+          "STM32C091RCT7",
+          "STM32C091RCT7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091rc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C091RCI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091RCI6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091RCT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091RCT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091RCT7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C091RCT7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "cc678b40f9d3730db7e01b779628adecd477bea60cf611bd31d71760deca710e",
+        "retrieved_at_utc": "2026-09-11T07:37:30Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091rc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C091RCI6",
+          "ordering_pattern": "STM32C091RCIx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091RCI6TR",
+          "ordering_pattern": "STM32C091RCIx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091RCT6",
+          "ordering_pattern": "STM32C091RCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091RCT6TR",
+          "ordering_pattern": "STM32C091RCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091RCT7",
+          "ordering_pattern": "STM32C091RCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C091RCT7TR",
+          "ordering_pattern": "STM32C091RCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091rc.html",
+      "subfamily": "STM32C091"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092CB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092CB",
+        "evidence_section_sha256": "bb0e138468de3311e9d05f688a7ad29c2cee974563f0c5114ce5661661beed00",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092CBT6",
+          "STM32C092CBU6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092CBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092CBU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "6d59b4745180d81c6f1afc2a1952ad8174bb15bc3eaa43e5b324596251337abe",
+        "retrieved_at_utc": "2026-09-11T07:37:34Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092CBT6",
+          "ordering_pattern": "STM32C092CBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092CBU6",
+          "ordering_pattern": "STM32C092CBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cb.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092CC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092CC",
+        "evidence_section_sha256": "feed63e0372915096c78067fdb804520ff5ee30b5bc49bde641dbc6a1a2a4a1f",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092CCT3",
+          "STM32C092CCT3TR",
+          "STM32C092CCT6",
+          "STM32C092CCT6TR",
+          "STM32C092CCT7",
+          "STM32C092CCT7TR",
+          "STM32C092CCU6",
+          "STM32C092CCU6TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092CCT3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092CCT3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092CCT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092CCT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092CCT7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092CCT7TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092CCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092CCU6TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "d65c9f3c5eea5eec00371958adf7207f95f5cae14632eb4f72664b2c58dc3c9b",
+        "retrieved_at_utc": "2026-09-11T07:37:40Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092CCT3",
+          "ordering_pattern": "STM32C092CCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092CCT3TR",
+          "ordering_pattern": "STM32C092CCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092CCT6",
+          "ordering_pattern": "STM32C092CCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092CCT6TR",
+          "ordering_pattern": "STM32C092CCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092CCT7",
+          "ordering_pattern": "STM32C092CCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092CCT7TR",
+          "ordering_pattern": "STM32C092CCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092CCU6",
+          "ordering_pattern": "STM32C092CCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092CCU6TR",
+          "ordering_pattern": "STM32C092CCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cc.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092FB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092FB",
+        "evidence_section_sha256": "f1f8b2cd44c3c8cf6f8e014868fb801590a0022f3884d80eaf3a23410f0c71e8",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092FBP6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092fb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092FBP6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "ee5f020dcdfaadc449b4a00272e03fcdf6c05824bac75b90afb07b816894ebf7",
+        "retrieved_at_utc": "2026-09-11T07:37:45Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092fb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092FBP6",
+          "ordering_pattern": "STM32C092FBPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092fb.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092FC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092FC",
+        "evidence_section_sha256": "5baa868ab37b1e0c734e27237429f7952e1f3137deb8053133bb5f6dc4ac726e",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092FCP6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092fc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092FCP6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "87aa15360fa05625bf13d55205e8cab69ed12961139d38491f75510e24189bed",
+        "retrieved_at_utc": "2026-09-11T07:37:50Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092fc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092FCP6",
+          "ordering_pattern": "STM32C092FCPx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092fc.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092GB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092GB",
+        "evidence_section_sha256": "0b357627fcd6f9a3d2b9539051eeff1a8101b816aa5133f613f02ab333f10b72",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092GBU6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092gb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092GBU6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "40bb93b699a56a07d304f07e02f4c7841e73fd1663d2c41658fc05c2d482a957",
+        "retrieved_at_utc": "2026-09-11T07:37:55Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092gb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092GBU6",
+          "ordering_pattern": "STM32C092GBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092gb.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092GC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092GC",
+        "evidence_section_sha256": "1f94006e954d68355a6c74edf11697fd4836a2102107d8b613521efb3518fdf1",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092GCU3",
+          "STM32C092GCU3TR",
+          "STM32C092GCU6",
+          "STM32C092GCU7",
+          "STM32C092GCU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092gc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092GCU3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092GCU3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092GCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092GCU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092GCU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "d7e2fcb6c41bb4e07def9e5501628830f341c043497648e222d6c83231d73f24",
+        "retrieved_at_utc": "2026-09-11T07:38:00Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092gc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092GCU3",
+          "ordering_pattern": "STM32C092GCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092GCU3TR",
+          "ordering_pattern": "STM32C092GCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092GCU6",
+          "ordering_pattern": "STM32C092GCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092GCU7",
+          "ordering_pattern": "STM32C092GCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092GCU7TR",
+          "ordering_pattern": "STM32C092GCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092gc.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092KB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092KB",
+        "evidence_section_sha256": "00b6c49afd70fccb6b7a9f2c1470c7c7f8c8f492622f01c41a61768ab9d41355",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092KBT6",
+          "STM32C092KBU3",
+          "STM32C092KBU3TR",
+          "STM32C092KBU6",
+          "STM32C092KBU7"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092kb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092KBT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KBU3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KBU3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KBU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KBU7",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "bfa94608e11568724ee97133eaa154090f847ffabb2bba5d1607977bb8d7b470",
+        "retrieved_at_utc": "2026-09-11T07:38:05Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092kb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092KBT6",
+          "ordering_pattern": "STM32C092KBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KBU3",
+          "ordering_pattern": "STM32C092KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KBU3TR",
+          "ordering_pattern": "STM32C092KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KBU6",
+          "ordering_pattern": "STM32C092KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KBU7",
+          "ordering_pattern": "STM32C092KBUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092kb.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092KC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092KC",
+        "evidence_section_sha256": "2f0ac3eac41b7df6ac50d058a2c841c76e164c515bdcc52b20b4eb274e79d724",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092KCT6",
+          "STM32C092KCU3",
+          "STM32C092KCU3TR",
+          "STM32C092KCU6",
+          "STM32C092KCU7",
+          "STM32C092KCU7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092kc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092KCT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KCU3",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KCU3TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KCU6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KCU7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092KCU7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "926b33b1375a1e6947bbfe27ec2d7d064f66db04ff8fef827ffa180a5b636e5d",
+        "retrieved_at_utc": "2026-09-11T07:38:10Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092kc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092KCT6",
+          "ordering_pattern": "STM32C092KCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KCU3",
+          "ordering_pattern": "STM32C092KCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KCU3TR",
+          "ordering_pattern": "STM32C092KCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KCU6",
+          "ordering_pattern": "STM32C092KCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KCU7",
+          "ordering_pattern": "STM32C092KCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092KCU7TR",
+          "ordering_pattern": "STM32C092KCUx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092kc.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092RB",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092RB",
+        "evidence_section_sha256": "a343016e5302b625d58d966e5e379bdd3fbb0768f8c1a953ba277529022f7c19",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092RBI6",
+          "STM32C092RBT6"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092rb.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092RBI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092RBT6",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "05ea8310515a6d827d3d634088651cb8a86488d66879d3824239869ee69ba6e7",
+        "retrieved_at_utc": "2026-09-11T07:38:15Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092rb.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unmapped"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092RBI6",
+          "status": "unmapped"
+        },
+        {
+          "icpn": "STM32C092RBT6",
+          "ordering_pattern": "STM32C092RBTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092rb.html",
+      "subfamily": "STM32C092"
+    },
+    {
+      "acquisition_status": "success",
+      "base_device": "STM32C092RC",
+      "commercial_identity_status": "verified_active",
+      "disposition": "active_candidates",
+      "evidence": {
+        "acquisition_transport": "chromium_rendered_dom",
+        "base_device": "STM32C092RC",
+        "evidence_section_sha256": "94a74e564b9d351aadbf37db39c34a299c72716a52fafd30dd07272521d2ed11",
+        "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+        "exact_icpns": [
+          "STM32C092RCI6",
+          "STM32C092RCT6",
+          "STM32C092RCT6TR",
+          "STM32C092RCT7",
+          "STM32C092RCT7TR"
+        ],
+        "excluded_non_active_part_numbers": [],
+        "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092rc.html",
+        "http_etag": null,
+        "http_last_modified": null,
+        "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+        "parser_version": 2,
+        "part_number_records": [
+          {
+            "active": true,
+            "icpn": "STM32C092RCI6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092RCT6",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092RCT6TR",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092RCT7",
+            "marketing_status": "Active Product is in volume production."
+          },
+          {
+            "active": true,
+            "icpn": "STM32C092RCT7TR",
+            "marketing_status": "Active Product is in volume production."
+          }
+        ],
+        "rendered_dom_sha256": "571fef228b57ce717aa520da501741cca898c41df21b610e67edbfba8425e525",
+        "retrieved_at_utc": "2026-09-11T07:39:36Z",
+        "schema_version": 1,
+        "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092rc.html"
+      },
+      "manual_intervention_required": false,
+      "openocd_routing": {
+        "gates_commercial_identity": false,
+        "status": "unique"
+      },
+      "routing_observations": [
+        {
+          "icpn": "STM32C092RCI6",
+          "ordering_pattern": "STM32C092RCIx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092RCT6",
+          "ordering_pattern": "STM32C092RCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092RCT6TR",
+          "ordering_pattern": "STM32C092RCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092RCT7",
+          "ordering_pattern": "STM32C092RCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        },
+        {
+          "icpn": "STM32C092RCT7TR",
+          "ordering_pattern": "STM32C092RCTx",
+          "status": "unique",
+          "target_config": "tcl/target/stm32c0x.cfg"
+        }
+      ],
+      "selection_reason": "deterministic unique Base Device collapsed from frozen C0.1 ordering-pattern surface",
+      "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092rc.html",
+      "subfamily": "STM32C092"
+    }
+  ],
+  "routing_followup_required": 6,
+  "schema_version": 1,
+  "scope": "bounded read-only official-ST STM32C0 commercial identity/lifecycle discovery",
+  "source_unavailable_exclusions": 0
+}

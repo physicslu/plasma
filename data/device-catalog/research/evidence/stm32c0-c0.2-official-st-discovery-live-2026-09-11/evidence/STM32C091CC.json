@@ -1,0 +1,56 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C091CC",
+  "evidence_section_sha256": "60194736530092dec83315534520bf5e2daf8218214527f5764d0960e6f18f9d",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C091CCT6",
+    "STM32C091CCT6TR",
+    "STM32C091CCU6",
+    "STM32C091CCU6TR",
+    "STM32C091CCU7",
+    "STM32C091CCU7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C091CCT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C091CCT6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C091CCU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C091CCU6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C091CCU7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C091CCU7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "f8d8f4d5bfa14280988f38552a601129597af2e1d417b05d6072f5f313c44317",
+  "retrieved_at_utc": "2026-09-11T07:35:32Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c091cc.html"
+}

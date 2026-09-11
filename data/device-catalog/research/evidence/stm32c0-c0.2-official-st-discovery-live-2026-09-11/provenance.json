@@ -1,0 +1,30 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "active_exact_icpn_candidates": 220,
+  "bounded_discovery_clean": true,
+  "browser": {
+    "browser_version": "151.0.7922.34",
+    "evidence_profile": "stm32c0_c0_2_dual_surface_v1",
+    "headless": false,
+    "playwright_version": "1.62.0"
+  },
+  "c0_1_foundation_git_blob": "59eaaa5b367ba889fe547e89b36e4ce58736e794",
+  "c0_1_foundation_sha256": "c89e8c528f80f9b199a2b153d3d40aa4af090e50c492a7c88bfa7876ce406515",
+  "canonical_admission_authorized": false,
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_identity_plus_sample_and_buy_marketing_status_exact_set_join",
+  "executed_git_sha": "64fa5800a5f495da3818a44a71d5bcf8918d16e1",
+  "family": "STM32C0",
+  "live_summary_sha256": "bbbfb5ccd7695bff2933ed87d4a45985221d6e267e5a75792be4e5a81b943612",
+  "openocd_catalog_git_blob": "0ef056e3363e20bb527590c4a4cc1cc0d7afb810",
+  "phase": "C0.2",
+  "production_manifest_git_blob": "89cbaa8807daf8f9c55bc8c1ca0bc1c05eaec1fc",
+  "production_manifest_sha256": "903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0",
+  "production_write_authorized": false,
+  "runtime_programming_support_claimed": false,
+  "schema_version": 1,
+  "source_repository": "physicslu/plasma",
+  "target_count": 50,
+  "target_manifest_sha256": "5f3ff84cf21825e132d4526b262ad5a10a2e604a5d6024633ffefed94e7cef36",
+  "workflow_run_attempt": 1,
+  "workflow_run_id": 34573244983
+}

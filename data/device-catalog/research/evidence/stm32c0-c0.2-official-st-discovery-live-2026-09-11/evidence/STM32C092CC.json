@@ -1,0 +1,68 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32C092CC",
+  "evidence_section_sha256": "feed63e0372915096c78067fdb804520ff5ee30b5bc49bde641dbc6a1a2a4a1f",
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "exact_icpns": [
+    "STM32C092CCT3",
+    "STM32C092CCT3TR",
+    "STM32C092CCT6",
+    "STM32C092CCT6TR",
+    "STM32C092CCT7",
+    "STM32C092CCT7TR",
+    "STM32C092CCU6",
+    "STM32C092CCU6TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cc.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32c0_c0_2_dual_surface_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32C092CCT3",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092CCT3TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092CCT6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092CCT6TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092CCT7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092CCT7TR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092CCU6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32C092CCU6TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "d65c9f3c5eea5eec00371958adf7207f95f5cae14632eb4f72664b2c58dc3c9b",
+  "retrieved_at_utc": "2026-09-11T07:37:40Z",
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32c092cc.html"
+}
