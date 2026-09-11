@@ -16,7 +16,11 @@ Exact ICPN
        -> Programming Profile
        -> Memory Geometry Profile
        -> OpenOCD target identity
-  -> OpenOCDPlanCompiler
+  -> Operation Admission
+  -> CompilerRegistry
+       -> compiler_id
+       -> backend_id + backend_lock_digest
+  -> vendor/backend-specific plan compiler
   -> OpenOCDExecutionPlan
   -> software executor validation where applicable
   -> runtime-readiness gate
@@ -29,7 +33,7 @@ This contract proves the transformation from support knowledge to backend-specif
 
 An additional Gate 1 candidate compiler exists for exact target `MKL25Z128VLK4`. It is reachable only through explicitly supplied candidate profiles and an injected fake-process executor. It is not registered in the production device catalog or production routing allowlist.
 
-The KL25 compiler admits `READ`, `VERIFY`, `PROGRAM`, and one exact `ERASE_SECTOR` request. It requires an explicitly injected, digest-valid operation-admission artifact and binds each plan to that artifact's canonical-specification digest and pinned OpenOCD backend digest. It pins `target/kl25.cfg` and the reviewed OpenOCD source revision. PROGRAM has no implicit erase, requires a four-byte-aligned start address, permits the backend-documented padded image tail, and rejects any range intersecting the Flash Configuration Field. ERASE_SECTOR requires one aligned 1 KiB sector and rejects the sector containing that field. Mass erase, security changes, unprotect, configuration-field programming, and other implicit destructive flows remain blocked.
+The compiler registry admits `READ`, `VERIFY`, `PROGRAM`, and one exact `ERASE_SECTOR` request for KL25 candidates by requiring the generic operation row to be `ADMITTED` and to match the registered compiler, backend, and backend lock. The selected KL25 compiler then owns only KL25 plan semantics. It pins `target/kl25.cfg` and the reviewed OpenOCD source revision. PROGRAM has no implicit erase, requires a four-byte-aligned start address, permits the backend-documented padded image tail, and rejects any range intersecting the Flash Configuration Field. ERASE_SECTOR requires one aligned 1 KiB sector and rejects the sector containing that field. Mass erase, security changes, unprotect, configuration-field programming, and other implicit destructive flows remain blocked.
 
 The compiler supports the evidence-backed Programming Profile:
 

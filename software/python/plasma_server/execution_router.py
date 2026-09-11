@@ -10,6 +10,12 @@ from plasma_core.models import ExecutionOutput, JobRequest
 from plasma_handlers.base import BaseHandler, StageCallback
 from plasma_handlers.programming import ProgrammingOperationHandler
 from plasma_interfaces.base import BaseInterface
+from plasma_interfaces.compiler_registry import (
+    CompilerBinding,
+    CompilerRegistry,
+    OperationAdmission,
+)
+from plasma_interfaces.kl25_openocd_plan import KL25OpenOCDPlanCompiler
 from plasma_interfaces.openocd_plan import (
     OPENOCD_PLAN_PROGRAMMING_PROFILES,
     OpenOCDPlanCompiler,
@@ -22,6 +28,58 @@ MOCK_ROUTE = "mock_workflow"
 OPENOCD_ROUTE = "openocd"
 PLASMA_NATIVE_ROUTE = "plasma_native"
 ROUTABLE_PROGRAMMING_PROFILES = OPENOCD_PLAN_PROGRAMMING_PROFILES
+STM32_COMPILER_ID = "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler"
+STM32_BACKEND_ID = "stm32f103c-openocd-backend-v1"
+STM32_BACKEND_LOCK_DIGEST = "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411"
+KL25_COMPILER_ID = "plasma_interfaces.kl25_openocd_plan.KL25OpenOCDPlanCompiler"
+KL25_BACKEND_ID = "nxp-kl25-openocd-backend-v1"
+KL25_BACKEND_LOCK_DIGEST = "7628554b4b34a3587688824e95f861bcd95c792699f023e2ae5ad7880196e1c5"
+
+
+def _default_compiler_registry() -> CompilerRegistry:
+    contract_digests = {
+        "READ": "0a073d9c5ec716cc77c6b5f25c1e8af972866124ca747758d4cf96cc2ebbed55",
+        "VERIFY": "bce2403bc5132c6d7c0ccbd23fcbdda7098b8d99a1286739ddce03452c17675c",
+        "PROGRAM": "124d2ceb2eefc249cb79a40f5435082d1688845e4479f1412beb05505a721d4c",
+        "ERASE": "4754a708c498fbf0e2972f77589122746cbd27a71371320517ee4ec4d50f1730",
+    }
+    targets = {
+        "STM32F103C8T6": (
+            "stm32f103c-stm32f103c8t6-operation-admission-v1",
+            "6d8a4df4d16fdac95d15274b1215f2f70ca576e7511e952e8348797190e05e28",
+            "186e24dd768343e9e924a661573ae6fc2da6c86028c37ed876b7fdab3244ef56",
+        ),
+        "STM32F103CBT6": (
+            "stm32f103c-stm32f103cbt6-operation-admission-v1",
+            "5499d74d2c7ba1246a473ce40f66590d92743797f0d3358f190669d0768b4f13",
+            "24bb3fa0e4245186d92b02b93bc2bd49f9eea9d8a0e3bb787d0bbb78e38d7b01",
+        ),
+    }
+    admissions = tuple(
+        OperationAdmission(
+            target_icpn=target,
+            request_operation=operation,
+            state="ADMITTED",
+            operation_admission_id=admission_id,
+            operation_admission_digest=admission_digest,
+            operation_contract_id=f"stm32f103c-operation-contract-{operation.lower()}-v1",
+            operation_contract_digest=contract_digests[operation],
+            canonical_admission_digest=canonical_digest,
+            backend_id=STM32_BACKEND_ID,
+            backend_lock_digest=STM32_BACKEND_LOCK_DIGEST,
+            compiler_id=STM32_COMPILER_ID,
+            hardware_runtime_ready=False,
+        )
+        for target, (admission_id, admission_digest, canonical_digest) in targets.items()
+        for operation in contract_digests
+    )
+    return CompilerRegistry(
+        bindings=(
+            CompilerBinding(STM32_COMPILER_ID, STM32_BACKEND_ID, STM32_BACKEND_LOCK_DIGEST, OpenOCDPlanCompiler()),
+            CompilerBinding(KL25_COMPILER_ID, KL25_BACKEND_ID, KL25_BACKEND_LOCK_DIGEST, KL25OpenOCDPlanCompiler()),
+        ),
+        admissions=admissions,
+    )
 
 
 class SiteExecutionRouter:
@@ -39,12 +97,12 @@ class SiteExecutionRouter:
         site: SiteConfig,
         interface: BaseInterface,
         resolver: ICSupportResolver | None,
-        openocd_plan_compiler: OpenOCDPlanCompiler | None = None,
+        compiler_registry: CompilerRegistry | None = None,
     ) -> None:
         self.site = site
         self.interface = interface
         self.resolver = resolver
-        self.openocd_plan_compiler = openocd_plan_compiler or OpenOCDPlanCompiler()
+        self.compiler_registry = compiler_registry or _default_compiler_registry()
         self._generic_handler = ProgrammingOperationHandler(interface)
         self._profile_handlers: dict[str, BaseHandler] = {
             profile_id: ProgrammingOperationHandler(interface)
@@ -136,7 +194,8 @@ class SiteExecutionRouter:
 
     def _resolve_openocd(self, request: JobRequest) -> JobRequest:
         programming_profile_id, support, support_payload = self._resolved_support(request)
-        plan = self.openocd_plan_compiler.compile(
+        selection = self.compiler_registry.select(support.icpn, request.operation)
+        plan = selection.compiler.compile(
             support,
             request,
             configured_target_config=self.site.openocd.get("target_cfg"),
@@ -148,6 +207,13 @@ class SiteExecutionRouter:
                 "mode": OPENOCD_ROUTE,
                 "selected_programming_profile_id": programming_profile_id,
                 "selected_openocd_target_config": plan.target_config,
+                "operation_admission_id": selection.admission.operation_admission_id,
+                "operation_admission_digest": selection.admission.operation_admission_digest,
+                "operation_contract_id": selection.admission.operation_contract_id,
+                "operation_contract_digest": selection.admission.operation_contract_digest,
+                "compiler_id": selection.admission.compiler_id,
+                "backend_id": selection.admission.backend_id,
+                "backend_lock_digest": selection.admission.backend_lock_digest,
                 "backend_implementation_state": "plan_compiled_not_executable",
                 "openocd_execution_plan": plan.to_dict(),
                 "hardware_runtime_ready": False,

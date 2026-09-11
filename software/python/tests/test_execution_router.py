@@ -111,6 +111,13 @@ class ExecutionRouterTests(unittest.IsolatedAsyncioTestCase):
             "stm32f1-medium-density-flash-v0",
         )
         self.assertEqual(route["selected_openocd_target_config"], "target/stm32f1x.cfg")
+        self.assertEqual(route["compiler_id"], "plasma_interfaces.openocd_plan.OpenOCDPlanCompiler")
+        self.assertEqual(route["backend_id"], "stm32f103c-openocd-backend-v1")
+        self.assertEqual(
+            route["backend_lock_digest"],
+            "041644e5e7203c0d1b679d0799d2136b1ce89c398cb5686395753e73998f4411",
+        )
+        self.assertEqual(route["operation_contract_id"], "stm32f103c-operation-contract-erase-v1")
         self.assertEqual(route["backend_implementation_state"], "plan_compiled_not_executable")
         self.assertFalse(route["hardware_runtime_ready"])
         plan = route["openocd_execution_plan"]

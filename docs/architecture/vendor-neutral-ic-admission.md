@@ -1,6 +1,6 @@
 # Vendor-neutral IC admission governance
 
-Status: **Current governance contract; no runtime integration**
+Status: **Current governance contract with compiler-registry integration**
 
 ## Purpose
 
@@ -66,8 +66,16 @@ This prevents one high-level request name from silently inheriting the semantics
 
 A backend implementation binding records an implementation identity and revision, implementation evidence references, and an opaque vendor constraint payload reference. The lock digest covers those fields. The generic validator verifies the constraint payload reference but does not parse its semantics.
 
+## Compiler registry boundary
+
+The runtime `CompilerRegistry` consumes the operation-level decision after generic package validation. It selects by `compiler_id` only when the exact target and request operation are `ADMITTED`, and it requires the selected compiler registration to match both `backend_id` and `backend_lock_digest`. Registering a compiler alone never admits an operation.
+
+Existing admitted routes carry their operation-admission, operation-contract, backend-lock, and compiler identities into the resolved route metadata before plan compilation. A compiler may also be registered for candidate use without adding its target to the Production resolver or routing profile set.
+
+Compiler selection remains separate from execution readiness. The registry passes through `hardware_runtime_ready` as admission data, while current routes continue to set runtime readiness to false and stop before hardware execution.
+
 ## Current integration boundary
 
-The v1 schemas and deterministic validator are governance infrastructure only. They are not selected by production resolution or routing code. No compiler selection, catalog record, runtime launcher, deployment job, programmable-logic component, or hardware readiness flag is changed by this framework.
+No catalog record, Production target set, runtime launcher, deployment job, programmable-logic component, or hardware readiness flag is changed by compiler-registry integration.
 
 Migration of existing target artifacts requires separate work. A migration must construct target-owned payload schemas and prove equivalence without rewriting historical evidence or review records.
