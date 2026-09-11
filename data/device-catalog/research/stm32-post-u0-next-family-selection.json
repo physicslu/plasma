@@ -1,0 +1,91 @@
+{
+  "authority_boundaries": {
+    "canonical_admission_authorized": false,
+    "flash_geometry_qualified": false,
+    "option_security_semantics_qualified": false,
+    "physical_hil_qualified": false,
+    "production_write_authorized": false,
+    "programming_algorithm_equivalence": false,
+    "programming_policy_defined": false,
+    "runtime_programming_support_claimed": false
+  },
+  "candidate_evidence": {
+    "STM32C0": {
+      "active_candidate_targets": 6,
+      "active_exact_icpns_observed": 21,
+      "commercial_identity_access_clean": true,
+      "disposition": "ordering_review_candidate",
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 0,
+      "rejected_for_future_support": false,
+      "representative_targets": 6,
+      "source_unavailable_404": 0,
+      "verified_identity_targets": 6
+    },
+    "STM32L0": {
+      "active_candidate_targets": 16,
+      "active_exact_icpns_observed": 44,
+      "commercial_identity_access_clean": true,
+      "disposition": "ordering_review_candidate",
+      "lifecycle_excluded_targets": 0,
+      "manual_review": 0,
+      "rejected_for_future_support": false,
+      "representative_targets": 16,
+      "source_unavailable_404": 0,
+      "verified_identity_targets": 16
+    },
+    "STM32L1": {
+      "active_candidate_targets": 1,
+      "active_exact_icpns_observed": 1,
+      "commercial_identity_access_clean": true,
+      "disposition": "deprioritized_for_next_family_research_due_to_lifecycle",
+      "lifecycle_excluded_targets": 3,
+      "manual_review": 0,
+      "rejected_for_future_support": false,
+      "representative_targets": 4,
+      "source_unavailable_404": 0,
+      "verified_identity_targets": 4
+    }
+  },
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_identity_plus_sample_and_buy_marketing_status_exact_set_join",
+  "current_shortlist": [
+    "STM32C0",
+    "STM32L1",
+    "STM32L0"
+  ],
+  "evidence_surface": "quality_and_reliability_identity_plus_sample_and_buy_lifecycle",
+  "inputs": {
+    "authoritative_probe_provenance_sha256": "5f9efa9f2b0b435242e608ebe6458e7c4f92efd8d93d1a69102e68bd979a09ae",
+    "authoritative_probe_summary": "data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-live-2026-09-11/probe-summary.json",
+    "authoritative_probe_summary_sha256": "1bfa9da6e6b3d020c3f643eb5d6c72ee7ee5c8aa995c66de21fa7576b79a9228",
+    "authoritative_targets_sha256": "c2b30151a5e52975562f03478c7665e16b17ac0751c06275cfd5db717d504671",
+    "authoritative_workflow_run_id": 34560484391,
+    "openocd_catalog_sha256": "43ca9f9bbd2826aef8cd147a251263255d957dd1bcac7da653905d3bf980b6a3",
+    "ordering_information_review": "data/device-catalog/research/stm32-c0-l0-post-u0-ordering-authority-review.json",
+    "ordering_information_review_sha256": "9f4bde47508100025d3d6e92813f244431a18d95cf3fc73a45de93849dddd38d",
+    "production_manifest_sha256": "903476d41997f9d20c237bccea0ee1e085fc343730e0d3740b2b82b0de0462b0",
+    "qr_only_method_diagnostic_provenance_sha256": "c57b05e2760e8f8a22409fd70a5447c91e16df64dbba9e0888ee038fa518c0d9",
+    "qr_only_method_diagnostic_summary": "data/device-catalog/research/evidence/stm32-c0-l1-l0-post-u0-qr-live-2026-09-11/probe-summary.json",
+    "qr_only_method_diagnostic_summary_sha256": "0634a3044738a19fad163e6ff013c9dab60731f4ee5678612fc3ce9b8a8918b4",
+    "qr_only_method_diagnostic_workflow_run_id": 34561677731
+  },
+  "method_findings": {
+    "authoritative_probe": "official ST Q&R exact identity joined to Sample & Buy Marketing Status only when exact Part Number sets match",
+    "qr_only_c0_timeout_is_family_evidence": false,
+    "qr_only_diagnostic": "STM32C0 pages did not co-locate Marketing Status in the Q&R surface; six C0 representatives timed out under the Q&R-only readiness rule",
+    "sample_buy_alone_is_commercial_identity_authority": false,
+    "transport_diagnostics_are_selection_evidence": false
+  },
+  "ordering_evidence_result": "equivalent_required_ordering_evidence_quality",
+  "ordering_review_candidates": [
+    "STM32C0",
+    "STM32L0"
+  ],
+  "schema_version": 1,
+  "scope": "next_family_research_only",
+  "selected_next_research_family": "STM32C0",
+  "selection_date": "2026-09-11",
+  "selection_id": "stm32-post-u0-next-family-selection-v1",
+  "selection_status": "selected_by_current_shortlist_order_after_equivalent_evidence",
+  "tie_break_policy": "current_post_u0_cross_family_prioritization_order_after_equivalent_required_evidence"
+}

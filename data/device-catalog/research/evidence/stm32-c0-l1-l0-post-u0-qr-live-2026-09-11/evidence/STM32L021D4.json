@@ -1,0 +1,52 @@
+{
+  "acquisition_transport": "chromium_rendered_dom",
+  "base_device": "STM32L021D4",
+  "commercial_identity_authority": "official_st_quality_and_reliability_exact_part_number_marketing_status",
+  "evidence_section_sha256": "f2a84962289ab373956cffd38faf97dca98a580d49e7bea310e22949a25bd42b",
+  "evidence_surface": "quality_and_reliability_part_number",
+  "exact_icpns": [
+    "STM32L021D4P6",
+    "STM32L021D4P7",
+    "STM32L021D4P7D",
+    "STM32L021D4P7DTR",
+    "STM32L021D4P7TR"
+  ],
+  "excluded_non_active_part_numbers": [],
+  "final_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021d4.html",
+  "http_etag": null,
+  "http_last_modified": null,
+  "parser_profile": "stm32_post_u0_qr_identity_v1",
+  "parser_version": 2,
+  "part_number_records": [
+    {
+      "active": true,
+      "icpn": "STM32L021D4P6",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L021D4P7",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L021D4P7D",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L021D4P7DTR",
+      "marketing_status": "Active Product is in volume production."
+    },
+    {
+      "active": true,
+      "icpn": "STM32L021D4P7TR",
+      "marketing_status": "Active Product is in volume production."
+    }
+  ],
+  "rendered_dom_sha256": "df43d3fe148282c56a59913dadea6418a4222868e7c633f9180a2a3d9e742454",
+  "retrieved_at_utc": "2026-09-11T04:33:20Z",
+  "sample_buy_is_identity_gate": false,
+  "schema_version": 1,
+  "source_url": "https://www.st.com/en/microcontrollers-microprocessors/stm32l021d4.html"
+}
