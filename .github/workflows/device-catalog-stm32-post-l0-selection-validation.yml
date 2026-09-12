@@ -1,0 +1,61 @@
+name: STM32 post-L0 next-family selection validation
+
+on:
+  pull_request:
+    paths:
+      - "data/device-catalog/research/stm32_post_l0_selection.py"
+      - "data/device-catalog/research/test_stm32_post_l0_selection.py"
+      - "data/device-catalog/research/validate_stm32_post_l0_selection.py"
+      - "data/device-catalog/research/stm32-post-l0-next-family-selection.json"
+      - "data/device-catalog/research/stm32-post-l0-production-manifest-prestate.json"
+      - "data/device-catalog/research/stm32-post-c0-next-family-selection.json"
+      - "data/device-catalog/research/stm32-l0-l4-post-c0-ordering-authority-review.json"
+      - "data/device-catalog/research/evidence/stm32-l1-l0-l4-post-c0-live-2026-09-12/**"
+      - "data/device-catalog/research/stm32_cross_family_prioritization.py"
+      - "data/device-catalog/research/openocd-parts-canonical.csv"
+      - ".github/workflows/device-catalog-stm32-post-l0-selection-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run post-L0 selection tests
+        working-directory: data/device-catalog/research
+        run: python -m unittest -v test_stm32_post_l0_selection.py
+      - name: Replay hard-locked post-L0 selection
+        working-directory: data/device-catalog/research
+        run: python validate_stm32_post_l0_selection.py
+      - name: Build deterministic selection
+        working-directory: data/device-catalog/research
+        run: python stm32_post_l0_selection.py > "$RUNNER_TEMP/stm32-post-l0-selection.json"
+      - name: Enforce zero Production writes in this transaction
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code "${{ github.event.pull_request.base.sha }}...HEAD" -- data/device-catalog/production
+      - name: Enforce research-only authority boundary
+        run: |
+          python - <<'PY'
+          import json, os
+          path = os.path.join(os.environ["RUNNER_TEMP"], "stm32-post-l0-selection.json")
+          data = json.load(open(path, encoding="utf-8"))
+          assert data["selected_next_research_family"] == "STM32L4"
+          assert data["production_prestate"] == {
+              "exact_icpns": 1272,
+              "base_devices": 392,
+              "stm32_families": 11,
+              "stm32l0_exact_icpns": 360,
+          }
+          assert data["current_shortlist"] == ["STM32L1", "STM32L4"]
+          assert set(data["authority_boundaries"].values()) == {False}
+          print("STM32 post-L0 research-only boundary: PASS")
+          PY
