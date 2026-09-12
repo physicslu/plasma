@@ -1,10 +1,10 @@
 # H015 — STM32L0 L0.3 Manufacturer-Authoritative Metadata Policy
 
-**Date:** 2026-09-12  
-**Status:** Gate 1 implementation complete; PR #513 Gate 2 candidate after final-head recheck  
-**Primary workstream:** Device Catalog / STM32L0 metadata policy  
-**Repository:** `physicslu/plasma`  
-**Branch:** `agent/device-catalog-stm32l0-phase-l03-metadata-policy`  
+**Date:** 2026-09-12
+**Status:** Gate 1 implementation complete; PR #513 Gate 2 candidate after final-head recheck
+**Primary workstream:** Device Catalog / STM32L0 metadata policy
+**Repository:** `physicslu/plasma`
+**Branch:** `agent/device-catalog-stm32l0-phase-l03-metadata-policy`
 **PR:** #513
 
 ## 1. Starting state
