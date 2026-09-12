@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: stm32l4-l42-live-retain
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   live-retain:
@@ -29,6 +29,7 @@ jobs:
 
       - name: Validate deterministic L4.2 target boundary
         run: |
+          python data/device-catalog/research/test_stm32l4_phase_l4_2_discovery.py
           python data/device-catalog/research/stm32l4_phase_l4_2_discovery.py --targets-output /tmp/l4-targets.json >/dev/null
           python - <<'PY'
           import json
@@ -159,6 +160,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$ROOT/live-summary.json" "$ROOT/targets.json" "$ROOT/provenance.json" "$ROOT/leaf-digests.json" "$ROOT/retained-manifest.json"
           git commit -m "Retain STM32L4 L4.2 official ST discovery evidence"
+          git pull --rebase origin "${{ github.ref_name }}"
           git push origin HEAD:${{ github.ref_name }}
 
       - name: Enforce bounded discovery gate
