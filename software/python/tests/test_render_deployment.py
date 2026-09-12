@@ -114,8 +114,13 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertEqual(control_station["healthCheckPath"], "/")
         control_environment = {item["key"]: item for item in control_station["envVars"]}
         self.assertEqual(control_environment["PLASMA_RENDER_PPU_ALIAS"]["value"], "swpc-ppu")
-        self.assertIs(control_environment["PLASMA_RENDER_PPU_ENDPOINT"]["sync"], False)
-        self.assertNotIn("value", control_environment["PLASMA_RENDER_PPU_ENDPOINT"])
+        for secret_key in (
+            "PLASMA_RENDER_PPU_ENDPOINT",
+            "PLASMA_RENDER_PPU_ACCESS_CLIENT_ID",
+            "PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET",
+        ):
+            self.assertIs(control_environment[secret_key]["sync"], False)
+            self.assertNotIn("value", control_environment[secret_key])
 
     def test_public_demo_uses_product_control_station_path(self) -> None:
         script = (REPOSITORY_ROOT / "scripts/render-start.sh").read_text(encoding="utf-8")
@@ -132,14 +137,16 @@ class RenderDeploymentContractTests(unittest.TestCase):
         self.assertNotIn("--static-root", script)
         self.assertNotIn("dist-render", script)
 
-    def test_control_station_lab_is_manager_only_and_requires_restricted_https_ppu_ingress(self) -> None:
+    def test_control_station_lab_is_manager_only_and_requires_managed_https_ppu_ingress(self) -> None:
         script = (REPOSITORY_ROOT / "scripts/render-control-station-start.sh").read_text(encoding="utf-8")
         self.assertIn("python -m plasma_manager.server", script)
         self.assertIn('PLASMA_CONTROL_STATION_MODE="managed"', script)
         self.assertIn('PLASMA_FLEET_UI_ENABLED="1"', script)
         self.assertIn('PLASMA_MANAGER_API_URL="http://127.0.0.1:', script)
         self.assertIn('parsed.scheme != "https"', script)
-        self.assertIn("must identify the restricted ingress root", script)
+        self.assertIn("must identify the managed PPU ingress root", script)
+        self.assertIn("PLASMA_RENDER_PPU_ACCESS_CLIENT_ID", script)
+        self.assertIn("PLASMA_RENDER_PPU_ACCESS_CLIENT_SECRET", script)
         self.assertNotIn("python -m plasma_server.server", script)
         self.assertNotIn("-m plasma_web.gateway", script)
         self.assertNotIn("--engineering-mock", script)
