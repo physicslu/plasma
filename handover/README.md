@@ -18,16 +18,17 @@ This directory contains numbered engineering handover documents intended to let 
 | [H010](H010-stm32c0-c04-admission-plan-2026-09-12.md) | 2026-09-12 | STM32C0 C0.4 exact-ICPN read-only capability/admission plan | Superseded by H011 | Retain as C0.4 history |
 | [H011](H011-stm32c0-c05-publication-2026-09-12.md) | 2026-09-12 | STM32C0 C0.5 controlled publication of 209 capability-admittable exact ICPNs | Superseded by H012; PR #503 merged | Retain as C0.5 publication history |
 | [H012](H012-stm32-post-c0-evidence-selection-2026-09-12.md) | 2026-09-12 | Post-C0 L1/L0/L4 official-ST evidence comparison and deterministic STM32L0 selection | Complete; PR #504 merged | Retain as next-family selection history |
-| [H013](H013-stm32l0-l01-foundation-2026-09-12.md) | 2026-09-12 | STM32L0 L0.1 bounded research foundation | Complete; PR #506 merged | Retain as L0.1 foundation history; use H014/H015 |
-| [H014](H014-stm32l0-l02-commercial-discovery-2026-09-12.md) | 2026-09-12 | STM32L0 L0.2 manufacturer-authoritative commercial discovery | Complete; PR #509 merged | Retain as L0.2 discovery history; use H015 |
-| [H015](H015-stm32l0-l03-metadata-policy-2026-09-12.md) | 2026-09-12 | STM32L0 L0.3 manufacturer-authoritative metadata policy | Current; PR #513 Gate 2 candidate | Recheck final head/main/CI/reviews, then obtain Gate 2 merge approval |
+| [H013](H013-stm32l0-l01-foundation-2026-09-12.md) | 2026-09-12 | STM32L0 L0.1 bounded research foundation | Complete; PR #506 merged | Retain as L0.1 foundation history; use H014/H015/H016 |
+| [H014](H014-stm32l0-l02-commercial-discovery-2026-09-12.md) | 2026-09-12 | STM32L0 L0.2 manufacturer-authoritative commercial discovery | Complete; PR #509 merged | Retain as L0.2 discovery history; use H015/H016 |
+| [H015](H015-stm32l0-l03-metadata-policy-2026-09-12.md) | 2026-09-12 | STM32L0 L0.3 manufacturer-authoritative metadata policy | Complete; PR #513 merged | Retain as L0.3 metadata history; use H016 |
+| [H016](H016-stm32l0-l04-admission-plan-2026-09-12.md) | 2026-09-12 | STM32L0 L0.4 read-only capability/admission plan | Current; PR #515 Gate 2 candidate | Recheck final head/main/CI/reviews, then obtain Gate 2 merge approval |
 
 ## Usage
 
 For a new STM32 Device Catalog session:
 
 ```text
-Read repo handover H015 and AGENTS.md, verify PR #513 final-head CI and current main drift, then continue the Gate 2 transaction.
+Read repo handover H016 and AGENTS.md, verify PR #515 final-head CI and current main drift, then continue the Gate 2 transaction.
 ```
 
 For IC Support Architecture / hardware qualification:
